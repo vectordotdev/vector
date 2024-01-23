@@ -1,9 +1,9 @@
 use std::io;
 
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::lookup_v2::OptionalValuePath;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 
 use crate::{
     config::{Resource, SourceConfig, SourceContext, SourceOutput},
@@ -116,7 +116,7 @@ mod tests {
         SourceSender,
     };
     use futures::StreamExt;
-    use lookup::path;
+    use vector_lib::lookup::path;
     use vrl::value;
 
     #[test]
@@ -142,17 +142,21 @@ mod tests {
             let event = stream.next().await;
             assert_eq!(
                 Some("hello world".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .into_owned())
+                event.map(
+                    |event| event.as_log()[log_schema().message_key().unwrap().to_string()]
+                        .to_string_lossy()
+                        .into_owned()
+                )
             );
 
             let event = stream.next().await;
             assert_eq!(
                 Some("hello world again".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .into_owned())
+                event.map(
+                    |event| event.as_log()[log_schema().message_key().unwrap().to_string()]
+                        .to_string_lossy()
+                        .into_owned()
+                )
             );
 
             let event = stream.next().await;

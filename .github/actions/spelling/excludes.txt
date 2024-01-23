@@ -2,6 +2,10 @@
 (?:^|/)(?i)COPYRIGHT
 (?:^|/)(?i)LICEN[CS]E
 (?:^|/)3rdparty/
+(?:^|/)amplify\.yml$
+(?:^|/)build_preview_sites\.yml$
+(?:^|/)create_preview_sites\.yml$
+(?:^|/)preview_site_trigger\.yml$
 (?:^|/)go\.sum$
 (?:^|/)package(?:-lock|)\.json$
 (?:^|/)Pipfile$
@@ -12,6 +16,7 @@
 \.ai$
 \.all-contributorsrc$
 \.avi$
+\.avro$
 \.bmp$
 \.bz2$
 \.class$
@@ -48,6 +53,7 @@
 \.otf$
 \.p12$
 \.pattern$
+\.pb$
 \.pdf$
 \.pem$
 \.png$
@@ -68,11 +74,17 @@
 \.zst$
 ^\.github/actions/spelling/
 ^\Q.cargo/config.toml\E$
-^\Q.github/workflows/spelling.yml\E$
+^\Q.github/dependabot.yml\E$
 ^\Q.github/workflows/gardener_issue_comment.yml\E$
+^\Q.github/workflows/spelling.yml\E$
 ^\Qbenches/codecs/moby_dick.txt\E$
 ^\Qbenches/dnstap/mod.rs\E$
 ^\Qbenches/transform/route.rs\E$
+^\Qlib/codecs/tests/data/decoding/protobuf/test_protobuf.desc\E$
+^\Qlib/codecs/tests/data/decoding/protobuf/test_protobuf3.desc\E$
+^\Qlib/codecs/tests/data/protobuf/test.desc\E$
+^\Qlib/codecs/tests/data/protobuf/test_protobuf.desc\E$
+^\Qlib/codecs/tests/data/protobuf/test_protobuf3.desc\E$
 ^\Qlib/dnsmsg-parser/benches/benches.rs\E$
 ^\Qlib/dnsmsg-parser/src/dns_message_parser.rs\E$
 ^\Qlib/lookup/tests/fixtures/lookup/quoted\E$

@@ -33,7 +33,6 @@ jobs:
       vector_version: ${{ steps.generate-publish-metadata.outputs.vector_version }}
       vector_build_desc: ${{ steps.generate-publish-metadata.outputs.vector_build_desc }}
       vector_release_channel: ${{ steps.generate-publish-metadata.outputs.vector_release_channel }}
-      vector_cloudsmith_repo: ${{ steps.generate-publish-metadata.outputs.vector_cloudsmith_repo }}
     steps:
       - name: Checkout Vector
         uses: actions/checkout@v3
@@ -290,10 +289,10 @@ jobs:
           - ubuntu:18.04
           - ubuntu:20.04
           - ubuntu:22.04
-          - ubuntu:22.10
           - ubuntu:23.04
           - debian:10
           - debian:11
+          - debian:12
     container:
       image: ${{ matrix.container }}
     steps:
@@ -316,14 +315,9 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
-      - name: First install of DEB package.
+      - name: Verify install of DEB package.
         run: |
-          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
-          ./scripts/verify-install.sh
-      - name: Second install of DEB package.
-        run: |
-          dpkg -i target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
-          ./scripts/verify-install.sh
+          ./scripts/verify-install.sh target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
 
   rpm-verify:
     name: Verify RPM Packages
@@ -340,11 +334,9 @@ jobs:
           - "quay.io/centos/centos:stream9"
           - "amazonlinux:1"
           - "amazonlinux:2"
-          - "fedora:34"
-          - "fedora:35"
-          - "fedora:36"
           - "fedora:37"
           - "fedora:38"
+          - "fedora:39"
     container:
       image: ${{ matrix.container }}
     steps:
@@ -372,14 +364,9 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
-      - name: First install of RPM package.
+      - name: Verify install of RPM package.
         run: |
-          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-          ./scripts/verify-install.sh
-      - name: Second install of RPM package.
-        run: |
-          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-          ./scripts/verify-install.sh
+          ./scripts/verify-install.sh target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
 
   macos-verify:
     name: Verify macOS Package
@@ -425,17 +412,17 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Login to DockerHub
-        uses: docker/login-action@v2.1.0
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2.2.0
+        uses: docker/setup-qemu-action@v3.0.0
         with:
           platforms: all
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.9.1
+        uses: docker/setup-buildx-action@v3.0.0
         with:
           version: latest
           install: true
@@ -563,6 +550,7 @@ jobs:
       - deb-verify
       - rpm-verify
       - macos-verify
+      - generate-sha256sum
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     steps:
@@ -610,6 +598,11 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
+      - name: Download artifact checksums
+        uses: actions/download-artifact@v3
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
+          path: target/artifacts
       - name: Publish release to GitHub
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -635,21 +628,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}
         run: make release-homebrew
 
-  publish-cloudsmith:
-    name: Publish to Cloudsmith
-    # We only publish to CloudSmith for versioned releases, not nightlies.
-    if:  inputs.channel == 'release'
+  generate-sha256sum:
+    name: Generate SHA256 checksums
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
+      - build-x86_64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
+      - build-x86_64-apple-darwin-packages
+      - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
-      - deb-verify
-      - rpm-verify
+      - build-armv7-unknown-linux-musleabihf-packages
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      CLOUDSMITH_REPO: ${{ needs.generate-publish-metadata.outputs.vector_cloudsmith_repo }}
     steps:
       - name: Checkout Vector
         uses: actions/checkout@v3
@@ -660,91 +653,45 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts
+      - name: Download staged package artifacts (aarch64-unknown-linux-musl)
+        uses: actions/download-artifact@v3
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
+          path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
         uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
+          path: target/artifacts
+      - name: Download staged package artifacts (x86_64-unknown-linux-musl)
+        uses: actions/download-artifact@v3
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
+          path: target/artifacts
+      - name: Download staged package artifacts (x86_64-apple-darwin)
+        uses: actions/download-artifact@v3
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+          path: target/artifacts
+      - name: Download staged package artifacts (x86_64-pc-windows-msvc)
+        uses: actions/download-artifact@v3
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
         uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
           path: target/artifacts
-      - name: Push amd64 deb
-        id: push-deb-amd64
-        uses: cloudsmith-io/action@v0.5.3
+      - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
+        uses: actions/download-artifact@v3
         with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "deb"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb"
-      - name: Push arm64 deb
-        id: push-deb-arm64
-        uses: cloudsmith-io/action@v0.5.3
+          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
+          path: target/artifacts
+      - name: Generate SHA256 checksums for artifacts
+        run: make sha256sum
+      - name: Stage checksum for publish
+        uses: actions/upload-artifact@v3
         with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "deb"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_arm64.deb"
-      - name: Push armhf deb
-        id: push-deb-armhf
-        uses: cloudsmith-io/action@v0.5.3
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "deb"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_armhf.deb"
-      - name: Push x86_64 RPM
-        id: push-rpm-x86_64
-        uses: cloudsmith-io/action@v0.5.3
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "rpm"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
-      - name: Push aarch64 RPM
-        id: push-rpm-aarch64
-        uses: cloudsmith-io/action@v0.5.3
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "rpm"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
-      - name: Push armv7-gnu RPM
-        id: push-rpm-armv7-gnu
-        uses: cloudsmith-io/action@v0.5.3
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "rpm"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
+          name: vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
+          path: target/artifacts/vector-${{ env.VECTOR_VERSION }}-SHA256SUMS

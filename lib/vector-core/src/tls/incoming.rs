@@ -32,7 +32,7 @@ impl TlsSettings {
             Some(_) => {
                 let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls())
                     .context(CreateAcceptorSnafu)?;
-                self.apply_context(&mut acceptor)?;
+                self.apply_context_base(&mut acceptor, true)?;
                 Ok(acceptor.build())
             }
         }
@@ -263,7 +263,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
     where
         F: FnOnce(Pin<&mut MaybeTlsStream<TcpStream>>, &mut Context) -> Poll<io::Result<T>>,
     {
-        let mut this = self.get_mut();
+        let this = self.get_mut();
         loop {
             return match &mut this.state {
                 StreamState::Accepted(stream) => poll_fn(Pin::new(stream), cx),
@@ -307,7 +307,7 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
-        let mut this = self.get_mut();
+        let this = self.get_mut();
         match &mut this.state {
             StreamState::Accepted(stream) => match Pin::new(stream).poll_shutdown(cx) {
                 Poll::Ready(Ok(())) => {

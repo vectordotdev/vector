@@ -7,7 +7,7 @@ use std::{
 };
 
 use metrics::gauge;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct ConnectionOpen {

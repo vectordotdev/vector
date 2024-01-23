@@ -4,7 +4,7 @@ pub use self::component_spec::ComponentSpecValidator;
 
 use std::fmt::{Display, Formatter};
 
-use vector_core::event::Event;
+use vector_lib::event::Event;
 
 use super::{ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent};
 

@@ -6,16 +6,16 @@ use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
 use tower::Service;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::Region;
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue},
-        Event,
+        Event, KeyString,
     },
     http::HttpClient,
     internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
@@ -85,7 +85,7 @@ pub struct SematextMetricsConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -166,10 +166,7 @@ impl SematextMetricsService {
         client: HttpClient,
     ) -> Result<VectorSink> {
         let batch = config.batch.into_batch_settings()?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
-            ..Default::default()
-        });
+        let request = config.request.into_settings();
         let http_service = HttpBatchService::new(client, create_build_request(endpoint));
         let sematext_service = SematextMetricsService {
             config,
@@ -299,9 +296,9 @@ fn encode_events(
     EncodedEvent::new(output.freeze(), byte_size, json_byte_size)
 }
 
-fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
+fn to_fields(label: String, value: f64) -> HashMap<KeyString, Field> {
     let mut result = HashMap::new();
-    result.insert(label, Field::Float(value));
+    result.insert(label.into(), Field::Float(value));
     result
 }
 
@@ -310,7 +307,7 @@ mod tests {
     use chrono::{offset::TimeZone, Timelike, Utc};
     use futures::StreamExt;
     use indoc::indoc;
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::{

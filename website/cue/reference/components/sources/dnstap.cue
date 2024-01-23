@@ -1169,8 +1169,4 @@ components: sources: dnstap: {
 				"""
 		}
 	}
-
-	telemetry: metrics: {
-		parse_errors_total: components.sources.internal_metrics.output.metrics.parse_errors_total
-	}
 }

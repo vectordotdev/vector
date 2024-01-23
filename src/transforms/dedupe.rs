@@ -3,8 +3,10 @@ use std::{future::ready, num::NonZeroUsize, pin::Pin};
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
-use vector_config::configurable_component;
-use vector_core::config::{clone_input_definitions, LogNamespace};
+use vector_lib::config::{clone_input_definitions, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::ConfigTargetPath;
+use vrl::path::OwnedTargetPath;
 
 use crate::{
     config::{
@@ -43,7 +45,7 @@ pub enum FieldMatchConfig {
             docs::examples = "field1",
             docs::examples = "parent.child_field"
         ))]
-        Vec<String>,
+        Vec<ConfigTargetPath>,
     ),
 
     /// Matches events using all fields except for the ignored ones.
@@ -55,7 +57,7 @@ pub enum FieldMatchConfig {
             docs::examples = "host",
             docs::examples = "hostname"
         ))]
-        Vec<String>,
+        Vec<ConfigTargetPath>,
     ),
 }
 
@@ -102,13 +104,16 @@ fn default_cache_config() -> CacheConfig {
 //   These aren't great defaults in that case, but hard-coding isn't much better since the
 //   structure can vary significantly. This should probably either become a required field
 //   in the future, or maybe the "semantic meaning" can be utilized here.
-fn default_match_fields() -> Vec<String> {
-    let mut fields = vec![log_schema().message_key().into()];
-    if let Some(host_key) = log_schema().host_key() {
-        fields.push(host_key.to_string());
+fn default_match_fields() -> Vec<ConfigTargetPath> {
+    let mut fields = Vec::new();
+    if let Some(message_key) = log_schema().message_key_target_path() {
+        fields.push(ConfigTargetPath(message_key.clone()));
     }
-    if let Some(timestamp_key) = log_schema().timestamp_key() {
-        fields.push(timestamp_key.to_string());
+    if let Some(host_key) = log_schema().host_key_target_path() {
+        fields.push(ConfigTargetPath(host_key.clone()));
+    }
+    if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+        fields.push(ConfigTargetPath(timestamp_key.clone()));
     }
     fields
 }
@@ -155,7 +160,7 @@ impl TransformConfig for DedupeConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -194,7 +199,7 @@ type TypeId = u8;
 #[derive(PartialEq, Eq, Hash)]
 enum CacheEntry {
     Match(Vec<Option<(TypeId, Bytes)>>),
-    Ignore(Vec<(String, TypeId, Bytes)>),
+    Ignore(Vec<(OwnedTargetPath, TypeId, Bytes)>),
 }
 
 /// Assigns a unique number to each of the types supported by Event::Value.
@@ -241,7 +246,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
         FieldMatchConfig::MatchFields(fields) => {
             let mut entry = Vec::new();
             for field_name in fields.iter() {
-                if let Some(value) = event.as_log().get(field_name.as_str()) {
+                if let Some(value) = event.as_log().get(field_name) {
                     entry.push(Some((type_id_for_value(value), value.coerce_to_bytes())));
                 } else {
                     entry.push(None);
@@ -252,14 +257,18 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
         FieldMatchConfig::IgnoreFields(fields) => {
             let mut entry = Vec::new();
 
-            if let Some(all_fields) = event.as_log().all_fields() {
-                for (field_name, value) in all_fields {
-                    if !fields.contains(&field_name) {
-                        entry.push((
-                            field_name,
-                            type_id_for_value(value),
-                            value.coerce_to_bytes(),
-                        ));
+            if let Some(event_fields) = event.as_log().all_event_fields() {
+                if let Some(metadata_fields) = event.as_log().all_metadata_fields() {
+                    for (field_name, value) in event_fields.chain(metadata_fields) {
+                        if let Ok(path) = ConfigTargetPath::try_from(field_name) {
+                            if !fields.contains(&path) {
+                                entry.push((
+                                    path.0,
+                                    type_id_for_value(value),
+                                    value.coerce_to_bytes(),
+                                ));
+                            }
+                        }
                     }
                 }
             }
@@ -284,16 +293,17 @@ impl TaskTransform<Event> for Dedupe {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeMap, sync::Arc};
+    use std::sync::Arc;
 
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
-    use vector_core::config::OutputId;
+    use vector_lib::config::ComponentKey;
+    use vector_lib::config::OutputId;
+    use vector_lib::lookup::lookup_v2::ConfigTargetPath;
 
     use crate::config::schema::Definition;
     use crate::{
-        event::{Event, LogEvent, Value},
+        event::{Event, LogEvent, ObjectMap, Value},
         test_util::components::assert_transform_compliance,
         transforms::{
             dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig},
@@ -306,7 +316,10 @@ mod tests {
         crate::test_util::test_generate_config::<DedupeConfig>();
     }
 
-    fn make_match_transform_config(num_events: usize, fields: Vec<String>) -> DedupeConfig {
+    fn make_match_transform_config(
+        num_events: usize,
+        fields: Vec<ConfigTargetPath>,
+    ) -> DedupeConfig {
         DedupeConfig {
             cache: CacheConfig {
                 num_events: std::num::NonZeroUsize::new(num_events).expect("non-zero num_events"),
@@ -315,7 +328,10 @@ mod tests {
         }
     }
 
-    fn make_ignore_transform_config(num_events: usize, given_fields: Vec<String>) -> DedupeConfig {
+    fn make_ignore_transform_config(
+        num_events: usize,
+        given_fields: Vec<ConfigTargetPath>,
+    ) -> DedupeConfig {
         // "message" and "timestamp" are added automatically to all Events
         let mut fields = vec!["message".into(), "timestamp".into()];
         fields.extend(given_fields);
@@ -331,34 +347,40 @@ mod tests {
     #[tokio::test]
     async fn dedupe_match_basic() {
         let transform_config = make_match_transform_config(5, vec!["matched".into()]);
-        basic(transform_config).await;
+        basic(transform_config, "matched", "unmatched").await;
     }
 
     #[tokio::test]
     async fn dedupe_ignore_basic() {
         let transform_config = make_ignore_transform_config(5, vec!["unmatched".into()]);
-        basic(transform_config).await;
+        basic(transform_config, "matched", "unmatched").await;
     }
 
-    async fn basic(transform_config: DedupeConfig) {
+    #[tokio::test]
+    async fn dedupe_ignore_with_metadata_field() {
+        let transform_config = make_ignore_transform_config(5, vec!["%ignored".into()]);
+        basic(transform_config, "matched", "%ignored").await;
+    }
+
+    async fn basic(transform_config: DedupeConfig, first_path: &str, second_path: &str) {
         assert_transform_compliance(async {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", "some value");
-            event1.as_mut_log().insert("unmatched", "another value");
+            event1.as_mut_log().insert(first_path, "some value");
+            event1.as_mut_log().insert(second_path, "another value");
 
             // Test that unmatched field isn't considered
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched", "some value2");
-            event2.as_mut_log().insert("unmatched", "another value");
+            event2.as_mut_log().insert(first_path, "some value2");
+            event2.as_mut_log().insert(second_path, "another value");
 
             // Test that matched field is considered
             let mut event3 = Event::Log(LogEvent::from("message"));
-            event3.as_mut_log().insert("matched", "some value");
-            event3.as_mut_log().insert("unmatched", "another value2");
+            event3.as_mut_log().insert(first_path, "some value");
+            event3.as_mut_log().insert(second_path, "another value2");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
@@ -655,12 +677,12 @@ mod tests {
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
-            let mut map1: BTreeMap<String, Value> = BTreeMap::new();
+            let mut map1 = ObjectMap::new();
             map1.insert("key".into(), "123".into());
             let mut event1 = Event::Log(LogEvent::from("message"));
             event1.as_mut_log().insert("matched", map1);
 
-            let mut map2: BTreeMap<String, Value> = BTreeMap::new();
+            let mut map2 = ObjectMap::new();
             map2.insert("key".into(), 123.into());
             let mut event2 = Event::Log(LogEvent::from("message"));
             event2.as_mut_log().insert("matched", map2);

@@ -1,26 +1,33 @@
-use std::net::SocketAddr;
+use std::time::Duration;
+use std::{convert::Infallible, net::SocketAddr};
 
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::StatusCode;
-use opentelemetry_proto::proto::collector::logs::v1::{
-    ExportLogsServiceRequest, ExportLogsServiceResponse,
-};
+use hyper::{service::make_service_fn, Server};
 use prost::Message;
 use snafu::Snafu;
+use tokio::net::TcpStream;
+use tower::ServiceBuilder;
 use tracing::Span;
-use vector_common::internal_event::{
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
 };
-use vector_core::{
+use vector_lib::opentelemetry::proto::collector::logs::v1::{
+    ExportLogsServiceRequest, ExportLogsServiceResponse,
+};
+use vector_lib::tls::MaybeTlsIncomingStream;
+use vector_lib::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus},
     EstimatedJsonEncodedSizeOf,
 };
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
+use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     event::Event,
+    http::build_http_trace_layer,
     internal_events::{EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::util::{decode, ErrorMessage},
@@ -43,18 +50,32 @@ pub(crate) async fn run_http_server(
     tls_settings: MaybeTlsSettings,
     filters: BoxedFilter<(Response,)>,
     shutdown: ShutdownSignal,
+    keepalive_settings: KeepaliveConfig,
 ) -> crate::Result<()> {
-    let span = Span::current();
     let listener = tls_settings.bind(&address).await?;
-    let routes = filters
-        .with(warp::trace(move |_info| span.clone()))
-        .recover(handle_rejection);
+    let routes = filters.recover(handle_rejection);
 
     info!(message = "Building HTTP server.", address = %address);
 
-    warp::serve(routes)
-        .serve_incoming_with_graceful_shutdown(listener.accept_stream(), shutdown.map(|_| ()))
-        .await;
+    let span = Span::current();
+    let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+        let svc = ServiceBuilder::new()
+            .layer(build_http_trace_layer(span.clone()))
+            .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                MaxConnectionAgeLayer::new(
+                    Duration::from_secs(secs),
+                    keepalive_settings.max_connection_age_jitter_factor,
+                    conn.peer_addr(),
+                )
+            }))
+            .service(warp::service(routes.clone()));
+        futures_util::future::ok::<_, Infallible>(svc)
+    });
+
+    Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+        .serve(make_svc)
+        .with_graceful_shutdown(shutdown.map(|_| ()))
+        .await?;
 
     Ok(())
 }
@@ -75,7 +96,7 @@ pub(crate) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::body::bytes())
         .and_then(move |encoding_header: Option<String>, body: Bytes| {
-            let events = decode(&encoding_header, body).and_then(|body| {
+            let events = decode(encoding_header.as_deref(), body).and_then(|body| {
                 bytes_received.emit(ByteSize(body.len()));
                 decode_body(body, log_namespace, &events_received)
             });
@@ -128,11 +149,15 @@ async fn handle_request(
             })?;
 
             match receiver {
-                None => Ok(protobuf(ExportLogsServiceResponse {}).into_response()),
+                None => Ok(protobuf(ExportLogsServiceResponse {
+                    partial_success: None,
+                })
+                .into_response()),
                 Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => {
-                        Ok(protobuf(ExportLogsServiceResponse {}).into_response())
-                    }
+                    BatchStatus::Delivered => Ok(protobuf(ExportLogsServiceResponse {
+                        partial_success: None,
+                    })
+                    .into_response()),
                     BatchStatus::Errored => Err(warp::reject::custom(Status {
                         code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
                         message: "Error delivering contents to sink".into(),

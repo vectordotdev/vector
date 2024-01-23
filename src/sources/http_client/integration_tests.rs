@@ -15,11 +15,11 @@ use crate::{
     tls::TlsConfig,
     SourceSender,
 };
-use codecs::decoding::DeserializerConfig;
-use vector_core::config::log_schema;
+use vector_lib::codecs::decoding::DeserializerConfig;
+use vector_lib::config::log_schema;
 
 use super::{
-    tests::{run_compliance, INTERVAL},
+    tests::{run_compliance, INTERVAL, TIMEOUT},
     HttpClientConfig,
 };
 
@@ -53,6 +53,7 @@ async fn invalid_endpoint() {
     run_error(HttpClientConfig {
         endpoint: "http://nope".to_string(),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: default_decoding(),
         framing: default_framing_message_based(),
@@ -71,6 +72,7 @@ async fn collected_logs_bytes() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/bytes", dufs_address()),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::Bytes,
         framing: default_framing_message_based(),
@@ -84,7 +86,7 @@ async fn collected_logs_bytes() {
     // panics if not log event
     let log = events[0].as_log();
     assert_eq!(
-        log[log_schema().source_type_key().unwrap().to_string()],
+        *log.get_source_type().unwrap(),
         HttpClientConfig::NAME.into()
     );
 }
@@ -95,6 +97,7 @@ async fn collected_logs_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_address()),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
@@ -108,7 +111,7 @@ async fn collected_logs_json() {
     // panics if not log event
     let log = events[0].as_log();
     assert_eq!(
-        log[log_schema().source_type_key().unwrap().to_string()],
+        *log.get_source_type().unwrap(),
         HttpClientConfig::NAME.into()
     );
 }
@@ -119,6 +122,7 @@ async fn collected_metrics_native_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/metrics/native.json", dufs_address()),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::NativeJson(Default::default()),
         framing: default_framing_message_based(),
@@ -148,6 +152,7 @@ async fn collected_trace_native_json() {
     let events = run_compliance(HttpClientConfig {
         endpoint: format!("{}/traces/native.json", dufs_address()),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::NativeJson(Default::default()),
         framing: default_framing_message_based(),
@@ -172,6 +177,7 @@ async fn unauthorized_no_auth() {
     run_error(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
@@ -190,6 +196,7 @@ async fn unauthorized_wrong_auth() {
     run_error(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
@@ -211,6 +218,7 @@ async fn authorized() {
     run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_auth_address()),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
@@ -232,6 +240,7 @@ async fn tls_invalid_ca() {
     run_error(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_https_address()),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
@@ -253,6 +262,7 @@ async fn tls_valid() {
     run_compliance(HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_https_address()),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),
@@ -275,6 +285,7 @@ async fn shutdown() {
     let source = HttpClientConfig {
         endpoint: format!("{}/logs/json.json", dufs_address()),
         interval: INTERVAL,
+        timeout: TIMEOUT,
         query: HashMap::new(),
         decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),

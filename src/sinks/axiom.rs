@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
-        elasticsearch::{ElasticsearchApiVersion, ElasticsearchAuth, ElasticsearchConfig},
+        elasticsearch::{ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchConfig},
         util::{http::RequestConfig, Compression},
         Healthcheck, VectorSink,
     },
@@ -59,7 +59,7 @@ pub struct AxiomConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -95,7 +95,7 @@ impl SinkConfig for AxiomConfig {
         let elasticsearch_config = ElasticsearchConfig {
             endpoints: vec![self.build_endpoint()],
             compression: self.compression,
-            auth: Some(ElasticsearchAuth::Basic {
+            auth: Some(ElasticsearchAuthConfig::Basic {
                 user: "axiom".to_string(),
                 password: self.token.clone(),
             }),
@@ -145,7 +145,7 @@ mod integration_tests {
     use futures::stream;
     use serde::{Deserialize, Serialize};
     use std::env;
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
     use crate::{

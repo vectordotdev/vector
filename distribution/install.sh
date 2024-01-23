@@ -12,7 +12,8 @@ set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
-VECTOR_VERSION="0.31.0"
+# If VECTOR_VERSION is unset or empty, default it.
+VECTOR_VERSION="${VECTOR_VERSION:-"0.35.0"}"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -216,7 +217,7 @@ install_from_archive() {
     printf " ✓\n"
 
     if [ "$modify_path" = "yes" ]; then
-      local _path="export PATH=$PATH:$prefix/bin"
+      local _path="export PATH=\"$PATH:$prefix/bin\""
       add_to_path "${HOME}/.zprofile" "${_path}"
       add_to_path "${HOME}/.profile" "${_path}"
     fi
@@ -224,7 +225,7 @@ install_from_archive() {
     printf "%s Install succeeded! 🚀\n" "$_prompt"
     printf "%s To start Vector:\n" "$_prompt"
     printf "\n"
-    printf "%s vector --config $prefix/config/vector.toml\n" "$_indent"
+    printf "%s vector --config $prefix/config/vector.yaml\n" "$_indent"
     printf "\n"
     printf "%s More information at https://vector.dev/docs/\n" "$_prompt"
 

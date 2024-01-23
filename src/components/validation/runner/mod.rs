@@ -17,14 +17,16 @@ use tokio::{
 };
 use tokio_util::codec::Encoder as _;
 
-use codecs::encoding;
-use vector_core::{config::LogNamespace, event::Event, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    codecs::encoding, config::LogNamespace, event::Event, EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::Encoder,
     components::validation::{RunnerMetrics, TestCase},
-    config::{ConfigBuilder, ConfigDiff},
-    topology,
+    config::ConfigBuilder,
+    extra_context::ExtraContext,
+    topology::RunningTopology,
 };
 
 use super::{
@@ -153,17 +155,20 @@ pub struct Runner {
     configuration: ValidationConfiguration,
     test_case_data_path: PathBuf,
     validators: HashMap<String, Box<dyn Validator>>,
+    extra_context: ExtraContext,
 }
 
 impl Runner {
     pub fn from_configuration(
         configuration: ValidationConfiguration,
         test_case_data_path: PathBuf,
+        extra_context: ExtraContext,
     ) -> Self {
         Self {
             configuration,
             test_case_data_path,
             validators: HashMap::new(),
+            extra_context,
         }
     }
 
@@ -190,7 +195,7 @@ impl Runner {
         }
     }
 
-    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, String> {
+    pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_lib::Error> {
         // Initialize our test environment.
         initialize_test_environment();
 
@@ -229,7 +234,7 @@ impl Runner {
                 )
                 .await;
 
-            debug!("Component topology configuration built and telemetry collector spawned.");
+            info!("Component topology configuration built and telemetry collector spawned.");
 
             // Create the data structure that the input and output runners will use to store
             // their received/sent metrics. This is then shared with the Validator for comparison
@@ -251,27 +256,31 @@ impl Runner {
                 &input_task_coordinator,
                 &output_task_coordinator,
                 &runner_metrics,
-            );
+            )?;
             let input_tx = runner_input.into_sender(controlled_edges.input);
             let output_rx = runner_output.into_receiver(controlled_edges.output);
-            debug!("External resource (if any) and controlled edges built and spawned.");
+            info!("External resource (if any) and controlled edges built and spawned.");
 
             // Now with any external resource spawned, as well as any tasks for handling controlled
             // edges, we'll wait for all of those tasks to report that they're ready to go and
             // listening, etc.
             let input_task_coordinator = input_task_coordinator.started().await;
-            debug!("All input task(s) started.");
+            info!("All input task(s) started.");
 
             let telemetry_task_coordinator = telemetry_task_coordinator.started().await;
-            debug!("All telemetry task(s) started.");
+            info!("All telemetry task(s) started.");
 
             let output_task_coordinator = output_task_coordinator.started().await;
-            debug!("All output task(s) started.");
+            info!("All output task(s) started.");
 
             // At this point, we need to actually spawn the configured component topology so that it
             // runs, and make sure we have a way to tell it when to shutdown so that we can properly
             // sequence the test in terms of sending inputs, waiting for outputs, etc.
-            spawn_component_topology(config_builder, &topology_task_coordinator);
+            spawn_component_topology(
+                config_builder,
+                &topology_task_coordinator,
+                self.extra_context.clone(),
+            );
             let topology_task_coordinator = topology_task_coordinator.started().await;
 
             // Now we'll spawn two tasks: one for sending inputs, and one for collecting outputs.
@@ -333,7 +342,7 @@ impl Runner {
                 .expect("input driver task should not have panicked");
 
             input_task_coordinator.shutdown().await;
-            debug!("Input task(s) have been shutdown.");
+            info!("Input task(s) have been shutdown.");
 
             // Without this, not all internal metric events are received for sink components under test.
             // TODO: This is awful and needs a proper solution.
@@ -344,19 +353,20 @@ impl Runner {
             }
 
             telemetry_task_coordinator.shutdown().await;
-            debug!("Telemetry task(s) have been shutdown.");
+            info!("Telemetry task(s) have been shutdown.");
 
             topology_task_coordinator.shutdown().await;
-            debug!("Component topology task has been shutdown.");
+            info!("Component topology task has been shutdown.");
 
             output_task_coordinator.shutdown().await;
-            debug!("Output task(s) have been shutdown.");
+            info!("Output task(s) have been shutdown.");
 
             let output_events = output_driver
                 .await
                 .expect("output driver task should not have panicked");
 
-            debug!("Collected runner metrics: {:?}", runner_metrics);
+            info!("Collected runner metrics: {:?}", runner_metrics);
+            let final_runner_metrics = runner_metrics.lock().await;
 
             // Run the relevant data -- inputs, outputs, telemetry, etc -- through each validator to
             // get the validation results for this test.
@@ -366,8 +376,6 @@ impl Runner {
                 events: input_events,
             } = test_case;
             let telemetry_events = telemetry_collector.collect().await;
-
-            let final_runner_metrics = runner_metrics.lock().await;
 
             let validator_results = self
                 .validators
@@ -438,7 +446,7 @@ fn build_external_resource(
     input_task_coordinator: &TaskCoordinator<Configuring>,
     output_task_coordinator: &TaskCoordinator<Configuring>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
-) -> (RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>) {
+) -> Result<(RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>), vector_lib::Error> {
     let component_type = configuration.component_type();
     let maybe_external_resource = configuration.external_resource();
     let maybe_encoder = maybe_external_resource
@@ -455,15 +463,15 @@ fn build_external_resource(
                 maybe_external_resource.expect("a source must always have an external resource");
             resource.spawn_as_input(rx, input_task_coordinator, runner_metrics);
 
-            (
+            Ok((
                 RunnerInput::External(tx),
                 RunnerOutput::Controlled,
                 maybe_encoder,
-            )
+            ))
         }
         ComponentType::Transform => {
             // Transforms have no external resources.
-            (RunnerInput::Controlled, RunnerOutput::Controlled, None)
+            Ok((RunnerInput::Controlled, RunnerOutput::Controlled, None))
         }
         ComponentType::Sink => {
             // As an external resource for a sink, we create a channel that the validation runner
@@ -473,13 +481,13 @@ fn build_external_resource(
             let (tx, rx) = mpsc::channel(1024);
             let resource =
                 maybe_external_resource.expect("a sink must always have an external resource");
-            resource.spawn_as_output(tx, output_task_coordinator, runner_metrics);
+            resource.spawn_as_output(tx, output_task_coordinator, runner_metrics)?;
 
-            (
+            Ok((
                 RunnerInput::Controlled,
                 RunnerOutput::External(rx),
                 maybe_encoder,
-            )
+            ))
         }
     }
 }
@@ -487,6 +495,7 @@ fn build_external_resource(
 fn spawn_component_topology(
     config_builder: ConfigBuilder,
     topology_task_coordinator: &TaskCoordinator<Configuring>,
+    extra_context: ExtraContext,
 ) {
     let topology_started = topology_task_coordinator.track_started();
     let topology_completed = topology_task_coordinator.track_completed();
@@ -496,7 +505,6 @@ fn spawn_component_topology(
         .build()
         .expect("config should not have any errors");
     config.healthchecks.set_require_healthy(Some(true));
-    let config_diff = ConfigDiff::initial(&config);
 
     _ = std::thread::spawn(move || {
         let test_runtime = Builder::new_current_thread()
@@ -505,25 +513,22 @@ fn spawn_component_topology(
             .expect("should not fail to build current-thread runtime");
 
         test_runtime.block_on(async move {
-            debug!("Building component topology...");
+            info!("Building component topology...");
 
-            let pieces = topology::build_or_log_errors(&config, &config_diff, HashMap::new())
-                .await
-                .unwrap();
-            let (topology, (_, mut crash_rx)) =
-                topology::start_validated(config, config_diff, pieces)
+            let (topology, mut crash_rx) =
+                RunningTopology::start_init_validated(config, extra_context)
                     .await
                     .unwrap();
 
-            debug!("Component topology built and spawned.");
+            info!("Component topology built and spawned.");
             topology_started.mark_as_done();
 
             select! {
                 // We got the signal to shutdown, so stop the topology gracefully.
                 _ = topology_shutdown_handle.wait() => {
-                    debug!("Shutdown signal received, stopping topology...");
+                    info!("Shutdown signal received, stopping topology...");
                     topology.stop().await;
-                    debug!("Component topology stopped gracefully.")
+                    info!("Component topology stopped gracefully.")
                 },
                 _ = crash_rx.recv() => {
                     error!("Component topology under validation unexpectedly crashed.");

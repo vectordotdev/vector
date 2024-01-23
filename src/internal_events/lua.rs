@@ -1,11 +1,8 @@
 use metrics::{counter, gauge};
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
-use crate::emit;
 use crate::transforms::lua::v2::BuildError;
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
-};
 
 #[derive(Debug)]
 pub struct LuaGcTriggered {
@@ -82,7 +79,6 @@ const fn mlua_error_code(err: &mlua::Error) -> &'static str {
         MemoryError(_) => "memory_error",
         SafetyError(_) => "memory_safety_error",
         MemoryLimitNotAvailable => "memory_limit_not_available",
-        MainThreadNotAvailable => "main_thread_not_available",
         RecursiveMutCallback => "mutable_callback_called_recursively",
         CallbackDestructed => "callback_destructed",
         StackError => "out_of_stack",

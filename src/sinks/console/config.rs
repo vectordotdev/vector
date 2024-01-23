@@ -1,10 +1,10 @@
-use codecs::{
+use futures::{future, FutureExt};
+use tokio::io;
+use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     JsonSerializerConfig,
 };
-use futures::{future, FutureExt};
-use tokio::io;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
@@ -51,7 +51,7 @@ pub struct ConsoleSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }

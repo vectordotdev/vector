@@ -25,8 +25,8 @@ use serde::Deserialize;
 use snafu::Snafu;
 use tokio::time::{self, sleep, Duration, Instant};
 use tower::Service;
-use vector_common::json_size::JsonSize;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::json_size::JsonSize;
 
 use super::controller::ControllerStatistics;
 use crate::{
@@ -35,8 +35,8 @@ use crate::{
     metrics,
     sinks::{
         util::{
-            retries::RetryLogic, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
-            TowerRequestConfig, VecBuffer,
+            retries::{JitterMode, RetryLogic},
+            BatchSettings, Concurrency, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
     },
@@ -178,7 +178,7 @@ impl SinkConfig for TestConfig {
         batch_settings.size.events = 1;
         batch_settings.timeout = Duration::from_secs(9999);
 
-        let request = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request = self.request.into_settings();
         let sink = request
             .batch_sink(
                 TestRetryLogic,
@@ -393,7 +393,7 @@ impl Statistics {
     /// number of requests per second.
     fn prune_old_requests(&mut self, now: Instant) {
         let then = now - Duration::from_secs(1);
-        while let Some(&first) = self.requests.get(0) {
+        while let Some(&first) = self.requests.front() {
             if first > then {
                 break;
             }
@@ -415,8 +415,9 @@ async fn run_test(params: TestParams) -> TestResults {
     let test_config = TestConfig {
         request: TowerRequestConfig {
             concurrency: params.concurrency,
-            rate_limit_num: Some(9999),
-            timeout_secs: Some(1),
+            rate_limit_num: 9999,
+            timeout_secs: 1,
+            retry_jitter_mode: JitterMode::None,
             ..Default::default()
         },
         params,

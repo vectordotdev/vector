@@ -3,15 +3,18 @@
 
 #![deny(missing_docs)]
 
+mod avro;
 mod bytes;
 mod gelf;
 mod json;
 mod native;
 mod native_json;
+mod protobuf;
 #[cfg(feature = "syslog")]
 mod syslog;
 
 use ::bytes::Bytes;
+pub use avro::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
 use dyn_clone::DynClone;
 pub use gelf::{GelfDeserializer, GelfDeserializerConfig, GelfDeserializerOptions};
 pub use json::{JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions};
@@ -19,6 +22,7 @@ pub use native::{NativeDeserializer, NativeDeserializerConfig};
 pub use native_json::{
     NativeJsonDeserializer, NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,
 };
+pub use protobuf::{ProtobufDeserializer, ProtobufDeserializerConfig, ProtobufDeserializerOptions};
 use smallvec::SmallVec;
 #[cfg(feature = "syslog")]
 pub use syslog::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};

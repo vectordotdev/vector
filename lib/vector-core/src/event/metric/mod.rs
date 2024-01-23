@@ -12,21 +12,19 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use vector_common::{
-    internal_event::OptionalTag,
+    byte_size_of::ByteSizeOf,
+    internal_event::{OptionalTag, TaggedEventsSent},
     json_size::JsonSize,
-    request_metadata::{EventCountTags, GetEventCountTags},
+    request_metadata::GetEventCountTags,
     EventDataEq,
 };
 use vector_config::configurable_component;
 
-use crate::{
-    config::telemetry,
-    event::{
-        estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
-        EventFinalizers, EventMetadata, Finalizable,
-    },
-    ByteSizeOf,
+use super::{
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
+    EventFinalizers, EventMetadata, Finalizable,
 };
+use crate::config::telemetry;
 
 #[cfg(any(test, feature = "test"))]
 mod arbitrary;
@@ -483,7 +481,7 @@ impl Finalizable for Metric {
 }
 
 impl GetEventCountTags for Metric {
-    fn get_tags(&self) -> EventCountTags {
+    fn get_tags(&self) -> TaggedEventsSent {
         let source = if telemetry().tags().emit_source {
             self.metadata().source_id().cloned().into()
         } else {
@@ -500,7 +498,7 @@ impl GetEventCountTags for Metric {
             OptionalTag::Ignored
         };
 
-        EventCountTags { source, service }
+        TaggedEventsSent { source, service }
     }
 }
 
@@ -578,7 +576,7 @@ pub(crate) fn zip_samples(
 ) -> Vec<Sample> {
     values
         .into_iter()
-        .zip(rates.into_iter())
+        .zip(rates)
         .map(|(value, rate)| Sample { value, rate })
         .collect()
 }
@@ -590,7 +588,7 @@ pub(crate) fn zip_buckets(
 ) -> Vec<Bucket> {
     limits
         .into_iter()
-        .zip(counts.into_iter())
+        .zip(counts)
         .map(|(upper_limit, count)| Bucket { upper_limit, count })
         .collect()
 }
@@ -602,7 +600,7 @@ pub(crate) fn zip_quantiles(
 ) -> Vec<Quantile> {
     quantiles
         .into_iter()
-        .zip(values.into_iter())
+        .zip(values)
         .map(|(quantile, value)| Quantile { quantile, value })
         .collect()
 }
@@ -941,7 +939,7 @@ mod test {
                 )
                 .with_namespace(Some("vector"))
             ),
-            r#"vector_namespace{} = 1.23"#
+            r"vector_namespace{} = 1.23"
         );
 
         assert_eq!(
@@ -982,7 +980,7 @@ mod test {
                     }
                 )
             ),
-            r#"four{} = histogram 3@1 4@2"#
+            r"four{} = histogram 3@1 4@2"
         );
 
         assert_eq!(
@@ -998,7 +996,7 @@ mod test {
                     }
                 )
             ),
-            r#"five{} = count=107 sum=103 53@51 54@52"#
+            r"five{} = count=107 sum=103 53@51 54@52"
         );
 
         assert_eq!(
@@ -1014,7 +1012,7 @@ mod test {
                     }
                 )
             ),
-            r#"six{} = count=2 sum=127 1@63 2@64"#
+            r"six{} = count=2 sum=127 1@63 2@64"
         );
     }
 

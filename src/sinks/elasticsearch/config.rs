@@ -4,10 +4,9 @@ use std::{
 };
 
 use futures::{FutureExt, TryFutureExt};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
-    aws::RegionOrEndpoint,
     codecs::Transformer,
     config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
@@ -19,12 +18,12 @@ use crate::{
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
-            ElasticsearchApiVersion, ElasticsearchAuth, ElasticsearchCommon,
+            ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchCommon,
             ElasticsearchCommonMode, ElasticsearchMode,
         },
         util::{
             http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
-            RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
+            RealtimeSizeBasedDefaultBatchSettings,
         },
         Healthcheck, VectorSink,
     },
@@ -32,8 +31,9 @@ use crate::{
     tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
-use lookup::event_path;
-use vector_core::schema::Requirement;
+use vector_lib::lookup::event_path;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use vector_lib::schema::Requirement;
 use vrl::value::Kind;
 
 /// The field name for the timestamp required by data stream mode
@@ -108,7 +108,7 @@ pub struct ElasticsearchConfig {
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "id"))]
     #[configurable(metadata(docs::examples = "_id"))]
-    pub id_key: Option<String>,
+    pub id_key: Option<ConfigValuePath>,
 
     /// The name of the pipeline to apply.
     #[serde(default)]
@@ -124,10 +124,7 @@ pub struct ElasticsearchConfig {
     #[configurable(derived)]
     pub compression: Compression,
 
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     pub encoding: Transformer,
@@ -141,7 +138,7 @@ pub struct ElasticsearchConfig {
     pub request: RequestConfig,
 
     #[configurable(derived)]
-    pub auth: Option<ElasticsearchAuth>,
+    pub auth: Option<ElasticsearchAuthConfig>,
 
     /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
     #[serde(default)]
@@ -152,7 +149,8 @@ pub struct ElasticsearchConfig {
 
     #[serde(default)]
     #[configurable(derived)]
-    pub aws: Option<RegionOrEndpoint>,
+    #[cfg(feature = "aws-core")]
+    pub aws: Option<crate::aws::RegionOrEndpoint>,
 
     #[serde(default)]
     #[configurable(derived)]
@@ -182,7 +180,7 @@ pub struct ElasticsearchConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     #[configurable(derived)]
     pub acknowledgements: AcknowledgementsConfig,
@@ -193,7 +191,7 @@ fn default_doc_type() -> String {
 }
 
 fn query_examples() -> HashMap<String, String> {
-    HashMap::<_, _>::from_iter([("X-Powered-By".to_owned(), "Vector".to_owned())].into_iter())
+    HashMap::<_, _>::from_iter([("X-Powered-By".to_owned(), "Vector".to_owned())])
 }
 
 impl Default for ElasticsearchConfig {
@@ -214,6 +212,7 @@ impl Default for ElasticsearchConfig {
             request: Default::default(),
             auth: None,
             query: None,
+            #[cfg(feature = "aws-core")]
             aws: None,
             tls: None,
             endpoint_health: None,
@@ -355,15 +354,12 @@ impl DataStreamConfig {
 
     /// If there is a `timestamp` field, rename it to the expected `@timestamp` for Elastic Common Schema.
     pub fn remap_timestamp(&self, log: &mut LogEvent) {
-        if let Some(timestamp_key) = log.timestamp_path() {
-            if timestamp_key == DATA_STREAM_TIMESTAMP_KEY {
+        if let Some(timestamp_key) = log.timestamp_path().cloned() {
+            if timestamp_key.to_string() == DATA_STREAM_TIMESTAMP_KEY {
                 return;
             }
 
-            log.rename_key(
-                timestamp_key.as_str(),
-                event_path!(DATA_STREAM_TIMESTAMP_KEY),
-            )
+            log.rename_key(&timestamp_key, event_path!(DATA_STREAM_TIMESTAMP_KEY));
         }
     }
 
@@ -446,7 +442,9 @@ impl DataStreamConfig {
         let (dtype, dataset, namespace) = if !self.auto_routing {
             (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
         } else {
-            let data_stream = log.get("data_stream").and_then(|ds| ds.as_object());
+            let data_stream = log
+                .get(event_path!("data_stream"))
+                .and_then(|ds| ds.as_object());
             let dtype = data_stream
                 .and_then(|ds| ds.get("type"))
                 .map(|value| value.to_string_lossy().into_owned())
@@ -461,7 +459,14 @@ impl DataStreamConfig {
                 .or_else(|| self.namespace(log))?;
             (dtype, dataset, namespace)
         };
-        Some(format!("{}-{}-{}", dtype, dataset, namespace))
+
+        let name = [dtype, dataset, namespace]
+            .into_iter()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("-");
+
+        Some(name)
     }
 }
 
@@ -474,10 +479,7 @@ impl SinkConfig for ElasticsearchConfig {
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
-        let request_limits = self
-            .request
-            .tower
-            .unwrap_with(&TowerRequestConfig::default());
+        let request_limits = self.request.tower.into_settings();
 
         let health_config = self.endpoint_health.clone().unwrap_or_default();
 
@@ -501,6 +503,7 @@ impl SinkConfig for ElasticsearchConfig {
             services,
             health_config,
             ElasticsearchHealthLogic,
+            1,
         );
 
         let sink = ElasticsearchSink::new(&common, self, service)?;

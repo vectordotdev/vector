@@ -160,7 +160,7 @@ configuration: {
 									required:    false
 									type: string: {
 										default: ","
-										examples: [ ":"]
+										examples: [":"]
 									}
 								}
 
@@ -583,13 +583,13 @@ configuration: {
 				Vector interpolates environment variables within your configuration file
 				with the following syntax:
 
-				```toml title="vector.toml"
-				[transforms.add_host]
-				  inputs = ["apache_logs"]
-				  type   = "remap"
-				  source = '''
-				  .host = get_env_var!("HOSTNAME")
-				  '''
+				```toml title="vector.yaml"
+				transforms:
+					add_host:
+						inputs: ["apache_logs"]
+						type: "remap"
+						source: |
+							.host = get_env_var!("HOSTNAME")
 				```
 				"""
 
@@ -639,21 +639,23 @@ configuration: {
 
 				The following example shows a simple configuration with two backends defined:
 
-				```toml title="vector.toml"
-				[secret.backend_1]
-				type = "exec"
-				command = ["/path/to/cmd1", "--some-option"]
-				[secret.backend_2]
-				type = "exec"
-				command = ["/path/to/cmd2"]
+				```toml title="vector.yaml"
+				secret:
+					backend_1:
+						type: "exec"
+						command: ["/path/to/cmd1", "--some-option"]
+					backend_2:
+						type: "exec"
+						command: ["/path/to/cmd2"]
 
-				[sinks.dd_logs]
-				type = "datadog_logs"
-				default_api_key = "SECRET[backend_1.dd_api_key]"
+				sinks:
+					dd_logs:
+						type: "datadog_logs"
+						default_api_key: "SECRET[backend_1.dd_api_key]"
 
-				[sinks.splunk]
-				type = "splunk_hec"
-				default_token = "SECRET[backend_2.splunk_token]"
+					splunk:
+						type: "splunk_hec"
+						default_token: "SECRET[backend_2.splunk_token]"
 				```
 
 				In that example Vector will retrieve the `dd_api_key` from `backen_1` and `splunk_token` from `backend_2`.
@@ -701,7 +703,7 @@ configuration: {
 		formats: {
 			title: "Formats"
 			body:  """
-				Vector supports [TOML](\(urls.toml)), [YAML](\(urls.yaml)), and [JSON](\(urls.json)) to
+				Vector supports [YAML](\(urls.yaml)), [TOML](\(urls.toml)), and [JSON](\(urls.json)) to
 				ensure Vector fits into your workflow. A side benefit of supporting YAML and JSON is that they
 				enable you to use data templating languages such as [ytt](\(urls.ytt)), [Jsonnet](\(urls.jsonnet)) and
 				[Cue](\(urls.cue)).
@@ -711,7 +713,7 @@ configuration: {
 			title: "Location"
 			body: """
 				The location of your Vector configuration file depends on your installation method. For most Linux
-				based systems, the file can be found at `/etc/vector/vector.toml`.
+				based systems, the file can be found at `/etc/vector/vector.yaml`.
 
 				All files in `/etc/vector` are user configuration files and can be safely overridden to craft your
 				desired Vector configuration.
@@ -723,13 +725,13 @@ configuration: {
 				You can pass multiple configuration files when starting Vector:
 
 				```bash
-				vector --config vector1.toml --config vector2.toml
+				vector --config vector1.yaml --config vector2.yaml
 				```
 
 				Or use a [globbing syntax](\(urls.globbing)):
 
 				```bash
-				vector --config /etc/vector/*.toml
+				vector --config /etc/vector/*.yaml
 				```
 				"""
 		}
@@ -742,7 +744,7 @@ configuration: {
 				configure it as follows:
 
 				```toml
-				type = "sink_type"
+				type: "sink_type"
 				# here the sinks options
 				```
 
@@ -763,26 +765,28 @@ configuration: {
 
 				For example:
 
-				```toml
-				[sources.app1_logs]
-				type = "file"
-				includes = ["/var/log/app1.log"]
+				```yaml
+				sources:
+					app1_logs:
+						type: "file"
+						includes: ["/var/log/app1.log"]
 
-				[sources.app2_logs]
-				type = "file"
-				includes = ["/var/log/app.log"]
+					app2_logs:
+						type: "file"
+						includes: ["/var/log/app.log"]
 
-				[sources.system_logs]
-				type = "file"
-				includes = ["/var/log/system.log"]
+					system_logs:
+						type: "file"
+						includes: ["/var/log/system.log"]
 
-				[sinks.app_logs]
-				type = "datadog_logs"
-				inputs = ["app*"]
+				sinks:
+					app_logs:
+						type: "datadog_logs"
+						inputs: ["app*"]
 
-				[sinks.archive]
-				type = "aws_s3"
-				inputs = ["*_logs"]
+					archive:
+						type: "aws_s3"
+						inputs: ["*_logs"]
 				```
 				"""
 		}

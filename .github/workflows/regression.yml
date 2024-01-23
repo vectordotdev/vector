@@ -34,7 +34,9 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.merge_group.head_sha || github.sha }}
+  # In flight runs will be canceled only by re-trigger through the merge queue or if additional PR commits are pushed.
+  # The comment.html_url should always be unique.
+  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -232,8 +234,8 @@ jobs:
           export REPLICAS="10"
           export TOTAL_SAMPLES="600"
           export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.9.1"
-          export LADING_VERSION="0.12.0"
+          export SMP_CRATE_VERSION="0.11.0"
+          export LADING_VERSION="0.19.1"
 
           echo "warmup seconds: ${WARMUP_SECONDS}"
           echo "replicas: ${REPLICAS}"
@@ -271,7 +273,7 @@ jobs:
 
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         with:
           sha: ${{ steps.pr-metadata-comment.outputs.COMPARISON_SHA }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -298,10 +300,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.9.1
+        uses: docker/setup-buildx-action@v3.0.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v4.1.1
+        uses: docker/build-push-action@v5.1.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -335,10 +337,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v2.9.1
+        uses: docker/setup-buildx-action@v3.0.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v4.1.1
+        uses: docker/build-push-action@v5.1.0
         with:
           context: comparison-vector/
           cache-from: type=gha
@@ -362,7 +364,7 @@ jobs:
       - compute-metadata
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -394,7 +396,7 @@ jobs:
           docker load --input baseline-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -402,10 +404,10 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Docker Login to ECR
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ${{ steps.login-ecr.outputs.registry }}
 
@@ -432,7 +434,7 @@ jobs:
           docker load --input comparison-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -440,10 +442,10 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Docker Login to ECR
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ${{ steps.login-ecr.outputs.registry }}
 
@@ -478,7 +480,7 @@ jobs:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -486,7 +488,7 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Download SMP binary
         run: |
@@ -499,7 +501,6 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job submit \
-            --use-curta \
             --lading-version ${{ needs.compute-metadata.outputs.lading-version }} \
             --total-samples ${{ needs.compute-metadata.outputs.total-samples }} \
             --warmup-seconds ${{ needs.compute-metadata.outputs.warmup-seconds }} \
@@ -529,10 +530,10 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job status \
-            --use-curta \
             --wait \
             --wait-delay-seconds 60 \
             --wait-timeout-minutes 90 \
+            --use-consignor welch \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Handle cancellation if necessary
@@ -542,7 +543,6 @@ jobs:
         run: |
           chmod +x ${{ runner.temp }}/bin/smp
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job cancel \
-            --use-curta \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Check status, cancelled
@@ -600,7 +600,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -623,8 +623,7 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job result \
-            --use-curta \
-            --submission-metadata ${{ runner.temp }}/submission-metadata
+            --submission-metadata ${{ runner.temp }}/submission-metadata --use-consignor welch
 
       - name: Check status, cancelled
         if: ${{ cancelled() }}
@@ -692,7 +691,7 @@ jobs:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2.2.0
+        uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -715,15 +714,14 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
-            --use-curta \
             --submission-metadata ${{ runner.temp }}/submission-metadata \
-            --output-path "${{ runner.temp }}/outputs"
+            --output-path "${{ runner.temp }}/outputs" --use-consignor welch
 
       - name: Read regression report
         id: read-analysis
         uses: juliangruber/read-file-action@v1
         with:
-          path: ${{ runner.temp }}/outputs/report.html
+          path: ${{ runner.temp }}/outputs/report.md
 
       - name: Post report to PR
         uses: peter-evans/create-or-update-comment@v3
@@ -805,7 +803,7 @@ jobs:
 
       - name: (PR comment) Submit PR result as failed
         if: github.event_name == 'issue_comment' && env.FAILED == 'true'
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -814,12 +812,19 @@ jobs:
 
       - name: (PR comment) Submit PR result as success
         if: github.event_name == 'issue_comment' && env.FAILED != 'true'
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+        uses: myrotvorets/set-commit-status-action@v2.0.0
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Regression Detection Suite
           status: 'success'
+
+      - name: (PR) Indicate why skipped
+        if: github.event_name == 'pull_request'
+        run: |
+           echo "### Workflow skipped" >> $GITHUB_STEP_SUMMARY
+           echo "This workflow doesn't run on PR's automatically." >> $GITHUB_STEP_SUMMARY
+           echo "To trigger a run, leave a comment with \`/ci-run-regression\`" >> $GITHUB_STEP_SUMMARY
 
       - name: exit
         run: |

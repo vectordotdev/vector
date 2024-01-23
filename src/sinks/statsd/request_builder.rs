@@ -3,8 +3,12 @@ use std::convert::Infallible;
 use bytes::BytesMut;
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::event::{EventFinalizers, Finalizable, Metric};
+use vector_lib::request_metadata::RequestMetadata;
+use vector_lib::{
+    config::telemetry,
+    event::{EventFinalizers, Finalizable, Metric},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use super::{encoder::StatsdEncoder, service::StatsdRequest};
 use crate::{
@@ -79,6 +83,7 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
 
         let mut metrics = input.drain(..);
         while metrics.len() != 0 || pending.is_some() {
+            let mut byte_size = telemetry().create_request_count_byte_size();
             let mut n = 0;
 
             let mut request_buf = Vec::new();
@@ -94,6 +99,8 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
                         None => break,
                     },
                 };
+
+                byte_size.add_event(&metric, metric.estimated_json_encoded_size_of());
 
                 // Encode the metric. Once we've done that, see if it can fit into the request
                 // buffer without exceeding the maximum request size limit.
@@ -131,7 +138,7 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
 
             // If we encoded one or more metrics this pass, finalize the request.
             if n > 0 {
-                let encode_result = EncodeResult::uncompressed(request_buf);
+                let encode_result = EncodeResult::uncompressed(request_buf, byte_size);
                 let request_metadata = request_metadata_builder.build(&encode_result);
 
                 results.push(Ok((

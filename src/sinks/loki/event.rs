@@ -3,6 +3,7 @@ use std::{collections::HashMap, io};
 use crate::sinks::{prelude::*, util::encoding::Encoder};
 use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
+use vector_lib::config::telemetry;
 
 pub type Labels = Vec<(String, String)>;
 
@@ -20,8 +21,13 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
         &self,
         input: Vec<LokiRecord>,
         writer: &mut dyn io::Write,
-    ) -> io::Result<usize> {
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
         let count = input.len();
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        for event in &input {
+            byte_size.add_event(event, event.estimated_json_encoded_size_of());
+        }
+
         let batch = LokiBatch::from(input);
         let body = match self.0 {
             LokiBatchEncoding::Json => {
@@ -52,7 +58,7 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
                 batch.encode()
             }
         };
-        write_all(writer, count, &body).map(|()| body.len())
+        write_all(writer, count, &body).map(|()| (body.len(), byte_size))
     }
 }
 
@@ -152,7 +158,7 @@ pub struct LokiRecord {
     pub event: LokiEvent,
     pub json_byte_size: JsonSize,
     pub finalizers: EventFinalizers,
-    pub event_count_tags: EventCountTags,
+    pub event_count_tags: TaggedEventsSent,
 }
 
 impl ByteSizeOf for LokiRecord {
@@ -185,7 +191,7 @@ impl Finalizable for LokiRecord {
 }
 
 impl GetEventCountTags for LokiRecord {
-    fn get_tags(&self) -> EventCountTags {
+    fn get_tags(&self) -> TaggedEventsSent {
         self.event_count_tags.clone()
     }
 }

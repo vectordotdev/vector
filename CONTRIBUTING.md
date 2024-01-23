@@ -162,6 +162,15 @@ discuss if a change that large is even needed! This will produce a quicker
 response to the change and likely produce code that aligns better with our
 process.
 
+#### Changelog
+
+By default, all pull requests are assumed to include user-facing changes that
+need to be communicated in the project's changelog. If your pull request does
+not contain user-facing changes that warrant describing in the changelog, add
+the label 'no-changelog' to your PR. When in doubt, consult the vector team
+for guidance. The details on how to add a changelog entry for your PR are
+outlined in detail in [changelog.d/README.md](changelog.d/README.md).
+
 ### CI
 
 Currently, Vector uses GitHub Actions to run tests. The workflows are defined in
@@ -221,10 +230,31 @@ Integration tests are not run by default when running
 `cargo vdev test`. Instead, they are accessible via the integration subcommand (example:
 `cargo vdev int test aws` runs aws-related integration tests). You can find the list of available integration tests using `cargo vdev int show`. Integration tests require docker or podman to run.
 
+### Running other checks
+
+There are other checks that are run by CI before the PR can be merged. These should be run locally
+first to ensure they pass.
+
+```sh
+# Run the Clippy linter to catch common mistakes.
+cargo vdev check rust
+# Ensure all code is properly formatted. Code can be run through `rustfmt` using `cargo fmt` to ensure it is properly formatted.
+cargo vdev check fmt
+# Ensure the internal metrics that Vector emits conform to standards.
+cargo vdev check events
+# Ensure the `LICENSE-3rdparty.csv` file is up to date with the licenses each of Vector's dependencies are published under.
+cargo vdev check licenses
+# Vector's documentation for each component is generated from the comments attached to the Component structs and members.
+# Running this ensures that the generated docs are up to date.
+make check-component-docs
+# Generate the code documentation for the Vector project.
+# Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
+cd rust-doc && make docs
+```
 
 ### Deprecations
 
-When deprecating functionality in Vector, see [DEPRECATION.md](DEPRECATION.md).
+When deprecating functionality in Vector, see [DEPRECATION.md](docs/DEPRECATION.md).
 
 ### Dependencies
 
@@ -238,9 +268,9 @@ inventory of third-party licenses maintained in `LICENSE-3rdparty.csv`. This fil
 As discussed in the [`README`](README.md), you should continue to the following
 documents:
 
-1. **[DEVELOPING.md](DEVELOPING.md)** - Everything necessary to develop
-2. **[DOCUMENTING.md](DOCUMENTING.md)** - Preparing your change for Vector users
-3. **[DEPRECATION.md](DEPRECATION.md)** - Deprecating functionality in Vector
+1. **[DEVELOPING.md](docs/DEVELOPING.md)** - Everything necessary to develop
+2. **[DOCUMENTING.md](docs/DOCUMENTING.md)** - Preparing your change for Vector users
+3. **[DEPRECATION.md](docs/DEPRECATION.md)** - Deprecating functionality in Vector
 
 ## Legal
 

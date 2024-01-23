@@ -3,15 +3,15 @@ mod http;
 
 use std::sync::Arc;
 
-use codecs::{
+use tokio::sync::{mpsc, Mutex};
+use vector_lib::codecs::{
     decoding::{self, DeserializerConfig},
     encoding::{
         self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig, TextSerializerConfig,
     },
     BytesEncoder,
 };
-use tokio::sync::{mpsc, Mutex};
-use vector_core::{config::DataType, event::Event};
+use vector_lib::{config::DataType, event::Event};
 
 use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
@@ -101,24 +101,24 @@ impl ResourceCodec {
     ///
     /// The decoder is generated as an inverse to the input codec: if an encoding configuration was
     /// given, we generate a decoder that satisfies that encoding configuration, and vice versa.
-    pub fn into_decoder(&self) -> Decoder {
+    pub fn into_decoder(&self) -> vector_lib::Result<Decoder> {
         let (framer, deserializer) = match self {
             Self::Decoding(config) => return config.build(),
             Self::Encoding(config) => (
                 encoder_framing_to_decoding_framer(config.config().default_stream_framing()),
-                serializer_config_to_deserializer(config.config()),
+                serializer_config_to_deserializer(config.config())?,
             ),
             Self::EncodingWithFraming(config) => {
                 let (maybe_framing, serializer) = config.config();
                 let framing = maybe_framing.clone().unwrap_or(FramingConfig::Bytes);
                 (
                     encoder_framing_to_decoding_framer(framing),
-                    serializer_config_to_deserializer(serializer),
+                    serializer_config_to_deserializer(serializer)?,
                 )
             }
         };
 
-        Decoder::new(framer, deserializer)
+        Ok(Decoder::new(framer, deserializer))
     }
 }
 
@@ -147,14 +147,23 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         // `message` field... but it's close enough for now.
         DeserializerConfig::Bytes => SerializerConfig::Text(TextSerializerConfig::default()),
         DeserializerConfig::Json { .. } => SerializerConfig::Json(JsonSerializerConfig::default()),
+        DeserializerConfig::Protobuf(config) => {
+            SerializerConfig::Protobuf(vector_lib::codecs::encoding::ProtobufSerializerConfig {
+                protobuf: vector_lib::codecs::encoding::ProtobufSerializerOptions {
+                    desc_file: config.protobuf.desc_file.clone(),
+                    message_type: config.protobuf.message_type.clone(),
+                },
+            })
+        }
         // TODO: We need to create an Avro serializer because, certainly, for any source decoding
         // the data as Avro, we can't possibly send anything else without the source just
         // immediately barfing.
-        #[cfg(feature = "sources-syslog")]
+        #[cfg(feature = "codecs-syslog")]
         DeserializerConfig::Syslog { .. } => SerializerConfig::Logfmt,
         DeserializerConfig::Native => SerializerConfig::Native,
         DeserializerConfig::NativeJson { .. } => SerializerConfig::NativeJson,
         DeserializerConfig::Gelf { .. } => SerializerConfig::Gelf,
+        DeserializerConfig::Avro { avro } => SerializerConfig::Avro { avro: avro.into() },
     };
 
     serializer_config
@@ -182,7 +191,9 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
     framing_config.build()
 }
 
-fn serializer_config_to_deserializer(config: &SerializerConfig) -> decoding::Deserializer {
+fn serializer_config_to_deserializer(
+    config: &SerializerConfig,
+) -> vector_lib::Result<decoding::Deserializer> {
     let deserializer_config = match config {
         SerializerConfig::Avro { .. } => todo!(),
         SerializerConfig::Csv { .. } => todo!(),
@@ -191,6 +202,14 @@ fn serializer_config_to_deserializer(config: &SerializerConfig) -> decoding::Des
         SerializerConfig::Logfmt => todo!(),
         SerializerConfig::Native => DeserializerConfig::Native,
         SerializerConfig::NativeJson => DeserializerConfig::NativeJson(Default::default()),
+        SerializerConfig::Protobuf(config) => {
+            DeserializerConfig::Protobuf(vector_lib::codecs::decoding::ProtobufDeserializerConfig {
+                protobuf: vector_lib::codecs::decoding::ProtobufDeserializerOptions {
+                    desc_file: config.protobuf.desc_file.clone(),
+                    message_type: config.protobuf.message_type.clone(),
+                },
+            })
+        }
         SerializerConfig::RawMessage | SerializerConfig::Text(_) => DeserializerConfig::Bytes,
     };
 
@@ -321,7 +340,7 @@ impl ExternalResource {
         output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
         runner_metrics: &Arc<Mutex<RunnerMetrics>>,
-    ) {
+    ) -> vector_lib::Result<()> {
         match self.definition {
             ResourceDefinition::Http(http_config) => http_config.spawn_as_output(
                 self.direction,

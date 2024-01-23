@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
-use vector_config::configurable_component;
-pub use vector_core::config::ComponentKey;
+pub use vector_lib::config::ComponentKey;
+use vector_lib::configurable::configurable_component;
 
 /// A list of upstream [source][sources] or [transform][transforms] IDs.
 ///

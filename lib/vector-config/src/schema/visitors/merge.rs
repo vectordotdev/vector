@@ -128,11 +128,7 @@ fn merge_schema_instance_type(
     source: Option<&SingleOrVec<InstanceType>>,
 ) {
     merge_optional_with(destination, source, |existing, new| {
-        let mut deduped = existing
-            .into_iter()
-            .chain(new.into_iter())
-            .cloned()
-            .collect::<Vec<_>>();
+        let mut deduped = existing.into_iter().chain(new).cloned().collect::<Vec<_>>();
         deduped.dedup();
 
         *existing = deduped.into();

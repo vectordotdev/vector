@@ -3,7 +3,8 @@ use std::{cell::RefCell, collections::BTreeSet, fmt};
 use indexmap::IndexMap;
 use serde::{de, ser};
 use serde_json::Value;
-use vector_config::{
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::{
     schema::{
         apply_base_metadata, generate_const_string_schema, generate_enum_schema,
         generate_one_of_schema, generate_struct_schema, get_or_generate_schema, SchemaGenerator,
@@ -11,7 +12,6 @@ use vector_config::{
     },
     Configurable, GenerateError, Metadata, ToValue,
 };
-use vector_config_common::attributes::CustomAttribute;
 
 use crate::sinks::util::zstd::ZstdCompressionLevel;
 
@@ -37,6 +37,11 @@ pub enum Compression {
     ///
     /// [zstd]: https://facebook.github.io/zstd/
     Zstd(CompressionLevel),
+
+    /// [Snappy][snappy] compression.
+    ///
+    /// [snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+    Snappy,
 }
 
 impl Compression {
@@ -70,6 +75,7 @@ impl Compression {
             Self::Gzip(_) => Some("gzip"),
             Self::Zlib(_) => Some("deflate"),
             Self::Zstd(_) => Some("zstd"),
+            Self::Snappy => Some("snappy"),
         }
     }
 
@@ -78,6 +84,7 @@ impl Compression {
             Self::Gzip(_) => Some("gzip"),
             Self::Zlib(_) => Some("deflate"),
             Self::Zstd(_) => Some("zstd"),
+            Self::Snappy => Some("snappy"),
             _ => None,
         }
     }
@@ -88,6 +95,7 @@ impl Compression {
             Self::Gzip(_) => "log.gz",
             Self::Zlib(_) => "log.zz",
             Self::Zstd(_) => "log.zst",
+            Self::Snappy => "log.snappy",
         }
     }
 
@@ -97,12 +105,13 @@ impl Compression {
             Compression::Gzip(_) => 9,
             Compression::Zlib(_) => 9,
             Compression::Zstd(_) => 21,
+            Compression::Snappy => 0,
         }
     }
 
     pub const fn compression_level(self) -> CompressionLevel {
         match self {
-            Self::None => CompressionLevel::None,
+            Self::None | Self::Snappy => CompressionLevel::None,
             Self::Gzip(level) | Self::Zlib(level) | Self::Zstd(level) => level,
         }
     }
@@ -117,6 +126,7 @@ impl fmt::Display for Compression {
             Compression::Zstd(ref level) => {
                 write!(f, "zstd({})", ZstdCompressionLevel::from(*level))
             }
+            Compression::Snappy => write!(f, "snappy"),
         }
     }
 }
@@ -144,6 +154,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                     "gzip" => Ok(Compression::gzip_default()),
                     "zlib" => Ok(Compression::zlib_default()),
                     "zstd" => Ok(Compression::zstd_default()),
+                    "snappy" => Ok(Compression::Snappy),
                     _ => Err(de::Error::invalid_value(
                         de::Unexpected::Str(s),
                         &r#""none" or "gzip" or "zlib" or "zstd""#,
@@ -187,9 +198,13 @@ impl<'de> de::Deserialize<'de> for Compression {
                     "gzip" => Ok(Compression::Gzip(level.unwrap_or_default())),
                     "zlib" => Ok(Compression::Zlib(level.unwrap_or_default())),
                     "zstd" => Ok(Compression::Zstd(level.unwrap_or_default())),
+                    "snappy" => match level {
+                        Some(_) => Err(de::Error::unknown_field("level", &[])),
+                        None => Ok(Compression::Snappy),
+                    },
                     algorithm => Err(de::Error::unknown_variant(
                         algorithm,
-                        &["none", "gzip", "zlib", "zstd"],
+                        &["none", "gzip", "zlib", "zstd", "snappy"],
                     )),
                 }?;
 
@@ -252,6 +267,7 @@ impl ser::Serialize for Compression {
                     serializer.serialize_str("zstd")
                 }
             }
+            Compression::Snappy => serializer.serialize_str("snappy"),
         }
     }
 }
@@ -314,11 +330,18 @@ impl Configurable for Compression {
             "[zstd]: https://facebook.github.io/zstd/",
         );
 
+        let snappy_string_subschema = generate_string_schema(
+            "Snappy",
+            Some("[Snappy][snappy] compression."),
+            "[snappy]: https://github.com/google/snappy/blob/main/docs/README.md",
+        );
+
         let mut all_string_oneof_subschema = generate_one_of_schema(&[
             none_string_subschema,
             gzip_string_subschema,
             zlib_string_subschema,
             zstd_string_subschema,
+            snappy_string_subschema,
         ]);
         apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
 
@@ -431,7 +454,21 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
             where
                 E: de::Error,
             {
-                Ok(CompressionLevel::Val(v as u32))
+                u32::try_from(v).map(CompressionLevel::Val).map_err(|err| {
+                    de::Error::custom(format!(
+                        "unsigned integer could not be converted to u32: {}",
+                        err
+                    ))
+                })
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                u32::try_from(v).map(CompressionLevel::Val).map_err(|err| {
+                    de::Error::custom(format!("integer could not be converted to u32: {}", err))
+                })
             }
         }
 
@@ -490,11 +527,12 @@ mod test {
     use super::{Compression, CompressionLevel};
 
     #[test]
-    fn deserialization() {
+    fn deserialization_json() {
         let fixtures_valid = [
             (r#""none""#, Compression::None),
             (r#""gzip""#, Compression::Gzip(CompressionLevel::default())),
             (r#""zlib""#, Compression::Zlib(CompressionLevel::default())),
+            (r#""snappy""#, Compression::Snappy),
             (r#"{"algorithm": "none"}"#, Compression::None),
             (
                 r#"{"algorithm": "gzip"}"#,
@@ -537,7 +575,7 @@ mod test {
             ),
             (
                 r#"{"algorithm": "b42"}"#,
-                r#"unknown variant `b42`, expected one of `none`, `gzip`, `zlib`, `zstd` at line 1 column 20"#,
+                r#"unknown variant `b42`, expected one of `none`, `gzip`, `zlib`, `zstd`, `snappy` at line 1 column 20"#,
             ),
             (
                 r#"{"algorithm": "none", "level": "default"}"#,
@@ -545,7 +583,7 @@ mod test {
             ),
             (
                 r#"{"algorithm": "gzip", "level": -1}"#,
-                r#"invalid type: integer `-1`, expected unsigned number or string at line 1 column 33"#,
+                r#"integer could not be converted to u32: out of range integral type conversion attempted at line 1 column 33"#,
             ),
             (
                 r#"{"algorithm": "gzip", "level": "good"}"#,
@@ -567,11 +605,31 @@ mod test {
                 r#"{"algorithm": "zstd", "level": 22}"#,
                 r#"invalid value `22`, expected value in range [0, 21] at line 1 column 34"#,
             ),
+            (
+                r#"{"algorithm": "snappy", "level": 3}"#,
+                r#"unknown field `level`, there are no fields at line 1 column 35"#,
+            ),
         ];
         for (source, result) in fixtures_invalid.iter() {
             let deserialized: Result<Compression, _> = serde_json::from_str(source);
             let error = deserialized.expect_err("invalid source");
             assert_eq!(error.to_string().as_str(), *result);
+        }
+    }
+
+    #[test]
+    fn deserialization_toml() {
+        let fixtures_valid = [
+            // TOML differs from YAML and JSON by always parsing integers as signed
+            (
+                r#"algorithm = "gzip"
+                   level = 8"#,
+                Compression::Gzip(CompressionLevel::Val(8)),
+            ),
+        ];
+        for (sources, result) in fixtures_valid.iter() {
+            let deserialized: Result<Compression, _> = toml::from_str(sources);
+            assert_eq!(deserialized.expect("valid source"), *result);
         }
     }
 

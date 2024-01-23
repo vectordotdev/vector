@@ -15,7 +15,8 @@ use http::StatusCode;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::time::{timeout, Duration};
-use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vector_lib::lookup::PathPrefix;
 use warp::Filter;
 
 use super::*;
@@ -49,7 +50,7 @@ async fn insert_events() {
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
-            retry_attempts: Some(1),
+            retry_attempts: 1,
             ..Default::default()
         },
         ..Default::default()
@@ -99,7 +100,7 @@ async fn skip_unknown_fields() {
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
-            retry_attempts: Some(1),
+            retry_attempts: 1,
             ..Default::default()
         },
         ..Default::default()
@@ -145,7 +146,7 @@ async fn insert_events_unix_timestamps() {
         encoding: Transformer::new(None, None, Some(TimestampFormat::Unix)).unwrap(),
         batch,
         request: TowerRequestConfig {
-            retry_attempts: Some(1),
+            retry_attempts: 1,
             ..Default::default()
         },
         ..Default::default()
@@ -171,17 +172,11 @@ async fn insert_events_unix_timestamps() {
 
     let exp_event = input_event.as_mut_log();
     exp_event.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         format!(
             "{}",
             exp_event
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
+                .get_timestamp()
                 .unwrap()
                 .as_timestamp()
                 .unwrap()
@@ -235,17 +230,11 @@ timestamp_format = "unix""#,
 
     let exp_event = input_event.as_mut_log();
     exp_event.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         format!(
             "{}",
             exp_event
-                .get((
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap()
-                ))
+                .get_timestamp()
                 .unwrap()
                 .as_timestamp()
                 .unwrap()

@@ -136,7 +136,7 @@ fn build_output_edge() -> (OutputEdge, impl Into<BoxedSink>) {
     // we don't want to waste time performing retries, especially when the test
     // harness is shutting down.
     output_sink.batch.timeout_secs = Some(0.1);
-    output_sink.request.retry_attempts = Some(0);
+    output_sink.request.retry_attempts = 0;
 
     let output_edge = OutputEdge::from_address(output_listen_addr);
 

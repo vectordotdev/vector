@@ -1,13 +1,9 @@
 use std::time::Instant;
 
-use crate::emit;
 use metrics::{counter, histogram};
-pub use vector_core::internal_event::EventsReceived;
-use vector_core::internal_event::InternalEvent;
-
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
-};
+pub use vector_lib::internal_event::EventsReceived;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
 #[derive(Debug)]
 pub struct EndpointBytesReceived<'a> {
@@ -105,20 +101,6 @@ impl InternalEvent for StreamClosedError {
             count: self.count,
             reason: "Downstream is closed.",
         });
-    }
-}
-
-#[derive(Debug)]
-pub struct RequestCompleted {
-    pub start: Instant,
-    pub end: Instant,
-}
-
-impl InternalEvent for RequestCompleted {
-    fn emit(self) {
-        debug!(message = "Request completed.");
-        counter!("requests_completed_total", 1);
-        histogram!("request_duration_seconds", self.end - self.start);
     }
 }
 

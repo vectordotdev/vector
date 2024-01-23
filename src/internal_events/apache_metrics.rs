@@ -1,12 +1,11 @@
 use metrics::counter;
 
-use vector_common::{
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
-use vector_core::internal_event::InternalEvent;
 
-use super::prelude::http_error_code;
 use crate::sources::apache_metrics;
 
 #[derive(Debug)]
@@ -47,69 +46,10 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
             endpoint = %self.endpoint,
             internal_log_rate_limit = true,
         );
-        debug!(
-            message = %format!("Parse error:\n\n{}\n\n", self.error),
-            endpoint = %self.endpoint,
-            internal_log_rate_limit = true
-        );
-        counter!("parse_errors_total", 1);
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
-            "endpoint" => self.endpoint.to_owned(),
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct ApacheMetricsResponseError<'a> {
-    pub code: hyper::StatusCode,
-    pub endpoint: &'a str,
-}
-
-impl InternalEvent for ApacheMetricsResponseError<'_> {
-    fn emit(self) {
-        error!(
-            message = "HTTP error response.",
-            stage = error_stage::RECEIVING,
-            error_type = error_type::REQUEST_FAILED,
-            error_code = %http_error_code(self.code.as_u16()),
-            endpoint = %self.endpoint,
-            internal_log_rate_limit = true,
-        );
-        counter!("http_error_response_total", 1);
-        counter!(
-            "component_errors_total", 1,
-            "stage" => error_stage::RECEIVING,
-            "error_type" => error_type::REQUEST_FAILED,
-            "error_code" => http_error_code(self.code.as_u16()),
-            "endpoint" => self.endpoint.to_owned(),
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct ApacheMetricsHttpError<'a> {
-    pub error: crate::Error,
-    pub endpoint: &'a str,
-}
-
-impl InternalEvent for ApacheMetricsHttpError<'_> {
-    fn emit(self) {
-        error!(
-            message = "HTTP request processing error.",
-            error = ?self.error,
-            stage = error_stage::RECEIVING,
-            error_type = error_type::REQUEST_FAILED,
-            endpoint = %self.endpoint,
-            internal_log_rate_limit = true,
-        );
-        counter!("http_request_errors_total", 1);
-        counter!(
-            "component_errors_total", 1,
-            "stage" => error_stage::RECEIVING,
-            "error_type" => error_type::REQUEST_FAILED,
             "endpoint" => self.endpoint.to_owned(),
         );
     }

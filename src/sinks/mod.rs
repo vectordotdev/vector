@@ -20,8 +20,8 @@ pub mod aws_cloudwatch_metrics;
 pub mod aws_kinesis;
 #[cfg(feature = "sinks-aws_s3")]
 pub mod aws_s3;
-#[cfg(feature = "sinks-aws_sqs")]
-pub mod aws_sqs;
+#[cfg(any(feature = "sinks-aws_sqs", feature = "sinks-sinks-aws_sns"))]
+pub mod aws_s_s;
 #[cfg(feature = "sinks-axiom")]
 pub mod axiom;
 #[cfg(feature = "sinks-azure_blob")]
@@ -51,7 +51,7 @@ pub mod elasticsearch;
 pub mod file;
 #[cfg(feature = "sinks-gcp")]
 pub mod gcp;
-#[cfg(any(feature = "sinks-gcp"))]
+#[cfg(feature = "sinks-gcp")]
 pub mod gcs_common;
 #[cfg(feature = "sinks-greptimedb")]
 pub mod greptimedb;
@@ -100,7 +100,7 @@ pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
 
-pub use vector_core::{config::Input, sink::VectorSink};
+pub use vector_lib::{config::Input, sink::VectorSink};
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
 

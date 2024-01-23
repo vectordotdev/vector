@@ -20,19 +20,20 @@ use crate::{
     sources::util::{
         http::HttpMethod,
         http_client::{
-            build_url, call, default_interval, GenericHttpClientInputs, HttpClientBuilder,
+            build_url, call, default_interval, default_timeout, warn_if_interval_too_low,
+            GenericHttpClientInputs, HttpClientBuilder,
         },
     },
     tls::{TlsConfig, TlsSettings},
     Result,
 };
 use crate::{components::validation::*, sources::util::http_client};
-use codecs::{
+use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     config::{log_schema, LogNamespace, SourceOutput},
     event::Event,
 };
@@ -51,12 +52,21 @@ pub struct HttpClientConfig {
     #[configurable(metadata(docs::examples = "http://127.0.0.1:9898/logs"))]
     pub endpoint: String,
 
-    /// The interval between calls.
+    /// The interval between scrapes. Requests are run concurrently so if a scrape takes longer
+    /// than the interval a new scrape will be started. This can take extra resources, set the timeout
+    /// to a value lower than the scrape interval to prevent this from happening.
     #[serde(default = "default_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(rename = "scrape_interval_secs")]
     #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub interval: Duration,
+
+    /// The timeout for each scrape request.
+    #[serde(default = "default_timeout")]
+    #[serde_as(as = "serde_with:: DurationSecondsWithFrac<f64>")]
+    #[serde(rename = "scrape_timeout_secs")]
+    #[configurable(metadata(docs::human_name = "Scrape Timeout"))]
+    pub timeout: Duration,
 
     /// Custom parameters for the HTTP request query string.
     ///
@@ -114,37 +124,31 @@ const fn default_http_method() -> HttpMethod {
 }
 
 fn query_examples() -> HashMap<String, Vec<String>> {
-    HashMap::<_, _>::from_iter(
-        [
-            ("field".to_owned(), vec!["value".to_owned()]),
-            (
-                "fruit".to_owned(),
-                vec!["mango".to_owned(), "papaya".to_owned(), "kiwi".to_owned()],
-            ),
-        ]
-        .into_iter(),
-    )
+    HashMap::<_, _>::from_iter([
+        ("field".to_owned(), vec!["value".to_owned()]),
+        (
+            "fruit".to_owned(),
+            vec!["mango".to_owned(), "papaya".to_owned(), "kiwi".to_owned()],
+        ),
+    ])
 }
 
 fn headers_examples() -> HashMap<String, Vec<String>> {
-    HashMap::<_, _>::from_iter(
-        [
-            (
-                "Accept".to_owned(),
-                vec!["text/plain".to_owned(), "text/html".to_owned()],
-            ),
-            (
-                "X-My-Custom-Header".to_owned(),
-                vec![
-                    "a".to_owned(),
-                    "vector".to_owned(),
-                    "of".to_owned(),
-                    "values".to_owned(),
-                ],
-            ),
-        ]
-        .into_iter(),
-    )
+    HashMap::<_, _>::from_iter([
+        (
+            "Accept".to_owned(),
+            vec!["text/plain".to_owned(), "text/html".to_owned()],
+        ),
+        (
+            "X-My-Custom-Header".to_owned(),
+            vec![
+                "a".to_owned(),
+                "vector".to_owned(),
+                "of".to_owned(),
+                "values".to_owned(),
+            ],
+        ),
+    ])
 }
 
 impl Default for HttpClientConfig {
@@ -153,6 +157,7 @@ impl Default for HttpClientConfig {
             endpoint: "http://localhost:9898/logs".to_string(),
             query: HashMap::new(),
             interval: default_interval(),
+            timeout: default_timeout(),
             decoding: default_decoding(),
             framing: default_framing_message_based(),
             headers: HashMap::new(),
@@ -183,7 +188,7 @@ impl SourceConfig for HttpClientConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         // build the decoder
-        let decoder = self.get_decoding_config(Some(log_namespace)).build();
+        let decoder = self.get_decoding_config(Some(log_namespace)).build()?;
 
         let content_type = self.decoding.content_type(&self.framing).to_string();
 
@@ -193,9 +198,12 @@ impl SourceConfig for HttpClientConfig {
             log_namespace,
         };
 
+        warn_if_interval_too_low(self.timeout, self.interval);
+
         let inputs = GenericHttpClientInputs {
             urls,
             interval: self.interval,
+            timeout: self.timeout,
             headers: self.headers.clone(),
             content_type,
             auth: self.auth.clone(),
@@ -276,7 +284,7 @@ impl HttpClientContext {
         loop {
             match self.decoder.decode_eof(buf) {
                 Ok(Some((next, _))) => {
-                    events.extend(next.into_iter());
+                    events.extend(next);
                 }
                 Ok(None) => break,
                 Err(error) => {
@@ -336,12 +344,9 @@ impl http_client::HttpClientContext for HttpClientContext {
                     }
                 }
                 Event::Trace(ref mut trace) => {
-                    if let Some(source_type_key) = log_schema().source_type_key() {
-                        trace.insert(
-                            source_type_key.to_string(),
-                            Bytes::from(HttpClientConfig::NAME),
-                        );
-                    }
+                    trace.maybe_insert(log_schema().source_type_key_target_path(), || {
+                        Bytes::from(HttpClientConfig::NAME).into()
+                    });
                 }
             }
         }

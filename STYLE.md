@@ -229,7 +229,7 @@ would know that the queue size was _currently_ zero but we'd also know that we j
   [Component
   Specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md).
 - **Don't** emit metrics in tight loops. Each metric emission carries an overhead, and emitting them
-  in tight loops can cause that overhead to become noticable in terms of CPU usage and throughput
+  in tight loops can cause that overhead to become noticeable in terms of CPU usage and throughput
   reduction. Instead of incrementing a counter every time a loop iteration occurs, you might
   consider incrementing a local variable instead, and then emitting that sum after the loop is over.
 - **Don't** update a counter to measure the total number of operations/events/etc if you're already

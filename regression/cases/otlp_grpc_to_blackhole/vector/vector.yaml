@@ -1,0 +1,34 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  opentelemetry:
+    type: "opentelemetry"
+    http:
+      address: "127.0.0.1:4318"
+    grpc:
+      address: "127.0.0.1:4317"
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "127.0.0.1:9090"
+
+  socket_sink:
+    type:    "socket"
+    inputs: [ "opentelemetry.logs" ]
+    mode:    "tcp"
+    address: "127.0.0.1:15400"
+    encoding:
+      codec: "json"

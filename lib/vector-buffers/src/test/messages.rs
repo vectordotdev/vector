@@ -33,6 +33,7 @@ macro_rules! message_wrapper {
         }
 
         impl EventCount for $id {
+            #[allow(clippy::redundant_closure_call)]
             fn event_count(&self) -> usize {
                 usize::try_from($event_count(self)).unwrap_or(usize::MAX)
             }

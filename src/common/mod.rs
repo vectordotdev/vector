@@ -1,3 +1,4 @@
+//! Modules that are common between sources and sinks.
 #[cfg(any(
     feature = "sources-datadog_agent",
     feature = "sinks-datadog_events",
@@ -6,7 +7,7 @@
     feature = "sinks-datadog_traces",
     feature = "enterprise"
 ))]
-pub(crate) mod datadog;
+pub mod datadog;
 
 #[cfg(any(
     feature = "sources-aws_sqs",

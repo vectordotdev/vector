@@ -1,12 +1,44 @@
-use std::error::Error;
+use std::{error::Error, time::Duration};
 
+use http::Response;
 use metrics::{counter, histogram};
-use vector_core::internal_event::InternalEvent;
-
-use vector_common::{
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
+
+const HTTP_STATUS_LABEL: &str = "status";
+
+#[derive(Debug)]
+pub struct HttpServerRequestReceived;
+
+impl InternalEvent for HttpServerRequestReceived {
+    fn emit(self) {
+        debug!(
+            message = "Received HTTP request.",
+            internal_log_rate_limit = true
+        );
+        counter!("http_server_requests_received_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct HttpServerResponseSent<'a, B> {
+    pub response: &'a Response<B>,
+    pub latency: Duration,
+}
+
+impl<'a, B> InternalEvent for HttpServerResponseSent<'a, B> {
+    fn emit(self) {
+        let labels = &[(
+            HTTP_STATUS_LABEL,
+            self.response.status().as_u16().to_string(),
+        )];
+        counter!("http_server_responses_sent_total", 1, labels);
+        histogram!("http_server_handler_duration_seconds", self.latency, labels);
+    }
+}
 
 #[derive(Debug)]
 pub struct HttpBytesReceived<'a> {
@@ -99,8 +131,6 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
             "error_type" => error_type::REQUEST_FAILED,
             "error_stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("http_bad_requests_total", 1);
     }
 }
 
@@ -127,8 +157,6 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("parse_errors_total", 1);
     }
 }
 

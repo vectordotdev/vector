@@ -14,11 +14,9 @@ use hyper::Body;
 use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    stream::DriverResponse,
-};
+use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::stream::DriverResponse;
 
 use crate::{
     http::HttpClient,
@@ -95,6 +93,7 @@ pub struct LogApiService {
     client: HttpClient,
     uri: Uri,
     user_provided_headers: IndexMap<HeaderName, HeaderValue>,
+    dd_evp_headers: IndexMap<HeaderName, HeaderValue>,
 }
 
 impl LogApiService {
@@ -102,13 +101,23 @@ impl LogApiService {
         client: HttpClient,
         uri: Uri,
         headers: IndexMap<String, String>,
+        dd_evp_origin: String,
     ) -> crate::Result<Self> {
-        let headers = validate_headers(&headers)?;
+        let user_provided_headers = validate_headers(&headers)?;
+
+        let dd_evp_headers = &[
+            ("DD-EVP-ORIGIN".to_string(), dd_evp_origin),
+            ("DD-EVP-ORIGIN-VERSION".to_string(), crate::get_version()),
+        ]
+        .into_iter()
+        .collect();
+        let dd_evp_headers = validate_headers(dd_evp_headers)?;
 
         Ok(Self {
             client,
             uri,
-            user_provided_headers: headers,
+            user_provided_headers,
+            dd_evp_headers,
         })
     }
 }
@@ -128,8 +137,6 @@ impl Service<LogApiRequest> for LogApiService {
         let mut client = self.client.clone();
         let http_request = Request::post(&self.uri)
             .header(CONTENT_TYPE, "application/json")
-            .header("DD-EVP-ORIGIN", "vector")
-            .header("DD-EVP-ORIGIN-VERSION", crate::get_version())
             .header("DD-API-KEY", request.api_key.to_string());
 
         let http_request = if let Some(ce) = request.compression.content_encoding() {
@@ -147,6 +154,10 @@ impl Service<LogApiRequest> for LogApiService {
         if let Some(headers) = http_request.headers_mut() {
             for (name, value) in &self.user_provided_headers {
                 // Replace rather than append to any existing header values
+                headers.insert(name, value.clone());
+            }
+            // Set DD EVP headers last so that they cannot be overridden.
+            for (name, value) in &self.dd_evp_headers {
                 headers.insert(name, value.clone());
             }
         }

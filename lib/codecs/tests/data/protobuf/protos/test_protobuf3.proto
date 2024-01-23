@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package test_protobuf3;
+
+message Person {
+  optional string name = 1;
+  optional int32 id = 2;
+  optional string email = 3;
+
+  enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+  }
+
+  message PhoneNumber {
+    optional string number = 1;
+    optional PhoneType type = 2;
+  }
+
+  map<string, PhoneType> data = 4;
+  repeated PhoneNumber phones = 5;
+}
+
+message AddressBook {
+  repeated Person people = 1;
+}

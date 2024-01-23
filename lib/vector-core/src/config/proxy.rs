@@ -5,6 +5,8 @@ use no_proxy::NoProxy;
 use url::Url;
 use vector_config::configurable_component;
 
+use crate::serde::is_default;
+
 // suggestion of standardization coming from https://about.gitlab.com/blog/2021/01/27/we-need-to-talk-no-proxy/
 fn from_env(key: &str) -> Option<String> {
     // use lowercase first and the uppercase
@@ -52,7 +54,7 @@ pub struct ProxyConfig {
     /// Enables proxying support.
     #[serde(
         default = "ProxyConfig::default_enabled",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "is_enabled"
     )]
     pub enabled: bool,
 
@@ -61,14 +63,14 @@ pub struct ProxyConfig {
     /// Must be a valid URI string.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "http://foo.bar:3128"))]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_default")]
     pub http: Option<String>,
 
     /// Proxy endpoint to use when proxying HTTPS traffic.
     ///
     /// Must be a valid URI string.
     #[configurable(validation(format = "uri"))]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_default")]
     #[configurable(metadata(docs::examples = "http://foo.bar:3128"))]
     pub https: Option<String>,
 
@@ -85,10 +87,7 @@ pub struct ProxyConfig {
     /// | Splat               | `*` matches all hosts                                                   |
     ///
     /// [cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "is_default")]
     #[configurable(metadata(docs::examples = "localhost"))]
     #[configurable(metadata(docs::examples = ".foo.bar"))]
     #[configurable(metadata(docs::examples = "*"))]
@@ -104,6 +103,11 @@ impl Default for ProxyConfig {
             no_proxy: NoProxy::default(),
         }
     }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // Calling convention is required by serde
+fn is_enabled(e: &bool) -> bool {
+    e == &true
 }
 
 impl ProxyConfig {
@@ -205,10 +209,43 @@ mod tests {
         header::{AUTHORIZATION, PROXY_AUTHORIZATION},
         HeaderName, HeaderValue, Uri,
     };
+    use proptest::prelude::*;
 
     const PROXY_HEADERS: [HeaderName; 2] = [AUTHORIZATION, PROXY_AUTHORIZATION];
 
     use super::*;
+
+    impl Arbitrary for ProxyConfig {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+            (
+                any::<bool>(),
+                any::<Option<String>>(),
+                any::<Option<String>>(),
+            )
+                .prop_map(|(enabled, http, https)| Self {
+                    enabled,
+                    http,
+                    https,
+                    // TODO: Neither NoProxy nor IpCidr contained with in it supports proptest. Once
+                    // they support proptest, add another any here.
+                    no_proxy: Default::default(),
+                })
+                .boxed()
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn encodes_and_decodes_through_yaml(config:ProxyConfig) {
+            let yaml = serde_yaml::to_string(&config).expect("Could not serialize config");
+            let reloaded: ProxyConfig = serde_yaml::from_str(&yaml)
+                .expect("Could not deserialize config");
+            assert_eq!(config, reloaded);
+        }
+    }
 
     #[test]
     fn merge_simple() {

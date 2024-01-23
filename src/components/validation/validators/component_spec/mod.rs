@@ -1,8 +1,7 @@
-use vector_core::event::{Event, Metric, MetricKind};
-
 use crate::components::validation::{
     component_names::*, ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent,
 };
+use vector_lib::event::{Event, Metric, MetricKind};
 
 use super::{ComponentMetricType, Validator};
 
@@ -32,11 +31,11 @@ impl Validator for ComponentSpecValidator {
         runner_metrics: &RunnerMetrics,
     ) -> Result<Vec<String>, Vec<String>> {
         for input in inputs {
-            debug!("Validator observed input event: {:?}", input);
+            info!("Validator observed input event: {:?}", input);
         }
 
         for output in outputs {
-            debug!("Validator observed output event: {:?}", output);
+            info!("Validator observed output event: {:?}", output);
         }
 
         // Validate that the number of inputs/outputs matched the test case expectation.
@@ -131,7 +130,7 @@ fn validate_metric(
     metric_type: &ComponentMetricType,
     component_type: ComponentType,
 ) -> Result<Vec<String>, Vec<String>> {
-    let component_name = match component_type {
+    let component_id = match component_type {
         ComponentType::Source => TEST_SOURCE_NAME,
         ComponentType::Transform => TEST_TRANSFORM_NAME,
         ComponentType::Sink => TEST_SINK_NAME,
@@ -180,18 +179,24 @@ fn validate_metric(
         ComponentMetricType::DiscardedEventsTotal => runner_metrics.discarded_events_total,
     };
 
-    compare_actual_to_expected(telemetry_events, metric_type, component_name, expected)
+    compare_actual_to_expected(telemetry_events, metric_type, component_id, expected)
 }
 
 fn filter_events_by_metric_and_component<'a>(
     telemetry_events: &'a [Event],
     metric: &ComponentMetricType,
-    component_name: &'a str,
+    component_id: &'a str,
 ) -> Vec<&'a Metric> {
+    info!(
+        "filter looking for metric {} {}",
+        metric.to_string(),
+        component_id
+    );
+
     let metrics: Vec<&Metric> = telemetry_events
         .iter()
         .flat_map(|e| {
-            if let vector_core::event::Event::Metric(m) = e {
+            if let vector_lib::event::Event::Metric(m) = e {
                 Some(m)
             } else {
                 None
@@ -200,7 +205,7 @@ fn filter_events_by_metric_and_component<'a>(
         .filter(|&m| {
             if m.name() == metric.to_string() {
                 if let Some(tags) = m.tags() {
-                    if tags.get("component_name").unwrap_or("") == component_name {
+                    if tags.get("component_id").unwrap_or("") == component_id {
                         return true;
                     }
                 }
@@ -210,21 +215,21 @@ fn filter_events_by_metric_and_component<'a>(
         })
         .collect();
 
-    debug!("{}: {} metrics found.", metric.to_string(), metrics.len(),);
+    info!("{}: {} metrics found.", metric.to_string(), metrics.len());
 
     metrics
 }
 
 fn sum_counters(
     metric_name: &ComponentMetricType,
-    metrics: &[&vector_core::event::Metric],
+    metrics: &[&Metric],
 ) -> Result<u64, Vec<String>> {
     let mut sum: f64 = 0.0;
     let mut errs = Vec::new();
 
     for m in metrics {
         match m.value() {
-            vector_core::event::MetricValue::Counter { value } => {
+            vector_lib::event::MetricValue::Counter { value } => {
                 if let MetricKind::Absolute = m.data().kind {
                     sum = *value;
                 } else {
@@ -245,17 +250,17 @@ fn sum_counters(
 fn compare_actual_to_expected(
     telemetry_events: &[Event],
     metric_type: &ComponentMetricType,
-    component_name: &str,
+    component_id: &str,
     expected: u64,
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
 
     let metrics =
-        filter_events_by_metric_and_component(telemetry_events, metric_type, component_name);
+        filter_events_by_metric_and_component(telemetry_events, metric_type, component_id);
 
     let actual = sum_counters(metric_type, &metrics)?;
 
-    debug!("{}: expected {}, actual {}.", metric_type, expected, actual,);
+    info!("{}: expected {}, actual {}.", metric_type, expected, actual,);
 
     if actual != expected {
         errs.push(format!(

@@ -1,7 +1,8 @@
 # Gardener Issue Comment
 #
 # This workflow moves GH issues from the Gardener board's "Blocked / Waiting" column
-# to the "Triage", so that the Gardener can assess the issue in light of new information.
+# to "Triage", when a comment is posted on an issue from a non-team member
+# so that the Gardener can assess the issue in light of new information.
 
 name: Gardener Issue Comment
 
@@ -13,9 +14,25 @@ jobs:
   move-to-backlog:
     name: Move issues back to Gardener project board Triage
     runs-on: ubuntu-latest
-    if: contains(github.event.issue.url, 'issues')
+    if: ${{ !github.event.issue.pull_request }}
     steps:
+      - name: Generate authentication token
+        id: generate_token
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a
+        with:
+          app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
+
+      - name: Get PR comment author
+        id: comment
+        uses: tspascoal/get-user-teams-membership@v3
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+
       - name: Move issue back to Triage if status is Blocked/Waiting
+        if: steps.comment.outputs.isTeamMember == 'false'
         env:
           GH_TOKEN: ${{ secrets.GH_PROJECT_PAT }}
         run: |
@@ -79,7 +96,7 @@ jobs:
 
           # Extract the item in the Gardener project
           project=$(echo $project_items | jq -c -r --arg project_id $project_id '.data.node.projectItems.nodes[] | select(.project.id == $project_id)')
-          current_status=$(echo $project | jq -c '.fieldValueByName.name')
+          current_status=$(echo $project | jq -c -r '.fieldValueByName.name')
           item_id=$(echo $project | jq -c '.id')
 
           if [ -z "$current_status" ] ; then

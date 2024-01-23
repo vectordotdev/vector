@@ -6,8 +6,8 @@ use std::{
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
@@ -24,7 +24,7 @@ use crate::{
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
     ///
-    /// During this time frame, metrics with the same series data (name, namespace, tags, and so on) are aggregated.
+    /// During this time frame, metrics (beta) with the same series data (name, namespace, tags, and so on) are aggregated.
     #[serde(default = "default_interval_ms")]
     #[configurable(metadata(docs::human_name = "Flush Interval"))]
     pub interval_ms: u64,
@@ -49,7 +49,7 @@ impl TransformConfig for AggregateConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         _: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -155,7 +155,7 @@ mod tests {
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
+    use vector_lib::config::ComponentKey;
     use vrl::value::Kind;
 
     use super::*;
@@ -182,6 +182,9 @@ mod tests {
         event.metadata_mut().set_schema_definition(&Arc::new(
             Definition::new_with_default_metadata(Kind::any_object(), [LogNamespace::Legacy]),
         ));
+
+        event.metadata_mut().set_source_type("unit_test_stream");
+
         event
     }
 

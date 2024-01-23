@@ -1,11 +1,7 @@
+use crate::encoding::format::common::get_serializer_schema_requirement;
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
-use vector_core::{
-    config::{log_schema, DataType},
-    event::Event,
-    schema,
-};
-use vrl::value::Kind;
+use vector_core::{config::DataType, event::Event, schema};
 
 use crate::MetricTagValues;
 
@@ -17,10 +13,7 @@ pub struct TextSerializerConfig {
     ///
     /// When set to `single`, only the last non-bare value of tags are displayed with the
     /// metric.  When set to `full`, all metric tags are exposed as separate assignments.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub metric_tag_values: MetricTagValues,
 }
 
@@ -42,7 +35,7 @@ impl TextSerializerConfig {
 
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
-        schema::Requirement::empty().required_meaning(log_schema().message_key(), Kind::any())
+        get_serializer_schema_requirement()
     }
 }
 
@@ -67,15 +60,9 @@ impl Encoder<Event> for TextSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        let message_key = log_schema().message_key();
-
         match event {
             Event::Log(log) => {
-                if let Some(bytes) = log
-                    .get_by_meaning(message_key)
-                    .or_else(|| log.get(message_key))
-                    .map(|value| value.coerce_to_bytes())
-                {
+                if let Some(bytes) = log.get_message().map(|value| value.coerce_to_bytes()) {
                     buffer.put(bytes);
                 }
             }

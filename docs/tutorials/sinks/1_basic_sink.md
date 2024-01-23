@@ -33,7 +33,7 @@ is deserialized to the fields in this struct so the user can customise the
 sink's behaviour.
 
 ```rust
-#[configurable_component(sink("basic", "Basic sink."))]
+#[configurable_component(sink("basic"))]
 #[derive(Clone, Debug)]
 /// A basic sink that dumps its output to stdout.
 pub struct BasicConfig {
@@ -41,7 +41,7 @@ pub struct BasicConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -273,7 +273,7 @@ emit the event. Change the body of `run_inner` to look like the following:
 
 ## EventSent
 
-[`EventSent`][events_sent] is emmitted by each component in Vector to
+[`EventSent`][events_sent] is emitted by each component in Vector to
 instrument how many bytes have been sent to the next downstream component.
 
 Add the following after emitting `BytesSent`:
@@ -284,7 +284,7 @@ Add the following after emitting `BytesSent`:
 +         count: 1,
 +         byte_size: event_byte_size,
 +         output: None,
-+     })
++     });
 ```
 
 More details about instrumenting Vector can be found

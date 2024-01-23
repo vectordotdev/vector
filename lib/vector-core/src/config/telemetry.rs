@@ -1,8 +1,10 @@
-use once_cell::sync::{Lazy, OnceCell};
+use std::sync::OnceLock;
+
+use once_cell::sync::Lazy;
 use vector_common::request_metadata::GroupedCountByteSize;
 use vector_config::configurable_component;
 
-static TELEMETRY: OnceCell<Telemetry> = OnceCell::new();
+static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 static TELEMETRY_DEFAULT: Lazy<Telemetry> = Lazy::new(Telemetry::default);
 
 /// Loads the telemetry options from configurations and sets the global options.
@@ -85,9 +87,9 @@ mod test {
 
     #[test]
     fn partial_telemetry() {
-        let toml = r#"
+        let toml = r"
             emit_source = true
-        "#;
+        ";
         toml::from_str::<Telemetry>(toml).unwrap();
     }
 }

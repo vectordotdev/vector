@@ -1,0 +1,7 @@
+# Preserve the comments from the original TOML file
+# Structure and parse the data
+inputs: ["apache_logs"]
+type: "remap"
+drop_on_error: false
+source: |
+  . |= parse_apache_log!(string!(.message), "common")

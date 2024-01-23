@@ -5,7 +5,7 @@ use std::{
 
 use futures_util::{stream::Fuse, Stream, StreamExt};
 use pin_project::pin_project;
-use vector_core::event::Metric;
+use vector_lib::event::Metric;
 
 use super::buffer::metrics::{MetricNormalize, MetricNormalizer};
 

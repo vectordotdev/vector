@@ -36,10 +36,17 @@ following items should also be checked:
 - [ ] Does it comply with [component spec](specs/component.md)?
 - [ ] Does it comply with the [instrumentation spec](specs/instrumentation.md)?
 
+### Checklist - new source
+
+This checklist is specific for Vector's sources.
+
+- [ ] Does the source handle metrics? If it does, the Datadog Origin Metadata function (`sinks::datadog::metrics::encoder::source_type_to_service`),
+      which maps the source to the correct Service value, needs to be updated. If this source is an Agent role and thus is the true origin of it's
+      metrics, this will need to be a follow-up PR by a member of the Vector team.
 
 ### Checklist - new sink
 
-This checklist is specific for Vector's sink code.
+This checklist is specific for Vector's sinks.
 
 #### Logic
 

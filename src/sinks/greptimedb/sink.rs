@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
-use vector_core::event::{Metric, MetricValue};
+use vector_lib::event::{Metric, MetricValue};
 
 use crate::sinks::prelude::*;
 use crate::sinks::util::buffer::metrics::MetricNormalize;
@@ -37,7 +37,7 @@ impl GreptimeDBSink {
             .normalized_with_default::<GreptimeDBMetricNormalize>()
             .batched(
                 self.batch_settings
-                    .into_item_size_config(GreptimeDBBatchSizer::default()),
+                    .as_item_size_config(GreptimeDBBatchSizer),
             )
             .map(GreptimeDBRequest::from_metrics)
             .into_driver(self.service)

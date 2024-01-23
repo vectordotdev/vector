@@ -2,7 +2,7 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use hyper::Body;
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     gcp::{GcpAuthenticator, GcpError},
@@ -152,6 +152,7 @@ impl RetryLogic for GcsRetryLogic {
         let status = response.inner.status();
 
         match status {
+            StatusCode::UNAUTHORIZED => RetryAction::Retry("unauthorized".into()),
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())

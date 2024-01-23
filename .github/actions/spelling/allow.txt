@@ -25,6 +25,7 @@ Asus
 Atlassian
 Attab
 Audiosonic
+avsc
 Axioo
 Azend
 Bedove
@@ -44,15 +45,18 @@ Collectd
 Comcast
 Consolas
 Coolpad
+BADDCAFE
 DEBHELPER
-DOOV
 Danew
+dkr
 Dockerfiles
+DOOV
 Douban
 Enot
 Evercoss
 Explay
 FAQs
+FDO
 FQDNs
 Fabro
 Figma
@@ -105,11 +109,13 @@ Lifetab
 Lifetouch
 Lumia
 Malata
+manden
 Maxthon
 Mediacom
 Medion
 Meizu
 Mertz
+metakey
 Metakey
 Micromax
 Mito
@@ -136,6 +142,7 @@ PHILIPSTV
 POCs
 Panasonic
 Papyre
+pbs
 Phicomm
 Phototechnik
 Pingdom
@@ -147,6 +154,7 @@ Podcast
 Podkicker
 Positivo
 Prestigio
+pront
 Proscan
 Qmobilevn
 RPZ
@@ -248,6 +256,7 @@ corejs
 coreutils
 curta
 daemonset
+dalek
 databend
 datacenter
 datadog
@@ -319,6 +328,7 @@ https
 humungus
 icecream
 ifeq
+ifneq
 imobile
 influxd
 ionik
@@ -392,6 +402,7 @@ podman
 postgresql
 proxyuser
 pseudocode
+pushgateway
 qwerty
 rabbitmq
 rclone
@@ -401,9 +412,13 @@ rootfs
 roundrobin
 rpmbuild
 rpms
+rstest
 rsyslog
 rsyslogd
+security-tab
 servlet
+Sinjo
+sublocation
 snyk
 socketaddr
 solarwinds
@@ -424,6 +439,8 @@ userguide
 webhdfs
 winapi
 workarounds
+XCHACHA
+XSALSA
 yandex
 zeek
 zookeeper

@@ -1,21 +1,32 @@
 [licenses]
+unlicensed = "deny"
+default = "deny"
+copyleft = "deny"
 allow = [
-  "MIT",
-  "CC0-1.0",
-  "ISC",
-  "OpenSSL",
-  "Unlicense",
+  "0BSD",
+  "Apache-2.0",
   "BSD-2-Clause",
   "BSD-3-Clause",
-  "Apache-2.0",
-  "Apache-2.0 WITH LLVM-exception",
-  "Zlib",
+  "BSL-1.0",
+  "CC0-1.0",
+  "ISC",
+  "MIT",
+  "OpenSSL",
+  "Unicode-DFS-2016",
+  "Zlib"
 ]
 
-unlicensed = "warn"
-default = "warn"
-
 private = { ignore = true }
+
+exceptions = [
+    # MPL-2.0 are added case-by-case to make sure we are in compliance. To be in
+    # compliance we cannot be modifying the source files.
+    { allow = ["MPL-2.0"], name = "colored", version = "*" },
+    { allow = ["MPL-2.0"], name = "webpki-roots", version = "*" },
+    { allow = ["MPL-2.0"], name = "vector-config-common", version = "*" },
+    { allow = ["MPL-2.0"], name = "vector-config-macros", version = "*" },
+    { allow = ["MPL-2.0"], name = "vrl", version = "*" },
+]
 
 [[licenses.clarify]]
 name = "ring"
@@ -27,9 +38,8 @@ license-files = [
 
 [advisories]
 ignore = [
-    # The NATS official Rust clients are vulnerable to MitM when using TLS
-    #
-    # Will be resolved when we switch to `async_nats` crate
-    # https://github.com/vectordotdev/vector/pull/15533
-    "RUSTSEC-2023-0029",
+    # Vulnerability in `rsa` crate: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
+    # There is not fix available yet.
+    # https://github.com/vectordotdev/vector/issues/19262
+    "RUSTSEC-2023-0071"
 ]

@@ -20,7 +20,7 @@ remap: functions: parse_logfmt: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a properly formatted key/value string",
+		"`value` is not a properly formatted key-value string",
 	]
 	return: types: ["object"]
 

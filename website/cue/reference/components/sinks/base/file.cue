@@ -78,7 +78,20 @@ base: components: sinks: file: configuration: {
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
+						This codec is experimental for the following reason:
+
+						The GELF specification is more strict than the actual Graylog receiver.
+						Vector's encoder currently adheres more strictly to the GELF spec, with
+						the exception that some characters such as `@`  are allowed in field names.
+
+						Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
+						by Graylog, and is much more relaxed than the GELF spec.
+
+						Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
+						the codec may continue to relax the enforcement of specification.
+
 						[gelf]: https://docs.graylog.org/docs/gelf
+						[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 						"""
 					json: """
 						Encodes an event as [JSON][json].
@@ -106,6 +119,11 @@ base: components: sinks: file: configuration: {
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
+					protobuf: """
+						Encodes an event as a [Protobuf][protobuf] message.
+
+						[protobuf]: https://protobuf.dev/
+						"""
 					raw_message: """
 						No encoding.
 
@@ -131,18 +149,82 @@ base: components: sinks: file: configuration: {
 				description:   "The CSV Serializer Options."
 				relevant_when: "codec = \"csv\""
 				required:      true
-				type: object: options: fields: {
-					description: """
-						Configures the fields that will be encoded, as well as the order in which they
-						appear in the output.
+				type: object: options: {
+					capacity: {
+						description: """
+																Set the capacity (in bytes) of the internal buffer used in the CSV writer.
+																This defaults to a reasonable setting.
+																"""
+						required: false
+						type: uint: default: 8192
+					}
+					delimiter: {
+						description: "The field delimiter to use when writing CSV."
+						required:    false
+						type: uint: default: 44
+					}
+					double_quote: {
+						description: """
+																Enable double quote escapes.
 
-						If a field is not present in the event, the output will be an empty string.
+																This is enabled by default, but it may be disabled. When disabled, quotes in
+																field data are escaped instead of doubled.
+																"""
+						required: false
+						type: bool: default: true
+					}
+					escape: {
+						description: """
+																The escape character to use when writing CSV.
 
-						Values of type `Array`, `Object`, and `Regex` are not supported and the
-						output will be an empty string.
-						"""
-					required: true
-					type: array: items: type: string: {}
+																In some variants of CSV, quotes are escaped using a special escape character
+																like \\ (instead of escaping quotes by doubling them).
+
+																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+																"""
+						required: false
+						type: uint: default: 34
+					}
+					fields: {
+						description: """
+																Configures the fields that will be encoded, as well as the order in which they
+																appear in the output.
+
+																If a field is not present in the event, the output will be an empty string.
+
+																Values of type `Array`, `Object`, and `Regex` are not supported and the
+																output will be an empty string.
+																"""
+						required: true
+						type: array: items: type: string: {}
+					}
+					quote: {
+						description: "The quote character to use when writing CSV."
+						required:    false
+						type: uint: default: 34
+					}
+					quote_style: {
+						description: "The quoting style to use when writing CSV data."
+						required:    false
+						type: string: {
+							default: "necessary"
+							enum: {
+								always: "Always puts quotes around every field."
+								necessary: """
+																			Puts quotes around fields only when necessary.
+																			They are necessary when fields contain a quote, delimiter, or record terminator.
+																			Quotes are also necessary when writing an empty record
+																			(which is indistinguishable from a record with one empty field).
+																			"""
+								never: "Never writes quotes, even if it produces invalid CSV data."
+								non_numeric: """
+																			Puts quotes around all fields that are non-numeric.
+																			Namely, when writing a field that does not parse as a valid float or integer,
+																			then quotes are used even if they aren't strictly necessary.
+																			"""
+							}
+						}
+					}
 				}
 			}
 			except_fields: {
@@ -176,12 +258,37 @@ base: components: sinks: file: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			protobuf: {
+				description:   "Options for the Protobuf serializer."
+				relevant_when: "codec = \"protobuf\""
+				required:      true
+				type: object: options: {
+					desc_file: {
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -o <path> ...`
+																"""
+						required: true
+						type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
+					}
+					message_type: {
+						description: "The name of the message type to use for serializing."
+						required:    true
+						type: string: examples: ["package.Message"]
+					}
+				}
+			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
@@ -231,6 +338,20 @@ base: components: sinks: file: configuration: {
 			unit: "seconds"
 		}
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type: object: options: include_file_tag: {
+			description: """
+				Whether or not to include the "file" tag on the component's corresponding internal metrics.
+
+				This is useful for distinguishing between different files while monitoring. However, the tag's
+				cardinality is unbounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
+	}
 	path: {
 		description: """
 			File path to write events to.
@@ -242,5 +363,16 @@ base: components: sinks: file: configuration: {
 			examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log", "/tmp/vector-%Y-%m-%d.log.zst"]
 			syntax: "template"
 		}
+	}
+	timezone: {
+		description: """
+			Timezone to use for any date specifiers in template strings.
+
+			This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone. It will default to the [globally configured timezone](https://vector.dev/docs/reference/configuration/global-options/#timezone).
+
+			[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+			"""
+		required: false
+		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
 }

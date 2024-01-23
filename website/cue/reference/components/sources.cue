@@ -176,6 +176,11 @@ components: sources: [Name=string]: {
 								type: string: {
 									default: "bytes"
 									enum: {
+										avro: """
+											Decodes the raw bytes as an [Apache Avro][apache_avro] record.
+
+											[apache_avro]: https://avro.apache.org/
+											"""
 										bytes: "Uses the raw bytes as-is."
 										json: """
 											Decodes the raw bytes as [JSON][json].
@@ -342,7 +347,7 @@ components: sources: [Name=string]: {
 								required:    false
 								type: string: {
 									default: null
-									examples: [ "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
+									examples: ["CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
 								}
 							}
 						}
@@ -356,9 +361,11 @@ components: sources: [Name=string]: {
 		_tls: {
 			title: "Transport Layer Security (TLS)"
 			body:  """
-				  Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols. You can
-				  adjust TLS behavior via the `tls.*` options.
-				  """
+				Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols due to OpenSSL's maturity. You can
+				enable and adjust TLS behavior via the `tls.*` options and/or via an
+				[OpenSSL configuration file](\(urls.openssl_conf)). The file location defaults to
+				`/usr/local/ssl/openssl.cnf` or can be specified with the `OPENSSL_CONF` environment variable.
+				"""
 		}
 
 		if features.collect != _|_ {

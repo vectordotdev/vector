@@ -13,7 +13,7 @@ use futures::{stream, SinkExt, Stream, StreamExt};
 use futures_util::Future;
 use once_cell::sync::Lazy;
 use tokio::{pin, select, time::sleep};
-use vector_core::event_test_util;
+use vector_lib::event_test_util;
 
 use crate::{
     config::{SourceConfig, SourceContext},
@@ -42,12 +42,7 @@ pub const HTTP_PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
 pub const HTTP_PUSH_SOURCE_TAGS: [&str; 2] = ["http_path", "protocol"];
 
 /// The standard set of tags for all generic socket-based sources that accept connections i.e. `TcpSource`.
-pub const SOCKET_PUSH_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
-
-/// The standard set of tags for all generic socket-based sources that accept connections i.e. `TcpSource`, but
-/// specifically sources that experience high cardinality i.e. many many clients, where emitting metrics with the peer
-/// address as a tag would represent too high of a cost to pay.
-pub const SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS: [&str; 1] = ["protocol"];
+pub const SOCKET_PUSH_SOURCE_TAGS: [&str; 1] = ["protocol"];
 
 /// The standard set of tags for all generic socket-based sources that poll connections i.e. Redis.
 pub const SOCKET_PULL_SOURCE_TAGS: [&str; 2] = ["remote_addr", "protocol"];
