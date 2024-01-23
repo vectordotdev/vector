@@ -188,7 +188,7 @@ fn filter_events_by_metric_and_component<'a>(
     component_id: &'a str,
 ) -> Vec<&'a Metric> {
     info!(
-        "filter looking for metric {} {}",
+        "Filter looking for metric {} {}",
         metric.to_string(),
         component_id
     );
