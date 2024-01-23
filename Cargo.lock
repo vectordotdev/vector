@@ -1716,9 +1716,9 @@ checksum = "a3e368af43e418a04d52505cf3dbc23dda4e3407ae2fa99fd0e4f308ce546acc"
 
 [[package]]
 name = "cached"
-version = "0.48.0"
+version = "0.48.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e19d1059a4bedbc76b73980269f4195a0f54e046a113affdbbdd7184cef62745"
+checksum = "355face540df58778b96814c48abb3c2ed67c4878a8087ab1819c1fedeec505f"
 dependencies = [
  "ahash 0.8.6",
  "cached_proc_macro",
@@ -1731,9 +1731,9 @@ dependencies = [
 
 [[package]]
 name = "cached_proc_macro"
-version = "0.19.0"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9702122b4ca80256cfde5dfa743b9ffee02896be8b193b75d1e5970edaf78af3"
+checksum = "9d52f526f7cbc875b296856ca8c964a9f6290556922c303a8a3883e3c676e6a1"
 dependencies = [
  "darling 0.14.4",
  "proc-macro2 1.0.76",
@@ -1743,9 +1743,9 @@ dependencies = [
 
 [[package]]
 name = "cached_proc_macro_types"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a4f925191b4367301851c6d99b09890311d74b0d43f274c0b34c86d308a3663"
+checksum = "ade8366b8bd5ba243f0a58f036cc0ca8a2f069cff1a2351ef1cac6b083e16fc0"
 
 [[package]]
 name = "cargo_toml"
