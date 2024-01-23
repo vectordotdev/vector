@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 anyhow = "1.0.79"
 cached = "0.48.0"
-chrono = { version = "0.4.31", default-features = false, features = ["serde", "clock"] }
+chrono = { version = "0.4.32", default-features = false, features = ["serde", "clock"] }
 clap.workspace = true
 clap-verbosity-flag = "2.1.2"
 clap_complete = "4.4.9"
