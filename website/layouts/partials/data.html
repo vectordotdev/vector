@@ -318,7 +318,7 @@
 
   {{/* Source/transform/sink examples */}}
   {{ with .component_examples }}
-  {{ $formats := slice "toml" "yaml" "json" }}
+  {{ $formats := slice "yaml"  "toml" "json" }}
   {{ $defaultFormat := index $formats 0 }}
   <div class="no-prose flex flex-col divide-y dark:divide-gray-700">
     {{ range . }}
@@ -687,6 +687,16 @@
           {{ partial "badge.html" (dict "word" "infallible" "color" "blue" "inline" true "href" $href) }}
           {{ else }}
           {{ partial "badge.html" (dict "word" "fallible" "color" "yellow" "inline" true "href" $href) }}
+          {{ end }}
+          {{/* Deprecation Badge */}}
+          {{ if $func.deprecated }}
+          {{ partial "badge.html" (dict "word" "deprecated" "color" "red" "inline" true "href" $href) }}
+          {{ end }}
+          {{/* Pure Badge */}}
+          {{ if $func.pure }}
+          {{ partial "badge.html" (dict "word" "pure" "color" "green" "inline" true "href" $href) }}
+          {{ else }}
+          {{ partial "badge.html" (dict "word" "impure" "color" "yellow" "inline" true "href" $href) }}
           {{ end }}
         </span>
       </span>
@@ -2189,7 +2199,7 @@
             {{ partial "heading.html" (dict "text" .title "level" 4) }}
           </span>
 
-          {{ $formats := slice "toml" "yaml" "json" }}
+          {{ $formats := slice "yaml"  "toml" "json" }}
           <div class="flex space-x-2">
             {{ range $formats }}
             <button @click="$store.global.setFormat('{{ . }}')"

@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use codecs::encoding::{Framer, FramingConfig};
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
-use vector_config::{component::GenerateConfig, configurable_component};
-use vector_core::tls::TlsSettings;
+use vector_lib::codecs::encoding::{Framer, FramingConfig};
+use vector_lib::configurable::{component::GenerateConfig, configurable_component};
+use vector_lib::tls::TlsSettings;
 
 use crate::{
     codecs::{Encoder, EncodingConfig},
@@ -73,7 +73,7 @@ pub struct DatabendConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -116,7 +116,7 @@ impl SinkConfig for DatabendConfig {
             DatabendAPIClient::new(self.build_client(&cx)?, endpoint.clone(), auth.clone());
         let healthcheck = select_one(health_client).boxed();
 
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let database = config.database;

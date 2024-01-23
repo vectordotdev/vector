@@ -1,0 +1,35 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  syslog:
+    type:       "syslog"
+    address:    "0.0.0.0:8282"
+    max_length: 1500000
+    mode:       "tcp"
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  humio_logs:
+    type:     "humio_logs"
+    inputs: [ "syslog" ]
+    endpoint: "http://localhost:8080"
+    encoding:
+      codec: "json"
+    token:    "humio_token"
+    healthcheck:
+      enabled: false

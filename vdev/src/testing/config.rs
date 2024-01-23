@@ -151,7 +151,7 @@ impl IntegrationTestConfig {
                 let config: Environment = self
                     .matrix
                     .keys()
-                    .zip(product.into_iter())
+                    .zip(product)
                     .map(|(variable, value)| (variable.clone(), Some(value.clone())))
                     .collect();
                 (key, config)

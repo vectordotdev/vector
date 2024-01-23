@@ -1,8 +1,8 @@
-use codecs::{
+use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
@@ -23,7 +23,7 @@ pub struct SocketSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -164,7 +164,6 @@ mod test {
         net::{SocketAddr, UdpSocket},
     };
 
-    use codecs::JsonSerializerConfig;
     use futures::stream::StreamExt;
     use futures_util::stream;
     use serde_json::Value;
@@ -174,6 +173,7 @@ mod test {
     };
     use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
+    use vector_lib::codecs::JsonSerializerConfig;
 
     use super::*;
     use crate::{

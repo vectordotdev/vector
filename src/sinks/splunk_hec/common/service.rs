@@ -13,8 +13,8 @@ use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
-use vector_common::request_metadata::MetaDescriptive;
-use vector_core::event::EventStatus;
+use vector_lib::event::EventStatus;
+use vector_lib::request_metadata::MetaDescriptive;
 
 use super::{
     acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig},
@@ -282,7 +282,8 @@ mod tests {
     use bytes::Bytes;
     use futures_util::{poll, stream::FuturesUnordered, StreamExt};
     use tower::{util::BoxService, Service, ServiceExt};
-    use vector_core::{
+    use vector_lib::internal_event::CountByteSize;
+    use vector_lib::{
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
     };
@@ -339,7 +340,11 @@ mod tests {
         let body = Bytes::from("test-message");
         let events_byte_size = body.len();
 
-        let builder = RequestMetadataBuilder::new(1, events_byte_size, events_byte_size.into());
+        let builder = RequestMetadataBuilder::new(
+            1,
+            events_byte_size,
+            CountByteSize(1, events_byte_size.into()).into(),
+        );
         let bytes_len =
             NonZeroUsize::new(events_byte_size).expect("payload should never be zero length");
         let metadata = builder.with_request_size(bytes_len);

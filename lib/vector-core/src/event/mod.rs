@@ -1,11 +1,5 @@
-use std::{
-    collections::BTreeMap,
-    convert::{TryFrom, TryInto},
-    fmt::Debug,
-    sync::Arc,
-};
+use std::{convert::TryInto, fmt::Debug, sync::Arc};
 
-use crate::{config::OutputId, ByteSizeOf};
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
@@ -13,22 +7,22 @@ pub use finalization::{
     Finalizable,
 };
 pub use log_event::LogEvent;
-pub use metadata::{EventMetadata, WithMetadata};
+pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
 use vector_common::{
-    config::ComponentKey,
-    finalization,
-    json_size::JsonSize,
-    request_metadata::{EventCountTags, GetEventCountTags},
-    EventDataEq,
+    byte_size_of::ByteSizeOf, config::ComponentKey, finalization, internal_event::TaggedEventsSent,
+    json_size::JsonSize, request_metadata::GetEventCountTags, EventDataEq,
 };
-pub use vrl::value::Value;
+pub use vrl::value::{KeyString, ObjectMap, Value};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
+
+use crate::config::LogNamespace;
+use crate::config::OutputId;
 
 pub mod array;
 pub mod discriminant;
@@ -97,7 +91,7 @@ impl Finalizable for Event {
 }
 
 impl GetEventCountTags for Event {
-    fn get_tags(&self) -> EventCountTags {
+    fn get_tags(&self) -> TaggedEventsSent {
         match self {
             Event::Log(log) => log.get_tags(),
             Event::Metric(metric) => metric.get_tags(),
@@ -314,10 +308,22 @@ impl Event {
         self.metadata_mut().set_upstream_id(upstream_id);
     }
 
+    /// Sets the `source_type` in the event metadata to the provided value.
+    pub fn set_source_type(&mut self, source_type: &'static str) {
+        self.metadata_mut().set_source_type(source_type);
+    }
+
     /// Sets the `source_id` in the event metadata to the provided value.
     #[must_use]
     pub fn with_source_id(mut self, source_id: Arc<ComponentKey>) -> Self {
         self.metadata_mut().set_source_id(source_id);
+        self
+    }
+
+    /// Sets the `source_type` in the event metadata to the provided value.
+    #[must_use]
+    pub fn with_source_type(mut self, source_type: &'static str) -> Self {
+        self.metadata_mut().set_source_type(source_type);
         self
     }
 
@@ -326,6 +332,31 @@ impl Event {
     pub fn with_upstream_id(mut self, upstream_id: Arc<OutputId>) -> Self {
         self.metadata_mut().set_upstream_id(upstream_id);
         self
+    }
+
+    /// Creates an Event from a JSON value.
+    ///
+    /// # Errors
+    /// If a non-object JSON value is passed in with the `Legacy` namespace, this will return an error.
+    pub fn from_json_value(
+        value: serde_json::Value,
+        log_namespace: LogNamespace,
+    ) -> crate::Result<Self> {
+        match log_namespace {
+            LogNamespace::Vector => Ok(LogEvent::from(Value::from(value)).into()),
+            LogNamespace::Legacy => match value {
+                serde_json::Value::Object(fields) => Ok(LogEvent::from(
+                    fields
+                        .into_iter()
+                        .map(|(k, v)| (k.into(), v.into()))
+                        .collect::<ObjectMap>(),
+                )
+                .into()),
+                _ => Err(crate::Error::from(
+                    "Attempted to convert non-Object JSON into an Event.",
+                )),
+            },
+        }
     }
 }
 
@@ -347,25 +378,6 @@ impl finalization::AddBatchNotifier for Event {
             Self::Log(log) => log.add_finalizer(finalizer),
             Self::Metric(metric) => metric.add_finalizer(finalizer),
             Self::Trace(trace) => trace.add_finalizer(finalizer),
-        }
-    }
-}
-
-impl TryFrom<serde_json::Value> for Event {
-    type Error = crate::Error;
-
-    fn try_from(map: serde_json::Value) -> Result<Self, Self::Error> {
-        match map {
-            serde_json::Value::Object(fields) => Ok(LogEvent::from(
-                fields
-                    .into_iter()
-                    .map(|(k, v)| (k, v.into()))
-                    .collect::<BTreeMap<_, _>>(),
-            )
-            .into()),
-            _ => Err(crate::Error::from(
-                "Attempted to convert non-Object JSON into an Event.",
-            )),
         }
     }
 }

@@ -50,17 +50,63 @@ base: components: sources: amqp: configuration: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: {
+			avro: {
+				description:   "Apache Avro-specific encoder options."
+				relevant_when: "codec = \"avro\""
+				required:      true
+				type: object: options: {
+					schema: {
+						description: """
+																The Avro schema definition.
+																Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+																* `Date`
+																* `Decimal`
+																* `Duration`
+																* `Fixed`
+																* `TimeMillis`
+																"""
+						required: true
+						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
+					}
+					strip_schema_id_prefix: {
+						description: """
+																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to true to strip the schema ID prefix.
+																According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
+																"""
+						required: true
+						type: bool: {}
+					}
+				}
+			}
 			codec: {
 				description: "The codec to use for decoding events."
 				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
+						avro: """
+															Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+
+															[apache_avro]: https://avro.apache.org/
+															"""
 						bytes: "Uses the raw bytes as-is."
 						gelf: """
 															Decodes the raw bytes as a [GELF][gelf] message.
 
+															This codec is experimental for the following reason:
+
+															The GELF specification is more strict than the actual Graylog receiver.
+															Vector's decoder currently adheres more strictly to the GELF spec, with
+															the exception that some characters such as `@`  are allowed in field names.
+
+															Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
+															by Graylog, and is much more relaxed than the GELF spec.
+
+															Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
+															the codec may continue to relax the enforcement of specification.
+
 															[gelf]: https://docs.graylog.org/docs/gelf
+															[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 															"""
 						json: """
 															Decodes the raw bytes as [JSON][json].
@@ -68,7 +114,7 @@ base: components: sources: amqp: configuration: {
 															[json]: https://www.json.org/
 															"""
 						native: """
-															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
 															This codec is **[experimental][experimental]**.
 
@@ -76,12 +122,17 @@ base: components: sources: amqp: configuration: {
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
 						native_json: """
-															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+															Decodes the raw bytes as [native JSON format][vector_native_json].
 
 															This codec is **[experimental][experimental]**.
 
 															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						protobuf: """
+															Decodes the raw bytes as [protobuf][protobuf].
+
+															[protobuf]: https://protobuf.dev/
 															"""
 						syslog: """
 															Decodes the raw bytes as a Syslog message.
@@ -141,6 +192,23 @@ base: components: sources: amqp: configuration: {
 						"""
 					required: false
 					type: bool: default: true
+				}
+			}
+			protobuf: {
+				description:   "Protobuf-specific decoding options."
+				relevant_when: "codec = \"protobuf\""
+				required:      false
+				type: object: options: {
+					desc_file: {
+						description: "Path to desc file"
+						required:    false
+						type: string: default: ""
+					}
+					message_type: {
+						description: "message type. e.g package.message"
+						required:    false
+						type: string: default: ""
+					}
 				}
 			}
 			syslog: {

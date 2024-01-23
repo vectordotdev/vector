@@ -43,6 +43,7 @@ async fn receive_logs_legacy_namespace() {
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
@@ -89,8 +90,8 @@ async fn receive_logs_legacy_namespace() {
         let events = collect_n(logs_output, 2).await;
         assert_eq!(events.len(), 2);
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            events[1].as_log()[log_schema().message_key()]
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()]
         );
     })
     .await;

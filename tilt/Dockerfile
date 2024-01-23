@@ -1,5 +1,5 @@
 ARG RUST_VERSION
-ARG DEBIAN_RELEASE=bullseye
+ARG DEBIAN_RELEASE=bookworm
 # Features required for both Agent and Aggregator Helm chart configurations
 ARG FEATURES=api,api-client,sources-datadog_agent,sources-fluent,sources-host_metrics,sources-internal_metrics,sources-kubernetes_logs,sources-logstash,sources-splunk_hec,sources-statsd,sources-syslog,sources-vector,sinks-console,sinks-prometheus,sinks-vector
 
@@ -7,12 +7,20 @@ ARG FEATURES=api,api-client,sources-datadog_agent,sources-fluent,sources-host_me
 # VECTOR BUILDER
 #
 FROM docker.io/rust:${RUST_VERSION}-${DEBIAN_RELEASE} as builder
-RUN apt-get update && apt-get -y --no-install-recommends install build-essential git clang cmake libclang-dev libsasl2-dev libstdc++-10-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g
-RUN git clone https://github.com/rui314/mold.git && cd mold && git checkout v1.2.1 && make -j"$(nproc)" && make install
+RUN apt-get update && apt-get -y --no-install-recommends install build-essential git clang cmake libclang-dev libsasl2-dev libstdc++-11-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g
+RUN git clone https://github.com/rui314/mold.git \
+    && mkdir mold/build \
+    && cd mold/build \
+    && git checkout v2.0.0 \
+    && ../install-build-deps.sh \
+    && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=c++ .. \
+    && cmake --build . -j $(nproc) \
+    && cmake --install .
 
 WORKDIR /vector
 COPY . .
 ARG FEATURES
+RUN scripts/environment/install-protoc.sh
 RUN --mount=type=cache,target=/vector/target \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \

@@ -22,6 +22,7 @@ macro_rules! mapping {
 
 static SOURCE_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     mapping!(
+        prometheus_pushgateway => prometheus,
         prometheus_scrape => prometheus,
         prometheus_remote_write => prometheus,
     )

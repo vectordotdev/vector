@@ -21,10 +21,9 @@ pub use config::*;
 pub use encoder::ElasticsearchEncoder;
 use http::{uri::InvalidUri, Request};
 use snafu::Snafu;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
-use crate::aws::AwsAuthentication;
 use crate::{
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
@@ -36,7 +35,7 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 #[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
-pub enum ElasticsearchAuth {
+pub enum ElasticsearchAuthConfig {
     /// HTTP Basic Authentication.
     Basic {
         /// Basic authentication username.
@@ -50,8 +49,9 @@ pub enum ElasticsearchAuth {
         password: SensitiveString,
     },
 
+    #[cfg(feature = "aws-core")]
     /// Amazon OpenSearch Service-specific authentication.
-    Aws(AwsAuthentication),
+    Aws(crate::aws::AwsAuthentication),
 }
 
 /// Elasticsearch Indexing mode.
@@ -210,6 +210,7 @@ pub enum ParseError {
     IndexTemplate { source: TemplateParseError },
     #[snafu(display("Batch action template parse error: {}", source))]
     BatchActionTemplate { source: TemplateParseError },
+    #[cfg(feature = "aws-core")]
     #[snafu(display("aws.region required when AWS authentication is in use"))]
     RegionRequired,
     #[snafu(display("Endpoints option must be specified"))]

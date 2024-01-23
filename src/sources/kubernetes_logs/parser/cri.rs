@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
-use lookup::path;
-use vector_common::conversion;
-use vector_core::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::conversion;
+use vector_lib::lookup::path;
 
+use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 use crate::{
     event::{self, Event, Value},
     internal_events::{
@@ -40,20 +41,17 @@ impl Cri {
 
 impl FunctionTransform for Cri {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let message_field = match self.log_namespace {
-            LogNamespace::Vector => ".",
-            LogNamespace::Legacy => log_schema().message_key(),
-        };
+        let message_path = get_message_path(self.log_namespace);
 
         // Get the log field with the message, if it exists, and coerce it to bytes.
         let log = event.as_mut_log();
-        let value = log.remove(message_field).map(|s| s.coerce_to_bytes());
+        let value = log.remove(&message_path).map(|s| s.coerce_to_bytes());
         match value {
             None => {
                 // The message field was missing, inexplicably. If we can't find the message field, there's nothing for
                 // us to actually decode, so there's no event we could emit, and so we just emit the error and return.
                 emit!(ParserMissingFieldError::<DROP_EVENT> {
-                    field: message_field
+                    field: &message_path.to_string()
                 });
                 return;
             }
@@ -70,7 +68,7 @@ impl FunctionTransform for Cri {
                     // MESSAGE
                     // Insert either directly into `.` or `log_schema().message_key()`,
                     // overwriting the original "full" CRI log that included additional fields.
-                    drop(log.insert(message_field, Value::Bytes(s.slice_ref(parsed_log.message))));
+                    drop(log.insert(&message_path, Value::Bytes(s.slice_ref(parsed_log.message))));
 
                     // MULTILINE_TAG
                     // If the MULTILINE_TAG is 'P' (partial), insert our generic `_partial` key.

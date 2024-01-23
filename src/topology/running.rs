@@ -12,24 +12,27 @@ use tokio::{
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
-use vector_buffers::topology::channel::BufferSender;
-use vector_common::trigger::DisabledTrigger;
+use vector_lib::buffers::topology::channel::BufferSender;
+use vector_lib::trigger::DisabledTrigger;
 
-use super::{TapOutput, TapResource};
+use super::{
+    builder,
+    builder::TopologyPieces,
+    fanout::{ControlChannel, ControlMessage},
+    handle_errors, retain, take_healthchecks,
+    task::TaskOutput,
+    BuiltBuffer, TapOutput, TapResource, TaskHandle, WatchRx, WatchTx,
+};
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
+    extra_context::ExtraContext,
     shutdown::SourceShutdownCoordinator,
+    signal::ShutdownError,
     spawn_named,
-    topology::{
-        build_or_log_errors, builder,
-        builder::Pieces,
-        fanout::{ControlChannel, ControlMessage},
-        handle_errors, retain, take_healthchecks,
-        task::TaskOutput,
-        BuiltBuffer, TaskHandle, WatchRx, WatchTx,
-    },
 };
+
+pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
@@ -42,14 +45,14 @@ pub struct RunningTopology {
     shutdown_coordinator: SourceShutdownCoordinator,
     detach_triggers: HashMap<ComponentKey, DisabledTrigger>,
     pub(crate) config: Config,
-    abort_tx: mpsc::UnboundedSender<()>,
+    pub(crate) abort_tx: mpsc::UnboundedSender<ShutdownError>,
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
 }
 
 impl RunningTopology {
-    pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<()>) -> Self {
+    pub fn new(config: Config, abort_tx: mpsc::UnboundedSender<ShutdownError>) -> Self {
         Self {
             inputs: HashMap::new(),
             inputs_tap_metadata: HashMap::new(),
@@ -217,7 +220,11 @@ impl RunningTopology {
     ///
     /// If all changes from the new configuration cannot be made, and the current configuration
     /// cannot be fully restored, then `Err(())` is returned.
-    pub async fn reload_config_and_respawn(&mut self, new_config: Config) -> Result<bool, ()> {
+    pub async fn reload_config_and_respawn(
+        &mut self,
+        new_config: Config,
+        extra_context: ExtraContext,
+    ) -> Result<bool, ()> {
         info!("Reloading running topology with new configuration.");
 
         if self.config.global != new_config.global {
@@ -247,7 +254,13 @@ impl RunningTopology {
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
-        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
+        if let Some(mut new_pieces) = TopologyPieces::build_or_log_errors(
+            &new_config,
+            &diff,
+            buffers.clone(),
+            extra_context.clone(),
+        )
+        .await
         {
             // If healthchecks are configured for any of the changing/new components, try running
             // them before moving forward with connecting and spawning.  In some cases, healthchecks
@@ -272,7 +285,10 @@ impl RunningTopology {
         warn!("Failed to completely load new configuration. Restoring old configuration.");
 
         let diff = diff.flip();
-        if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff, buffers).await {
+        if let Some(mut new_pieces) =
+            TopologyPieces::build_or_log_errors(&self.config, &diff, buffers, extra_context.clone())
+                .await
+        {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
@@ -294,7 +310,7 @@ impl RunningTopology {
     pub(crate) async fn run_healthchecks(
         &mut self,
         diff: &ConfigDiff,
-        pieces: &mut Pieces,
+        pieces: &mut TopologyPieces,
         options: HealthcheckOptions,
     ) -> bool {
         if options.enabled {
@@ -526,7 +542,11 @@ impl RunningTopology {
     }
 
     /// Connects all changed/added components in the given configuration diff.
-    pub(crate) async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
+    pub(crate) async fn connect_diff(
+        &mut self,
+        diff: &ConfigDiff,
+        new_pieces: &mut TopologyPieces,
+    ) {
         debug!("Connecting changed/added component(s).");
 
         // Update tap metadata
@@ -653,7 +673,11 @@ impl RunningTopology {
         }
     }
 
-    async fn setup_outputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+    async fn setup_outputs(
+        &mut self,
+        key: &ComponentKey,
+        new_pieces: &mut builder::TopologyPieces,
+    ) {
         let outputs = new_pieces.outputs.remove(key).unwrap();
         for (port, output) in outputs {
             debug!(component = %key, output_id = ?port, "Configuring output for component.");
@@ -671,7 +695,7 @@ impl RunningTopology {
         &mut self,
         key: &ComponentKey,
         diff: &ConfigDiff,
-        new_pieces: &mut builder::Pieces,
+        new_pieces: &mut builder::TopologyPieces,
     ) {
         let (tx, inputs) = new_pieces.inputs.remove(key).unwrap();
 
@@ -793,7 +817,7 @@ impl RunningTopology {
     }
 
     /// Starts any new or changed components in the given configuration diff.
-    pub(crate) fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
+    pub(crate) fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: TopologyPieces) {
         for key in &diff.sources.to_change {
             debug!(message = "Spawning changed source.", key = %key);
             self.spawn_source(key, &mut new_pieces);
@@ -825,20 +849,18 @@ impl RunningTopology {
         }
     }
 
-    fn spawn_sink(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+    fn spawn_sink(&mut self, key: &ComponentKey, new_pieces: &mut builder::TopologyPieces) {
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
             "sink",
             component_kind = "sink",
             component_id = %task.id(),
             component_type = %task.typetag(),
-            // maintained for compatibility
-            component_name = %task.id(),
         );
 
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
-        {
+        if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
                 "sink".to_string(),
@@ -855,27 +877,31 @@ impl RunningTopology {
         }
 
         let task_name = format!(">> {} ({})", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span);
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::SinkAborted { key, error }
+            })
+        }
+        .instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
         }
     }
 
-    fn spawn_transform(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+    fn spawn_transform(&mut self, key: &ComponentKey, new_pieces: &mut builder::TopologyPieces) {
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
             "transform",
             component_kind = "transform",
             component_id = %task.id(),
             component_type = %task.typetag(),
-            // maintained for compatibility
-            component_name = %task.id(),
         );
 
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
-        {
+        if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
                 "transform".to_string(),
@@ -892,27 +918,31 @@ impl RunningTopology {
         }
 
         let task_name = format!(">> {} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span);
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::TransformAborted { key, error }
+            })
+        }
+        .instrument(task_span);
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
         }
     }
 
-    fn spawn_source(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
+    fn spawn_source(&mut self, key: &ComponentKey, new_pieces: &mut builder::TopologyPieces) {
         let task = new_pieces.tasks.remove(key).unwrap();
         let span = error_span!(
             "source",
             component_kind = "source",
             component_id = %task.id(),
             component_type = %task.typetag(),
-            // maintained for compatibility
-            component_name = %task.id(),
         );
 
         let task_span = span.or_current();
         #[cfg(feature = "allocation-tracing")]
-        {
+        if crate::internal_telemetry::allocations::is_allocation_tracing_enabled() {
             let group_id = crate::internal_telemetry::allocations::acquire_allocation_group_id(
                 task.id().to_string(),
                 "source".to_string(),
@@ -930,7 +960,13 @@ impl RunningTopology {
         }
 
         let task_name = format!("{} ({}) >>", task.typetag(), task.id());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(task_span.clone());
+        let task = {
+            let key = key.clone();
+            handle_errors(task, self.abort_tx.clone(), |error| {
+                ShutdownError::SourceAborted { key, error }
+            })
+        }
+        .instrument(task_span.clone());
         let spawned = spawn_named(task, task_name.as_ref());
         if let Some(previous) = self.tasks.insert(key.clone(), spawned) {
             drop(previous); // detach and forget
@@ -941,9 +977,72 @@ impl RunningTopology {
 
         // Now spawn the actual source task.
         let source_task = new_pieces.source_tasks.remove(key).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(task_span);
+        let source_task = {
+            let key = key.clone();
+            handle_errors(source_task, self.abort_tx.clone(), |error| {
+                ShutdownError::SourceAborted { key, error }
+            })
+        }
+        .instrument(task_span);
         self.source_tasks
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
+    }
+
+    pub async fn start_init_validated(
+        config: Config,
+        extra_context: ExtraContext,
+    ) -> Option<(Self, ShutdownErrorReceiver)> {
+        let diff = ConfigDiff::initial(&config);
+        let pieces =
+            TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new(), extra_context)
+                .await?;
+        Self::start_validated(config, diff, pieces).await
+    }
+
+    pub async fn start_validated(
+        config: Config,
+        diff: ConfigDiff,
+        mut pieces: TopologyPieces,
+    ) -> Option<(Self, ShutdownErrorReceiver)> {
+        let (abort_tx, abort_rx) = mpsc::unbounded_channel();
+
+        let expire_metrics = match (
+            config.global.expire_metrics,
+            config.global.expire_metrics_secs,
+        ) {
+            (Some(e), None) => {
+                warn!(
+                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
+            );
+                Some(e.as_secs_f64())
+            }
+            (Some(_), Some(_)) => {
+                error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
+                return None;
+            }
+            (None, e) => e,
+        };
+
+        if let Err(error) = crate::metrics::Controller::get()
+            .expect("Metrics must be initialized")
+            .set_expiry(expire_metrics)
+        {
+            error!(message = "Invalid metrics expiry.", %error);
+            return None;
+        }
+
+        let mut running_topology = Self::new(config, abort_tx);
+
+        if !running_topology
+            .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)
+            .await
+        {
+            return None;
+        }
+        running_topology.connect_diff(&diff, &mut pieces).await;
+        running_topology.spawn_diff(&diff, pieces);
+
+        Some((running_topology, abort_rx))
     }
 }
 

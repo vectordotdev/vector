@@ -44,10 +44,7 @@ pub struct ClickhouseConfig {
     pub compression: Compression,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
     #[configurable(derived)]
@@ -68,7 +65,7 @@ pub struct ClickhouseConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -95,7 +92,7 @@ impl SinkConfig for ClickhouseConfig {
             self.date_time_best_effort,
         );
 
-        let request_limits = self.request.unwrap_with(&Default::default());
+        let request_limits = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_limits, ClickhouseRetryLogic::default())
             .service(service);
@@ -130,8 +127,17 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
+fn get_healthcheck_uri(endpoint: &Uri) -> String {
+    let mut uri = endpoint.to_string();
+    if !uri.ends_with('/') {
+        uri.push('/');
+    }
+    uri.push_str("?query=SELECT%201");
+    uri
+}
+
 async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
-    let uri = format!("{}/?query=SELECT%201", endpoint);
+    let uri = get_healthcheck_uri(&endpoint);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {
@@ -153,5 +159,21 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ClickhouseConfig>();
+    }
+
+    #[test]
+    fn test_get_healthcheck_uri() {
+        assert_eq!(
+            get_healthcheck_uri(&"http://localhost:8123".parse().unwrap()),
+            "http://localhost:8123/?query=SELECT%201"
+        );
+        assert_eq!(
+            get_healthcheck_uri(&"http://localhost:8123/".parse().unwrap()),
+            "http://localhost:8123/?query=SELECT%201"
+        );
+        assert_eq!(
+            get_healthcheck_uri(&"http://localhost:8123/path/".parse().unwrap()),
+            "http://localhost:8123/path/?query=SELECT%201"
+        );
     }
 }

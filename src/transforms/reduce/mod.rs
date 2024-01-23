@@ -1,3 +1,6 @@
+use futures::Stream;
+use indexmap::IndexMap;
+use serde_with::serde_as;
 use std::collections::BTreeMap;
 use std::{
     collections::{hash_map, HashMap},
@@ -5,14 +8,9 @@ use std::{
     pin::Pin,
     time::{Duration, Instant},
 };
-
-use async_stream::stream;
-use futures::{stream, Stream, StreamExt};
-use indexmap::IndexMap;
-use lookup::lookup_v2::parse_target_path;
-use lookup::PathPrefix;
-use serde_with::serde_as;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::parse_target_path;
+use vector_lib::lookup::PathPrefix;
 
 use crate::config::OutputId;
 use crate::{
@@ -29,9 +27,10 @@ mod merge_strategy;
 use crate::config::schema::Definition;
 use crate::event::Value;
 pub use merge_strategy::*;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
 use vrl::value::kind::Collection;
-use vrl::value::Kind;
+use vrl::value::{KeyString, Kind};
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
@@ -92,7 +91,7 @@ pub struct ReduceConfig {
     #[configurable(metadata(
         docs::additional_props_description = "An individual merge strategy."
     ))]
-    pub merge_strategies: IndexMap<String, MergeStrategy>,
+    pub merge_strategies: IndexMap<KeyString, MergeStrategy>,
 
     /// A condition used to distinguish the final event of a transaction.
     ///
@@ -130,7 +129,7 @@ impl TransformConfig for ReduceConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -238,7 +237,7 @@ impl TransformConfig for ReduceConfig {
 #[derive(Debug)]
 struct ReduceState {
     events: usize,
-    fields: HashMap<String, Box<dyn ReduceValueMerger>>,
+    fields: HashMap<KeyString, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
     metadata: EventMetadata,
 }
@@ -256,7 +255,7 @@ impl ReduceState {
         }
     }
 
-    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) {
+    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<KeyString, MergeStrategy>) {
         let (value, metadata) = e.into_parts();
         self.metadata.merge(metadata);
 
@@ -310,7 +309,7 @@ pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
     group_by: Vec<String>,
-    merge_strategies: IndexMap<String, MergeStrategy>,
+    merge_strategies: IndexMap<KeyString, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
@@ -320,7 +319,7 @@ pub struct Reduce {
 impl Reduce {
     pub fn new(
         config: &ReduceConfig,
-        enrichment_tables: &enrichment::TableRegistry,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
     ) -> crate::Result<Self> {
         if config.ends_when.is_some() && config.starts_when.is_some() {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
@@ -351,7 +350,7 @@ impl Reduce {
         })
     }
 
-    fn flush_into(&mut self, output: &mut Vec<Event>) {
+    fn flush_into(&mut self, emitter: &mut Emitter<Event>) {
         let mut flush_discriminants = Vec::new();
         let now = Instant::now();
         for (k, t) in &self.reduce_merge_states {
@@ -362,15 +361,15 @@ impl Reduce {
         for k in &flush_discriminants {
             if let Some(t) = self.reduce_merge_states.remove(k) {
                 emit!(ReduceStaleEventFlushed);
-                output.push(Event::from(t.flush()));
+                emitter.emit(Event::from(t.flush()));
             }
         }
     }
 
-    fn flush_all_into(&mut self, output: &mut Vec<Event>) {
+    fn flush_all_into(&mut self, emitter: &mut Emitter<Event>) {
         self.reduce_merge_states
             .drain()
-            .for_each(|(_, s)| output.push(Event::from(s.flush())));
+            .for_each(|(_, s)| emitter.emit(Event::from(s.flush())));
     }
 
     fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
@@ -386,7 +385,7 @@ impl Reduce {
         }
     }
 
-    fn transform_one(&mut self, output: &mut Vec<Event>, event: Event) {
+    pub(crate) fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
         let (starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
@@ -413,12 +412,12 @@ impl Reduce {
 
         if starts_here {
             if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
-                output.push(state.flush().into());
+                emitter.emit(state.flush().into());
             }
 
             self.push_or_new_reduce_state(event, discriminant)
         } else if ends_here {
-            output.push(match self.reduce_merge_states.remove(&discriminant) {
+            emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
                 Some(mut state) => {
                     state.add_event(event, &self.merge_strategies);
                     state.flush().into()
@@ -438,55 +437,40 @@ impl Reduce {
 impl TaskTransform<Event> for Reduce {
     fn transform(
         self: Box<Self>,
-        mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+        input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static,
     {
-        let mut me = self;
+        let flush_period = self.flush_period;
 
-        let poll_period = me.flush_period;
-
-        let mut flush_stream = tokio::time::interval(poll_period);
-
-        Box::pin(
-            stream! {
-              loop {
-                let mut output = Vec::new();
-                let done = tokio::select! {
-                    _ = flush_stream.tick() => {
-                      me.flush_into(&mut output);
-                      false
-                    }
-                    maybe_event = input_rx.next() => {
-                      match maybe_event {
-                        None => {
-                          me.flush_all_into(&mut output);
-                          true
-                        }
-                        Some(event) => {
-                          me.transform_one(&mut output, event);
-                          false
-                        }
-                      }
-                    }
-                };
-                yield stream::iter(output.into_iter());
-                if done { break }
-              }
-            }
-            .flatten(),
-        )
+        Box::pin(map_with_expiration(
+            self,
+            input_rx,
+            flush_period,
+            |me: &mut Box<Reduce>, event, emitter: &mut Emitter<Event>| {
+                // called for each event
+                me.transform_one(emitter, event);
+            },
+            |me: &mut Box<Reduce>, emitter: &mut Emitter<Event>| {
+                // called periodically to check for expired events
+                me.flush_into(emitter);
+            },
+            |me: &mut Box<Reduce>, emitter: &mut Emitter<Event>| {
+                // called when the input stream ends
+                me.flush_all_into(emitter);
+            },
+        ))
     }
 }
 
 #[cfg(test)]
 mod test {
-    use enrichment::TableRegistry;
     use serde_json::json;
     use std::sync::Arc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::enrichment::TableRegistry;
     use vrl::value::Kind;
 
     use super::*;
@@ -494,7 +478,7 @@ mod test {
     use crate::event::{LogEvent, Value};
     use crate::test_util::components::assert_transform_compliance;
     use crate::transforms::test::create_topology;
-    use lookup::owned_value_path;
+    use vector_lib::lookup::owned_value_path;
 
     #[test]
     fn generate_config() {
@@ -530,7 +514,7 @@ group_by = [ "request_id" ]
                 );
             let schema_definitions = reduce_config
                 .outputs(
-                    enrichment::TableRegistry::default(),
+                    vector_lib::enrichment::TableRegistry::default(),
                     &[("test".into(), input_definition)],
                     LogNamespace::Legacy,
                 )

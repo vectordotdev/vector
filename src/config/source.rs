@@ -3,12 +3,12 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
-use vector_config::{
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::schema::{SchemaGenerator, SchemaObject};
+use vector_lib::configurable::{
     configurable_component, Configurable, GenerateError, Metadata, NamedComponent,
 };
-use vector_config_common::attributes::CustomAttribute;
-use vector_config_common::schema::{SchemaGenerator, SchemaObject};
-use vector_core::{
+use vector_lib::{
     config::{
         AcknowledgementsConfig, GlobalOptions, LogNamespace, SourceAcknowledgementsConfig,
         SourceOutput,
@@ -35,7 +35,7 @@ impl Configurable for BoxedSource {
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_config::component::SourceDescription::generate_schemas(gen)
+        vector_lib::configurable::component::SourceDescription::generate_schemas(gen)
     }
 }
 
@@ -51,10 +51,7 @@ impl<T: SourceConfig + 'static> From<T> for BoxedSource {
 #[derive(Clone, Debug)]
 pub struct SourceOuter {
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
     #[serde(default, skip)]
@@ -181,7 +178,7 @@ impl SourceContext {
         if config.enabled() {
             warn!(
                 message = "Enabling `acknowledgements` on sources themselves is deprecated in favor of enabling them in the sink configuration, and will be removed in a future version.",
-                component_name = self.key.id(),
+                component_id = self.key.id(),
             );
         }
 

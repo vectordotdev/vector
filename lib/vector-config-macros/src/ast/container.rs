@@ -235,7 +235,7 @@ impl<'a> Container<'a> {
                 }
 
                 let original = input;
-                let name = serde.attrs.name().deserialize_name();
+                let name = serde.attrs.name().deserialize_name().to_string();
                 let default_value = get_serde_default_value(&serde.ident, serde.attrs.default());
 
                 let container = Container {

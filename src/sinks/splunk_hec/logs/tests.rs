@@ -1,19 +1,19 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::{TimeZone, Utc};
-use codecs::{JsonSerializerConfig, TextSerializerConfig};
 use futures_util::StreamExt;
-use lookup::lookup_v2::OptionalValuePath;
-use lookup::{OwnedValuePath, PathPrefix};
 use serde::Deserialize;
-use vector_core::{
+use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+use vector_lib::{
     config::log_schema,
     event::{Event, LogEvent, Value},
 };
 use vrl::owned_value_path;
+use vrl::path::OwnedTargetPath;
 
 use super::sink::HecProcessedEvent;
-use crate::sinks::splunk_hec::common::config_timestamp_key;
+use crate::sinks::splunk_hec::common::config_timestamp_key_target_path;
 use crate::{
     codecs::{Encoder, EncodingConfig},
     config::{SinkConfig, SinkContext},
@@ -52,7 +52,7 @@ struct HecEventText {
 
 fn get_processed_event_timestamp(
     timestamp: Option<Value>,
-    timestamp_key: Option<OwnedValuePath>,
+    timestamp_key: Option<OwnedTargetPath>,
 ) -> HecProcessedEvent {
     let mut event = Event::Log(LogEvent::from("hello world"));
     event
@@ -68,20 +68,19 @@ fn get_processed_event_timestamp(
 
     if let Some(timestamp_key) = &timestamp_key {
         if timestamp.is_some() {
-            event
-                .as_mut_log()
-                .insert((PathPrefix::Event, timestamp_key), timestamp);
+            event.as_mut_log().insert(timestamp_key, timestamp);
         } else {
-            event
-                .as_mut_log()
-                .remove((PathPrefix::Event, timestamp_key));
+            event.as_mut_log().remove(timestamp_key);
         }
     }
 
     let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
     let source = Template::try_from("{{ event_source }}".to_string()).ok();
     let index = Template::try_from("{{ event_index }}".to_string()).ok();
-    let indexed_fields = vec!["event_field1".to_string(), "event_field2".to_string()];
+    let indexed_fields = vec![
+        owned_value_path!("event_field1"),
+        owned_value_path!("event_field2"),
+    ];
     let timestamp_nanos_key = Some(String::from("ts_nanos_key"));
 
     process_log(
@@ -90,7 +89,7 @@ fn get_processed_event_timestamp(
             sourcetype: sourcetype.as_ref(),
             source: source.as_ref(),
             index: index.as_ref(),
-            host_key: Some(owned_value_path!("host_key")),
+            host_key: Some(OwnedTargetPath::event(owned_value_path!("host_key"))),
             indexed_fields: indexed_fields.as_slice(),
             timestamp_nanos_key: timestamp_nanos_key.as_ref(),
             timestamp_key,
@@ -104,7 +103,7 @@ fn get_processed_event() -> HecProcessedEvent {
         Some(vrl::value::Value::Timestamp(
             Utc.timestamp_nanos(1638366107111456123),
         )),
-        config_timestamp_key().path,
+        config_timestamp_key_target_path().path,
     )
 }
 
@@ -152,7 +151,9 @@ fn splunk_encode_log_event_json() {
     assert_eq!(event.get("key").unwrap(), &serde_json::Value::from("value"));
     assert_eq!(event.get("int_val").unwrap(), &serde_json::Value::from(123));
     assert_eq!(
-        event.get(&log_schema().message_key().to_string()).unwrap(),
+        event
+            .get(&log_schema().message_key().unwrap().to_string())
+            .unwrap(),
         &serde_json::Value::from("hello world")
     );
     assert!(event
@@ -201,8 +202,8 @@ async fn splunk_passthrough_token() {
     let config = HecLogsSinkConfig {
         default_token: "token".to_string().into(),
         endpoint: format!("http://{}", addr),
-        host_key: OptionalValuePath {
-            path: log_schema().host_key().cloned(),
+        host_key: OptionalTargetPath {
+            path: log_schema().host_key_target_path().cloned(),
         },
         indexed_fields: Vec::new(),
         index: None,
@@ -215,8 +216,8 @@ async fn splunk_passthrough_token() {
         tls: None,
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
-        timestamp_key: OptionalValuePath {
-            path: log_schema().timestamp_key().cloned(),
+        timestamp_key: OptionalTargetPath {
+            path: log_schema().timestamp_key_target_path().cloned(),
         },
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
@@ -259,7 +260,7 @@ fn splunk_encode_log_event_json_timestamps() {
 
     fn get_hec_data_for_timestamp_test(
         timestamp: Option<Value>,
-        timestamp_key: Option<OwnedValuePath>,
+        timestamp_key: Option<OwnedTargetPath>,
     ) -> HecEventJson {
         let processed_event = get_processed_event_timestamp(timestamp, timestamp_key);
         let encoder = hec_encoder(JsonSerializerConfig::default().into());
@@ -270,7 +271,7 @@ fn splunk_encode_log_event_json_timestamps() {
         serde_json::from_slice::<HecEventJson>(&bytes).unwrap()
     }
 
-    let timestamp = lookup::owned_value_path!("timestamp");
+    let timestamp = OwnedTargetPath::event(owned_value_path!("timestamp"));
 
     // no timestamp_key is provided
     let mut hec_data = get_hec_data_for_timestamp_test(None, None);

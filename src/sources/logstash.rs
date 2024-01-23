@@ -7,19 +7,19 @@ use std::{
 };
 
 use bytes::{Buf, Bytes, BytesMut};
-use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::ZlibDecoder;
-use lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix};
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath};
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
 };
 use vrl::value::kind::Collection;
-use vrl::value::Kind;
+use vrl::value::{KeyString, Kind};
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -232,9 +232,9 @@ impl TcpSource for LogstashSource {
                     log.insert(metadata_path!("vector", "ingest_timestamp"), now);
                 }
                 LogNamespace::Legacy => {
-                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                    if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
                         log.insert(
-                            (PathPrefix::Event, timestamp_key),
+                            timestamp_key,
                             log_timestamp.unwrap_or_else(|| Value::from(now)),
                         );
                     }
@@ -434,7 +434,7 @@ impl TryFrom<u8> for LogstashFrameType {
 struct LogstashEventFrame {
     protocol: LogstashProtocolVersion,
     sequence_number: u32,
-    fields: BTreeMap<String, serde_json::Value>,
+    fields: BTreeMap<KeyString, serde_json::Value>,
 }
 
 // Based on spec at: https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md
@@ -522,7 +522,7 @@ impl Decoder for LogstashDecoder {
                     let sequence_number = rest.get_u32();
                     let pair_count = rest.get_u32();
 
-                    let mut fields: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+                    let mut fields = BTreeMap::<KeyString, serde_json::Value>::new();
                     for _ in 0..pair_count {
                         if src.remaining() < 4 {
                             return Ok(None);
@@ -546,7 +546,7 @@ impl Decoder for LogstashDecoder {
                         rest = right;
 
                         fields.insert(
-                            String::from_utf8_lossy(key).to_string(),
+                            String::from_utf8_lossy(key).into(),
                             String::from_utf8_lossy(value).into(),
                         );
                     }
@@ -585,7 +585,7 @@ impl Decoder for LogstashDecoder {
                     let (slice, right) = rest.split_at(payload_size);
                     rest = right;
 
-                    let fields_result: Result<BTreeMap<String, serde_json::Value>, _> =
+                    let fields_result: Result<BTreeMap<KeyString, serde_json::Value>, _> =
                         serde_json::from_slice(slice).context(JsonFrameFailedDecodeSnafu {});
 
                     let remaining = rest.remaining();
@@ -679,9 +679,9 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 #[cfg(test)]
 mod test {
     use bytes::BufMut;
-    use lookup::OwnedTargetPath;
     use rand::{thread_rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use vector_lib::lookup::OwnedTargetPath;
     use vrl::value::kind::Collection;
 
     use super::*;

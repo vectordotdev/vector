@@ -1,12 +1,11 @@
 use std::{io::Error, path::Path};
 
 use metrics::counter;
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+use vector_lib::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
 };
-use vector_core::internal_event::InternalEvent;
 
-use crate::{emit, internal_events::SocketOutgoingConnectionError};
+use crate::internal_events::SocketOutgoingConnectionError;
 
 #[derive(Debug)]
 pub struct UnixSocketConnectionEstablished<'a> {
@@ -30,8 +29,6 @@ impl<E: std::error::Error> InternalEvent for UnixSocketOutgoingConnectionError<E
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
         emit!(SocketOutgoingConnectionError { error: self.error });
-        // deprecated
-        counter!("connection_failed_total", 1, "mode" => "unix");
     }
 }
 
@@ -56,8 +53,6 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => "unix");
     }
 }
 
@@ -83,8 +78,6 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => "unix");
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }

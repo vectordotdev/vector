@@ -3,7 +3,7 @@ use std::sync::Arc;
 use metrics::{register_counter, Counter};
 use tracing::trace;
 
-use crate::{config::ComponentKey, request_metadata::EventCountTags};
+use crate::config::ComponentKey;
 
 use super::{CountByteSize, OptionalTag, Output, SharedString};
 
@@ -91,19 +91,25 @@ crate::registered_event!(
         self.event_bytes.increment(byte_size.get() as u64);
     }
 
-    fn register(_fixed: (), tags: EventCountTags) {
-        super::register(TaggedEventsSent::new(
-            tags,
-        ))
+    fn register(_fixed: (), tags: TaggedEventsSent) {
+        super::register(tags)
     }
 );
 
 impl TaggedEventsSent {
     #[must_use]
-    pub fn new(tags: EventCountTags) -> Self {
+    pub fn new_empty() -> Self {
         Self {
-            source: tags.source,
-            service: tags.service,
+            source: OptionalTag::Specified(None),
+            service: OptionalTag::Specified(None),
+        }
+    }
+
+    #[must_use]
+    pub fn new_unspecified() -> Self {
+        Self {
+            source: OptionalTag::Ignored,
+            service: OptionalTag::Ignored,
         }
     }
 }

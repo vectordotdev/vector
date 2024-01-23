@@ -1,21 +1,26 @@
+//! Authentication settings for AWS components.
 use std::time::Duration;
 
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain,
+    identity::IdentityCache,
     imds,
     profile::{
         profile_file::{ProfileFileKind, ProfileFiles},
         ProfileFileCredentialsProvider,
     },
+    provider_config::ProviderConfig,
     sts::AssumeRoleProviderBuilder,
 };
-use aws_credential_types::{
-    cache::CredentialsCache, provider::SharedCredentialsProvider, Credentials,
-};
+use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
+use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
+use aws_smithy_runtime_api::client::identity::SharedIdentityCache;
 use aws_types::region::Region;
 use serde_with::serde_as;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::{config::proxy::ProxyConfig, sensitive_string::SensitiveString, tls::TlsConfig};
+use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
+
+use crate::http::{build_proxy_connector, build_tls_connector};
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
@@ -79,6 +84,12 @@ pub enum AwsAuthentication {
         #[configurable(metadata(docs::examples = "arn:aws:iam::123456789098:role/my_role"))]
         assume_role: Option<String>,
 
+        /// The optional unique external ID in conjunction with role to assume.
+        ///
+        /// [external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+        #[configurable(metadata(docs::examples = "randomEXAMPLEidString"))]
+        external_id: Option<String>,
+
         /// The [AWS region][aws_region] to send STS requests to.
         ///
         /// If not set, this will default to the configured region
@@ -114,6 +125,12 @@ pub enum AwsAuthentication {
         /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
         #[configurable(metadata(docs::examples = "arn:aws:iam::123456789098:role/my_role"))]
         assume_role: String,
+
+        /// The optional unique external ID in conjunction with role to assume.
+        ///
+        /// [external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+        #[configurable(metadata(docs::examples = "randomEXAMPLEidString"))]
+        external_id: Option<String>,
 
         /// Timeout for assuming the role, in seconds.
         ///
@@ -168,7 +185,8 @@ fn default_profile() -> String {
 }
 
 impl AwsAuthentication {
-    pub async fn credentials_cache(&self) -> crate::Result<CredentialsCache> {
+    /// Creates the identity cache to store credentials based on the authentication mechanism chosen.
+    pub(super) async fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
         match self {
             AwsAuthentication::Role {
                 load_timeout_secs, ..
@@ -176,29 +194,33 @@ impl AwsAuthentication {
             | AwsAuthentication::Default {
                 load_timeout_secs, ..
             } => {
-                let credentials_cache = CredentialsCache::lazy_builder()
+                let credentials_cache = IdentityCache::lazy()
                     .load_timeout(
                         load_timeout_secs
                             .map(Duration::from_secs)
                             .unwrap_or(DEFAULT_LOAD_TIMEOUT),
                     )
-                    .into_credentials_cache();
+                    .build();
 
                 Ok(credentials_cache)
             }
-            _ => Ok(CredentialsCache::lazy()),
+            _ => Ok(IdentityCache::lazy().build()),
         }
     }
 
+    /// Returns the provider for the credentials based on the authentication mechanism chosen.
     pub async fn credentials_provider(
         &self,
         service_region: Region,
+        proxy: &ProxyConfig,
+        tls_options: &Option<TlsConfig>,
     ) -> crate::Result<SharedCredentialsProvider> {
         match self {
             Self::AccessKey {
                 access_key_id,
                 secret_access_key,
                 assume_role,
+                external_id,
                 region,
             } => {
                 let provider = SharedCredentialsProvider::new(Credentials::from_keys(
@@ -208,9 +230,15 @@ impl AwsAuthentication {
                 ));
                 if let Some(assume_role) = assume_role {
                     let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                    let provider = AssumeRoleProviderBuilder::new(assume_role)
-                        .region(auth_region)
-                        .build(provider);
+                    let mut builder =
+                        AssumeRoleProviderBuilder::new(assume_role).region(auth_region);
+
+                    if let Some(external_id) = external_id {
+                        builder = builder.external_id(external_id)
+                    }
+
+                    let provider = builder.build_from_provider(provider).await;
+
                     return Ok(SharedCredentialsProvider::new(provider));
                 }
                 Ok(provider)
@@ -232,20 +260,33 @@ impl AwsAuthentication {
             }
             AwsAuthentication::Role {
                 assume_role,
+                external_id,
                 imds,
                 region,
                 ..
             } => {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                let provider = AssumeRoleProviderBuilder::new(assume_role)
-                    .region(auth_region.clone())
-                    .build(default_credentials_provider(auth_region, *imds).await?);
+                let mut builder =
+                    AssumeRoleProviderBuilder::new(assume_role).region(auth_region.clone());
+
+                if let Some(external_id) = external_id {
+                    builder = builder.external_id(external_id)
+                }
+
+                let provider = builder
+                    .build_from_provider(
+                        default_credentials_provider(auth_region, proxy, tls_options, *imds)
+                            .await?,
+                    )
+                    .await;
 
                 Ok(SharedCredentialsProvider::new(provider))
             }
             AwsAuthentication::Default { imds, region, .. } => Ok(SharedCredentialsProvider::new(
                 default_credentials_provider(
                     region.clone().map(Region::new).unwrap_or(service_region),
+                    proxy,
+                    tls_options,
                     *imds,
                 )
                 .await?,
@@ -254,11 +295,13 @@ impl AwsAuthentication {
     }
 
     #[cfg(test)]
+    /// Creates dummy authentication for tests.
     pub fn test_auth() -> AwsAuthentication {
         AwsAuthentication::AccessKey {
             access_key_id: "dummy".to_string().into(),
             secret_access_key: "dummy".to_string().into(),
             assume_role: None,
+            external_id: None,
             region: None,
         }
     }
@@ -266,18 +309,34 @@ impl AwsAuthentication {
 
 async fn default_credentials_provider(
     region: Region,
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
     imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
+    let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
+    let connector = if proxy.enabled {
+        let proxy = build_proxy_connector(tls_settings, proxy)?;
+        HyperClientBuilder::new().build(proxy)
+    } else {
+        let tls_connector = build_tls_connector(tls_settings)?;
+        HyperClientBuilder::new().build(tls_connector)
+    };
+
+    let provider_config = ProviderConfig::empty()
+        .with_region(Some(region.clone()))
+        .with_http_client(connector);
+
     let client = imds::Client::builder()
         .max_attempts(imds.max_attempts)
         .connect_timeout(imds.connect_timeout)
         .read_timeout(imds.read_timeout)
-        .build()
-        .await?;
+        .configure(&provider_config)
+        .build();
 
     let credentials_provider = DefaultCredentialsChain::builder()
         .region(region)
         .imds_client(client)
+        .configure(provider_config)
         .build()
         .await;
 
@@ -295,6 +354,7 @@ mod tests {
     #[derive(Serialize, Deserialize, Clone, Debug)]
     struct ComponentConfig {
         assume_role: Option<String>,
+        external_id: Option<String>,
         #[serde(default)]
         auth: AwsAuthentication,
     }
@@ -397,6 +457,20 @@ mod tests {
     }
 
     #[test]
+    fn parsing_external_id_with_assume_role() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.assume_role = "root"
+            auth.external_id = "id"
+            auth.load_timeout_secs = 10
+        "#,
+        )
+        .unwrap();
+
+        assert!(matches!(config.auth, AwsAuthentication::Role { .. }));
+    }
+
+    #[test]
     fn parsing_assume_role_with_imds_client() {
         let config = toml::from_str::<ComponentConfig>(
             r#"
@@ -411,11 +485,13 @@ mod tests {
         match config.auth {
             AwsAuthentication::Role {
                 assume_role,
+                external_id,
                 load_timeout_secs,
                 imds,
                 region,
             } => {
                 assert_eq!(&assume_role, "root");
+                assert_eq!(external_id, None);
                 assert_eq!(load_timeout_secs, None);
                 assert!(matches!(
                     imds,
@@ -446,11 +522,13 @@ mod tests {
         match config.auth {
             AwsAuthentication::Role {
                 assume_role,
+                external_id,
                 load_timeout_secs,
                 imds,
                 region,
             } => {
                 assert_eq!(&assume_role, "auth.root");
+                assert_eq!(external_id, None);
                 assert_eq!(load_timeout_secs, Some(10));
                 assert!(matches!(imds, ImdsAuthentication { .. }));
                 assert_eq!(region.unwrap(), "us-west-2");
@@ -496,6 +574,38 @@ mod tests {
                     &SensitiveString::from("other".to_string())
                 );
                 assert_eq!(&assume_role, &Some("root".to_string()));
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn parsing_static_with_assume_role_and_external_id() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.access_key_id = "key"
+            auth.secret_access_key = "other"
+            auth.assume_role = "root"
+            auth.external_id = "id"
+        "#,
+        )
+        .unwrap();
+
+        match config.auth {
+            AwsAuthentication::AccessKey {
+                access_key_id,
+                secret_access_key,
+                assume_role,
+                external_id,
+                ..
+            } => {
+                assert_eq!(&access_key_id, &SensitiveString::from("key".to_string()));
+                assert_eq!(
+                    &secret_access_key,
+                    &SensitiveString::from("other".to_string())
+                );
+                assert_eq!(&assume_role, &Some("root".to_string()));
+                assert_eq!(&external_id, &Some("id".to_string()));
             }
             _ => panic!(),
         }

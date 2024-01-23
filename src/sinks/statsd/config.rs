@@ -1,9 +1,9 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use async_trait::async_trait;
-use vector_common::internal_event::Protocol;
-use vector_config::{component::GenerateConfig, configurable_component};
-use vector_core::{
+use vector_lib::configurable::{component::GenerateConfig, configurable_component};
+use vector_lib::internal_event::Protocol;
+use vector_lib::{
     config::{AcknowledgementsConfig, Input},
     sink::VectorSink,
 };
@@ -57,7 +57,7 @@ pub struct StatsdSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -99,8 +99,8 @@ impl Mode {
     }
 }
 
-fn default_address() -> SocketAddr {
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8125)
+const fn default_address() -> SocketAddr {
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8125)
 }
 
 impl GenerateConfig for StatsdSinkConfig {

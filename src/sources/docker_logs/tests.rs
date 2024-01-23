@@ -279,7 +279,7 @@ mod integration_tests {
         // Wait for before message
         let events = collect_n(out, 1).await;
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
             "before".into()
         );
 
@@ -346,7 +346,7 @@ mod integration_tests {
                 .unwrap()
                 .assert_valid_for_event(&events[0]);
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 message.into()
             );
         })
@@ -440,7 +440,7 @@ mod integration_tests {
                 .unwrap()
                 .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
+            assert_eq!(*log.get_message().unwrap(), message.into());
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
@@ -479,15 +479,10 @@ mod integration_tests {
             let definition = schema_definitions.unwrap();
 
             definition.assert_valid_for_event(&events[0]);
-            assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                message.into()
-            );
+            let message_key = log_schema().message_key().unwrap().to_string();
+            assert_eq!(events[0].as_log()[&message_key], message.into());
             definition.assert_valid_for_event(&events[1]);
-            assert_eq!(
-                events[1].as_log()[log_schema().message_key()],
-                message.into()
-            );
+            assert_eq!(events[1].as_log()[message_key], message.into());
         })
         .await;
     }
@@ -521,7 +516,7 @@ mod integration_tests {
                 .unwrap()
                 .assert_valid_for_event(&events[0]);
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 message.into()
             );
         })
@@ -567,18 +562,13 @@ mod integration_tests {
             assert_eq!(events.len(), 2);
 
             let definition = schema_definitions.unwrap();
-
             definition.assert_valid_for_event(&events[0]);
-            assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
-                will_be_read.into()
-            );
+
+            let message_key = log_schema().message_key().unwrap().to_string();
+            assert_eq!(events[0].as_log()[&message_key], will_be_read.into());
 
             definition.assert_valid_for_event(&events[1]);
-            assert_eq!(
-                events[1].as_log()[log_schema().message_key()],
-                will_be_read.into()
-            );
+            assert_eq!(events[1].as_log()[message_key], will_be_read.into());
         })
         .await;
     }
@@ -613,7 +603,7 @@ mod integration_tests {
                 .unwrap()
                 .assert_valid_for_event(&events[0]);
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 message.into()
             );
         })
@@ -647,7 +637,7 @@ mod integration_tests {
                 .unwrap()
                 .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
+            assert_eq!(*log.get_message().unwrap(), message.into());
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
@@ -692,7 +682,7 @@ mod integration_tests {
                 .unwrap()
                 .assert_valid_for_event(&events[0]);
             assert_eq!(
-                events[0].as_log()[log_schema().message_key()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 message.into()
             );
         })
@@ -782,7 +772,7 @@ mod integration_tests {
                 .unwrap()
                 .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
+            assert_eq!(*log.get_message().unwrap(), message.into());
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
@@ -831,7 +821,7 @@ mod integration_tests {
                 .unwrap()
                 .assert_valid_for_event(&events[0]);
             let log = events[0].as_log();
-            assert_eq!(log[log_schema().message_key()], message.into());
+            assert_eq!(*log.get_message().unwrap(), message.into());
         })
         .await;
     }
@@ -968,7 +958,7 @@ mod integration_tests {
 
                     event
                         .into_log()
-                        .remove(crate::config::log_schema().message_key())
+                        .remove(log_schema().message_key_target_path().unwrap())
                         .unwrap()
                         .to_string_lossy()
                         .into_owned()

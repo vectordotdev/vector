@@ -3,18 +3,19 @@ use std::cell::RefCell;
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
-use vector_buffers::{BufferConfig, BufferType};
-use vector_config::{
+use vector_lib::buffers::{BufferConfig, BufferType};
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::schema::{SchemaGenerator, SchemaObject};
+use vector_lib::configurable::{
     configurable_component, Configurable, GenerateError, Metadata, NamedComponent,
 };
-use vector_config_common::attributes::CustomAttribute;
-use vector_config_common::schema::{SchemaGenerator, SchemaObject};
-use vector_core::{
+use vector_lib::{
     config::{AcknowledgementsConfig, GlobalOptions, Input},
     sink::VectorSink,
 };
 
 use super::{id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
+use crate::extra_context::ExtraContext;
 use crate::sinks::{util::UriSerde, Healthcheck};
 
 pub type BoxedSink = Box<dyn SinkConfig>;
@@ -33,7 +34,7 @@ impl Configurable for BoxedSink {
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_config::component::SinkDescription::generate_schemas(gen)
+        vector_lib::configurable::component::SinkDescription::generate_schemas(gen)
     }
 }
 
@@ -66,17 +67,11 @@ where
     healthcheck: SinkHealthcheckOptions,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub buffer: BufferConfig,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     proxy: ProxyConfig,
 
     #[serde(flatten)]
@@ -235,12 +230,29 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
 
 dyn_clone::clone_trait_object!(SinkConfig);
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone)]
 pub struct SinkContext {
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
     pub proxy: ProxyConfig,
     pub schema: schema::Options,
+    pub app_name: String,
+    pub app_name_slug: String,
+    pub extra_context: ExtraContext,
+}
+
+impl Default for SinkContext {
+    fn default() -> Self {
+        Self {
+            healthcheck: Default::default(),
+            globals: Default::default(),
+            proxy: Default::default(),
+            schema: Default::default(),
+            app_name: crate::get_app_name().to_string(),
+            app_name_slug: crate::get_slugified_app_name(),
+            extra_context: Default::default(),
+        }
+    }
 }
 
 impl SinkContext {

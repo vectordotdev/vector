@@ -1,6 +1,8 @@
-use std::{borrow::Cow, fmt::Debug, marker::PhantomData, num::NonZeroUsize};
+use std::{borrow::Cow, fmt::Debug, marker::PhantomData};
 
 use rand::random;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use vrl::path::PathPrefix;
 
 use crate::{
     internal_events::{AwsKinesisStreamNoPartitionKeyError, SinkRequestBuildError},
@@ -27,7 +29,7 @@ pub struct KinesisSink<S, R> {
     pub batch_settings: BatcherSettings,
     pub service: S,
     pub request_builder: KinesisRequestBuilder<R>,
-    pub partition_key_field: Option<String>,
+    pub partition_key_field: Option<ConfigValuePath>,
     pub _phantom: PhantomData<R>,
 }
 
@@ -40,19 +42,20 @@ where
     R: Record + Send + Sync + Unpin + Clone + 'static,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request_builder_concurrency_limit = NonZeroUsize::new(50);
-
-        let partition_key_field = self.partition_key_field.clone();
+        let batch_settings = self.batch_settings;
 
         input
             .filter_map(|event| {
                 // Panic: This sink only accepts Logs, so this should never panic
                 let log = event.into_log();
-                let processed = process_log(log, &partition_key_field);
+                let processed = process_log(log, self.partition_key_field.as_ref());
 
                 future::ready(processed)
             })
-            .request_builder(request_builder_concurrency_limit, self.request_builder)
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                self.request_builder,
+            )
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
@@ -66,7 +69,7 @@ where
                 KinesisPartitioner {
                     _phantom: PhantomData,
                 },
-                self.batch_settings,
+                || batch_settings.as_byte_size_config(),
             )
             .map(|(key, events)| {
                 let metadata = RequestMetadata::from_batch(
@@ -106,14 +109,14 @@ where
 /// events are emitted and None is returned.
 pub(crate) fn process_log(
     log: LogEvent,
-    partition_key_field: &Option<String>,
+    partition_key_field: Option<&ConfigValuePath>,
 ) -> Option<KinesisProcessedEvent> {
     let partition_key = if let Some(partition_key_field) = partition_key_field {
-        if let Some(v) = log.get(partition_key_field.as_str()) {
+        if let Some(v) = log.get((PathPrefix::Event, partition_key_field)) {
             v.to_string_lossy()
         } else {
             emit!(AwsKinesisStreamNoPartitionKeyError {
-                partition_key_field
+                partition_key_field: partition_key_field.0.to_string().as_str()
             });
             return None;
         }

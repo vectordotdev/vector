@@ -7,8 +7,8 @@ use crate::event::Metric;
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
-    field(name = "received_events_total", type = "Option<ReceivedEventsTotal>"),
-    field(name = "sent_events_total", type = "Option<SentEventsTotal>")
+    field(name = "received_events_total", ty = "Option<ReceivedEventsTotal>"),
+    field(name = "sent_events_total", ty = "Option<SentEventsTotal>")
 )]
 pub enum TransformMetrics {
     GenericTransformMetrics(generic::GenericTransformMetrics),

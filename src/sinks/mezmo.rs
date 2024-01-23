@@ -4,8 +4,9 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
+use vrl::event_path;
 use vrl::value::{Kind, Value};
 
 use crate::{
@@ -97,10 +98,7 @@ pub struct MezmoConfig {
     tags: Option<Vec<Template>>,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
     /// The default app that is set for events that do not contain a `file` or `app` field.
@@ -125,7 +123,7 @@ pub struct MezmoConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -162,7 +160,7 @@ impl SinkConfig for MezmoConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batch_settings()?;
         let client = HttpClient::new(None, cx.proxy())?;
 
@@ -253,12 +251,15 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
 
         let line = log
             .message_path()
-            .and_then(|path| log.remove(path.as_str()))
+            .cloned()
+            .as_ref()
+            .and_then(|path| log.remove(path))
             .unwrap_or_else(|| String::from("").into());
 
         let timestamp: Value = log
             .timestamp_path()
-            .and_then(|path| log.remove(path.as_str()))
+            .cloned()
+            .and_then(|path| log.remove(&path))
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();
@@ -266,15 +267,15 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
         map.insert("line".to_string(), json!(line));
         map.insert("timestamp".to_string(), json!(timestamp));
 
-        if let Some(env) = log.remove("env") {
+        if let Some(env) = log.remove(event_path!("env")) {
             map.insert("env".to_string(), json!(env));
         }
 
-        if let Some(app) = log.remove("app") {
+        if let Some(app) = log.remove(event_path!("app")) {
             map.insert("app".to_string(), json!(app));
         }
 
-        if let Some(file) = log.remove("file") {
+        if let Some(file) = log.remove(event_path!("file")) {
             map.insert("file".to_string(), json!(file));
         }
 
@@ -398,7 +399,7 @@ mod tests {
     use futures_util::stream;
     use http::{request::Parts, StatusCode};
     use serde_json::json;
-    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
     use crate::{

@@ -4,10 +4,10 @@ use std::sync::Arc;
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
-use lookup::owned_value_path;
-use vector_common::encode_logfmt;
-use vector_core::{
-    config::LogNamespace,
+use vector_lib::encode_logfmt;
+use vector_lib::lookup::{owned_value_path, PathPrefix};
+use vector_lib::{
+    config::{init_telemetry, LogNamespace, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 use vrl::value::{kind::Collection, Kind};
@@ -20,7 +20,10 @@ use crate::{
     sinks::{util::test::load_sink, VectorSink},
     template::Template,
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{
+            run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
+            DATA_VOLUME_SINK_TAGS, SINK_TAGS,
+        },
         generate_events_with_stream, generate_lines_with_stream, random_lines,
     },
 };
@@ -152,6 +155,34 @@ async fn text() {
 }
 
 #[tokio::test]
+async fn data_volume_tags() {
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+
+    let (stream, sink) = build_sink("text", false).await;
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
+    run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
+
+    let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+    assert_eq!(lines.len(), outputs.len());
+    for (i, output) in outputs.iter().enumerate() {
+        assert_eq!(output, &lines[i]);
+    }
+}
+
+#[tokio::test]
 async fn namespaced_timestamp() {
     let (stream, sink) = build_sink("json", true).await;
 
@@ -179,7 +210,12 @@ async fn namespaced_timestamp() {
 
         // The timestamp of the event needs to be the timestamp set in the `norknork`
         // field since that was given the meaning of `timestamp`.
-        assert_eq!(timestamp.timestamp_nanos(), timestamps[i]);
+        assert_eq!(
+            timestamp
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range"),
+            timestamps[i]
+        );
     }
 }
 
@@ -327,7 +363,7 @@ async fn many_streams() {
         let index = (i % 5) * 2;
         let message = lines[index]
             .as_log()
-            .get(log_schema().message_key())
+            .get(log_schema().message_key_target_path().unwrap())
             .unwrap()
             .to_string_lossy();
         assert_eq!(output, &message);
@@ -337,7 +373,7 @@ async fn many_streams() {
         let index = ((i % 5) * 2) + 1;
         let message = lines[index]
             .as_log()
-            .get(log_schema().message_key())
+            .get(log_schema().message_key_target_path().unwrap())
             .unwrap()
             .to_string_lossy();
         assert_eq!(output, &message);
@@ -384,7 +420,7 @@ async fn interpolate_stream_key() {
     for (i, output) in outputs.iter().enumerate() {
         let message = lines[i]
             .as_log()
-            .get(log_schema().message_key())
+            .get(log_schema().message_key_target_path().unwrap())
             .unwrap()
             .to_string_lossy();
         assert_eq!(output, &message);
@@ -461,19 +497,13 @@ async fn out_of_order_drop() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
     events[batch_size].as_mut_log().insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         base,
     );
 
@@ -497,19 +527,13 @@ async fn out_of_order_accept() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
     events[batch_size].as_mut_log().insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         base - Duration::seconds(1),
     );
 
@@ -535,19 +559,13 @@ async fn out_of_order_rewrite() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
     events[batch_size].as_mut_log().insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         base,
     );
 
@@ -555,10 +573,7 @@ async fn out_of_order_rewrite() {
     let time = get_timestamp(&expected[batch_size - 1]);
     // timestamp is rewritten with latest timestamp of the first batch
     expected[batch_size].as_mut_log().insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         time,
     );
 
@@ -586,10 +601,7 @@ async fn out_of_order_per_partition() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
@@ -637,24 +649,26 @@ async fn test_out_of_order_events(
         assert_eq!(
             &expected[i]
                 .as_log()
-                .get(log_schema().message_key())
+                .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy(),
             output,
         )
     }
     for (i, ts) in timestamps.iter().enumerate() {
-        assert_eq!(get_timestamp(&expected[i]).timestamp_nanos(), *ts);
+        assert_eq!(
+            get_timestamp(&expected[i])
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range"),
+            *ts
+        );
     }
 }
 
 fn get_timestamp(event: &Event) -> DateTime<Utc> {
     *event
         .as_log()
-        .get((
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ))
+        .get((PathPrefix::Event, log_schema().timestamp_key().unwrap()))
         .unwrap()
         .as_timestamp()
         .unwrap()

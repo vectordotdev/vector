@@ -1,8 +1,8 @@
 //! Configuration functionality for the `AMQP` sink.
 use crate::{amqp::AmqpConfig, sinks::prelude::*};
-use codecs::TextSerializerConfig;
 use lapin::{types::ShortString, BasicProperties};
 use std::sync::Arc;
+use vector_lib::codecs::TextSerializerConfig;
 
 use super::sink::AmqpSink;
 
@@ -61,7 +61,7 @@ pub struct AmqpSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub(crate) acknowledgements: AcknowledgementsConfig,
 }

@@ -9,4 +9,12 @@ runner:
     GREPTIMEDB_HTTP: http://greptimedb:4000
 
 matrix:
-  version: ['latest']
+  # Temporarily pegging to the latest known stable release
+  # since using `latest` is failing consistently.
+  version: [v0.4.4]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sinks/greptimedb/**"
+- "scripts/integration/greptimedb/**"

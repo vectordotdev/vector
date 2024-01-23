@@ -4,10 +4,6 @@ use std::time::{Duration, Instant};
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use codecs::{
-    encoding::{Framer, FramingConfig},
-    TextSerializerConfig,
-};
 use futures::{
     future,
     stream::{BoxStream, StreamExt},
@@ -19,10 +15,14 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tokio_util::codec::Encoder as _;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::codecs::{
+    encoding::{Framer, FramingConfig},
+    TextSerializerConfig,
+};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
-    EstimatedJsonEncodedSizeOf,
+    EstimatedJsonEncodedSizeOf, TimeZone,
 };
 
 use crate::{
@@ -30,10 +30,13 @@ use crate::{
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
-    internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
-    sinks::util::StreamSink,
+    internal_events::{
+        FileBytesSent, FileInternalMetricsConfig, FileIoError, FileOpen, TemplateRenderingError,
+    },
+    sinks::util::{timezone_to_offset, StreamSink},
     template::Template,
 };
+
 mod bytes_path;
 
 use bytes_path::BytesPath;
@@ -68,19 +71,24 @@ pub struct FileSinkConfig {
     pub encoding: EncodingConfigWithFraming,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub compression: Compression,
 
     #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub timezone: Option<TimeZone>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub internal_metrics: FileInternalMetricsConfig,
 }
 
 impl GenerateConfig for FileSinkConfig {
@@ -91,6 +99,8 @@ impl GenerateConfig for FileSinkConfig {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Default::default(),
             acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: Default::default(),
         })
         .unwrap()
     }
@@ -174,9 +184,9 @@ impl OutFile {
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,
-        _cx: SinkContext,
+        cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self)?;
+        let sink = FileSink::new(self, cx)?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -200,22 +210,29 @@ pub struct FileSink {
     files: ExpiringHashMap<Bytes, OutFile>,
     compression: Compression,
     events_sent: Registered<EventsSent>,
+    include_file_metric_tag: bool,
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig) -> crate::Result<Self> {
+    pub fn new(config: &FileSinkConfig, cx: SinkContext) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
+        let offset = config
+            .timezone
+            .or(cx.globals.timezone)
+            .and_then(timezone_to_offset);
+
         Ok(Self {
-            path: config.path.clone(),
+            path: config.path.clone().with_tz_offset(offset),
             transformer,
             encoder,
             idle_timeout: config.idle_timeout,
             files: ExpiringHashMap::default(),
             compression: config.compression,
             events_sent: register!(EventsSent::from(Output(None))),
+            include_file_metric_tag: config.internal_metrics.include_file_tag,
         })
     }
 
@@ -365,6 +382,7 @@ impl FileSink {
                 emit!(FileBytesSent {
                     byte_size,
                     file: String::from_utf8_lossy(&path),
+                    include_file_metric_tag: self.include_file_metric_tag,
                 });
             }
             Err(error) => {
@@ -427,7 +445,7 @@ mod tests {
 
     use futures::{stream, SinkExt};
     use similar_asserts::assert_eq;
-    use vector_core::{event::LogEvent, sink::VectorSink};
+    use vector_lib::{event::LogEvent, sink::VectorSink};
 
     use super::*;
     use crate::{
@@ -454,6 +472,10 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -476,6 +498,10 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -498,6 +524,10 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::Zstd,
             acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -525,6 +555,10 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -556,36 +590,37 @@ mod tests {
             lines_from_file(directory.join("errors-2019-29-07.log")),
         ];
 
+        let message_key = log_schema().message_key().unwrap().to_string();
         assert_eq!(
-            input[0].as_log()[log_schema().message_key()],
+            input[0].as_log()[&message_key],
             From::<&str>::from(&output[0][0])
         );
         assert_eq!(
-            input[1].as_log()[log_schema().message_key()],
+            input[1].as_log()[&message_key],
             From::<&str>::from(&output[1][0])
         );
         assert_eq!(
-            input[2].as_log()[log_schema().message_key()],
+            input[2].as_log()[&message_key],
             From::<&str>::from(&output[0][1])
         );
         assert_eq!(
-            input[3].as_log()[log_schema().message_key()],
+            input[3].as_log()[&message_key],
             From::<&str>::from(&output[3][0])
         );
         assert_eq!(
-            input[4].as_log()[log_schema().message_key()],
+            input[4].as_log()[&message_key],
             From::<&str>::from(&output[2][0])
         );
         assert_eq!(
-            input[5].as_log()[log_schema().message_key()],
+            input[5].as_log()[&message_key],
             From::<&str>::from(&output[2][1])
         );
         assert_eq!(
-            input[6].as_log()[log_schema().message_key()],
+            input[6].as_log()[&message_key],
             From::<&str>::from(&output[4][0])
         );
         assert_eq!(
-            input[7].as_log()[log_schema().message_key()],
+            input[7].as_log()[message_key],
             From::<&str>::from(&output[5][0])
         );
     }
@@ -602,6 +637,10 @@ mod tests {
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
@@ -610,7 +649,7 @@ mod tests {
 
         let sink_handle = tokio::spawn(async move {
             assert_sink_compliance(&FILE_SINK_TAGS, async move {
-                let sink = FileSink::new(&config).unwrap();
+                let sink = FileSink::new(&config, SinkContext::default()).unwrap();
                 VectorSink::from_event_streamsink(sink)
                     .run(Box::pin(rx.map(Into::into)))
                     .await
@@ -654,7 +693,7 @@ mod tests {
 
     async fn run_assert_sink(config: FileSinkConfig, events: impl Iterator<Item = Event> + Send) {
         assert_sink_compliance(&FILE_SINK_TAGS, async move {
-            let sink = FileSink::new(&config).unwrap();
+            let sink = FileSink::new(&config, SinkContext::default()).unwrap();
             VectorSink::from_event_streamsink(sink)
                 .run(Box::pin(stream::iter(events.map(Into::into))))
                 .await

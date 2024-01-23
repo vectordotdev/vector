@@ -1,11 +1,11 @@
 use std::{fs::File, io, os::unix::io::FromRawFd};
 
 use super::{outputs, FileDescriptorConfig};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use indoc::indoc;
-use lookup::lookup_v2::OptionalValuePath;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 
 use crate::{
     config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
@@ -101,8 +101,8 @@ impl SourceConfig for FileDescriptorSourceConfig {
 
 #[cfg(test)]
 mod tests {
-    use lookup::path;
     use nix::unistd::{close, pipe, write};
+    use vector_lib::lookup::path;
 
     use super::*;
     use crate::{
@@ -143,19 +143,16 @@ mod tests {
             config.build(context).await.unwrap().await.unwrap();
 
             let event = stream.next().await;
+            let message_key = log_schema().message_key().unwrap().to_string();
             assert_eq!(
                 Some("hello world".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .into_owned())
+                event.map(|event| event.as_log()[&message_key].to_string_lossy().into_owned())
             );
 
             let event = stream.next().await;
             assert_eq!(
                 Some("hello world again".into()),
-                event.map(|event| event.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .into_owned())
+                event.map(|event| event.as_log()[message_key].to_string_lossy().into_owned())
             );
 
             let event = stream.next().await;

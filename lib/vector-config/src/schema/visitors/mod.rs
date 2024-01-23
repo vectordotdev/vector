@@ -5,7 +5,7 @@ pub mod scoped_visit;
 mod unevaluated;
 
 #[cfg(test)]
-pub(self) mod test;
+mod test;
 
 pub use self::human_name::GenerateHumanFriendlyNameVisitor;
 pub use self::inline_single::InlineSingleUseReferencesVisitor;

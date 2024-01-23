@@ -6,22 +6,21 @@ use std::{
 };
 
 use aws_sdk_s3::{
-    error::CreateBucketErrorKind,
-    model::{
+    operation::{create_bucket::CreateBucketError, get_object::GetObjectOutput},
+    types::{
         DefaultRetention, ObjectLockConfiguration, ObjectLockEnabled, ObjectLockRetentionMode,
         ObjectLockRule,
     },
-    output::GetObjectOutput,
-    types::SdkError,
     Client as S3Client,
 };
+use aws_smithy_runtime_api::client::result::SdkError;
 use bytes::Buf;
-use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use flate2::read::MultiGzDecoder;
 use futures::{stream, Stream};
 use similar_asserts::assert_eq;
 use tokio_stream::StreamExt;
-use vector_core::{
+use vector_lib::codecs::{encoding::FramingConfig, TextSerializerConfig};
+use vector_lib::{
     config::proxy::ProxyConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
 };
@@ -61,7 +60,7 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
     config.key_prefix = "test-prefix".to_string();
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service).unwrap();
+    let sink = config.build_processor(service, cx).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -77,7 +76,7 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
     assert!(key.ends_with(".log"));
 
     let obj = get_object(&bucket, key).await;
-    assert_eq!(obj.content_encoding, Some("identity".to_string()));
+    assert_eq!(obj.content_encoding, None);
 
     let response_lines = get_lines(obj).await;
     assert_eq!(lines, response_lines);
@@ -95,7 +94,7 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
     config.key_prefix = "test-prefix/".to_string();
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service).unwrap();
+    let sink = config.build_processor(service, cx).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -111,7 +110,7 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
     assert!(key.ends_with(".log"));
 
     let obj = get_object(&bucket, key).await;
-    assert_eq!(obj.content_encoding, Some("identity".to_string()));
+    assert_eq!(obj.content_encoding, None);
 
     let response_lines = get_lines(obj).await;
     assert_eq!(lines, response_lines);
@@ -132,7 +131,7 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
     config.options.ssekms_key_id = Some("alias/aws/s3".to_string());
 
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service).unwrap();
+    let sink = config.build_processor(service, cx).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -148,7 +147,7 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
     assert!(key.ends_with(".log"));
 
     let obj = get_object(&bucket, key).await;
-    assert_eq!(obj.content_encoding, Some("identity".to_string()));
+    assert_eq!(obj.content_encoding, None);
 
     let response_lines = get_lines(obj).await;
     assert_eq!(lines, response_lines);
@@ -170,7 +169,7 @@ async fn s3_rotate_files_after_the_buffer_size_is_reached() {
     };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service).unwrap();
+    let sink = config.build_processor(service, cx).unwrap();
 
     let (lines, _events) = random_lines_with_stream(100, 30, None);
 
@@ -229,7 +228,7 @@ async fn s3_gzip() {
 
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service).unwrap();
+    let sink = config.build_processor(service, cx).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -274,7 +273,7 @@ async fn s3_zstd() {
 
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service).unwrap();
+    let sink = config.build_processor(service, cx).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -336,7 +335,7 @@ async fn s3_insert_message_into_object_lock() {
     let config = config(&bucket, 1000000);
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service).unwrap();
+    let sink = config.build_processor(service, cx).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -349,7 +348,7 @@ async fn s3_insert_message_into_object_lock() {
     assert!(key.ends_with(".log"));
 
     let obj = get_object(&bucket, key).await;
-    assert_eq!(obj.content_encoding, Some("identity".to_string()));
+    assert_eq!(obj.content_encoding, None);
 
     let response_lines = get_lines(obj).await;
     assert_eq!(lines, response_lines);
@@ -368,7 +367,7 @@ async fn acknowledges_failures() {
     config.bucket = format!("BREAK{}IT", config.bucket);
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service).unwrap();
+    let sink = config.build_processor(service, cx).unwrap();
 
     let (_lines, events, receiver) = make_events_batch(1, 1);
     run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
@@ -426,7 +425,7 @@ async fn s3_flush_on_exhaustion() {
             filename_append_uuid: true,
             filename_extension: None,
             options: S3Options::default(),
-            region: RegionOrEndpoint::with_both("minio", s3_address()),
+            region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             batch,
@@ -434,11 +433,12 @@ async fn s3_flush_on_exhaustion() {
             tls: Default::default(),
             auth: Default::default(),
             acknowledgements: Default::default(),
+            timezone: Default::default(),
         }
     };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service).unwrap();
+    let sink = config.build_processor(service, cx).unwrap();
 
     let (lines, _events) = random_lines_with_stream(100, 2, None); // only generate two events (less than batch size)
 
@@ -482,7 +482,7 @@ async fn s3_flush_on_exhaustion() {
 
 async fn client() -> S3Client {
     let auth = AwsAuthentication::test_auth();
-    let region = RegionOrEndpoint::with_both("minio", s3_address());
+    let region = RegionOrEndpoint::with_both("us-east-1", s3_address());
     let proxy = ProxyConfig::default();
     let tls_options = None;
     create_client::<S3ClientBuilder>(
@@ -491,7 +491,6 @@ async fn client() -> S3Client {
         region.endpoint(),
         &proxy,
         &tls_options,
-        true,
     )
     .await
     .unwrap()
@@ -509,7 +508,7 @@ fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
         filename_append_uuid: true,
         filename_extension: None,
         options: S3Options::default(),
-        region: RegionOrEndpoint::with_both("minio", s3_address()),
+        region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
         compression: Compression::None,
         batch,
@@ -517,6 +516,7 @@ fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
         tls: Default::default(),
         auth: Default::default(),
         acknowledgements: Default::default(),
+        timezone: Default::default(),
     }
 }
 
@@ -545,8 +545,8 @@ async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
     {
         Ok(_) => {}
         Err(err) => match err {
-            SdkError::ServiceError(inner) => match &inner.err().kind {
-                CreateBucketErrorKind::BucketAlreadyOwnedByYou(_) => {}
+            SdkError::ServiceError(inner) => match &inner.err() {
+                CreateBucketError::BucketAlreadyOwnedByYou(_) => {}
                 err => panic!("Failed to create bucket: {:?}", err),
             },
             err => panic!("Failed to create bucket: {:?}", err),
@@ -554,7 +554,7 @@ async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
     }
 }
 
-async fn list_objects(bucket: &str, prefix: String) -> Option<Vec<aws_sdk_s3::model::Object>> {
+async fn list_objects(bucket: &str, prefix: String) -> Option<Vec<aws_sdk_s3::types::Object>> {
     let prefix = prefix.split('/').next().unwrap().to_string();
 
     client()

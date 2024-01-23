@@ -56,37 +56,44 @@ create a simple topology consisting of three components:
 
 This configuration defines that topology:
 
-```toml title="vector.toml"
-[sources.logs]
-  type = "demo_logs"
-  format = "syslog"
-  interval = 0.1
+```yaml title="vector.yaml"
+sources:
+  logs:
+    type: demo_logs
+    format: syslog
+    interval: 0.1
 
-[transforms.modify]
-  type = "remap"
-  inputs = ["logs"]
-  source = '''
-    # Parse Syslog input. The "!" means that the script should abort on error.
-    . = parse_syslog!(.message)
-  '''
+transforms:
+  modify:
+    type: remap
+    inputs:
+      - logs
+    source: |
+      # Parse Syslog input. The "!" means that the script should abort on error.
+      . = parse_syslog!(.message)
 
-[sinks.out]
-  type = "console"
-  inputs = ["modify"]
-  encoding.codec = "json"
+sinks:
+  out:
+    type: console
+    inputs:
+      - modify
+    encoding:
+      codec: json
 ```
 
 {{< info >}}
-Although we're using [TOML][urls.toml] for the configuration here, Vector also
-supports JSON and YAML.
+Although we're using [YAML][urls.yaml] for the configuration here, Vector also
+supports [TOML][urls.toml] and [JSON][urls.json].
 
 [urls.toml]: https://github.com/toml-lang/toml
+[urls.yaml]: https://yaml.org
+[urls.json]: https://www.json.org/json-en.html
 {{< /info >}}
 
 To start Vector using this topology:
 
 ```bash
-vector --config-toml /etc/vector/vector.toml
+vector --config /etc/vector/vector.yaml
 ```
 
 You should see lines like this emitted via stdout (formatted for readability
@@ -109,31 +116,33 @@ So far, we've gotten Vector to *parse* the Syslog data but we're not yet
 *modifying* that data. So let's update the `source` script of our `remap`
 transform to make some ad hoc transformations:
 
-```toml
-[transforms.modify]
-  type = "remap"
-  inputs = ["logs"]
-  source = '''
-  . = parse_syslog!(.message)
+```yaml
+transforms:
+  modify:
+    type: remap
+    inputs:
+      - logs
+    source: |
+      . = parse_syslog!(.message)
 
-  # Convert the timestamp to a Unix timestamp, aborting on error
-  .timestamp = to_unix_timestamp!(.timestamp)
+      # Convert the timestamp to a Unix timestamp, aborting on error
+      .timestamp = to_unix_timestamp!(.timestamp)
 
-  # Remove the "facility" and "procid" fields
-  del(.facility); del(.procid)
+      # Remove the "facility" and "procid" fields
+      del(.facility)
+      del(.procid)
 
-  # Replace the "msgid" field with a unique ID
-  .msgid = uuid_v4()
+      # Replace the "msgid" field with a unique ID
+      .msgid = uuid_v4()
 
-  # If the log message contains the phrase "Great Scott!", set the new field
-  # "critical" to true, otherwise set it to false. If the "contains" function
-  # errors, log the error (instead of aborting the script, as above).
-  if (is_critical, err = contains(.message, "Great Scott!"); err != null) {
-    log(err, level: "error")
-  }
+      # If the log message contains the phrase "Great Scott!", set the new field
+      # "critical" to true, otherwise set it to false. If the "contains" function
+      # errors, log the error (instead of aborting the script, as above).
+      if (is_critical, err = contains(.message, "Great Scott!"); err != null) {
+        log(err, level: "error")
+      }
 
-  .critical = is_critical
-  '''
+      .critical = is_critical
 ```
 
 A few things to notice about this script:

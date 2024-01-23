@@ -1,12 +1,17 @@
 use std::{convert::TryFrom, iter, num::NonZeroU8};
 
 use chrono::{TimeZone, Timelike, Utc};
-use codecs::{JsonSerializerConfig, TextSerializerConfig};
 use futures::{future::ready, stream};
-use lookup::lookup_v2::OptionalValuePath;
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
-use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
+use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
+use vector_lib::{
+    config::{init_telemetry, Tags, Telemetry},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    lookup,
+};
+use vrl::path::OwnedTargetPath;
 
 use crate::{
     codecs::EncodingConfig,
@@ -25,7 +30,10 @@ use crate::{
     },
     template::Template,
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{
+            run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
+            DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
+        },
         random_lines_with_stream, random_string,
     },
 };
@@ -100,14 +108,17 @@ async fn find_entries(messages: &[String]) -> bool {
     found_all
 }
 
-async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLogsSinkConfig {
+async fn config(
+    encoding: EncodingConfig,
+    indexed_fields: Vec<ConfigValuePath>,
+) -> HecLogsSinkConfig {
     let mut batch = BatchConfig::default();
     batch.max_events = Some(5);
 
     HecLogsSinkConfig {
         default_token: get_token().await.into(),
         endpoint: splunk_hec_address(),
-        host_key: OptionalValuePath::new("host"),
+        host_key: OptionalTargetPath::event("host"),
         indexed_fields,
         index: None,
         sourcetype: None,
@@ -125,6 +136,18 @@ async fn config(encoding: EncodingConfig, indexed_fields: Vec<String>) -> HecLog
     }
 }
 
+fn enable_telemetry() {
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+}
+
 #[tokio::test]
 async fn splunk_insert_message() {
     let cx = SinkContext::default();
@@ -137,6 +160,33 @@ async fn splunk_insert_message() {
     let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
     drop(batch);
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let entry = find_entry(message.as_str()).await;
+
+    assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert!(entry.get("message").is_none());
+}
+
+#[tokio::test]
+async fn splunk_insert_message_data_volume() {
+    enable_telemetry();
+
+    let cx = SinkContext::default();
+
+    let config = config(TextSerializerConfig::default().into(), vec![]).await;
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let message = random_string(100);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
+    drop(batch);
+    run_and_assert_data_volume_sink_compliance(
+        sink,
+        stream::once(ready(event)),
+        &DATA_VOLUME_SINK_TAGS,
+    )
+    .await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     let entry = find_entry(message.as_str()).await;
@@ -161,6 +211,38 @@ async fn splunk_insert_raw_message() {
     let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
     drop(batch);
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let entry = find_entry(message.as_str()).await;
+
+    assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert_eq!("zork", entry[SOURCE_FIELD].as_str().unwrap());
+    assert!(entry.get("message").is_none());
+}
+
+#[tokio::test]
+async fn splunk_insert_raw_message_data_volume() {
+    enable_telemetry();
+
+    let cx = SinkContext::default();
+
+    let config = HecLogsSinkConfig {
+        endpoint_target: EndpointTarget::Raw,
+        source: Some(Template::try_from("zork").unwrap()),
+        ..config(TextSerializerConfig::default().into(), vec![]).await
+    };
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let message = random_string(100);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
+    drop(batch);
+    run_and_assert_data_volume_sink_compliance(
+        sink,
+        stream::once(ready(event)),
+        &DATA_VOLUME_SINK_TAGS,
+    )
+    .await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     let entry = find_entry(message.as_str()).await;
@@ -225,7 +307,7 @@ async fn splunk_insert_index() {
 async fn splunk_index_is_interpolated() {
     let cx = SinkContext::default();
 
-    let indexed_fields = vec!["asdf".to_string()];
+    let indexed_fields = vec!["asdf".into()];
     let mut config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
     config.index = Template::try_from("{{ index_name }}".to_string()).ok();
 
@@ -302,7 +384,7 @@ async fn splunk_hostname() {
 async fn splunk_sourcetype() {
     let cx = SinkContext::default();
 
-    let indexed_fields = vec!["asdf".to_string()];
+    let indexed_fields = vec!["asdf".into()];
     let mut config = config(JsonSerializerConfig::default().into(), indexed_fields).await;
     config.sourcetype = Template::try_from("_json".to_string()).ok();
 
@@ -327,12 +409,8 @@ async fn splunk_configure_hostname() {
     let cx = SinkContext::default();
 
     let config = HecLogsSinkConfig {
-        host_key: OptionalValuePath::new("roast"),
-        ..config(
-            JsonSerializerConfig::default().into(),
-            vec!["asdf".to_string()],
-        )
-        .await
+        host_key: OptionalTargetPath::event("roast"),
+        ..config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await
     };
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -366,11 +444,7 @@ async fn splunk_indexer_acknowledgements() {
     let config = HecLogsSinkConfig {
         default_token: String::from(ACK_TOKEN).into(),
         acknowledgements: acknowledgements_config,
-        ..config(
-            JsonSerializerConfig::default().into(),
-            vec!["asdf".to_string()],
-        )
-        .await
+        ..config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -387,11 +461,7 @@ async fn splunk_indexer_acknowledgements() {
 async fn splunk_indexer_acknowledgements_disabled_on_server() {
     let cx = SinkContext::default();
 
-    let config = config(
-        JsonSerializerConfig::default().into(),
-        vec!["asdf".to_string()],
-    )
-    .await;
+    let config = config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (tx, mut rx) = BatchNotifier::new_with_receiver();
@@ -418,8 +488,10 @@ async fn splunk_auto_extracted_timestamp() {
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(true),
-            timestamp_key: OptionalValuePath {
-                path: Some(lookup::owned_value_path!("timestamp")),
+            timestamp_key: OptionalTargetPath {
+                path: Some(OwnedTargetPath::event(lookup::owned_value_path!(
+                    "timestamp"
+                ))),
             },
             ..config(JsonSerializerConfig::default().into(), vec![]).await
         };
@@ -471,8 +543,10 @@ async fn splunk_non_auto_extracted_timestamp() {
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(false),
-            timestamp_key: OptionalValuePath {
-                path: Some(lookup::owned_value_path!("timestamp")),
+            timestamp_key: OptionalTargetPath {
+                path: Some(OwnedTargetPath::event(lookup::owned_value_path!(
+                    "timestamp"
+                ))),
             },
             ..config(JsonSerializerConfig::default().into(), vec![]).await
         };

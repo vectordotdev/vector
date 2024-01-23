@@ -281,6 +281,7 @@ mod tests {
     use test_generator::test_resources;
 
     use crate::components::validation::{Runner, StandardValidators};
+    use crate::extra_context::ExtraContext;
 
     use super::{ComponentType, ValidatableComponentDescription, ValidationConfiguration};
 
@@ -366,7 +367,11 @@ mod tests {
             .build()
             .unwrap();
         rt.block_on(async {
-            let mut runner = Runner::from_configuration(configuration, test_case_data_path);
+            let mut runner = Runner::from_configuration(
+                configuration,
+                test_case_data_path,
+                ExtraContext::default(),
+            );
             runner.add_validator(StandardValidators::ComponentSpec);
 
             match runner.run_validation().await {

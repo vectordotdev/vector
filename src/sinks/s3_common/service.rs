@@ -1,21 +1,19 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_s3::{
-    error::PutObjectError,
-    types::{ByteStream, SdkError},
-    Client as S3Client,
-};
+use aws_sdk_s3::operation::put_object::PutObjectError;
+use aws_sdk_s3::Client as S3Client;
+use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
+use aws_smithy_runtime_api::client::result::SdkError;
+use aws_smithy_types::byte_stream::ByteStream;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    stream::DriverResponse,
-};
+use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::stream::DriverResponse;
 
 use super::config::S3Options;
 use super::partitioner::S3PartitionKey;
@@ -91,7 +89,7 @@ impl S3Service {
 
 impl Service<S3Request> for S3Service {
     type Response = S3Response;
-    type Error = SdkError<PutObjectError>;
+    type Error = SdkError<PutObjectError, HttpResponse>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     // Emission of an internal event in case of errors is handled upstream by the caller.

@@ -1,17 +1,15 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
 use derivative::Derivative;
-use lookup::lookup_v2::parse_value_path;
-use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
+use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath};
 use smallvec::{smallvec, SmallVec};
 use std::borrow::Cow;
-use std::collections::BTreeMap;
-use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
+use syslog_loose::{IncompleteDate, Message, ProcId, Protocol, Variant};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::{
     config::{log_schema, DataType},
-    event::{Event, LogEvent, Value},
+    event::{Event, LogEvent, ObjectMap, Value},
     schema,
 };
 use vrl::value::{kind::Collection, Kind};
@@ -26,10 +24,7 @@ pub struct SyslogDeserializerConfig {
     source: Option<&'static str>,
 
     /// Syslog-specific decoding options.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub syslog: SyslogDeserializerOptions,
 }
 
@@ -71,7 +66,7 @@ impl SyslogDeserializerConfig {
                     // The `message` field is always defined. If parsing fails, the entire body becomes the
                     // message.
                     .with_event_field(
-                        &parse_value_path(log_schema().message_key()).expect("valid message key"),
+                        log_schema().message_key().expect("valid message key"),
                         Kind::bytes(),
                         Some("message"),
                     );
@@ -253,7 +248,7 @@ pub struct SyslogDeserializerOptions {
     /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
     #[serde(
         default = "default_lossy",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::is_default"
     )]
     #[derivative(Default(value = "default_lossy()"))]
     pub lossy: bool,
@@ -283,7 +278,8 @@ impl Deserializer for SyslogDeserializer {
             false => Cow::from(std::str::from_utf8(&bytes)?),
         };
         let line = line.trim();
-        let parsed = syslog_loose::parse_message_with_year_exact(line, resolve_year)?;
+        let parsed =
+            syslog_loose::parse_message_with_year_exact(line, resolve_year, Variant::Either)?;
 
         let log = match (self.source, log_namespace) {
             (Some(source), LogNamespace::Vector) => {
@@ -292,7 +288,7 @@ impl Deserializer for SyslogDeserializer {
                 log
             }
             _ => {
-                let mut log = LogEvent::from(Value::Object(BTreeMap::new()));
+                let mut log = LogEvent::from(Value::Object(ObjectMap::new()));
                 insert_fields_from_syslog(&mut log, parsed, log_namespace);
                 log
             }
@@ -402,15 +398,15 @@ fn insert_metadata_fields_from_syslog(
         );
     }
 
-    let mut sdata: BTreeMap<String, Value> = BTreeMap::new();
+    let mut sdata = ObjectMap::new();
     for element in parsed.structured_data.into_iter() {
-        let mut data: BTreeMap<String, Value> = BTreeMap::new();
+        let mut data = ObjectMap::new();
 
         for (name, value) in element.params() {
-            data.insert(name.to_string(), value.into());
+            data.insert(name.to_string().into(), value.into());
         }
 
-        sdata.insert(element.id.to_string(), data.into());
+        sdata.insert(element.id.into(), data.into());
     }
 
     log_namespace.insert_source_metadata(
@@ -429,7 +425,7 @@ fn insert_fields_from_syslog(
 ) {
     match log_namespace {
         LogNamespace::Legacy => {
-            log.insert(event_path!(log_schema().message_key()), parsed.msg);
+            log.maybe_insert(log_schema().message_key_target_path(), parsed.msg);
         }
         LogNamespace::Vector => {
             log.insert(event_path!("message"), parsed.msg);
@@ -440,9 +436,7 @@ fn insert_fields_from_syslog(
         let timestamp = DateTime::<Utc>::from(timestamp);
         match log_namespace {
             LogNamespace::Legacy => {
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
-                    log.insert((PathPrefix::Event, timestamp_key), timestamp);
-                }
+                log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
             }
             LogNamespace::Vector => {
                 log.insert(event_path!("timestamp"), timestamp);
@@ -476,9 +470,9 @@ fn insert_fields_from_syslog(
     }
 
     for element in parsed.structured_data.into_iter() {
-        let mut sdata: BTreeMap<String, Value> = BTreeMap::new();
+        let mut sdata = ObjectMap::new();
         for (name, value) in element.params() {
-            sdata.insert(name.to_string(), value.into());
+            sdata.insert(name.to_string().into(), value.into());
         }
         log.insert(event_path!(element.id), sdata);
     }
@@ -486,9 +480,8 @@ fn insert_fields_from_syslog(
 
 #[cfg(test)]
 mod tests {
-    use vector_core::config::{init_log_schema, log_schema, LogSchema};
-
     use super::*;
+    use vector_core::config::{init_log_schema, log_schema, LogSchema};
 
     #[test]
     fn deserialize_syslog_legacy_namespace() {
@@ -500,7 +493,10 @@ mod tests {
 
         let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
         assert_eq!(events.len(), 1);
-        assert_eq!(events[0].as_log()[log_schema().message_key()], "MSG".into());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "MSG".into()
+        );
         assert!(
             events[0].as_log()[log_schema().timestamp_key().unwrap().to_string()].is_timestamp()
         );
@@ -522,8 +518,12 @@ mod tests {
 
     fn init() {
         let mut schema = LogSchema::default();
-        schema.set_message_key("legacy_message".to_string());
-        schema.set_message_key("legacy_timestamp".to_string());
+        schema.set_message_key(Some(OwnedTargetPath::event(owned_value_path!(
+            "legacy_message"
+        ))));
+        schema.set_message_key(Some(OwnedTargetPath::event(owned_value_path!(
+            "legacy_timestamp"
+        ))));
         init_log_schema(schema, false);
     }
 }

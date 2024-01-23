@@ -1,12 +1,13 @@
 use async_trait::async_trait;
-use codecs::JsonSerializerConfig;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
-use lookup::lookup_v2::OptionalValuePath;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::sink::StreamSink;
+use vector_lib::codecs::JsonSerializerConfig;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup;
+use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath, OptionalValuePath};
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::sink::StreamSink;
 
 use super::{
     config_host_key,
@@ -97,7 +98,7 @@ pub struct HumioMetricsConfig {
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
-    indexed_fields: Vec<String>,
+    indexed_fields: Vec<ConfigValuePath>,
 
     /// Optional name of the repository to ingest into.
     ///
@@ -131,7 +132,7 @@ pub struct HumioMetricsConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -164,7 +165,10 @@ impl SinkConfig for HumioMetricsConfig {
             source: self.source.clone(),
             encoding: JsonSerializerConfig::default().into(),
             event_type: self.event_type.clone(),
-            host_key: self.host_key.clone(),
+            host_key: OptionalTargetPath::from(
+                vrl::path::PathPrefix::Event,
+                self.host_key.path.clone(),
+            ),
             indexed_fields: self.indexed_fields.clone(),
             index: self.index.clone(),
             compression: self.compression,
@@ -174,9 +178,10 @@ impl SinkConfig for HumioMetricsConfig {
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
             // hard coded as humio expects this format so no sense in making it configurable
-            timestamp_key: OptionalValuePath {
-                path: Some(lookup::owned_value_path!("timestamp")),
-            },
+            timestamp_key: OptionalTargetPath::from(
+                vrl::path::PathPrefix::Event,
+                Some(lookup::owned_value_path!("timestamp")),
+            ),
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
@@ -227,7 +232,7 @@ mod tests {
     use futures::stream;
     use indoc::indoc;
     use similar_asserts::assert_eq;
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::{
@@ -305,7 +310,7 @@ mod tests {
                     "metric2",
                     MetricKind::Absolute,
                     MetricValue::Distribution {
-                        samples: vector_core::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
+                        samples: vector_lib::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
                         statistic: StatisticKind::Histogram,
                     },
                 )

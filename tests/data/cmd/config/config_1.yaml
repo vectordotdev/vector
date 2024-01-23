@@ -1,0 +1,36 @@
+data_dir: /var/lib/vector/
+sources:
+  source0:
+    count: 9223372036854775807
+    format: json
+    interval: 1.0
+    type: demo_logs
+    decoding:
+      codec: bytes
+    framing:
+      method: bytes
+transforms:
+  transform0:
+    inputs:
+      - source0
+    drop_on_abort: false
+    drop_on_error: false
+    metric_tag_values: single
+    reroute_dropped: false
+    runtime: ast
+    type: remap
+sinks:
+  sink0:
+    inputs:
+      - transform0
+    target: stdout
+    type: console
+    encoding:
+      codec: json
+    healthcheck:
+      enabled: true
+      uri: null
+    buffer:
+      type: memory
+      max_events: 500
+      when_full: block

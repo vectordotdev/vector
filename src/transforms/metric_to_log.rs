@@ -1,11 +1,11 @@
 use chrono::Utc;
-use codecs::MetricTagValues;
-use lookup::{event_path, owned_value_path, path, PathPrefix};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
-use vector_common::TimeZone;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::codecs::MetricTagValues;
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{event_path, owned_value_path, path, PathPrefix};
+use vector_lib::TimeZone;
 use vrl::path::OwnedValuePath;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
@@ -99,7 +99,7 @@ impl TransformConfig for MetricToLogConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -309,17 +309,13 @@ impl MetricToLog {
                             })
                             .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
 
-                        if let Some(timestamp_key) = log_schema().timestamp_key() {
-                            log.insert((PathPrefix::Event, timestamp_key), timestamp);
-                        }
+                        log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
 
                         if let Some(host_tag) = &self.host_tag {
                             if let Some(host_value) =
-                                log.remove_prune(host_tag.to_string().as_str(), true)
+                                log.remove_prune((PathPrefix::Event, host_tag), true)
                             {
-                                if let Some(host_key) = log_schema().host_key() {
-                                    log.insert((PathPrefix::Event, host_key), host_value);
-                                }
+                                log.maybe_insert(log_schema().host_key_target_path(), host_value);
                             }
                         }
                     }
@@ -357,13 +353,13 @@ mod tests {
     use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
-    use vector_core::metric_tags;
+    use vector_lib::config::ComponentKey;
+    use vector_lib::{event::EventMetadata, metric_tags};
 
     use super::*;
     use crate::event::{
         metric::{MetricKind, MetricTags, MetricValue, StatisticKind, TagValue, TagValueSet},
-        Metric, Value,
+        KeyString, Metric, Value,
     };
     use crate::test_util::{components::assert_transform_compliance, random_string};
     use crate::transforms::test::create_topology;
@@ -412,12 +408,17 @@ mod tests {
         }
     }
 
+    fn event_metadata() -> EventMetadata {
+        EventMetadata::default().with_source_type("unit_test_stream")
+    }
+
     #[tokio::test]
     async fn transform_counter() {
-        let counter = Metric::new(
+        let counter = Metric::new_with_metadata(
             "counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
+            event_metadata(),
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
@@ -427,17 +428,17 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(counter).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
             vec![
-                (String::from("counter.value"), &Value::from(1.0)),
-                (String::from("host"), &Value::from("localhost")),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("counter")),
-                (String::from("tags.some_tag"), &Value::from("some_value")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (KeyString::from("counter.value"), &Value::from(1.0)),
+                (KeyString::from("host"), &Value::from("localhost")),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("counter")),
+                (KeyString::from("tags.some_tag"), &Value::from("some_value")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -445,10 +446,11 @@ mod tests {
 
     #[tokio::test]
     async fn transform_gauge() {
-        let gauge = Metric::new(
+        let gauge = Metric::new_with_metadata(
             "gauge",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.0 },
+            event_metadata(),
         )
         .with_timestamp(Some(ts()));
         let mut metadata = gauge.metadata().clone();
@@ -457,15 +459,15 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(gauge).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
             vec![
-                (String::from("gauge.value"), &Value::from(1.0)),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("gauge")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (KeyString::from("gauge.value"), &Value::from(1.0)),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("gauge")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -473,12 +475,13 @@ mod tests {
 
     #[tokio::test]
     async fn transform_set() {
-        let set = Metric::new(
+        let set = Metric::new_with_metadata(
             "set",
             MetricKind::Absolute,
             MetricValue::Set {
                 values: vec!["one".into(), "two".into()].into_iter().collect(),
             },
+            event_metadata(),
         )
         .with_timestamp(Some(ts()));
         let mut metadata = set.metadata().clone();
@@ -487,16 +490,16 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(set).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
             vec![
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("set")),
-                (String::from("set.values[0]"), &Value::from("one")),
-                (String::from("set.values[1]"), &Value::from("two")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("set")),
+                (KeyString::from("set.values[0]"), &Value::from("one")),
+                (KeyString::from("set.values[1]"), &Value::from("two")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -504,13 +507,14 @@ mod tests {
 
     #[tokio::test]
     async fn transform_distribution() {
-        let distro = Metric::new(
+        let distro = Metric::new_with_metadata(
             "distro",
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.0 => 10, 2.0 => 20],
+                samples: vector_lib::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
+            event_metadata(),
         )
         .with_timestamp(Some(ts()));
         let mut metadata = distro.metadata().clone();
@@ -519,34 +523,34 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(distro).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
             vec![
                 (
-                    String::from("distribution.samples[0].rate"),
+                    KeyString::from("distribution.samples[0].rate"),
                     &Value::from(10)
                 ),
                 (
-                    String::from("distribution.samples[0].value"),
+                    KeyString::from("distribution.samples[0].value"),
                     &Value::from(1.0)
                 ),
                 (
-                    String::from("distribution.samples[1].rate"),
+                    KeyString::from("distribution.samples[1].rate"),
                     &Value::from(20)
                 ),
                 (
-                    String::from("distribution.samples[1].value"),
+                    KeyString::from("distribution.samples[1].value"),
                     &Value::from(2.0)
                 ),
                 (
-                    String::from("distribution.statistic"),
+                    KeyString::from("distribution.statistic"),
                     &Value::from("histogram")
                 ),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("distro")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("distro")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -554,14 +558,15 @@ mod tests {
 
     #[tokio::test]
     async fn transform_histogram() {
-        let histo = Metric::new(
+        let histo = Metric::new_with_metadata(
             "histo",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![1.0 => 10, 2.0 => 20],
+                buckets: vector_lib::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
                 sum: 50.0,
             },
+            event_metadata(),
         )
         .with_timestamp(Some(ts()));
         let mut metadata = histo.metadata().clone();
@@ -570,32 +575,38 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(histo).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
             vec![
                 (
-                    String::from("aggregated_histogram.buckets[0].count"),
+                    KeyString::from("aggregated_histogram.buckets[0].count"),
                     &Value::from(10)
                 ),
                 (
-                    String::from("aggregated_histogram.buckets[0].upper_limit"),
+                    KeyString::from("aggregated_histogram.buckets[0].upper_limit"),
                     &Value::from(1.0)
                 ),
                 (
-                    String::from("aggregated_histogram.buckets[1].count"),
+                    KeyString::from("aggregated_histogram.buckets[1].count"),
                     &Value::from(20)
                 ),
                 (
-                    String::from("aggregated_histogram.buckets[1].upper_limit"),
+                    KeyString::from("aggregated_histogram.buckets[1].upper_limit"),
                     &Value::from(2.0)
                 ),
-                (String::from("aggregated_histogram.count"), &Value::from(30)),
-                (String::from("aggregated_histogram.sum"), &Value::from(50.0)),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("histo")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (
+                    KeyString::from("aggregated_histogram.count"),
+                    &Value::from(30)
+                ),
+                (
+                    KeyString::from("aggregated_histogram.sum"),
+                    &Value::from(50.0)
+                ),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("histo")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);
@@ -603,14 +614,15 @@ mod tests {
 
     #[tokio::test]
     async fn transform_summary() {
-        let summary = Metric::new(
+        let summary = Metric::new_with_metadata(
             "summary",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: vector_core::quantiles![50.0 => 10.0, 90.0 => 20.0],
+                quantiles: vector_lib::quantiles![50.0 => 10.0, 90.0 => 20.0],
                 count: 30,
                 sum: 50.0,
             },
+            event_metadata(),
         )
         .with_timestamp(Some(ts()));
         let mut metadata = summary.metadata().clone();
@@ -619,32 +631,38 @@ mod tests {
         metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(summary).await.unwrap();
-        let collected: Vec<_> = log.all_fields().unwrap().collect();
+        let collected: Vec<_> = log.all_event_fields().unwrap().collect();
 
         assert_eq!(
             collected,
             vec![
-                (String::from("aggregated_summary.count"), &Value::from(30)),
                 (
-                    String::from("aggregated_summary.quantiles[0].quantile"),
+                    KeyString::from("aggregated_summary.count"),
+                    &Value::from(30)
+                ),
+                (
+                    KeyString::from("aggregated_summary.quantiles[0].quantile"),
                     &Value::from(50.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[0].value"),
+                    KeyString::from("aggregated_summary.quantiles[0].value"),
                     &Value::from(10.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[1].quantile"),
+                    KeyString::from("aggregated_summary.quantiles[1].quantile"),
                     &Value::from(90.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[1].value"),
+                    KeyString::from("aggregated_summary.quantiles[1].value"),
                     &Value::from(20.0)
                 ),
-                (String::from("aggregated_summary.sum"), &Value::from(50.0)),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("summary")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (
+                    KeyString::from("aggregated_summary.sum"),
+                    &Value::from(50.0)
+                ),
+                (KeyString::from("kind"), &Value::from("absolute")),
+                (KeyString::from("name"), &Value::from("summary")),
+                (KeyString::from("timestamp"), &Value::from(ts())),
             ]
         );
         assert_eq!(log.metadata(), &metadata);

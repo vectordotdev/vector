@@ -2,7 +2,7 @@
 use std::collections::{HashMap, HashSet};
 
 use enum_dispatch::enum_dispatch;
-use vector_config::{configurable_component, NamedComponent};
+use vector_lib::configurable::{configurable_component, NamedComponent};
 
 use crate::{config::SecretBackend, signal};
 

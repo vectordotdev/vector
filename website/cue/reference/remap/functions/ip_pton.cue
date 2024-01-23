@@ -28,7 +28,7 @@ remap: functions: ip_pton: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a valid IP (v4 or v6) address in text form",
+		"`value` is not a valid IP (v4 or v6) address in text form.",
 	]
 	return: types: ["string"]
 

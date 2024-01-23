@@ -4,7 +4,7 @@ use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use tonic::body::BoxBody;
 use tower::ServiceBuilder;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use super::{
     service::{VectorResponse, VectorService},
@@ -74,7 +74,7 @@ pub struct VectorConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub(in crate::sinks::vector) acknowledgements: AcknowledgementsConfig,
 }
@@ -123,7 +123,7 @@ impl SinkConfig for VectorConfig {
         let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri, false);
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck);
         let service = VectorService::new(client, uri, self.compression);
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let service = ServiceBuilder::new()
@@ -161,12 +161,12 @@ async fn healthcheck(
 
     let request = service.client.health_check(proto::HealthCheckRequest {});
     match request.await {
-        Ok(response) => match proto::ServingStatus::from_i32(response.into_inner().status) {
-            Some(proto::ServingStatus::Serving) => Ok(()),
-            Some(status) => Err(Box::new(VectorSinkError::Health {
+        Ok(response) => match proto::ServingStatus::try_from(response.into_inner().status) {
+            Ok(proto::ServingStatus::Serving) => Ok(()),
+            Ok(status) => Err(Box::new(VectorSinkError::Health {
                 status: Some(status.as_str_name()),
             })),
-            None => Err(Box::new(VectorSinkError::Health { status: None })),
+            Err(_) => Err(Box::new(VectorSinkError::Health { status: None })),
         },
         Err(source) => Err(Box::new(VectorSinkError::Request { source })),
     }
