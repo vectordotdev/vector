@@ -55,6 +55,18 @@ These environment checks can be disabled using the [`--no-environment`][no_envir
 vector validate --no-environment /etc/vector/vector.yaml
 ```
 
+#### Skipping health checks
+
+To validate the vector configuration even if the health-checked endpoints are not reachable
+(i.e. from a local workstation), but still run all other environment checks, use the
+[`--skip-healthchecks`][skip_healthchecks] flag:
+
+```bash
+vector validate --skip-healthchecks /etc/vector/vector.yaml
+```
+
+Note that the configured `data_dir` must still be writeable.
+
 [components]: /components
 [no_environment]: /docs/reference/cli/#validate-no-environment
 [sinks]: /sinks
