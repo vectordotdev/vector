@@ -17,11 +17,10 @@ default = [
 
 btreemap = []
 
-byte_size_of = ["dep:bytes", "dep:chrono"]
+byte_size_of = ["dep:bytes"]
 
 conversion = [
   "dep:bytes",
-  "dep:chrono",
   "dep:snafu",
 ]
 
@@ -44,7 +43,7 @@ tokenize = [
 async-stream = "0.3.5"
 bytes = { version = "1.5.0", default-features = false, optional = true }
 chrono-tz = { version = "0.8.5", default-features = false, features = ["serde"] }
-chrono = { version = "0.4", default-features = false, optional = true, features = ["clock"] }
+chrono.workspace = true
 crossbeam-utils = { version = "0.8.19", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 futures = { version = "0.3.30", default-features = false, features = ["std"] }
