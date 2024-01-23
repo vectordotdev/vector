@@ -89,7 +89,7 @@ jobs:
             || needs.changes.outputs.webhdfs == 'true'
         )
       )
-    timeout-minutes: 120
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v3
         with:
@@ -187,6 +187,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  datadog-logs
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-metrics == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: datadog-metrics
@@ -212,8 +214,6 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  dnstap
-
-      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.docker-logs == 'true' }}
         name: docker-logs
@@ -262,6 +262,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  greptimedb
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.humio == 'true' }}
         name: humio
@@ -319,8 +321,6 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  mongodb
 
-      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
-
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.nats == 'true' }}
         name: nats
         uses: nick-fields/retry@v2
@@ -336,6 +336,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-integration-test.sh  nginx
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.opentelemetry == 'true' }}
         name: opentelemetry
