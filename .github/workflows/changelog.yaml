@@ -5,14 +5,14 @@
 #   - opened/re-opened
 #   - new commits pushed
 #   - label is added or removed
-# Runs on MQs, but just passes, because it is a required check.
+# Runs on merge queues, but just passes, because it is a required check.
 
 name: Changelog
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  # Due to MQ requiring same status checks as PRs, must pass by default in MQ
+  # Due to merge queue requiring same status checks as PRs, must pass by default
   merge_group:
     types: [checks_requested]
 
