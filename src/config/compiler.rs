@@ -17,7 +17,8 @@ use fs4::FileExt;
 fn create_data_dir_lock(data_dir: &Option<PathBuf>) -> Result<Option<File>, String> {
     if let Some(data_dir) = data_dir {
         let lock_path = data_dir.join(".lock");
-        let lock = File::create(&lock_path).map_err(|e| e.to_string())?;
+        let lock = File::create(&lock_path)
+            .map_err(|e| format!("Couldn't create lockfile at {lock_path:?}. Error: {e}"))?;
         match lock.try_lock_exclusive() {
             Ok(()) => Ok(Some(lock)),
             Err(e) => Err(format!("Couldn't lock {lock_path:?}. Error: {e}")),
@@ -124,10 +125,13 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         .into_iter()
         .map(|test| test.resolve_outputs(&graph))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
+    println!("tets");
 
+    println!("Seb test {:?}", &global.data_dir);
     let data_dir_lock = match create_data_dir_lock(&global.data_dir) {
         Ok(lock) => lock,
         Err(e) => {
+            println!("Seb test 2 {}", e);
             errors.push(e);
             None
         }
