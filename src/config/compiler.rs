@@ -125,13 +125,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         .into_iter()
         .map(|test| test.resolve_outputs(&graph))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
-    println!("tets");
 
-    println!("Seb test {:?}", &global.data_dir);
     let data_dir_lock = match create_data_dir_lock(&global.data_dir) {
         Ok(lock) => lock,
         Err(e) => {
-            println!("Seb test 2 {}", e);
             errors.push(e);
             None
         }
