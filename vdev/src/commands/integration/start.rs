@@ -10,6 +10,10 @@ pub struct Cli {
     /// The integration name
     integration: String,
 
+    /// Whether to compile the test runner with all integration test features
+    #[arg(short = 'a', long)]
+    build_all: bool,
+
     /// The desired environment name to start. If omitted, the first environment name is used.
     environment: Option<String>,
 }
@@ -24,6 +28,6 @@ impl Cli {
             let env = envs.keys().next().expect("Integration has no environments");
             env.clone()
         };
-        IntegrationTest::new(self.integration, environment, false, 0)?.start()
+        IntegrationTest::new(self.integration, environment, self.build_all, 0)?.start()
     }
 }
