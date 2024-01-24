@@ -1022,9 +1022,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sigv4"
-version = "1.1.2"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b92384b39aedb258aa734fe0e7b2ffcd13f33e68227251a72cd2635e0acc8f1a"
+checksum = "511879249616f30e30fd2fa81edb4833784f65dd5d56053b7de2e2bcb583dda7"
 dependencies = [
  "aws-credential-types",
  "aws-smithy-eventstream",
@@ -1036,6 +1036,7 @@ dependencies = [
  "hex",
  "hmac",
  "http 0.2.9",
+ "http 1.0.0",
  "once_cell",
  "percent-encoding",
  "sha2",
@@ -1198,9 +1199,9 @@ dependencies = [
 
 [[package]]
 name = "aws-types"
-version = "1.1.2"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8549aa62c5b7db5c57ab915200ee214b4f5d8f19b29a4a8fa0b3ad3bca1380e3"
+checksum = "ee2739d97d47f47cdf0d27982019a405dcc736df25925d1a75049f1faa79df88"
 dependencies = [
  "aws-credential-types",
  "aws-smithy-async",
