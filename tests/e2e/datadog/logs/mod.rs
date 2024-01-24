@@ -59,10 +59,10 @@ fn common_assertions(payloads: &mut [Value]) {
 }
 
 // reduces the payload down to just the log data
-fn reduce_to_data(payloads: &mut [FakeIntakePayload<Value>]) -> Vec<Value> {
+fn reduce_to_data(payloads: Vec<FakeIntakePayload<Value>>) -> Vec<Value> {
     payloads
-        .iter_mut()
-        .map(|payload| payload.data.take())
+        .into_iter()
+        .map(|mut payload| payload.data.take())
         .collect()
 }
 
@@ -87,19 +87,19 @@ async fn validate() {
         agent_payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty())
     }
 
-    let mut agent_payloads = reduce_to_data(&mut agent_payloads);
+    let mut agent_payloads = reduce_to_data(agent_payloads);
 
     common_assertions(&mut agent_payloads);
 
     info!("getting log payloads from agent-vector pipeline");
-    let mut vector_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
+    let vector_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
         &fake_intake_vector_address(),
         LOGS_ENDPOINT,
     )
     .await
     .payloads;
 
-    let mut vector_payloads = reduce_to_data(&mut vector_payloads);
+    let mut vector_payloads = reduce_to_data(vector_payloads);
 
     common_assertions(&mut vector_payloads);
 

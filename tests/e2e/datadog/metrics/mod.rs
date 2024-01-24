@@ -1,6 +1,7 @@
 use base64::{prelude::BASE64_STANDARD, Engine};
 use bytes::Bytes;
 use flate2::read::ZlibDecoder;
+use std::io::Read;
 
 use vector::test_util::trace_init;
 
@@ -12,7 +13,7 @@ use super::*;
 fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
     let mut decompressor = ZlibDecoder::new(&payload[..]);
     let mut decompressed = Vec::new();
-    let result = std::io::copy(&mut decompressor, &mut decompressed);
+    let result = decompressor.read_to_end(&mut decompressed);
     result.map(|_| decompressed)
 }
 

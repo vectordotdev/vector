@@ -35,7 +35,7 @@ type SketchIntake =
     BTreeMap<SketchContext, (TimeSketchData<Dogsketch>, TimeSketchData<Distribution>)>;
 
 // massages the raw payloads into our intake structure
-fn generate_sketch_intake(payloads: &mut [SketchPayload]) -> SketchIntake {
+fn generate_sketch_intake(mut payloads: Vec<SketchPayload>) -> SketchIntake {
     let mut intake = SketchIntake::new();
 
     payloads.iter_mut().for_each(|payload| {
@@ -97,10 +97,10 @@ async fn get_sketches_from_pipeline(address: String) -> SketchIntake {
         get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SKETCHES_ENDPOINT).await;
 
     info!("unpacking payloads");
-    let mut payloads = unpack_proto_payloads(&payloads);
+    let payloads = unpack_proto_payloads(&payloads);
 
     info!("generating sketch intake");
-    let sketches = generate_sketch_intake(&mut payloads);
+    let sketches = generate_sketch_intake(payloads);
 
     common_sketch_assertions(&sketches);
 

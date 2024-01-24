@@ -74,7 +74,7 @@ fn generate_series_intake(payloads: &[MetricPayload]) -> SeriesIntake {
             serie.points.iter().for_each(|point| {
                 let tb = get_time_bucket(point, serie.interval, serie.r#type());
                 if !entry.contains_key(&tb) {
-                    entry.insert(tb.clone(), vec![]);
+                    entry.insert(tb.clone(), Vec::new());
                 }
                 entry.get_mut(&tb).unwrap().push(point.value);
             });
@@ -127,13 +127,14 @@ impl From<&DatadogSeriesMetric> for MetricSeries {
             });
         }
 
-        let mut points = vec![];
-        input.points.iter().for_each(|point| {
-            points.push(MetricPoint {
+        let points = input
+            .points
+            .iter()
+            .map(|point| MetricPoint {
                 value: point.1,
                 timestamp: point.0,
             })
-        });
+            .collect();
 
         let interval = input.interval.unwrap_or(0) as i64;
 
@@ -158,30 +159,37 @@ impl From<&DatadogSeriesMetric> for MetricSeries {
 }
 
 fn convert_v1_payloads_v2(input: &[DatadogSeriesMetric]) -> Vec<MetricPayload> {
-    let mut output = vec![];
-
-    input.iter().for_each(|serie| {
-        output.push(MetricPayload {
+    input
+        .iter()
+        .map(|serie| MetricPayload {
             series: vec![serie.into()],
-        });
-    });
-
-    output
+        })
+        .collect()
 }
 
 fn unpack_v1_series(in_payloads: &[FakeIntakePayloadJson]) -> Vec<DatadogSeriesMetric> {
-    let mut out_series = vec![];
+    // let mut out_series = vec![];
 
-    in_payloads.iter().for_each(|payload| {
-        let series = payload.data.as_array().unwrap();
+    // in_payloads.iter().for_each(|payload| {
+    //     let series = payload.data.as_array().unwrap();
 
-        series.iter().for_each(|serie| {
-            let ser: DatadogSeriesMetric = serde_json::from_value(serie.clone()).unwrap();
-            out_series.push(ser);
-        });
-    });
+    //     series.iter().for_each(|serie| {
+    //         let ser: DatadogSeriesMetric = serde_json::from_value(serie.clone()).unwrap();
+    //         out_series.push(ser);
+    //     });
+    // });
 
-    out_series
+    // out_series
+
+    in_payloads
+        .iter()
+        .flat_map(|payload| {
+            let series = payload.data.as_array().unwrap();
+            series
+                .iter()
+                .map(|serie| serde_json::from_value(serie.clone()).unwrap())
+        })
+        .collect()
 }
 
 async fn get_v1_series_from_pipeline(address: String) -> SeriesIntake {
@@ -257,17 +265,17 @@ pub(super) async fn validate() {
 
             // rate: summation.
             if metric_type == 2 {
-                let mut agent_sum = 0.0;
-                agent_ts
+                let agent_sum: f64 = agent_ts
                     .1
                     .iter()
-                    .for_each(|(_tb, points)| points.iter().for_each(|v| agent_sum += v));
+                    .map(|(_tb, points)| points.iter().sum::<f64>())
+                    .sum();
 
-                let mut vector_sum = 0.0;
-                vector_ts
+                let vector_sum: f64 = vector_ts
                     .1
                     .iter()
-                    .for_each(|(_tb, points)| points.iter().for_each(|v| vector_sum += v));
+                    .map(|(_tb, points)| points.iter().sum::<f64>())
+                    .sum();
 
                 assert_eq!(agent_sum, vector_sum, "Mismatch of rate data");
             }
