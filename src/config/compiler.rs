@@ -17,8 +17,9 @@ use fs4::FileExt;
 fn create_data_dir_lock(data_dir: &Option<PathBuf>) -> Result<Option<File>, String> {
     if let Some(data_dir) = data_dir {
         let lock_path = data_dir.join(".lock");
-        let lock = File::create(&lock_path)
-            .map_err(|e| format!("Couldn't create lockfile for the data directory at {lock_path:?}. Error: {e}"))?;
+        let lock = File::create(&lock_path).map_err(|e| {
+            format!("Couldn't create lockfile for the data directory at {lock_path:?}. Error: {e}")
+        })?;
         match lock.try_lock_exclusive() {
             Ok(()) => Ok(Some(lock)),
             Err(e) => Err(format!("Couldn't lock {lock_path:?}. Error: {e}")),
