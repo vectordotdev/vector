@@ -45,7 +45,7 @@ on:
       k8s:
         value: ${{ jobs.source.outputs.k8s }}
       all-int:
-        value: ${{ jobs.int_tests.outputs.all-int }}
+        value: ${{ jobs.int_tests.outputs.all-tests }}
       amqp:
         value: ${{ jobs.int_tests.outputs.amqp }}
       appsignal:
@@ -116,7 +116,7 @@ on:
         value: ${{ jobs.int_tests.outputs.webhdfs }}
       # e2e tests
       all-e2e:
-        value: ${{ jobs.e2e_tests.outputs.all-e2e }}
+        value: ${{ jobs.e2e_tests.outputs.all-tests }}
       e2e-datadog-logs:
         value: ${{ jobs.e2e_tests.outputs.datadog-logs }}
       e2e-datadog-metrics:
@@ -195,7 +195,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.int_tests }}
     outputs:
-      all-int: ${{ steps.filter.outputs.all-tests}}
+      all-tests: ${{ steps.filter.outputs.all-tests}}
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
       aws: ${{ steps.filter.outputs.aws }}
@@ -251,7 +251,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.e2e_tests }}
     outputs:
-      all-e2e: ${{ steps.filter.outputs.all-tests}}
+      all-tests: ${{ steps.filter.outputs.all-tests}}
       datadog-logs: ${{ steps.filter.outputs.e2e-datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.e2e-datadog-metrics }}
     steps:
