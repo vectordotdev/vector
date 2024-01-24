@@ -142,7 +142,8 @@ impl ApplicationConfig {
                 Ok(api_server) => {
                     emit!(ApiStarted {
                         addr: self.api.address.unwrap(),
-                        playground: self.api.playground
+                        playground: self.api.playground,
+                        graphql: self.api.graphql
                     });
 
                     Some(api_server)
