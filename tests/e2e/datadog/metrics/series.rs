@@ -168,19 +168,6 @@ fn convert_v1_payloads_v2(input: &[DatadogSeriesMetric]) -> Vec<MetricPayload> {
 }
 
 fn unpack_v1_series(in_payloads: &[FakeIntakePayloadJson]) -> Vec<DatadogSeriesMetric> {
-    // let mut out_series = vec![];
-
-    // in_payloads.iter().for_each(|payload| {
-    //     let series = payload.data.as_array().unwrap();
-
-    //     series.iter().for_each(|serie| {
-    //         let ser: DatadogSeriesMetric = serde_json::from_value(serie.clone()).unwrap();
-    //         out_series.push(ser);
-    //     });
-    // });
-
-    // out_series
-
     in_payloads
         .iter()
         .flat_map(|payload| {
@@ -254,8 +241,16 @@ pub(super) async fn validate() {
             // gauge: last one wins.
             // we can't rely on comparing each value due to the fact that we can't guarantee consistent sampling
             if metric_type == 3 {
-                let last_agent_point = agent_ts.1.iter().last();
-                let last_vector_point = vector_ts.1.iter().last();
+                let last_agent_point = agent_ts
+                    .1
+                    .last_key_value()
+                    .expect("should have received points")
+                    .1;
+                let last_vector_point = vector_ts
+                    .1
+                    .last_key_value()
+                    .expect("should have received points")
+                    .1;
 
                 assert_eq!(
                     last_agent_point, last_vector_point,
