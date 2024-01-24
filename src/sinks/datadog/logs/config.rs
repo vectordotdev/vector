@@ -32,7 +32,6 @@ use crate::{
 // of escaped double-quotes -- but we believe this should be very rare in
 // practice.
 pub const MAX_PAYLOAD_BYTES: usize = 5_000_000;
-pub const BATCH_GOAL_BYTES: usize = 4_250_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 
@@ -41,7 +40,7 @@ pub struct DatadogLogsDefaultBatchSettings;
 
 impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(BATCH_MAX_EVENTS);
-    const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
+    const MAX_BYTES: Option<usize> = Some(MAX_PAYLOAD_BYTES);
     const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
@@ -112,7 +111,7 @@ impl DatadogLogsConfig {
         let batch = self
             .batch
             .validate()?
-            .limit_max_bytes(BATCH_GOAL_BYTES)?
+            .limit_max_bytes(MAX_PAYLOAD_BYTES)?
             .limit_max_events(BATCH_MAX_EVENTS)?
             .into_batcher_settings()?;
 
