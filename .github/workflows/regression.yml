@@ -57,7 +57,7 @@ jobs:
     - name: Collect file changes
       id: changes
       if: github.event_name == 'merge_group'
-      uses: dorny/paths-filter@v2
+      uses: dorny/paths-filter@v3
       with:
         base: ${{ github.event.merge_group.base_ref }}
         ref: ${{ github.event.merge_group.head_ref }}
