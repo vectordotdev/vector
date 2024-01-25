@@ -1,0 +1,1 @@
+Vector logs and internal metrics emitted while in the context of stream sink request building, now correctly contain the component's automatic tags (`component_kind`, `component_type`, `component_id`).
