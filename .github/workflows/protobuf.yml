@@ -20,7 +20,7 @@ jobs:
       # Run `git checkout`
       - uses: actions/checkout@v3
       # Install the `buf` CLI
-      - uses: bufbuild/buf-setup-action@v1.28.1
+      - uses: bufbuild/buf-setup-action@v1.29.0
       # Perform breaking change detection against the `master` branch
       - uses: bufbuild/buf-breaking-action@v1.1.3
         with:
