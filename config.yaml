@@ -1,0 +1,12 @@
+sources:
+  generate_syslog:
+    type:   "demo_logs"
+    format: "syslog"
+    count:  100
+sinks:
+  basic:
+    type: basic
+    endpoint: https://endpoint4.collection.sumologic.com/receiver/v1/http/ZaVnC4dhaV1JGGcOB3Er3h2YbhhL4I3_ra4-mtEBebT_B8MUqQER9Y8zr1LQ4FujvCg1vXIrsKYGb59Z3aPNTWO7_XDHyejj_9vLpov0nlFXz19u3PQzvA==
+    inputs:
+      - generate_syslog
+data_dir: /var/lib/vector
