@@ -238,6 +238,13 @@ pub(super) async fn validate() {
 
             let metric_type = agent_ts.0.r#type;
 
+            // Dogstatsd emits counters but the output type from the Agent is Rate.
+            // https://docs.datadoghq.com/metrics/types/?tab=rate#submission-types-and-datadog-in-app-types
+            assert!(
+                metric_type == 2 || metric_type == 3,
+                "Metric type should always be rate or gauge."
+            );
+
             // gauge: last one wins.
             // we can't rely on comparing each value due to the fact that we can't guarantee consistent sampling
             if metric_type == 3 {
