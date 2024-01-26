@@ -285,9 +285,9 @@ Change the body of `run_inner` to look like the following:
 +       let events_sent = register!(EventsSent::from(Output(None)));
 
         while let Some(mut event) = input.next().await {
-           let bytes = format!("{:#?}", event);
-           println!("{}", bytes);
-           bytes_sent.emit(ByteSize(bytes.len()));
+            let bytes = format!("{:#?}", event);
+            println!("{}", bytes);
+            bytes_sent.emit(ByteSize(bytes.len()));
 
 +           let event_byte_size = event.estimated_json_encoded_size_of();
 +           events_sent.emit(CountByteSize(1, event_byte_size));
