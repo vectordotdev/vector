@@ -30,38 +30,10 @@ pub(crate) struct ComposeTest {
     retries: u8,
 }
 
-/// Integration tests are located in the `scripts/integration` dir,
-/// and are the full feature flag is `all-integration-tests`.
-pub(crate) struct IntegrationTest;
-
-impl ComposeTestT for IntegrationTest {
-    fn directory() -> &'static str {
-        INTEGRATION_TESTS_DIR
-    }
-
-    fn feature_flag() -> &'static str {
-        INTEGRATION_FEATURE_FLAG
-    }
-}
-
-/// E2E tests are located in the `scripts/e2e` dir,
-/// and are the full feature flag is `all-e2e-tests`.
-pub(crate) struct E2ETest;
-
-impl ComposeTestT for E2ETest {
-    fn directory() -> &'static str {
-        E2E_TESTS_DIR
-    }
-
-    fn feature_flag() -> &'static str {
-        E2E_FEATURE_FLAG
-    }
-}
-
 pub(crate) trait ComposeTestT {
-    fn directory() -> &'static str;
+    const DIRECTORY: &'static str;
 
-    fn feature_flag() -> &'static str;
+    const FEATURE_FLAG: &'static str;
 
     fn generate(
         test_name: impl Into<String>,
@@ -71,7 +43,7 @@ pub(crate) trait ComposeTestT {
     ) -> Result<ComposeTest> {
         let test_name = test_name.into();
         let environment = environment.into();
-        let (test_dir, config) = ComposeTestConfig::load(Self::directory(), &test_name)?;
+        let (test_dir, config) = ComposeTestConfig::load(Self::DIRECTORY, &test_name)?;
         let envs_dir = EnvsDir::new(&test_name);
         let Some(mut env_config) = config.environments().get(&environment).map(Clone::clone) else {
             bail!("Could not find environment named {environment:?}");
@@ -126,7 +98,7 @@ pub(crate) trait ComposeTestT {
         args.push("--features".to_string());
 
         args.push(if compose_test.build_all {
-            Self::feature_flag().to_string()
+            Self::FEATURE_FLAG.to_string()
         } else {
             compose_test.config.features.join(",")
         });
@@ -213,6 +185,26 @@ pub(crate) trait ComposeTestT {
 
         Ok(())
     }
+}
+
+/// Integration tests are located in the `scripts/integration` dir,
+/// and are the full feature flag is `all-integration-tests`.
+pub(crate) struct IntegrationTest;
+
+impl ComposeTestT for IntegrationTest {
+    const DIRECTORY: &'static str = INTEGRATION_TESTS_DIR;
+
+    const FEATURE_FLAG: &'static str = INTEGRATION_FEATURE_FLAG;
+}
+
+/// E2E tests are located in the `scripts/e2e` dir,
+/// and are the full feature flag is `all-e2e-tests`.
+pub(crate) struct E2ETest;
+
+impl ComposeTestT for E2ETest {
+    const DIRECTORY: &'static str = E2E_TESTS_DIR;
+
+    const FEATURE_FLAG: &'static str = E2E_FEATURE_FLAG;
 }
 
 struct Compose {

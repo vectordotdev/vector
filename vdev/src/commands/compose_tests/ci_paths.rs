@@ -11,7 +11,7 @@ pub(crate) fn exec(path: &str) -> Result<()> {
         if let Some(paths) = config.paths {
             println!("{test_name}:");
             for path in paths {
-                println!("- \"{path}\"");
+                println!("- {path:?}");
             }
         }
     }

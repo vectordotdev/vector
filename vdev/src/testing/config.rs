@@ -142,7 +142,7 @@ impl ComposeTestConfig {
     fn parse_file(config_file: &Path) -> Result<Self> {
         let contents = fs::read_to_string(config_file)
             .with_context(|| format!("failed to read {}", config_file.display()))?;
-        let config: ComposeTestConfig = serde_yaml::from_str(&contents).with_context(|| {
+        let config: Self = serde_yaml::from_str(&contents).with_context(|| {
             format!(
                 "failed to parse integration test configuration file {}",
                 config_file.display()

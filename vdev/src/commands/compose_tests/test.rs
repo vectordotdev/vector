@@ -9,7 +9,7 @@ pub fn exec<T: ComposeTestT>(
     retries: u8,
     args: &[String],
 ) -> Result<()> {
-    let (_test_dir, config) = ComposeTestConfig::load(T::directory(), integration)?;
+    let (_test_dir, config) = ComposeTestConfig::load(T::DIRECTORY, integration)?;
     let envs = config.environments();
 
     let active = EnvsDir::new(integration).active()?;

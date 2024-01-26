@@ -7,12 +7,12 @@ use crate::testing::config::E2E_TESTS_DIR;
 #[derive(Args, Debug)]
 #[command()]
 pub struct Cli {
-    /// The desired e2e-test
-    e2e_test: Option<String>,
+    /// The desired e2e test name
+    test: Option<String>,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::show::exec(&self.e2e_test, E2E_TESTS_DIR)
+        crate::commands::compose_tests::show::exec(&self.test, E2E_TESTS_DIR)
     }
 }
