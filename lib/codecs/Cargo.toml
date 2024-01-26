@@ -12,7 +12,7 @@ path = "tests/bin/generate-avro-fixtures.rs"
 [dependencies]
 apache-avro = { version = "0.16.0", default-features = false }
 bytes = { version = "1", default-features = false }
-chrono = { version = "0.4", default-features = false }
+chrono.workspace = true
 csv-core = { version = "0.1.10", default-features = false }
 derivative = { version = "2", default-features = false }
 dyn-clone = { version = "1", default-features = false }
