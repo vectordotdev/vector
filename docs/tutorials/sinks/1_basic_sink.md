@@ -256,12 +256,12 @@ emit the event. Change the body of `run_inner` to look like the following:
 
 ```diff
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
++       let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
+
         while let Some(mut event) = input.next().await {
 +           let bytes = format!("{:#?}", event);
 +           println!("{}", bytes);
 -           println!("{:#?}", event);
-
-+           let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
 +           bytes_sent.emit(ByteSize(bytes.len()));
 
             let finalizers = event.take_finalizers();
@@ -277,12 +277,27 @@ emit the event. Change the body of `run_inner` to look like the following:
 [`EventSent`][events_sent] is emitted by each component in Vector to
 instrument how many bytes have been sent to the next downstream component.
 
-Add the following after emitting `BytesSent`:
+Change the body of `run_inner` to look like the following:
 
 ```diff
-+     let event_byte_size = event.estimated_json_encoded_size_of();
-+     let events_sent = register!(EventsSent::from(Output(None)));
-+     events_sent.emit(CountByteSize(1, event_byte_size));
+    async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
++       let events_sent = register!(EventsSent::from(Output(None)));
+
+        while let Some(mut event) = input.next().await {
+           let bytes = format!("{:#?}", event);
+           println!("{}", bytes);
+           bytes_sent.emit(ByteSize(bytes.len()));
+
++           let event_byte_size = event.estimated_json_encoded_size_of();
++           events_sent.emit(CountByteSize(1, event_byte_size));
+
+            let finalizers = event.take_finalizers();
+            finalizers.update_status(EventStatus::Delivered);
+        }
+
+        Ok(())
+    }
 ```
 
 More details about instrumenting Vector can be found
