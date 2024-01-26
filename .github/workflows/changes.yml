@@ -128,7 +128,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - uses: dorny/paths-filter@v2
+    - uses: dorny/paths-filter@v3
       id: filter
       with:
         base: ${{ inputs.base_ref }}
@@ -228,7 +228,7 @@ jobs:
       - name: Create filter rules for integrations
         run: cargo vdev int ci-paths > int_test_filters.yaml
 
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v3
         id: filter
         with:
           base: ${{ inputs.base_ref }}
