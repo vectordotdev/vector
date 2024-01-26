@@ -106,7 +106,7 @@ fn validate_cleanup() {
 
     // Assert that data folder didn't change
     assert_eq!(
-        HashSet::from([path, dir.join(".lock")]),
+        HashSet::from([path]),
         read_dir(dir)
             .unwrap()
             .map(|entry| entry.unwrap().path())
