@@ -17,7 +17,7 @@ crossbeam-utils = { version = "0.8.19", default-features = false }
 derivative = { version = "2.2.0", default-features =  false }
 fslock = { version = "0.2.1", default-features = false, features = ["std"] }
 futures = { version = "0.3.30", default-features = false, features = ["std"] }
-memmap2 = { version = "0.9.3", default-features = false }
+memmap2 = { version = "0.9.4", default-features = false }
 metrics = "0.21.1"
 num-traits = { version = "0.2.17", default-features = false }
 paste = "1.0.14"
