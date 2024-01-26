@@ -22,7 +22,10 @@ Provide some module level comments to explain what the sink does.
 Let's setup all the imports we will need for the tutorial:
 
 ```rust
-use crate::prelude::*;
+use crate::sinks::prelude::*;
+use vector_lib::internal_event::{
+    ByteSize, BytesSent, EventsSent, InternalEventHandle, Output, Protocol,
+};
 ```
 
 # Configuration
@@ -258,10 +261,8 @@ emit the event. Change the body of `run_inner` to look like the following:
 +           println!("{}", bytes);
 -           println!("{:#?}", event);
 
-+           emit!(BytesSent {
-+               byte_size: bytes.len(),
-+               protocol: "none".into()
-+           });
++           let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
++           bytes_sent.emit(ByteSize(bytes.len()));
 
             let finalizers = event.take_finalizers();
             finalizers.update_status(EventStatus::Delivered);
@@ -280,11 +281,8 @@ Add the following after emitting `BytesSent`:
 
 ```diff
 +     let event_byte_size = event.estimated_json_encoded_size_of();
-+     emit!(EventsSent {
-+         count: 1,
-+         byte_size: event_byte_size,
-+         output: None,
-+     });
++     let events_sent = register!(EventsSent::from(Output(None)));
++     events_sent.emit(CountByteSize(1, event_byte_size));
 ```
 
 More details about instrumenting Vector can be found
