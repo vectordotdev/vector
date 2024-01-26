@@ -1,0 +1,13 @@
+sources:
+  demo_logs:
+    type: demo_logs
+    interval: 1
+    format: json
+sinks:
+  console:
+    inputs:
+      - demo_logs
+    target: stdout
+    type: console
+    encoding:
+      codec: json
