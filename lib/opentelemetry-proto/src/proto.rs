@@ -1,5 +1,10 @@
 /// Service stub and clients.
 pub mod collector {
+    pub mod trace {
+        pub mod v1 {
+            tonic::include_proto!("opentelemetry.proto.collector.trace.v1");
+        }
+    }
     pub mod logs {
         pub mod v1 {
             tonic::include_proto!("opentelemetry.proto.collector.logs.v1");
@@ -18,6 +23,13 @@ pub mod common {
 pub mod logs {
     pub mod v1 {
         tonic::include_proto!("opentelemetry.proto.logs.v1");
+    }
+}
+
+/// Generated types used for trace.
+pub mod trace {
+    pub mod v1 {
+        tonic::include_proto!("opentelemetry.proto.trace.v1");
     }
 }
 
