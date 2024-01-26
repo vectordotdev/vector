@@ -3,7 +3,6 @@ platforms:
 - kubernetes
 
 sinks:
-- apex
 - aws_sqs
 - aws_cloudwatch_logs
 - aws_cloudwatch_metrics
@@ -13,6 +12,7 @@ sinks:
 - axiom
 - azure_monitor_logs
 - clickhouse
+- databend
 - datadog_logs
 - datadog_metrics
 - elasticsearch
@@ -28,7 +28,7 @@ sinks:
 - influxdb_logs
 - influxdb_metrics
 - kafka
-- logdna
+- mezmo
 - loki
 - nats
 - new_relic_logs

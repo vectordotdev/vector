@@ -1,14 +1,14 @@
-use std::{collections::BTreeMap, time::SystemTime};
+use std::time::SystemTime;
 
 use chrono::prelude::*;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use enrichment::Case;
-use value::Value;
 use vector::enrichment_tables::{
     file::File,
     geoip::{Geoip, GeoipConfig},
     Condition, Table,
 };
+use vector_lib::enrichment::Case;
+use vrl::value::{ObjectMap, Value};
 
 criterion_group!(
     name = benches;
@@ -25,7 +25,11 @@ fn column(col: usize, row: usize) -> Value {
     } else if col == 1 {
         // And a final column with a date, each of the above duplicated row should have
         // a unique date.
-        Value::Timestamp(Utc.ymd(2013, row as u32 % 10 + 1, 15).and_hms(0, 0, 0))
+        Value::Timestamp(
+            Utc.ymd(2013, row as u32 % 10 + 1, 15)
+                .and_hms_opt(0, 0, 0)
+                .expect("invalid timestamp"),
+        )
     } else {
         Value::from(format!("data-{}-{}", col, row))
     }
@@ -62,8 +66,14 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                     },
                     Condition::BetweenDates {
                         field: "field-1",
-                        from: Utc.ymd(2013, 6, 1).and_hms(0, 0, 0),
-                        to: Utc.ymd(2013, 7, 1).and_hms(0, 0, 0),
+                        from: Utc
+                            .ymd(2013, 6, 1)
+                            .and_hms_opt(0, 0, 0)
+                            .expect("invalid timestamp"),
+                        to: Utc
+                            .ymd(2013, 7, 1)
+                            .and_hms_opt(0, 0, 0)
+                            .expect("invalid timestamp"),
                     },
                 ],
                 file.add_index(case, &["field-0"]).unwrap(),
@@ -87,8 +97,13 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
         };
 
         let result = (0..10)
-            .map(|idx| (format!("field-{}", idx), column(idx, size - result_offset)))
-            .collect::<BTreeMap<_, _>>();
+            .map(|idx| {
+                (
+                    format!("field-{}", idx).into(),
+                    column(idx, size - result_offset),
+                )
+            })
+            .collect::<ObjectMap>();
 
         (file, index, condition, result)
     };
@@ -239,14 +254,14 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
     group.bench_function("enrichment_tables/geoip_isp", |b| {
         let table = build("tests/data/GeoIP2-ISP-Test.mmdb");
         let ip = "208.192.1.2";
-        let mut expected = BTreeMap::<String, Value>::new();
-        expected.insert("autonomous_system_number".to_string(), 701i64.into());
+        let mut expected = ObjectMap::new();
+        expected.insert("autonomous_system_number".into(), 701i64.into());
         expected.insert(
-            "autonomous_system_organization".to_string(),
+            "autonomous_system_organization".into(),
             "MCI Communications Services, Inc. d/b/a Verizon Business".into(),
         );
-        expected.insert("isp".to_string(), "Verizon Business".into());
-        expected.insert("organization".to_string(), "Verizon Business".into());
+        expected.insert("isp".into(), "Verizon Business".into());
+        expected.insert("organization".into(), "Verizon Business".into());
 
         b.iter_batched(
             || (&table, ip, &expected),
@@ -273,18 +288,18 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
     group.bench_function("enrichment_tables/geoip_city", |b| {
         let table = build("tests/data/GeoIP2-City-Test.mmdb");
         let ip = "67.43.156.9";
-        let mut expected = BTreeMap::<String, Value>::new();
-        expected.insert("city_name".to_string(), Value::Null);
-        expected.insert("country_code".to_string(), "BT".into());
-        expected.insert("country_name".to_string(), "Bhutan".into());
-        expected.insert("continent_code".to_string(), "AS".into());
-        expected.insert("region_code".to_string(), Value::Null);
-        expected.insert("region_name".to_string(), Value::Null);
-        expected.insert("timezone".to_string(), "Asia/Thimphu".into());
-        expected.insert("latitude".to_string(), Value::from(27.5));
-        expected.insert("longitude".to_string(), Value::from(90.5));
-        expected.insert("postal_code".to_string(), Value::Null);
-        expected.insert("metro_code".to_string(), Value::Null);
+        let mut expected = ObjectMap::new();
+        expected.insert("city_name".into(), Value::Null);
+        expected.insert("country_code".into(), "BT".into());
+        expected.insert("country_name".into(), "Bhutan".into());
+        expected.insert("continent_code".into(), "AS".into());
+        expected.insert("region_code".into(), Value::Null);
+        expected.insert("region_name".into(), Value::Null);
+        expected.insert("timezone".into(), "Asia/Thimphu".into());
+        expected.insert("latitude".into(), Value::from(27.5));
+        expected.insert("longitude".into(), Value::from(90.5));
+        expected.insert("postal_code".into(), Value::Null);
+        expected.insert("metro_code".into(), Value::Null);
 
         b.iter_batched(
             || (&table, ip, &expected),

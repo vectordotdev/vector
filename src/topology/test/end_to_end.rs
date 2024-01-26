@@ -1,9 +1,5 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use crate::{
-    config::{self, ConfigDiff, Format},
-    test_util, topology, Error,
-};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server, StatusCode,
@@ -12,6 +8,12 @@ use tokio::{
     sync::{mpsc, oneshot, Mutex},
     task::JoinHandle,
     time::{timeout, Duration},
+};
+
+use super::{RunningTopology, TopologyPieces};
+use crate::{
+    config::{self, ConfigDiff, Format},
+    test_util, Error,
 };
 
 type Lock = Arc<Mutex<()>>;
@@ -24,7 +26,7 @@ pub async fn respond(
     tx.send(())
         .await
         .expect("Error sending 'before' status from test server");
-    let _ = waiter.lock().await;
+    _ = waiter.lock().await;
     Ok(Response::builder()
         .status(status)
         .body(Body::empty())
@@ -101,10 +103,11 @@ uri = "http://{address2}/"
     )
     .unwrap();
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
-    let (_topology, _shutdown) = topology::start_validated(config, diff, pieces)
+    let pieces =
+        TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new(), Default::default())
+            .await
+            .unwrap();
+    let (_topology, _) = RunningTopology::start_validated(config, diff, pieces)
         .await
         .unwrap();
 
@@ -116,7 +119,7 @@ uri = "http://{address2}/"
 
     // The expected flow is this:
     // 0. Nothing is ready to continue.
-    assert!(matches!(rx_server.try_recv(), Err(_)));
+    assert!(rx_server.try_recv().is_err());
 
     // 1. We send an event to the HTTP source server.
     let (mut rx_client, sender) = http_client(address1, "test");
@@ -126,11 +129,11 @@ uri = "http://{address2}/"
         .await
         .expect("Timed out waiting to receive event from HTTP sink")
         .expect("Error receiving event from HTTP sink");
-    assert!(matches!(rx_client.try_recv(), Err(_)));
+    assert!(rx_client.try_recv().is_err());
 
     // 3. Our test HTTP server waits for the mutex lock.
     drop(pause);
-    assert!(matches!(rx_server.try_recv(), Err(_)));
+    assert!(rx_server.try_recv().is_err());
 
     // 4. Our test HTTP server responds.
     // 5. The acknowledgement is returned to the source.

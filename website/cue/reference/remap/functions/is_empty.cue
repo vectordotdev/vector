@@ -3,7 +3,7 @@ package metadata
 remap: functions: is_empty: {
 	category: "Type"
 	description: """
-		Check if the object, array, or string has a length of 0.
+		Check if the object, array, or string has a length of `0`.
 		"""
 
 	arguments: [

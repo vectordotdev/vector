@@ -5,23 +5,23 @@ use std::{
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
+use headers::HeaderName;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-    Request, Uri,
+    HeaderValue, Request, Uri,
 };
 use hyper::Body;
+use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
-    stream::DriverResponse,
-};
+use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::stream::DriverResponse;
 
 use crate::{
     http::HttpClient,
-    sinks::datadog::DatadogApiError,
     sinks::util::{retries::RetryLogic, Compression},
+    sinks::{datadog::DatadogApiError, util::http::validate_headers},
 };
 
 #[derive(Debug, Default, Clone)]
@@ -38,13 +38,12 @@ impl RetryLogic for LogApiRetry {
 
 #[derive(Debug, Clone)]
 pub struct LogApiRequest {
-    pub batch_size: usize,
     pub api_key: Arc<str>,
     pub compression: Compression,
     pub body: Bytes,
     pub finalizers: EventFinalizers,
-    pub events_byte_size: usize,
     pub uncompressed_size: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl Finalizable for LogApiRequest {
@@ -53,13 +52,21 @@ impl Finalizable for LogApiRequest {
     }
 }
 
+impl MetaDescriptive for LogApiRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
+    }
+}
+
 #[derive(Debug)]
 pub struct LogApiResponse {
     event_status: EventStatus,
-    count: usize,
-    events_byte_size: usize,
+    events_byte_size: GroupedCountByteSize,
     raw_byte_size: usize,
-    protocol: String,
 }
 
 impl DriverResponse for LogApiResponse {
@@ -67,12 +74,12 @@ impl DriverResponse for LogApiResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.count, self.events_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.raw_byte_size, &self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.raw_byte_size)
     }
 }
 
@@ -85,16 +92,33 @@ impl DriverResponse for LogApiResponse {
 pub struct LogApiService {
     client: HttpClient,
     uri: Uri,
-    enterprise: bool,
+    user_provided_headers: IndexMap<HeaderName, HeaderValue>,
+    dd_evp_headers: IndexMap<HeaderName, HeaderValue>,
 }
 
 impl LogApiService {
-    pub const fn new(client: HttpClient, uri: Uri, enterprise: bool) -> Self {
-        Self {
+    pub fn new(
+        client: HttpClient,
+        uri: Uri,
+        headers: IndexMap<String, String>,
+        dd_evp_origin: String,
+    ) -> crate::Result<Self> {
+        let user_provided_headers = validate_headers(&headers)?;
+
+        let dd_evp_headers = &[
+            ("DD-EVP-ORIGIN".to_string(), dd_evp_origin),
+            ("DD-EVP-ORIGIN-VERSION".to_string(), crate::get_version()),
+        ]
+        .into_iter()
+        .collect();
+        let dd_evp_headers = validate_headers(dd_evp_headers)?;
+
+        Ok(Self {
             client,
             uri,
-            enterprise,
-        }
+            user_provided_headers,
+            dd_evp_headers,
+        })
     }
 }
 
@@ -103,23 +127,16 @@ impl Service<LogApiRequest> for LogApiService {
     type Error = DatadogApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, request: LogApiRequest) -> Self::Future {
+    // Emission of Error internal event is handled upstream by the caller
+    fn call(&mut self, mut request: LogApiRequest) -> Self::Future {
         let mut client = self.client.clone();
         let http_request = Request::post(&self.uri)
             .header(CONTENT_TYPE, "application/json")
-            .header(
-                "DD-EVP-ORIGIN",
-                if self.enterprise {
-                    "vector-enterprise"
-                } else {
-                    "vector"
-                },
-            )
-            .header("DD-EVP-ORIGIN-VERSION", crate::get_version())
             .header("DD-API-KEY", request.api_key.to_string());
 
         let http_request = if let Some(ce) = request.compression.content_encoding() {
@@ -128,13 +145,24 @@ impl Service<LogApiRequest> for LogApiService {
             http_request
         };
 
-        let count = request.batch_size;
-        let events_byte_size = request.events_byte_size;
+        let metadata = std::mem::take(request.metadata_mut());
+        let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
         let raw_byte_size = request.uncompressed_size;
-        let protocol = self.uri.scheme_str().unwrap_or("http").to_string();
+
+        let mut http_request = http_request.header(CONTENT_LENGTH, request.body.len());
+
+        if let Some(headers) = http_request.headers_mut() {
+            for (name, value) in &self.user_provided_headers {
+                // Replace rather than append to any existing header values
+                headers.insert(name, value.clone());
+            }
+            // Set DD EVP headers last so that they cannot be overridden.
+            for (name, value) in &self.dd_evp_headers {
+                headers.insert(name, value.clone());
+            }
+        }
 
         let http_request = http_request
-            .header(CONTENT_LENGTH, request.body.len())
             .body(Body::from(request.body))
             .expect("building HTTP request failed unexpectedly");
 
@@ -142,10 +170,8 @@ impl Service<LogApiRequest> for LogApiService {
             DatadogApiError::from_result(client.call(http_request).in_current_span().await).map(
                 |_| LogApiResponse {
                     event_status: EventStatus::Delivered,
-                    count,
                     events_byte_size,
                     raw_byte_size,
-                    protocol,
                 },
             )
         })

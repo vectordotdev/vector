@@ -5,8 +5,7 @@ cargo-timing*.html
 *~
 **/*.rs.bk
 .DS_Store
-.idea/
-.vscode/
+.dir-locals.el
 checkpoints/*
 miniodat
 bench_output.txt

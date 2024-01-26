@@ -27,7 +27,7 @@ releases: "0.11.0": {
 				In addition to Vector's observability, 0.12 will include support for
 				deploying Vector into the [aggregator role](\(urls.vector_aggregator_role))
 				within Kubernetes. This will allow you to build end-to-end observability
-				piplines in Kubernetes with Vector. Distributing processing on the edge,
+				pipelines in Kubernetes with Vector. Distributing processing on the edge,
 				centralizing it with an aggregator, or both. If you are interested in
 				beta testing, please [join our chat](\(urls.vector_chat)) and let us
 				know.

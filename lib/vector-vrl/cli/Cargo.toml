@@ -1,0 +1,12 @@
+[package]
+name = "vector-vrl-cli"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2021"
+publish = false
+license = "MPL-2.0"
+
+[dependencies]
+clap.workspace = true
+vector-vrl-functions = { path = "../functions" }
+vrl.workspace = true

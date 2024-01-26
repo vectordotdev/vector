@@ -14,6 +14,7 @@ components: sinks: splunk_hec_logs: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -72,101 +73,8 @@ components: sinks: splunk_hec_logs: {
 		notices: []
 	}
 
-	configuration: sinks._splunk_hec.configuration & {
-		endpoint: {
-			description: "The base URL of the Splunk instance."
-			required:    true
-			type: string: {
-				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
-			}
-		}
-		endpoint_target: {
-			common:      false
-			description: """
-                                     The Splunk endpoint to send to. Either the [event endpoint](\(urls.splunk_hec_event_endpoint)) or the
-                                     [raw endpoint](\(urls.splunk_hec_raw_endpoint)). [metadata](\(urls.splunk_hec_metadata)) for the event
-                                     endpoint is sent with each event. For the `raw` endpoint, configured [event metadata](\(urls.splunk_hec_metadata))
-                                     is sent as query parameters - except the `timestamp` field.
-                                     """
-			required:    false
-			warnings: []
-			type: string: {
-				default: "event"
-				enum: {
-					event: "[Event endpoint](\(urls.splunk_hec_event_endpoint))"
-					raw:   "[Raw endpoint](\(urls.splunk_hec_raw_endpoint))"
-				}
-				syntax: "literal"
-			}
-		}
-		host_key: {
-			common:      true
-			description: """
-				The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-				"""
-			required:    false
-			type: string: {
-				default: null
-				examples: ["hostname"]
-			}
-		}
-		index: {
-			common:      false
-			description: "The name of the index where to send the events to. If not specified, the default index is used."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["{{ host }}", "custom_index"]
-				syntax: "template"
-			}
-		}
-		indexed_fields: {
-			common:      true
-			description: "Fields to be [added to Splunk index](\(urls.splunk_hec_indexed_fields))."
-			required:    false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["field1", "field2"]
-					syntax: "field_path"
-				}
-			}
-		}
-		source: {
-			common:      false
-			description: "The source of events sent to this sink. Typically the filename the logs originated from. If unset, the Splunk collector will set it."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
-				syntax: "template"
-			}
-		}
-		sourcetype: {
-			common:      false
-			description: "The sourcetype of events sent to this sink. If unset, Splunk will default to httpevent."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["{{ sourcetype }}", "_json", "httpevent"]
-				syntax: "template"
-			}
-		}
-		timestamp_key: {
-			common:      false
-			description: """
-				The name of the log field to be used as the timestamp sent to Splunk HEC. This overrides the
-				[global `timestamp_key` option](\(urls.vector_configuration)/global-options#log_schema.timestamp_key).
-				When set to "", vector omits setting a timestamp in the events sent to Splunk HEC.
-				"""
-			required:    false
-			type: string: {
-				default: null
-				examples: ["timestamp", ""]
-			}
-		}
-	}
+	configuration: base.components.sinks.splunk_hec_logs.configuration
+
 	input: {
 		logs:    true
 		metrics: null
@@ -174,15 +82,8 @@ components: sinks: splunk_hec_logs: {
 	}
 
 	telemetry: metrics: {
-		component_discarded_events_total: components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:           components.sources.internal_metrics.output.metrics.component_errors_total
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
-		http_request_errors_total:        components.sources.internal_metrics.output.metrics.http_request_errors_total
-		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
-		requests_received_total:          components.sources.internal_metrics.output.metrics.requests_received_total
+		http_client_responses_total:      components.sources.internal_metrics.output.metrics.http_client_responses_total
+		http_client_response_rtt_seconds: components.sources.internal_metrics.output.metrics.http_client_response_rtt_seconds
 	}
 
 	how_it_works: sinks._splunk_hec.how_it_works

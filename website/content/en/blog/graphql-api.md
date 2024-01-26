@@ -114,9 +114,9 @@ query {
       node {
         componentId
         metrics {
-          # Total bytes processed by this sink.
-          processedBytesTotal {
-            processedBytesTotal
+          # Total bytes sent by this sink.
+          sentBytesTotal {
+            sentBytesTotal
           }
         }
       }
@@ -221,7 +221,7 @@ We chose GraphQL over REST or gRPC for a few reasons:
 - Universal browser support, making it an ideal protocol for web usage (or
   apps!).
 
-## Our first API clien: `top`
+## Our first API client: `top`
 
 To help you visualize your Vector instance in action,
 [v0.11.0](https://vector.dev/releases/0.11.0/) also brings you `vector top`, our

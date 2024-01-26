@@ -14,7 +14,7 @@ use crate::{
 
 /// Value that can be used as a stage in a buffer topology.
 #[async_trait]
-pub trait IntoBuffer<T: Bufferable> {
+pub trait IntoBuffer<T: Bufferable>: Send {
     /// Gets whether or not this buffer stage provides its own instrumentation, or if it should be
     /// instrumented from the outside.
     ///
@@ -22,8 +22,8 @@ pub trait IntoBuffer<T: Bufferable> {
     /// in the middle of the channel without introducing an unnecessary hop, [`BufferSender`] and
     /// [`BufferReceiver`] can be configured to instrument all events flowing through directly.
     ///
-    /// When instrumentation is provided in this way, [`ByteSizeOf`] is used to calculate the size
-    /// of the event going both into and out of the buffer.
+    /// When instrumentation is provided in this way, [`vector_common::byte_size_of::ByteSizeOf`]
+    ///  is used to calculate the size of the event going both into and out of the buffer.
     fn provides_instrumentation(&self) -> bool {
         false
     }
@@ -110,7 +110,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         span: Span,
     ) -> Result<(BufferSender<T>, BufferReceiver<T>), TopologyError> {
         // We pop stages off in reverse order to build from the inside out.
-        let mut buffer_usage = BufferUsage::from_span(span);
+        let mut buffer_usage = BufferUsage::from_span(span.clone());
         let mut current_stage = None;
 
         for (stage_idx, stage) in self.stages.into_iter().enumerate().rev() {
@@ -154,9 +154,10 @@ impl<T: Bufferable> TopologyBuilder<T> {
                 ),
             };
 
+            sender.with_send_duration_instrumentation(stage_idx, &span);
             if !provides_instrumentation {
-                sender.with_instrumentation(usage_handle.clone());
-                receiver.with_instrumentation(usage_handle);
+                sender.with_usage_instrumentation(usage_handle.clone());
+                receiver.with_usage_instrumentation(usage_handle);
             }
 
             current_stage = Some((sender, receiver));
@@ -183,9 +184,12 @@ impl<T: Bufferable> TopologyBuilder<T> {
     /// This is a convenience method for `vector` as it is used for inter-transform channels, and we
     /// can simplifying needing to require callers to do all the boilerplate to create the builder,
     /// create the stage, installing buffer usage metrics that aren't required, and so on.
+    ///
+    #[allow(clippy::print_stderr)]
     pub async fn standalone_memory(
         max_events: NonZeroUsize,
         when_full: WhenFull,
+        receiver_span: &Span,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         let usage_handle = BufferUsageHandle::noop();
 
@@ -193,13 +197,14 @@ impl<T: Bufferable> TopologyBuilder<T> {
         let (sender, receiver) = memory_buffer
             .into_buffer_parts(usage_handle.clone())
             .await
-            .expect("should not fail to directly create a memory buffer");
+            .unwrap_or_else(|_| unreachable!("should not fail to directly create a memory buffer"));
 
         let mode = match when_full {
             WhenFull::Overflow => WhenFull::Block,
             m => m,
         };
-        let sender = BufferSender::new(sender, mode);
+        let mut sender = BufferSender::new(sender, mode);
+        sender.with_send_duration_instrumentation(0, receiver_span);
         let receiver = BufferReceiver::new(receiver);
 
         (sender, receiver)
@@ -228,7 +233,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         let (sender, receiver) = memory_buffer
             .into_buffer_parts(usage_handle.clone())
             .await
-            .expect("should not fail to directly create a memory buffer");
+            .unwrap_or_else(|_| unreachable!("should not fail to directly create a memory buffer"));
 
         let mode = match when_full {
             WhenFull::Overflow => WhenFull::Block,
@@ -237,8 +242,8 @@ impl<T: Bufferable> TopologyBuilder<T> {
         let mut sender = BufferSender::new(sender, mode);
         let mut receiver = BufferReceiver::new(receiver);
 
-        sender.with_instrumentation(usage_handle.clone());
-        receiver.with_instrumentation(usage_handle);
+        sender.with_usage_instrumentation(usage_handle.clone());
+        receiver.with_usage_instrumentation(usage_handle);
 
         (sender, receiver)
     }
@@ -302,7 +307,7 @@ mod tests {
         let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::OverflowWhenLast) => {}
-            r => panic!("unexpected build result: {:?}", r),
+            r => panic!("unexpected build result: {r:?}"),
         }
     }
 
@@ -320,7 +325,7 @@ mod tests {
         let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
-            r => panic!("unexpected build result: {:?}", r),
+            r => panic!("unexpected build result: {r:?}"),
         }
     }
 
@@ -338,7 +343,7 @@ mod tests {
         let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
-            r => panic!("unexpected build result: {:?}", r),
+            r => panic!("unexpected build result: {r:?}"),
         }
     }
 

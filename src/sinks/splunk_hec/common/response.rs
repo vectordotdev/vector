@@ -1,10 +1,11 @@
-use vector_core::internal_event::CountByteSize;
-use vector_core::{event::EventStatus, stream::DriverResponse};
+use vector_lib::event::EventStatus;
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::stream::DriverResponse;
 
 pub struct HecResponse {
     pub event_status: EventStatus,
     pub events_count: usize,
-    pub events_byte_size: usize,
+    pub events_byte_size: GroupedCountByteSize,
 }
 
 impl AsRef<EventStatus> for HecResponse {
@@ -18,7 +19,7 @@ impl DriverResponse for HecResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.events_count, self.events_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
     }
 }

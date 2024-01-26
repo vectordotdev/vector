@@ -44,35 +44,7 @@ components: sources: eventstoredb_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		endpoints: {
-			common:      true
-			description: "Endpoints to scrape stats from."
-			required:    false
-			type: string: {
-				examples: ["https://localhost:2113/stats"]
-				default: "https://localhost:2113/stats"
-			}
-		}
-		scrape_interval_secs: {
-			common:      true
-			description: "The interval between scrapes, in seconds."
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		default_namespace: {
-			common:      false
-			description: "The namespace used otherwise will be defaulted to eventstoredb."
-			required:    false
-			type: string: {
-				examples: ["app-123-eventstoredb"]
-				default: "eventstoredb"
-			}
-		}
-	}
+	configuration: base.components.sources.eventstoredb_metrics.configuration
 
 	output: metrics: {
 		_eventstoredb_metrics_tags: {
@@ -142,15 +114,5 @@ components: sources: eventstoredb_metrics: {
 			default_namespace: "eventstoredb"
 			tags:              _eventstoredb_metrics_tags
 		}
-	}
-	telemetry: metrics: {
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

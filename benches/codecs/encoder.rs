@@ -1,20 +1,20 @@
 use std::time::Duration;
 
 use bytes::{BufMut, BytesMut};
-use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
     Throughput,
 };
 use tokio_util::codec::Encoder;
 use vector::event::{Event, LogEvent};
-use vector_common::{btreemap, byte_size_of::ByteSizeOf};
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoder};
+use vector_lib::{btreemap, byte_size_of::ByteSizeOf};
 
 #[derive(Debug, Clone)]
 pub struct JsonLogSerializer;
 
 impl Encoder<Event> for JsonLogSerializer {
-    type Error = vector_common::Error;
+    type Error = vector_lib::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let writer = buffer.writer();
@@ -28,7 +28,7 @@ impl Encoder<Event> for JsonLogSerializer {
 pub struct JsonLogVecSerializer;
 
 impl Encoder<Event> for JsonLogVecSerializer {
-    type Error = vector_common::Error;
+    type Error = vector_lib::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.as_log();
@@ -77,7 +77,7 @@ fn encoder(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(input.size_of() as u64));
     group.bench_with_input("codecs::JsonSerializer::encode", &(), |b, ()| {
         b.iter_batched(
-            || JsonSerializer::new(),
+            || JsonSerializerConfig::default().build(),
             |mut encoder| {
                 let mut bytes = BytesMut::new();
                 encoder.encode(input.clone(), &mut bytes).unwrap();
@@ -93,7 +93,7 @@ fn encoder(c: &mut Criterion) {
             || {
                 vector::codecs::Encoder::<Framer>::new(
                     NewlineDelimitedEncoder::new().into(),
-                    JsonSerializer::new().into(),
+                    JsonSerializerConfig::default().build().into(),
                 )
             },
             |mut encoder| {

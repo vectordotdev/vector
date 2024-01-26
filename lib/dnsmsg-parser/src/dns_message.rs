@@ -1,4 +1,4 @@
-use trust_dns_proto::op::ResponseCode;
+use hickory_proto::op::ResponseCode;
 
 pub(super) const RTYPE_MB: u16 = 7;
 pub(super) const RTYPE_MG: u16 = 8;
@@ -31,7 +31,7 @@ pub struct DnsQueryMessage {
     pub answer_section: Vec<DnsRecord>,
     pub authority_section: Vec<DnsRecord>,
     pub additional_section: Vec<DnsRecord>,
-    pub opt_pserdo_section: Option<OptPseudoSection>,
+    pub opt_pseudo_section: Option<OptPseudoSection>,
 }
 
 #[derive(Clone, Debug, Default)]

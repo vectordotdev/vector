@@ -1,4 +1,0 @@
-# result: {"integer": true}
-
-.a = 1
-type_def(del(.a))

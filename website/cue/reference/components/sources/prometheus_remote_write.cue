@@ -13,6 +13,7 @@ components: sources: prometheus_remote_write: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {
@@ -48,17 +49,7 @@ components: sources: prometheus_remote_write: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		address: {
-			description: "The address to accept connections on. The address _must_ include a port."
-			required:    true
-			type: string: {
-				examples: ["0.0.0.0:9090"]
-			}
-		}
-		auth: configuration._http_basic_auth
-	}
+	configuration: base.components.sources.prometheus_remote_write.configuration
 
 	output: metrics: {
 		counter: output._passthrough_counter
@@ -81,19 +72,20 @@ components: sources: prometheus_remote_write: {
 				are emitted as gauges.
 				"""
 		}
+
+		duplicate_tag_names: {
+			title: "Duplicate tag names"
+			body: """
+				Multiple tags with the same name are invalid within Prometheus. Prometheus
+				itself will reject a metric with duplicate tags. Vector will accept the metric,
+				but will only take the last value for each tag name specified.
+				"""
+		}
 	}
 
 	telemetry: metrics: {
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
-		requests_completed_total:             components.sources.internal_metrics.output.metrics.requests_completed_total
-		requests_received_total:              components.sources.internal_metrics.output.metrics.requests_received_total
-		request_duration_seconds:             components.sources.internal_metrics.output.metrics.request_duration_seconds
+		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
+		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
+		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total
 	}
 }

@@ -25,18 +25,7 @@ components: transforms: metric_to_log: {
 		notices: []
 	}
 
-	configuration: {
-		host_tag: {
-			common:      true
-			description: "Tag key that identifies the source host."
-			required:    false
-			type: string: {
-				default: "hostname"
-				examples: ["host", "hostname"]
-			}
-		}
-		timezone: configuration._timezone
-	}
+	configuration: base.components.transforms.metric_to_log.configuration
 
 	input: {
 		logs: false
@@ -103,8 +92,4 @@ components: transforms: metric_to_log: {
 	]
 
 	how_it_works: {}
-
-	telemetry: metrics: {
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
-	}
 }

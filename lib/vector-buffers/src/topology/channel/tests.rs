@@ -21,7 +21,7 @@ async fn assert_send_ok_with_capacities<T>(
 ) where
     T: Bufferable,
 {
-    assert!(sender.send(value.into()).await.is_ok());
+    assert!(sender.send(value.into(), None).await.is_ok());
     assert_current_send_capacity(sender, base_expected, overflow_expected);
 }
 
@@ -44,7 +44,7 @@ where
 
         // Synchronize with sender and then wait for a small period of time to simulate a
         // blocking delay.
-        let _ = recv_baton.wait().await;
+        _ = recv_baton.wait().await;
         sleep(recv_delay).await;
 
         // Grab all messages and then return the results.
@@ -58,8 +58,8 @@ where
     // task correctly exits.  If we didn't drop it, the receiver task would just assume that we
     // had no more messages to send, waiting for-ev-er for the next one.
     let start = Instant::now();
-    let _ = send_baton.wait().await;
-    assert!(sender.send(send_value.into()).await.is_ok());
+    _ = send_baton.wait().await;
+    assert!(sender.send(send_value.into(), None).await.is_ok());
     let send_delay = start.elapsed();
     assert!(send_delay > recv_delay);
     drop(sender);

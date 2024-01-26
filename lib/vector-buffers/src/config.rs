@@ -16,7 +16,7 @@ use crate::{
         builder::{TopologyBuilder, TopologyError},
         channel::{BufferReceiver, BufferSender},
     },
-    variants::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
+    variants::{DiskV2Buffer, MemoryBuffer},
     Bufferable, WhenFull,
 };
 
@@ -34,8 +34,6 @@ pub enum BufferBuildError {
 enum BufferTypeKind {
     #[serde(rename = "memory")]
     Memory,
-    #[serde(rename = "disk_v1")]
-    DiskV1,
     #[serde(rename = "disk")]
     DiskV2,
 }
@@ -99,18 +97,6 @@ impl BufferTypeVisitor {
                     when_full,
                 })
             }
-            BufferTypeKind::DiskV1 => {
-                if max_events.is_some() {
-                    return Err(de::Error::unknown_field(
-                        "max_events",
-                        &["type", "max_size", "when_full"],
-                    ));
-                }
-                Ok(BufferType::DiskV1 {
-                    max_size: max_size.ok_or_else(|| de::Error::missing_field("max_size"))?,
-                    when_full,
-                })
-            }
             BufferTypeKind::DiskV2 => {
                 if max_events.is_some() {
                     return Err(de::Error::unknown_field(
@@ -155,7 +141,7 @@ pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
     unsafe { NonZeroUsize::new_unchecked(500) }
 }
 
-/// Disk usage configurtion for disk-backed buffers.
+/// Disk usage configuration for disk-backed buffers.
 #[derive(Debug)]
 pub struct DiskUsage {
     id: ComponentKey,
@@ -193,8 +179,13 @@ impl DiskUsage {
 #[configurable_component(no_deser)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case", tag = "type")]
+#[configurable(metadata(docs::enum_tag_description = "The type of buffer to use."))]
 pub enum BufferType {
     /// A buffer stage backed by an in-memory channel provided by `tokio`.
+    ///
+    /// This is more performant, but less durable. Data will be lost if Vector is restarted
+    /// forcefully or crashes.
+    #[configurable(title = "Events are buffered in memory.")]
     #[serde(rename = "memory")]
     Memory {
         /// The maximum number of events allowed in the buffer.
@@ -206,26 +197,22 @@ pub enum BufferType {
         when_full: WhenFull,
     },
 
-    /// A buffer stage backed by an on-disk database, powered by LevelDB.
-    #[configurable(deprecated)]
-    #[serde(rename = "disk_v1")]
-    DiskV1 {
-        /// The maximum size of the buffer on disk.
-        ///
-        /// Must be at least ~256 megabytes (268435488 bytes).
-        max_size: NonZeroU64,
-
-        #[configurable(derived)]
-        #[serde(default)]
-        when_full: WhenFull,
-    },
-
     /// A buffer stage backed by disk.
+    ///
+    /// This is less performant, but more durable. Data that has been synchronized to disk will not
+    /// be lost if Vector is restarted forcefully or crashes.
+    ///
+    /// Data is synchronized to disk every 500ms.
+    #[configurable(title = "Events are buffered on disk.")]
     #[serde(rename = "disk")]
     DiskV2 {
         /// The maximum size of the buffer on disk.
         ///
         /// Must be at least ~256 megabytes (268435488 bytes).
+        #[configurable(
+            validation(range(min = 268435488)),
+            metadata(docs::type_unit = "bytes")
+        )]
         max_size: NonZeroU64,
 
         #[configurable(derived)]
@@ -262,14 +249,6 @@ impl BufferType {
             None => None,
             Some(global_data_dir) => match self {
                 Self::Memory { .. } => None,
-                Self::DiskV1 { max_size, .. } => {
-                    let data_dir = crate::variants::disk_v1::get_new_style_buffer_dir_path(
-                        &global_data_dir,
-                        id.id(),
-                    );
-
-                    Some(DiskUsage::new(id.clone(), data_dir, *max_size))
-                }
                 Self::DiskV2 { max_size, .. } => {
                     let data_dir = crate::variants::disk_v2::get_disk_v2_data_dir_path(
                         &global_data_dir,
@@ -287,7 +266,7 @@ impl BufferType {
     /// # Errors
     ///
     /// If a required parameter is missing, or if there is an error building the topology itself, an
-    /// error variant will be returned desribing the error
+    /// error variant will be returned describing the error
     pub fn add_to_builder<T>(
         &self,
         builder: &mut TopologyBuilder<T>,
@@ -303,13 +282,6 @@ impl BufferType {
                 max_events,
             } => {
                 builder.stage(MemoryBuffer::new(max_events), when_full);
-            }
-            BufferType::DiskV1 {
-                when_full,
-                max_size,
-            } => {
-                let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
-                builder.stage(DiskV1Buffer::new(id, data_dir, max_size), when_full);
             }
             BufferType::DiskV2 {
                 when_full,
@@ -342,19 +314,22 @@ impl BufferType {
 // defined, otherwise, for example, two instances of the same disk buffer type in a single chained
 // buffer topology would try to both open the same buffer files on disk, which wouldn't work or
 // would go horribly wrong.
-
-// TODO: We need a custom implementation of `Configurable` here, I think? in order to capture the
-// "deserialize as a single unnested `BufferType`, or as an array of them", but we might also be
-// able to encode that as an untagged enum as well?
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(untagged)]
+#[configurable(
+    title = "Configures the buffering behavior for this sink.",
+    description = r#"More information about the individual buffer types, and buffer behavior, can be found in the
+[Buffering Model][buffering_model] section.
+
+[buffering_model]: /docs/about/under-the-hood/architecture/buffering-model/"#
+)]
 pub enum BufferConfig {
     /// A single stage buffer topology.
-    Single(#[configurable(transparent)] BufferType),
+    Single(BufferType),
 
     /// A chained buffer topology.
-    Chained(#[configurable(transparent)] Vec<BufferType>),
+    Chained(Vec<BufferType>),
 }
 
 impl Default for BufferConfig {
@@ -431,41 +406,38 @@ mod test {
         }
     }
 
+    const BUFFER_CONFIG_NO_MATCH_ERR: &str =
+        "data did not match any variant of untagged enum BufferConfig";
+
     #[test]
     fn parse_empty() {
         let source = "";
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
-        assert_eq!(error.to_string(), "EOF while parsing a value");
+        assert_eq!(error.to_string(), BUFFER_CONFIG_NO_MATCH_ERR);
     }
 
     #[test]
     fn parse_only_invalid_keys() {
         let source = "foo: 314";
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "data did not match any variant of untagged enum BufferConfig"
-        );
+        assert_eq!(error.to_string(), BUFFER_CONFIG_NO_MATCH_ERR);
     }
 
     #[test]
     fn parse_partial_invalid_keys() {
-        let source = r#"max_size: 100
+        let source = r"max_size: 100
 max_events: 42
-"#;
+";
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "data did not match any variant of untagged enum BufferConfig"
-        );
+        assert_eq!(error.to_string(), BUFFER_CONFIG_NO_MATCH_ERR);
     }
 
     #[test]
     fn parse_without_type_tag() {
         check_single_stage(
-            r#"
+            r"
           max_events: 100
-          "#,
+          ",
             BufferType::Memory {
                 max_events: NonZeroUsize::new(100).unwrap(),
                 when_full: WhenFull::Block,
@@ -476,11 +448,11 @@ max_events: 42
     #[test]
     fn parse_multiple_stages() {
         check_multiple_stages(
-            r#"
+            r"
           - max_events: 42
           - max_events: 100
             when_full: drop_newest
-          "#,
+          ",
             &[
                 BufferType::Memory {
                     max_events: NonZeroUsize::new(42).unwrap(),
@@ -497,20 +469,9 @@ max_events: 42
     #[test]
     fn ensure_field_defaults_for_all_types() {
         check_single_stage(
-            r#"
-          type: disk_v1
-          max_size: 1024
-          "#,
-            BufferType::DiskV1 {
-                max_size: NonZeroU64::new(1024).unwrap(),
-                when_full: WhenFull::Block,
-            },
-        );
-
-        check_single_stage(
-            r#"
+            r"
           type: memory
-          "#,
+          ",
             BufferType::Memory {
                 max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::Block,
@@ -518,10 +479,10 @@ max_events: 42
         );
 
         check_single_stage(
-            r#"
+            r"
           type: memory
           max_events: 100
-          "#,
+          ",
             BufferType::Memory {
                 max_events: NonZeroUsize::new(100).unwrap(),
                 when_full: WhenFull::Block,
@@ -529,10 +490,10 @@ max_events: 42
         );
 
         check_single_stage(
-            r#"
+            r"
           type: memory
           when_full: drop_newest
-          "#,
+          ",
             BufferType::Memory {
                 max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::DropNewest,
@@ -540,10 +501,10 @@ max_events: 42
         );
 
         check_single_stage(
-            r#"
+            r"
           type: memory
           when_full: overflow
-          "#,
+          ",
             BufferType::Memory {
                 max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::Overflow,
@@ -551,10 +512,10 @@ max_events: 42
         );
 
         check_single_stage(
-            r#"
+            r"
           type: disk
           max_size: 1024
-          "#,
+          ",
             BufferType::DiskV2 {
                 max_size: NonZeroU64::new(1024).unwrap(),
                 when_full: WhenFull::Block,

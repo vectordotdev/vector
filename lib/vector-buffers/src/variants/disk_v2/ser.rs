@@ -53,8 +53,8 @@ impl DeserializeError {
     /// Consumes this error and returns the stringified error reason.
     pub fn into_inner(self) -> String {
         match self {
-            DeserializeError::InvalidData(s) => format!("invalid data: {}", s),
-            DeserializeError::InvalidStructure(s) => format!("invalid structure: {}", s),
+            DeserializeError::InvalidData(s) => format!("invalid data: {s}"),
+            DeserializeError::InvalidStructure(s) => format!("invalid structure: {s}"),
         }
     }
 }

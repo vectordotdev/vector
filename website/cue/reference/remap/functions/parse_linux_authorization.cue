@@ -22,7 +22,7 @@ remap: functions: parse_linux_authorization: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a properly formatted Syslog message",
+		"`value` is not a properly formatted Syslog message.",
 	]
 	return: types: ["object"]
 
@@ -31,7 +31,7 @@ remap: functions: parse_linux_authorization: {
 			title: "Parse Linux authorization event"
 			source: """
 				parse_linux_authorization!(
-					s'Mar 23 01:49:58 localhost sshd[1111]: Accepted publickey for eng from 10.1.1.1 port 8888 ssh2: RSA SHA256:foobar'
+					s'Mar 23 2023 01:49:58 localhost sshd[1111]: Accepted publickey for eng from 10.1.1.1 port 8888 ssh2: RSA SHA256:foobar'
 				)
 				"""
 			return: {
@@ -39,7 +39,7 @@ remap: functions: parse_linux_authorization: {
 				hostname:  "localhost"
 				message:   "Accepted publickey for eng from 10.1.1.1 port 8888 ssh2: RSA SHA256:foobar"
 				procid:    1111
-				timestamp: "2022-03-23T01:49:58Z"
+				timestamp: "2023-03-23T01:49:58Z"
 			}
 		},
 	]

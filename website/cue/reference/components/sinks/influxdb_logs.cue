@@ -13,6 +13,7 @@ components: sinks: influxdb_logs: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -42,42 +43,7 @@ components: sinks: influxdb_logs: {
 		notices: []
 	}
 
-	configuration: sinks._influxdb.configuration & {
-		measurement: {
-			description: "The influxdb measurement name that will be written to."
-			groups: ["v1", "v2"]
-			required: true
-			type: string: {
-				examples: ["vector-logs"]
-			}
-		}
-		namespace: {
-			description: """
-				`{namespace}.vector` will be encoded as the destination infuxdb measurement.
-				"""
-			groups: ["v1", "v2"]
-			required: false
-			common:   true
-			warnings: ["Deprecated, please use `measurement` instead."]
-			type: string: {
-				default: null
-				examples: ["service"]
-			}
-		}
-		tags: {
-			required:    false
-			common:      false
-			description: "The set of fields that will be attached to each LineProtocol as tags. Note: If the set of tag values has high cardinality this also increase cardinality in InfluxDB."
-			groups: ["v1", "v2"]
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["field1", "parent.child_field"]
-					syntax: "field_path"
-				}
-			}
-		}
-	}
+	configuration: base.components.sinks.influxdb_logs.configuration
 
 	input: {
 		logs:    true
@@ -95,7 +61,7 @@ components: sinks: influxdb_logs: {
 
 				The following matrix outlines how Log Event fields are mapped into InfluxDB Line Protocol:
 
-				| Field         | Line Protocol     |                                                                                                                                                 |
+				| Field         | Line Protocol     |
 				|---------------|-------------------|
 				| host          | tag               |
 				| message       | field             |
@@ -130,12 +96,5 @@ components: sinks: influxdb_logs: {
 				},
 			]
 		}
-	}
-
-	telemetry: metrics: {
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 	}
 }

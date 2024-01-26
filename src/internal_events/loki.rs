@@ -1,44 +1,63 @@
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, INTENTIONAL},
-};
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
 
 #[derive(Debug)]
-pub struct LokiEventUnlabeled;
+pub struct LokiEventUnlabeledError;
 
-impl InternalEvent for LokiEventUnlabeled {
+impl InternalEvent for LokiEventUnlabeledError {
     fn emit(self) {
-        // Deprecated
-        counter!("processing_errors_total", 1,
-                "error_type" => "unlabeled_event");
+        error!(
+            message = "Event had no labels. Adding default `agent` label.",
+            error_code = "unlabeled_event",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "unlabeled_event",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
     }
 }
 
 #[derive(Debug)]
-pub struct LokiOutOfOrderEventDropped {
-    pub count: u64,
+pub struct LokiOutOfOrderEventDroppedError {
+    pub count: usize,
 }
 
-impl InternalEvent for LokiOutOfOrderEventDropped {
+impl InternalEvent for LokiOutOfOrderEventDroppedError {
     fn emit(self) {
+        let reason = "Dropping out-of-order event(s).";
+
+        error!(
+            message = reason,
+            error_code = "out_of_order",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+
         emit!(ComponentEventsDropped::<INTENTIONAL> {
             count: self.count,
-            reason: "out_of_order",
+            reason,
         });
 
-        // Deprecated
-        counter!("events_discarded_total", self.count,
-                "reason" => "out_of_order");
-        counter!("processing_errors_total", 1,
-                "error_type" => "out_of_order");
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "out_of_order",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
     }
 }
 
 #[derive(Debug)]
 pub struct LokiOutOfOrderEventRewritten {
-    pub count: u64,
+    pub count: usize,
 }
 
 impl InternalEvent for LokiOutOfOrderEventRewritten {
@@ -49,10 +68,6 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
             reason = "out_of_order",
             internal_log_rate_limit = true,
         );
-        counter!("rewritten_timestamp_events_total", self.count);
-
-        // Deprecated
-        counter!("processing_errors_total", 1,
-                "error_type" => "out_of_order");
+        counter!("rewritten_timestamp_events_total", self.count as u64);
     }
 }

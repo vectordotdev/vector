@@ -1,5 +1,4 @@
-use std::io::stdout;
-
+use crate::internal_telemetry::is_allocation_tracking_enabled;
 use crossterm::{
     cursor::Show,
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
@@ -10,15 +9,16 @@ use crossterm::{
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
-use tokio::sync::oneshot;
-use tui::{
-    backend::{Backend, CrosstermBackend},
+use ratatui::{
+    backend::CrosstermBackend,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
+    text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
+use std::io::stdout;
+use tokio::sync::oneshot;
 
 use super::{
     events::capture_key_press,
@@ -104,27 +104,51 @@ fn format_metric(total: i64, throughput: i64, human_metrics: bool) -> String {
     }
 }
 
-const NUM_COLUMNS: usize = 8;
+fn format_metric_bytes(total: i64, throughput: i64, human_metrics: bool) -> String {
+    match total {
+        0 => "N/A".to_string(),
+        v => format!(
+            "{} ({}/s)",
+            if human_metrics {
+                v.human_format_bytes()
+            } else {
+                v.thousands_format()
+            },
+            throughput.human_format_bytes()
+        ),
+    }
+}
+
+const NUM_COLUMNS: usize = if is_allocation_tracking_enabled() {
+    10
+} else {
+    9
+};
+
 static HEADER: [&str; NUM_COLUMNS] = [
     "ID",
     "Output",
     "Kind",
     "Type",
     "Events In",
+    "Bytes In",
     "Events Out",
-    "Bytes",
+    "Bytes Out",
     "Errors",
+    #[cfg(feature = "allocation-tracing")]
+    "Memory Used",
 ];
 
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
     url_string: &'a str,
     opts: &'a super::Opts,
+    title: &'a str,
 }
 
 impl<'a> Widgets<'a> {
     /// Creates a new Widgets, containing constraints to re-use across renders.
-    pub fn new(url_string: &'a str, opts: &'a super::Opts) -> Self {
+    pub fn new(title: &'a str, url_string: &'a str, opts: &'a super::Opts) -> Self {
         let constraints = vec![
             Constraint::Length(3),
             Constraint::Max(90),
@@ -135,28 +159,26 @@ impl<'a> Widgets<'a> {
             constraints,
             url_string,
             opts,
+            title,
         }
     }
 
-    /// Renders a title showing 'Vector', and the URL the dashboard is currently connected to.
-    fn title<B: Backend>(
-        &'a self,
-        f: &mut Frame<B>,
-        area: Rect,
-        connection_status: &ConnectionStatus,
-    ) {
-        let text = vec![Spans::from(vec![
+    /// Renders a title and the URL the dashboard is currently connected to.
+    fn title(&'a self, f: &mut Frame, area: Rect, connection_status: &ConnectionStatus) {
+        let mut text = vec![
             Span::from(self.url_string),
             Span::styled(
                 format!(" | Sampling @ {}ms", self.opts.interval.thousands_format()),
                 Style::default().fg(Color::Gray),
             ),
             Span::from(" | "),
-            Span::styled(connection_status.to_string(), connection_status.style()),
-        ])];
+        ];
+        text.extend(connection_status.as_ui_spans());
+
+        let text = vec![Line::from(text)];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(
-            "Vector",
+            self.title,
             Style::default()
                 .fg(Color::Green)
                 .add_modifier(Modifier::BOLD),
@@ -168,7 +190,7 @@ impl<'a> Widgets<'a> {
 
     /// Renders a components table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `ComponentsState`,
-    fn components_table<B: Backend>(&self, f: &mut Frame<B>, state: &state::State, area: Rect) {
+    fn components_table(&self, f: &mut Frame, state: &state::State, area: Rect) {
         // Header columns
         let header = HEADER
             .iter()
@@ -194,14 +216,19 @@ impl<'a> Widgets<'a> {
                     r.received_events_throughput_sec,
                     self.opts.human_metrics,
                 ),
+                format_metric_bytes(
+                    r.received_bytes_total,
+                    r.received_bytes_throughput_sec,
+                    self.opts.human_metrics,
+                ),
                 format_metric(
                     r.sent_events_total,
                     r.sent_events_throughput_sec,
                     self.opts.human_metrics,
                 ),
-                format_metric(
-                    r.processed_bytes_total,
-                    r.processed_bytes_throughput_sec,
+                format_metric_bytes(
+                    r.sent_bytes_total,
+                    r.sent_bytes_throughput_sec,
                     self.opts.human_metrics,
                 ),
                 if self.opts.human_metrics {
@@ -209,6 +236,8 @@ impl<'a> Widgets<'a> {
                 } else {
                     r.errors.thousands_format()
                 },
+                #[cfg(feature = "allocation-tracing")]
+                r.allocated_bytes.human_format_bytes(),
             ];
 
             data.extend_from_slice(&formatted_metrics);
@@ -226,33 +255,48 @@ impl<'a> Widgets<'a> {
                         .into_iter()
                         .map(Cell::from)
                         .collect::<Vec<_>>();
-                    data[1] = Cell::from(id.as_ref());
+                    data[1] = Cell::from(id.as_str());
                     data[5] = Cell::from(sent_events_metric);
                     items.push(Row::new(data).style(Style::default()));
                 }
             }
         }
 
-        let w = Table::new(items)
+        let widths: &[Constraint] = if is_allocation_tracking_enabled() {
+            &[
+                Constraint::Percentage(13), // ID
+                Constraint::Percentage(8),  // Output
+                Constraint::Percentage(4),  // Kind
+                Constraint::Percentage(9),  // Type
+                Constraint::Percentage(10), // Events In
+                Constraint::Percentage(12), // Bytes In
+                Constraint::Percentage(10), // Events Out
+                Constraint::Percentage(12), // Bytes Out
+                Constraint::Percentage(8),  // Errors
+                Constraint::Percentage(14), // Allocated Bytes
+            ]
+        } else {
+            &[
+                Constraint::Percentage(13), // ID
+                Constraint::Percentage(12), // Output
+                Constraint::Percentage(9),  // Kind
+                Constraint::Percentage(6),  // Type
+                Constraint::Percentage(12), // Events In
+                Constraint::Percentage(14), // Bytes In
+                Constraint::Percentage(12), // Events Out
+                Constraint::Percentage(14), // Bytes Out
+                Constraint::Percentage(8),  // Errors
+            ]
+        };
+        let w = Table::new(items, widths)
             .header(Row::new(header).bottom_margin(1))
             .block(Block::default().borders(Borders::ALL).title("Components"))
-            .column_spacing(2)
-            .widths(&[
-                Constraint::Percentage(15), // ID
-                Constraint::Percentage(15), // Output
-                Constraint::Percentage(10), // Kind
-                Constraint::Percentage(10), // Type
-                Constraint::Percentage(10), // Events In
-                Constraint::Percentage(10), // Events Out
-                Constraint::Percentage(10), // Bytes
-                Constraint::Percentage(10), // Errors
-            ]);
-
+            .column_spacing(2);
         f.render_widget(w, area);
     }
 
     /// Alerts the user to resize the window to view columns
-    fn components_resize_window<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
+    fn components_resize_window(&self, f: &mut Frame, area: Rect) {
         let block = Block::default().borders(Borders::ALL).title("Components");
         let w = Paragraph::new("Expand the window to > 80 chars to view metrics")
             .block(block)
@@ -262,8 +306,8 @@ impl<'a> Widgets<'a> {
     }
 
     /// Renders a box showing instructions on how to exit from `vector top`.
-    fn quit_box<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let text = vec![Spans::from("To quit, press ESC or 'q'")];
+    fn quit_box(&self, f: &mut Frame, area: Rect) {
+        let text = vec![Line::from("To quit, press ESC or 'q'")];
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -277,7 +321,7 @@ impl<'a> Widgets<'a> {
     }
 
     /// Draw a single frame. Creates a layout and renders widgets into it.
-    fn draw<B: Backend>(&self, f: &mut Frame<B>, state: state::State) {
+    fn draw(&self, f: &mut Frame, state: state::State) {
         let size = f.size();
         let rects = Layout::default()
             .constraints(self.constraints.clone())
@@ -306,6 +350,7 @@ pub fn is_tty() -> bool {
 /// as well as entering an 'alternate screen' to overlay the console. This ensures that when
 /// the dashboard is exited, the user's previous terminal session can commence, unaffected.
 pub async fn init_dashboard<'a>(
+    title: &'a str,
     url: &'a str,
     opts: &'a super::Opts,
     mut state_rx: state::StateRx,
@@ -330,7 +375,7 @@ pub async fn init_dashboard<'a>(
     // Clear the screen, readying it for output
     terminal.clear()?;
 
-    let widgets = Widgets::new(url, opts);
+    let widgets = Widgets::new(title, url, opts);
 
     loop {
         tokio::select! {
@@ -339,12 +384,12 @@ pub async fn init_dashboard<'a>(
             },
             k = key_press_rx.recv() => {
                 if let KeyCode::Esc | KeyCode::Char('q') = k.unwrap() {
-                    let _ = key_press_kill_tx.send(());
+                    _ = key_press_kill_tx.send(());
                     break
                 }
             }
             _ = &mut shutdown_rx => {
-                let _ = key_press_kill_tx.send(());
+                _ = key_press_kill_tx.send(());
                 break
             }
         }

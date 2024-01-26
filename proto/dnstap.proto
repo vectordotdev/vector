@@ -97,7 +97,7 @@ message Policy {
     // rule: the rule matched by the message.
     //
     // In a RPZ context, this is the owner name of the rule in
-    // the Reponse Policy Zone in wire format.
+    // the Response Policy Zone in wire format.
     optional bytes rule = 2;
 
     // action: the policy action taken in response to the

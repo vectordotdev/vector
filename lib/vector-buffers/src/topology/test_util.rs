@@ -76,7 +76,7 @@ pub struct BasicError(pub(crate) String);
 
 impl fmt::Display for BasicError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 

@@ -59,7 +59,7 @@ When finished, the Vector binary is placed in `target/<target>/release/vector`. 
 Finally, you can start Vector:
 
 ```shell
-target/<target>/release/vector --config config/vector.toml
+target/<target>/release/vector --config config/vector.yaml
 ```
 
 ### Windows
@@ -146,7 +146,7 @@ The command above builds a Docker image with a Rust toolchain for a Linux target
 The Vector configuration file is located at:
 
 ```shell
-config/vector.toml
+config/vector.yaml
 ```
 
 Example configurations are located in `config/vector/examples/*`. You can learn more about configuring Vector in the [Configuration] documentation.
@@ -210,7 +210,6 @@ under "[features]" [here](https://github.com/vectordotdev/vector/blob/master/Car
 [jemalloc]: https://github.com/jemalloc/jemalloc
 [kafka_sink]: /docs/reference/configuration/sinks/kafka
 [kafka_source]: /docs/reference/configuration/sources/kafka
-[leveldb]: https://github.com/google/leveldb
 [librdkafka]: https://github.com/edenhill/librdkafka
 [openssl]: https://www.openssl.org
 [perl]: https://www.perl.org/get.html#win32

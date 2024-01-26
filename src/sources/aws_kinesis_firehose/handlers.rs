@@ -1,18 +1,26 @@
 use std::io::Read;
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
-use lookup::event_path;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_common::finalization::AddBatchNotifier;
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Registered,
+use vector_lib::codecs::StreamDecodingError;
+use vector_lib::lookup::{metadata_path, path, PathPrefix};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    event::BatchNotifier,
+    EstimatedJsonEncodedSizeOf,
 };
-use vector_core::{event::BatchNotifier, ByteSizeOf};
+use vector_lib::{
+    finalization::AddBatchNotifier,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
+    },
+};
+use vrl::compiler::SecretTarget;
 use warp::reject;
 
 use super::{
@@ -27,16 +35,19 @@ use crate::{
     internal_events::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, EventsReceived, StreamClosedError,
     },
+    sources::aws_kinesis_firehose::AwsKinesisFirehoseConfig,
     SourceSender,
 };
 
 #[derive(Clone)]
 pub(super) struct Context {
     pub(super) compression: Compression,
+    pub(super) store_access_key: bool,
     pub(super) decoder: Decoder,
     pub(super) acknowledgements: bool,
     pub(super) bytes_received: Registered<BytesReceived>,
     pub(super) out: SourceSender,
+    pub(super) log_namespace: LogNamespace,
 }
 
 /// Publishes decoded events from the FirehoseRequest to the pipeline
@@ -46,6 +57,9 @@ pub(super) async fn firehose(
     request: FirehoseRequest,
     mut context: Context,
 ) -> Result<impl warp::Reply, reject::Rejection> {
+    let log_namespace = context.log_namespace;
+    let events_received = register!(EventsReceived);
+
     for record in request.records {
         let bytes = decode_record(&record, context.compression)
             .with_context(|_| ParseRecordsSnafu {
@@ -58,10 +72,10 @@ pub(super) async fn firehose(
         loop {
             match stream.next().await {
                 Some(Ok((mut events, _byte_size))) => {
-                    emit!(EventsReceived {
-                        count: events.len(),
-                        byte_size: events.size_of(),
-                    });
+                    events_received.emit(CountByteSize(
+                        events.len(),
+                        events.estimated_json_encoded_size_of(),
+                    ));
 
                     let (batch, receiver) = context
                         .acknowledgements
@@ -71,27 +85,67 @@ pub(super) async fn firehose(
                         })
                         .unwrap_or((None, None));
 
+                    let now = Utc::now();
                     for event in &mut events {
                         if let Some(batch) = &batch {
                             event.add_batch_notifier(batch.clone());
                         }
                         if let Event::Log(ref mut log) = event {
-                            log.try_insert(
+                            log_namespace.insert_vector_metadata(
+                                log,
                                 log_schema().source_type_key(),
-                                Bytes::from("aws_kinesis_firehose"),
+                                path!("source_type"),
+                                Bytes::from_static(AwsKinesisFirehoseConfig::NAME.as_bytes()),
                             );
-                            log.try_insert(log_schema().timestamp_key(), request.timestamp);
-                            log.try_insert(event_path!("request_id"), request_id.to_string());
-                            log.try_insert(event_path!("source_arn"), source_arn.to_string());
+                            // This handles the transition from the original timestamp logic. Originally the
+                            // `timestamp_key` was always populated by the `request.timestamp` time.
+                            match log_namespace {
+                                LogNamespace::Vector => {
+                                    log.insert(metadata_path!("vector", "ingest_timestamp"), now);
+                                    log.insert(
+                                        metadata_path!(AwsKinesisFirehoseConfig::NAME, "timestamp"),
+                                        request.timestamp,
+                                    );
+                                }
+                                LogNamespace::Legacy => {
+                                    if let Some(timestamp_key) = log_schema().timestamp_key() {
+                                        log.try_insert(
+                                            (PathPrefix::Event, timestamp_key),
+                                            request.timestamp,
+                                        );
+                                    }
+                                }
+                            };
+
+                            log_namespace.insert_source_metadata(
+                                AwsKinesisFirehoseConfig::NAME,
+                                log,
+                                Some(LegacyKey::InsertIfEmpty(path!("request_id"))),
+                                path!("request_id"),
+                                request_id.to_owned(),
+                            );
+                            log_namespace.insert_source_metadata(
+                                AwsKinesisFirehoseConfig::NAME,
+                                log,
+                                Some(LegacyKey::InsertIfEmpty(path!("source_arn"))),
+                                path!("source_arn"),
+                                source_arn.to_owned(),
+                            );
+
+                            if context.store_access_key {
+                                if let Some(access_key) = &request.access_key {
+                                    log.metadata_mut().secrets_mut().insert_secret(
+                                        "aws_kinesis_firehose_access_key",
+                                        access_key,
+                                    );
+                                }
+                            }
                         }
                     }
 
                     let count = events.len();
                     if let Err(error) = context.out.send_batch(events).await {
-                        emit!(StreamClosedError {
-                            error: error.clone(),
-                            count,
-                        });
+                        emit!(StreamClosedError { count });
                         let error = RequestError::ShuttingDown {
                             request_id: request_id.clone(),
                             source: error,
@@ -151,7 +205,9 @@ fn decode_record(
     record: &EncodedFirehoseRecord,
     compression: Compression,
 ) -> Result<Bytes, RecordDecodeError> {
-    let buf = base64::decode(record.data.as_bytes()).context(Base64Snafu {})?;
+    let buf = BASE64_STANDARD
+        .decode(record.data.as_bytes())
+        .context(Base64Snafu {})?;
 
     if buf.is_empty() {
         return Ok(Bytes::default());

@@ -25,7 +25,7 @@ impl<'a> EventRef<'a> {
     pub fn as_log(self) -> &'a LogEvent {
         match self {
             Self::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log reference", self),
+            _ => panic!("Failed type coercion, {self:?} is not a log reference"),
         }
     }
 
@@ -37,7 +37,7 @@ impl<'a> EventRef<'a> {
     pub fn into_log(self) -> LogEvent {
         match self {
             Self::Log(log) => log.clone(),
-            _ => panic!("Failed type coercion, {:?} is not a log reference", self),
+            _ => panic!("Failed type coercion, {self:?} is not a log reference"),
         }
     }
 
@@ -49,7 +49,7 @@ impl<'a> EventRef<'a> {
     pub fn as_metric(self) -> &'a Metric {
         match self {
             Self::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric reference", self),
+            _ => panic!("Failed type coercion, {self:?} is not a metric reference"),
         }
     }
 
@@ -61,7 +61,7 @@ impl<'a> EventRef<'a> {
     pub fn into_metric(self) -> Metric {
         match self {
             Self::Metric(metric) => metric.clone(),
-            _ => panic!("Failed type coercion, {:?} is not a metric reference", self),
+            _ => panic!("Failed type coercion, {self:?} is not a metric reference"),
         }
     }
 }
@@ -126,7 +126,7 @@ impl<'a> EventMutRef<'a> {
     pub fn as_log(self) -> &'a LogEvent {
         match self {
             Self::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log reference", self),
+            _ => panic!("Failed type coercion, {self:?} is not a log reference"),
         }
     }
 
@@ -138,7 +138,7 @@ impl<'a> EventMutRef<'a> {
     pub fn into_log(self) -> LogEvent {
         match self {
             Self::Log(log) => log.clone(),
-            _ => panic!("Failed type coercion, {:?} is not a log reference", self),
+            _ => panic!("Failed type coercion, {self:?} is not a log reference"),
         }
     }
 
@@ -150,7 +150,7 @@ impl<'a> EventMutRef<'a> {
     pub fn as_metric(self) -> &'a Metric {
         match self {
             Self::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric reference", self),
+            _ => panic!("Failed type coercion, {self:?} is not a metric reference"),
         }
     }
 
@@ -162,7 +162,7 @@ impl<'a> EventMutRef<'a> {
     pub fn into_metric(self) -> Metric {
         match self {
             Self::Metric(metric) => metric.clone(),
-            _ => panic!("Failed type coercion, {:?} is not a metric reference", self),
+            _ => panic!("Failed type coercion, {self:?} is not a metric reference"),
         }
     }
 

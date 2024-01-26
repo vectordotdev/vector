@@ -1,21 +1,22 @@
 use core::fmt;
-use std::{collections::BTreeMap, time::Duration};
+use std::time::Duration;
 
 use bytes::Bytes;
 use criterion::{
     black_box, criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
     Criterion, SamplingMode, Throughput,
 };
-use value::Value;
+use vector::config::TransformContext;
 use vector::transforms::{
     route::{Route, RouteConfig},
     TransformOutputsBuf,
 };
-use vector_core::{
-    config::{DataType, Output},
+use vector_lib::{
+    config::{DataType, TransformOutput},
     event::{Event, EventContainer, EventMetadata, LogEvent},
-    transform::{SyncTransform, TransformContext},
+    transform::SyncTransform,
 };
+use vrl::value::{ObjectMap, Value};
 
 #[derive(Debug)]
 struct Param {
@@ -35,12 +36,12 @@ fn route(c: &mut Criterion) {
     let mut group: BenchmarkGroup<WallTime> = c.benchmark_group("vector::transforms::route::Route");
     group.sampling_mode(SamplingMode::Auto);
 
-    let mut fields = BTreeMap::new();
+    let mut fields = ObjectMap::new();
     for alpha in [
         "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r",
         "s", "t", "u", "v", "w", "x", "y", "z",
     ] {
-        fields.insert(String::from(alpha), Value::Bytes(Bytes::from(alpha)));
+        fields.insert(alpha.into(), Value::Bytes(Bytes::from(alpha)));
     }
     let event = Event::from(LogEvent::from_map(fields, EventMetadata::default()));
 
@@ -54,10 +55,10 @@ fn route(c: &mut Criterion) {
         "bba", "bbca", "dba", "bea", "fba", "gba", "hba", "iba", "jba", "bka", "bal", "bma", "bna",
         "boa", "bpa", "bqa", "bra", "bsa", "bta", "bua", "bva", "bwa", "xba", "aby", "zba",
     ] {
-        outputs.push(Output {
+        outputs.push(TransformOutput {
             port: Some(String::from(name)),
             ty: DataType::Log,
-            log_schema_definition: None,
+            log_schema_definitions: Default::default(),
         });
     }
     let output_buffer: TransformOutputsBuf = TransformOutputsBuf::new_with_capacity(outputs, 10);
@@ -78,7 +79,7 @@ fn route(c: &mut Criterion) {
             output_buffer: output_buffer.clone(),
         },
         // A small filter where a sole field is mapped into a named route, does
-        // not matche.
+        // not match.
         Param {
             slug: "vrl_field_not_match",
             input: event.clone(),

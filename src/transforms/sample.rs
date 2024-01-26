@@ -1,8 +1,14 @@
-use vector_config::configurable_component;
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vrl::value::Kind;
+use vrl::{event_path, owned_value_path};
 
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext},
+    config::{
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
     event::Event,
     internal_events::SampleEventDiscarded,
     schema,
@@ -10,22 +16,31 @@ use crate::{
 };
 
 /// Configuration for the `sample` transform.
-#[configurable_component(transform("sample"))]
+#[configurable_component(transform(
+    "sample",
+    "Sample events from an event stream based on supplied criteria and at a configurable rate."
+))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SampleConfig {
-    /// The rate at which events will be forwarded, expressed as `1/N`.
+    /// The rate at which events are forwarded, expressed as `1/N`.
     ///
-    /// For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will
-    /// be dropped.
+    /// For example, `rate = 10` means 1 out of every 10 events are forwarded and the rest are
+    /// dropped.
     pub rate: u64,
 
-    /// The name of the log field whose value will be hashed to determine if the event should be
-    /// passed.
+    /// The name of the field whose value is hashed to determine if the event should be
+    /// sampled.
     ///
-    /// Consistently samples the same events. Actual rate of sampling may differ from the configured
-    /// one if values in the field are not uniformly distributed. If left unspecified, or if the
-    /// event doesn’t have `key_field`, events will be count rated.
+    /// Each unique value for the key creates a bucket of related events to be sampled together
+    /// and the rate is applied to the buckets themselves to sample `1/N` buckets.  The overall rate
+    /// of sampling may differ from the configured one if values in the field are not uniformly
+    /// distributed. If left unspecified, or if the event doesn’t have `key_field`, then the
+    /// event is sampled independently.
+    ///
+    /// This can be useful to, for example, ensure that all logs for a given transaction are
+    /// sampled together, but that overall `1/N` transactions are sampled.
+    #[configurable(metadata(docs::examples = "message",))]
     pub key_field: Option<String>,
 
     /// A logical condition used to exclude events from sampling.
@@ -44,6 +59,7 @@ impl GenerateConfig for SampleConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Sample::new(
@@ -60,8 +76,30 @@ impl TransformConfig for SampleConfig {
         Input::new(DataType::Log | DataType::Trace)
     }
 
-    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log | DataType::Trace)]
+    fn outputs(
+        &self,
+        _: vector_lib::enrichment::TableRegistry,
+        input_definitions: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(
+            DataType::Log | DataType::Trace,
+            input_definitions
+                .iter()
+                .map(|(output, definition)| {
+                    (
+                        output.clone(),
+                        definition.clone().with_source_metadata(
+                            SampleConfig::NAME,
+                            Some(LegacyKey::Overwrite(owned_value_path!("sample_rate"))),
+                            &owned_value_path!("sample_rate"),
+                            Kind::bytes(),
+                            None,
+                        ),
+                    )
+                })
+                .collect(),
+        )]
     }
 }
 
@@ -104,8 +142,14 @@ impl FunctionTransform for Sample {
             .key_field
             .as_ref()
             .and_then(|key_field| match &event {
-                Event::Log(event) => event.get(key_field.as_str()),
-                Event::Trace(event) => event.get(key_field.as_str()),
+                Event::Log(event) => event
+                    .parse_path_and_get_value(key_field.as_str())
+                    .ok()
+                    .flatten(),
+                Event::Trace(event) => event
+                    .parse_path_and_get_value(key_field.as_str())
+                    .ok()
+                    .flatten(),
                 Event::Metric(_) => panic!("component can never receive metric events"),
             })
             .map(|v| v.to_string_lossy());
@@ -120,8 +164,18 @@ impl FunctionTransform for Sample {
 
         if num % self.rate == 0 {
             match event {
-                Event::Log(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
-                Event::Trace(ref mut event) => event.insert("sample_rate", self.rate.to_string()),
+                Event::Log(ref mut event) => {
+                    event.namespace().insert_source_metadata(
+                        SampleConfig::NAME,
+                        event,
+                        Some(LegacyKey::Overwrite(vrl::path!("sample_rate"))),
+                        vrl::path!("sample_rate"),
+                        self.rate.to_string(),
+                    );
+                }
+                Event::Trace(ref mut event) => {
+                    event.insert(event_path!("sample_rate"), self.rate.to_string());
+                }
                 Event::Metric(_) => panic!("component can never receive metric events"),
             };
             output.push(event);
@@ -140,9 +194,11 @@ mod tests {
         conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
         event::{Event, LogEvent, TraceEvent},
-        test_util::random_lines,
-        transforms::test::transform_one,
+        test_util::{components::assert_transform_compliance, random_lines},
+        transforms::test::{create_topology, transform_one},
     };
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     fn condition_contains(key: &str, needle: &str) -> Condition {
         let vrl_config = VrlConfig {
@@ -156,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    fn genreate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<SampleConfig>();
     }
 
@@ -167,8 +223,11 @@ mod tests {
         let events = random_events(num_events);
         let mut sampler = Sample::new(
             2,
-            Some(log_schema().message_key().into()),
-            Some(condition_contains(log_schema().message_key(), "na")),
+            log_schema().message_key().map(ToString::to_string),
+            Some(condition_contains(
+                log_schema().message_key().unwrap().to_string().as_str(),
+                "na",
+            )),
         );
         let total_passed = events
             .into_iter()
@@ -185,8 +244,11 @@ mod tests {
         let events = random_events(num_events);
         let mut sampler = Sample::new(
             25,
-            Some(log_schema().message_key().into()),
-            Some(condition_contains(log_schema().message_key(), "na")),
+            log_schema().message_key().map(ToString::to_string),
+            Some(condition_contains(
+                log_schema().message_key().unwrap().to_string().as_str(),
+                "na",
+            )),
         );
         let total_passed = events
             .into_iter()
@@ -206,8 +268,11 @@ mod tests {
         let events = random_events(1000);
         let mut sampler = Sample::new(
             2,
-            Some(log_schema().message_key().into()),
-            Some(condition_contains(log_schema().message_key(), "na")),
+            log_schema().message_key().map(ToString::to_string),
+            Some(condition_contains(
+                log_schema().message_key().unwrap().to_string().as_str(),
+                "na",
+            )),
         );
 
         let first_run = events
@@ -233,12 +298,15 @@ mod tests {
 
     #[test]
     fn always_passes_events_matching_pass_list() {
-        for key_field in &[None, Some(log_schema().message_key().into())] {
+        for key_field in &[None, log_schema().message_key().map(ToString::to_string)] {
             let event = Event::Log(LogEvent::from("i am important"));
             let mut sampler = Sample::new(
                 0,
                 key_field.clone(),
-                Some(condition_contains(log_schema().message_key(), "important")),
+                Some(condition_contains(
+                    log_schema().message_key().unwrap().to_string().as_str(),
+                    "important",
+                )),
             );
             let iterations = 0..1000;
             let total_passed = iterations
@@ -275,20 +343,17 @@ mod tests {
 
     #[test]
     fn sampler_adds_sampling_rate_to_event() {
-        for key_field in &[None, Some(log_schema().message_key().into())] {
+        for key_field in &[None, log_schema().message_key().map(ToString::to_string)] {
             let events = random_events(10000);
+            let message_key = log_schema().message_key().unwrap().to_string();
             let mut sampler = Sample::new(
                 10,
                 key_field.clone(),
-                Some(condition_contains(log_schema().message_key(), "na")),
+                Some(condition_contains(&message_key, "na")),
             );
             let passing = events
                 .into_iter()
-                .filter(|s| {
-                    !s.as_log()[log_schema().message_key()]
-                        .to_string_lossy()
-                        .contains("na")
-                })
+                .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
                 .find_map(|event| transform_one(&mut sampler, event))
                 .unwrap();
             assert_eq!(passing.as_log()["sample_rate"], "10".into());
@@ -297,15 +362,11 @@ mod tests {
             let mut sampler = Sample::new(
                 25,
                 key_field.clone(),
-                Some(condition_contains(log_schema().message_key(), "na")),
+                Some(condition_contains(&message_key, "na")),
             );
             let passing = events
                 .into_iter()
-                .filter(|s| {
-                    !s.as_log()[log_schema().message_key()]
-                        .to_string_lossy()
-                        .contains("na")
-                })
+                .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
                 .find_map(|event| transform_one(&mut sampler, event))
                 .unwrap();
             assert_eq!(passing.as_log()["sample_rate"], "25".into());
@@ -314,7 +375,7 @@ mod tests {
             let mut sampler = Sample::new(
                 25,
                 key_field.clone(),
-                Some(condition_contains(log_schema().message_key(), "na")),
+                Some(condition_contains(&message_key, "na")),
             );
             let event = Event::Log(LogEvent::from("nananana"));
             let passing = transform_one(&mut sampler, event).unwrap();
@@ -332,6 +393,29 @@ mod tests {
             .filter_map(|_| transform_one(&mut sampler, trace.clone()))
             .count();
         assert_eq!(total_passed, 1);
+    }
+
+    #[tokio::test]
+    async fn emits_internal_events() {
+        assert_transform_compliance(async move {
+            let config = SampleConfig {
+                rate: 1,
+                key_field: None,
+                exclude: None,
+            };
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let log = LogEvent::from("hello world");
+            tx.send(log.into()).await.unwrap();
+
+            _ = out.recv().await;
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 
     fn random_events(n: usize) -> Vec<Event> {

@@ -59,8 +59,8 @@ impl Encoder<Event> for LogfmtSerializer {
 mod tests {
     use super::*;
     use bytes::BytesMut;
-    use vector_common::btreemap;
     use vector_core::event::{LogEvent, Value};
+    use vrl::btreemap;
 
     #[test]
     fn serialize_logfmt() {

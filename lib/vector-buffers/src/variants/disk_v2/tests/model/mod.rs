@@ -3,13 +3,12 @@ use std::{
     io::Cursor,
     sync::{
         atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
-        Arc,
+        Arc, Mutex,
     },
     task::Poll,
 };
 
 use crossbeam_queue::SegQueue;
-use parking_lot::Mutex;
 use proptest::{prop_assert, prop_assert_eq, proptest};
 use temp_dir::TempDir;
 use tokio::runtime::Builder;
@@ -64,12 +63,12 @@ impl FilesystemModel {
     }
 
     fn open_file(&self, id: u16) -> Option<FileModel> {
-        let files = self.files.lock();
+        let files = self.files.lock().expect("poisoned");
         files.get(&id).cloned()
     }
 
     fn create_file(&self, id: u16) -> Option<FileModel> {
-        let mut files = self.files.lock();
+        let mut files = self.files.lock().expect("poisoned");
         if files.contains_key(&id) {
             return None;
         }
@@ -81,7 +80,7 @@ impl FilesystemModel {
     }
 
     fn delete_file(&self, id: u16) -> bool {
-        let mut files = self.files.lock();
+        let mut files = self.files.lock().expect("poisoned");
         files.remove(&id).is_some()
     }
 }
@@ -350,7 +349,7 @@ impl ReaderModel {
                 // We have enough unconsumed event acknowledgements to fully acknowledge this
                 // record. Remove it, consume the event acknowledgements, add a record
                 // acknowledgement, and update the buffer size.
-                let _ = self.pending_record_acks.pop_front().unwrap();
+                _ = self.pending_record_acks.pop_front().unwrap();
                 self.unconsumed_event_acks -= 1;
                 self.unconsumed_record_acks += 1;
 
@@ -370,13 +369,12 @@ impl ReaderModel {
             if self.unconsumed_record_acks >= required_record_acks {
                 // We have enough unconsumed record acknowledgements to fully acknowledge this data
                 // file. Remove it, consume the record acknowledgements, and delete the data file.
-                let _ = self.pending_data_file_acks.pop_front().unwrap();
+                _ = self.pending_data_file_acks.pop_front().unwrap();
                 self.unconsumed_record_acks -= required_record_acks;
 
                 assert!(
                     self.filesystem.delete_file(file_id),
-                    "invariant violation: tried to delete file id {}, but file does not exist",
-                    file_id
+                    "invariant violation: tried to delete file id {file_id}, but file does not exist"
                 );
             } else {
                 // Not enough delete acks to proceed, so we can't do anything more.
@@ -461,7 +459,7 @@ impl ReaderModel {
     }
 
     fn track_read(&mut self, event_count: usize, bytes_read: u64) {
-        // We tneed to track how many acknowledgements we expect to come in based on the number of
+        // We need to track how many acknowledgements we expect to come in based on the number of
         // records read vs the number of their events that have been acknowledged, as we only adjust
         // the buffer size when a record has been fully acknowledged, since one record may contain
         // multiple events.
@@ -837,7 +835,7 @@ proptest! {
             // itself, input actions, and the sequencer.
             //
             // At the very top, we have our input actions, which are mapped one-to-one with the
-            // possible actions that can influence the disk buffer: reaading records, writing
+            // possible actions that can influence the disk buffer: reading records, writing
             // records, flushing writes, and acknowledging reads.
             //
             // After that, we have the model itself, which essentially a barebones re-implementation
@@ -891,7 +889,7 @@ proptest! {
                 // doing the next operation.
                 tokio::task::yield_now().await;
 
-                // We manully check if the sequencer has any write operations left, either
+                // We manually check if the sequencer has any write operations left, either
                 // in-flight or yet-to-be-triggered, and if none are left, we mark the writer
                 // closed.  This allows us to properly inform the model that reads should start
                 // returning `None` if there's no more flushed records left vs being blocked on
@@ -932,7 +930,7 @@ proptest! {
                                                 Ok(written) => prop_assert_eq!(model_result, Progress::RecordWritten(written), "expected completed write"),
                                                 Err(e) => prop_assert_eq!(model_result, Progress::WriteError(e), "expected write error"),
                                             },
-                                            WriteActionResult::Flush(r) => panic!("got unexpected flush action result for pending write: {:?}", r),
+                                            WriteActionResult::Flush(r) => panic!("got unexpected flush action result for pending write: {r:?}"),
                                         }
                                     },
                                 }
@@ -948,11 +946,11 @@ proptest! {
                                     Poll::Pending => panic!("flush should never be blocked"),
                                     Poll::Ready(sut_result) => match sut_result {
                                         WriteActionResult::Flush(result) => prop_assert!(result.is_ok()),
-                                        WriteActionResult::Write(r) => panic!("got unexpected write action result for pending flush: {:?}", r),
+                                        WriteActionResult::Write(r) => panic!("got unexpected write action result for pending flush: {r:?}"),
                                     },
                                 }
                             },
-                            a => panic!("invalid action for pending write: {:?}", a),
+                            a => panic!("invalid action for pending write: {a:?}"),
                         }
                     }
 
@@ -975,7 +973,7 @@ proptest! {
                                     },
                                 }
                             },
-                            a => panic!("invalid action for pending read: {:?}", a),
+                            a => panic!("invalid action for pending read: {a:?}"),
                         }
                     }
 

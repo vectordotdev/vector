@@ -1,61 +1,57 @@
 #![cfg(test)]
+use similar_asserts::assert_eq;
 
-use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use vector_lib::lookup::{event_path, metadata_path};
+use vector_lib::{config::LogNamespace, event};
+use vrl::value;
+use vrl::value::Value;
 
 use crate::{
     event::{Event, LogEvent},
-    transforms::{OutputBuffer, Transform},
+    sources::kubernetes_logs::Config,
+    transforms::{FunctionTransform, OutputBuffer},
 };
 
 /// Build a log event for test purposes.
 ///
 /// The implementation is shared, and therefore consistent across all
 /// the parsers.
-pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: bool) -> Event {
-    let mut log = LogEvent::default();
-
-    log.insert("message", message);
-
-    let timestamp = DateTime::parse_from_rfc3339(timestamp)
-        .expect("invalid test case")
-        .with_timezone(&Utc);
-    log.insert("timestamp", timestamp);
-
-    log.insert("stream", stream);
-
-    if is_partial {
-        log.insert("_partial", true);
-    }
-
-    Event::Log(log)
-}
-
-/// Build a log event for test purposes.
-/// Message can be a not valid UTF-8 string
-///
-/// The implementation is shared, and therefore consistent across all
-/// the parsers.
-pub(crate) fn make_log_event_with_byte_message(
-    message: Bytes,
+pub fn make_log_event(
+    message: Value,
     timestamp: &str,
     stream: &str,
     is_partial: bool,
+    log_namespace: LogNamespace,
 ) -> Event {
-    let mut log = LogEvent::default();
-
-    log.insert("message", message);
-
     let timestamp = DateTime::parse_from_rfc3339(timestamp)
-        .expect("invalid test case")
+        .expect("invalid timestamp in test case")
         .with_timezone(&Utc);
-    log.insert("timestamp", timestamp);
 
-    log.insert("stream", stream);
+    let log = match log_namespace {
+        LogNamespace::Vector => {
+            let mut log = LogEvent::from(value!(message));
+            log.insert(metadata_path!(Config::NAME, "timestamp"), timestamp);
+            log.insert(metadata_path!(Config::NAME, "stream"), stream);
+            if is_partial {
+                log.insert(metadata_path!(Config::NAME, event::PARTIAL), true);
+            }
 
-    if is_partial {
-        log.insert("_partial", true);
-    }
+            log
+        }
+        LogNamespace::Legacy => {
+            let mut log = LogEvent::default();
+
+            log.insert(event_path!("message"), message);
+            log.insert(event_path!("timestamp"), timestamp);
+            log.insert(event_path!("stream"), stream);
+            if is_partial {
+                log.insert(event_path!(event::PARTIAL), true);
+            }
+
+            log
+        }
+    };
 
     Event::Log(log)
 }
@@ -63,21 +59,20 @@ pub(crate) fn make_log_event_with_byte_message(
 /// Shared logic for testing parsers.
 ///
 /// Takes a parser builder and a list of test cases.
-pub fn test_parser<B, L, S>(builder: B, loader: L, cases: Vec<(S, Vec<Event>)>)
+pub fn test_parser<B, L, S, F>(builder: B, loader: L, cases: Vec<(S, Vec<Event>)>)
 where
-    B: Fn() -> Transform,
+    B: Fn() -> F,
+    F: FunctionTransform,
     L: Fn(S) -> Event,
 {
     for (message, expected) in cases {
         let input = loader(message);
         let mut parser = (builder)();
-        let parser = parser.as_function();
-
         let mut output = OutputBuffer::default();
         parser.transform(&mut output, input);
 
         let actual = output.into_events().collect::<Vec<_>>();
 
-        vector_common::assert_event_data_eq!(expected, actual, "expected left, actual right");
+        assert_eq!(expected, actual, "expected left, actual right");
     }
 }

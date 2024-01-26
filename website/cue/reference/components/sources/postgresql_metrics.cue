@@ -12,7 +12,7 @@ components: sources: postgresql_metrics: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}
@@ -52,83 +52,7 @@ components: sources: postgresql_metrics: {
 		platform_name: null
 	}
 
-	configuration: {
-		endpoints: {
-			description: "PostgreSQL server endpoint in libpq-style connection strings."
-			required:    true
-			type: array: {
-				items: type: string: {
-					examples: ["postgresql://postgres:vector@localhost:5432/postgres"]
-				}
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between scrapes."
-			common:      true
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		namespace: {
-			description: "The namespace of metrics. Disabled if empty."
-			common:      false
-			required:    false
-			type: string: {
-				default: "postgresql"
-			}
-		}
-		include_databases: {
-			description: """
-				A list of databases to match (by using [POSIX Regular Expressions](\(urls.postgresql_matching))) against
-				the `datname` column for which you want to collect metrics from. If not set, metrics are collected from
-				all databases. Specifying `""` will include metrics where `datname` is `NULL`. This can be used in
-				conjunction with [`exclude_databases`](#exclude_databases).
-				"""
-			common:      false
-			required:    false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["^postgres$", "^vector$", "^foo"]
-				}
-			}
-		}
-		exclude_databases: {
-			description: """
-				A list of databases to match (by using [POSIX Regular Expressions](\(urls.postgresql_matching))) against
-				the `datname` column for which you don't want to collect metrics from.
-				Specifying `""` will include metrics where `datname` is `NULL`.
-				This can be used in conjunction with [`include_databases`](#include_databases).
-				"""
-			common:      false
-			required:    false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["^postgres$", "^template.*", ""]
-				}
-			}
-		}
-		tls: {
-			common:      false
-			description: "TLS options to connect to the PostgreSQL Server."
-			required:    false
-			type: object: {
-				examples: []
-				options: {
-					ca_file: {
-						description: "Path to CA certificate file."
-						required:    true
-						type: string: {
-							examples: ["certs/ca.pem"]
-						}
-					}
-				}
-			}
-		}
-	}
+	configuration: base.components.sources.postgresql_metrics.configuration
 
 	how_it_works: {
 		privileges: {
@@ -145,15 +69,8 @@ components: sources: postgresql_metrics: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		collect_completed_total:              components.sources.internal_metrics.output.metrics.collect_completed_total
-		collect_duration_seconds:             components.sources.internal_metrics.output.metrics.collect_duration_seconds
-		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		request_errors_total:                 components.sources.internal_metrics.output.metrics.request_errors_total
+		collect_completed_total:  components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_seconds: components.sources.internal_metrics.output.metrics.collect_duration_seconds
 	}
 
 	output: metrics: {

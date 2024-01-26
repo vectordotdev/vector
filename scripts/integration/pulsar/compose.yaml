@@ -1,0 +1,8 @@
+version: '3'
+
+services:
+  pulsar:
+    image: docker.io/apachepulsar/pulsar:${CONFIG_VERSION}
+    command: bin/pulsar standalone
+    ports:
+    - 6650:6650

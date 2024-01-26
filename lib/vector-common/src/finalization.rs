@@ -76,7 +76,7 @@ impl EventFinalizers {
 
     /// Merges the event finalizers from `other` into the collection.
     pub fn merge(&mut self, other: Self) {
-        self.0.extend(other.0.into_iter());
+        self.0.extend(other.0);
     }
 
     /// Updates the status of all event finalizers in the collection.
@@ -266,7 +266,7 @@ impl OwnedBatchNotifier {
             let status = self.status.load();
             // Ignore the error case, as it will happen during normal
             // source shutdown and we can't detect that here.
-            let _ = notifier.send(status);
+            _ = notifier.send(status);
         }
     }
 }

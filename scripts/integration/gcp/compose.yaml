@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  gcloud-pubsub:
+    image: docker.io/messagebird/gcloud-pubsub-emulator:${CONFIG_VERSION}
+    environment:
+    - PUBSUB_PROJECT1=testproject,topic1:subscription1
+    - PUBSUB_PROJECT2=sourceproject,topic2:subscription2
+  chronicle-emulator:
+    image: docker.io/plork/chronicle-emulator:${CONFIG_VERSION}
+    ports:
+    - 3000:3000
+    volumes:
+    - ./public.pem:/public.pem:ro
+    command:
+    - -p
+    - /public.pem

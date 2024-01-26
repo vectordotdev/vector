@@ -26,7 +26,6 @@ use crate::sinks::util::retries::RetryLogic;
 /// spawning it) to prevent extraneous delays from causing discrepancies
 /// in the measurements.
 #[pin_project]
-#[derive(Debug)]
 pub struct ResponseFuture<F, L> {
     #[pin]
     inner: F,

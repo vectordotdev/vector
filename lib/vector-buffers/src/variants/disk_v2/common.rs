@@ -26,7 +26,7 @@ pub const MINIMUM_MAX_RECORD_SIZE: usize = align16(RECORD_HEADER_LEN + 1);
 // We want to ensure a reasonable time before we `fsync`/flush to disk, and 500ms should provide that for non-critical
 // workloads.
 //
-// Practically, it's far more definitive than `disk_v1` which does not definitvely `fsync` at all, at least with how we
+// Practically, it's far more definitive than `disk_v1` which does not definitely `fsync` at all, at least with how we
 // have it configured.
 pub const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
 
@@ -58,7 +58,7 @@ pub(crate) fn create_crc32c_hasher() -> Hasher {
 /// on-disk sizes for various elements, and account for those in size limits, etc.
 pub(crate) const fn align16(amount: usize) -> usize {
     // The amount must be less than `MAX_ALIGNABLE_AMOUNT` otherwise we'll overflow trying to align it, ending up with a
-    // nonsensicial value.
+    // nonsensical value.
     assert!(
         amount <= MAX_ALIGNABLE_AMOUNT,
         "`amount` must be less than `MAX_ALIGNABLE_AMOUNT`"
@@ -75,7 +75,7 @@ fn get_maximum_data_file_size() -> u64 {
     (u64::MAX - ledger_len) / 2
 }
 
-/// Gets the minimum buffer size for the the given maximum data file size.
+/// Gets the minimum buffer size for the given maximum data file size.
 ///
 /// This ensures that we are allowed to store enough bytes on-disk, as the buffer design requires being able to always
 /// write to a minimum number of data files, etc. This allow ensures that we're accounting for non-data file disk usage
@@ -315,27 +315,18 @@ where
         if max_data_file_size > data_file_size_mechanical_limit {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_data_file_size",
-                reason: format!(
-                    "cannot be greater than {} bytes",
-                    data_file_size_mechanical_limit
-                ),
+                reason: format!("cannot be greater than {data_file_size_mechanical_limit} bytes"),
             });
         }
 
-        let minimum_buffer_size = match get_minimum_buffer_size(max_data_file_size) {
-            Some(value) => value,
-            None => {
-                unreachable!("maximum data file size should be correctly limited at this point")
-            }
+        let Some(minimum_buffer_size) = get_minimum_buffer_size(max_data_file_size) else {
+            unreachable!("maximum data file size should be correctly limited at this point")
         };
 
         if max_buffer_size < minimum_buffer_size {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_buffer_size",
-                reason: format!(
-                    "must be greater than or equal to {} bytes",
-                    minimum_buffer_size
-                ),
+                reason: format!("must be greater than or equal to {minimum_buffer_size} bytes"),
             });
         }
 
@@ -349,21 +340,15 @@ where
         if max_record_size <= MINIMUM_MAX_RECORD_SIZE {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_record_size",
-                reason: format!(
-                    "must be greater than or equal to {} bytes",
-                    MINIMUM_MAX_RECORD_SIZE,
-                ),
+                reason: format!("must be greater than or equal to {MINIMUM_MAX_RECORD_SIZE} bytes",),
             });
         }
 
-        let max_record_size_converted = match u64::try_from(max_record_size) {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(BuildError::InvalidParameter {
-                    param_name: "max_record_size",
-                    reason: "must be less than 2^64 bytes".to_string(),
-                })
-            }
+        let Ok(max_record_size_converted) = u64::try_from(max_record_size) else {
+            return Err(BuildError::InvalidParameter {
+                param_name: "max_record_size",
+                reason: "must be less than 2^64 bytes".to_string(),
+            });
         };
 
         if max_record_size_converted > max_data_file_size {
@@ -443,7 +428,7 @@ mod tests {
     };
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "`amount` must be less than `MAX_ALIGNABLE_AMOUNT`")]
     fn test_align16_too_large() {
         // We forcefully panic if the input to `align16` is too large to align without overflow, primarily because
         // that's a huge amount even on 32-bit systems and in non-test code, we only use `align16` in a const context,

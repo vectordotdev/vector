@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <!-- the below line lets monaco editor to appear nicely in mobile view -->
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <title>VRL playground</title>
+    <link rel="icon" type="image/x-icon" href="https://vector.dev/favicon.ico">
+    <link
+      rel="stylesheet"
+      data-name="vs/editor/editor.main"
+      href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.20.0/min/vs/editor/editor.main.min.css"
+    />
+
+    <link
+      rel="stylesheet"
+      href="index.css"
+    />
+
+    <style type="text/css">
+    </style>
+  </head>
+
+  <body>
+    <div class="headers-grid">
+      <div class="headers-grid-item">
+        <h2>VRL Playground</h2>
+      </div>
+      <div class="headers-grid-item">
+        <table>
+          <tr>
+            <td>Vector Version: </td>
+            <td><a id="vector-version-link"></a></td>
+          </tr>
+          <tr>
+            <td>VRL Version: </td>
+            <td><a id="vrl-version-link"></a></td>
+          </tr>
+        </table>
+      </div>
+      <div class="headers-grid-item" id="description-cell">
+          <p id="description-paragraph" >
+            <a href="https://vector.dev/docs/reference/vrl/functions/">Vector Remap Language (VRL)</a> is an expression-oriented language designed for transforming
+            observability data. This playground lets you write a program, run it against an event or
+            events, share it, and see how the events are transformed.
+          </p>
+      </div>
+    </div>
+    <div id="App">
+
+
+      <div id="toolbar-section">
+        <button id="run-code-btn" class="btn btn-primary" onClick="vrlPlayground.handleRunCode()">Run program</button>
+        <button id="share-code-btn" class="btn btn-secondary" onClick="vrlPlayground.handleShareCode()">Share program</button>
+      </div>
+
+      <div id="input-section">
+        <div id="cell">
+          <div id="input-cell-title">
+            <p class="cell-title">Program</p>
+          </div>
+
+          <div id="container-program"></div>
+        </div>
+      </div>
+
+      <div id="output-section">
+        <div id="event-cell">
+          <div id="event-cell-title">
+            <p class="cell-title">Event</p>
+          </div>
+          <div id="container-event"></div>
+        </div>
+
+        <div id="output-cell">
+          <div id="output-cell-title">
+            <p class="cell-title">Output</p>
+          </div>
+          <div id="container-output"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/loader.min.js"></script>
+
+    <script src="index.js" type="module"></script>
+  </body>
+</html>

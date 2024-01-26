@@ -304,7 +304,7 @@ impl BufferUsage {
             }
         };
 
-        let task_name = format!("buffer usage reporter ({})", buffer_id);
+        let task_name = format!("buffer usage reporter ({buffer_id})");
         spawn_named(task.instrument(span.or_current()), task_name.as_str());
     }
 }

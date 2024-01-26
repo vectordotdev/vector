@@ -18,7 +18,7 @@ remap: expressions: block: {
 		definitions: {
 			expressions: {
 				description: """
-					One or more expresions.
+					One or more expressions.
 					"""
 			}
 		}

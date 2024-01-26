@@ -1,7 +1,0 @@
-# https://github.com/vectordotdev/vector/issues/6792#issuecomment-817986771
-# result: {"field1": "2020-01-01T00:00:00Z", "field2": 1577836800, "timestamp": "2020-01-01T00:00:00+00:00"}
-
-.timestamp = "2020-01-01T00:00:00+00:00"
-.field1 = parse_timestamp!(.timestamp, format: "%+")
-.field2 = to_int(.field1)
-.

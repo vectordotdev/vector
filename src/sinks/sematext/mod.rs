@@ -3,16 +3,20 @@ pub mod metrics;
 
 pub use self::{logs::SematextLogsConfig, metrics::SematextMetricsConfig};
 
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
-/// Sematext region.
+/// The Sematext region to send data to.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {
-    /// US region.
+    /// United States
     Us,
 
-    /// EU region.
+    /// Europe
     Eu,
+}
+
+const fn default_region() -> Region {
+    Region::Us
 }

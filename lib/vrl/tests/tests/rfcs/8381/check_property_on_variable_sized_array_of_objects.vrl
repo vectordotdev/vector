@@ -1,7 +1,0 @@
-# result: true
-
-arr =  [{ "a": 3 }, { "a": 2 }, { "a": 4 }]
-any_two = false
-for_each(arr) -> |_index, value| { if value.a == 2 { any_two = true } }
-
-any_two

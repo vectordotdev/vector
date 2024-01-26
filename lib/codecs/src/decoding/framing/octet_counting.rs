@@ -2,7 +2,6 @@ use std::io;
 
 use bytes::{Buf, Bytes, BytesMut};
 use derivative::Derivative;
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::{LinesCodec, LinesCodecError};
 use tracing::trace;
 use vector_config::configurable_component;
@@ -10,12 +9,10 @@ use vector_config::configurable_component;
 use super::BoxedFramingError;
 
 /// Config used to build a `OctetCountingDecoder`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Debug, Clone, Default)]
 pub struct OctetCountingDecoderConfig {
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     /// Options for the octet counting decoder.
     pub octet_counting: OctetCountingDecoderOptions,
 }
@@ -37,12 +34,12 @@ impl OctetCountingDecoderConfig {
 #[derivative(Default)]
 pub struct OctetCountingDecoderOptions {
     /// The maximum length of the byte buffer.
-    #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
-    max_length: Option<usize>,
+    #[serde(skip_serializing_if = "vector_core::serde::is_default")]
+    pub max_length: Option<usize>,
 }
 
 /// Codec using the `Octet Counting` format as specified in
-/// https://tools.ietf.org/html/rfc6587#section-3.4.1.
+/// <https://tools.ietf.org/html/rfc6587#section-3.4.1>.
 #[derive(Clone, Debug)]
 pub struct OctetCountingDecoder {
     other: LinesCodec,
@@ -406,7 +403,7 @@ mod tests {
         let mut buffer = BytesMut::with_capacity(32);
 
         buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit"[..]);
-        let _ = decoder.decode(&mut buffer);
+        _ = decoder.decode(&mut buffer);
 
         assert_eq!(decoder.octet_decoding, Some(State::DiscardingToEol));
         buffer.put(&b"wemustcontinuetodiscard\n32 something valid"[..]);

@@ -2,9 +2,9 @@ use async_trait::async_trait;
 use futures_util::{stream::BoxStream, FutureExt, StreamExt};
 use snafu::Snafu;
 use tokio::sync::oneshot;
-use vector_common::finalization::Finalizable;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::finalization::Finalizable;
+use vector_lib::{
     config::{AcknowledgementsConfig, Input},
     event::Event,
     sink::{StreamSink, VectorSink},
@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the `test_basic` sink.
-#[configurable_component(sink("test_basic"))]
+#[configurable_component(sink("test_basic", "Test (basic)."))]
 #[derive(Clone, Debug, Default)]
 pub struct BasicSinkConfig {
     #[serde(skip)]
@@ -32,16 +32,12 @@ pub struct BasicSinkConfig {
 
 impl_generate_config_from_default!(BasicSinkConfig);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
+#[allow(clippy::large_enum_variant)]
 enum Mode {
     Normal(SourceSender),
+    #[default]
     Dead,
-}
-
-impl Default for Mode {
-    fn default() -> Self {
-        Mode::Dead
-    }
 }
 
 impl BasicSinkConfig {
@@ -69,6 +65,7 @@ enum HealthcheckError {
 }
 
 #[async_trait]
+#[typetag::serde(name = "test_basic")]
 impl SinkConfig for BasicSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // If this sink is set to not be healthy, just send the healthcheck error immediately over
@@ -79,7 +76,7 @@ impl SinkConfig for BasicSinkConfig {
         let health_tx = if self.healthy {
             Some(tx)
         } else {
-            let _ = tx.send(Err(HealthcheckError::Unhealthy.into()));
+            _ = tx.send(Err(HealthcheckError::Unhealthy.into()));
             None
         };
 
@@ -113,7 +110,7 @@ impl StreamSink<Event> for MockSink {
         match self.sink {
             Mode::Normal(mut sink) => {
                 if let Some(tx) = self.health_tx.take() {
-                    let _ = tx.send(Ok(()));
+                    _ = tx.send(Ok(()));
                 }
 
                 // We have an inner sink, so forward the input normally

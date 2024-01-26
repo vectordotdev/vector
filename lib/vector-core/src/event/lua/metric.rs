@@ -2,18 +2,27 @@ use std::collections::BTreeMap;
 
 use mlua::prelude::*;
 
-use super::util::{table_to_timestamp, timestamp_to_table};
-use crate::{
-    event::{
-        metric::{self, MetricSketch},
-        Metric, MetricKind, MetricValue, StatisticKind,
-    },
-    metrics::AgentDDSketch,
+use super::super::{
+    metric::TagValue,
+    metric::{self, MetricSketch, MetricTags, TagValueSet},
+    Metric, MetricKind, MetricValue, StatisticKind,
 };
+use super::util::{table_to_timestamp, timestamp_to_table};
+use crate::metrics::AgentDDSketch;
 
-impl<'a> ToLua<'a> for MetricKind {
+pub struct LuaMetric {
+    pub metric: Metric,
+    pub multi_value_tags: bool,
+}
+
+pub struct LuaMetricTags {
+    pub tags: MetricTags,
+    pub multi_value_tags: bool,
+}
+
+impl<'a> IntoLua<'a> for MetricKind {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let kind = match self {
             MetricKind::Absolute => "absolute",
             MetricKind::Incremental => "incremental",
@@ -38,8 +47,8 @@ impl<'a> FromLua<'a> for MetricKind {
     }
 }
 
-impl<'a> ToLua<'a> for StatisticKind {
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+impl<'a> IntoLua<'a> for StatisticKind {
+    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let kind = match self {
             StatisticKind::Summary => "summary",
             StatisticKind::Histogram => "histogram",
@@ -64,27 +73,83 @@ impl<'a> FromLua<'a> for StatisticKind {
     }
 }
 
-impl<'a> ToLua<'a> for Metric {
+impl<'a> FromLua<'a> for TagValueSet {
+    fn from_lua(value: LuaValue<'a>, _: &'a Lua) -> LuaResult<Self> {
+        match value {
+            LuaValue::Nil => Ok(Self::Single(TagValue::Bare)),
+            LuaValue::Table(table) => {
+                let mut string_values: Vec<String> = vec![];
+                for value in table.sequence_values() {
+                    match value {
+                        Ok(value) => string_values.push(value),
+                        Err(_) => unimplemented!(),
+                    }
+                }
+                Ok(Self::from(string_values))
+            }
+            LuaValue::String(x) => Ok(Self::from([x.to_string_lossy().to_string()])),
+            _ => Err(mlua::Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "metric tag value",
+                message: None,
+            }),
+        }
+    }
+}
+
+impl<'a> FromLua<'a> for MetricTags {
+    fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
+        Ok(Self(BTreeMap::from_lua(value, lua)?))
+    }
+}
+
+impl<'a> IntoLua<'a> for LuaMetricTags {
+    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+        if self.multi_value_tags {
+            Ok(LuaValue::Table(lua.create_table_from(
+                self.tags.0.into_iter().map(|(key, value)| {
+                    let value: Vec<_> = value
+                        .into_iter()
+                        .filter_map(|tag_value| tag_value.into_option().into_lua(lua).ok())
+                        .collect();
+                    (key, value)
+                }),
+            )?))
+        } else {
+            Ok(LuaValue::Table(
+                lua.create_table_from(self.tags.iter_single())?,
+            ))
+        }
+    }
+}
+
+impl<'a> IntoLua<'a> for LuaMetric {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let tbl = lua.create_table()?;
 
-        tbl.raw_set("name", self.name())?;
-        if let Some(namespace) = self.namespace() {
+        tbl.raw_set("name", self.metric.name())?;
+        if let Some(namespace) = self.metric.namespace() {
             tbl.raw_set("namespace", namespace)?;
         }
-        if let Some(ts) = self.data.time.timestamp {
+        if let Some(ts) = self.metric.data.time.timestamp {
             tbl.raw_set("timestamp", timestamp_to_table(lua, ts)?)?;
         }
-        if let Some(i) = self.data.time.interval_ms {
+        if let Some(i) = self.metric.data.time.interval_ms {
             tbl.raw_set("interval_ms", i.get())?;
         }
-        if let Some(tags) = self.series.tags {
-            tbl.raw_set("tags", tags)?;
+        if let Some(tags) = self.metric.series.tags {
+            tbl.raw_set(
+                "tags",
+                LuaMetricTags {
+                    tags,
+                    multi_value_tags: self.multi_value_tags,
+                },
+            )?;
         }
-        tbl.raw_set("kind", self.data.kind)?;
+        tbl.raw_set("kind", self.metric.data.kind)?;
 
-        match self.data.value {
+        match self.metric.data.value {
             MetricValue::Counter { value } => {
                 let counter = lua.create_table()?;
                 counter.raw_set("value", value)?;
@@ -184,7 +249,7 @@ impl<'a> FromLua<'a> for Metric {
             .transpose()?;
         let interval_ms: Option<u32> = table.raw_get("interval_ms")?;
         let namespace: Option<String> = table.raw_get("namespace")?;
-        let tags: Option<BTreeMap<String, String>> = table.raw_get("tags")?;
+        let tags: Option<MetricTags> = table.raw_get("tags")?;
         let kind = table
             .raw_get::<_, Option<MetricKind>>("kind")?
             .unwrap_or(MetricKind::Absolute);
@@ -257,7 +322,7 @@ impl<'a> FromLua<'a> for Metric {
                     return Err(LuaError::FromLuaConversionError {
                         from: value.type_name(),
                         to: "Metric",
-                        message: Some(format!("Invalid sketch type '{}' given", x)),
+                        message: Some(format!("Invalid sketch type '{x}' given")),
                     })
                 }
             }
@@ -279,14 +344,23 @@ impl<'a> FromLua<'a> for Metric {
 
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, Utc};
+    use chrono::{offset::TimeZone, Timelike, Utc};
     use vector_common::assert_event_data_eq;
 
     use super::*;
 
-    fn assert_metric(metric: Metric, assertions: Vec<&'static str>) {
+    fn assert_metric(metric: Metric, multi_value_tags: bool, assertions: Vec<&'static str>) {
         let lua = Lua::new();
-        lua.globals().set("metric", metric).unwrap();
+        lua.globals()
+            .set(
+                "metric",
+                LuaMetric {
+                    metric,
+                    multi_value_tags,
+                },
+            )
+            .unwrap();
+
         for assertion in assertions {
             assert!(
                 lua.load(assertion).eval::<bool>().expect(assertion),
@@ -297,41 +371,93 @@ mod test {
     }
 
     #[test]
-    fn to_lua_counter_full() {
+    fn into_lua_counter_full() {
         let metric = Metric::new(
             "example counter",
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         )
         .with_namespace(Some("namespace_example"))
-        .with_tags(Some(
-            vec![("example tag".to_string(), "example value".to_string())]
-                .into_iter()
-                .collect(),
-        ))
-        .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)));
-        let assertions = vec![
-            "type(metric) == 'table'",
-            "metric.name == 'example counter'",
-            "metric.namespace == 'namespace_example'",
-            "type(metric.timestamp) == 'table'",
-            "metric.timestamp.year == 2018",
-            "metric.timestamp.month == 11",
-            "metric.timestamp.day == 14",
-            "metric.timestamp.hour == 8",
-            "metric.timestamp.min == 9",
-            "metric.timestamp.sec == 10",
-            "type(metric.tags) == 'table'",
-            "metric.tags['example tag'] == 'example value'",
-            "metric.kind == 'incremental'",
-            "type(metric.counter) == 'table'",
-            "metric.counter.value == 1",
-        ];
-        assert_metric(metric, assertions);
+        .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
+        .with_timestamp(Some(
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .and_then(|t| t.with_nanosecond(11))
+                .expect("invalid timestamp"),
+        ));
+
+        assert_metric(
+            metric.clone(),
+            false,
+            vec![
+                "type(metric) == 'table'",
+                "metric.name == 'example counter'",
+                "metric.namespace == 'namespace_example'",
+                "type(metric.timestamp) == 'table'",
+                "metric.timestamp.year == 2018",
+                "metric.timestamp.month == 11",
+                "metric.timestamp.day == 14",
+                "metric.timestamp.hour == 8",
+                "metric.timestamp.min == 9",
+                "metric.timestamp.sec == 10",
+                "type(metric.tags) == 'table'",
+                "metric.tags['example tag'] == 'example value'",
+                "metric.kind == 'incremental'",
+                "type(metric.counter) == 'table'",
+                "metric.counter.value == 1",
+            ],
+        );
+        assert_metric(
+            metric,
+            true,
+            vec![
+                "type(metric) == 'table'",
+                "metric.name == 'example counter'",
+                "metric.namespace == 'namespace_example'",
+                "type(metric.timestamp) == 'table'",
+                "metric.timestamp.year == 2018",
+                "metric.timestamp.month == 11",
+                "metric.timestamp.day == 14",
+                "metric.timestamp.hour == 8",
+                "metric.timestamp.min == 9",
+                "metric.timestamp.sec == 10",
+                "type(metric.tags) == 'table'",
+                "metric.tags['example tag'][1] == 'example value'",
+                "metric.kind == 'incremental'",
+                "type(metric.counter) == 'table'",
+                "metric.counter.value == 1",
+            ],
+        );
     }
 
     #[test]
-    fn to_lua_counter_minimal() {
+    fn read_multi_value_tag() {
+        let metric = Metric::new(
+            "example counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(BTreeMap::from([(
+            "example tag".to_string(),
+            TagValueSet::from(vec![
+                TagValue::from("a".to_string()),
+                TagValue::from("b".to_string()),
+            ]),
+        )]))));
+
+        assert_metric(
+            metric,
+            true,
+            vec![
+                "type(metric.tags) == 'table'",
+                "metric.tags['example tag'][1] == 'a'",
+                "metric.tags['example tag'][2] == 'b'",
+            ],
+        );
+    }
+
+    #[test]
+    fn into_lua_counter_minimal() {
         let metric = Metric::new(
             "example counter",
             MetricKind::Absolute,
@@ -339,28 +465,37 @@ mod test {
                 value: 0.577_215_66,
             },
         );
-        let assertions = vec![
-            "metric.timestamp == nil",
-            "metric.tags == nil",
-            "metric.kind == 'absolute'",
-            "metric.counter.value == 0.57721566",
-        ];
-        assert_metric(metric, assertions);
+
+        for multi_value_tags in [false, true] {
+            assert_metric(
+                metric.clone(),
+                multi_value_tags,
+                vec![
+                    "metric.timestamp == nil",
+                    "metric.tags == nil",
+                    "metric.kind == 'absolute'",
+                    "metric.counter.value == 0.57721566",
+                ],
+            );
+        }
     }
 
     #[test]
-    fn to_lua_gauge() {
+    fn into_lua_gauge() {
         let metric = Metric::new(
             "example gauge",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.618_033_9 },
         );
-        let assertions = vec!["metric.gauge.value == 1.6180339", "metric.counter == nil"];
-        assert_metric(metric, assertions);
+        assert_metric(
+            metric,
+            false,
+            vec!["metric.gauge.value == 1.6180339", "metric.counter == nil"],
+        );
     }
 
     #[test]
-    fn to_lua_set() {
+    fn into_lua_set() {
         let metric = Metric::new(
             "example set",
             MetricKind::Incremental,
@@ -370,18 +505,21 @@ mod test {
                     .collect(),
             },
         );
-        let assertions = vec![
-            "type(metric.set) == 'table'",
-            "type(metric.set.values) == 'table'",
-            "#metric.set.values == 2",
-            "metric.set.values[1] == 'another value'",
-            "metric.set.values[2] == 'value'",
-        ];
-        assert_metric(metric, assertions);
+        assert_metric(
+            metric,
+            false,
+            vec![
+                "type(metric.set) == 'table'",
+                "type(metric.set.values) == 'table'",
+                "#metric.set.values == 2",
+                "metric.set.values[1] == 'another value'",
+                "metric.set.values[2] == 'value'",
+            ],
+        );
     }
 
     #[test]
-    fn to_lua_distribution() {
+    fn into_lua_distribution() {
         let metric = Metric::new(
             "example distribution",
             MetricKind::Incremental,
@@ -390,20 +528,23 @@ mod test {
                 statistic: StatisticKind::Histogram,
             },
         );
-        let assertions = vec![
-            "type(metric.distribution) == 'table'",
-            "#metric.distribution.values == 2",
-            "metric.distribution.values[1] == 1",
-            "metric.distribution.values[2] == 1",
-            "#metric.distribution.sample_rates == 2",
-            "metric.distribution.sample_rates[1] == 10",
-            "metric.distribution.sample_rates[2] == 20",
-        ];
-        assert_metric(metric, assertions);
+        assert_metric(
+            metric,
+            false,
+            vec![
+                "type(metric.distribution) == 'table'",
+                "#metric.distribution.values == 2",
+                "metric.distribution.values[1] == 1",
+                "metric.distribution.values[2] == 1",
+                "#metric.distribution.sample_rates == 2",
+                "metric.distribution.sample_rates[1] == 10",
+                "metric.distribution.sample_rates[2] == 20",
+            ],
+        );
     }
 
     #[test]
-    fn to_lua_aggregated_histogram() {
+    fn into_lua_aggregated_histogram() {
         let metric = Metric::new(
             "example histogram",
             MetricKind::Incremental,
@@ -413,22 +554,25 @@ mod test {
                 sum: 975.2,
             },
         );
-        let assertions = vec![
-            "type(metric.aggregated_histogram) == 'table'",
-            "#metric.aggregated_histogram.buckets == 4",
-            "metric.aggregated_histogram.buckets[1] == 1",
-            "metric.aggregated_histogram.buckets[4] == 8",
-            "#metric.aggregated_histogram.counts == 4",
-            "metric.aggregated_histogram.counts[1] == 20",
-            "metric.aggregated_histogram.counts[4] == 12",
-            "metric.aggregated_histogram.count == 87",
-            "metric.aggregated_histogram.sum == 975.2",
-        ];
-        assert_metric(metric, assertions);
+        assert_metric(
+            metric,
+            false,
+            vec![
+                "type(metric.aggregated_histogram) == 'table'",
+                "#metric.aggregated_histogram.buckets == 4",
+                "metric.aggregated_histogram.buckets[1] == 1",
+                "metric.aggregated_histogram.buckets[4] == 8",
+                "#metric.aggregated_histogram.counts == 4",
+                "metric.aggregated_histogram.counts[1] == 20",
+                "metric.aggregated_histogram.counts[4] == 12",
+                "metric.aggregated_histogram.count == 87",
+                "metric.aggregated_histogram.sum == 975.2",
+            ],
+        );
     }
 
     #[test]
-    fn to_lua_aggregated_summary() {
+    fn into_lua_aggregated_summary() {
         let metric = Metric::new(
             "example summary",
             MetricKind::Incremental,
@@ -440,16 +584,20 @@ mod test {
                 sum: 975.2,
             },
         );
-        let assertions = vec![
-            "type(metric.aggregated_summary) == 'table'",
-            "#metric.aggregated_summary.quantiles == 7",
-            "metric.aggregated_summary.quantiles[2] == 0.25",
-            "#metric.aggregated_summary.values == 7",
-            "metric.aggregated_summary.values[3] == 5",
-            "metric.aggregated_summary.count == 197",
-            "metric.aggregated_summary.sum == 975.2",
-        ];
-        assert_metric(metric, assertions);
+
+        assert_metric(
+            metric,
+            false,
+            vec![
+                "type(metric.aggregated_summary) == 'table'",
+                "#metric.aggregated_summary.quantiles == 7",
+                "metric.aggregated_summary.quantiles[2] == 0.25",
+                "#metric.aggregated_summary.values == 7",
+                "metric.aggregated_summary.values[3] == 5",
+                "metric.aggregated_summary.count == 197",
+                "metric.aggregated_summary.sum == 975.2",
+            ],
+        );
     }
 
     #[test]
@@ -497,12 +645,54 @@ mod test {
             MetricValue::Counter { value: 1.0 },
         )
         .with_namespace(Some("example_namespace"))
-        .with_tags(Some(
-            vec![("example tag".to_string(), "example value".to_string())]
-                .into_iter()
-                .collect(),
-        ))
-        .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)));
+        .with_tags(Some(crate::metric_tags!("example tag" => "example value")))
+        .with_timestamp(Some(
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .expect("invalid timestamp"),
+        ));
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
+    }
+
+    #[test]
+    fn set_multi_valued_tags() {
+        let value = r#"{
+            name = "example counter",
+            namespace = "example_namespace",
+            timestamp = {
+                year = 2018,
+                month = 11,
+                day = 14,
+                hour = 8,
+                min = 9,
+                sec = 10
+            },
+            tags = {
+                ["example tag"] = {"a", "b"}
+            },
+            kind = "incremental",
+            counter = {
+                value = 1
+            }
+        }"#;
+        let expected = Metric::new(
+            "example counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_namespace(Some("example_namespace"))
+        .with_tags(Some(MetricTags(BTreeMap::from([(
+            "example tag".to_string(),
+            TagValueSet::from(vec![
+                TagValue::from("a".to_string()),
+                TagValue::from("b".to_string()),
+            ]),
+        )]))))
+        .with_timestamp(Some(
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .expect("invalid timestamp"),
+        ));
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 

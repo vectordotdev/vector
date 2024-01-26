@@ -37,9 +37,9 @@ experimental or breaking changes.
 
 ### Stable channel
 
-* Go to our [Github repository] and click the "watch" button in the top right.
+* Go to our [GitHub repository] and click the "watch" button in the top right.
   Click "Custom" and then "Releases" to only be notified for new releases.
-  See the [Github subscription docs] for more info.
+  See the [GitHub subscription docs] for more info.
 * Subscribe to the [Vector public calendar], release events are added.
 * Follow [@vectordotdev] on Twitter.
 * Head to our [chat], watch the `#announcements` channel, and configure
@@ -92,7 +92,7 @@ Otherwise, the stable release is your best bet.
 [download page]: https://vector.dev/download/
 [nightly artifact list]: https://packages.timber.io/vector/nightly/
 [@vectordotdev]: https://twitter.com/vectordotdev
-[Github repository]: https://github.com/vectordotdev/vector
-[Github subscription docs]: https://docs.github.com/en/github/managing-subscriptions-and-notifications-on-github/managing-subscriptions-for-activity-on-github/viewing-your-subscriptions
+[GitHub repository]: https://github.com/vectordotdev/vector
+[GitHub subscription docs]: https://docs.github.com/en/github/managing-subscriptions-and-notifications-on-github/managing-subscriptions-for-activity-on-github/viewing-your-subscriptions
 [`master` branch]: https://github.com/vectordotdev/vector/tree/master
 [versioning policy]: https://github.com/vectordotdev/vector/blob/master/VERSIONING.md

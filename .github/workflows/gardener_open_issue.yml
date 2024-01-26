@@ -1,0 +1,17 @@
+# Add new issues Gardener project board for triage
+name: Add issue to Gardener board
+
+on:
+  issues:
+    types:
+      - opened
+
+jobs:
+  add-to-project:
+    name: Add issue to Gardener project board
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: https://github.com/orgs/vectordotdev/projects/49
+          github-token: ${{ secrets.GH_PROJECT_PAT }}

@@ -9,12 +9,13 @@ components: sources: aws_kinesis_firehose: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		stateful:      false
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {
@@ -57,61 +58,7 @@ components: sources: aws_kinesis_firehose: {
 		platform_name: null
 	}
 
-	configuration: {
-		address: {
-			description: "The address to listen for connections on"
-			required:    true
-			type: string: {
-				examples: ["0.0.0.0:443", "localhost:443"]
-			}
-		}
-		access_key: {
-			common: true
-			description: """
-				AWS Kinesis Firehose can be configured to pass along an access
-				key to authenticate requests. If configured, `access_key` should
-				be set to the same value. If not specified, vector will treat
-				all requests as authenticated.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["A94A8FE5CCB19BA61C4C08"]
-			}
-		}
-		acknowledgements: configuration._source_acknowledgements
-		record_compression: {
-			common:      true
-			description: """
-				The compression of records within the Firehose message.
-
-				Some services, like AWS CloudWatch Logs, will [compress the events with
-				gzip](\(urls.aws_cloudwatch_logs_firehose)), before sending them AWS Kinesis Firehose. This option
-				can be used to automatically decompress them before forwarding them to the next component.
-
-				Note that this is different from [Content encoding option](\(urls.aws_kinesis_firehose_http_protocol))
-				of the Firehose HTTP endpoint destination. That option controls the content encoding of the entire HTTP
-				request.
-				"""
-			required:    false
-			type: string: {
-				default: "text"
-				enum: {
-					auto: """
-					Vector will try to determine the compression format of the object by looking at its file signature,
-					also known as [magic bytes](\(urls.magic_bytes)).
-
-					Given that determining the encoding using magic bytes is not a perfect check, if the record fails to
-					decompress with the discovered format, the record will be forwarded as-is. Thus, if you know the
-					records will always be gzip encoded (for example if they are coming from AWS CloudWatch Logs) then
-					you should prefer to set `gzip` here to have Vector reject any records that are not-gziped.
-					"""
-					gzip: "GZIP format."
-					none: "Uncompressed."
-				}
-			}
-		}
-	}
+	configuration: base.components.sources.aws_kinesis_firehose.configuration
 
 	output: logs: {
 		line: {
@@ -133,7 +80,7 @@ components: sources: aws_kinesis_firehose: {
 					}
 				}
 				source_arn: {
-					description: "The AWS Kinises Firehose delivery stream that issued the request, value of the `X-Amz-Firehose-Source-Arn` header."
+					description: "The AWS Kinesis Firehose delivery stream that issued the request, value of the `X-Amz-Firehose-Source-Arn` header."
 					required:    true
 					type: string: {
 						examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
@@ -195,7 +142,7 @@ components: sources: aws_kinesis_firehose: {
 				   this source. You will likely also want to use the
 				   [`parse_aws_cloudwatch_log_subscription_message`](\(urls.vrl_functions)/#parse_aws_cloudwatch_log_subscription_message)
 				   function to extract the log events. Make sure to set
-				   the `access_key` to secure this endpoint. Your
+				   the `access_keys` to secure this endpoint. Your
 				   configuration might look something like:
 
 				   ```toml
@@ -203,7 +150,7 @@ components: sources: aws_kinesis_firehose: {
 					# General
 					type = "aws_kinesis_firehose"
 					address = "127.0.0.1:9000"
-					access_key = "secret"
+					access_keys = ["secret"]
 
 					[transforms.cloudwatch]
 					type = "remap"
@@ -213,10 +160,10 @@ components: sources: aws_kinesis_firehose: {
 					parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
 					. = unnest(parsed.log_events)
 					. = map_values(.) -> |value| {
-						event = del(value.log_events)
-						value |= event
-						message = del(.message)
-						. |= object!(parse_json!(message))
+					  event = del(value.log_events)
+					  value |= event
+					  message = string!(del(.message))
+					  merge(value, object!(parse_json!(message)))
 					}
 					'''
 
@@ -226,12 +173,12 @@ components: sources: aws_kinesis_firehose: {
 					encoding.codec = "json"
 				   ```
 
-				2. Create a Kinesis Firewatch delivery stream in the region
+				2. Create a Kinesis Firehose delivery stream in the region
 				   where the CloudWatch Logs groups exist that you want to
 				   ingest.
 				3. Set the stream to forward to your Vector instance via its
 				   HTTP Endpoint destination. Make sure to configure the
-				   same `access_key` you set earlier.
+				   same `access_keys` you set earlier.
 				4. Setup a [CloudWatch Logs
 				   subscription](\(urls.aws_cloudwatch_logs_subscriptions)) to
 				   forward the events to your delivery stream
@@ -240,17 +187,9 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	telemetry: metrics: {
-		component_errors_total:                components.sources.internal_metrics.output.metrics.component_errors_total
-		component_discarded_events_total:      components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_sent_events_total:           components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total:      components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		component_received_bytes_total:        components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:       components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total:  components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		events_in_total:                       components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:                 components.sources.internal_metrics.output.metrics.processed_bytes_total
-		request_read_errors_total:             components.sources.internal_metrics.output.metrics.request_read_errors_total
-		requests_received_total:               components.sources.internal_metrics.output.metrics.requests_received_total
-		request_automatic_decode_errors_total: components.sources.internal_metrics.output.metrics.request_automatic_decode_errors_total
+
+		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
+		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
+		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total
 	}
 }

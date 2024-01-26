@@ -1,1 +1,1 @@
-{"metric":{"name":"w","timestamp":"1969-12-31T22:00:52.000013227Z","kind":"absolute","gauge":{"value":-408320.0}}}
+{"metric":{"name":"z","interval_ms":3004087257,"kind":"incremental","counter":{"value":-364736.0}}}

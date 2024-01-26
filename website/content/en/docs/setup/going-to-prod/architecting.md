@@ -77,7 +77,7 @@ Avoid deploying a single monolith aggregator since it introduces a single point 
 
 #### Using Firewalls & Proxies {#firewalls}
 
-We recommend following our [network security recommendations](/docs/setup/going-to-prod/hardening/#securing-the-network). Restrict agent communication to your aggregators, and restrict aggregator communication to the your configured sources and sinks.
+We recommend following our [network security recommendations](/docs/setup/going-to-prod/hardening/#securing-the-network). Restrict agent communication to your aggregators, and restrict aggregator communication to your configured sources and sinks.
 
 For HTTP proxying, we do not recommend one way or another. However, if you prefer to use a HTTP proxy, Vector offers a global `proxy` option making it easy to route all Vector HTTP traffic through a proxy.
 

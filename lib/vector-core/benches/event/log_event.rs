@@ -6,6 +6,14 @@ use criterion::{
 use lookup::event_path;
 use vector_core::event::LogEvent;
 
+fn default_log_event() -> LogEvent {
+    let mut log_event = LogEvent::default();
+    log_event.insert(event_path!("one"), 1);
+    log_event.insert(event_path!("two"), 2);
+    log_event.insert(event_path!("three"), 3);
+    log_event
+}
+
 fn rename_key_flat(c: &mut Criterion) {
     let mut group: BenchmarkGroup<WallTime> =
         c.benchmark_group("vector_core::event::log_event::LogEvent::rename_key_flat");
@@ -13,13 +21,7 @@ fn rename_key_flat(c: &mut Criterion) {
 
     group.bench_function("rename_flat_key (key is present)", move |b| {
         b.iter_batched(
-            || {
-                let mut log_event = LogEvent::default();
-                log_event.insert("one", 1);
-                log_event.insert("two", 2);
-                log_event.insert("three", 3);
-                log_event
-            },
+            default_log_event,
             |mut log_event| {
                 log_event.rename_key(event_path!("one"), event_path!("1"));
             },
@@ -29,13 +31,7 @@ fn rename_key_flat(c: &mut Criterion) {
 
     group.bench_function("rename_flat_key (key is NOT present)", move |b| {
         b.iter_batched(
-            || {
-                let mut log_event = LogEvent::default();
-                log_event.insert("one", 1);
-                log_event.insert("two", 2);
-                log_event.insert("three", 3);
-                log_event
-            },
+            default_log_event,
             |mut log_event| {
                 log_event.rename_key(event_path!("four"), event_path!("4"));
             },

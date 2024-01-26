@@ -56,7 +56,7 @@ since it includes all structured data.
 
 With the [announcement][vrl_announcement] of the [Vector Remap Language][vrl_reference] (VRL), [pull request #5978][pr_5978]
 _deprecated_ the `check_fields` conditions in favor of using [VRL boolean expressions][vrl_boolean_expression]. The old
-`check_fields` conditions were limiting and suffered from many of the [pitfalls][config_synytax_pitfalls] outlined in
+`check_fields` conditions were limiting and suffered from many of the [pitfalls][config_syntax_pitfalls] outlined in
 the VRL announcement. Configuration languages, like TOML, are bad at expressing boolean conditions and severely
 limited how users could [route][route_transform], [filter][filter_transform], and [reduce][reduce_transform] data.
 
@@ -154,7 +154,7 @@ Adjust as necessary. The above values are the defaults and are not required to b
 [chat]: https://chat.vector.dev
 [coercer_transform]: /docs/reference/vrl/functions/#coerce-functions
 [concat_transform]: /docs/reference/configuration/transforms/remap
-[config_synytax_pitfalls]: /blog/vector-remap-language/#config-languages
+[config_syntax_pitfalls]: /blog/vector-remap-language/#config-languages
 [file_source_highlight]: /highlights/2021-01-31-file-source-checkpointing
 [grok_parser_transform]: /docs/reference/vrl/functions/#parse_grok
 [json_parser_transform]: /docs/reference/vrl/functions/#parse_json

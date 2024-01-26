@@ -11,7 +11,7 @@ releases: "0.19.0": {
 				We are in the process of replacing our current disk buffer
 				implementation, which leverages LevelDB in a way that doesn't
 				quite match common LevelDB use-cases, with a custom
-				implementaion specific to Vector's needs. The end result is
+				implementation specific to Vector's needs. The end result is
 				faster disk buffers.
 				"""
 		},
@@ -93,7 +93,7 @@ releases: "0.19.0": {
 			type: "enhancement"
 			scopes: ["influxdb_logs sink"]
 			description: """
-				A couple of enhancments have been made to the `influxdb_logs`
+				A couple of enhancements have been made to the `influxdb_logs`
 				sink to modify how Vector encodes events.
 
 				A `measurement` config field was added to allow overriding the
@@ -264,7 +264,7 @@ releases: "0.19.0": {
 			scopes: ["elasticsearch sink"]
 			description: """
 				A new config option has been added to the `elasticsearch` sink
-				to allow supressing the `type` field from being sent by Vector.
+				to allow suppressing the `type` field from being sent by Vector.
 				This field is deprecated in Elasticsearch v7 and will be removed
 				in v8.
 				"""
@@ -336,7 +336,7 @@ releases: "0.19.0": {
 				The `max_length` option available on some `decoding` framers for
 				sources previously caused Vector to stop decoding a given input
 				stream (like a TCP connection) when a frame that was too big was
-				encountered. It now corretly just discards that frame and
+				encountered. It now correctly just discards that frame and
 				continues.
 				"""
 			pr_numbers: [10568]

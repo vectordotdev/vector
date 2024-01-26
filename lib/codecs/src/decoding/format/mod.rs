@@ -3,31 +3,36 @@
 
 #![deny(missing_docs)]
 
+mod avro;
 mod bytes;
 mod gelf;
 mod json;
 mod native;
 mod native_json;
+mod protobuf;
 #[cfg(feature = "syslog")]
 mod syslog;
 
 use ::bytes::Bytes;
+pub use avro::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
 use dyn_clone::DynClone;
-pub use gelf::{GelfDeserializer, GelfDeserializerConfig};
-pub use json::{JsonDeserializer, JsonDeserializerConfig};
+pub use gelf::{GelfDeserializer, GelfDeserializerConfig, GelfDeserializerOptions};
+pub use json::{JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions};
 pub use native::{NativeDeserializer, NativeDeserializerConfig};
-pub use native_json::{NativeJsonDeserializer, NativeJsonDeserializerConfig};
+pub use native_json::{
+    NativeJsonDeserializer, NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,
+};
+pub use protobuf::{ProtobufDeserializer, ProtobufDeserializerConfig, ProtobufDeserializerOptions};
 use smallvec::SmallVec;
-use std::fmt::Debug;
+#[cfg(feature = "syslog")]
+pub use syslog::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
 use vector_core::config::LogNamespace;
 use vector_core::event::Event;
 
 pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
-#[cfg(feature = "syslog")]
-pub use self::syslog::{SyslogDeserializer, SyslogDeserializerConfig};
 
 /// Parse structured events from bytes.
-pub trait Deserializer: DynClone + Debug + Send + Sync {
+pub trait Deserializer: DynClone + Send + Sync {
     /// Parses structured events from bytes.
     ///
     /// It returns a `SmallVec` rather than an `Event` directly, since one byte
@@ -45,3 +50,8 @@ dyn_clone::clone_trait_object!(Deserializer);
 
 /// A `Box` containing a `Deserializer`.
 pub type BoxedDeserializer = Box<dyn Deserializer>;
+
+/// Default value for the UTF-8 lossy option.
+const fn default_lossy() -> bool {
+    true
+}

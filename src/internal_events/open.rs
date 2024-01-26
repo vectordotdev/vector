@@ -7,7 +7,7 @@ use std::{
 };
 
 use metrics::gauge;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct ConnectionOpen {
@@ -53,7 +53,7 @@ impl OpenGauge {
         }
     }
 
-    #[cfg(all(feature = "sources-utils-unix", unix))]
+    #[cfg(all(feature = "sources-utils-net-unix", unix))]
     pub fn any_open(&self) -> bool {
         self.gauge.load(Ordering::Acquire) != 0
     }

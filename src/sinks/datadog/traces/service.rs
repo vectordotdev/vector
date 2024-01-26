@@ -9,11 +9,9 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    internal_event::CountByteSize,
-    stream::DriverResponse,
-};
+use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::stream::DriverResponse;
 
 use crate::{
     http::{BuildRequestSnafu, CallRequestSnafu, HttpClient, HttpError},
@@ -55,12 +53,12 @@ impl RetryLogic for TraceApiRetry {
 
 #[derive(Debug, Clone)]
 pub struct TraceApiRequest {
-    pub batch_size: usize,
     pub body: Bytes,
     pub headers: BTreeMap<String, String>,
     pub finalizers: EventFinalizers,
     pub uri: Uri,
     pub uncompressed_size: usize,
+    pub metadata: RequestMetadata,
 }
 
 impl TraceApiRequest {
@@ -79,14 +77,22 @@ impl Finalizable for TraceApiRequest {
     }
 }
 
+impl MetaDescriptive for TraceApiRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.metadata
+    }
+}
+
 #[derive(Debug)]
 pub struct TraceApiResponse {
     status_code: StatusCode,
     body: Bytes,
-    batch_size: usize,
-    byte_size: usize,
+    byte_size: GroupedCountByteSize,
     uncompressed_size: usize,
-    protocol: String,
 }
 
 impl DriverResponse for TraceApiResponse {
@@ -100,12 +106,12 @@ impl DriverResponse for TraceApiResponse {
         }
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.batch_size, self.byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.byte_size
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.uncompressed_size, &self.protocol))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.uncompressed_size)
     }
 }
 
@@ -130,17 +136,18 @@ impl Service<TraceApiRequest> for TraceApiService {
     type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         self.client.poll_ready(cx)
     }
 
-    fn call(&mut self, request: TraceApiRequest) -> Self::Future {
+    // Emission of Error internal event is handled upstream by the caller
+    fn call(&mut self, mut request: TraceApiRequest) -> Self::Future {
         let client = self.client.clone();
-        let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
 
         Box::pin(async move {
-            let byte_size = request.body.len();
-            let batch_size = request.batch_size;
+            let metadata = std::mem::take(request.metadata_mut());
+            let byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let uncompressed_size = request.uncompressed_size;
             let http_request = request.into_http_request().context(BuildRequestSnafu)?;
 
@@ -154,9 +161,7 @@ impl Service<TraceApiRequest> for TraceApiService {
             Ok(TraceApiResponse {
                 status_code: parts.status,
                 body,
-                batch_size,
                 byte_size,
-                protocol,
                 uncompressed_size,
             })
         })

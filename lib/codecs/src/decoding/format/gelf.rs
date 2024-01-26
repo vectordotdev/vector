@@ -1,11 +1,11 @@
 use bytes::Bytes;
-use chrono::{DateTime, NaiveDateTime, Utc};
-use lookup::event_path;
+use chrono::{NaiveDateTime, Utc};
+use derivative::Derivative;
+use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
-use value::kind::Collection;
-use value::Kind;
+use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{
     config::{log_schema, DataType},
@@ -13,24 +13,42 @@ use vector_core::{
     event::LogEvent,
     schema,
 };
+use vrl::value::kind::Collection;
+use vrl::value::{Kind, Value};
 
-use super::Deserializer;
+use super::{default_lossy, Deserializer};
+use crate::gelf::GELF_TARGET_PATHS;
 use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 
-/// On GELF decoding behavior:
-///   Graylog has a relaxed decoding. They are much more lenient than the spec would
-///   suggest. We've elected to take a more strict approach to maintain backwards compatability
-///   in the event that we need to change the behavior to be more relaxed, so that prior versions
-///   of vector will still work with the new relaxed decoding.
+// On GELF decoding behavior:
+//   Graylog has a relaxed decoding. They are much more lenient than the spec would
+//   suggest. We've elected to take a more strict approach to maintain backwards compatibility
+//   in the event that we need to change the behavior to be more relaxed, so that prior versions
+//   of vector will still work with the new relaxed decoding.
+//
+//   Additionally, Graylog's own GELF Output produces GELF messages with any field names present
+//   in the sending Stream, exceeding the specified field name character set.
 
 /// Config used to build a `GelfDeserializer`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct GelfDeserializerConfig;
+#[configurable_component]
+#[derive(Debug, Clone, Default)]
+pub struct GelfDeserializerConfig {
+    /// GELF-specific decoding options.
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    pub gelf: GelfDeserializerOptions,
+}
 
 impl GelfDeserializerConfig {
+    /// Creates a new `GelfDeserializerConfig`.
+    pub fn new(options: GelfDeserializerOptions) -> Self {
+        Self { gelf: options }
+    }
+
     /// Build the `GelfDeserializer` from this configuration.
     pub fn build(&self) -> GelfDeserializer {
-        GelfDeserializer::default()
+        GelfDeserializer {
+            lossy: self.gelf.lossy,
+        }
     }
 
     /// Return the type of event built by this deserializer.
@@ -44,15 +62,15 @@ impl GelfDeserializerConfig {
             Kind::object(Collection::empty()),
             [log_namespace],
         )
-        .with_field(VERSION, Kind::bytes(), None)
-        .with_field(HOST, Kind::bytes(), None)
-        .with_field(SHORT_MESSAGE, Kind::bytes(), None)
-        .optional_field(FULL_MESSAGE, Kind::bytes(), None)
-        .optional_field(TIMESTAMP, Kind::timestamp(), None)
-        .optional_field(LEVEL, Kind::integer(), None)
-        .optional_field(FACILITY, Kind::bytes(), None)
-        .optional_field(LINE, Kind::integer(), None)
-        .optional_field(FILE, Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(VERSION), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(HOST), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(SHORT_MESSAGE), Kind::bytes(), None)
+        .optional_field(&owned_value_path!(FULL_MESSAGE), Kind::bytes(), None)
+        .optional_field(&owned_value_path!(TIMESTAMP), Kind::timestamp(), None)
+        .optional_field(&owned_value_path!(LEVEL), Kind::integer(), None)
+        .optional_field(&owned_value_path!(FACILITY), Kind::bytes(), None)
+        .optional_field(&owned_value_path!(LINE), Kind::integer(), None)
+        .optional_field(&owned_value_path!(FILE), Kind::bytes(), None)
         // Every field with an underscore (_) prefix will be treated as an additional field.
         // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
         // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
@@ -60,21 +78,36 @@ impl GelfDeserializerConfig {
     }
 }
 
-/// Deserializer that builds an `Event` from a byte frame containing a GELF log
-/// message.
-#[derive(Debug, Clone)]
-pub struct GelfDeserializer;
+/// GELF-specific decoding options.
+#[configurable_component]
+#[derive(Debug, Clone, PartialEq, Eq, Derivative)]
+#[derivative(Default)]
+pub struct GelfDeserializerOptions {
+    /// Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+    ///
+    /// When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+    ///
+    /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+    #[serde(
+        default = "default_lossy",
+        skip_serializing_if = "vector_core::serde::is_default"
+    )]
+    #[derivative(Default(value = "default_lossy()"))]
+    pub lossy: bool,
+}
 
-impl Default for GelfDeserializer {
-    fn default() -> Self {
-        Self::new()
-    }
+/// Deserializer that builds an `Event` from a byte frame containing a GELF log message.
+#[derive(Debug, Clone, Derivative)]
+#[derivative(Default)]
+pub struct GelfDeserializer {
+    #[derivative(Default(value = "default_lossy()"))]
+    lossy: bool,
 }
 
 impl GelfDeserializer {
-    /// Create a new GelfDeserializer
-    pub fn new() -> GelfDeserializer {
-        GelfDeserializer
+    /// Create a new `GelfDeserializer`.
+    pub fn new(lossy: bool) -> GelfDeserializer {
+        GelfDeserializer { lossy }
     }
 
     /// Builds a LogEvent from the parsed GelfMessage.
@@ -91,43 +124,41 @@ impl GelfDeserializer {
             .into());
         }
 
-        log.insert(VERSION, parsed.version.to_string());
-        log.insert(HOST, parsed.host.to_string());
+        log.insert(&GELF_TARGET_PATHS.version, parsed.version.to_string());
+        log.insert(&GELF_TARGET_PATHS.host, parsed.host.to_string());
 
         if let Some(full_message) = &parsed.full_message {
-            log.insert(FULL_MESSAGE, full_message.to_string());
+            log.insert(&GELF_TARGET_PATHS.full_message, full_message.to_string());
         }
 
-        if let Some(timestamp) = parsed.timestamp {
-            let naive = NaiveDateTime::from_timestamp(
-                f64::trunc(timestamp) as i64,
-                f64::fract(timestamp) as u32,
-            );
-            log.insert(
-                log_schema().timestamp_key(),
-                DateTime::<Utc>::from_utc(naive, Utc),
-            );
-        // per GELF spec- add timestamp if not provided
-        } else {
-            log.insert(log_schema().timestamp_key(), Utc::now());
+        if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+            if let Some(timestamp) = parsed.timestamp {
+                let naive = NaiveDateTime::from_timestamp_opt(
+                    f64::trunc(timestamp) as i64,
+                    f64::fract(timestamp) as u32,
+                )
+                .expect("invalid timestamp");
+                log.insert(timestamp_key, naive.and_utc());
+                // per GELF spec- add timestamp if not provided
+            } else {
+                log.insert(timestamp_key, Utc::now());
+            }
         }
 
         if let Some(level) = parsed.level {
-            log.insert(LEVEL, level);
+            log.insert(&GELF_TARGET_PATHS.level, level);
         }
         if let Some(facility) = &parsed.facility {
-            log.insert(FACILITY, facility.to_string());
+            log.insert(&GELF_TARGET_PATHS.facility, facility.to_string());
         }
         if let Some(line) = parsed.line {
             log.insert(
-                LINE,
-                value::Value::Float(
-                    ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs"),
-                ),
+                &GELF_TARGET_PATHS.line,
+                Value::Float(ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs")),
             );
         }
         if let Some(file) = &parsed.file {
-            log.insert(FILE, file.to_string());
+            log.insert(&GELF_TARGET_PATHS.file, file.to_string());
         }
 
         if let Some(add) = &parsed.additional_fields {
@@ -153,7 +184,7 @@ impl GelfDeserializer {
 
                 // per GELF spec, Additional field values must be either strings or numbers
                 if val.is_string() || val.is_number() {
-                    let vector_val: value::Value = val.into();
+                    let vector_val: Value = val.into();
                     log.insert(event_path!(key.as_str()), vector_val);
                 } else {
                     let type_ = match val {
@@ -194,10 +225,10 @@ impl Deserializer for GelfDeserializer {
         bytes: Bytes,
         _log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let line = std::str::from_utf8(&bytes)?;
-        let line = line.trim();
-
-        let parsed: GelfMessage = serde_json::from_str(line)?;
+        let parsed: GelfMessage = match self.lossy {
+            true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
+            false => serde_json::from_slice(&bytes),
+        }?;
         let event = self.message_to_event(&parsed)?;
 
         Ok(smallvec![event])
@@ -208,18 +239,18 @@ impl Deserializer for GelfDeserializer {
 mod tests {
     use super::*;
     use bytes::Bytes;
-    use chrono::{DateTime, NaiveDateTime, Utc};
+    use chrono::NaiveDateTime;
     use lookup::event_path;
-    use pretty_assertions::assert_eq;
     use serde_json::json;
+    use similar_asserts::assert_eq;
     use smallvec::SmallVec;
-    use value::Value;
     use vector_core::{config::log_schema, event::Event};
+    use vrl::value::Value;
 
     fn deserialize_gelf_input(
         input: &serde_json::Value,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let config = GelfDeserializerConfig;
+        let config = GelfDeserializerConfig::default();
         let deserializer = config.build();
         let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());
         deserializer.parse(buffer, LogNamespace::Legacy)
@@ -260,7 +291,7 @@ mod tests {
             Some(&Value::Bytes(Bytes::from_static(b"example.org")))
         );
         assert_eq!(
-            log.get(log_schema().message_key()),
+            log.get(log_schema().message_key_target_path().unwrap()),
             Some(&Value::Bytes(Bytes::from_static(
                 b"A short message that helps you identify what is going on"
             )))
@@ -272,11 +303,8 @@ mod tests {
             )))
         );
         // Vector does not use the nanos
-        let naive = NaiveDateTime::from_timestamp(1385053862, 0);
-        assert_eq!(
-            log.get(TIMESTAMP),
-            Some(&Value::Timestamp(DateTime::<Utc>::from_utc(naive, Utc)))
-        );
+        let naive = NaiveDateTime::from_timestamp_opt(1385053862, 0).expect("invalid timestamp");
+        assert_eq!(log.get(TIMESTAMP), Some(&Value::Timestamp(naive.and_utc())));
         assert_eq!(log.get(LEVEL), Some(&Value::Integer(1)));
         assert_eq!(
             log.get(FACILITY),
@@ -302,7 +330,7 @@ mod tests {
         );
     }
 
-    /// Validates deserializiation succeeds for edge case inputs.
+    /// Validates deserialization succeeds for edge case inputs.
     #[test]
     fn gelf_deserializing_edge_cases() {
         // timestamp is set if omitted from input
@@ -315,7 +343,7 @@ mod tests {
             let events = deserialize_gelf_input(&input).unwrap();
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
-            assert!(log.contains(log_schema().message_key()));
+            assert!(log.contains(log_schema().message_key_target_path().unwrap()));
         }
 
         // filter out id
@@ -329,7 +357,7 @@ mod tests {
             let events = deserialize_gelf_input(&input).unwrap();
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
-            assert!(!log.contains("_id"));
+            assert!(!log.contains(event_path!("_id")));
         }
     }
 

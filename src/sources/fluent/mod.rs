@@ -1,22 +1,30 @@
+use std::collections::HashMap;
 use std::io::{self, Read};
 use std::net::SocketAddr;
+use std::time::Duration;
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Buf, Bytes, BytesMut};
-use codecs::StreamDecodingError;
+use chrono::Utc;
 use flate2::read::MultiGzDecoder;
-use lookup::event_path;
-use rmp_serde::{decode, Deserializer};
-use serde::Deserialize;
+use rmp_serde::{decode, Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::parse_value_path;
+use vector_lib::lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
+use vector_lib::schema::Definition;
+use vrl::value::kind::Collection;
+use vrl::value::{Kind, Value};
 
-use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext,
+        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
@@ -29,21 +37,24 @@ mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
 /// Configuration for the `fluent` source.
-#[configurable_component(source("fluent"))]
+#[configurable_component(source("fluent", "Collect logs from a Fluentd or Fluent Bit agent."))]
 #[derive(Clone, Debug)]
 pub struct FluentConfig {
-    /// The address to listen for connections on.
+    #[configurable(derived)]
     address: SocketListenAddr,
 
-    /// The maximum number of TCP connections that will be allowed at any given time.
+    /// The maximum number of TCP connections that are allowed at any given time.
+    #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    /// The size, in bytes, of the receive buffer used for each connection.
+    /// The size of the receive buffer used for each connection.
     ///
-    /// This should not typically needed to be changed.
+    /// This generally should not need to be changed.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
     receive_buffer_bytes: Option<usize>,
 
     #[configurable(derived)]
@@ -51,7 +62,12 @@ pub struct FluentConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
 }
 
 impl GenerateConfig for FluentConfig {
@@ -63,21 +79,25 @@ impl GenerateConfig for FluentConfig {
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
             connection_limit: Some(2),
+            log_namespace: None,
         })
         .unwrap()
     }
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "fluent")]
 impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let source = FluentSource {};
-        let shutdown_secs = 30;
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        let source = FluentSource::new(log_namespace);
+        let shutdown_secs = Duration::from_secs(30);
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
         let tls_client_metadata_key = self
             .tls
             .as_ref()
-            .and_then(|tls| tls.client_metadata_key.clone());
+            .and_then(|tls| tls.client_metadata_key.clone())
+            .and_then(|k| k.path);
         let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
@@ -86,18 +106,24 @@ impl SourceConfig for FluentConfig {
             tls,
             tls_client_metadata_key,
             self.receive_buffer_bytes,
+            None,
             cx,
             self.acknowledgements,
             self.connection_limit,
+            FluentConfig::NAME,
+            log_namespace,
         )
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = self.schema_definition(log_namespace);
+
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![self.address.into()]
+        vec![self.address.as_tcp_resource()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -105,8 +131,89 @@ impl SourceConfig for FluentConfig {
     }
 }
 
+impl FluentConfig {
+    /// Builds the `schema::Definition` for this source using the provided `LogNamespace`.
+    fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
+        // `host_key` is only inserted if not present already.
+        let host_key = log_schema()
+            .host_key()
+            .cloned()
+            .map(LegacyKey::InsertIfEmpty);
+
+        let tag_key = parse_value_path("tag").ok().map(LegacyKey::Overwrite);
+
+        let tls_client_metadata_path = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.as_ref())
+            .and_then(|k| k.path.clone())
+            .map(LegacyKey::Overwrite);
+
+        // There is a global and per-source `log_namespace` config.
+        // The source config overrides the global setting and is merged here.
+        let mut schema_definition = BytesDeserializerConfig
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                FluentConfig::NAME,
+                host_key,
+                &owned_value_path!("host"),
+                Kind::bytes(),
+                Some("host"),
+            )
+            .with_source_metadata(
+                FluentConfig::NAME,
+                tag_key,
+                &owned_value_path!("tag"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                FluentConfig::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            // for metadata that is added to the events dynamically from the FluentRecord
+            .with_source_metadata(
+                FluentConfig::NAME,
+                None,
+                &owned_value_path!("record"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                tls_client_metadata_path,
+                &owned_value_path!("tls_client_metadata"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            );
+
+        // for metadata that is added to the events dynamically
+        if log_namespace == LogNamespace::Legacy {
+            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+        }
+
+        schema_definition
+    }
+}
+
 #[derive(Debug, Clone)]
-struct FluentSource;
+struct FluentSource {
+    log_namespace: LogNamespace,
+    legacy_host_key_path: Option<OwnedValuePath>,
+}
+
+impl FluentSource {
+    fn new(log_namespace: LogNamespace) -> Self {
+        Self {
+            log_namespace,
+            legacy_host_key_path: log_schema().host_key().cloned(),
+        }
+    }
+}
 
 impl TcpSource for FluentSource {
     type Error = DecodeError;
@@ -115,16 +222,25 @@ impl TcpSource for FluentSource {
     type Acker = FluentAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        FluentDecoder::new()
+        FluentDecoder::new(self.log_namespace)
     }
 
     fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
         for event in events {
             let log = event.as_mut_log();
 
-            if !log.contains(log_schema().host_key()) {
-                log.insert(log_schema().host_key(), host.ip().to_string());
-            }
+            let legacy_host_key = self
+                .legacy_host_key_path
+                .as_ref()
+                .map(LegacyKey::InsertIfEmpty);
+
+            self.log_namespace.insert_source_metadata(
+                FluentConfig::NAME,
+                log,
+                legacy_host_key,
+                path!("host"),
+                host.ip().to_string(),
+            );
         }
     }
 
@@ -180,11 +296,13 @@ impl From<decode::Error> for DecodeError {
 }
 
 #[derive(Debug)]
-struct FluentDecoder;
+struct FluentDecoder {
+    log_namespace: LogNamespace,
+}
 
 impl FluentDecoder {
-    const fn new() -> Self {
-        FluentDecoder
+    const fn new(log_namespace: LogNamespace) -> Self {
+        Self { log_namespace }
     }
 
     fn handle_message(
@@ -192,12 +310,15 @@ impl FluentDecoder {
         message: Result<FluentMessage, DecodeError>,
         byte_size: usize,
     ) -> Result<Option<(FluentFrame, usize)>, DecodeError> {
+        let log_namespace = &self.log_namespace;
+
         match message? {
             FluentMessage::Message(tag, timestamp, record) => {
                 let event = Event::from(FluentEvent {
                     tag,
                     timestamp,
                     record,
+                    log_namespace,
                 });
                 let frame = FluentFrame {
                     events: smallvec![event],
@@ -210,6 +331,7 @@ impl FluentDecoder {
                     tag,
                     timestamp,
                     record,
+                    log_namespace,
                 });
                 let frame = FluentFrame {
                     events: smallvec![event],
@@ -225,6 +347,7 @@ impl FluentDecoder {
                             tag: tag.clone(),
                             timestamp,
                             record,
+                            log_namespace,
                         })
                     })
                     .collect();
@@ -242,6 +365,7 @@ impl FluentDecoder {
                             tag: tag.clone(),
                             timestamp,
                             record,
+                            log_namespace,
                         })
                     })
                     .collect();
@@ -262,6 +386,7 @@ impl FluentDecoder {
                         tag: tag.clone(),
                         timestamp,
                         record,
+                        log_namespace,
                     }));
                 }
                 let frame = FluentFrame {
@@ -293,6 +418,7 @@ impl FluentDecoder {
                         tag: tag.clone(),
                         timestamp,
                         record,
+                        log_namespace,
                     }));
                 }
                 let frame = FluentFrame {
@@ -339,7 +465,7 @@ impl Decoder for FluentDecoder {
             src.advance(byte_size);
 
             let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
-                let base64_encoded_message = base64::encode(&src);
+                let base64_encoded_message = BASE64_STANDARD.encode(&src);
                 emit!(FluentMessageDecodeError {
                     error: &error,
                     base64_encoded_message
@@ -408,27 +534,31 @@ impl TcpSourceAcker for FluentAcker {
             return None;
         }
 
-        let mut acks = String::new();
+        let mut buf = Vec::new();
+        let mut ser = Serializer::new(&mut buf);
+        let mut ack_map = HashMap::new();
+
         for chunk in self.chunks {
-            let ack = match ack {
-                TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk),
-                _ => String::from("{}"),
+            ack_map.clear();
+            if let TcpSourceAck::Ack = ack {
+                ack_map.insert("ack", chunk);
             };
-            acks.push_str(&ack);
+            ack_map.serialize(&mut ser).unwrap();
         }
-        Some(acks.into())
+        Some(buf.into())
     }
 }
 
 /// Normalized fluent message.
 #[derive(Debug, PartialEq)]
-struct FluentEvent {
+struct FluentEvent<'a> {
     tag: FluentTag,
     timestamp: FluentTimestamp,
     record: FluentRecord,
+    log_namespace: &'a LogNamespace,
 }
 
-impl From<FluentEvent> for Event {
+impl From<FluentEvent<'_>> for Event {
     fn from(frame: FluentEvent) -> Event {
         LogEvent::from(frame).into()
     }
@@ -445,19 +575,51 @@ impl From<FluentFrame> for SmallVec<[Event; 1]> {
     }
 }
 
-impl From<FluentEvent> for LogEvent {
+impl From<FluentEvent<'_>> for LogEvent {
     fn from(frame: FluentEvent) -> LogEvent {
         let FluentEvent {
             tag,
             timestamp,
             record,
+            log_namespace,
         } = frame;
 
         let mut log = LogEvent::default();
-        log.insert(log_schema().timestamp_key(), timestamp);
-        log.insert("tag", tag);
+
+        log_namespace.insert_vector_metadata(
+            &mut log,
+            log_schema().source_type_key(),
+            path!("source_type"),
+            Bytes::from_static(FluentConfig::NAME.as_bytes()),
+        );
+
+        match log_namespace {
+            LogNamespace::Vector => {
+                log.insert(metadata_path!(FluentConfig::NAME, "timestamp"), timestamp);
+                log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
+            }
+            LogNamespace::Legacy => {
+                log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
+            }
+        }
+
+        log_namespace.insert_source_metadata(
+            FluentConfig::NAME,
+            &mut log,
+            Some(LegacyKey::Overwrite(path!("tag"))),
+            path!("tag"),
+            tag,
+        );
+
         for (key, value) in record.into_iter() {
-            log.insert(event_path!(&key), value);
+            let value: Value = value.into();
+            log_namespace.insert_source_metadata(
+                FluentConfig::NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(key.as_str()))),
+                path!("record", key.as_str()),
+                value,
+            );
         }
         log
     }
@@ -469,14 +631,15 @@ mod tests {
     use chrono::{DateTime, Utc};
     use rmp_serde::Serializer;
     use serde::Serialize;
-    use std::collections::BTreeMap;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use vector_common::assert_event_data_eq;
-    use vector_core::event::Value;
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::lookup::OwnedTargetPath;
+    use vector_lib::schema::Definition;
+    use vrl::value::{kind::Collection, ObjectMap, Value};
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
@@ -496,6 +659,21 @@ mod tests {
     // Encode to array of bytes: https://kawanet.github.io/msgpack-lite/
     // Decode base64: https://toolslick.com/conversion/data/messagepack-to-json
 
+    fn mock_event(name: &str, timestamp: &str) -> Event {
+        Event::Log(LogEvent::from(ObjectMap::from([
+            ("message".into(), Value::from(name)),
+            (
+                log_schema().source_type_key().unwrap().to_string().into(),
+                Value::from(FluentConfig::NAME),
+            ),
+            ("tag".into(), Value::from("tag.name")),
+            (
+                "timestamp".into(),
+                Value::Timestamp(DateTime::parse_from_rfc3339(timestamp).unwrap().into()),
+            ),
+        ])))
+    }
+
     #[test]
     fn decode_message_mode() {
         //[
@@ -508,18 +686,7 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114,
         ];
 
-        let expected = Event::Log(LogEvent::from(BTreeMap::from([
-            (String::from("message"), Value::from("bar")),
-            (String::from("tag"), Value::from("tag.name")),
-            (
-                String::from("timestamp"),
-                Value::Timestamp(
-                    DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                        .unwrap()
-                        .into(),
-                ),
-            ),
-        ])));
+        let expected = mock_event("bar", "2015-09-07T01:23:04Z");
         let got = decode_all(message.clone()).unwrap();
         assert_event_data_eq!(got.0[0], expected);
         assert_eq!(got.1, message.len());
@@ -538,18 +705,7 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114, 129, 164, 115, 105, 122, 101, 1,
         ];
 
-        let expected = Event::Log(LogEvent::from(BTreeMap::from([
-            (String::from("message"), Value::from("bar")),
-            (String::from("tag"), Value::from("tag.name")),
-            (
-                String::from("timestamp"),
-                Value::Timestamp(
-                    DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                        .unwrap()
-                        .into(),
-                ),
-            ),
-        ])));
+        let expected = mock_event("bar", "2015-09-07T01:23:04Z");
         let got = decode_all(message.clone()).unwrap();
         assert_eq!(got.1, message.len());
         assert_event_data_eq!(got.0[0], expected);
@@ -573,44 +729,10 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("foo")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("bar")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("baz")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
+            mock_event("foo", "2015-09-07T01:23:04Z"),
+            mock_event("bar", "2015-09-07T01:23:05Z"),
+            mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
-
         let got = decode_all(message.clone()).unwrap();
 
         assert_eq!(got.1, message.len());
@@ -639,42 +761,9 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("foo")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("bar")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("baz")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
+            mock_event("foo", "2015-09-07T01:23:04Z"),
+            mock_event("bar", "2015-09-07T01:23:05Z"),
+            mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -706,42 +795,9 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("foo")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("bar")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("baz")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
+            mock_event("foo", "2015-09-07T01:23:04Z"),
+            mock_event("bar", "2015-09-07T01:23:05Z"),
+            mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -774,42 +830,9 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("foo")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("bar")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
-                (String::from("message"), Value::from("baz")),
-                (String::from("tag"), Value::from("tag.name")),
-                (
-                    String::from("timestamp"),
-                    Value::Timestamp(
-                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
-                            .unwrap()
-                            .into(),
-                    ),
-                ),
-            ]))),
+            mock_event("foo", "2015-09-07T01:23:04Z"),
+            mock_event("bar", "2015-09-07T01:23:05Z"),
+            mock_event("baz", "2015-09-07T01:23:06Z"),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -823,7 +846,7 @@ mod tests {
     fn decode_all(message: Vec<u8>) -> Result<(SmallVec<[Event; 1]>, usize), DecodeError> {
         let mut buf = BytesMut::from(&message[..]);
 
-        let mut decoder = FluentDecoder::new();
+        let mut decoder = FluentDecoder::new(LogNamespace::default());
 
         let (frame, byte_size) = decoder.decode(&mut buf)?.unwrap();
         Ok((frame.into(), byte_size))
@@ -832,7 +855,7 @@ mod tests {
     #[tokio::test]
     async fn ack_delivered_without_chunk() {
         let (result, output) = check_acknowledgements(EventStatus::Delivered, false).await;
-        assert!(matches!(result, Err(_))); // the `_` inside this error is `Elapsed`
+        assert!(result.is_err()); // the `_` inside this error is `Elapsed`
         assert!(output.is_empty());
     }
 
@@ -840,7 +863,8 @@ mod tests {
     async fn ack_delivered_with_chunk() {
         let (result, output) = check_acknowledgements(EventStatus::Delivered, true).await;
         assert_eq!(result.unwrap().unwrap(), output.len());
-        assert!(output.starts_with(b"{\"ack\":"));
+        let expected: Vec<u8> = vec![0x81, 0xa3, 0x61, 0x63]; // { "ack": ...
+        assert_eq!(output[..expected.len()], expected);
     }
 
     #[tokio::test]
@@ -854,7 +878,8 @@ mod tests {
     async fn ack_failed_with_chunk() {
         let (result, output) = check_acknowledgements(EventStatus::Rejected, true).await;
         assert_eq!(result.unwrap().unwrap(), output.len());
-        assert_eq!(output, &b"{}"[..]);
+        let expected: Vec<u8> = vec![0x80]; // { }
+        assert_eq!(output, expected);
     }
 
     async fn check_acknowledgements(
@@ -872,6 +897,7 @@ mod tests {
             receive_buffer_bytes: None,
             acknowledgements: true.into(),
             connection_limit: None,
+            log_namespace: None,
         }
         .build(SourceContext::new_test(sender, None))
         .await
@@ -911,7 +937,7 @@ mod tests {
         for (tag, value) in fields {
             record.insert((*tag).into(), rmpv::Value::String((*value).into()).into());
         }
-        let chunk = with_chunk.then(|| base64::encode(uuid::Uuid::new_v4().as_bytes()));
+        let chunk = with_chunk.then(|| BASE64_STANDARD.encode(uuid::Uuid::new_v4().as_bytes()));
         let req = FluentMessage::MessageWithOptions(
             tag.into(),
             FluentTimestamp::Unix(Utc::now()),
@@ -925,6 +951,96 @@ mod tests {
         req.serialize(&mut Serializer::new(&mut buf)).unwrap();
         buf
     }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = FluentConfig {
+            address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
+            tls: None,
+            keepalive: None,
+            receive_buffer_bytes: None,
+            acknowledgements: false.into(),
+            connection_limit: None,
+            log_namespace: Some(true),
+        };
+
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_metadata_field(&owned_value_path!("fluent", "tag"), Kind::bytes(), None)
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp"),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "record"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "host"),
+                    Kind::bytes(),
+                    Some("host"),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("fluent", "tls_client_metadata"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                    None,
+                );
+
+        assert_eq!(definitions, Some(expected_definition))
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = FluentConfig {
+            address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
+            tls: None,
+            keepalive: None,
+            receive_buffer_bytes: None,
+            acknowledgements: false.into(),
+            connection_limit: None,
+            log_namespace: None,
+        };
+
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("tag"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!("host"), Kind::bytes(), Some("host"))
+        .unknown_fields(Kind::bytes());
+
+        assert_eq!(definitions, Some(expected_definition))
+    }
 }
 
 #[cfg(all(test, feature = "fluent-integration-tests"))]
@@ -933,7 +1049,7 @@ mod integration_tests {
 
     use futures::Stream;
     use tokio::time::sleep;
-    use vector_core::event::{Event, EventStatus};
+    use vector_lib::event::{Event, EventStatus};
 
     use crate::{
         config::{SourceConfig, SourceContext},
@@ -1121,6 +1237,7 @@ mod integration_tests {
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
+                log_namespace: None,
             }
             .build(SourceContext::new_test(sender, None))
             .await

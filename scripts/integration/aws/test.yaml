@@ -1,0 +1,32 @@
+features:
+- aws-integration-tests
+
+test_filter: ::aws_
+
+env:
+  AWS_ACCESS_KEY_ID: dummy
+  AWS_SECRET_ACCESS_KEY: dummy
+  CLOUDWATCH_ADDRESS: http://mock-localstack:4566
+  EC2_METADATA_ADDRESS: http://mock-ec2-metadata:1338
+  ECS_ADDRESS: http://mock-ecs
+  ELASTICSEARCH_ADDRESS: http://mock-localstack:4566
+  KINESIS_ADDRESS: http://mock-localstack:4566
+  S3_ADDRESS: http://mock-localstack:4566
+  SQS_ADDRESS: http://mock-localstack:4566
+  SNS_ADDRESS: http://mock-localstack:4566
+  WATCHLOGS_ADDRESS: http://mock-watchlogs:6000
+
+matrix:
+  version: [latest]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/aws/**"
+- "src/internal_events/aws_*"
+- "src/sources/aws_*/**"
+- "src/sources/util/**"
+- "src/sinks/aws_*/**"
+- "src/sinks/util/**"
+- "src/transforms/aws_*"
+- "scripts/integration/aws/**"

@@ -436,7 +436,7 @@ and do little for our ability to extend the source in the future.
 
 ## Plan Of Attack
 
-The work with the highest investment/payofff ratio is likely around
+The work with the highest investment/payoff ratio is likely around
 checksumming, so I would suggest we attack that first:
 
 * [ ] Migrate `FileWatcher` to general purpose file wrapper with fingerprinting

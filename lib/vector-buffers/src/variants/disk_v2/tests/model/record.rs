@@ -17,7 +17,7 @@ pub struct EncodeError;
 
 impl fmt::Display for EncodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -28,7 +28,7 @@ pub struct DecodeError;
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -80,7 +80,7 @@ impl fmt::Debug for Record {
             .field("event_count", &self.event_count)
             .field("encoded_len", &self.encoded_len())
             .field("archived_len", &self.archived_len())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

@@ -97,7 +97,7 @@ async fn wait_for_message() {
     )
     .await;
     assert_eq!(events.len(), 2);
-    let event = events.get(0).unwrap().as_log();
+    let event = events.first().unwrap().as_log();
     let msg = event.get("message").unwrap().coerce_to_bytes();
     assert_eq!(msg, "hello world");
     let event = events.get(1).unwrap().as_log();
@@ -146,10 +146,10 @@ async fn wait_for_traces() {
     .await;
 
     assert_eq!(events.len(), 1);
-    let trace = events.get(0).unwrap().as_trace();
+    let trace = events.first().unwrap().as_trace();
     let spans = trace.get("spans").unwrap().as_array().unwrap();
     assert_eq!(spans.len(), 1);
-    let span = spans.get(0).unwrap();
+    let span = spans.first().unwrap();
     assert_eq!(span.get("name"), Some(&Value::from("a_name")));
     assert_eq!(span.get("service"), Some(&Value::from("a_service")));
     assert_eq!(span.get("resource"), Some(&Value::from("a_resource")));
@@ -185,6 +185,8 @@ fn get_simple_trace() -> String {
             ]
         ]
         "#},
-        Utc::now().timestamp_nanos()
+        Utc::now()
+            .timestamp_nanos_opt()
+            .expect("Timestamp out of range")
     )
 }

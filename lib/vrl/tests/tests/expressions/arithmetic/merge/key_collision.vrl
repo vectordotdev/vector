@@ -1,5 +1,0 @@
-# result: {"foo": {"x": "string"}, "foo_type": {"object": {"x": {"bytes": true }}}}
-
-.foo = {"x": 1} | {"x": "string"}
-.foo_type = type_def(.foo)
-.

@@ -24,16 +24,7 @@ components: transforms: filter: {
 		notices: []
 	}
 
-	configuration: {
-		condition: {
-			description: """
-				The condition to be matched against every input event. Only messages that pass the condition are
-				forwarded; messages that don't pass are dropped.
-				"""
-			required: true
-			type: condition: {}
-		}
-	}
+	configuration: base.components.transforms.filter.configuration
 
 	input: {
 		logs: true
@@ -78,8 +69,4 @@ components: transforms: filter: {
 			]
 		},
 	]
-
-	telemetry: metrics: {
-		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
-	}
 }

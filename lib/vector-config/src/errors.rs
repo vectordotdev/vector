@@ -55,4 +55,10 @@ pub enum GenerateError {
         /// than the type name itself.
         map_type: &'static str,
     },
+
+    /// A type tried to modify a schema to be optional, but provided an invalid schema.
+    ///
+    /// In order to make a schema "optional", which implies allowing it to match `null`, it must not
+    /// be a schema reference and it must already have an instance type, or types, defined.
+    InvalidOptionalSchema,
 }

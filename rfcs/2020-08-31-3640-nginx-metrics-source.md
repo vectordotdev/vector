@@ -120,7 +120,7 @@ the likelihood that a user will not be able to ingest metrics from their tools.
 We could not add the source directly to Vector and instead instruct users to run
 Telegraf and point Vector at the exposed Prometheus scrape endpoint. This would
 leverage the already supported [telegraf Nginx input
-plugin](hhttps://github.com/influxdata/telegraf/tree/release-1.15/plugins/inputs/nginx)
+plugin](https://github.com/influxdata/telegraf/tree/release-1.15/plugins/inputs/nginx)
 
 Or someone could use the Prometheus Nginx exporter directly and the `prometheus` sink.
 

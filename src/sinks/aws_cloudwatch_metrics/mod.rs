@@ -1,21 +1,20 @@
+#[cfg(all(test, feature = "aws-cloudwatch-metrics-integration-tests"))]
 mod integration_tests;
+#[cfg(test)]
 mod tests;
 
-use std::collections::BTreeMap;
-
-use aws_sdk_cloudwatch::{
-    error::PutMetricDataError,
-    model::{Dimension, MetricDatum},
-    types::SdkError,
-    Client as CloudwatchClient, Region,
-};
+use aws_config::Region;
+use aws_sdk_cloudwatch::error::SdkError;
+use aws_sdk_cloudwatch::operation::put_metric_data::PutMetricDataError;
+use aws_sdk_cloudwatch::types::{Dimension, MetricDatum};
+use aws_sdk_cloudwatch::Client as CloudwatchClient;
 use aws_smithy_types::DateTime as AwsDateTime;
 use futures::{stream, FutureExt, SinkExt};
 use futures_util::{future, future::BoxFuture};
 use std::task::{Context, Poll};
 use tower::Service;
-use vector_config::configurable_component;
-use vector_core::{sink::VectorSink, ByteSizeOf};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{sink::VectorSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     aws::{
@@ -23,7 +22,7 @@ use crate::{
     },
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     event::{
-        metric::{Metric, MetricValue},
+        metric::{Metric, MetricTags, MetricValue},
         Event,
     },
     sinks::util::{
@@ -36,6 +35,8 @@ use crate::{
     tls::TlsConfig,
 };
 
+use super::util::service::TowerRequestConfigDefaults;
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CloudWatchMetricsDefaultBatchSettings;
 
@@ -45,16 +46,29 @@ impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct CloudWatchMetricsTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for CloudWatchMetricsTowerRequestConfigDefaults {
+    const RATE_LIMIT_NUM: u64 = 150;
+}
+
 /// Configuration for the `aws_cloudwatch_metrics` sink.
-#[configurable_component(sink("aws_cloudwatch_metrics"))]
+#[configurable_component(sink(
+    "aws_cloudwatch_metrics",
+    "Publish metric events to AWS CloudWatch Metrics."
+))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CloudWatchMetricsSinkConfig {
-    /// The default namespace to use for metrics that do not have one.
+    /// The default [namespace][namespace] to use for metrics that do not have one.
     ///
     /// Metrics with the same name can only be differentiated by their namespace, and not all
     /// metrics have their own namespace.
+    ///
+    /// [namespace]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace
     #[serde(alias = "namespace")]
+    #[configurable(metadata(docs::examples = "service"))]
     pub default_namespace: String,
 
     /// The [AWS region][aws_region] of the target service.
@@ -73,7 +87,7 @@ pub struct CloudWatchMetricsSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<CloudWatchMetricsTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -82,6 +96,7 @@ pub struct CloudWatchMetricsSinkConfig {
     ///
     /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     assume_role: Option<String>,
 
     #[configurable(derived)]
@@ -92,7 +107,7 @@ pub struct CloudWatchMetricsSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -102,20 +117,15 @@ impl_generate_config_from_default!(CloudWatchMetricsSinkConfig);
 struct CloudwatchMetricsClientBuilder;
 
 impl ClientBuilder for CloudwatchMetricsClientBuilder {
-    type Config = aws_sdk_cloudwatch::config::Config;
     type Client = aws_sdk_cloudwatch::client::Client;
-    type DefaultMiddleware = aws_sdk_cloudwatch::middleware::DefaultMiddleware;
 
-    fn default_middleware() -> Self::DefaultMiddleware {
-        aws_sdk_cloudwatch::middleware::DefaultMiddleware::new()
-    }
-
-    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
-        aws_sdk_cloudwatch::client::Client::with_config(client, config.into())
+    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_cloudwatch::client::Client::new(config)
     }
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
     async fn build(
         &self,
@@ -164,10 +174,9 @@ impl CloudWatchMetricsSinkConfig {
         create_client::<CloudwatchMetricsClientBuilder>(
             &self.auth,
             region,
-            self.region.endpoint()?,
+            self.region.endpoint(),
             proxy,
             &self.tls,
-            true,
         )
         .await
     }
@@ -197,10 +206,10 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
     }
 }
 
-fn tags_to_dimensions(tags: &BTreeMap<String, String>) -> Vec<Dimension> {
-    // according to the API, up to 10 dimensions per metric can be provided
-    tags.iter()
-        .take(10)
+fn tags_to_dimensions(tags: &MetricTags) -> Vec<Dimension> {
+    // according to the API, up to 30 dimensions per metric can be provided
+    tags.iter_single()
+        .take(30)
         .map(|(k, v)| Dimension::builder().name(k).value(v).build())
         .collect()
 }
@@ -217,11 +226,7 @@ impl CloudWatchMetricsSvc {
     ) -> crate::Result<VectorSink> {
         let default_namespace = config.default_namespace.clone();
         let batch = config.batch.into_batch_settings()?;
-        let request_settings = config.request.unwrap_with(&TowerRequestConfig {
-            timeout_secs: Some(30),
-            rate_limit_num: Some(150),
-            ..Default::default()
-        });
+        let request_settings = config.request.into_settings();
 
         let service = CloudWatchMetricsSvc { client };
         let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
@@ -232,7 +237,8 @@ impl CloudWatchMetricsSvc {
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
                 stream::iter({
-                    let byte_size = event.size_of();
+                    let byte_size = event.allocated_bytes();
+                    let json_byte_size = event.estimated_json_encoded_size_of();
                     normalizer.normalize(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
@@ -241,11 +247,13 @@ impl CloudWatchMetricsSvc {
                         Ok(EncodedEvent::new(
                             PartitionInnerBuffer::new(metric, namespace),
                             byte_size,
+                            json_byte_size,
                         ))
                     })
                 })
             });
 
+        #[allow(deprecated)]
         Ok(VectorSink::from_event_sink(sink))
     }
 
@@ -308,15 +316,13 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
     type Error = SdkError<PutMetricDataError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of an internal event in case of errors is handled upstream by the caller.
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        // Emission of Error internal event is handled upstream by the caller
-
         Poll::Ready(Ok(()))
     }
 
+    // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, items: PartitionInnerBuffer<Vec<Metric>, String>) -> Self::Future {
-        // Emission of Error internal event is handled upstream by the caller
-
         let (items, namespace) = items.into_parts();
         let metric_data = self.encode_events(items);
         if metric_data.is_empty() {

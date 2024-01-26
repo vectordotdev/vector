@@ -13,7 +13,7 @@ upgrading, and so on.
 
 Additionally, we did not change the on-disk format for `disk_v2` between 0.20.0 and now, so we
 should also be able to create a `disk_v2` buffer with 0.20.0 and continue using it as a `disk`
-buffer withj a binary built from this PR.
+buffer with a binary built from this PR.
 
 ## Plan
 

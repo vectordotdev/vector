@@ -75,7 +75,7 @@ impl Framework {
     }
 
     /// Initialize port forward for a particular `resource` in a particular
-    /// `namespace` with a partucular pair of local/resource ports.
+    /// `namespace` with a particular pair of local/resource ports.
     pub fn port_forward(
         &self,
         namespace: &str,

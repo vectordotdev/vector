@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -15,6 +16,7 @@ use std::{
     task::{ready, Context, Poll},
 };
 
+use chrono::{SubsecRound, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::{stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
@@ -33,14 +35,17 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_buffers::topology::channel::LimitedReceiver;
-use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
+use vector_lib::event::{BatchNotifier, Event, EventArray, LogEvent, MetricTags, MetricValue};
+use vector_lib::{
+    buffers::topology::channel::LimitedReceiver,
+    event::{Metric, MetricKind},
+};
 #[cfg(test)]
 use zstd::Decoder as ZstdDecoder;
 
 use crate::{
-    config::{Config, ConfigDiff, GenerateConfig},
-    topology::{self, RunningTopology},
+    config::{Config, GenerateConfig},
+    topology::{RunningTopology, ShutdownErrorReceiver},
     trace,
 };
 
@@ -91,8 +96,10 @@ pub fn test_generate_config<T>()
 where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
 {
-    let cfg = T::generate_config().to_string();
-    toml::from_str::<T>(&cfg).expect("Invalid config generated");
+    let cfg = toml::to_string(&T::generate_config()).unwrap();
+
+    toml::from_str::<T>(&cfg)
+        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{}\n'{}'", e, cfg));
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
@@ -110,16 +117,19 @@ pub fn next_addr_for_ip(ip: IpAddr) -> SocketAddr {
 }
 
 pub fn next_addr() -> SocketAddr {
-    next_addr_for_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
+    next_addr_for_ip(IpAddr::V4(Ipv4Addr::LOCALHOST))
 }
 
 pub fn next_addr_v6() -> SocketAddr {
-    next_addr_for_ip(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)))
+    next_addr_for_ip(IpAddr::V6(Ipv6Addr::LOCALHOST))
 }
 
 pub fn trace_init() {
     #[cfg(unix)]
-    let color = atty::is(atty::Stream::Stdout);
+    let color = {
+        use std::io::IsTerminal;
+        std::io::stdout().is_terminal()
+    };
     // Windows: ANSI colors are not supported by cmd.exe
     // Color is false for everything except unix.
     #[cfg(not(unix))]
@@ -130,12 +140,7 @@ pub fn trace_init() {
     trace::init(color, false, &levels, 10);
 
     // Initialize metrics as well
-    if let Err(error) = vector_core::metrics::init_test() {
-        // Handle multiple initializations.
-        if error != vector_core::metrics::Error::AlreadyInitialized {
-            panic!("Failed to initialize metrics recorder: {:?}", error);
-        }
-    }
+    vector_lib::metrics::init_test();
 }
 
 pub async fn send_lines(
@@ -276,6 +281,35 @@ pub fn generate_events_with_stream<Gen: FnMut(usize) -> Event>(
     (events, stream)
 }
 
+pub fn random_metrics_with_stream(
+    count: usize,
+    batch: Option<BatchNotifier>,
+    tags: Option<MetricTags>,
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
+    let timestamp = Utc::now().trunc_subsecs(3);
+    let events: Vec<_> = (0..count)
+        .map(|index| {
+            let ts = timestamp + (std::time::Duration::from_secs(2) * index as u32);
+            Event::Metric(
+                Metric::new(
+                    format!("counter_{}", thread_rng().gen::<u32>()),
+                    MetricKind::Incremental,
+                    MetricValue::Counter {
+                        value: index as f64,
+                    },
+                )
+                .with_timestamp(Some(ts))
+                .with_tags(tags.clone()),
+            )
+            // this ensures we get Origin Metadata, with an undefined service but that's ok.
+            .with_source_type("a_source_like_none_other")
+        })
+        .collect();
+
+    let stream = map_event_batch_stream(stream::iter(events.clone()), batch);
+    (events, stream)
+}
+
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
@@ -342,7 +376,7 @@ pub fn random_maps(
 
 pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
 where
-    S: Stream + Unpin,
+    S: Stream,
 {
     rx.take(n).collect().await
 }
@@ -504,37 +538,6 @@ where
     panic!("Timeout")
 }
 
-#[cfg(test)]
-mod tests {
-    use std::{
-        sync::{Arc, RwLock},
-        time::Duration,
-    };
-
-    use super::retry_until;
-
-    // helper which errors the first 3x, and succeeds on the 4th
-    async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
-        if *count.read().unwrap() < 3 {
-            let mut c = count.write().unwrap();
-            *c += 1;
-            return Err(());
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn retry_until_before_timeout() {
-        let count = Arc::new(RwLock::new(0));
-        let func = || {
-            let count = Arc::clone(&count);
-            retry_until_helper(count)
-        };
-
-        retry_until(func, Duration::from_millis(10), Duration::from_secs(1)).await;
-    }
-}
-
 pub struct CountReceiver<T> {
     count: Arc<AtomicUsize>,
     trigger: Option<oneshot::Sender<()>>,
@@ -595,7 +598,7 @@ impl<T> Future for CountReceiver<T> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
         if let Some(trigger) = this.trigger.take() {
-            let _ = trigger.send(());
+            _ = trigger.send(());
         }
 
         let result = ready!(this.handle.poll_unpin(cx));
@@ -682,13 +685,9 @@ impl CountReceiver<Event> {
 pub async fn start_topology(
     mut config: Config,
     require_healthy: impl Into<Option<bool>>,
-) -> (RunningTopology, tokio::sync::mpsc::UnboundedReceiver<()>) {
+) -> (RunningTopology, ShutdownErrorReceiver) {
     config.healthchecks.set_require_healthy(require_healthy);
-    let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
-    topology::start_validated(config, diff, pieces)
+    RunningTopology::start_init_validated(config, Default::default())
         .await
         .unwrap()
 }
@@ -701,7 +700,7 @@ pub async fn start_topology(
 pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
 where
     F: Future<Output = ()> + Send + 'static,
-    S: Stream<Item = Event> + Unpin,
+    S: Stream<Item = Event>,
 {
     // TODO: Switch to using `select!` so that we can drive `future` to completion while also driving `collect_n`,
     // such that if `future` panics, we break out and don't continue driving `collect_n`. In most cases, `future`
@@ -728,4 +727,35 @@ where
     let events = collect_ready(stream).await;
     sender.await.expect("Failed to send data");
     events
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        sync::{Arc, RwLock},
+        time::Duration,
+    };
+
+    use super::retry_until;
+
+    // helper which errors the first 3x, and succeeds on the 4th
+    async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
+        if *count.read().unwrap() < 3 {
+            let mut c = count.write().unwrap();
+            *c += 1;
+            return Err(());
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retry_until_before_timeout() {
+        let count = Arc::new(RwLock::new(0));
+        let func = || {
+            let count = Arc::clone(&count);
+            retry_until_helper(count)
+        };
+
+        retry_until(func, Duration::from_millis(10), Duration::from_secs(1)).await;
+    }
 }

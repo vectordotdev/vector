@@ -58,7 +58,7 @@ pub struct Config<'a> {
     /// Set to empty to opt-out of passing any custom values.
     pub custom_helm_values: Vec<&'a str>,
 
-    /// Custom Kubernestes resource(s) to deploy together with Vector.
+    /// Custom Kubernetes resource(s) to deploy together with Vector.
     /// Set to empty to opt-out of deploying custom resources.
     pub custom_resource: &'a str,
 }

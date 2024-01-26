@@ -1,9 +1,9 @@
 ---
-title: Clickhouse
-description: Deliver log data to the [Clickhouse](https://clickhouse.tech) database
+title: ClickHouse
+description: Deliver log data to the [ClickHouse](https://clickhouse.com) database
 kind: sink
 layout: component
-tags: ["clickhole", "component", "sink", "storage", "logs"]
+tags: ["clickhouse", "component", "sink", "storage", "logs"]
 ---
 
 {{/*

@@ -13,7 +13,7 @@ use crate::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    variants::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
+    variants::{DiskV2Buffer, MemoryBuffer},
     Bufferable, WhenFull,
 };
 
@@ -33,12 +33,6 @@ pub enum Variant {
     Memory {
         max_events: NonZeroUsize,
         when_full: WhenFull,
-    },
-    DiskV1 {
-        max_size: NonZeroU64,
-        when_full: WhenFull,
-        data_dir: PathBuf,
-        id: String,
     },
     DiskV2 {
         max_size: NonZeroU64,
@@ -62,17 +56,6 @@ impl Variant {
             } => {
                 builder.stage(MemoryBuffer::new(*max_events), *when_full);
             }
-            Variant::DiskV1 {
-                max_size,
-                when_full,
-                data_dir,
-                id,
-            } => {
-                builder.stage(
-                    DiskV1Buffer::new(id.clone(), data_dir.clone(), *max_size),
-                    *when_full,
-                );
-            }
             Variant::DiskV2 {
                 max_size,
                 when_full,
@@ -89,7 +72,7 @@ impl Variant {
         let (sender, receiver) = builder
             .build(String::from("benches"), Span::none())
             .await
-            .expect("topology build should not fail");
+            .unwrap_or_else(|_| unreachable!("topology build should not fail"));
 
         (sender, receiver)
     }
@@ -117,36 +100,26 @@ impl Arbitrary for Id {
 #[cfg(test)]
 impl Arbitrary for Variant {
     fn arbitrary(g: &mut Gen) -> Self {
-        let idx = usize::arbitrary(g) % 3;
+        let use_memory_buffer = bool::arbitrary(g);
 
         // Using a u16 ensures we avoid any allocation errors for our holding buffers, etc.
-        let max_events = NonZeroU16::arbitrary(g)
-            .try_into()
-            .expect("we don't support 16-bit platforms");
-        let max_size = NonZeroU16::arbitrary(g)
-            .try_into()
-            .expect("we don't support 16-bit platforms");
+        let max_events = NonZeroU16::arbitrary(g).into();
+        let max_size = NonZeroU16::arbitrary(g).into();
 
         let when_full = WhenFull::arbitrary(g);
 
-        match idx {
-            0 => Variant::Memory {
+        if use_memory_buffer {
+            Variant::Memory {
                 max_events,
                 when_full,
-            },
-            1 => Variant::DiskV1 {
+            }
+        } else {
+            Variant::DiskV2 {
                 max_size,
                 when_full,
                 id: Id::arbitrary(g).inner,
                 data_dir: PathBuf::arbitrary(g),
-            },
-            2 => Variant::DiskV2 {
-                max_size,
-                when_full,
-                id: Id::arbitrary(g).inner,
-                data_dir: PathBuf::arbitrary(g),
-            },
-            _ => unreachable!("idx divisor should be 3"),
+            }
         }
     }
 
@@ -161,24 +134,6 @@ impl Arbitrary for Variant {
                 Box::new(max_events.shrink().map(move |me| Variant::Memory {
                     max_events: me,
                     when_full,
-                }))
-            }
-            Variant::DiskV1 {
-                max_size,
-                when_full,
-                id,
-                data_dir,
-                ..
-            } => {
-                let max_size = *max_size;
-                let when_full = *when_full;
-                let id = id.clone();
-                let data_dir = data_dir.clone();
-                Box::new(max_size.shrink().map(move |ms| Variant::DiskV1 {
-                    max_size: ms,
-                    when_full,
-                    id: id.clone(),
-                    data_dir: data_dir.clone(),
                 }))
             }
             Variant::DiskV2 {

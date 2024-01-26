@@ -44,7 +44,7 @@ impl VectorSink {
     pub fn into_sink(self) -> Box<dyn Sink<EventArray, Error = ()> + Send + Unpin> {
         match self {
             Self::Sink(sink) => sink,
-            _ => panic!("Failed type coercion, {:?} is not a Sink", self),
+            _ => panic!("Failed type coercion, {self:?} is not a Sink"),
         }
     }
 
@@ -56,11 +56,17 @@ impl VectorSink {
     pub fn into_stream(self) -> Box<dyn StreamSink<EventArray> + Send> {
         match self {
             Self::Stream(stream) => stream,
-            _ => panic!("Failed type coercion, {:?} is not a Stream", self),
+            _ => panic!("Failed type coercion, {self:?} is not a Stream"),
         }
     }
 
     /// Converts an event sink into a `VectorSink`
+    ///
+    /// Deprecated in favor of `VectorSink::from_event_streamsink`. See [vector/9261]
+    /// for more info.
+    ///
+    /// [vector/9261]: https://github.com/vectordotdev/vector/issues/9261
+    #[deprecated]
     pub fn from_event_sink(sink: impl Sink<Event, Error = ()> + Send + Unpin + 'static) -> Self {
         VectorSink::Sink(Box::new(EventSink::new(sink)))
     }
@@ -125,9 +131,8 @@ impl<S: Sink<Event> + Send + Unpin> EventSink<S> {
     fn flush_queue(self: &mut Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
         while self.queue.is_some() {
             poll_ready_ok!(self.sink.poll_ready_unpin(cx));
-            let event = match self.next_event() {
-                None => break,
-                Some(event) => event,
+            let Some(event) = self.next_event() else {
+                break;
             };
             if let Err(err) = self.sink.start_send_unpin(event) {
                 return Poll::Ready(Err(err));

@@ -1,17 +1,19 @@
 use crate::internal_events::HostMetricsScrapeDetailError;
 use futures::StreamExt;
 use heim::units::information::byte;
-use vector_common::btreemap;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::metric_tags;
 
-use super::{filter_result, FilterList, HostMetrics};
+use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
 
-/// Options for the “disk” metrics collector.
+/// Options for the disk metrics collector.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct DiskConfig {
-    /// Lists of device name patterns to include or exclude.
-    #[serde(default)]
+    /// Lists of device name patterns to include or exclude in gathering
+    /// I/O utilization metrics.
+    #[configurable(metadata(docs::examples = "example_devices()"))]
+    #[serde(default = "default_all_devices")]
     devices: FilterList,
 }
 
@@ -34,7 +36,7 @@ impl HostMetrics {
                     .collect::<Vec<_>>()
                     .await
                 {
-                    let tags = btreemap! {
+                    let tags = metric_tags! {
                         "device" => counter.device_name().to_string_lossy()
                     };
                     output.name = "disk";
@@ -89,7 +91,7 @@ mod tests {
         let metrics = buffer.metrics;
 
         // The Windows test runner doesn't generate any disk metrics on the VM.
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(not(windows))]
         assert!(!metrics.is_empty());
         assert!(metrics.len() % 4 == 0);
         assert!(all_counters(&metrics));

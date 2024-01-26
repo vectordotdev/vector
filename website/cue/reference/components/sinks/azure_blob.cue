@@ -6,13 +6,14 @@ components: sinks: azure_blob: {
 	classes: {
 		commonly_used: true
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Azure"]
 		stateful: false
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -66,61 +67,7 @@ components: sinks: azure_blob: {
 		notices: []
 	}
 
-	configuration: {
-		connection_string: {
-			description: "The Azure Blob Storage Account connection string. Only authentication with access key supported. This or storage_account has to be provided."
-			required:    false
-			common:      true
-			type: string: {
-				default: ""
-				examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"]
-			}
-		}
-		storage_account: {
-			description: "The Azure Blob Storage Account name. Credentials are read in this order: [EnvironmentCredential](https://docs.rs/azure_identity/latest/azure_identity/struct.DefaultAzureCredential.html), ManagedIdentityCredential, AzureCliCredential. This or connection_string has to be provided."
-			required:    false
-			common:      true
-			type: string: {
-				default: ""
-				examples: ["mylogstorage"]
-			}
-		}
-		container_name: {
-			description: "The Azure Blob Storage Account container name."
-			required:    true
-			type: string: {
-				examples: ["my-logs"]
-			}
-		}
-		blob_prefix: {
-			category:    "File Naming"
-			common:      true
-			description: "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root azure storage \"folder\"."
-			required:    false
-			type: string: {
-				default: "blob/%F/"
-				examples: ["date/%F/", "date/%F/hour/%H/", "year=%Y/month=%m/day=%d/", "kubernetes/{{ metadata.cluster }}/{{ metadata.application_name }}/"]
-				syntax: "template"
-			}
-		}
-		blob_append_uuid: {
-			category:    "File Naming"
-			common:      false
-			description: "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
-			required:    false
-			type: bool: default: true
-		}
-		blob_time_format: {
-			category:    "File Naming"
-			common:      false
-			description: "The format of the resulting object file name. [`strftime` specifiers](\(urls.strptime_specifiers)) are supported."
-			required:    false
-			type: string: {
-				default: "%s"
-				syntax:  "strftime"
-			}
-		}
-	}
+	configuration: base.components.sinks.azure_blob.configuration
 
 	input: {
 		logs:    true
@@ -164,17 +111,16 @@ components: sinks: azure_blob: {
 
 				You can control the resulting name via the [`blob_prefix`](#blob_prefix),
 				[`blob_time_format`](#blob_time_format), and [`blob_append_uuid`](#blob_append_uuid) options.
+
+				For example, to store objects at the root Azure storage folder, without a timestamp or UUID use
+				these configuration options:
+
+				```text
+				blob_prefix = "{{ my_file_name }}"
+				blob_time_format = ""
+				blob_append_uuid = false
+				```
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
-		http_error_response_total:        components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total:        components.sources.internal_metrics.output.metrics.http_request_errors_total
-		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
 	}
 }

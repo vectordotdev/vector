@@ -407,7 +407,7 @@ Everything we need to do to achieve this is outlined at the
 [The Chart Repository Guide].
 
 We can use a tool like [ChartMuseum] to manage our repo. Alternatively, we can
-use a bare HTTP server, like AWS S3 or Github Pages.
+use a bare HTTP server, like AWS S3 or GitHub Pages.
 [ChartMuseum] has the benefit of doing some things for us. It can use S3 for
 storage, and offers a convenient [helm plugin][helm_push] to release charts, so
 the release process should be very simple.
@@ -1093,7 +1093,7 @@ This is a very controversial question.
 
 Currently we have:
 
-- the Vector repo (with the Github Actions based CI flow)
+- the Vector repo (with the GitHub Actions based CI flow)
 - the test harness (also integrated with CI, but this is it's own thing)
 
 We don't necessarily have to choose one of those places: we can add a new
@@ -1309,7 +1309,7 @@ whatsoever, it's possible to just deploy Vector as a
 
 While nothing prevents users from manually configuring Vector for gathering data
 from the host OS, it's very hard for us to offer sane defaults that would work
-out-of-the-box for all clusters, since there's a miriad of configurations.
+out-of-the-box for all clusters, since there's a myriad of configurations.
 
 We can consider offering some kind of user-selectable presets for well known
 popular setups - like AWS and CGP.
@@ -1490,7 +1490,7 @@ We should also consider integrating with tools like [Vault] and [redoctober].
 - Suggest setting up proper RBAC rules for cluster operators and users;
   [`audit2rbac`](https://github.com/liggitt/audit2rbac) is a useful tool to
   help with this.
-- Suggest using [Pod Security Policies][k8s_docs_pod_security_policiy]
+- Suggest using [Pod Security Policies][k8s_docs_pod_security_policy]
   ([API][k8s_api_pod_security_policy]).
 - Suggest using [NetworkPolicy][k8s_api_network_policy].
 - Suggest running [kube-bench].
@@ -1578,7 +1578,7 @@ See [motivation](#motivation).
     - Ensure we are testing all supported minor versions. See
       [issue#2223].
   - Run `make test-integration-kubernetes` against AWS' EKS platform in
-    Vector's Github actions.
+    Vector's GitHub actions.
 - Finalize the `kubernetes` source.
   - Audit the code and ensure the base is high-quality and correct.
   - Merge in the `kubernetes_pod_metadata` transform.
@@ -1693,7 +1693,7 @@ See [motivation](#motivation).
 [k8s_docs_operator]: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
 [k8s_docs_persistent_volumes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 [k8s_docs_pod_lifecycle_container_probes]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
-[k8s_docs_pod_security_policiy]: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
+[k8s_docs_pod_security_policy]: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
 [k8s_docs_pod]: https://kubernetes.io/docs/concepts/workloads/pods/pod/
 [k8s_docs_priority_class]: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass
 [k8s_docs_rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/

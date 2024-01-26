@@ -14,7 +14,7 @@ const LOG_PATH_DELIMITER: &str = "_";
 
 /// Builds absolute log directory path for a pod sandbox.
 ///
-/// Based on https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L178
+/// Based on <https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L178>
 pub(super) fn build_pod_logs_directory(
     pod_namespace: &str,
     pod_name: &str,
@@ -32,7 +32,7 @@ pub(super) fn build_pod_logs_directory(
 ///
 /// Assumes the input is a valid pod log file name.
 ///
-/// Inspired by https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L186
+/// Inspired by <https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L186>
 pub(super) fn parse_log_file_path(path: &str) -> Option<LogFileInfo<'_>> {
     let mut components = path.rsplit('/');
 

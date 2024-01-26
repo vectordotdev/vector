@@ -39,7 +39,7 @@ library as well.
 
 `kube` is the leading Rust client for Kubernetes and we should look to utilize
 the community support and experience behind it as much as possible. We can replace
-most of our "plumbling" level code with the equivalent, or high level, code from
+most of our "plumbing" level code with the equivalent, or high level, code from
 `kube` while keeping the same functionality.
 
 As far as I'm aware the only implementation we need to keep in-house is the `Store`
@@ -53,7 +53,7 @@ Some of our existing code in `src/kubernetes` is already taken directly from `ku
 ## Rationale
 
 Rewriting the `kubernetes_logs` source to leverage the existing "official" Kubernetes
-client for Rust will give us a more stable and maintable foundation. We currently
+client for Rust will give us a more stable and maintainable foundation. We currently
 are unable to maintain and troubleshoot the `kubernetes_logs` source properly and
 leveraging `kube` directly will provide an existing community of users, tests, and
 experiences to improve our ability to support this feature in Vector.

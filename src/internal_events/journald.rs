@@ -1,8 +1,7 @@
-use codecs::decoding::BoxedFramingError;
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::codecs::decoding::BoxedFramingError;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct JournaldInvalidRecordError {
@@ -16,16 +15,15 @@ impl InternalEvent for JournaldInvalidRecordError {
             message = "Invalid record from journald, discarding.",
             error = ?self.error,
             text = %self.text,
-            stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
         );
-        counter!("invalid_record_total", 1); // deprecated
-        counter!("invalid_record_bytes_total", self.text.len() as u64); // deprecated
     }
 }
 
@@ -39,8 +37,9 @@ impl InternalEvent for JournaldStartJournalctlError {
         error!(
             message = "Error starting journalctl process.",
             error = %self.error,
-            stage = error_stage::RECEIVING,
             error_type = error_type::COMMAND_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -58,10 +57,11 @@ pub struct JournaldReadError {
 impl InternalEvent for JournaldReadError {
     fn emit(self) {
         error!(
-            message = "Cound not read from journald.",
+            message = "Could not read from journald.",
             error = %self.error,
-            stage = error_stage::PROCESSING,
             error_type = error_type::READER_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -84,8 +84,9 @@ impl InternalEvent for JournaldCheckpointSetError {
             message = "Could not set journald checkpoint.",
             filename = ?self.filename,
             error = %self.error,
-            stage = error_stage::PROCESSING,
             error_type = error_type::IO_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -107,8 +108,9 @@ impl InternalEvent for JournaldCheckpointFileOpenError {
             message = "Unable to open checkpoint file.",
             path = ?self.path,
             error = %self.error,
-            stage = error_stage::RECEIVING,
             error_type = error_type::IO_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,

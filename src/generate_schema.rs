@@ -1,4 +1,5 @@
-use vector_config::schema::generate_root_schema;
+#![allow(missing_docs)]
+use vector_lib::configurable::schema::generate_root_schema;
 
 use crate::config::ConfigBuilder;
 

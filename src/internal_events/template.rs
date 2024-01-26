@@ -1,11 +1,6 @@
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 
 pub struct TemplateRenderingError<'a> {
     pub field: Option<&'a str>,
@@ -18,35 +13,37 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
         let mut msg = "Failed to render template".to_owned();
         if let Some(field) = self.field {
             use std::fmt::Write;
-            let _ = write!(msg, " for \"{}\"", field);
+            _ = write!(msg, " for \"{}\"", field);
         }
         msg.push('.');
 
-        error!(
-            message = %msg,
-            error = %self.error,
-            error_type = error_type::TEMPLATE_FAILED,
-            stage = error_stage::PROCESSING,
-        );
-
-        counter!(
-            "component_errors_total", 1,
-            "error_type" => error_type::TEMPLATE_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-
-        // deprecated
-        counter!("processing_errors_total", 1,
-            "error_type" => "render_error");
-
         if self.drop_event {
+            error!(
+                message = %msg,
+                error = %self.error,
+                error_type = error_type::TEMPLATE_FAILED,
+                stage = error_stage::PROCESSING,
+                internal_log_rate_limit = true,
+            );
+
+            counter!(
+                "component_errors_total", 1,
+                "error_type" => error_type::TEMPLATE_FAILED,
+                "stage" => error_stage::PROCESSING,
+            );
+
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
                 reason: "Failed to render template.",
             });
-
-            // deprecated
-            counter!("events_discarded_total", 1);
+        } else {
+            warn!(
+                message = %msg,
+                error = %self.error,
+                error_type = error_type::TEMPLATE_FAILED,
+                stage = error_stage::PROCESSING,
+                internal_log_rate_limit = true,
+            );
         }
     }
 }

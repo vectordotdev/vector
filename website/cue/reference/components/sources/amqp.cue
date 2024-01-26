@@ -4,6 +4,7 @@ components: sources: amqp: {
 	title: "AMQP"
 
 	features: {
+		auto_generated:   true
 		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
@@ -41,61 +42,7 @@ components: sources: amqp: {
 		platform_name: null
 	}
 
-	configuration: {
-		connection: {
-			description: "Connection options for the AMQP source."
-			required:    true
-			warnings: []
-			type: object: {
-				examples: []
-				options: {
-					connection_string: components._amqp.configuration.connection_string
-				}
-			}
-		}
-		group_id: {
-			description: "The consumer group name to be used to consume events from AMQP."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["consumer-group-name"]
-				syntax: "literal"
-			}
-		}
-		routing_key_field: {
-			common:      true
-			description: "The log field name to use for the AMQP routing key."
-			required:    false
-			warnings: []
-			type: string: {
-				default: "routing"
-				examples: ["routing"]
-				syntax: "literal"
-			}
-		}
-		exchange_key: {
-			common:      true
-			description: "The log field name to use for the AMQP exchange key."
-			required:    false
-			warnings: []
-			type: string: {
-				default: "exchange"
-				examples: ["exchange"]
-				syntax: "literal"
-			}
-		}
-		offset_key: {
-			common:      true
-			description: "The log field name to use for the AMQP offset key."
-			required:    false
-			warnings: []
-			type: string: {
-				default: "offset"
-				examples: ["offset"]
-				syntax: "literal"
-			}
-		}
-	}
+	configuration: base.components.sources.amqp.configuration
 
 	output: logs: record: {
 		description: "An individual AMQP record."
@@ -128,14 +75,6 @@ components: sources: amqp: {
 				}
 			}
 		}
-	}
-
-	telemetry: metrics: {
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		consumer_offset_updates_failed_total: components.sources.internal_metrics.output.metrics.consumer_offset_updates_failed_total
-		events_failed_total:                  components.sources.internal_metrics.output.metrics.events_failed_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 
 	how_it_works: components._amqp.how_it_works

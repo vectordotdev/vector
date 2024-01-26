@@ -100,11 +100,10 @@ impl MetricData {
             other.time.interval_ms,
         ) {
             (Some(t1), Some(i1), Some(t2), Some(i2)) => {
-                let delta_t = match TryInto::<u32>::try_into(
-                    t1.timestamp_millis().abs_diff(t2.timestamp_millis()),
-                ) {
-                    Ok(delta_t) => delta_t,
-                    Err(_) => return false,
+                let Ok(delta_t) =
+                    TryInto::<u32>::try_into(t1.timestamp_millis().abs_diff(t2.timestamp_millis()))
+                else {
+                    return false;
                 };
 
                 if t1 > t2 {

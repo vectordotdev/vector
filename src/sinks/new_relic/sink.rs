@@ -1,28 +1,11 @@
-use std::{convert::TryFrom, fmt::Debug, num::NonZeroUsize, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::stream::{BoxStream, StreamExt};
-use tower::Service;
-use vector_core::{
-    event::{EventFinalizers, Finalizable},
-    stream::{BatcherSettings, DriverResponse},
-};
 
-use super::{
-    EventsApiModel, LogsApiModel, MetricsApiModel, NewRelicApi, NewRelicApiModel,
-    NewRelicApiRequest, NewRelicCredentials, NewRelicEncoder,
-};
+use super::{NewRelicApiRequest, NewRelicCredentials, NewRelicEncoder};
 use crate::{
-    codecs::Transformer,
-    event::Event,
-    internal_events::SinkRequestBuildError,
-    sinks::util::{
-        builder::SinkBuilderExt,
-        metadata::{RequestMetadata, RequestMetadataBuilder},
-        request_builder::EncodeResult,
-        Compression, RequestBuilder, StreamSink,
-    },
+    http::get_http_scheme_from_uri, internal_events::SinkRequestBuildError, sinks::prelude::*,
 };
 
 #[derive(Debug)]
@@ -69,15 +52,14 @@ impl From<NewRelicSinkError> for std::io::Error {
 }
 
 struct NewRelicRequestBuilder {
-    transformer: Transformer,
     encoder: NewRelicEncoder,
     compression: Compression,
     credentials: Arc<NewRelicCredentials>,
 }
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
-    type Metadata = (EventFinalizers, RequestMetadataBuilder);
-    type Events = Result<NewRelicApiModel, Self::Error>;
+    type Metadata = EventFinalizers;
+    type Events = Vec<Event>;
     type Encoder = NewRelicEncoder;
     type Payload = Bytes;
     type Request = NewRelicApiRequest;
@@ -91,37 +73,22 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(&self, mut input: Vec<Event>) -> (Self::Metadata, Self::Events) {
-        for event in input.iter_mut() {
-            self.transformer.transform(event);
-        }
-
-        let metadata_builder = RequestMetadata::builder(&input);
-
+    fn split_input(
+        &self,
+        mut input: Vec<Event>,
+    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let builder = RequestMetadataBuilder::from_events(&input);
         let finalizers = input.take_finalizers();
-        let api_model = || -> Result<NewRelicApiModel, Self::Error> {
-            match self.credentials.api {
-                NewRelicApi::Events => {
-                    Ok(NewRelicApiModel::Events(EventsApiModel::try_from(input)?))
-                }
-                NewRelicApi::Metrics => {
-                    Ok(NewRelicApiModel::Metrics(MetricsApiModel::try_from(input)?))
-                }
-                NewRelicApi::Logs => Ok(NewRelicApiModel::Logs(LogsApiModel::try_from(input)?)),
-            }
-        }();
 
-        ((finalizers, metadata_builder), api_model)
+        (finalizers, builder, input)
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        finalizers: Self::Metadata,
+        metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (finalizers, metadata_builder) = metadata;
-        let metadata = metadata_builder.build(&payload);
-
         NewRelicApiRequest {
             metadata,
             finalizers,
@@ -134,7 +101,6 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
 
 pub struct NewRelicSink<S> {
     pub service: S,
-    pub transformer: Transformer,
     pub encoder: NewRelicEncoder,
     pub credentials: Arc<NewRelicCredentials>,
     pub compression: Compression,
@@ -149,17 +115,16 @@ where
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let builder_limit = NonZeroUsize::new(64);
         let request_builder = NewRelicRequestBuilder {
-            transformer: self.transformer,
             encoder: self.encoder,
             compression: self.compression,
             credentials: Arc::clone(&self.credentials),
         };
+        let protocol = get_http_scheme_from_uri(&self.credentials.get_uri());
 
-        let sink = input
-            .batched(self.batcher_settings.into_byte_size_config())
-            .request_builder(builder_limit, request_builder)
+        input
+            .batched(self.batcher_settings.as_byte_size_config())
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(
                 |request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {
                     match request {
@@ -171,9 +136,10 @@ where
                     }
                 },
             )
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .protocol(protocol)
+            .run()
+            .await
     }
 }
 

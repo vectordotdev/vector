@@ -42,6 +42,7 @@ components: sources: statsd: {
 				enabled_default:        false
 			}
 		}
+		auto_generated: true
 	}
 
 	support: {
@@ -54,56 +55,7 @@ components: sources: statsd: {
 		platform_name: null
 	}
 
-	configuration: {
-		address: {
-			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
-			relevant_when: "mode = `tcp` or `udp`"
-			required:      true
-			type: string: {
-				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
-			}
-		}
-		mode: {
-			description: "The type of socket to use."
-			required:    true
-			type: string: {
-				enum: {
-					tcp:  "TCP Socket."
-					udp:  "UDP Socket."
-					unix: "Unix Domain Socket."
-				}
-			}
-		}
-		path: {
-			description:   "The unix socket path. *This should be an absolute path*."
-			relevant_when: "mode = `unix`"
-			required:      true
-			type: string: {
-				examples: ["/path/to/socket"]
-			}
-		}
-		shutdown_timeout_secs: {
-			common:        false
-			description:   "The timeout before a connection is forcefully closed during shutdown."
-			relevant_when: "mode = `tcp`"
-			required:      false
-			type: uint: {
-				default: 30
-				unit:    "seconds"
-			}
-		}
-		connection_limit: {
-			common:        false
-			description:   "The max number of TCP connections that will be processed."
-			relevant_when: "mode = `tcp`"
-			required:      false
-			type: uint: {
-				default: null
-				unit:    "concurrency"
-			}
-		}
-
-	}
+	configuration: base.components.sources.statsd.configuration
 
 	output: metrics: {
 		counter:      output._passthrough_counter
@@ -124,19 +76,5 @@ components: sources: statsd: {
 				[metric data model](\(urls.vector_metric)) page for more info.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		connection_errors_total:              components.sources.internal_metrics.output.metrics.connection_errors_total
-		invalid_record_total:                 components.sources.internal_metrics.output.metrics.invalid_record_total
-		invalid_record_bytes_total:           components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
-		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

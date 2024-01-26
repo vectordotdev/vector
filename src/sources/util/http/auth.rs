@@ -1,8 +1,8 @@
 use std::convert::TryFrom;
 
 use headers::{Authorization, HeaderMapExt};
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 use warp::http::HeaderMap;
 
 #[cfg(any(
@@ -16,9 +16,13 @@ use super::error::ErrorMessage;
 #[derive(Clone, Debug)]
 pub struct HttpSourceAuthConfig {
     /// The username for basic authentication.
+    #[configurable(metadata(docs::examples = "AzureDiamond"))]
+    #[configurable(metadata(docs::examples = "admin"))]
     pub username: String,
 
     /// The password for basic authentication.
+    #[configurable(metadata(docs::examples = "hunter2"))]
+    #[configurable(metadata(docs::examples = "${PASSWORD}"))]
     pub password: SensitiveString,
 }
 

@@ -1,15 +1,15 @@
 use std::borrow::Cow;
 
 use bytes::Bytes;
-use datadog_filter::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::event::{Event, LogEvent, Value};
+use vrl::datadog_filter::{
     build_matcher,
     regex::{wildcard_regex, word_regex},
     Filter, Matcher, Resolver, Run,
 };
-use datadog_search_syntax::parse;
-use datadog_search_syntax::{Comparison, ComparisonValue, Field};
-use vector_config::configurable_component;
-use vector_core::event::{Event, LogEvent, Value};
+use vrl::datadog_search_syntax::parse;
+use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field};
 
 use crate::conditions::{Condition, Conditional, ConditionalConfig};
 
@@ -38,9 +38,12 @@ impl Conditional for DatadogSearchRunner {
 }
 
 impl ConditionalConfig for DatadogSearchConfig {
-    fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
+    fn build(
+        &self,
+        _enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> crate::Result<Condition> {
         let node = parse(&self.source)?;
-        let matcher = as_log(build_matcher(&node, &EventFilter::default()));
+        let matcher = as_log(build_matcher(&node, &EventFilter));
 
         Ok(Condition::DatadogSearch(DatadogSearchRunner { matcher }))
     }
@@ -75,7 +78,12 @@ impl Filter<LogEvent> for EventFilter {
                 any_string_match("tags", move |value| value == field)
             }
             Field::Default(f) | Field::Facet(f) | Field::Reserved(f) => {
-                Run::boxed(move |log: &LogEvent| log.get(f.as_str()).is_some())
+                Run::boxed(move |log: &LogEvent| {
+                    log.parse_path_and_get_value(f.as_str())
+                        .ok()
+                        .flatten()
+                        .is_some()
+                })
             }
         }
     }
@@ -165,8 +173,11 @@ impl Filter<LogEvent> for EventFilter {
         match field {
             // Facets are compared numerically if the value is numeric, or as strings otherwise.
             Field::Facet(f) => {
-                Run::boxed(
-                    move |log: &LogEvent| match (log.get(f.as_str()), &comparison_value) {
+                Run::boxed(move |log: &LogEvent| {
+                    match (
+                        log.parse_path_and_get_value(f.as_str()).ok().flatten(),
+                        &comparison_value,
+                    ) {
                         // Integers.
                         (Some(Value::Integer(lhs)), ComparisonValue::Integer(rhs)) => {
                             match comparator {
@@ -227,8 +238,8 @@ impl Filter<LogEvent> for EventFilter {
                             }
                         }
                         _ => false,
-                    },
-                )
+                    }
+                })
             }
             // Tag values need extracting by "key:value" to be compared.
             Field::Tag(tag) => any_string_match("tags", move |value| match value.split_once(':') {
@@ -266,9 +277,11 @@ where
 {
     let field = field.into();
 
-    Run::boxed(move |log: &LogEvent| match log.get(field.as_str()) {
-        Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
-        _ => false,
+    Run::boxed(move |log: &LogEvent| {
+        match log.parse_path_and_get_value(field.as_str()).ok().flatten() {
+            Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
+            _ => false,
+        }
     })
 }
 
@@ -281,9 +294,11 @@ where
 {
     let field = field.into();
 
-    Run::boxed(move |log: &LogEvent| match log.get(field.as_str()) {
-        Some(Value::Array(values)) => func(values),
-        _ => false,
+    Run::boxed(move |log: &LogEvent| {
+        match log.parse_path_and_get_value(field.as_str()).ok().flatten() {
+            Some(Value::Array(values)) => func(values),
+            _ => false,
+        }
     })
 }
 
@@ -297,7 +312,7 @@ where
     array_match(field, move |values| values.iter().any(&func))
 }
 
-/// Retrns a `Matcher` that returns true if the log event resolves to an array of strings,
+/// Returns a `Matcher` that returns true if the log event resolves to an array of strings,
 /// where at least one string matches the provided `func`.
 fn any_string_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
 where
@@ -312,10 +327,10 @@ where
 
 #[cfg(test)]
 mod test {
-    use datadog_filter::{build_matcher, Filter, Resolver};
-    use datadog_search_syntax::parse;
     use serde_json::json;
-    use vector_core::event::Event;
+    use vector_lib::event::Event;
+    use vrl::datadog_filter::{build_matcher, Filter, Resolver};
+    use vrl::datadog_search_syntax::parse;
 
     use super::*;
     use crate::log_event;
@@ -1039,7 +1054,7 @@ mod test {
     #[test]
     /// Parse each Datadog Search Syntax query and check that it passes/fails.
     fn event_filter() {
-        test_filter(EventFilter::default(), |ev| ev.into_log())
+        test_filter(EventFilter, |ev| ev.into_log())
     }
 
     #[test]

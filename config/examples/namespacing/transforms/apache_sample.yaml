@@ -1,0 +1,4 @@
+# Sample the data to save on cost
+inputs: ["apache_parser"]
+type: "sample"
+rate: 2  # only keep 50% (1/`rate`)

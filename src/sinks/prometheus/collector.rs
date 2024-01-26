@@ -2,8 +2,8 @@ use std::{collections::BTreeMap, fmt::Write as _};
 
 use chrono::Utc;
 use indexmap::map::IndexMap;
-use prometheus_parser::{proto, METRIC_NAME_LABEL};
-use vector_core::event::metric::{samples_to_buckets, MetricSketch, Quantile};
+use vector_lib::event::metric::{samples_to_buckets, MetricSketch, MetricTags, Quantile};
+use vector_lib::prometheus::parser::{proto, METRIC_NAME_LABEL};
 
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -23,7 +23,7 @@ pub(super) trait MetricCollector {
         name: &str,
         suffix: &str,
         value: f64,
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&MetricTags>,
         extra: Option<(&str, String)>,
     );
 
@@ -67,7 +67,7 @@ pub(super) trait MetricCollector {
                             timestamp,
                             name,
                             "_bucket",
-                            bucket_count as f64,
+                            bucket_count,
                             tags,
                             Some(("le", bucket.upper_limit.to_string())),
                         );
@@ -80,7 +80,7 @@ pub(super) trait MetricCollector {
                         tags,
                         Some(("le", "+Inf".to_string())),
                     );
-                    self.emit_value(timestamp, name, "_sum", sum as f64, tags, None);
+                    self.emit_value(timestamp, name, "_sum", sum, tags, None);
                     self.emit_value(timestamp, name, "_count", count as f64, tags, None);
                 }
                 MetricValue::Distribution {
@@ -244,7 +244,7 @@ impl MetricCollector for StringCollector {
         name: &str,
         suffix: &str,
         value: f64,
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&MetricTags>,
         extra: Option<(&str, String)>,
     ) {
         let result = self
@@ -255,29 +255,25 @@ impl MetricCollector for StringCollector {
         result.push_str(name);
         result.push_str(suffix);
         Self::encode_tags(result, tags, extra);
-        let _ = match timestamp_millis {
+        _ = match timestamp_millis {
             None => writeln!(result, " {}", value),
             Some(timestamp) => writeln!(result, " {} {}", value, timestamp),
         };
     }
 
     fn finish(self) -> String {
-        self.processed.into_iter().map(|(_, value)| value).collect()
+        self.processed.into_values().collect()
     }
 }
 
 impl StringCollector {
-    fn encode_tags(
-        result: &mut String,
-        tags: Option<&BTreeMap<String, String>>,
-        extra: Option<(&str, String)>,
-    ) {
+    fn encode_tags(result: &mut String, tags: Option<&MetricTags>, extra: Option<(&str, String)>) {
         match (tags, extra) {
             (None, None) => Ok(()),
             (None, Some(tag)) => write!(result, "{{{}}}", Self::format_tag(tag.0, &tag.1)),
             (Some(tags), ref tag) => {
                 let mut parts = tags
-                    .iter()
+                    .iter_single()
                     .map(|(key, value)| Self::format_tag(key, value))
                     .collect::<Vec<_>>();
 
@@ -328,7 +324,7 @@ pub(super) struct TimeSeries {
 
 impl TimeSeries {
     fn make_labels(
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&MetricTags>,
         name: &str,
         suffix: &str,
         extra: Option<(&str, String)>,
@@ -338,15 +334,15 @@ impl TimeSeries {
         // label for the actual metric name. For convenience below, an
         // optional extra tag is added.
         let mut labels = tags.cloned().unwrap_or_default();
-        labels.insert(METRIC_NAME_LABEL.into(), [name, suffix].join(""));
+        labels.replace(METRIC_NAME_LABEL.into(), [name, suffix].join(""));
         if let Some((name, value)) = extra {
-            labels.insert(name.into(), value);
+            labels.replace(name.into(), value);
         }
 
         // Extract the labels into a vec and sort to produce a
         // consistent key for the buffer.
         let mut labels = labels
-            .into_iter()
+            .into_iter_single()
             .map(|(name, value)| proto::Label { name, value })
             .collect::<Labels>();
         labels.sort();
@@ -390,7 +386,7 @@ impl MetricCollector for TimeSeries {
         name: &str,
         suffix: &str,
         value: f64,
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&MetricTags>,
         extra: Option<(&str, String)>,
     ) {
         let timestamp = timestamp_millis.unwrap_or_else(|| self.default_timestamp());
@@ -441,9 +437,10 @@ const fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType
 mod tests {
     use std::collections::BTreeSet;
 
-    use chrono::{DateTime, TimeZone};
+    use chrono::{DateTime, TimeZone, Timelike};
     use indoc::indoc;
-    use pretty_assertions::assert_eq;
+    use similar_asserts::assert_eq;
+    use vector_lib::metric_tags;
 
     use super::{super::default_summary_quantiles, *};
     use crate::{
@@ -462,10 +459,8 @@ mod tests {
         s.finish()
     }
 
-    fn tags() -> BTreeMap<String, String> {
-        vec![("code".to_owned(), "200".to_owned())]
-            .into_iter()
-            .collect()
+    fn tags() -> MetricTags {
+        metric_tags!("code" => "200")
     }
 
     macro_rules! write_request {
@@ -673,7 +668,7 @@ mod tests {
             "requests".to_owned(),
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: vector_lib::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -808,7 +803,7 @@ mod tests {
             "requests".to_owned(),
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: vector_lib::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -865,7 +860,7 @@ mod tests {
             "requests".to_owned(),
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: vector_lib::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
         )
@@ -917,19 +912,19 @@ mod tests {
     }
 
     fn timestamp() -> DateTime<Utc> {
-        Utc.ymd(2021, 2, 3).and_hms_milli(4, 5, 6, 789)
+        Utc.with_ymd_and_hms(2021, 2, 3, 4, 5, 6)
+            .single()
+            .and_then(|t| t.with_nanosecond(789 * 1_000_000))
+            .expect("invalid timestamp")
     }
 
     #[test]
     fn escapes_tags_text() {
-        let tags: BTreeMap<String, String> = [
-            ("code", "200"),
-            ("quoted", r#"host"1""#),
-            ("path", r#"c:\Windows"#),
-        ]
-        .iter()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect();
+        let tags = metric_tags!(
+            "code" => "200",
+            "quoted" => r#"host"1""#,
+            "path" => r"c:\Windows",
+        );
         let metric = Metric::new(
             "something".to_owned(),
             MetricKind::Absolute,
@@ -943,6 +938,33 @@ mod tests {
                 # HELP something something
                 # TYPE something counter
                 something{code="200",path="c:\\Windows",quoted="host\"1\""} 1
+            "#}
+        );
+    }
+
+    /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    /// > Label names MUST be unique within a LabelSet.
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
+    /// we only publish the last tag in the list.
+    #[test]
+    fn encodes_duplicate_tags() {
+        let tags = metric_tags!(
+            "code" => "200",
+            "code" => "success",
+        );
+        let metric = Metric::new(
+            "something".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags));
+        let encoded = encode_one::<StringCollector>(None, &[], &[], &metric);
+        assert_eq!(
+            encoded,
+            indoc! {r#"
+                # HELP something something
+                # TYPE something counter
+                something{code="success"} 1
             "#}
         );
     }

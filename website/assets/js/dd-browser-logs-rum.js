@@ -15,7 +15,8 @@ if (datadogRum) {
       env,
       service: '{{ $ddConfig.service_name }}',
       version: '{{ $latest }}',
-      trackInteractions: true
+      trackInteractions: true,
+      internalAnalyticsSubdomain: '8b61d74c'
     });
   }
 }
@@ -27,7 +28,8 @@ if (datadogLogs) {
       forwardErrorsToLogs: true,
       env,
       service: '{{ $ddConfig.service_name }}',
-      version: '{{ $latest }}'
+      version: '{{ $latest }}',
+      internalAnalyticsSubdomain: '8b61d74c'
     })
   }
 }

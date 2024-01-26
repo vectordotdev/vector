@@ -47,6 +47,7 @@ components: sources: docker_logs: {
 
 	features: {
 		acknowledgements: false
+		auto_generated:   true
 		collect: {
 			checkpoint: enabled: false
 			from: {
@@ -72,14 +73,6 @@ components: sources: docker_logs: {
 		requirements: []
 		warnings: [
 			"""
-			Collecting logs directly from the Docker Engine is known to have
-			performance problems for very large setups. If you have a large
-			setup, please consider alternative collection methods, such as the
-			Docker [`syslog`](\(urls.docker_logging_driver_syslog)) or
-			[Docker `journald` driver](\(urls.docker_logging_driver_journald))
-			drivers.
-			""",
-			"""
 				To avoid collecting logs from itself when deployed as a container,
 				the Docker source uses current hostname to find out which container
 				it is inside. If a container's ID matches the hostname, that container
@@ -95,162 +88,7 @@ components: sources: docker_logs: {
 		platform_name: "docker"
 	}
 
-	configuration: {
-		docker_host: {
-			common: true
-			description: """
-				The Docker host to connect to. Use an HTTPS URL to enable TLS encryption.
-				If absent, Vector will try to use `DOCKER_HOST` environment variable.
-				If `DOCKER_HOST` is also absent, Vector will use default Docker local socket
-				(`/var/run/docker.sock` on Unix platforms, `//./pipe/docker_engine` on Windows).
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: [
-					"http://localhost:2375",
-					"https://localhost:2376",
-					"unix:///var/run/docker.sock",
-					"npipe:////./pipe/docker_engine",
-					"/var/run/docker.sock",
-					"//./pipe/docker_engine",
-				]
-			}
-		}
-		tls: {
-			common: false
-			description: """
-				TLS options to connect to the Docker daemon. This has no effect unless `docker_host` is an HTTPS URL.
-				If absent, Vector will try to use environment variable `DOCKER_CERT_PATH` and then `DOCKER_CONFIG`.
-				If both environment variables are absent, Vector will try to read certificates in `~/.docker/`.
-				"""
-			required: false
-			type: object: {
-				examples: []
-				options: {
-					ca_file: {
-						description: "Path to CA certificate file."
-						required:    true
-						type: string: {
-							examples: ["certs/ca.pem"]
-						}
-					}
-					crt_file: {
-						description: "Path to TLS certificate file."
-						required:    true
-						type: string: {
-							examples: ["certs/cert.pem"]
-						}
-					}
-					key_file: {
-						description: "Path to TLS key file."
-						required:    true
-						type: string: {
-							examples: ["certs/key.pem"]
-						}
-					}
-				}
-			}
-		}
-		auto_partial_merge: {
-			common: false
-			description: """
-				Setting this to `false` will disable the automatic merging
-				of partial events.
-				"""
-			required: false
-			type: bool: default: true
-		}
-		exclude_containers: {
-			common: false
-			description: """
-				A list of container IDs _or_ names to match against for
-				containers you don't want to collect logs from. Prefix matches
-				are supported, so you can supply just the first few characters
-				of the ID or name of containers you want to exclude. This can be
-				used in conjunction with
-				[`include_containers`](#include_containers).
-				"""
-			required: false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["exclude_", "exclude_me_0", "ad08cc418cf9"]
-				}
-			}
-		}
-		include_containers: {
-			common: true
-			description: """
-				A list of container IDs _or_ names to match against for
-				containers you want to collect logs from. Prefix matches are
-				supported, so you can supply just the first few characters of
-				the ID or name of containers you want to include. This can be
-				used in conjunction with
-				[`exclude_containers`](#exclude_containers).
-				"""
-			required: false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["include_", "include_me_0", "ad08cc418cf9"]
-				}
-			}
-		}
-		include_labels: {
-			common:      true
-			description: """
-				A list of container object labels to match against when
-				filtering running containers. This should follow the
-				described label's syntax in [docker object labels docs](\(urls.docker_object_labels)).
-				"""
-			required:    false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["com.example.vendor=Timber Inc.", "com.example.name=Vector"]
-				}
-			}
-		}
-		include_images: {
-			common: true
-			description: """
-				A list of image names to match against. If not provided, all
-				images will be included.
-				"""
-			required: false
-			type: array: {
-				default: null
-				items: type: string: {
-					examples: ["httpd", "redis"]
-				}
-			}
-		}
-		retry_backoff_secs: {
-			common: false
-			description: """
-				The amount of time to wait before retrying after an error.
-				"""
-			required: false
-			type: uint: {
-				unit:    "seconds"
-				default: 1
-			}
-		}
-		host_key: {
-			category:    "Context"
-			common:      false
-			description: """
-				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)global-options#log_schema.host_key).
-				"""
-			required:    false
-			warnings: []
-			type: string: {
-				default: "host"
-			}
-		}
-	}
+	configuration: base.components.sources.docker_logs.configuration
 
 	output: logs: {
 		log: {
@@ -312,11 +150,11 @@ components: sources: docker_logs: {
 					type: timestamp: {}
 				}
 				host: fields._local_host
-				"*": {
+				label: {
 					description: "Each container label is inserted with it's exact key/value pair."
 					required:    true
-					type: string: {
-						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+					type: object: {
+						examples: [{"mylabel": "myvalue"}]
 					}
 				}
 			}
@@ -370,19 +208,8 @@ components: sources: docker_logs: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                       components.sources.internal_metrics.output.metrics.events_in_total
-		communication_errors_total:            components.sources.internal_metrics.output.metrics.communication_errors_total
-		container_metadata_fetch_errors_total: components.sources.internal_metrics.output.metrics.container_metadata_fetch_errors_total
-		container_processed_events_total:      components.sources.internal_metrics.output.metrics.container_processed_events_total
-		containers_unwatched_total:            components.sources.internal_metrics.output.metrics.containers_unwatched_total
-		containers_watched_total:              components.sources.internal_metrics.output.metrics.containers_watched_total
-		logging_driver_errors_total:           components.sources.internal_metrics.output.metrics.logging_driver_errors_total
-		processed_bytes_total:                 components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:                components.sources.internal_metrics.output.metrics.processed_events_total
-		component_discarded_events_total:      components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:                components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:        components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:       components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total:  components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		container_processed_events_total: components.sources.internal_metrics.output.metrics.container_processed_events_total
+		containers_unwatched_total:       components.sources.internal_metrics.output.metrics.containers_unwatched_total
+		containers_watched_total:         components.sources.internal_metrics.output.metrics.containers_watched_total
 	}
 }

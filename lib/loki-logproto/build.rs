@@ -10,7 +10,7 @@ fn main() -> Result<()> {
             "proto/stats.proto",
             "proto/logproto.proto",
         ],
-        &["proto/"],
+        &["proto", "../../proto"],
     )?;
     Ok(())
 }

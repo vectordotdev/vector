@@ -1,43 +1,55 @@
+use std::time::Duration;
+
 use futures::{future, FutureExt};
-use vector_config::configurable_component;
+use serde_with::serde_as;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{blackhole::sink::BlackholeSink, Healthcheck, VectorSink},
 };
 
-const fn default_print_interval_secs() -> u64 {
-    1
+const fn default_print_interval_secs() -> Duration {
+    Duration::from_secs(0)
 }
 
 /// Configuration for the `blackhole` sink.
-#[configurable_component(sink("blackhole"))]
+#[serde_as]
+#[configurable_component(sink(
+    "blackhole",
+    "Send observability events nowhere, which can be useful for debugging purposes."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct BlackholeConfig {
-    /// The number of seconds between reporting a summary of activity.
+    /// The interval between reporting a summary of activity.
     ///
-    /// Set to `0` to disable reporting.
-    #[derivative(Default(value = "1"))]
+    /// Set to `0` (default) to disable reporting.
+    #[derivative(Default(value = "default_print_interval_secs()"))]
     #[serde(default = "default_print_interval_secs")]
-    pub print_interval_secs: u64,
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Print Interval"))]
+    #[configurable(metadata(docs::examples = 10))]
+    pub print_interval_secs: Duration,
 
     /// The number of events, per second, that the sink is allowed to consume.
     ///
     /// By default, there is no limit.
+    #[configurable(metadata(docs::examples = 1000))]
     pub rate: Option<usize>,
 
     #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = BlackholeSink::new(self.clone());
@@ -57,7 +69,7 @@ impl SinkConfig for BlackholeConfig {
 
 impl GenerateConfig for BlackholeConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
+        toml::Value::try_from(Self::default()).unwrap()
     }
 }
 

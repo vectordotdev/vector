@@ -178,6 +178,8 @@ components: {
 		}
 		let Args = _args
 
+		auto_generated: bool | *false
+
 		if Args.kind == "source" {
 			acknowledgements: bool
 			collect?:         #FeaturesCollect
@@ -210,13 +212,14 @@ components: {
 				enabled: true
 			}
 
-			// `healtcheck` notes if a component offers a healthcheck on boot.
+			// `healthcheck` notes if a component offers a healthcheck on boot.
 			healthcheck: {
-				enabled: bool
+				enabled:   bool
+				uses_uri?: bool
 			}
 
-			exposes?: #FeaturesExpose
-			send?:    #FeaturesSend & {_args: Args}
+			exposes?:                      #FeaturesExpose
+			send?: #FeaturesSend & {_args: Args}
 		}
 
 		descriptions: [Name=string]: string
@@ -376,7 +379,7 @@ components: {
 
 					if enabled {
 						framing: bool | *false
-						enum:    [#EncodingCodec, ...#EncodingCodec] | null
+						enum: [#EncodingCodec, ...#EncodingCodec] | null
 					}
 				}
 			}
@@ -494,8 +497,8 @@ components: {
 			#RequiredFor: "operation" | "healthcheck"
 
 			// TODO: come up with a less janky URL generation scheme
-			_action:        !=""
-			required_for:   *["operation"] | [#RequiredFor, ...#RequiredFor]
+			_action: !=""
+			required_for: *["operation"] | [#RequiredFor, ...#RequiredFor]
 			docs_url:       !=""
 			required_when?: !=""
 
@@ -618,20 +621,29 @@ components: {
 				let Args = _args
 
 				common:      false
-				description: "Configures the TLS options for incoming connections."
+				description: "Configures the TLS options for incoming/outgoing connections."
 				required:    false
 				type: object: options: {
 					enabled: {
-						common:      false
-						description: "Require TLS for incoming connections. If this is set, an identity certificate is also required."
-						required:    false
+						common: false
+						description: """
+							Whether or not to require TLS for incoming/outgoing connections.
+
+							When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+							more information.
+							"""
+						required: false
 						type: bool: default: Args.enabled_default
 					}
 
 					ca_file: {
-						common:      false
-						description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an in-line CA certificate in PEM format."
-						required:    false
+						common: false
+						description: """
+							Absolute path to an additional CA certificate file.
+
+							The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+							"""
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
@@ -640,7 +652,7 @@ components: {
 					if Args.can_add_client_metadata {
 						client_metadata_key: {
 							common:      false
-							description: "The key name added to each event with the client certificate's metadata."
+							description: "Event field for client certificate metadata."
 							required:    false
 							type: string: {
 								default: null
@@ -649,27 +661,42 @@ components: {
 						}
 					}
 					crt_file: {
-						common:      false
-						description: "Absolute path to a certificate file used to identify this server, in DER or PEM format (X.509) or PKCS#12, or an in-line certificate in PEM format. If this is set, and is not a PKCS#12 archive, `key_file` must also be set. This is required if `enabled` is set to `true`."
-						required:    false
+						common: false
+						description: """
+							Absolute path to a certificate file used to identify this server.
+
+							The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+							an inline string in PEM format.
+
+							If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+							"""
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
 						}
 					}
 					key_file: {
-						common:      false
-						description: "Absolute path to a private key file used to identify this server, in DER or PEM format (PKCS#8), or an in-line private key in PEM format."
-						required:    false
+						common: false
+						description: """
+							Absolute path to a private key file used to identify this server.
+
+							The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+							"""
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
 						}
 					}
 					key_pass: {
-						common:      false
-						description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
-						required:    false
+						common: false
+						description: """
+							Passphrase used to unlock the encrypted key file.
+
+							This has no effect unless `key_file` is set.
+							"""
+						required: false
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
@@ -678,9 +705,20 @@ components: {
 
 					if Args.can_verify_certificate {
 						verify_certificate: {
-							common:      false
-							description: "If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if the certificate is not valid. If `false` (the default), Vector will not request a certificate from the client."
-							required:    false
+							common: false
+							description: """
+								Enables certificate verification.
+
+								If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
+								issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
+								certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
+								so on until reaching a root certificate.
+
+								Relevant for both incoming and outgoing connections.
+
+								Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+								"""
+							required: false
 							type: bool: default: false
 						}
 					}
@@ -697,58 +735,87 @@ components: {
 				let Args = _args
 
 				common:      false
-				description: "Configures the TLS options for outgoing connections."
+				description: "Configures the TLS options for incoming/outgoing connections."
 				required:    false
 				type: object: options: {
 					if !Args.enabled_by_scheme {
 						enabled: {
-							common:      true
-							description: "Enable TLS during connections to the remote."
-							required:    false
+							common: true
+							description: """
+								Whether or not to require TLS for incoming/outgoing connections.
+
+								When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+								more information.
+								"""
+							required: false
 							type: bool: default: Args.enabled_default
 						}
 					}
 
 					ca_file: {
-						common:      false
-						description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an inline CA certificate in PEM format."
-						required:    false
+						common: false
+						description: """
+							Absolute path to an additional CA certificate file.
+
+							The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+							"""
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
 						}
 					}
 					crt_file: {
-						common:      true
-						description: "Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If this is set and is not a PKCS#12 archive, `key_file` must also be set."
-						required:    false
+						common: true
+						description: """
+							Absolute path to a certificate file used to identify this server.
+
+							The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+							an inline string in PEM format.
+
+							If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+							"""
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
 						}
 					}
 					key_file: {
-						common:      true
-						description: "Absolute path to a private key file used to identify this connection, in DER or PEM format (PKCS#8), or an inline private key in PEM format. If this is set, `crt_file` must also be set."
-						required:    false
+						common: true
+						description: """
+							Absolute path to a private key file used to identify this server.
+
+							The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+							"""
+						required: false
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
 						}
 					}
 					key_pass: {
-						common:      false
-						description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
-						required:    false
+						common: false
+						description: """
+							Passphrase used to unlock the encrypted key file.
+
+							This has no effect unless `key_file` is set.
+							"""
+						required: false
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 						}
 					}
 					alpn_protocols: {
-						common:      false
-						description: "Sets the list of supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order they are defined."
-						required:    false
+						common: false
+						description: """
+							Sets the list of supported ALPN protocols.
+
+							Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
+							they are defined.
+							"""
+						required: false
 						type: array: {
 							default: null
 							items: type: string: {
@@ -760,18 +827,38 @@ components: {
 
 					if Args.can_verify_certificate {
 						verify_certificate: {
-							common:      false
-							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host. Specifically the issuer is checked but not CRLs (Certificate Revocation Lists)."
-							required:    false
+							common: false
+							description: """
+								Enables certificate verification.
+
+								If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
+								issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
+								certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
+								so on until reaching a root certificate.
+
+								Relevant for both incoming and outgoing connections.
+
+								Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+								"""
+							required: false
 							type: bool: default: true
 						}
 					}
 
 					if Args.can_verify_hostname {
 						verify_hostname: {
-							common:      false
-							description: "If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname."
-							required:    false
+							common: false
+							description: """
+								Enables hostname verification.
+
+								If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+								the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+
+								Only relevant for outgoing connections.
+
+								Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+								"""
+							required: false
 							type: bool: default: true
 						}
 					}
@@ -779,50 +866,64 @@ components: {
 			}
 
 			_proxy: {
-				common:      false
-				description: "Configures an HTTP(S) proxy for Vector to use. By default, the globally configured proxy is used."
-				required:    false
+				common: false
+				description: """
+					Proxy configuration.
+
+					Configure to proxy traffic through an HTTP(S) proxy when making external requests.
+
+					Similar to common proxy configuration convention, users can set different proxies
+					to use based on the type of traffic being proxied, as well as set specific hosts that
+					should not be proxied.
+					"""
+				required: false
 				type: object: options: {
 					enabled: {
 						common:      false
-						description: "If false the proxy will be disabled."
+						description: "Enables proxying support."
 						required:    false
 						type: bool: default: true
 					}
 					http: {
-						common:      false
-						description: "The URL to proxy HTTP requests through."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["http://foo.bar:3128"]
-						}
+						common: false
+						description: """
+							Proxy endpoint to use when proxying HTTP traffic.
+
+							Must be a valid URI string.
+							"""
+						required: false
+						type: string: examples: ["http://foo.bar:3128"]
 					}
 					https: {
-						common:      false
-						description: "The URL to proxy HTTPS requests through."
-						required:    false
-						type: string: {
-							default: null
-							examples: ["http://foo.bar:3128"]
-						}
+						common: false
+						description: """
+							Proxy endpoint to use when proxying HTTPS traffic.
+
+							Must be a valid URI string.
+							"""
+						required: false
+						type: string: examples: ["http://foo.bar:3128"]
 					}
 					no_proxy: {
-						common:      false
+						common: false
 						description: """
-							A list of hosts to avoid proxying. Allowed patterns here include:
+							A list of hosts to avoid proxying.
 
-							Pattern | Example match
-							:-------|:-------------
-							Domain names | `example.com` matches requests to `example.com`
-							Wildcard domains | `.example.com` matches requests to `example.com` and its subdomains
-							IP addresses | `127.0.0.1` matches requests to 127.0.0.1
-							[CIDR](\(urls.cidr)) blocks | `192.168.0.0./16` matches requests to any IP addresses in this range
-							Splat | `*` matches all hosts
+							Multiple patterns are allowed:
+
+							| Pattern             | Example match                                                               |
+							| ------------------- | --------------------------------------------------------------------------- |
+							| Domain names        | `example.com` matches requests to `example.com`                     |
+							| Wildcard domains    | `.example.com` matches requests to `example.com` and its subdomains |
+							| IP addresses        | `127.0.0.1` matches requests to `127.0.0.1`                         |
+							| [CIDR][cidr] blocks | `192.168.0.0/16` matches requests to any IP addresses in this range     |
+							| Splat               | `*` matches all hosts                                                   |
+
+							[cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 							"""
-						required:    false
+						required: false
 						type: array: {
-							default: null
+							default: []
 							items: type: string: {
 								examples: ["localhost", ".foo.bar", "*"]
 							}
@@ -934,25 +1035,6 @@ components: {
 						},
 					]
 					options: {}
-				}
-			}
-
-			if Kind != "source" {
-				inputs: {
-					description: """
-						A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms))
-						IDs. Wildcards (`*`) are supported.
-
-						See [configuration](\(urls.vector_configuration)) for more info.
-						"""
-					required:    true
-					sort:        -1
-					type: array: items: type: string: {
-						examples: [
-							"my-source-or-transform-id",
-							"prefix-*",
-						]
-					}
 				}
 			}
 
@@ -1192,14 +1274,6 @@ components: {
 					type:              "gauge"
 					default_namespace: "vector"
 				}
-			}
-		}
-
-		if Kind == "transform" {
-			telemetry: metrics: {
-				// Default metrics for each transform
-				processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
-				processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
 			}
 		}
 

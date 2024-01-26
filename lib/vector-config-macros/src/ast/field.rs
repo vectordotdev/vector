@@ -1,14 +1,19 @@
-use darling::{util::Flag, FromAttributes};
+use darling::{
+    util::{Flag, Override, SpannedValue},
+    FromAttributes,
+};
+use proc_macro2::{Span, TokenStream};
+use quote::ToTokens;
 use serde_derive_internals::ast as serde_ast;
-use syn::{parse_quote, spanned::Spanned, ExprPath, Ident};
-use vector_config_common::{attributes::CustomAttribute, validation::Validation};
+use syn::{parse_quote, ExprPath, Ident};
+use vector_config_common::{configurable_package_name_hack, validation::Validation};
 
 use super::{
     util::{
-        err_field_missing_description, find_delegated_serde_deser_ty, get_serde_default_value,
-        try_extract_doc_title_description,
+        err_field_implicit_transparent, err_field_missing_description,
+        find_delegated_serde_deser_ty, get_serde_default_value, try_extract_doc_title_description,
     },
-    Metadata,
+    LazyCustomAttribute, Metadata,
 };
 
 /// A field of a container.
@@ -24,14 +29,22 @@ impl<'a> Field<'a> {
     pub fn from_ast(
         serde: &serde_ast::Field<'a>,
         is_virtual_newtype: bool,
+        is_newtype_wrapper_field: bool,
     ) -> darling::Result<Field<'a>> {
         let original = serde.original;
 
-        let name = serde.attrs.name().deserialize_name();
-        let default_value = get_serde_default_value(serde.attrs.default());
+        let name = serde.attrs.name().deserialize_name().to_string();
+        let default_value = get_serde_default_value(&serde.ty, serde.attrs.default());
 
         Attributes::from_attributes(&original.attrs)
-            .and_then(|attrs| attrs.finalize(serde, &original.attrs, is_virtual_newtype))
+            .and_then(|attrs| {
+                attrs.finalize(
+                    serde,
+                    &original.attrs,
+                    is_virtual_newtype,
+                    is_newtype_wrapper_field,
+                )
+            })
             .map(|attrs| Field {
                 original,
                 name,
@@ -162,7 +175,7 @@ impl<'a> Field<'a> {
     /// variants, to simply document themselves at the container/variant level and avoid needing to
     /// document that inner field which itself needs no further title/description.
     pub fn transparent(&self) -> bool {
-        self.attrs.transparent.is_some()
+        self.attrs.transparent.is_present()
     }
 
     /// Whether or not the field is deprecated.
@@ -173,6 +186,17 @@ impl<'a> Field<'a> {
     /// deprecation status of a field when it is present.
     pub fn deprecated(&self) -> bool {
         self.attrs.deprecated.is_some()
+    }
+
+    /// The deprecated message, if one has been set.
+    pub fn deprecated_message(&self) -> Option<&String> {
+        self.attrs
+            .deprecated
+            .as_ref()
+            .and_then(|message| match message {
+                Override::Inherit => None,
+                Override::Explicit(message) => Some(message),
+            })
     }
 
     /// Validation rules specific to the field, if any.
@@ -207,7 +231,7 @@ impl<'a> Field<'a> {
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
     /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
     /// metadata to be attached directly to fields.
-    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
+    pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
         self.attrs
             .metadata
             .clone()
@@ -216,12 +240,9 @@ impl<'a> Field<'a> {
     }
 }
 
-impl<'a> Spanned for Field<'a> {
-    fn span(&self) -> proc_macro2::Span {
-        match self.original.ident.as_ref() {
-            Some(ident) => ident.span(),
-            None => self.original.ty.span(),
-        }
+impl<'a> ToTokens for Field<'a> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.original.to_tokens(tokens)
     }
 }
 
@@ -230,9 +251,9 @@ impl<'a> Spanned for Field<'a> {
 struct Attributes {
     title: Option<String>,
     description: Option<String>,
-    derived: Flag,
-    transparent: Flag,
-    deprecated: Flag,
+    derived: SpannedValue<Flag>,
+    transparent: SpannedValue<Flag>,
+    deprecated: Option<Override<String>>,
     #[darling(skip)]
     visible: bool,
     #[darling(skip)]
@@ -251,6 +272,7 @@ impl Attributes {
         field: &serde_ast::Field<'_>,
         forwarded_attrs: &[syn::Attribute],
         is_virtual_newtype: bool,
+        is_newtype_wrapper_field: bool,
     ) -> darling::Result<Self> {
         // Derive any of the necessary fields from the `serde` side of things.
         self.visible = !field.attrs.skip_deserializing() || !field.attrs.skip_serializing();
@@ -263,6 +285,30 @@ impl Attributes {
         self.title = self.title.or(doc_title);
         self.description = self.description.or(doc_description);
 
+        // If the field is part of a newtype wrapper -- it has the be the only field, and unnamed,
+        // like `struct Foo(usize)` -- then we simply mark it as transparent.
+        //
+        // We do this because the container -- struct or enum variant -- will itself be required to
+        // have a description. We never show the description of unnamed fields, anyways, as we defer
+        // to using the description of the container. Simply marking this field as transparent will
+        // keep the schema generation happy and avoid having to constantly specify `derived` or
+        // `transparent` all over the place.
+        if is_newtype_wrapper_field {
+            // We additionally check here to see if transparent/derived as already set, as we want
+            // to throw an error if they are. As we're going to forcefully mark the field as
+            // transparent, there's no reason to allow setting derived/transparent manually, as it
+            // only leads to boilerplate and potential confusion.
+            if self.transparent.is_present() {
+                return Err(err_field_implicit_transparent(&self.transparent.span()));
+            }
+
+            if self.derived.is_present() {
+                return Err(err_field_implicit_transparent(&self.derived.span()));
+            }
+
+            self.transparent = SpannedValue::new(Flag::present(), Span::call_site());
+        }
+
         // If no description was provided for the field, it is typically an error. There are few situations when this is
         // fine/valid, though:
         //
@@ -271,8 +317,9 @@ impl Attributes {
         // - the field is not visible (`#[serde(skip)]`, or `skip_serializing` plus `skip_deserializing`)
         // - the field is flattened (`#[serde(flatten)]`)
         // - the field is part of a virtual newtype
+        // - the field is part of a newtype wrapper (struct/enum variant with a single unnamed field)
         //
-        // If a field is derived, it means we're taking the description/title from the `Configurable` implementation of
+        // If the field is derived, it means we're taking the description/title from the `Configurable` implementation of
         // the field type, which we can only do at runtime so we ignore it here. Similarly, if a field is transparent,
         // we're explicitly saying that our container is meant to essentially take on the schema of the field, rather
         // than the container being defined by the fields, if that makes sense. Derived and transparent fields are most
@@ -284,14 +331,14 @@ impl Attributes {
         // we're lifting up all the fields from the type of the field itself, so again, requiring a description or title
         // makes no sense.
         //
-        // Finally, if a field is part of a virtual newtype, this means the container has instructed `serde` to
+        // If the field is part of a virtual newtype, this means the container has instructed `serde` to
         // (de)serialize it as some entirely different type. This means the original field will never show up in a
-        // schema, because the schema of the thing being (de)esrialized is some `T`, not `ContainerType`. Simply put,
+        // schema, because the schema of the thing being (de)serialized is some `T`, not `ContainerType`. Simply put,
         // like a field that is flattened or not visible, it makes no sense to require a description or title for fields
         // in a virtual newtype.
         if self.description.is_none()
-            && !self.derived.is_some()
-            && !self.transparent.is_some()
+            && !self.derived.is_present()
+            && !self.transparent.is_present()
             && self.visible
             && !self.flatten
             && !is_virtual_newtype
@@ -305,7 +352,8 @@ impl Attributes {
             // serialize wrapper, since we know we'll have to do that in a few different places
             // during codegen, so it's cleaner to do it here.
             let field_ty = field.ty;
-            parse_quote! { ::vector_config::ser::Delegated<#field_ty, #virtual_ty> }
+            let vector_config = configurable_package_name_hack();
+            parse_quote! { #vector_config::ser::Delegated<#field_ty, #virtual_ty> }
         });
 
         Ok(self)

@@ -1,15 +1,24 @@
-use std::{fmt, future::Future, hash::Hash, num::NonZeroUsize, pin::Pin, sync::Arc};
+use std::{
+    convert::Infallible,
+    fmt,
+    future::Future,
+    hash::Hash,
+    num::NonZeroUsize,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use futures_util::{stream::Map, Stream, StreamExt};
+use pin_project::pin_project;
 use tower::Service;
-use vector_core::{
+use vector_lib::stream::{
+    batcher::{config::BatchConfig, Batcher},
+    ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
+};
+use vector_lib::{
     event::{Finalizable, Metric},
     partition::Partitioner,
-    stream::{
-        batcher::{config::BatchConfig, Batcher},
-        BatcherSettings, ConcurrentMap, Driver, DriverResponse, ExpirationQueue,
-        PartitionedBatcher,
-    },
     ByteSizeOf,
 };
 
@@ -20,21 +29,33 @@ use super::{
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
 
 pub trait SinkBuilderExt: Stream {
+    /// Converts a stream of infallible results by unwrapping them.
+    ///
+    /// For a stream of `Result<T, Infallible>` items, this turns it into a stream of `T` items.
+    fn unwrap_infallible<T>(self) -> UnwrapInfallible<Self>
+    where
+        Self: Stream<Item = Result<T, Infallible>> + Sized,
+    {
+        UnwrapInfallible { st: self }
+    }
+
     /// Batches the stream based on the given partitioner and batch settings.
     ///
     /// The stream will yield batches of events, with their partition key, when either a batch fills
     /// up or times out. [`Partitioner`] operates on a per-event basis, and has access to the event
     /// itself, and so can access any and all fields of an event.
-    fn batched_partitioned<P>(
+    fn batched_partitioned<P, C, F, B>(
         self,
         partitioner: P,
-        settings: BatcherSettings,
-    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>>
+        settings: F,
+    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>, C, F, B>
     where
         Self: Stream<Item = P::Item> + Sized,
         P: Partitioner + Unpin,
         P::Key: Eq + Hash + Clone,
         P::Item: ByteSizeOf,
+        C: BatchConfig<P::Item>,
+        F: Fn() -> C + Send,
     {
         PartitionedBatcher::new(self, partitioner, settings)
     }
@@ -62,28 +83,27 @@ pub trait SinkBuilderExt: Stream {
     ///
     /// If the spawned future panics, the panic will be carried through and resumed on the task
     /// calling the stream.
-    fn concurrent_map<F, T>(self, limit: Option<NonZeroUsize>, f: F) -> ConcurrentMap<Self, T>
+    fn concurrent_map<F, T>(self, limit: NonZeroUsize, f: F) -> ConcurrentMap<Self, T>
     where
         Self: Sized,
         F: Fn(Self::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send + 'static,
         T: Send + 'static,
     {
-        ConcurrentMap::new(self, limit, f)
+        ConcurrentMap::new(self, Some(limit), f)
     }
 
     /// Constructs a [`Stream`] which transforms the input into a request suitable for sending to
     /// downstream services.
     ///
-    /// Each input is transformed concurrently, up to the given limit.  A limit of `None` is
-    /// self-describing, as it imposes no concurrency limit, and `Some(n)` limits this stage to `n`
-    /// concurrent operations at any given time.
+    /// Each input is transformed concurrently, up to the given limit.  A limit of `n` limits
+    /// this stage to `n` concurrent operations at any given time.
     ///
     /// Encoding and compression are handled internally, deferring to the builder at the necessary
     /// checkpoints for adjusting the event before encoding/compression, as well as generating the
     /// correct request object with the result of encoding/compressing the events.
     fn request_builder<B>(
         self,
-        limit: Option<NonZeroUsize>,
+        limit: NonZeroUsize,
         builder: B,
     ) -> ConcurrentMap<Self, Result<B::Request, B::Error>>
     where
@@ -100,13 +120,21 @@ pub trait SinkBuilderExt: Stream {
 
             Box::pin(async move {
                 // Split the input into metadata and events.
-                let (metadata, events) = builder.split_input(input);
+                let (metadata, request_metadata_builder, events) = builder.split_input(input);
 
                 // Encode the events.
                 let payload = builder.encode_events(events)?;
 
+                // Note: it would be nice for the RequestMetadataBuilder to build be created from the
+                // events here, and not need to be required by split_input(). But this then requires
+                // each Event type to implement Serialize, and that causes conflicts with the Serialize
+                // implementation for EstimatedJsonEncodedSizeOf.
+
+                // Build the request metadata.
+                let request_metadata = request_metadata_builder.build(&payload);
+
                 // Now build the actual request.
-                Ok(builder.build_request(metadata, payload))
+                Ok(builder.build_request(metadata, request_metadata, payload))
             })
         })
     }
@@ -200,5 +228,25 @@ pub trait SinkBuilderExt: Stream {
         Svc::Response: DriverResponse,
     {
         Driver::new(self, service)
+    }
+}
+
+#[pin_project]
+pub struct UnwrapInfallible<St> {
+    #[pin]
+    st: St,
+}
+
+impl<St, T> Stream for UnwrapInfallible<St>
+where
+    St: Stream<Item = Result<T, Infallible>>,
+{
+    type Item = T;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+        this.st
+            .poll_next(cx)
+            .map(|maybe| maybe.map(|result| result.unwrap()))
     }
 }

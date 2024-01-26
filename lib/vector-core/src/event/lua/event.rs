@@ -1,14 +1,27 @@
 use mlua::prelude::*;
 
-use crate::event::{Event, LogEvent, Metric};
+use super::super::{Event, LogEvent, Metric};
+use super::metric::LuaMetric;
 
-impl<'a> ToLua<'a> for Event {
+pub struct LuaEvent {
+    pub event: Event,
+    pub metric_multi_value_tags: bool,
+}
+
+impl<'a> IntoLua<'a> for LuaEvent {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
-    fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
-        match self {
-            Event::Log(log) => table.raw_set("log", log.to_lua(lua)?)?,
-            Event::Metric(metric) => table.raw_set("metric", metric.to_lua(lua)?)?,
+        match self.event {
+            Event::Log(log) => table.raw_set("log", log.into_lua(lua)?)?,
+            Event::Metric(metric) => table.raw_set(
+                "metric",
+                LuaMetric {
+                    metric,
+                    multi_value_tags: self.metric_multi_value_tags,
+                }
+                .into_lua(lua)?,
+            )?,
             Event::Trace(_) => {
                 return Err(LuaError::ToLuaConversionError {
                     from: "Event",
@@ -23,15 +36,12 @@ impl<'a> ToLua<'a> for Event {
 
 impl<'a> FromLua<'a> for Event {
     fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
-        let table = match &value {
-            LuaValue::Table(t) => t,
-            _ => {
-                return Err(LuaError::FromLuaConversionError {
-                    from: value.type_name(),
-                    to: "Event",
-                    message: Some("Event should be a Lua table".to_string()),
-                })
-            }
+        let LuaValue::Table(table) = &value else {
+            return Err(LuaError::FromLuaConversionError {
+                from: value.type_name(),
+                to: "Event",
+                message: Some("Event should be a Lua table".to_string()),
+            });
         };
         match (table.raw_get("log")?, table.raw_get("metric")?) {
             (LuaValue::Table(log), LuaValue::Nil) => {
@@ -63,7 +73,15 @@ mod test {
 
     fn assert_event(event: Event, assertions: Vec<&'static str>) {
         let lua = Lua::new();
-        lua.globals().set("event", event).unwrap();
+        lua.globals()
+            .set(
+                "event",
+                LuaEvent {
+                    event,
+                    metric_multi_value_tags: false,
+                },
+            )
+            .unwrap();
         for assertion in assertions {
             assert!(
                 lua.load(assertion).eval::<bool>().expect(assertion),
@@ -74,7 +92,7 @@ mod test {
     }
 
     #[test]
-    fn to_lua_log() {
+    fn into_lua_log() {
         let mut event = LogEvent::default();
         event.insert("field", "value");
 
@@ -89,7 +107,7 @@ mod test {
     }
 
     #[test]
-    fn to_lua_metric() {
+    fn into_lua_metric() {
         let event = Event::Metric(Metric::new(
             "example counter",
             MetricKind::Absolute,
@@ -151,11 +169,13 @@ mod test {
     }
 
     #[test]
+    // the panic message a) is platform dependent and b) can change if any code is added before this function.
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn from_lua_missing_log_and_metric() {
-        let lua_event = r#"{
+        let lua_event = r"{
             some_field: {}
-        }"#;
+        }";
         Lua::new().load(lua_event).eval::<Event>().unwrap();
     }
 }

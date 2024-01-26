@@ -2,7 +2,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# upload-test-restults.sh
+# upload-test-results.sh
 #
 # SUMMARY
 #

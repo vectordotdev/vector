@@ -3,23 +3,25 @@ use std::sync::Arc;
 use futures::{stream, Sink, Stream};
 use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
 use tokio::sync::{oneshot, Mutex};
-use vector_config::configurable_component;
-use vector_core::{
-    config::{DataType, Input, LogNamespace, Output},
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
+    config::{DataType, Input, LogNamespace},
     event::Event,
+    schema,
     sink::{StreamSink, VectorSink},
 };
 
 use crate::{
     conditions::Condition,
-    config::{AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext},
-    impl_generate_config_from_default,
+    config::{
+        AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
+    },
     sinks::Healthcheck,
     sources,
 };
 
 /// Configuration for the `unit_test` source.
-#[configurable_component(source("unit_test"))]
+#[configurable_component(source("unit_test", "Unit test."))]
 #[derive(Clone, Debug, Default)]
 pub struct UnitTestSourceConfig {
     /// List of events sent from this source as part of the test.
@@ -30,6 +32,7 @@ pub struct UnitTestSourceConfig {
 impl_generate_config_from_default!(UnitTestSourceConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "unit_test")]
 impl SourceConfig for UnitTestSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let events = self.events.clone().into_iter();
@@ -42,8 +45,11 @@ impl SourceConfig for UnitTestSourceConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_logs(
+            DataType::all(),
+            schema::Definition::default_legacy_namespace(),
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -52,7 +58,7 @@ impl SourceConfig for UnitTestSourceConfig {
 }
 
 /// Configuration for the `unit_test_stream` source.
-#[configurable_component(source("unit_test_stream"))]
+#[configurable_component(source("unit_test_stream", "Unit test stream."))]
 #[derive(Clone)]
 pub struct UnitTestStreamSourceConfig {
     #[serde(skip)]
@@ -84,6 +90,7 @@ impl std::fmt::Debug for UnitTestStreamSourceConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "unit_test_stream")]
 impl SourceConfig for UnitTestStreamSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let stream = self.stream.lock().await.take().unwrap();
@@ -95,8 +102,11 @@ impl SourceConfig for UnitTestStreamSourceConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::all())]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_logs(
+            DataType::all(),
+            schema::Definition::default_legacy_namespace(),
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -104,7 +114,7 @@ impl SourceConfig for UnitTestStreamSourceConfig {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum UnitTestSinkCheck {
     /// Check all events that are received against the list of conditions.
     Checks(Vec<Vec<Condition>>),
@@ -113,13 +123,8 @@ pub enum UnitTestSinkCheck {
     NoOutputs,
 
     /// Do nothing.
+    #[default]
     NoOp,
-}
-
-impl Default for UnitTestSinkCheck {
-    fn default() -> Self {
-        UnitTestSinkCheck::NoOp
-    }
 }
 
 #[derive(Debug)]
@@ -129,7 +134,7 @@ pub struct UnitTestSinkResult {
 }
 
 /// Configuration for the `unit_test` sink.
-#[configurable_component(sink("unit_test"))]
+#[configurable_component(sink("unit_test", "Unit test."))]
 #[derive(Clone, Default, Derivative)]
 #[derivative(Debug)]
 pub struct UnitTestSinkConfig {
@@ -152,6 +157,7 @@ pub struct UnitTestSinkConfig {
 impl_generate_config_from_default!(UnitTestSinkConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = self.result_tx.lock().await.take();
@@ -266,7 +272,7 @@ impl StreamSink<Event> for UnitTestSink {
 }
 
 /// Configuration for the `unit_test_stream` sink.
-#[configurable_component(sink("unit_test_stream"))]
+#[configurable_component(sink("unit_test_stream", "Unit test stream."))]
 #[derive(Clone, Default)]
 pub struct UnitTestStreamSinkConfig {
     /// Sink that receives the processed events.
@@ -291,11 +297,13 @@ impl std::fmt::Debug for UnitTestStreamSinkConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "unit_test_stream")]
 impl SinkConfig for UnitTestStreamSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = self.sink.lock().await.take().unwrap();
         let healthcheck = future::ok(()).boxed();
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 

@@ -16,6 +16,7 @@ components: sources: fluent: {
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		receive: {
 			from: {
 				service: services.fluent
@@ -50,26 +51,7 @@ components: sources: fluent: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		address: {
-			description: "The address to listen for TCP connections on."
-			required:    true
-			type: string: {
-				examples: ["0.0.0.0:\(_port)"]
-			}
-		}
-		connection_limit: {
-			common:        false
-			description:   "The max number of TCP connections that will be processed."
-			relevant_when: "mode = `tcp`"
-			required:      false
-			type: uint: {
-				default: null
-				unit:    "concurrency"
-			}
-		}
-	}
+	configuration: base.components.sources.fluent.configuration
 
 	output: logs: line: {
 		description: "A Fluent message"
@@ -192,14 +174,5 @@ components: sources: fluent: {
 				If you would find this useful, [please let us know](\(urls.vector_repo)/issues/7532).
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		decode_errors_total:             components.sources.internal_metrics.output.metrics.decode_errors_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_bytes_total:  components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

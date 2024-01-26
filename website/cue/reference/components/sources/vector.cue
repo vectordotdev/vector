@@ -13,12 +13,13 @@ components: sources: vector: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {
@@ -52,36 +53,12 @@ components: sources: vector: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		address: {
-			description: """
-				The HTTP address to listen for connections on. It _must_ include a port.
-				"""
-			required: true
-			type: string: {
-				examples: ["0.0.0.0:\(_port)"]
-			}
-		}
-		version: {
-			description: "Source API version. Specifying this version ensures that Vector does not silently break backward compatibility."
-			common:      true
-			required:    false
-			warnings: ["Ensure you use the same version for both the source and sink."]
-			type: string: {
-				enum: {
-					"2": "Vector source API version 2"
-				}
-				default: "2"
-			}
-		}
-	}
+	configuration: base.components.sources.vector.configuration
 
 	output: {
 		logs: event: {
 			description: "A Vector event"
 			fields: {
-				client_metadata: fields._client_metadata
 				source_type: {
 					description: "The name of the source type."
 					required:    true
@@ -123,12 +100,9 @@ components: sources: vector: {
 	}
 
 	telemetry: metrics: {
-		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		grpc_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.grpc_server_handler_duration_seconds
+		grpc_server_messages_received_total:  components.sources.internal_metrics.output.metrics.grpc_server_messages_received_total
+		grpc_server_messages_sent_total:      components.sources.internal_metrics.output.metrics.grpc_server_messages_sent_total
 		protobuf_decode_errors_total:         components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
 	}
 }

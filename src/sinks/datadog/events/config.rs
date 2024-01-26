@@ -1,11 +1,12 @@
-use futures::FutureExt;
 use indoc::indoc;
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::config::proxy::ProxyConfig;
+use vector_lib::config::proxy::ProxyConfig;
+use vector_lib::configurable::configurable_component;
+use vector_lib::schema;
+use vrl::value::Kind;
 
 use crate::{
+    common::datadog,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -14,55 +15,28 @@ use crate::{
                 service::{DatadogEventsResponse, DatadogEventsService},
                 sink::DatadogEventsSink,
             },
-            get_api_base_endpoint, get_api_validate_endpoint, healthcheck, Region,
+            get_api_base_endpoint, DatadogCommonConfig, LocalDatadogCommonConfig,
         },
         util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::MaybeTlsSettings,
 };
 
 /// Configuration for the `datadog_events` sink.
-#[configurable_component(sink("datadog_events"))]
-#[derive(Clone, Debug)]
+#[configurable_component(sink(
+    "datadog_events",
+    "Publish observability events to the Datadog Events API."
+))]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogEventsConfig {
-    /// The endpoint to send events to.
-    pub endpoint: Option<String>,
-
-    /// The Datadog region to send events to.
-    ///
-    /// This option is deprecated, and the `site` field should be used instead.
-    #[configurable(deprecated)]
-    pub region: Option<Region>,
-
-    /// The Datadog [site][dd_site] to send events to.
-    ///
-    /// [dd_site]: https://docs.datadoghq.com/getting_started/site
-    pub site: Option<String>,
-
-    /// The default Datadog [API key][api_key] to send events with.
-    ///
-    /// If an event has a Datadog [API key][api_key] set explicitly in its metadata, it will take
-    /// precedence over the default.
-    ///
-    /// [api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
-    pub default_api_key: SensitiveString,
-
-    #[configurable(derived)]
-    pub(super) tls: Option<TlsEnableableConfig>,
+    #[serde(flatten)]
+    pub dd_common: LocalDatadogCommonConfig,
 
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
-
-    #[configurable(derived)]
-    #[serde(
-        default,
-        deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogEventsConfig {
@@ -75,40 +49,33 @@ impl GenerateConfig for DatadogEventsConfig {
 }
 
 impl DatadogEventsConfig {
-    fn get_api_events_endpoint(&self) -> http::Uri {
+    fn get_api_events_endpoint(&self, dd_common: &DatadogCommonConfig) -> http::Uri {
         let api_base_endpoint =
-            get_api_base_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region);
+            get_api_base_endpoint(dd_common.endpoint.as_ref(), dd_common.site.as_str());
 
         // We know this URI will be valid since we have just built it up ourselves.
         http::Uri::try_from(format!("{}/api/v1/events", api_base_endpoint)).expect("URI not valid")
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+        let tls = MaybeTlsSettings::from_config(&self.dd_common.tls, false)?;
         let client = HttpClient::new(tls, proxy)?;
         Ok(client)
     }
 
-    fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
-        Ok(healthcheck(
-            client,
-            validate_endpoint,
-            self.default_api_key.clone().into(),
-        )
-        .boxed())
-    }
-
-    fn build_sink(&self, client: HttpClient) -> crate::Result<VectorSink> {
+    fn build_sink(
+        &self,
+        dd_common: &DatadogCommonConfig,
+        client: HttpClient,
+    ) -> crate::Result<VectorSink> {
         let service = DatadogEventsService::new(
-            self.get_api_events_endpoint(),
-            self.default_api_key.clone().into(),
+            self.get_api_events_endpoint(dd_common),
+            dd_common.default_api_key.clone(),
             client,
         );
 
         let request_opts = self.request;
-        let request_settings = request_opts.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = request_opts.into_settings();
         let retry_logic = HttpStatusRetryLogic::new(|req: &DatadogEventsResponse| req.http_status);
 
         let service = ServiceBuilder::new()
@@ -122,21 +89,29 @@ impl DatadogEventsConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "datadog_events")]
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(cx.proxy())?;
-        let healthcheck = self.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(client)?;
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
+        let dd_common = self.dd_common.with_globals(global)?;
+        let healthcheck = dd_common.build_healthcheck(client.clone())?;
+        let sink = self.build_sink(&dd_common, client)?;
 
         Ok((sink, healthcheck))
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement = schema::Requirement::empty()
+            .required_meaning("message", Kind::bytes())
+            .optional_meaning("host", Kind::bytes())
+            .optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
+        &self.dd_common.acknowledgements
     }
 }
 

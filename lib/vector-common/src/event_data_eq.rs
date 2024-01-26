@@ -18,7 +18,12 @@ macro_rules! assert_event_data_eq {
                     left.event_data_eq(right),
                     "assertion failed: {}\n\n{}\n",
                     $message,
-                    pretty_assertions::Comparison::new(left, right),
+                    similar_asserts::SimpleDiff::from_str(
+                        format!("{:#?}", left).as_str(),
+                        format!("{:#?}", right).as_str(),
+                        "left",
+                        "right"
+                    ),
                 );
             }
         }

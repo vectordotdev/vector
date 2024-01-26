@@ -3,6 +3,8 @@ use std::borrow::Cow;
 use bytes::BytesMut;
 use serde::Serialize;
 use tokio_util::codec::Encoder as _;
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{config::telemetry, EstimatedJsonEncodedSizeOf};
 
 use super::sink::HecProcessedEvent;
 use crate::{
@@ -55,6 +57,7 @@ impl<'a> HecData<'a> {
 pub struct HecLogsEncoder {
     pub transformer: Transformer,
     pub encoder: crate::codecs::Encoder<()>,
+    pub auto_extract_timestamp: bool,
 }
 
 impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
@@ -62,14 +65,17 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
         &self,
         input: Vec<HecProcessedEvent>,
         writer: &mut dyn std::io::Write,
-    ) -> std::io::Result<usize> {
+    ) -> std::io::Result<(usize, GroupedCountByteSize)> {
         let mut encoder = self.encoder.clone();
+        let mut byte_size = telemetry().create_request_count_byte_size();
         let encoded_input: Vec<u8> = input
             .into_iter()
             .filter_map(|processed_event| {
                 let mut event = Event::from(processed_event.event);
                 let metadata = processed_event.metadata;
                 self.transformer.transform(&mut event);
+
+                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
 
                 let mut bytes = BytesMut::new();
 
@@ -92,9 +98,20 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                             HecEvent::Text(String::from_utf8_lossy(&bytes))
                         };
 
-                        let mut hec_data =
-                            HecData::new(hec_event, metadata.fields, metadata.timestamp);
-                        hec_data.host = metadata.host.map(|host| host.to_string_lossy());
+                        let mut hec_data = HecData::new(
+                            hec_event,
+                            metadata.fields,
+                            // If auto_extract_timestamp is set we don't want to pass the timestamp in the
+                            // event since we want Splunk to extract it from the message.
+                            if self.auto_extract_timestamp {
+                                None
+                            } else {
+                                metadata.timestamp
+                            },
+                        );
+                        hec_data.host = metadata
+                            .host
+                            .map(|host| host.to_string_lossy().into_owned());
                         hec_data.index = metadata.index;
                         hec_data.source = metadata.source;
                         hec_data.sourcetype = metadata.sourcetype;
@@ -116,6 +133,6 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
 
         let encoded_size = encoded_input.len();
         writer.write_all(encoded_input.as_slice())?;
-        Ok(encoded_size)
+        Ok((encoded_size, byte_size))
     }
 }

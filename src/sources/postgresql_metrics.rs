@@ -1,9 +1,9 @@
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::HashSet,
     fmt::Write as _,
     iter,
     path::PathBuf,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use chrono::{DateTime, Utc};
@@ -16,6 +16,7 @@ use openssl::{
     ssl::{SslConnector, SslMethod},
 };
 use postgres_openssl::MakeTlsConnector;
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_postgres::{
@@ -24,13 +25,17 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    json_size::JsonSize,
+};
+use vector_lib::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
-    config::{DataType, Output, SourceConfig, SourceContext},
-    event::metric::{Metric, MetricKind, MetricValue},
+    config::{SourceConfig, SourceContext, SourceOutput},
+    event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{
         CollectionCompleted, EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectError,
         StreamClosedError,
@@ -43,7 +48,7 @@ macro_rules! tags {
         {
             let mut tags = $tags.clone();
             $(
-                tags.insert($key.into(), $value.into());
+                tags.replace($key.into(), String::from($value));
             )*
             tags
         }
@@ -103,46 +108,62 @@ enum CollectError {
 struct PostgresqlMetricsTlsConfig {
     /// Absolute path to an additional CA certificate file.
     ///
-    /// The certficate must be in the DER or PEM (X.509) format.
+    /// The certificate must be in the DER or PEM (X.509) format.
+    #[configurable(metadata(docs::examples = "certs/ca.pem"))]
     ca_file: PathBuf,
 }
 
 /// Configuration for the `postgresql_metrics` source.
-#[configurable_component(source("postgresql_metrics"))]
+#[serde_as]
+#[configurable_component(source(
+    "postgresql_metrics",
+    "Collect metrics from the PostgreSQL database."
+))]
 #[derive(Clone, Debug)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct PostgresqlMetricsConfig {
     /// A list of PostgreSQL instances to scrape.
     ///
     /// Each endpoint must be in the [Connection URI
     /// format](https://www.postgresql.org/docs/current/libpq-connect.html#id-1.7.3.8.3.6).
+    #[configurable(metadata(
+        docs::examples = "postgresql://postgres:vector@localhost:5432/postgres"
+    ))]
     endpoints: Vec<String>,
 
     /// A list of databases to match (by using [POSIX Regular
     /// Expressions](https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-POSIX-REGEXP)) against
     /// the `datname` column for which you want to collect metrics from.
     ///
-    /// If not set, metrics are collected from all databases. Specifying `""` will include metrics where `datname` is
+    /// If not set, metrics are collected from all databases. Specifying `""` includes metrics where `datname` is
     /// `NULL`.
     ///
     /// This can be used in conjunction with `exclude_databases`.
+    #[configurable(metadata(
+        docs::examples = "^postgres$",
+        docs::examples = "^vector$",
+        docs::examples = "^foo",
+    ))]
     include_databases: Option<Vec<String>>,
 
     /// A list of databases to match (by using [POSIX Regular
     /// Expressions](https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-POSIX-REGEXP)) against
     /// the `datname` column for which you don’t want to collect metrics from.
     ///
-    /// Specifying `""` will include metrics where `datname` is `NULL`.
+    /// Specifying `""` includes metrics where `datname` is `NULL`.
     ///
     /// This can be used in conjunction with `include_databases`.
+    #[configurable(metadata(docs::examples = "^postgres$", docs::examples = "^template.*",))]
     exclude_databases: Option<Vec<String>>,
 
-    /// The interval between scrapes, in seconds.
-    scrape_interval_secs: u64,
+    /// The interval between scrapes.
+    #[serde(default = "default_scrape_interval_secs")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Scrape Interval"))]
+    scrape_interval_secs: Duration,
 
     /// Overrides the default namespace for the metrics emitted by the source.
-    ///
-    /// By default, `postgresql` is used.
+    #[serde(default = "default_namespace")]
     namespace: String,
 
     #[configurable(derived)]
@@ -155,7 +176,7 @@ impl Default for PostgresqlMetricsConfig {
             endpoints: vec![],
             include_databases: None,
             exclude_databases: None,
-            scrape_interval_secs: 15,
+            scrape_interval_secs: Duration::from_secs(15),
             namespace: "postgresql".to_owned(),
             tls: None,
         }
@@ -164,7 +185,16 @@ impl Default for PostgresqlMetricsConfig {
 
 impl_generate_config_from_default!(PostgresqlMetricsConfig);
 
+pub const fn default_scrape_interval_secs() -> Duration {
+    Duration::from_secs(15)
+}
+
+pub fn default_namespace() -> String {
+    "postgresql".to_owned()
+}
+
 #[async_trait::async_trait]
+#[typetag::serde(name = "postgresql_metrics")]
 impl SourceConfig for PostgresqlMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let datname_filter = DatnameFilter::new(
@@ -183,22 +213,23 @@ impl SourceConfig for PostgresqlMetricsConfig {
         }))
         .await?;
 
-        let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let duration = self.scrape_interval_secs;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
-                let count = metrics.len();
                 emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });
 
-                let metrics = metrics.into_iter().flatten();
-                if let Err(error) = cx.out.send_batch(metrics).await {
-                    emit!(StreamClosedError { error, count });
+                let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
+                let count = metrics.len();
+
+                if (cx.out.send_batch(metrics).await).is_err() {
+                    emit!(StreamClosedError { count });
                     return Err(());
                 }
             }
@@ -207,8 +238,8 @@ impl SourceConfig for PostgresqlMetricsConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Metric)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -454,13 +485,13 @@ impl DatnameFilter {
     }
 }
 
-#[derive(Debug)]
 struct PostgresqlMetrics {
     client: PostgresqlClient,
     endpoint: String,
     namespace: Option<String>,
-    tags: BTreeMap<String, String>,
+    tags: MetricTags,
     datname_filter: DatnameFilter,
+    events_received: Registered<EventsReceived>,
 }
 
 impl PostgresqlMetrics {
@@ -490,9 +521,10 @@ impl PostgresqlMetrics {
             }
         };
 
-        let mut tags = BTreeMap::new();
-        tags.insert("endpoint".into(), endpoint.clone());
-        tags.insert("host".into(), host);
+        let tags = metric_tags!(
+            "endpoint" => endpoint.clone(),
+            "host" => host,
+        );
 
         Ok(Self {
             client: PostgresqlClient::new(config, tls_config),
@@ -500,6 +532,7 @@ impl PostgresqlMetrics {
             namespace,
             tags,
             datname_filter,
+            events_received: register!(EventsReceived),
         })
     }
 
@@ -538,16 +571,23 @@ impl PostgresqlMetrics {
         .await
         {
             Ok(result) => {
-                let (count, byte_size, received_byte_size) =
-                    result.iter().fold((0, 0, 0), |res, (set, size)| {
-                        (res.0 + set.len(), res.1 + set.size_of(), res.2 + size)
-                    });
+                let (count, json_byte_size, received_byte_size) =
+                    result
+                        .iter()
+                        .fold((0, JsonSize::zero(), 0), |res, (set, size)| {
+                            (
+                                res.0 + set.len(),
+                                res.1 + set.estimated_json_encoded_size_of(),
+                                res.2 + size,
+                            )
+                        });
                 emit!(EndpointBytesReceived {
                     byte_size: received_byte_size,
                     protocol: "tcp",
                     endpoint: &self.endpoint,
                 });
-                emit!(EventsReceived { count, byte_size });
+                self.events_received
+                    .emit(CountByteSize(count, json_byte_size));
                 self.client.set((client, client_version));
                 Ok(result.into_iter().flat_map(|(metrics, _)| metrics))
             }
@@ -812,12 +852,7 @@ impl PostgresqlMetrics {
         ))
     }
 
-    fn create_metric(
-        &self,
-        name: &str,
-        value: MetricValue,
-        tags: BTreeMap<String, String>,
-    ) -> Metric {
+    fn create_metric(&self, name: &str, value: MetricValue, tags: MetricTags) -> Metric {
         Metric::new(name, MetricKind::Absolute, value)
             .with_namespace(self.namespace.clone())
             .with_tags(Some(tags))
@@ -999,7 +1034,7 @@ mod integration_tests {
         assert_source_compliance(&PULL_SOURCE_TAGS, async move {
             let config: Config = endpoint.parse().unwrap();
             let tags_endpoint = config_to_endpoint(&config);
-            let tags_host = match config.get_hosts().get(0).unwrap() {
+            let tags_host = match config.get_hosts().first().unwrap() {
                 Host::Tcp(host) => host.clone(),
                 #[cfg(unix)]
                 Host::Unix(path) => path.to_string_lossy().to_string(),

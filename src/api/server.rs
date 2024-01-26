@@ -9,11 +9,20 @@ use async_graphql::{
     Data, Request, Schema,
 };
 use async_graphql_warp::{graphql_protocol, GraphQLResponse, GraphQLWebSocket};
+use hyper::{server::conn::AddrIncoming, service::make_service_fn, Server as HyperServer};
+use tokio::runtime::Handle;
 use tokio::sync::oneshot;
+use tower::ServiceBuilder;
+use tracing::Span;
 use warp::{filters::BoxedFilter, http::Response, ws::Ws, Filter, Reply};
 
 use super::{handler, schema, ShutdownTx};
-use crate::{config, topology};
+use crate::{
+    config::{self, api},
+    http::build_http_trace_layer,
+    internal_events::{SocketBindError, SocketMode},
+    topology,
+};
 
 pub struct Server {
     _shutdown: ShutdownTx,
@@ -27,24 +36,50 @@ impl Server {
         config: &config::Config,
         watch_rx: topology::WatchRx,
         running: Arc<AtomicBool>,
-    ) -> Self {
-        let routes = make_routes(config.api.playground, watch_rx, running);
+        handle: &Handle,
+    ) -> crate::Result<Self> {
+        let routes = make_routes(config.api, watch_rx, running);
 
         let (_shutdown, rx) = oneshot::channel();
-        let (addr, server) = warp::serve(routes).bind_with_graceful_shutdown(
-            config.api.address.expect("No socket address"),
-            async {
-                rx.await.ok();
-            },
-        );
+        // warp uses `tokio::spawn` and so needs us to enter the runtime context.
+        let _guard = handle.enter();
+
+        let addr = config.api.address.expect("No socket address");
+        let incoming = AddrIncoming::bind(&addr).map_err(|error| {
+            emit!(SocketBindError {
+                mode: SocketMode::Tcp,
+                error: &error,
+            });
+            error
+        })?;
+
+        let span = Span::current();
+        let make_svc = make_service_fn(move |_conn| {
+            let svc = ServiceBuilder::new()
+                .layer(build_http_trace_layer(span.clone()))
+                .service(warp::service(routes.clone()));
+            futures_util::future::ok::<_, Infallible>(svc)
+        });
+
+        let server = async move {
+            HyperServer::builder(incoming)
+                .serve(make_svc)
+                .with_graceful_shutdown(async {
+                    rx.await.ok();
+                })
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })
+        };
 
         // Update component schema with the config before starting the server.
         schema::components::update_config(config);
 
         // Spawn the server in the background.
-        tokio::spawn(server);
+        handle.spawn(server);
 
-        Self { _shutdown, addr }
+        Ok(Self { _shutdown, addr })
     }
 
     /// Returns a copy of the SocketAddr that the server was started on.
@@ -61,7 +96,7 @@ impl Server {
 }
 
 fn make_routes(
-    playground: bool,
+    api: api::Options,
     watch_tx: topology::WatchRx,
     running: Arc<AtomicBool>,
 ) -> BoxedFilter<(impl Reply,)> {
@@ -73,6 +108,7 @@ fn make_routes(
         .and_then(handler::health);
 
     // 404.
+    let not_found_graphql = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
     let not_found = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
 
     // GraphQL subscription handler. Creates a Warp WebSocket handler and for each connection,
@@ -105,16 +141,22 @@ fn make_routes(
     // Handle GraphQL queries. Headers will first be parsed to determine whether the query is
     // a subscription and if so, an attempt will be made to upgrade the connection to WebSockets.
     // All other queries will fall back to the default HTTP handler.
-    let graphql_handler = warp::path("graphql").and(graphql_subscription_handler.or(
-        async_graphql_warp::graphql(schema::build_schema().finish()).and_then(
-            |(schema, request): (Schema<_, _, _>, Request)| async move {
-                Ok::<_, Infallible>(GraphQLResponse::from(schema.execute(request).await))
-            },
-        ),
-    ));
+    let graphql_handler = if api.graphql {
+        warp::path("graphql")
+            .and(graphql_subscription_handler.or(
+                async_graphql_warp::graphql(schema::build_schema().finish()).and_then(
+                    |(schema, request): (Schema<_, _, _>, Request)| async move {
+                        Ok::<_, Infallible>(GraphQLResponse::from(schema.execute(request).await))
+                    },
+                ),
+            ))
+            .boxed()
+    } else {
+        not_found_graphql.boxed()
+    };
 
     // Provide a playground for executing GraphQL queries/mutations/subscriptions.
-    let graphql_playground = if playground {
+    let graphql_playground = if api.playground && api.graphql {
         warp::path("playground")
             .map(move || {
                 Response::builder()

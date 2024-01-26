@@ -26,7 +26,7 @@ remap: expressions: coalesce: {
 					"""
 				enum: {
 					"??": """
-						The `??` operator performs error coalescing, short-circutiing on the first expression that
+						The `??` operator performs error coalescing, short-circuiting on the first expression that
 						doesn't error and returning its result.
 						"""
 				}

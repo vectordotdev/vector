@@ -2,7 +2,7 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use hyper::Body;
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     gcp::{GcpAuthenticator, GcpError},
@@ -118,23 +118,16 @@ pub fn build_healthcheck(
         let not_found_error = GcsError::BucketNotFound { bucket }.into();
 
         let response = client.send(request).await?;
-        healthcheck_response(response, auth, not_found_error)
+        healthcheck_response(response, not_found_error)
     };
 
     Ok(healthcheck.boxed())
 }
 
-// Use this to map a healthcheck response, as it handles setting up the renewal task.
 pub fn healthcheck_response(
     response: http::Response<hyper::Body>,
-    auth: GcpAuthenticator,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
-    // If there are credentials configured, the generated OAuth
-    // token needs to be periodically regenerated. Since the
-    // health check runs at startup, after a health check is a
-    // good place to create the regeneration task.
-    auth.spawn_regenerate_token();
     match response.status() {
         StatusCode::OK => Ok(()),
         StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
@@ -159,6 +152,7 @@ impl RetryLogic for GcsRetryLogic {
         let status = response.inner.status();
 
         match status {
+            StatusCode::UNAUTHORIZED => RetryAction::Retry("unauthorized".into()),
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())

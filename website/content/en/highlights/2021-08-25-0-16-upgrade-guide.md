@@ -100,7 +100,7 @@ baked in assumptions that the data is specifically coming from agent.
 For now, this source only collects logs forwarded by the agent, but in the future it will be expanded to collect metrics
 and traces.
 
-We decided to make this a breaking change, instead of aliasing `datadog_logs`, as the released changes are not backwords
+We decided to make this a breaking change, instead of aliasing `datadog_logs`, as the released changes are not backwards
 compatible and the name change reflects this.
 
 It is possible that we will re-add a `datadog_logs` source in the future that mimics the Datadog API for use with other

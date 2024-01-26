@@ -6,14 +6,13 @@ use syn::{
     DeriveInput, ExprPath, GenericArgument, Generics, Ident, PathArguments, PathSegment, Type,
     TypeParam,
 };
-use vector_config_common::attributes::CustomAttribute;
 
 use super::{
     util::{
         err_serde_failed, get_serde_default_value, try_extract_doc_title_description,
         DarlingResultIterator,
     },
-    Data, Field, Metadata, Style, Tagging, Variant,
+    Data, Field, LazyCustomAttribute, Metadata, Style, Tagging, Variant,
 };
 
 const ERR_NO_ENUM_TUPLES: &str = "enum variants cannot be tuples (multiple unnamed fields)";
@@ -31,6 +30,7 @@ pub struct Container<'a> {
     name: String,
     default_value: Option<ExprPath>,
     data: Data<'a>,
+    tagging: Option<Tagging>,
     virtual_newtype: Option<Type>,
     attrs: Attributes,
 }
@@ -127,12 +127,12 @@ impl<'a> Container<'a> {
         Attributes::from_attributes(&input.attrs)
             .and_then(|attrs| attrs.finalize(&input.attrs))
             // We successfully parsed the derive input through both `serde` itself and our own attribute parsing, so
-            // build our data container based on whether or not we have a struct, enum, and do any neccessary
+            // build our data container based on whether or not we have a struct, enum, and do any necessary
             // validation, etc.
             .and_then(|attrs| {
                 let tagging: Tagging = serde.attrs.tag().into();
 
-                let data = match serde.data {
+                let (data, is_enum) = match serde.data {
                     serde_ast::Data::Enum(variants) => {
                         let variants = variants
                             .iter()
@@ -193,18 +193,26 @@ impl<'a> Container<'a> {
                             }
                         }
 
-                        Data::Enum(variants)
+                        (Data::Enum(variants), true)
                     }
                     serde_ast::Data::Struct(style, fields) => match style {
                         serde_ast::Style::Struct
                         | serde_ast::Style::Tuple
                         | serde_ast::Style::Newtype => {
+                            let is_newtype_wrapper_field =
+                                matches!(style, serde_ast::Style::Newtype);
                             let fields = fields
                                 .iter()
-                                .map(|field| Field::from_ast(field, virtual_newtype.is_some()))
+                                .map(|field| {
+                                    Field::from_ast(
+                                        field,
+                                        virtual_newtype.is_some(),
+                                        is_newtype_wrapper_field,
+                                    )
+                                })
                                 .collect_darling_results(&mut accumulator);
 
-                            Data::Struct(style.into(), fields)
+                            (Data::Struct(style.into(), fields), false)
                         }
                         serde_ast::Style::Unit => {
                             // This is a little ugly but we can't drop the accumulator without finishing it, otherwise
@@ -212,7 +220,7 @@ impl<'a> Container<'a> {
                             // our error and just return a dummy value.
                             accumulator
                                 .push(darling::Error::custom(ERR_NO_UNIT_STRUCTS).with_span(input));
-                            Data::Struct(Style::Unit, Vec::new())
+                            (Data::Struct(Style::Unit, Vec::new()), false)
                         }
                     },
                 };
@@ -227,8 +235,8 @@ impl<'a> Container<'a> {
                 }
 
                 let original = input;
-                let name = serde.attrs.name().deserialize_name();
-                let default_value = get_serde_default_value(serde.attrs.default());
+                let name = serde.attrs.name().deserialize_name().to_string();
+                let default_value = get_serde_default_value(&serde.ident, serde.attrs.default());
 
                 let container = Container {
                     original,
@@ -236,6 +244,7 @@ impl<'a> Container<'a> {
                     default_value,
                     data,
                     virtual_newtype,
+                    tagging: is_enum.then_some(tagging),
                     attrs,
                 };
 
@@ -333,6 +342,16 @@ impl<'a> Container<'a> {
         self.virtual_newtype.clone()
     }
 
+    /// Tagging mode of this container.
+    ///
+    /// When the container is an enum, `Some(..)` will be returned, where the value can be any of
+    /// the four modes supported by `serde`: external, internal, adjacent, or none (untagged).
+    ///
+    /// When the container is a struct, `None` is returned.
+    pub fn tagging(&self) -> Option<&Tagging> {
+        self.tagging.as_ref()
+    }
+
     /// Path to a function to call to generate a default value for the container, if any.
     ///
     /// This will boil down to something like `std::default::Default::default` or
@@ -349,7 +368,7 @@ impl<'a> Container<'a> {
     /// standard `#[deprecated]` attribute, neither automatically applying it nor deriving the
     /// deprecation status of a field when it is present.
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated.is_some()
+        self.attrs.deprecated.is_present()
     }
 
     /// Metadata (custom attributes) for the container, if any.
@@ -357,7 +376,7 @@ impl<'a> Container<'a> {
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
     /// key/value pairs (`#[configurable(metadata(status = "beta"))]`) to allow rich, semantic
     /// metadata to be attached directly to containers.
-    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
+    pub fn metadata(&self) -> impl Iterator<Item = LazyCustomAttribute> {
         self.attrs
             .metadata
             .clone()
@@ -565,7 +584,7 @@ mod tests {
         assert_eq!(literals_to_idents(&["T"]), idents);
 
         // We don't support parenthesized type parameters, like when using a function pointer type.
-        let parenthesized_type: Type = parse_quote! { Something<Fn(bool) -> String> };
+        let parenthesized_type: Type = parse_quote! { Something<fn(bool) -> String> };
         let idents = get_generic_type_param_idents(&parenthesized_type);
         assert_eq!(None, idents);
     }

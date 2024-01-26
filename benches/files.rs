@@ -1,7 +1,6 @@
-use std::{convert::TryInto, path::PathBuf};
+use std::{convert::TryInto, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
-use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{stream, SinkExt, StreamExt};
 use tempfile::tempdir;
@@ -11,6 +10,7 @@ use vector::{
     config, sinks, sources,
     test_util::{random_lines, runtime, start_topology},
 };
+use vector_lib::codecs::{encoding::FramingConfig, TextSerializerConfig};
 
 fn benchmark_files_no_partitions(c: &mut Criterion) {
     let num_lines: usize = 10_000;
@@ -54,10 +54,12 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                     &["in"],
                     sinks::file::FileSinkConfig {
                         path: output.try_into().unwrap(),
-                        idle_timeout_secs: None,
-                        encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
+                        idle_timeout: Duration::from_secs(30),
+                        encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
                         compression: sinks::file::Compression::None,
                         acknowledgements: Default::default(),
+                        timezone: Default::default(),
+                        internal_metrics: Default::default(),
                     },
                 );
 

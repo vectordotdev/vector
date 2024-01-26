@@ -1,13 +1,14 @@
 use crate::codecs::Transformer;
-use codecs::{
+use vector_lib::codecs::{
     encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
     CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 /// Encoding configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[configurable(description = "Configures how events are encoded into raw bytes.")]
 pub struct EncodingConfig {
     #[serde(flatten)]
     encoding: SerializerConfig,
@@ -106,9 +107,19 @@ impl EncodingConfigWithFraming {
             (None, Serializer::Avro(_) | Serializer::Native(_)) => {
                 LengthDelimitedEncoder::new().into()
             }
+            (None, Serializer::Gelf(_)) => {
+                // Graylog/GELF always uses null byte delimiter on TCP, see
+                // https://github.com/Graylog2/graylog2-server/issues/1240
+                CharacterDelimitedEncoder::new(0).into()
+            }
+            (None, Serializer::Protobuf(_)) => {
+                // Protobuf uses length-delimited messages, see:
+                // https://developers.google.com/protocol-buffers/docs/techniques#streaming
+                LengthDelimitedEncoder::new().into()
+            }
             (
                 None,
-                Serializer::Gelf(_)
+                Serializer::Csv(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
@@ -143,7 +154,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use lookup::lookup_v2::parse_value_path;
+    use vector_lib::lookup::lookup_v2::{parse_value_path, ConfigValuePath};
 
     use super::*;
     use crate::codecs::encoding::TimestampFormat;
@@ -162,18 +173,15 @@ mod test {
         let encoding = serde_json::from_str::<EncodingConfig>(string).unwrap();
         let serializer = encoding.config();
 
-        assert!(matches!(serializer, SerializerConfig::Json));
+        assert!(matches!(serializer, SerializerConfig::Json(_)));
 
         let transformer = encoding.transformer();
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]")])
+            &Some(vec![ConfigValuePath(parse_value_path("a.b[0]").unwrap())])
         );
-        assert_eq!(
-            transformer.except_fields(),
-            &Some(vec!["ignore_me".to_owned()])
-        );
+        assert_eq!(transformer.except_fields(), &Some(vec!["ignore_me".into()]));
         assert_eq!(transformer.timestamp_format(), &Some(TimestampFormat::Unix));
     }
 
@@ -197,18 +205,15 @@ mod test {
         let (framing, serializer) = encoding.config();
 
         assert!(matches!(framing, Some(FramingConfig::NewlineDelimited)));
-        assert!(matches!(serializer, SerializerConfig::Json));
+        assert!(matches!(serializer, SerializerConfig::Json(_)));
 
         let transformer = encoding.transformer();
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]")])
+            &Some(vec![ConfigValuePath(parse_value_path("a.b[0]").unwrap())])
         );
-        assert_eq!(
-            transformer.except_fields(),
-            &Some(vec!["ignore_me".to_owned()])
-        );
+        assert_eq!(transformer.except_fields(), &Some(vec!["ignore_me".into()]));
         assert_eq!(transformer.timestamp_format(), &Some(TimestampFormat::Unix));
     }
 
@@ -228,19 +233,16 @@ mod test {
         let encoding = serde_json::from_str::<EncodingConfigWithFraming>(string).unwrap();
         let (framing, serializer) = encoding.config();
 
-        assert!(matches!(framing, None));
-        assert!(matches!(serializer, SerializerConfig::Json));
+        assert!(framing.is_none());
+        assert!(matches!(serializer, SerializerConfig::Json(_)));
 
         let transformer = encoding.transformer();
 
         assert_eq!(
             transformer.only_fields(),
-            &Some(vec![parse_value_path("a.b[0]")])
+            &Some(vec![ConfigValuePath(parse_value_path("a.b[0]").unwrap())])
         );
-        assert_eq!(
-            transformer.except_fields(),
-            &Some(vec!["ignore_me".to_owned()])
-        );
+        assert_eq!(transformer.except_fields(), &Some(vec!["ignore_me".into()]));
         assert_eq!(transformer.timestamp_format(), &Some(TimestampFormat::Unix));
     }
 }

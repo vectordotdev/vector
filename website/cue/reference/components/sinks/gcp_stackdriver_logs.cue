@@ -13,6 +13,7 @@ components: sinks: gcp_stackdriver_logs: {
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -64,150 +65,7 @@ components: sinks: gcp_stackdriver_logs: {
 		notices: []
 	}
 
-	configuration: {
-		api_key: configuration._gcp_api_key
-		billing_account_id: {
-			common: false
-			description: """
-				The billing account ID to which to publish logs.
-
-				Exactly one of must be set: `billing_account_id`, `folder_id`, `organization_id`,
-				or `project_id`.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["012345-6789AB-CDEF01"]
-			}
-		}
-		credentials_path: {
-			common: true
-			description: """
-				The filename for a Google Cloud service account credentials JSON file used to authenticate access to the
-				Stackdriver Logging API. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS`
-				environment variable for a filename.
-
-				If no filename is named, Vector attempts to fetch an instance service account for the compute instance
-				the program is running on. If Vector is not running on a GCE instance, you must define a credentials
-				file as above.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["/path/to/credentials.json"]
-			}
-		}
-		folder_id: {
-			common:      false
-			description: """
-				The folder ID to which to publish logs.
-
-				See the [Google Cloud Platform folder documentation](\(urls.gcp_folders)) for more details.
-
-				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
-				"""
-			required:    false
-			type: string: {
-				default: null
-				examples: ["My Folder"]
-			}
-		}
-		log_id: {
-			description: "The log ID to which to publish logs. This is a name you create to identify this log stream."
-			required:    true
-			type: string: {
-				examples: ["vector-logs", "{{ component_id }}"]
-				syntax: "template"
-			}
-		}
-		organization_id: {
-			common: false
-			description: """
-				The organization ID to which to publish logs. This would be the identifier assigned to your organization
-				on Google Cloud Platform.
-
-				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["622418129737"]
-			}
-		}
-		project_id: {
-			description: """
-				The project ID to which to publish logs. See the
-				[Google Cloud Platform project management documentation](\(urls.gcp_projects)) for more details.
-
-				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
-				"""
-			required:    true
-			type: string: {
-				examples: ["vector-123456"]
-			}
-		}
-		resource: {
-			description: "Options for describing the logging resource."
-			required:    true
-			type: object: {
-				examples: [
-					{
-						type:        "gce_instance"
-						instance_id: "Twilight"
-						zone:        "us-central1-a"
-					},
-				]
-				options: {
-					type: {
-						description: """
-							The monitored resource type. For example, the type of a Compute Engine VM instance is
-							`gce_instance`.
-
-							See the [Google Cloud Platform monitored resource documentation](\(urls.gcp_resources)) for
-							more details.
-							"""
-						required:    true
-						type: string: {
-							examples: ["global", "gce_instance"]
-						}
-					}
-					"*": {
-						common: false
-						description: """
-							Values for all of the labels listed in the associated monitored resource descriptor.
-
-							For example, Compute Engine VM instances use the labels `instance_id` and `zone`.
-							"""
-						required: false
-						type: string: {
-							default: null
-							examples: ["Twilight", "{{ zone }}"]
-							syntax: "template"
-						}
-					}
-				}
-			}
-		}
-		severity_key: {
-			common:      false
-			description: """
-				The field of the log event from which to take the outgoing log's `severity` field. The named field is
-				removed from the log event if present, and must be either an integer between 0 and 800 or a string
-				containing one of the [severity level names](\(urls.gcp_stackdriver_severity)) (case is ignored) or a
-				common prefix such as `err`.
-
-				If no severity key is specified, the severity of outgoing records is set to 0 (`DEFAULT`).
-
-				See the [GCP Stackdriver Logging LogSeverity description](\(urls.gcp_stackdriver_severity)) for more
-				details on the value of the `severity` field.
-				"""
-			required:    false
-			type: string: {
-				default: null
-				examples: ["severity"]
-			}
-		}
-	}
+	configuration: base.components.sinks.gcp_stackdriver_logs.configuration
 
 	input: {
 		logs:    true
@@ -257,11 +115,4 @@ components: sinks: gcp_stackdriver_logs: {
 			]
 		},
 	]
-
-	telemetry: metrics: {
-		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
-	}
 }

@@ -43,6 +43,7 @@ components: sources: socket: {
 				enabled_default:         false
 			}
 		}
+		auto_generated: true
 	}
 
 	support: {
@@ -55,104 +56,7 @@ components: sources: socket: {
 		platform_name: null
 	}
 
-	configuration: {
-		address: {
-			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
-			relevant_when: "mode = `tcp` or `udp`"
-			required:      true
-			type: string: {
-				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
-			}
-		}
-		host_key: {
-			category:    "Context"
-			common:      false
-			description: """
-				The key name added to each event representing the peer host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-				"""
-			required:    false
-			type: string: {
-				default: "host"
-			}
-		}
-		port_key: {
-			category: "Context"
-			common:   true
-			description: """
-				The key name added to each event representing the peer source port. If empty, this context is not added.
-				"""
-			required: false
-			type: string: {
-				default: null
-			}
-		}
-		max_length: {
-			common:      true
-			description: "The maximum buffer size of incoming messages. Messages larger than this are truncated."
-			required:    false
-			type: uint: {
-				default: 102400
-				unit:    "bytes"
-			}
-		}
-		mode: {
-			description: "The type of socket to use."
-			required:    true
-			type: string: {
-				enum: {
-					tcp:           "TCP socket."
-					udp:           "UDP socket."
-					unix_datagram: "Unix domain datagram socket."
-					unix_stream:   "Unix domain stream socket."
-				}
-			}
-		}
-		path: {
-			description:   "The unix socket path. *This should be an absolute path*."
-			relevant_when: "mode = `unix_datagram` or `unix_stream`"
-			required:      true
-			type: string: {
-				examples: ["/path/to/socket"]
-			}
-		}
-		socket_file_mode: {
-			common: false
-			description: """
-				Unix file mode bits to be applied to the unix socket file
-				as its designated file permissions.
-				Note that the file mode value can be specified in any numeric format
-				supported by your configuration language, but it is most intuitive to use an octal number.
-				"""
-			relevant_when: "mode = `unix_datagram` or `unix_stream`"
-			required:      false
-			type: uint: {
-				default: null
-				unit:    null
-				examples: [0o777, 0o600, 508]
-			}
-		}
-		shutdown_timeout_secs: {
-			common:        false
-			description:   "The timeout before a connection is forcefully closed during shutdown."
-			relevant_when: "mode = `tcp`"
-			required:      false
-			type: uint: {
-				default: 30
-				unit:    "seconds"
-			}
-		}
-		connection_limit: {
-			common:        false
-			description:   "The max number of TCP connections that will be processed."
-			relevant_when: "mode = `tcp`"
-			required:      false
-			type: uint: {
-				default: null
-				unit:    "concurrency"
-			}
-		}
-	}
+	configuration: base.components.sources.socket.configuration
 
 	output: logs: line: {
 		description: "A single socket event."
@@ -207,18 +111,8 @@ components: sources: socket: {
 	]
 
 	telemetry: metrics: {
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		connection_errors_total:              components.sources.internal_metrics.output.metrics.connection_errors_total
-		connection_failed_total:              components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_established_total:         components.sources.internal_metrics.output.metrics.connection_established_total
-		connection_failed_total:              components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_send_errors_total:         components.sources.internal_metrics.output.metrics.connection_send_errors_total
-		connection_send_ack_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
-		connection_shutdown_total:            components.sources.internal_metrics.output.metrics.connection_shutdown_total
-		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
-		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
-		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total
+		connection_send_errors_total: components.sources.internal_metrics.output.metrics.connection_send_errors_total
+		connection_shutdown_total:    components.sources.internal_metrics.output.metrics.connection_shutdown_total
 	}
 }

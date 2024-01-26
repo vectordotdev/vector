@@ -16,6 +16,10 @@
 <meta name="author" content="{{ . }}">
 {{ end }}
 
+{{/* TrustArc */}}
+<script type="text/javascript" src="https://consent.trustarc.com/v2/autoblockasset/core.min.js?cmId=ufocto"></script>
+<script type="text/javascript" src="https://consent.trustarc.com/v2/autoblock?cmId=ufocto"></script>
+
 {{ hugo.Generator }}
 
 <link rel="shortcut icon" href="{{ $favicon }}">
@@ -40,6 +44,11 @@
 <meta name="algolia:title" content="{{ $title }}">
 {{ with .Params.tags }}
 <meta name="keywords" content="{{ delimit . "," }}">
+{{ end }}
+
+{{/*  facebook domain verification  */}}
+{{ if .IsHome }}
+<meta name="facebook-domain-verification" content="tlh9a8wkkmmawf51fhpt6bwsnrn3wz" />
 {{ end }}
 
 <link rel="manifest" href="/manifest.json">

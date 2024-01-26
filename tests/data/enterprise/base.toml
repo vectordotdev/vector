@@ -1,6 +1,6 @@
 [enterprise]
-api_key = "${DD_API_KEY}"
-configuration_key = "${DD_CONFIGURATION_KEY}"
+api_key = "api_key"
+configuration_key = "configuration_key"
 endpoint = "${MOCK_SERVER_ENDPOINT}"
 max_retries = 1
 

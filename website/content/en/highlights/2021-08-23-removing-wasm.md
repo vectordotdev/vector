@@ -28,5 +28,5 @@ the `wasm` transform would have been used for.
 
 Are you currently using the `wasm` transform? We would like to hear about your
 use-cases to ensure we accommodate them through other Vector features. Please
-leave a comment on this [Github
+leave a comment on this [GitHub
 issue](https://github.com/vectordotdev/vector/issues/8036).

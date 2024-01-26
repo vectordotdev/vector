@@ -2,17 +2,15 @@ use std::fmt::Write as _;
 use std::str::Utf8Error;
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
-use thiserror::Error;
-use trust_dns_proto::{
+use hickory_proto::{
     error::ProtoError,
     op::{message::Message as TrustDnsMessage, Edns, Query},
     rr::{
         dnssec::{rdata::DNSSECRData, Algorithm, SupportedAlgorithms},
         rdata::{
-            a, aaaa,
             caa::Value,
             opt::{EdnsCode, EdnsOption},
-            NULL,
+            A, AAAA, NULL,
         },
         record_data::RData,
         resource::Record,
@@ -20,6 +18,7 @@ use trust_dns_proto::{
     },
     serialize::binary::{BinDecodable, BinDecoder},
 };
+use thiserror::Error;
 
 use super::dns_message::{
     self, DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection,
@@ -69,7 +68,7 @@ impl DnsMessageParser {
         let msg = TrustDnsMessage::from_vec(&self.raw_message)
             .map_err(|source| DnsMessageParserError::TrustDnsError { source })?;
         let header = parse_dns_query_message_header(&msg);
-        let edns_section = parse_edns(&msg);
+        let edns_section = parse_edns(&msg).transpose()?;
         let rcode_high = edns_section.as_ref().map_or(0, |edns| edns.extended_rcode);
         let response_code = (u16::from(rcode_high) << 4) | ((u16::from(header.rcode)) & 0x000F);
 
@@ -81,7 +80,7 @@ impl DnsMessageParser {
             answer_section: self.parse_dns_message_section(msg.answers())?,
             authority_section: self.parse_dns_message_section(msg.name_servers())?,
             additional_section: self.parse_dns_message_section(msg.additionals())?,
-            opt_pserdo_section: edns_section,
+            opt_pseudo_section: edns_section,
         })
     }
 
@@ -132,7 +131,7 @@ impl DnsMessageParser {
             .collect::<Vec<ZoneInfo>>();
 
         zones
-            .get(0)
+            .first()
             .cloned()
             .ok_or_else(|| DnsMessageParserError::SimpleError {
                 cause: format!(
@@ -151,7 +150,9 @@ impl DnsMessageParser {
 
     fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
         let record_data = match record.data() {
-            Some(RData::Unknown { code, rdata }) => self.format_unknown_rdata(*code, rdata),
+            Some(RData::Unknown { code, rdata }) => {
+                self.format_unknown_rdata((*code).into(), rdata)
+            }
             Some(rdata) => format_rdata(rdata),
             None => Ok((Some(String::from("")), None)), // NULL record
         }?;
@@ -745,6 +746,26 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
                 );
                 Ok((Some(sig_rdata), None))
             }
+            // RSIG is a derivation of SIG but choosing to keep this duplicate code in lieu of the alternative
+            // which is to allocate to the heap with Box in order to deref.
+            DNSSECRData::RRSIG(sig) => {
+                let sig_rdata = format!(
+                    "{} {} {} {} {} {} {} {} {}",
+                    match format_record_type(sig.type_covered()) {
+                        Some(record_type) => record_type,
+                        None => String::from("Unknown record type"),
+                    },
+                    u8::from(sig.algorithm()),
+                    sig.num_labels(),
+                    sig.original_ttl(),
+                    sig.sig_expiration(), // currently in epoch convert to human readable ?
+                    sig.sig_inception(),  // currently in epoch convert to human readable ?
+                    sig.key_tag(),
+                    sig.signer_name(),
+                    BASE64.encode(sig.sig())
+                );
+                Ok((Some(sig_rdata), None))
+            }
             DNSSECRData::Unknown { code: _, rdata } => Ok((None, Some(rdata.anything().to_vec()))),
             _ => Err(DnsMessageParserError::SimpleError {
                 cause: format!("Unsupported rdata {:?}", rdata),
@@ -822,29 +843,32 @@ fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeade
     }
 }
 
-fn parse_edns(dns_message: &TrustDnsMessage) -> Option<OptPseudoSection> {
-    dns_message
-        .extensions()
-        .as_ref()
-        .map(|edns| OptPseudoSection {
+fn parse_edns(dns_message: &TrustDnsMessage) -> Option<DnsParserResult<OptPseudoSection>> {
+    dns_message.extensions().as_ref().map(|edns| {
+        parse_edns_options(edns).map(|options| OptPseudoSection {
             extended_rcode: edns.rcode_high(),
             version: edns.version(),
             dnssec_ok: edns.dnssec_ok(),
             udp_max_payload_size: edns.max_payload(),
-            options: parse_edns_options(edns),
+            options,
         })
+    })
 }
 
-fn parse_edns_options(edns: &Edns) -> Vec<EdnsOptionEntry> {
+fn parse_edns_options(edns: &Edns) -> DnsParserResult<Vec<EdnsOptionEntry>> {
     edns.options()
         .as_ref()
         .iter()
         .map(|(code, option)| match option {
             EdnsOption::DAU(algorithms)
             | EdnsOption::DHU(algorithms)
-            | EdnsOption::N3U(algorithms) => parse_edns_opt_dnssec_algorithms(*code, *algorithms),
-            EdnsOption::Unknown(_, opt_data) => parse_edns_opt(*code, opt_data),
-            option => parse_edns_opt(*code, &Vec::<u8>::from(option)),
+            | EdnsOption::N3U(algorithms) => {
+                Ok(parse_edns_opt_dnssec_algorithms(*code, *algorithms))
+            }
+            EdnsOption::Unknown(_, opt_data) => Ok(parse_edns_opt(*code, opt_data)),
+            option => Vec::<u8>::try_from(option)
+                .map(|bytes| parse_edns_opt(*code, &bytes))
+                .map_err(|source| DnsMessageParserError::TrustDnsError { source }),
         })
         .collect()
 }
@@ -983,13 +1007,13 @@ fn parse_vec_with_u16_len(
 }
 
 fn parse_ipv6_address(decoder: &mut BinDecoder<'_>) -> DnsParserResult<String> {
-    Ok(aaaa::read(decoder)
+    Ok(<AAAA as BinDecodable>::read(decoder)
         .map_err(|source| DnsMessageParserError::TrustDnsError { source })?
         .to_string())
 }
 
 fn parse_ipv4_address(decoder: &mut BinDecoder<'_>) -> DnsParserResult<String> {
-    Ok(a::read(decoder)
+    Ok(<A as BinDecodable>::read(decoder)
         .map_err(|source| DnsMessageParserError::TrustDnsError { source })?
         .to_string())
 }
@@ -1111,25 +1135,21 @@ mod tests {
         str::FromStr,
     };
 
-    use trust_dns_proto::{
-        rr::{
-            dnssec::{
-                rdata::{
-                    dnskey::DNSKEY, ds::DS, nsec::NSEC, nsec3::NSEC3, nsec3param::NSEC3PARAM,
-                    sig::SIG, DNSSECRData,
-                },
-                Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
-            },
-            domain::Name,
+    use hickory_proto::rr::{
+        dnssec::{
             rdata::{
-                caa::KeyValue,
-                null,
-                sshfp::{Algorithm, FingerprintType},
-                tlsa::{CertUsage, Matching, Selector},
-                CAA, NAPTR, SSHFP, TLSA, TXT,
+                dnskey::DNSKEY, ds::DS, nsec::NSEC, nsec3::NSEC3, nsec3param::NSEC3PARAM, sig::SIG,
+                DNSSECRData, RRSIG,
             },
+            Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
         },
-        serialize::binary::Restrict,
+        domain::Name,
+        rdata::{
+            caa::KeyValue,
+            sshfp::{Algorithm, FingerprintType},
+            tlsa::{CertUsage, Matching, Selector},
+            CAA, NAPTR, SSHFP, TLSA, TXT,
+        },
     };
 
     use super::*;
@@ -1284,7 +1304,7 @@ mod tests {
 
     #[test]
     fn test_format_rdata_for_a_type() {
-        let rdata = RData::A(Ipv4Addr::from_str("1.2.3.4").unwrap());
+        let rdata = RData::A(Ipv4Addr::from_str("1.2.3.4").unwrap().into());
         let rdata_text = format_rdata(&rdata);
         assert!(rdata_text.is_ok());
         if let Ok((parsed, raw_rdata)) = rdata_text {
@@ -1295,7 +1315,7 @@ mod tests {
 
     #[test]
     fn test_format_rdata_for_aaaa_type() {
-        let rdata = RData::AAAA(Ipv6Addr::from_str("2001::1234").unwrap());
+        let rdata = RData::AAAA(Ipv6Addr::from_str("2001::1234").unwrap().into());
         let rdata_text = format_rdata(&rdata);
         assert!(rdata_text.is_ok());
         if let Ok((parsed, raw_rdata)) = rdata_text {
@@ -1306,7 +1326,9 @@ mod tests {
 
     #[test]
     fn test_format_rdata_for_cname_type() {
-        let rdata = RData::CNAME(Name::from_str("www.example.com.").unwrap());
+        let rdata = RData::CNAME(hickory_proto::rr::rdata::CNAME(
+            Name::from_str("www.example.com.").unwrap(),
+        ));
         let rdata_text = format_rdata(&rdata);
         assert!(rdata_text.is_ok());
         if let Ok((parsed, raw_rdata)) = rdata_text {
@@ -1555,6 +1577,35 @@ mod tests {
         }
     }
 
+    // rsig is a derivation of the SIG record data, but the upstream crate does not handle that with an trait
+    // so there isn't really a great way to reduce code duplication here.
+    #[test]
+    fn test_format_rdata_for_rsig_type() {
+        let rdata = RData::DNSSEC(DNSSECRData::RRSIG(RRSIG::new(
+            RecordType::NULL,
+            DNSSEC_Algorithm::RSASHA256,
+            0,
+            0,
+            2,
+            1,
+            5,
+            Name::from_str("www.example.com").unwrap(),
+            vec![
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                23, 24, 25, 26, 27, 28, 29, 29, 31,
+            ],
+        )));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!(
+                "NULL 8 0 0 2 1 5 www.example.com AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHR8=",
+                parsed.unwrap()
+            );
+        }
+    }
+
     #[test]
     fn test_format_rdata_for_ds_type() {
         let rdata = RData::DNSSEC(DNSSECRData::DS(DS::new(
@@ -1778,8 +1829,7 @@ mod tests {
         let raw_rdata = BASE64
             .decode(raw_data.as_bytes())
             .expect("Invalid base64 encoded rdata.");
-        let mut decoder = BinDecoder::new(&raw_rdata);
-        let record_rdata = null::read(&mut decoder, Restrict::new(raw_rdata.len() as u16)).unwrap();
+        let record_rdata = NULL::with(raw_rdata);
         let rdata_text =
             DnsMessageParser::new(Vec::<u8>::new()).format_unknown_rdata(code, &record_rdata);
         assert!(rdata_text.is_ok());
@@ -1801,9 +1851,7 @@ mod tests {
             .decode(raw_data_encoded.as_bytes())
             .expect("Invalid base64 encoded raw rdata.");
         for i in 1..=2 {
-            let mut decoder = BinDecoder::new(&raw_rdata);
-            let record_rdata =
-                null::read(&mut decoder, Restrict::new(raw_rdata.len() as u16)).unwrap();
+            let record_rdata = NULL::with(raw_rdata.clone());
             let rdata_text = message_parser.format_unknown_rdata(code, &record_rdata);
             assert!(rdata_text.is_ok());
             assert_eq!(expected_output, rdata_text.unwrap().0.unwrap());

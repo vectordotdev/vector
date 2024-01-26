@@ -9,13 +9,14 @@ components: sources: logstash: {
 		commonly_used: true
 		delivery:      "best_effort"
 		deployment_roles: ["sidecar", "aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		receive: {
 			from: {
 				service: services.logstash
@@ -50,26 +51,7 @@ components: sources: logstash: {
 		platform_name: null
 	}
 
-	configuration: {
-		acknowledgements: configuration._source_acknowledgements
-		address: {
-			description: "The address to listen for TCP connections on."
-			required:    true
-			type: string: {
-				examples: ["0.0.0.0:\(_port)"]
-			}
-		}
-		connection_limit: {
-			common:        false
-			description:   "The max number of TCP connections that will be processed."
-			relevant_when: "mode = `tcp`"
-			required:      false
-			type: uint: {
-				default: null
-				unit:    "concurrency"
-			}
-		}
-	}
+	configuration: base.components.sources.logstash.configuration
 
 	output: logs: line: {
 		description: "A Logstash message"
@@ -323,14 +305,6 @@ components: sources: logstash: {
 	}
 
 	telemetry: metrics: {
-		connection_errors_total:          components.sources.internal_metrics.output.metrics.connection_errors_total
-		connection_send_ack_errors_total: components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
-		decode_errors_total:              components.sources.internal_metrics.output.metrics.decode_errors_total
-		events_in_total:                  components.sources.internal_metrics.output.metrics.events_in_total
-		open_connections:                 components.sources.internal_metrics.output.metrics.open_connections
-		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:  components.sources.internal_metrics.output.metrics.component_received_events_total
+		open_connections: components.sources.internal_metrics.output.metrics.open_connections
 	}
 }

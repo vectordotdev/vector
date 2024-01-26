@@ -1,4 +1,0 @@
-# result: [true, false, false, false]
-
-foo = 4
-[1 == 1, 0 == 1, "true" == true, (5 / foo ?? 0) == 0]

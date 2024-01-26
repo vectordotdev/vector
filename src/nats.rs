@@ -1,7 +1,7 @@
 use nkeys::error::Error as NKeysError;
 use snafu::{ResultExt, Snafu};
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::tls::TlsEnableableConfig;
 
@@ -13,36 +13,43 @@ pub enum NatsConfigError {
     TlsMissingKey,
     #[snafu(display("NATS TLS Config Error: missing cert"))]
     TlsMissingCert,
+    #[snafu(display("NATS Credentials file error"))]
+    CredentialsFileError { source: std::io::Error },
 }
 
 /// Configuration of the authentication strategy when interacting with NATS.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The strategy used to authenticate with the NATS server.
+
+More information on NATS authentication, and the various authentication strategies, can be found in the
+NATS [documentation][nats_auth_docs]. For TLS client certificate authentication specifically, see the
+`tls` settings.
+
+[nats_auth_docs]: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro"
+))]
 pub(crate) enum NatsAuthConfig {
-    /// Username and password authentication.
-    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password))
+    /// Username/password authentication.
     UserPassword {
         #[configurable(derived)]
         user_password: NatsAuthUserPassword,
     },
 
     /// Token authentication.
-    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens))
     Token {
         #[configurable(derived)]
         token: NatsAuthToken,
     },
 
-    /// Credentials file authentication.
-    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt))
+    /// Credentials file authentication. (JWT-based)
     CredentialsFile {
         #[configurable(derived)]
         credentials_file: NatsAuthCredentialsFile,
     },
 
     /// NKey authentication.
-    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth))
     Nkey {
         #[configurable(derived)]
         nkey: NatsAuthNKey,
@@ -89,6 +96,7 @@ pub(crate) struct NatsAuthToken {
 #[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthCredentialsFile {
     /// Path to credentials file.
+    #[configurable(metadata(docs::examples = "/etc/nats/nats.creds"))]
     pub(crate) path: String,
 }
 
@@ -109,30 +117,27 @@ pub(crate) struct NatsAuthNKey {
 }
 
 impl NatsAuthConfig {
-    pub(crate) fn to_nats_options(&self) -> Result<nats::asynk::Options, NatsConfigError> {
+    pub(crate) fn to_nats_options(&self) -> Result<async_nats::ConnectOptions, NatsConfigError> {
         match self {
             NatsAuthConfig::UserPassword { user_password } => {
-                Ok(nats::asynk::Options::with_user_pass(
-                    user_password.user.as_str(),
-                    user_password.password.inner(),
+                Ok(async_nats::ConnectOptions::with_user_and_password(
+                    user_password.user.clone(),
+                    user_password.password.inner().to_string(),
                 ))
             }
-            NatsAuthConfig::CredentialsFile { credentials_file } => Ok(
-                nats::asynk::Options::with_credentials(&credentials_file.path),
-            ),
-            NatsAuthConfig::Nkey { nkey } => nkeys::KeyPair::from_seed(&nkey.seed)
-                .context(AuthConfigSnafu)
-                .map(|kp| {
-                    // The following unwrap is safe because the only way the sign method can fail is if
-                    // keypair does not contain a seed. We are constructing the keypair from a seed in
-                    // the preceding line.
-                    nats::asynk::Options::with_nkey(&nkey.nkey, move |nonce| {
-                        kp.sign(nonce).unwrap()
-                    })
-                }),
-            NatsAuthConfig::Token { token } => {
-                Ok(nats::asynk::Options::with_token(token.value.inner()))
+            NatsAuthConfig::CredentialsFile { credentials_file } => {
+                async_nats::ConnectOptions::with_credentials(
+                    &std::fs::read_to_string(credentials_file.path.clone())
+                        .context(CredentialsFileSnafu)?,
+                )
+                .context(CredentialsFileSnafu)
             }
+            NatsAuthConfig::Nkey { nkey } => {
+                Ok(async_nats::ConnectOptions::with_nkey(nkey.seed.clone()))
+            }
+            NatsAuthConfig::Token { token } => Ok(async_nats::ConnectOptions::with_token(
+                token.value.inner().to_string(),
+            )),
         }
     }
 }
@@ -141,35 +146,33 @@ pub(crate) fn from_tls_auth_config(
     connection_name: &str,
     auth_config: &Option<NatsAuthConfig>,
     tls_config: &Option<TlsEnableableConfig>,
-) -> Result<nats::asynk::Options, NatsConfigError> {
+) -> Result<async_nats::ConnectOptions, NatsConfigError> {
     let nats_options = match &auth_config {
-        None => nats::asynk::Options::new(),
+        None => async_nats::ConnectOptions::new(),
         Some(auth) => auth.to_nats_options()?,
     };
 
-    let nats_options = nats_options
-        .with_name(connection_name)
-        // Set reconnect_buffer_size on the nats client to 0 bytes so that the
-        // client doesn't buffer internally (to avoid message loss).
-        .reconnect_buffer_size(0);
+    let nats_options = nats_options.name(connection_name);
 
     match tls_config {
         None => Ok(nats_options),
         Some(tls_config) => {
             let tls_enabled = tls_config.enabled.unwrap_or(false);
-            let nats_options = nats_options.tls_required(tls_enabled);
+            let nats_options = nats_options.require_tls(tls_enabled);
             if !tls_enabled {
                 return Ok(nats_options);
             }
 
             let nats_options = match &tls_config.options.ca_file {
                 None => nats_options,
-                Some(ca_file) => nats_options.add_root_certificate(ca_file),
+                Some(ca_file) => nats_options.add_root_certificates(ca_file.clone()),
             };
 
             let nats_options = match (&tls_config.options.crt_file, &tls_config.options.key_file) {
                 (None, None) => nats_options,
-                (Some(crt_file), Some(key_file)) => nats_options.client_cert(crt_file, key_file),
+                (Some(crt_file), Some(key_file)) => {
+                    nats_options.add_client_certificate(crt_file.clone(), key_file.clone())
+                }
                 (Some(_crt_file), None) => return Err(NatsConfigError::TlsMissingKey),
                 (None, Some(_key_file)) => return Err(NatsConfigError::TlsMissingCert),
             };
@@ -182,7 +185,7 @@ pub(crate) fn from_tls_auth_config(
 mod tests {
     use super::*;
 
-    fn parse_auth(s: &str) -> Result<nats::asynk::Options, crate::Error> {
+    fn parse_auth(s: &str) -> Result<async_nats::ConnectOptions, crate::Error> {
         toml::from_str(s)
             .map_err(Into::into)
             .and_then(|config: NatsAuthConfig| config.to_nats_options().map_err(Into::into))
@@ -260,7 +263,7 @@ mod tests {
         parse_auth(
             r#"
             strategy = "credentials_file"
-            credentials_file.path = "/path/to/nowhere"
+            credentials_file.path = "tests/data/nats/nats.creds"
         "#,
         )
         .unwrap();

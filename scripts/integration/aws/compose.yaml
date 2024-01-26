@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  mock-ec2-metadata:
+    image: public.ecr.aws/aws-ec2/amazon-ec2-metadata-mock:v1.11.2
+  mock-localstack:
+    image: docker.io/localstack/localstack:3
+    environment:
+    - SERVICES=kinesis,s3,cloudwatch,es,firehose,sqs,sns
+  mock-watchlogs:
+    image: docker.io/luciofranco/mockwatchlogs:latest
+  mock-ecs:
+    image: docker.io/amazon/amazon-ecs-local-container-endpoints:latest
+    volumes:
+    - $DOCKER_SOCKET:/var/run/docker.sock
+    - $HOME/.aws/:/home/.aws/

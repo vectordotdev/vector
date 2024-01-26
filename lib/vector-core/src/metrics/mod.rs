@@ -4,13 +4,12 @@ mod recency;
 mod recorder;
 mod storage;
 
-use std::time::Duration;
+use std::{sync::OnceLock, time::Duration};
 
 use chrono::Utc;
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::layers::Layer;
-use once_cell::sync::OnceCell;
 use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
@@ -29,7 +28,7 @@ pub enum Error {
     TimeoutMustBePositive { timeout: f64 },
 }
 
-static CONTROLLER: OnceCell<Controller> = OnceCell::new();
+static CONTROLLER: OnceLock<Controller> = OnceLock::new();
 
 // Cardinality counter parameters, expose the internal metrics registry
 // cardinality. Useful for the end users to help understand the characteristics
@@ -55,7 +54,7 @@ fn tracing_context_layer_enabled() -> bool {
 }
 
 fn init(recorder: VectorRecorder) -> Result<()> {
-    // An escape hatch to allow disabing internal metrics core. May be used for
+    // An escape hatch to allow disabling internal metrics core. May be used for
     // performance reasons. This is a hidden and undocumented functionality.
     if !metrics_enabled() {
         metrics::set_boxed_recorder(Box::new(metrics::NoopRecorder))
@@ -107,13 +106,18 @@ pub fn init_global() -> Result<()> {
     init(VectorRecorder::new_global())
 }
 
-/// Initialize the thread-local metrics sub-system
-///
-/// # Errors
-///
-/// This function will error if it is called multiple times.
-pub fn init_test() -> Result<()> {
-    init(VectorRecorder::new_test())
+/// Initialize the thread-local metrics sub-system. This function will loop until a recorder is
+/// actually set.
+pub fn init_test() {
+    if init(VectorRecorder::new_test()).is_err() {
+        // The only error case returned by `init` is `AlreadyInitialized`. A race condition is
+        // possible here: if metrics are being initialized by two (or more) test threads
+        // simultaneously, the ones that fail to set return immediately, possibly allowing
+        // subsequent code to execute before the static recorder value is actually set within the
+        // `metrics` crate. To prevent subsequent code from running with an unset recorder, loop
+        // here until a recorder is available.
+        while metrics::try_recorder().is_none() {}
+    }
 }
 
 impl Controller {
@@ -155,28 +159,6 @@ impl Controller {
         let timestamp = Utc::now();
 
         let mut metrics = self.recorder.with_registry(Registry::visit_metrics);
-
-        // Add aliases for deprecated metrics
-        for i in 0..metrics.len() {
-            let metric = &metrics[i];
-            match metric.name() {
-                "component_sent_events_total" => {
-                    let alias = metric.clone().with_name("processed_events_total");
-                    metrics.push(alias);
-                }
-                "component_sent_bytes_total" if metric.tag_matches("component_kind", "sink") => {
-                    let alias = metric.clone().with_name("processed_bytes_total");
-                    metrics.push(alias);
-                }
-                "component_received_bytes_total"
-                    if metric.tag_matches("component_kind", "source") =>
-                {
-                    let alias = metric.clone().with_name("processed_bytes_total");
-                    metrics.push(alias);
-                }
-                _ => {}
-            }
-        }
 
         #[allow(clippy::cast_precision_loss)]
         let value = (metrics.len() + 2) as f64;
@@ -248,20 +230,14 @@ mod tests {
     const IDLE_TIMEOUT: f64 = 0.5;
 
     fn init_metrics() -> &'static Controller {
-        if let Err(error) = init_test() {
-            assert!(
-                error == Error::AlreadyInitialized,
-                "Failed to initialize metrics recorder: {:?}",
-                error
-            );
-        }
+        init_test();
         Controller::get().expect("Could not get global metrics controller")
     }
 
     #[test]
     fn cardinality_matches() {
         for cardinality in [0, 1, 10, 100, 1000, 10000] {
-            let _ = init_test();
+            init_test();
             let controller = Controller::get().unwrap();
             controller.reset();
 
@@ -288,6 +264,20 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn handles_registered_metrics() {
+        let controller = init_metrics();
+
+        let counter = metrics::register_counter!("test7");
+        assert_eq!(controller.capture_metrics().len(), 3);
+        counter.increment(1);
+        assert_eq!(controller.capture_metrics().len(), 3);
+        let gauge = metrics::register_gauge!("test8");
+        assert_eq!(controller.capture_metrics().len(), 4);
+        gauge.set(1.0);
+        assert_eq!(controller.capture_metrics().len(), 4);
     }
 
     #[test]
@@ -341,7 +331,7 @@ mod tests {
             .expect("Test metric is not present");
         match metric.value() {
             MetricValue::Counter { value } => assert_eq!(*value, 2.0),
-            value => panic!("Invalid metric value {:?}", value),
+            value => panic!("Invalid metric value {value:?}"),
         }
     }
 }

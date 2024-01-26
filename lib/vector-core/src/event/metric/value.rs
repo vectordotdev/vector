@@ -1,12 +1,18 @@
 use core::fmt;
 use std::collections::BTreeSet;
 
-use float_eq::FloatEq;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
+use crate::{float_eq, metrics::AgentDDSketch};
+
 use super::{samples_to_buckets, write_list, write_word};
-use crate::metrics::AgentDDSketch;
+
+const INFINITY: &str = "inf";
+const NEG_INFINITY: &str = "-inf";
+const NAN: &str = "NaN";
 
 /// Metric value.
 #[configurable_component]
@@ -373,7 +379,7 @@ impl PartialEq for MetricValue {
         match (self, other) {
             (Self::Counter { value: l_value }, Self::Counter { value: r_value })
             | (Self::Gauge { value: l_value }, Self::Gauge { value: r_value }) => {
-                l_value.eq_ulps(r_value, &1)
+                float_eq(*l_value, *r_value)
             }
             (Self::Set { values: l_values }, Self::Set { values: r_values }) => {
                 l_values == r_values
@@ -399,7 +405,7 @@ impl PartialEq for MetricValue {
                     count: r_count,
                     sum: r_sum,
                 },
-            ) => l_buckets == r_buckets && l_count == r_count && l_sum.eq_ulps(r_sum, &1),
+            ) => l_buckets == r_buckets && l_count == r_count && float_eq(*l_sum, *r_sum),
             (
                 Self::AggregatedSummary {
                     quantiles: l_quantiles,
@@ -411,7 +417,7 @@ impl PartialEq for MetricValue {
                     count: r_count,
                     sum: r_sum,
                 },
-            ) => l_quantiles == r_quantiles && l_count == r_count && l_sum.eq_ulps(r_sum, &1),
+            ) => l_quantiles == r_quantiles && l_count == r_count && float_eq(*l_sum, *r_sum),
             (Self::Sketch { sketch: l_sketch }, Self::Sketch { sketch: r_sketch }) => {
                 l_sketch == r_sketch
             }
@@ -424,7 +430,7 @@ impl fmt::Display for MetricValue {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
             MetricValue::Counter { value } | MetricValue::Gauge { value } => {
-                write!(fmt, "{}", value)
+                write!(fmt, "{value}")
             }
             MetricValue::Set { values } => {
                 write_list(fmt, " ", values.iter(), |fmt, value| write_word(fmt, value))
@@ -447,7 +453,7 @@ impl fmt::Display for MetricValue {
                 count,
                 sum,
             } => {
-                write!(fmt, "count={} sum={} ", count, sum)?;
+                write!(fmt, "count={count} sum={sum} ")?;
                 write_list(fmt, " ", buckets, |fmt, bucket| {
                     write!(fmt, "{}@{}", bucket.count, bucket.upper_limit)
                 })
@@ -457,7 +463,7 @@ impl fmt::Display for MetricValue {
                 count,
                 sum,
             } => {
-                write!(fmt, "count={} sum={} ", count, sum)?;
+                write!(fmt, "count={count} sum={sum} ")?;
                 write_list(fmt, " ", quantiles, |fmt, quantile| {
                     write!(fmt, "{}@{}", quantile.quantile, quantile.value)
                 })
@@ -507,7 +513,7 @@ impl From<AgentDDSketch> for MetricValue {
 
 // Currently, VRL can only read the type of the value and doesn't consider any actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricValue> for ::value::Value {
+impl From<MetricValue> for vrl::value::Value {
     fn from(value: MetricValue) -> Self {
         value.as_name().into()
     }
@@ -538,7 +544,7 @@ pub enum MetricSketch {
     ///
     /// [ddsketch]: https://www.vldb.org/pvldb/vol12/p2195-masson.pdf
     /// [ddagent]: https://github.com/DataDog/datadog-agent
-    AgentDDSketch(#[configurable(derived)] AgentDDSketch),
+    AgentDDSketch(AgentDDSketch),
 }
 
 impl MetricSketch {
@@ -569,7 +575,7 @@ impl ByteSizeOf for MetricSketch {
 
 // Currently, VRL can only read the type of the value and doesn't consider ny actual metric values.
 #[cfg(feature = "vrl")]
-impl From<MetricSketch> for ::value::Value {
+impl From<MetricSketch> for vrl::value::Value {
     fn from(value: MetricSketch) -> Self {
         value.as_name().into()
     }
@@ -577,7 +583,7 @@ impl From<MetricSketch> for ::value::Value {
 
 /// A single observation.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug)]
 pub struct Sample {
     /// The value of the observation.
     pub value: f64,
@@ -586,24 +592,84 @@ pub struct Sample {
     pub rate: u32,
 }
 
+impl PartialEq for Sample {
+    fn eq(&self, other: &Self) -> bool {
+        self.rate == other.rate && float_eq(self.value, other.value)
+    }
+}
+
 impl ByteSizeOf for Sample {
     fn allocated_bytes(&self) -> usize {
         0
     }
 }
 
+/// Custom serialization function which converts special `f64` values to strings.
+/// Non-special values are serialized as numbers.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn serialize_f64<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if value.is_infinite() {
+        serializer.serialize_str(if *value > 0.0 { INFINITY } else { NEG_INFINITY })
+    } else if value.is_nan() {
+        serializer.serialize_str(NAN)
+    } else {
+        serializer.serialize_f64(*value)
+    }
+}
+
+/// Custom deserialization function for handling special f64 values.
+fn deserialize_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct UpperLimitVisitor;
+
+    impl<'de> de::Visitor<'de> for UpperLimitVisitor {
+        type Value = f64;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a number or a special string value")
+        }
+
+        fn visit_f64<E: de::Error>(self, value: f64) -> Result<Self::Value, E> {
+            Ok(value)
+        }
+
+        fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+            match value {
+                NAN => Ok(f64::NAN),
+                INFINITY => Ok(f64::INFINITY),
+                NEG_INFINITY => Ok(f64::NEG_INFINITY),
+                _ => Err(E::custom("unsupported string value")),
+            }
+        }
+    }
+
+    deserializer.deserialize_any(UpperLimitVisitor)
+}
+
 /// A histogram bucket.
 ///
 /// Histogram buckets represent the `count` of observations where the value of the observations does
 /// not exceed the specified `upper_limit`.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[configurable_component(no_deser, no_ser)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Bucket {
     /// The upper limit of values in the bucket.
+    #[serde(serialize_with = "serialize_f64", deserialize_with = "deserialize_f64")]
     pub upper_limit: f64,
 
     /// The number of values tracked in this bucket.
     pub count: u64,
+}
+
+impl PartialEq for Bucket {
+    fn eq(&self, other: &Self) -> bool {
+        self.count == other.count && float_eq(self.upper_limit, other.upper_limit)
+    }
 }
 
 impl ByteSizeOf for Bucket {
@@ -614,7 +680,7 @@ impl ByteSizeOf for Bucket {
 
 /// A single quantile observation.
 ///
-/// Quantiles themselves are "cut points diviing the range of a probability distribution into
+/// Quantiles themselves are "cut points dividing the range of a probability distribution into
 /// continuous intervals with equal probabilities". [[1][quantiles_wikipedia]].
 ///
 /// We use quantiles to measure the value along these probability distributions for representing
@@ -626,9 +692,9 @@ impl ByteSizeOf for Bucket {
 /// floating-point numbers and can represent higher-precision cut points, such as 0.9999, or the
 /// 99.99th percentile.
 ///
-/// [quantile_wikipedia]: https://en.wikipedia.org/wiki/Quantile
+/// [quantiles_wikipedia]: https://en.wikipedia.org/wiki/Quantile
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug)]
 pub struct Quantile {
     /// The value of the quantile.
     ///
@@ -637,6 +703,12 @@ pub struct Quantile {
 
     /// The estimated value of the given quantile within the probability distribution.
     pub value: f64,
+}
+
+impl PartialEq for Quantile {
+    fn eq(&self, other: &Self) -> bool {
+        float_eq(self.quantile, other.quantile) && float_eq(self.value, other.value)
+    }
 }
 
 impl Quantile {

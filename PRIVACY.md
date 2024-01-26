@@ -18,12 +18,12 @@ project thinks about privacy now and in the future.
 
 ### Downloads
 
-Vector uses AWS S3, Github assets, [Cloudsmith][cloudsmith], and Docker Hub to host
-release artifacts. Vector does track download counts in aggregate. For Github, Cloudsmith,
-and Docker this data is anonymous, but for AWS S3 IP addresses are logged. There is no
-way to disable IP address tracking within the AWS S3 logs. If you are concerned about
-sharing your IP address we recommend using a proxy, or downloading Vector from a
-different channel.
+Vector uses AWS S3, GitHub assets, and Docker Hub to host release artifacts.
+Vector does track download counts in aggregate. For GitHub, and Docker this data
+is anonymous, but for AWS S3 IP addresses are logged. There is no way to disable
+IP address tracking within the AWS S3 logs. If you are concerned about sharing
+your IP address we recommend using a proxy, or downloading Vector from
+a different channel.
 
 ### Phoning Home
 
@@ -41,9 +41,9 @@ derived from backend server logs which are anonymized. Vector uses
 
 ### Vector Repository
 
-The Vector repository is hosted on Github. You can review their privacy policy
+The Vector repository is hosted on GitHub. You can review their privacy policy
 [here][github_pp]. Additionally, Vector will not attempt to mine information
-about users that interact with Vector on Github. Vector team members will
+about users that interact with Vector on GitHub. Vector team members will
 occasionally reach out to active users offer help debugging or learn about
 ways Vector can improve.
 
@@ -56,5 +56,3 @@ privacy policy [here][discord_pp].
 [discord_pp]: https://discord.com/privacy/
 [netlify_analytics]: https://www.netlify.com/products/analytics/
 [vero_pp]: https://www.getvero.com/privacy/
-[cloudsmith]: https://cloudsmith.com/
-

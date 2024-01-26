@@ -3,7 +3,6 @@ use std::{
     mem,
 };
 
-use float_eq::FloatEq;
 use ordered_float::OrderedFloat;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, DeserializeAs, SerializeAs};
@@ -11,7 +10,10 @@ use snafu::Snafu;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
-use crate::event::{metric::Bucket, Metric, MetricValue};
+use crate::{
+    event::{metric::Bucket, Metric, MetricValue},
+    float_eq,
+};
 
 const AGENT_DEFAULT_BIN_LIMIT: u16 = 4096;
 const AGENT_DEFAULT_EPS: f64 = 1.0 / 128.0;
@@ -190,7 +192,7 @@ impl Bin {
 /// Datadog made some slight tweaks to configuration values and in-memory layout to optimize it for
 /// insertion performance within the agent.
 ///
-/// We've mimiced the agent version of `DDSketch` here in order to support a future where we can
+/// We've mimicked the agent version of `DDSketch` here in order to support a future where we can
 /// take sketches shipped by the agent, handle them internally, merge them, and so on, without any
 /// loss of accuracy, eventually forwarding them to Datadog ourselves.
 ///
@@ -641,7 +643,8 @@ impl AgentDDSketch {
             // generally enforced at the source level by converting from cumulative buckets, or
             // enforced by the internal structures that hold bucketed data i.e. Vector's internal
             // `Histogram` data structure used for collecting histograms from `metrics`.
-            let count = u32::try_from(bucket.count).expect("count range has already been checked.");
+            let count = u32::try_from(bucket.count)
+                .unwrap_or_else(|_| unreachable!("count range has already been checked."));
 
             self.insert_interpolate_bucket(lower, upper, count);
             lower = bucket.upper_limit;
@@ -817,10 +820,10 @@ impl PartialEq for AgentDDSketch {
         // because they can be minimally different between sketches purely due to floating-point
         // behavior, despite being fed the same exact data in terms of recorded samples.
         self.count == other.count
-            && self.min == other.min
-            && self.max == other.max
-            && self.sum.eq_ulps(&other.sum, &1)
-            && self.avg.eq_ulps(&other.avg, &1)
+            && float_eq(self.min, other.min)
+            && float_eq(self.max, other.max)
+            && float_eq(self.sum, other.sum)
+            && float_eq(self.avg, other.avg)
             && self.bins == other.bins
     }
 }
@@ -880,7 +883,7 @@ impl BinMap {
             Some(
                 self.keys
                     .into_iter()
-                    .zip(self.counts.into_iter())
+                    .zip(self.counts)
                     .map(|(k, n)| Bin { k, n })
                     .collect(),
             )
@@ -1289,9 +1292,7 @@ mod tests {
 
                 assert!(
                     (positive - negative).abs() <= 1.0e-6,
-                    "positive vs negative difference too great ({} vs {})",
-                    positive,
-                    negative
+                    "positive vs negative difference too great ({positive} vs {negative})",
                 );
             }
 
@@ -1397,7 +1398,7 @@ mod tests {
         // granularity.
         //
         // This test uses a far larger range of values, and takes 60-70 seconds, hence why we've
-        // guared it here behind a cfg flag.
+        // guarded it here behind a cfg flag.
         let config = Config::default();
         let min_value = 1.0e-6;
         let max_value = i64::MAX as f32;
@@ -1497,18 +1498,14 @@ mod tests {
         let max_observed_rel_acc = check_max_relative_accuracy(config, min_value, max_value);
         assert!(
             max_observed_rel_acc <= rel_acc + FLOATING_POINT_ACCEPTABLE_ERROR,
-            "observed out of bound max relative acc: {}, target rel acc={}",
-            max_observed_rel_acc,
-            rel_acc
+            "observed out of bound max relative acc: {max_observed_rel_acc}, target rel acc={rel_acc}",
         );
     }
 
     fn compute_relative_accuracy(target: f64, actual: f64) -> f64 {
         assert!(
             !(target < 0.0 || actual < 0.0),
-            "expected/actual values must be greater than 0.0; target={}, actual={}",
-            target,
-            actual
+            "expected/actual values must be greater than 0.0; target={target}, actual={actual}",
         );
 
         if target == actual {

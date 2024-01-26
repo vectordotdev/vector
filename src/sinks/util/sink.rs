@@ -48,9 +48,11 @@ use tokio::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing::Instrument;
+use vector_lib::internal_event::{
+    CallError, CountByteSize, EventsSent, InternalEventHandle as _, Output,
+};
 // === StreamSink<Event> ===
-use vector_core::internal_event::EventsSent;
-pub use vector_core::sink::StreamSink;
+pub use vector_lib::sink::StreamSink;
 
 use super::{
     batch::{Batch, EncodedBatch, FinalizersBatch, PushResult, StatefulBatch},
@@ -158,7 +160,7 @@ where
 /// in flight batches.
 ///
 /// This type is similar to `BatchSink` with the added benefit that it has
-/// more fine grained partitioning ability. It will hold many different batches
+/// more fine-grained partitioning ability. It will hold many different batches
 /// of events and contain linger timeouts for each.
 ///
 /// Note that, unlike `BatchSink`, the `batch` given to this sink is
@@ -173,7 +175,7 @@ where
 /// in all requests will not be acked until r1 has completed.
 ///
 /// # Ordering
-/// Per partition ordering can be achived by holding onto future of a request
+/// Per partition ordering can be achieved by holding onto future of a request
 /// until it finishes. Until then all further requests in that partition are
 /// delayed.
 ///
@@ -424,7 +426,8 @@ where
             items,
             finalizers,
             count,
-            byte_size,
+            json_byte_size,
+            ..
         } = batch;
 
         let (tx, rx) = oneshot::channel();
@@ -438,25 +441,35 @@ where
             message = "Submitting service request.",
             in_flight_requests = self.in_flight.len()
         );
+        let events_sent = register!(EventsSent::from(Output(None)));
         self.service
             .call(items)
             .err_into()
             .map(move |result| {
-                let status = result_status(result);
+                let status = result_status(&result);
                 finalizers.update_status(status);
-                if status == EventStatus::Delivered {
-                    emit!(EventsSent {
-                        count,
-                        byte_size,
-                        output: None
-                    });
-                    // TODO: Emit a BytesSent event here too
+                match status {
+                    EventStatus::Delivered => {
+                        events_sent.emit(CountByteSize(count, json_byte_size));
+                        // TODO: Emit a BytesSent event here too
+                    }
+                    EventStatus::Rejected => {
+                        // Emit the `Error` and `EventsDropped` internal events.
+                        // This scenario occurs after retries have been attempted.
+                        let error = result.err().unwrap_or_else(|| "Response failed.".into());
+                        emit!(CallError {
+                            error,
+                            request_id,
+                            count,
+                        });
+                    }
+                    _ => {} // do nothing
                 }
 
                 // If the rx end is dropped we still completed
                 // the request so this is a weird case that we can
                 // ignore for now.
-                let _ = tx.send(());
+                _ = tx.send(());
             })
             .instrument(info_span!("request", %request_id).or_current())
             .boxed()
@@ -490,7 +503,7 @@ where
 
 pub trait ServiceLogic: Clone {
     type Response: Response;
-    fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus;
+    fn result_status(&self, result: &crate::Result<Self::Response>) -> EventStatus;
 }
 
 #[derive(Derivative)]
@@ -511,12 +524,12 @@ where
 {
     type Response = R;
 
-    fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus {
+    fn result_status(&self, result: &crate::Result<Self::Response>) -> EventStatus {
         result_status(result)
     }
 }
 
-fn result_status<R: Response + Send>(result: crate::Result<R>) -> EventStatus {
+fn result_status<R: Response + Send>(result: &crate::Result<R>) -> EventStatus {
     match result {
         Ok(response) => {
             if response.is_successful() {
@@ -563,8 +576,9 @@ mod tests {
     use bytes::Bytes;
     use futures::{future, stream, task::noop_waker_ref, SinkExt, StreamExt};
     use tokio::{task::yield_now, time::Instant};
-    use vector_common::finalization::{
-        BatchNotifier, BatchStatus, EventFinalizer, EventFinalizers,
+    use vector_lib::{
+        finalization::{BatchNotifier, BatchStatus, EventFinalizer, EventFinalizers},
+        json_size::JsonSize,
     };
 
     use super::*;
@@ -609,6 +623,7 @@ mod tests {
             EncodedEvent {
                 item,
                 finalizers,
+                json_byte_size: JsonSize::zero(),
                 byte_size: 0,
             }
         }
@@ -651,7 +666,7 @@ mod tests {
         // Services future will be spawned and work between `yield_now` calls.
         let svc = tower::service_fn(|req: Vec<Request>| async move {
             let duration = match req[0].0 {
-                1 | 2 | 3 => Duration::from_secs(1),
+                1..=3 => Duration::from_secs(1),
 
                 // The 4th request will introduce some sort of
                 // latency spike to ensure later events don't
@@ -758,7 +773,10 @@ mod tests {
 
         buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(
+                &mut stream::iter(0..22)
+                    .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
+            )
             .await
             .unwrap();
 
@@ -794,7 +812,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(0, 0)),
+            buffered.start_send_unpin(EncodedEvent::new(0, 0, JsonSize::zero())),
             Ok(())
         ));
         assert!(matches!(
@@ -802,7 +820,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(1, 0)),
+            buffered.start_send_unpin(EncodedEvent::new(1, 0, JsonSize::zero())),
             Ok(())
         ));
 
@@ -833,7 +851,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(0, 0)),
+            buffered.start_send_unpin(EncodedEvent::new(0, 0, JsonSize::zero())),
             Ok(())
         ));
         assert!(matches!(
@@ -841,7 +859,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(1, 0)),
+            buffered.start_send_unpin(EncodedEvent::new(1, 0, JsonSize::zero())),
             Ok(())
         ));
 
@@ -875,7 +893,10 @@ mod tests {
         let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
 
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(
+                &mut stream::iter(0..22)
+                    .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
+            )
             .await
             .unwrap();
 
@@ -908,7 +929,10 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(
+                &mut stream::iter(input)
+                    .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
+            )
             .await
             .unwrap();
 
@@ -935,7 +959,10 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(
+                &mut stream::iter(input)
+                    .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
+            )
             .await
             .unwrap();
 
@@ -972,7 +999,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(1, 0)),
+            sink.start_send_unpin(EncodedEvent::new(1, 0, JsonSize::zero())),
             Ok(())
         ));
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));
@@ -1012,6 +1039,7 @@ mod tests {
                 finalizers,
                 count: items,
                 byte_size: 1,
+                json_byte_size: JsonSize::new(1),
             }
         };
 
@@ -1071,12 +1099,12 @@ mod tests {
         let mut sink = PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT);
         sink.ordered();
 
-        let input = (0..20)
-            .into_iter()
-            .map(|i| (0, i))
-            .chain((0..20).into_iter().map(|i| (1, i)));
+        let input = (0..20).map(|i| (0, i)).chain((0..20).map(|i| (1, i)));
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
+            .send_all(
+                &mut stream::iter(input)
+                    .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
+            )
             .await
             .unwrap();
 
@@ -1087,10 +1115,10 @@ mod tests {
         assert_eq!(
             &*output,
             &vec![
-                (0..10).into_iter().map(|i| (1, i)).collect::<Vec<_>>(),
-                (10..20).into_iter().map(|i| (1, i)).collect(),
-                (0..10).into_iter().map(|i| (0, i)).collect(),
-                (10..20).into_iter().map(|i| (0, i)).collect(),
+                (0..10).map(|i| (1, i)).collect::<Vec<_>>(),
+                (10..20).map(|i| (1, i)).collect(),
+                (0..10).map(|i| (0, i)).collect(),
+                (10..20).map(|i| (0, i)).collect(),
             ]
         );
     }

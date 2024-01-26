@@ -28,6 +28,7 @@ experience -- the purpose of this document.
          1. [Source & sink boundaries](#source--sink-boundaries)
          2. [Transform boundaries](#transform-boundaries)
       4. [Upfront configuration](#upfront-configuration)
+      5. [Sink log encoding](#sink-log-encoding)
    4. [Adherence](#adherence)
       1. [Roles](#roles)
          1. [Contributors](#contributors)
@@ -219,6 +220,13 @@ primary sink rejects events.
 
 Users may need to intervene to update invalid configuration, for example in the
 case of rotating invalid API keys.
+
+### Sink log encoding
+
+When encoding logs for sinks, fields indicated by `log_schema` keys should be mapped to where the
+destination expects to find them in the encoded payloads. For example, if the sink requires
+a "hostname", it should fetch it from the log event using `LogEvent#host_path` to fetch the value
+from the appropriate field and place it in the encoded payload where the "hostname" is expected.
 
 ## Adherence
 

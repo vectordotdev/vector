@@ -1,4 +1,0 @@
-# result: de76c3e567fca9d246f5f8d3b2e704a38c3c5e258988ab525f941db8
-
-variant = "SHA-224"
-sha2("foobar", variant)

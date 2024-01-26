@@ -72,13 +72,6 @@ impl Drop for PathGuard {
     }
 }
 
-fn create_disk_v1_variant(_max_events: usize, max_size: u64) -> BufferType {
-    BufferType::DiskV1 {
-        max_size: NonZeroU64::new(max_size).unwrap(),
-        when_full: WhenFull::DropNewest,
-    }
-}
-
 fn create_disk_v2_variant(_max_events: usize, max_size: u64) -> BufferType {
     BufferType::DiskV2 {
         max_size: NonZeroU64::new(max_size).unwrap(),
@@ -147,15 +140,6 @@ fn write_then_read(c: &mut Criterion) {
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],
-        "buffer-disk-v1",
-        "write-then-read",
-        wtr_measurement,
-        create_disk_v1_variant
-    );
-
-    experiment!(
-        c,
-        [32, 64, 128, 256, 512, 1024],
         "buffer-disk-v2",
         "write-then-read",
         wtr_measurement,
@@ -174,15 +158,6 @@ fn write_then_read(c: &mut Criterion) {
 
 /// Writes a message, and then reads a message, until all messages are gone.
 fn write_and_read(c: &mut Criterion) {
-    experiment!(
-        c,
-        [32, 64, 128, 256, 512, 1024],
-        "buffer-disk-v1",
-        "write-and-read",
-        war_measurement,
-        create_disk_v1_variant
-    );
-
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],

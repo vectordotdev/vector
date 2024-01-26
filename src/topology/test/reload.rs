@@ -7,8 +7,8 @@ use std::{
 use futures::StreamExt;
 use tokio::time::sleep;
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use vector_buffers::{BufferConfig, BufferType, WhenFull};
-use vector_core::config::ComponentKey;
+use vector_lib::buffers::{BufferConfig, BufferType, WhenFull};
+use vector_lib::config::ComponentKey;
 
 use crate::{
     config::Config,
@@ -21,7 +21,14 @@ use crate::{
 };
 
 fn internal_metrics_source() -> InternalMetricsConfig {
-    InternalMetricsConfig::default()
+    InternalMetricsConfig {
+        // TODO: A scrape interval left at the default of 1.0 seconds or less triggers some kind of
+        // race condition in the `topology_disk_buffer_conflict` test below, but it is unclear
+        // why. All these tests should work regardless of the scrape interval. This warrants further
+        // investigation.
+        scrape_interval_secs: Duration::from_secs_f64(1.1),
+        ..Default::default()
+    }
 }
 
 fn prom_remote_write_source(addr: SocketAddr) -> PrometheusRemoteWriteConfig {
@@ -56,9 +63,9 @@ async fn topology_reuse_old_port() {
     new_config.add_source("in2", prom_remote_write_source(address));
     new_config.add_sink("out", &["in2"], basic_sink(1).1);
 
-    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
         .await
         .unwrap());
 }
@@ -81,9 +88,9 @@ async fn topology_rebuild_old() {
     // Will cause the new_config to fail on build
     let _bind = TcpListener::bind(address_1).unwrap();
 
-    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     assert!(!topology
-        .reload_config_and_respawn(new_config.build().unwrap())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
         .await
         .unwrap());
 }
@@ -98,9 +105,9 @@ async fn topology_old() {
     old_config.add_source("in", prom_remote_write_source(address));
     old_config.add_sink("out", &["in"], basic_sink(1).1);
 
-    let (mut topology, _crash) = start_topology(old_config.clone().build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(old_config.clone().build().unwrap(), false).await;
     assert!(topology
-        .reload_config_and_respawn(old_config.build().unwrap())
+        .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
         .await
         .unwrap());
 }
@@ -178,15 +185,15 @@ async fn topology_disk_buffer_conflict() {
     old_config.add_sink("out", &["in"], prom_exporter_sink(address_0, 1));
 
     let sink_key = ComponentKey::from("out");
-    old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV1 {
-        max_size: NonZeroU64::new(1024).unwrap(),
+    old_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
+        max_size: NonZeroU64::new(268435488).unwrap(),
         when_full: WhenFull::Block,
     });
 
     let mut new_config = old_config.clone();
     new_config.sinks[&sink_key].inner = prom_exporter_sink(address_1, 1).into();
-    new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV1 {
-        max_size: NonZeroU64::new(1024).unwrap(),
+    new_config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
+        max_size: NonZeroU64::new(268435488).unwrap(),
         when_full: WhenFull::Block,
     });
 
@@ -251,7 +258,7 @@ async fn topology_readd_input() {
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1"], prom_exporter_sink(address_0, 1));
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
         .await
         .unwrap());
 
@@ -261,7 +268,7 @@ async fn topology_readd_input() {
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1", "in2"], prom_exporter_sink(address_0, 1));
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
         .await
         .unwrap());
 
@@ -292,7 +299,7 @@ async fn reload_sink_test(
 
     // Now reload the topology with the "new" configuration, and make sure that a component is now listening on `new_address`.
     assert!(topology
-        .reload_config_and_respawn(new_config)
+        .reload_config_and_respawn(new_config, Default::default())
         .await
         .unwrap());
 

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext};
 use crate::event::Event;
@@ -23,7 +23,7 @@ impl StreamSink<Event> for BackpressureSink {
 }
 
 /// Configuration for the `test_backpressure` sink.
-#[configurable_component(sink("test_backpressure"))]
+#[configurable_component(sink("test_backpressure", "Test (backpressure)."))]
 #[derive(Clone, Debug, Default)]
 pub struct BackpressureSinkConfig {
     /// Number of events to consume before stopping.
@@ -33,6 +33,7 @@ pub struct BackpressureSinkConfig {
 impl_generate_config_from_default!(BackpressureSinkConfig);
 
 #[async_trait]
+#[typetag::serde(name = "test_backpressure")]
 impl SinkConfig for BackpressureSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = BackpressureSink {

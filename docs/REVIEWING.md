@@ -36,6 +36,49 @@ following items should also be checked:
 - [ ] Does it comply with [component spec](specs/component.md)?
 - [ ] Does it comply with the [instrumentation spec](specs/instrumentation.md)?
 
+### Checklist - new source
+
+This checklist is specific for Vector's sources.
+
+- [ ] Does the source handle metrics? If it does, the Datadog Origin Metadata function (`sinks::datadog::metrics::encoder::source_type_to_service`),
+      which maps the source to the correct Service value, needs to be updated. If this source is an Agent role and thus is the true origin of it's
+      metrics, this will need to be a follow-up PR by a member of the Vector team.
+
+### Checklist - new sink
+
+This checklist is specific for Vector's sinks.
+
+#### Logic
+
+- [ ] Does it work? Do you understand what it is supposed to be doing?
+- [ ] Does the retry logic make sense?
+- [ ] Are the tests testing that the sink is emitting the correct metrics?
+- [ ] Are there integration tests?
+
+#### Code structure
+
+- [ ] Is it using the sink prelude (`use crate::sinks::prelude::*`)?
+- [ ] Is the sink a stream based sink?
+      Check that the return value from `SinkConfig::build` is the return from `VectorSink::from_event_streamsink`.
+- [ ] Is it gated by sensible feature flags?
+- [ ] Is the code modularized into `mod.rs`, `config.rs`, `sink.rs`,  `request_builder.rs`, `service.rs`
+- [ ] Does the code follow our [style guidelines].
+
+#### Documentation
+
+- [ ] Look at the doc preview on Netlify. Does it look good?
+- [ ] Is there a `cue` file linking to `base`?
+- [ ] Is there a markdown file under `/website/content/en/docs/reference/configuration/sinks/`?
+- [ ] Are module comments included in `mod.rs` linking to any relevant areas in the external services documentation?
+
+#### Configuration
+
+- [ ] Are TLS settings configurable?
+- [ ] Are the Request settings configurable?
+- [ ] Should it have proxy settings? If so, are they in place?
+- [ ] Does it need batch settings? If so, are they used?
+
+
 ## Expectations
 
 We endeavour to review all PRs within 2 working days (Monday to Friday) of submission.
@@ -131,3 +174,5 @@ your best judgment, some code requires more testing than others depending
 on its importance.
 
 For integrations, consider whether the code could be integration tested.
+
+[style guidelines]: https://github.com/vectordotdev/vector/blob/master/STYLE.md

@@ -3,21 +3,28 @@ use std::io;
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
+use futures::{channel::mpsc, executor, SinkExt, StreamExt};
+use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use tokio_util::{codec::FramedRead, io::StreamReader};
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::NamedComponent;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_lib::configurable::NamedComponent;
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    event::Event,
+    EstimatedJsonEncodedSizeOf,
+};
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::log_schema,
-    internal_events::{EventsReceived, StreamClosedError},
+    config::{log_schema, SourceOutput},
+    internal_events::{EventsReceived, FileDescriptorReadError, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -28,7 +35,7 @@ pub mod file_descriptor;
 pub mod stdin;
 
 pub trait FileDescriptorConfig: NamedComponent {
-    fn host_key(&self) -> Option<String>;
+    fn host_key(&self) -> Option<OptionalValuePath>;
     fn framing(&self) -> Option<FramingConfig>;
     fn decoding(&self) -> DeserializerConfig;
     fn description(&self) -> String;
@@ -38,23 +45,24 @@ pub trait FileDescriptorConfig: NamedComponent {
         reader: R,
         shutdown: ShutdownSignal,
         out: SourceSender,
+        log_namespace: LogNamespace,
     ) -> crate::Result<crate::sources::Source>
     where
         R: Send + io::BufRead + 'static,
     {
         let host_key = self
             .host_key()
-            .unwrap_or_else(|| log_schema().host_key().to_string());
+            .and_then(|k| k.path)
+            .or(log_schema().host_key().cloned());
         let hostname = crate::get_hostname().ok();
 
-        let source_type = Bytes::from_static(Self::NAME.as_bytes());
         let description = self.description();
 
         let decoding = self.decoding();
         let framing = self
             .framing()
             .unwrap_or_else(|| decoding.default_stream_framing());
-        let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
+        let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
         let (sender, receiver) = mpsc::channel(1024);
 
@@ -74,13 +82,15 @@ pub trait FileDescriptorConfig: NamedComponent {
             out,
             shutdown,
             host_key,
-            source_type,
+            self.get_component_name(),
             hostname,
+            log_namespace,
         )))
     }
 }
 
-type Sender = mpsc::Sender<std::result::Result<bytes::Bytes, std::io::Error>>;
+type Sender = mpsc::Sender<Result<Bytes, io::Error>>;
+
 fn read_from_fd<R>(mut reader: R, mut sender: Sender)
 where
     R: Send + io::BufRead + 'static,
@@ -89,7 +99,7 @@ where
         let (buffer, len) = match reader.fill_buf() {
             Ok(buffer) if buffer.is_empty() => break, // EOF.
             Ok(buffer) => (Ok(Bytes::copy_from_slice(buffer)), buffer.len()),
-            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
             Err(error) => (Err(error), 0),
         };
 
@@ -102,43 +112,67 @@ where
     }
 }
 
-type Receiver = mpsc::Receiver<std::result::Result<bytes::Bytes, std::io::Error>>;
+type Receiver = mpsc::Receiver<Result<Bytes, io::Error>>;
 
+#[allow(clippy::too_many_arguments)]
 async fn process_stream(
     receiver: Receiver,
     decoder: Decoder,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
-    host_key: String,
-    source_type: Bytes,
+    host_key: Option<OwnedValuePath>,
+    source_type: &'static str,
     hostname: Option<String>,
+    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
-    let stream = StreamReader::new(receiver);
+    let events_received = register!(EventsReceived);
+    let stream = receiver.inspect(|result| {
+        if let Err(error) = result {
+            emit!(FileDescriptorReadError { error: &error });
+        }
+    });
+    let stream = StreamReader::new(stream);
     let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
     let mut stream = stream! {
         while let Some(result) = stream.next().await {
             match result {
                 Ok((events, byte_size)) => {
                     bytes_received.emit(ByteSize(byte_size));
-                    emit!(EventsReceived {
-                        byte_size: events.size_of(),
-                        count: events.len()
-                    });
+                    events_received.emit(CountByteSize(
+                         events.len(),
+                         events.estimated_json_encoded_size_of(),
+                    ));
 
                     let now = Utc::now();
 
                     for mut event in events {
-                        let log = event.as_mut_log();
+                        match event{
+                            Event::Log(_) => {
+                                let log = event.as_mut_log();
 
-                        log.try_insert(log_schema().source_type_key(), source_type.clone());
-                        log.try_insert(log_schema().timestamp_key(), now);
+                                log_namespace.insert_standard_vector_source_metadata(
+                                    log,
+                                    source_type,
+                                    now
+                                );
 
-                        if let Some(hostname) = &hostname {
-                            log.try_insert(host_key.as_str(), hostname.clone());
+                                if let Some(hostname) = &hostname {
+                                    log_namespace.insert_source_metadata(
+                                        source_type,
+                                        log,
+                                        host_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                                        path!("host"),
+                                        hostname.clone()
+                                    );
+                                }
+
+                                yield event;
+                            },
+                            _ => {
+                                yield event;
+                            }
                         }
-
-                        yield event;
                     }
                 }
                 Err(error) => {
@@ -158,10 +192,38 @@ async fn process_stream(
             debug!("Finished sending.");
             Ok(())
         }
-        Err(error) => {
+        Err(_) => {
             let (count, _) = stream.size_hint();
-            emit!(StreamClosedError { error, count });
+            emit!(StreamClosedError { count });
             Err(())
         }
     }
+}
+
+/// Builds the `vector_lib::config::Outputs` for stdin and
+/// file_descriptor sources.
+fn outputs(
+    log_namespace: LogNamespace,
+    host_key: &Option<OptionalValuePath>,
+    decoding: &DeserializerConfig,
+    source_name: &'static str,
+) -> Vec<SourceOutput> {
+    let schema_definition = decoding
+        .schema_definition(log_namespace)
+        .with_source_metadata(
+            source_name,
+            host_key
+                .clone()
+                .map_or(log_schema().host_key().cloned(), |key| key.path)
+                .map(LegacyKey::Overwrite),
+            &owned_value_path!("host"),
+            Kind::bytes(),
+            Some("host"),
+        )
+        .with_standard_vector_source_metadata();
+
+    vec![SourceOutput::new_logs(
+        decoding.output_type(),
+        schema_definition,
+    )]
 }

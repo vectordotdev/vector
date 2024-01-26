@@ -1,3 +1,4 @@
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
@@ -6,7 +7,7 @@ use indoc::indoc;
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
@@ -44,18 +45,31 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
 }
 
 /// Configuration for the `gcp_pubsub` sink.
-#[configurable_component(sink("gcp_pubsub"))]
+#[configurable_component(sink(
+    "gcp_pubsub",
+    "Publish observability events to GCP's Pub/Sub messaging system."
+))]
 #[derive(Clone, Debug)]
 pub struct PubsubConfig {
     /// The project name to which to publish events.
+    #[configurable(metadata(docs::examples = "vector-123456"))]
     pub project: String,
 
     /// The topic within the project to which to publish events.
+    #[configurable(metadata(docs::examples = "this-is-a-topic"))]
     pub topic: String,
 
     /// The endpoint to which to publish events.
-    #[serde(default)]
-    pub endpoint: Option<String>,
+    ///
+    /// The scheme (`http` or `https`) must be specified. No path should be included since the paths defined
+    /// by the [`GCP Pub/Sub`][pubsub_api] API are used.
+    ///
+    /// The trailing slash `/` must not be included.
+    ///
+    /// [pubsub_api]: https://cloud.google.com/pubsub/docs/reference/rest
+    #[serde(default = "default_endpoint")]
+    #[configurable(metadata(docs::examples = "https://us-central1-pubsub.googleapis.com"))]
+    pub endpoint: String,
 
     #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
@@ -79,9 +93,13 @@ pub struct PubsubConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+fn default_endpoint() -> String {
+    PUBSUB_URL.to_string()
 }
 
 impl GenerateConfig for PubsubConfig {
@@ -96,6 +114,7 @@ impl GenerateConfig for PubsubConfig {
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
@@ -104,11 +123,12 @@ impl SinkConfig for PubsubConfig {
             .validate()?
             .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batch_settings()?;
-        let request_settings = self.request.unwrap_with(&Default::default());
+        let request_settings = self.request.into_settings();
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.auth.clone()).boxed();
+        sink.auth.spawn_regenerate_token();
 
         let sink = BatchedHttpSink::new(
             sink,
@@ -119,6 +139,7 @@ impl SinkConfig for PubsubConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error));
 
+        #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
@@ -143,13 +164,9 @@ impl PubsubSink {
         // We only need to load the credentials if we are not targeting an emulator.
         let auth = config.auth.build(Scope::PubSub).await?;
 
-        let uri_base = match config.endpoint.as_ref() {
-            Some(host) => host.to_string(),
-            None => PUBSUB_URL.into(),
-        };
         let uri_base = format!(
             "{}/v1/projects/{}/topics/{}",
-            uri_base, config.project, config.topic,
+            config.endpoint, config.project, config.topic,
         );
 
         let transformer = config.encoding.transformer();
@@ -185,7 +202,7 @@ impl HttpEventEncoder<Value> for PubSubSinkEventEncoder {
         self.encoder.encode(event, &mut bytes).ok()?;
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
-        Some(json!({ "data": base64::encode(&bytes) }))
+        Some(json!({ "data": BASE64_STANDARD.encode(&bytes) }))
     }
 }
 
@@ -221,7 +238,7 @@ async fn healthcheck(client: HttpClient, uri: Uri, auth: GcpAuthenticator) -> cr
     auth.apply(&mut request);
 
     let response = client.send(request).await?;
-    healthcheck_response(response, auth, HealthcheckError::TopicNotFound.into())
+    healthcheck_response(response, HealthcheckError::TopicNotFound.into())
 }
 
 #[cfg(test)]
@@ -243,7 +260,7 @@ mod tests {
                 encoding.codec = "json"
             "#})
         .unwrap();
-        if config.build(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::default()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -251,11 +268,11 @@ mod tests {
 
 #[cfg(all(test, feature = "gcp-integration-tests"))]
 mod integration_tests {
-    use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
     use serde_json::{json, Value};
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_lib::codecs::JsonSerializerConfig;
+    use vector_lib::event::{BatchNotifier, BatchStatus};
 
     use super::*;
     use crate::gcp;
@@ -271,21 +288,21 @@ mod integration_tests {
         PubsubConfig {
             project: PROJECT.into(),
             topic: topic.into(),
-            endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
+            endpoint: gcp::PUBSUB_ADDRESS.clone(),
             auth: GcpAuthConfig {
                 skip_authentication: true,
                 ..Default::default()
             },
             batch: Default::default(),
             request: Default::default(),
-            encoding: JsonSerializerConfig::new().into(),
+            encoding: JsonSerializerConfig::default().into(),
             tls: Default::default(),
             acknowledgements: Default::default(),
         }
     }
 
     async fn config_build(topic: &str) -> (VectorSink, crate::sinks::Healthcheck) {
-        let cx = SinkContext::new_test();
+        let cx = SinkContext::default();
         config(topic).build(cx).await.expect("Building sink failed")
     }
 
@@ -312,7 +329,8 @@ mod integration_tests {
         for i in 0..input.len() {
             let data = messages[i].message.decode_data();
             let data = serde_json::to_value(data).unwrap();
-            let expected = serde_json::to_value(input[i].as_log().all_fields().unwrap()).unwrap();
+            let expected =
+                serde_json::to_value(input[i].as_log().all_event_fields().unwrap()).unwrap();
             assert_eq!(data, expected);
         }
     }
@@ -411,7 +429,9 @@ mod integration_tests {
 
     impl PullMessage {
         fn decode_data(&self) -> TestMessage {
-            let data = base64::decode(&self.data).expect("Invalid base64 data");
+            let data = BASE64_STANDARD
+                .decode(&self.data)
+                .expect("Invalid base64 data");
             let data = String::from_utf8_lossy(&data);
             serde_json::from_str(&data).expect("Invalid message structure")
         }

@@ -1,21 +1,18 @@
 use std::time::Duration;
 
-use futures::Stream;
-use futures_util::StreamExt;
 use serde_json::json;
 
 use crate::{
     config::{log_schema, SourceConfig, SourceContext},
-    event::{into_event_stream, Event, EventStatus},
+    event::EventStatus,
     test_util::{
         collect_n,
         components::{assert_source_compliance, SOURCE_TAGS},
         retry_until, wait_for_tcp,
     },
-    SourceSender,
 };
 
-use super::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS};
+use super::{tests::new_source, GrpcConfig, HttpConfig, OpentelemetryConfig};
 
 fn otel_health_url() -> String {
     std::env::var("OTEL_HEALTH_URL").unwrap_or_else(|_| "http://0.0.0.0:13133".to_owned())
@@ -34,7 +31,7 @@ fn source_http_address() -> String {
 }
 
 #[tokio::test]
-async fn receive_logs() {
+async fn receive_logs_legacy_namespace() {
     assert_source_compliance(&SOURCE_TAGS, async {
         wait_ready(otel_health_url()).await;
 
@@ -46,8 +43,10 @@ async fn receive_logs() {
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             acknowledgements: Default::default(),
+            log_namespace: Default::default(),
         };
 
         let (sender, logs_output, _) = new_source(EventStatus::Delivered);
@@ -91,8 +90,8 @@ async fn receive_logs() {
         let events = collect_n(logs_output, 2).await;
         assert_eq!(events.len(), 2);
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            events[1].as_log()[log_schema().message_key()]
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            events[1].as_log()[log_schema().message_key().unwrap().to_string()]
         );
     })
     .await;
@@ -116,18 +115,4 @@ async fn wait_ready(address: String) {
         Duration::from_secs(30),
     )
     .await;
-}
-
-fn new_source(
-    status: EventStatus,
-) -> (
-    SourceSender,
-    impl Stream<Item = Event>,
-    impl Stream<Item = Event>,
-) {
-    let (mut sender, recv) = SourceSender::new_test_finalize(status);
-    let logs_output = sender
-        .add_outputs(status, LOGS.to_string())
-        .flat_map(into_event_stream);
-    (sender, logs_output, recv)
 }

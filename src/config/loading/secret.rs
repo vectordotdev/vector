@@ -1,11 +1,14 @@
-use std::{collections::HashMap, io::Read};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Read,
+};
 
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use toml::value::Table;
-use vector_common::config::ComponentKey;
+use vector_lib::config::ComponentKey;
 
 use crate::{
     config::{
@@ -19,11 +22,11 @@ use crate::{
 // The following regex aims to extract a pair of strings, the first being the secret backend name
 // and the second being the secret key. Here are some matching & non-matching examples:
 // - "SECRET[backend.secret_name]" will match and capture "backend" and "secret_name"
-// - "SECRET[backend.secret.name]" will match and catpure "backend" and "secret.name"
-// - "SECRET[backend..secret.name]" will match and catpure "backend" and ".secret.name"
+// - "SECRET[backend.secret.name]" will match and capture "backend" and "secret.name"
+// - "SECRET[backend..secret.name]" will match and capture "backend" and ".secret.name"
 // - "SECRET[secret_name]" will not match
-// - "SECRET[.secret.name]" wil not match
-static COLLECTOR: Lazy<Regex> =
+// - "SECRET[.secret.name]" will not match
+pub static COLLECTOR: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
 
 /// Helper type for specifically deserializing secrets backends.
@@ -37,7 +40,7 @@ pub(crate) struct SecretBackendOuter {
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct SecretBackendLoader {
     backends: IndexMap<ComponentKey, SecretBackends>,
-    pub(crate) secret_keys: HashMap<String, Vec<String>>,
+    pub(crate) secret_keys: HashMap<String, HashSet<String>>,
 }
 
 impl SecretBackendLoader {
@@ -59,7 +62,7 @@ impl SecretBackendLoader {
                 },
                 Some(backend) => {
                     debug!(message = "Retrieving secret from a backend.", backend = ?backend_name);
-                    match backend.retrieve(keys.to_vec(), signal_rx) {
+                    match backend.retrieve(keys.clone(), signal_rx) {
                         Err(e) => {
                             vec![Err(format!("Error while retrieving secret from backend \"{}\": {}.", backend_name, e))]
                         },
@@ -104,13 +107,16 @@ impl Loader<SecretBackendLoader> for SecretBackendLoader {
     }
 }
 
-fn collect_secret_keys(input: &str, keys: &mut HashMap<String, Vec<String>>) {
+fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>) {
     COLLECTOR.captures_iter(input).for_each(|cap| {
         if let (Some(backend), Some(key)) = (cap.get(1), cap.get(2)) {
             if let Some(keys) = keys.get_mut(backend.as_str()) {
-                keys.push(key.as_str().to_string());
+                keys.insert(key.as_str().to_string());
             } else {
-                keys.insert(backend.as_str().to_string(), vec![key.as_str().to_string()]);
+                keys.insert(
+                    backend.as_str().to_string(),
+                    HashSet::from_iter(std::iter::once(key.as_str().to_string())),
+                );
             }
         }
     });
@@ -208,14 +214,30 @@ mod tests {
 
         let first_backend_keys = keys.get("first_backend").unwrap();
         assert_eq!(first_backend_keys.len(), 4);
-        assert!(first_backend_keys.contains(&"secret_key".into()));
-        assert!(first_backend_keys.contains(&"another_secret_key".into()));
-        assert!(first_backend_keys.contains(&"a_third.secret_key".into()));
-        assert!(first_backend_keys.contains(&"..an_extra_secret_key".into()));
+        assert!(first_backend_keys.contains("secret_key"));
+        assert!(first_backend_keys.contains("another_secret_key"));
+        assert!(first_backend_keys.contains("a_third.secret_key"));
+        assert!(first_backend_keys.contains("..an_extra_secret_key"));
 
         let second_backend_keys = keys.get("second_backend").unwrap();
         assert_eq!(second_backend_keys.len(), 2);
-        assert!(second_backend_keys.contains(&"secret_key".into()));
-        assert!(second_backend_keys.contains(&"secret.key".into()));
+        assert!(second_backend_keys.contains("secret_key"));
+        assert!(second_backend_keys.contains("secret.key"));
+    }
+
+    #[test]
+    fn collection_duplicates() {
+        let mut keys = HashMap::new();
+        collect_secret_keys(
+            indoc! {r#"
+            SECRET[first_backend.secret_key]
+            SECRET[first_backend.secret_key]
+        "#},
+            &mut keys,
+        );
+
+        let first_backend_keys = keys.get("first_backend").unwrap();
+        assert_eq!(first_backend_keys.len(), 1);
+        assert!(first_backend_keys.contains("secret_key"));
     }
 }

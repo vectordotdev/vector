@@ -1,0 +1,20 @@
+features:
+- databend-integration-tests
+
+test_filter: '::databend::'
+
+runner:
+  env:
+    DATABEND_ENDPOINT: http://databend:8000
+    DATABEND_USER: vector
+    DATABEND_PASSWORD: vector
+
+matrix:
+  version: ['latest']
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sinks/databend/**"
+- "src/sinks/util/**"
+- "scripts/integration/databend/**"

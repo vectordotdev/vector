@@ -1,25 +1,17 @@
-use std::{fmt, num::NonZeroUsize, sync::Arc};
+use std::{fmt, sync::Arc};
 
-use async_trait::async_trait;
-use futures_util::{future, stream::BoxStream, StreamExt};
-use tower::Service;
-use vector_core::{
-    event::{Event, Metric, MetricValue},
-    partition::Partitioner,
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-    ByteSizeOf,
-};
+use serde::Serialize;
+use vector_lib::event::{Metric, MetricValue};
+use vrl::path::OwnedValuePath;
 
 use super::request_builder::HecMetricsRequestBuilder;
 use crate::{
-    config::SinkContext,
     internal_events::SplunkInvalidMetricReceivedError,
     sinks::{
+        prelude::*,
         splunk_hec::common::{render_template_string, request::HecRequest},
-        util::{encode_namespace, processed_event::ProcessedEvent, SinkBuilderExt},
+        util::{encode_namespace, processed_event::ProcessedEvent},
     },
-    template::Template,
 };
 
 pub struct HecMetricsSink<S> {
@@ -30,7 +22,7 @@ pub struct HecMetricsSink<S> {
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
-    pub host: String,
+    pub host_key: Option<OwnedValuePath>,
     pub default_namespace: Option<String>,
 }
 
@@ -45,11 +37,11 @@ where
         let sourcetype = self.sourcetype.as_ref();
         let source = self.source.as_ref();
         let index = self.index.as_ref();
-        let host = self.host.as_ref();
+        let host_key = self.host_key.as_ref();
         let default_namespace = self.default_namespace.as_deref();
+        let batch_settings = self.batch_settings;
 
-        let builder_limit = NonZeroUsize::new(64);
-        let sink = input
+        input
             .map(|event| (event.size_of(), event.into_metric()))
             .filter_map(move |(event_byte_size, metric)| {
                 future::ready(process_metric(
@@ -58,12 +50,15 @@ where
                     sourcetype,
                     source,
                     index,
-                    host,
+                    host_key,
                     default_namespace,
                 ))
             })
-            .batched_partitioned(EventPartitioner::default(), self.batch_settings)
-            .request_builder(builder_limit, self.request_builder)
+            .batched_partitioned(EventPartitioner, || batch_settings.as_byte_size_config())
+            .request_builder(
+                default_request_builder_concurrency_limit(),
+                self.request_builder,
+            )
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
@@ -73,9 +68,9 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service);
-
-        sink.run().await
+            .into_driver(self.service)
+            .run()
+            .await
     }
 }
 
@@ -104,6 +99,7 @@ impl Partitioner for EventPartitioner {
     }
 }
 
+#[derive(Serialize)]
 pub struct HecMetricsProcessedEventMetadata {
     pub event_byte_size: usize,
     pub sourcetype: Option<String>,
@@ -155,7 +151,7 @@ pub fn process_metric(
     sourcetype: Option<&Template>,
     source: Option<&Template>,
     index: Option<&Template>,
-    host_key: &str,
+    host_key: Option<&OwnedValuePath>,
     default_namespace: Option<&str>,
 ) -> Option<HecProcessedEvent> {
     let templated_field_keys = [index.as_ref(), source.as_ref(), sourcetype.as_ref()]
@@ -173,7 +169,7 @@ pub fn process_metric(
         sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &metric, "sourcetype"));
     let source = source.and_then(|source| render_template_string(source, &metric, "source"));
     let index = index.and_then(|index| render_template_string(index, &metric, "index"));
-    let host = metric.tag_value(host_key);
+    let host = host_key.and_then(|key| metric.tag_value(key.to_string().as_str()));
 
     let metadata = HecMetricsProcessedEventMetadata {
         event_byte_size,
@@ -190,4 +186,11 @@ pub fn process_metric(
         event: metric,
         metadata,
     })
+}
+
+impl EventCount for HecProcessedEvent {
+    fn event_count(&self) -> usize {
+        // A HecProcessedEvent is mapped one-to-one with an event.
+        1
+    }
 }

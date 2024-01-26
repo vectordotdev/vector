@@ -1,17 +1,13 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
 use crate::event::metric::{MetricKind, MetricValue};
-use crate::{
-    emit,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
 #[derive(Debug)]
 pub struct StatsdInvalidMetricError<'a> {
     pub value: &'a MetricValue,
-    pub kind: &'a MetricKind,
+    pub kind: MetricKind,
 }
 
 impl<'a> InternalEvent for StatsdInvalidMetricError<'a> {
@@ -32,8 +28,6 @@ impl<'a> InternalEvent for StatsdInvalidMetricError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("processing_errors_total", 1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { reason, count: 1 });
     }

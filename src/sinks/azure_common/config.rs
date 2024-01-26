@@ -8,7 +8,11 @@ use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
-use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
+use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    json_size::JsonSize,
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -21,6 +25,7 @@ pub struct AzureBlobRequest {
     pub content_encoding: Option<&'static str>,
     pub content_type: &'static str,
     pub metadata: AzureBlobMetadata,
+    pub request_metadata: RequestMetadata,
 }
 
 impl Finalizable for AzureBlobRequest {
@@ -29,11 +34,21 @@ impl Finalizable for AzureBlobRequest {
     }
 }
 
+impl MetaDescriptive for AzureBlobRequest {
+    fn get_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut RequestMetadata {
+        &mut self.request_metadata
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct AzureBlobMetadata {
     pub partition_key: String,
     pub count: usize,
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub finalizers: EventFinalizers,
 }
 
@@ -53,8 +68,7 @@ impl RetryLogic for AzureBlobRetryLogic {
 #[derive(Debug)]
 pub struct AzureBlobResponse {
     pub inner: PutBlockBlobResponse,
-    pub count: usize,
-    pub events_byte_size: usize,
+    pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,
 }
 
@@ -63,12 +77,12 @@ impl DriverResponse for AzureBlobResponse {
         EventStatus::Delivered
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(self.count, self.events_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
-        Some((self.byte_size, "https"))
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.byte_size)
     }
 }
 
@@ -113,34 +127,57 @@ pub fn build_client(
     connection_string: Option<String>,
     storage_account: Option<String>,
     container_name: String,
+    endpoint: Option<String>,
 ) -> crate::Result<Arc<ContainerClient>> {
     let client;
     match (connection_string, storage_account) {
         (Some(connection_string_p), None) => {
             let connection_string = ConnectionString::new(&connection_string_p)?;
-            let mut builder = ClientBuilder::new(
-                connection_string
-                    .account_name
-                    .ok_or("Account name missing in connection string")?,
-                connection_string.storage_credentials()?,
-            )
-            .retry(RetryOptions::none());
-            if let Some(uri) = connection_string.blob_endpoint {
-                builder = builder.cloud_location(CloudLocation::Custom {
-                    uri: uri.to_string(),
-                    credentials: connection_string.storage_credentials()?,
-                });
+
+            client = match connection_string.blob_endpoint {
+                // When the blob_endpoint is provided, we use the Custom CloudLocation since it is
+                // required to contain the full URI to the blob storage API endpoint, this means
+                // that account_name is not required to exist in the connection_string since
+                // account_name is only used with the default CloudLocation in the Azure SDK to
+                // generate the storage API endpoint
+                Some(uri) => ClientBuilder::with_location(
+                    CloudLocation::Custom {
+                        uri: uri.to_string(),
+                    },
+                    connection_string.storage_credentials()?,
+                ),
+                // Without a valid blob_endpoint in the connection_string, assume we are in Azure
+                // Commercial (AzureCloud location) and create a default Blob Storage Client that
+                // builds the API endpoint location using the account_name as input
+                None => ClientBuilder::new(
+                    connection_string
+                        .account_name
+                        .ok_or("Account name missing in connection string")?,
+                    connection_string.storage_credentials()?,
+                ),
             }
-            client = builder.container_client(container_name);
+            .retry(RetryOptions::none())
+            .container_client(container_name);
         }
         (None, Some(storage_account_p)) => {
             let creds = std::sync::Arc::new(DefaultAzureCredential::default());
             let auto_creds = std::sync::Arc::new(AutoRefreshingTokenCredential::new(creds));
-            let storage_credentials = StorageCredentials::TokenCredential(auto_creds);
+            let storage_credentials = StorageCredentials::token_credential(auto_creds);
 
-            client = ClientBuilder::new(storage_account_p, storage_credentials)
-                .retry(RetryOptions::none())
-                .container_client(container_name)
+            client = match endpoint {
+                // If a blob_endpoint is provided in the configuration, use it with a Custom
+                // CloudLocation, to allow overriding the blob storage API endpoint
+                Some(endpoint) => ClientBuilder::with_location(
+                    CloudLocation::Custom { uri: endpoint },
+                    storage_credentials,
+                ),
+                // Use the storage_account configuration parameter and assume we are in Azure
+                // Commercial (AzureCloud location) and build the blob storage API endpoint using
+                // the storage_account as input.
+                None => ClientBuilder::new(storage_account_p, storage_credentials),
+            }
+            .retry(RetryOptions::none())
+            .container_client(container_name);
         }
         (None, None) => {
             return Err("Either `connection_string` or `storage_account` has to be provided".into())

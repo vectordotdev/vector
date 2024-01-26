@@ -1,5 +1,10 @@
-use metrics::{counter, decrement_gauge, gauge, increment_gauge};
-use vector_common::internal_event::InternalEvent;
+use std::time::Duration;
+
+use metrics::{counter, decrement_gauge, gauge, increment_gauge, register_histogram, Histogram};
+use vector_common::{
+    internal_event::{error_type, InternalEvent},
+    registered_event,
+};
 
 pub struct BufferCreated {
     pub idx: usize,
@@ -100,7 +105,7 @@ impl InternalEvent for BufferReadError {
             message = "Error encountered during buffer read.",
             error = %self.error,
             error_code = self.error_code,
-            error_type = "reader_failed",
+            error_type = error_type::READER_FAILED,
             stage = "processing",
             internal_log_rate_limit = true,
         );
@@ -110,5 +115,17 @@ impl InternalEvent for BufferReadError {
             "error_type" => "reader_failed",
             "stage" => "processing",
         );
+    }
+}
+
+registered_event! {
+    BufferSendDuration {
+        stage: usize,
+    } => {
+        send_duration: Histogram = register_histogram!("buffer_send_duration_seconds", "stage" => self.stage.to_string()),
+    }
+
+    fn emit(&self, duration: Duration) {
+        self.send_duration.record(duration);
     }
 }

@@ -1,10 +1,9 @@
 use core::fmt;
-use std::collections::btree_map;
 
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
-use super::{write_list, write_word, MetricTags};
+use super::{write_list, write_word, MetricTags, TagValue};
 
 /// Metrics series.
 #[configurable_component]
@@ -13,7 +12,7 @@ pub struct MetricSeries {
     #[serde(flatten)]
     pub name: MetricName,
 
-    /// Tags for this metric series.
+    #[configurable(derived)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<MetricTags>,
 }
@@ -42,8 +41,17 @@ impl MetricSeries {
     /// Sets or updates the string value of a tag.
     ///
     /// *Note:* This will create the tags map if it is not present.
-    pub fn insert_tag(&mut self, key: String, value: String) -> Option<String> {
-        (self.tags.get_or_insert_with(Default::default)).insert(key, value)
+    pub fn replace_tag(&mut self, key: String, value: impl Into<TagValue>) -> Option<String> {
+        (self.tags.get_or_insert_with(Default::default)).replace(key, value)
+    }
+
+    pub fn set_multi_value_tag(&mut self, key: String, values: impl IntoIterator<Item = TagValue>) {
+        (self.tags.get_or_insert_with(Default::default)).set_multi_value(key, values);
+    }
+
+    /// Removes all the tags.
+    pub fn remove_tags(&mut self) {
+        self.tags = None;
     }
 
     /// Removes the tag entry for the named key, if it exists, and returns the old value.
@@ -60,13 +68,6 @@ impl MetricSeries {
                 result
             }
         }
-    }
-
-    /// Get the tag entry for the named key. *Note:* This will create
-    /// the tags map if it is not present, even if nothing is later
-    /// inserted.
-    pub fn tag_entry(&mut self, key: String) -> btree_map::Entry<String, String> {
-        self.tags.get_or_insert_with(Default::default).entry(key)
     }
 }
 
@@ -134,8 +135,11 @@ impl fmt::Display for MetricSeries {
         write_word(fmt, &self.name.name)?;
         write!(fmt, "{{")?;
         if let Some(tags) = &self.tags {
-            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
-                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
+            write_list(fmt, ",", tags.iter_all(), |fmt, (tag, value)| {
+                write_word(fmt, tag).and_then(|()| match value {
+                    Some(value) => write!(fmt, "={value:?}"),
+                    None => Ok(()),
+                })
             })?;
         }
         write!(fmt, "}}")

@@ -6,14 +6,15 @@ components: sinks: sematext_metrics: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
-		stateful:      false
+		stateful:      true
 	}
 
 	features: {
 		acknowledgements: true
+		auto_generated:   true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -47,16 +48,7 @@ components: sinks: sematext_metrics: {
 		notices: []
 	}
 
-	configuration: sinks._sematext.configuration & {
-		default_namespace: {
-			description: "Used as a namespace for metrics that don't have it."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["service"]
-			}
-		}
-	}
+	configuration: base.components.sinks.sematext_metrics.configuration
 
 	input: {
 		logs: false
@@ -69,12 +61,5 @@ components: sinks: sematext_metrics: {
 			summary:      false
 		}
 		traces: false
-	}
-
-	telemetry: metrics: {
-		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
-		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
-		encode_errors_total:              components.sources.internal_metrics.output.metrics.encode_errors_total
-		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

@@ -345,7 +345,7 @@ mod tests {
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
-                component_type: "mutliple_type".to_string(),
+                component_type: "multiple_type".to_string(),
                 output_type: DataType::Log | DataType::Metric | DataType::Trace,
                 outputs: vec![],
             }),
@@ -385,7 +385,7 @@ mod tests {
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
-                component_type: "mutliple_type".to_string(),
+                component_type: "multiple_type".to_string(),
                 output_type: DataType::Log | DataType::Metric | DataType::Trace,
                 outputs: vec![],
             }),

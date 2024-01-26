@@ -12,7 +12,7 @@ use crossbeam_queue::ArrayQueue;
 use futures::Stream;
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
-use crate::Bufferable;
+use crate::InMemoryBufferable;
 
 /// Error returned by `LimitedSender::send` when the receiver has disconnected.
 #[derive(Debug, PartialEq, Eq)]
@@ -79,7 +79,7 @@ pub struct LimitedSender<T> {
     sender_count: Arc<AtomicUsize>,
 }
 
-impl<T: Bufferable> LimitedSender<T> {
+impl<T: InMemoryBufferable> LimitedSender<T> {
     #[allow(clippy::cast_possible_truncation)]
     fn get_required_permits_for_item(&self, item: &T) -> u32 {
         // We have to limit the number of permits we ask for to the overall limit since we're always
@@ -102,21 +102,20 @@ impl<T: Bufferable> LimitedSender<T> {
     pub async fn send(&mut self, item: T) -> Result<(), SendError<T>> {
         // Calculate how many permits we need, and wait until we can acquire all of them.
         let permits_required = self.get_required_permits_for_item(&item);
-        let permits = match self
+        let Ok(permits) = self
             .inner
             .limiter
             .clone()
             .acquire_many_owned(permits_required)
             .await
-        {
-            Ok(permits) => permits,
-            Err(_) => return Err(SendError(item)),
+        else {
+            return Err(SendError(item));
         };
 
         self.inner
             .data
             .push((permits, item))
-            .expect("acquired permits but channel reported being full");
+            .unwrap_or_else(|_| unreachable!("acquired permits but channel reported being full"));
         self.inner.read_waker.notify_one();
 
         trace!("Sent item.");
@@ -132,6 +131,10 @@ impl<T: Bufferable> LimitedSender<T> {
     /// `Err(TrySendError::Disconnected)` be returned with the given `item`. If the channel has
     /// insufficient capacity for the item, then `Err(TrySendError::InsufficientCapacity)` will be
     /// returned with the given `item`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if adding ack amount overflows.
     pub fn try_send(&mut self, item: T) -> Result<(), TrySendError<T>> {
         // Calculate how many permits we need, and try to acquire them all without waiting.
         let permits_required = self.get_required_permits_for_item(&item);
@@ -153,7 +156,7 @@ impl<T: Bufferable> LimitedSender<T> {
         self.inner
             .data
             .push((permits, item))
-            .expect("acquired permits but channel reported being full");
+            .unwrap_or_else(|_| unreachable!("acquired permits but channel reported being full"));
         self.inner.read_waker.notify_one();
 
         trace!("Attempt to send item succeeded.");

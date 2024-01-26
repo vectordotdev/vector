@@ -41,6 +41,10 @@ pub fn table_is_timestamp(t: &LuaTable<'_>) -> LuaResult<bool> {
 /// # Errors
 ///
 /// This function will fail if the table is malformed.
+///
+/// # Panics
+///
+/// Panics if the resulting timestamp is invalid.
 #[allow(clippy::needless_pass_by_value)] // constrained by mlua types
 pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     let year = t.raw_get("year")?;
@@ -50,5 +54,9 @@ pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     let min = t.raw_get("min")?;
     let sec = t.raw_get("sec")?;
     let nano = t.raw_get::<_, Option<u32>>("nanosec")?.unwrap_or(0);
-    Ok(Utc.ymd(year, month, day).and_hms_nano(hour, min, sec, nano))
+    Ok(Utc
+        .with_ymd_and_hms(year, month, day, hour, min, sec)
+        .single()
+        .and_then(|t| t.with_nanosecond(nano))
+        .expect("invalid timestamp"))
 }

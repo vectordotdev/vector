@@ -19,7 +19,8 @@ docker pull timberio/vector:{{< version >}}-debian
 Other available distributions (beyond `debian`):
 
 * `alpine`
-* `distroless`
+* `distroless-libc`
+* `distroless-static`
 {{< /success >}}
 
 ## Deployment
@@ -35,21 +36,23 @@ Vector is an end-to-end observability data pipeline designed to deploy under var
 Create a new Vector configuration. The below will output dummy logs to stdout.
 
 ```shell
-cat <<-EOF > $PWD/vector.toml
-[api]
-enabled = true
-address = "0.0.0.0:8686"
-
-[sources.demo_logs]
-type = "demo_logs"
-interval = 1.0
-format = "json"
-
-[sinks.console]
-inputs = ["demo_logs"]
-target = "stdout"
-type = "console"
-encoding.codec = "json"
+cat <<-EOF > $PWD/vector.yaml
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+sources:
+  demo_logs:
+    type: demo_logs
+    interval: 1
+    format: json
+sinks:
+  console:
+    inputs:
+      - demo_logs
+    target: stdout
+    type: console
+    encoding:
+      codec: json
 EOF
 ```
 

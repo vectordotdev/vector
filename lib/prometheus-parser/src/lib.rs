@@ -80,7 +80,7 @@ pub struct SummaryQuantile {
 pub struct SummaryMetric {
     pub quantiles: Vec<SummaryQuantile>,
     pub sum: f64,
-    pub count: u32,
+    pub count: u64,
 }
 
 #[derive(Debug, Default, PartialEq, PartialOrd)]
@@ -215,7 +215,7 @@ impl GroupKind {
                     matching_group(metrics, key).sum = sum;
                 }
                 "_count" => {
-                    let count = try_f64_to_u32(metric.value)?;
+                    let count = try_f64_to_u64(metric.value)?;
                     matching_group(metrics, key).count = count;
                 }
                 _ => {
@@ -236,17 +236,6 @@ impl GroupKind {
 pub struct MetricGroup {
     pub name: String,
     pub metrics: GroupKind,
-}
-
-fn try_f64_to_u32(f: f64) -> Result<u32, ParserError> {
-    if 0.0 <= f && f <= u32::MAX as f64 {
-        Ok(f as u32)
-    } else {
-        Err(ParserError::ValueOutOfRange {
-            value: f,
-            max: u32::MAX.into(),
-        })
-    }
 }
 
 fn try_f64_to_u64(f: f64) -> Result<u64, ParserError> {
@@ -293,7 +282,7 @@ impl MetricGroup {
 }
 
 fn matching_group<T: Default>(values: &mut MetricMap<T>, group: GroupKey) -> &mut T {
-    values.entry(group).or_insert_with(T::default)
+    values.entry(group).or_default()
 }
 
 /// Parse the given text input, and group the result into higher-level
@@ -479,7 +468,7 @@ mod test {
 
     #[test]
     fn test_parse_text() {
-        let input = r##"
+        let input = r#"
             # HELP http_requests_total The total number of HTTP requests.
             # TYPE http_requests_total counter
             http_requests_total{method="post",code="200"} 1027 1395066363000
@@ -522,8 +511,8 @@ mod test {
             rpc_duration_seconds{quantile="0.9"} 9001
             rpc_duration_seconds{quantile="0.99"} 76656
             rpc_duration_seconds_sum 1.7560473e+07
-            rpc_duration_seconds_count 2693
-            "##;
+            rpc_duration_seconds_count 4.588206224e+09
+            "#;
         let output = parse_text(input).unwrap();
         assert_eq!(output.len(), 7);
         match_group!(output[0], "http_requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
@@ -608,64 +597,11 @@ mod test {
                         SummaryQuantile { quantile: 0.9, value: 9001.0 },
                         SummaryQuantile { quantile: 0.99, value: 76656.0 },
                     ],
-                    count: 2693,
+                    count: 4588206224,
                     sum: 1.7560473e+07,
                 },
             ));
         });
-    }
-
-    #[test]
-    fn test_f64_to_u32() {
-        let value = -1.0;
-        let error = try_f64_to_u32(value).unwrap_err();
-        assert_eq!(
-            error,
-            ParserError::ValueOutOfRange {
-                value,
-                max: u32::MAX.into()
-            }
-        );
-
-        let value = u32::MAX as f64 + 1.0;
-        let error = try_f64_to_u32(value).unwrap_err();
-        assert_eq!(
-            error,
-            ParserError::ValueOutOfRange {
-                value,
-                max: u32::MAX.into()
-            }
-        );
-
-        let value = f64::NAN;
-        let error = try_f64_to_u32(value).unwrap_err();
-        assert!(matches!(error, ParserError::ValueOutOfRange {
-                value,
-                max: _,
-            } if value.is_nan()));
-
-        let value = f64::INFINITY;
-        let error = try_f64_to_u32(value).unwrap_err();
-        assert_eq!(
-            error,
-            ParserError::ValueOutOfRange {
-                value,
-                max: u32::MAX.into()
-            }
-        );
-
-        let value = f64::NEG_INFINITY;
-        let error = try_f64_to_u32(value).unwrap_err();
-        assert_eq!(
-            error,
-            ParserError::ValueOutOfRange {
-                value,
-                max: u32::MAX.into()
-            }
-        );
-
-        assert_eq!(try_f64_to_u32(0.0).unwrap(), 0);
-        assert_eq!(try_f64_to_u32(u32::MAX as f64).unwrap(), u32::MAX);
     }
 
     #[test]
@@ -715,7 +651,7 @@ mod test {
 
     #[test]
     fn test_errors() {
-        let input = r##"name{registry="default" content_type="html"} 1890"##;
+        let input = r#"name{registry="default" content_type="html"} 1890"#;
         let error = parse_text(input).unwrap_err();
         assert!(matches!(
             error,
@@ -745,7 +681,7 @@ mod test {
             }
         ));
 
-        let input = r##"name{registry="} 1890"##;
+        let input = r#"name{registry="} 1890"#;
         let error = parse_text(input).unwrap_err();
         assert!(matches!(
             error,

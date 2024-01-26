@@ -14,11 +14,8 @@ query ComponentsQuery($first: Int!) {
                     }
                     metrics {
                         __typename
-                        processedEventsTotal {
-                            processedEventsTotal
-                        }
-                        processedBytesTotal {
-                            processedBytesTotal
+                        receivedBytesTotal {
+                            receivedBytesTotal
                         }
                         receivedEventsTotal {
                             receivedEventsTotal
@@ -37,12 +34,6 @@ query ComponentsQuery($first: Int!) {
                     }
                     metrics {
                         __typename
-                        processedEventsTotal {
-                            processedEventsTotal
-                        }
-                        processedBytesTotal {
-                            processedBytesTotal
-                        }
                         receivedEventsTotal {
                             receivedEventsTotal
                         }
@@ -54,14 +45,11 @@ query ComponentsQuery($first: Int!) {
                 ... on Sink {
                     metrics {
                         __typename
-                        processedEventsTotal {
-                            processedEventsTotal
-                        }
-                        processedBytesTotal {
-                            processedBytesTotal
-                        }
                         receivedEventsTotal {
                             receivedEventsTotal
+                        }
+                        sentBytesTotal {
+                            sentBytesTotal
                         }
                         sentEventsTotal {
                             sentEventsTotal

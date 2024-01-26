@@ -1,0 +1,5 @@
+version: '3'
+
+services:
+  humio:
+    image: docker.io/humio/humio:${CONFIG_VERSION}

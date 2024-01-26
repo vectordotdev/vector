@@ -3,17 +3,18 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use futures_util::{future, FutureExt};
 use stream_cancel::{Trigger, Tripwire};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::{
-    config::{DataType, Output},
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::schema::Definition;
+use vector_lib::{
+    config::{DataType, SourceOutput},
     source::Source,
 };
 
 use crate::config::{GenerateConfig, SourceConfig, SourceContext};
 
 /// Configuration for the `test_tripwire` source.
-#[configurable_component(source("test_tripwire"))]
+#[configurable_component(source("test_tripwire", "Test (tripwire)."))]
 #[derive(Clone, Debug)]
 pub struct TripwireSourceConfig {
     #[serde(skip)]
@@ -42,6 +43,7 @@ impl TripwireSourceConfig {
 }
 
 #[async_trait]
+#[typetag::serde(name = "test_tripwire")]
 impl SourceConfig for TripwireSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tripwire = self
@@ -59,13 +61,16 @@ impl SourceConfig for TripwireSourceConfig {
                     .then(crate::shutdown::tripwire_handler)
                     .boxed(),
             )
-            .map(|_| std::mem::drop(out))
+            .map(|_| drop(out))
             .unit_error(),
         ))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        vec![SourceOutput::new_logs(
+            DataType::Log,
+            Definition::default_legacy_namespace(),
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {

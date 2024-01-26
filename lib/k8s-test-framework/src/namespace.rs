@@ -47,7 +47,7 @@ impl up_down::CommandBuilder for CommandBuilder {
                 up_down::CommandToBuild::Down => "delete",
             })
             .arg("--filename")
-            .arg(&self.config.test_namespace_resource_file.path());
+            .arg(self.config.test_namespace_resource_file.path());
 
         if matches!(command_to_build, up_down::CommandToBuild::Down) {
             // We don't need a graceful shutdown

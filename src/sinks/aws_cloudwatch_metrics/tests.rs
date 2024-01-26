@@ -1,8 +1,7 @@
-#![cfg(test)]
-
-use aws_sdk_cloudwatch::types::DateTime;
-use chrono::{offset::TimeZone, Utc};
-use pretty_assertions::assert_eq;
+use aws_smithy_types::DateTime;
+use chrono::{offset::TimeZone, Timelike, Utc};
+use similar_asserts::assert_eq;
+use vector_lib::metric_tags;
 
 use super::*;
 use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
@@ -23,7 +22,7 @@ fn generate_config() {
 fn config() -> CloudWatchMetricsSinkConfig {
     CloudWatchMetricsSinkConfig {
         default_namespace: "vector".into(),
-        region: RegionOrEndpoint::with_region("local".to_owned()),
+        region: RegionOrEndpoint::with_region("us-east-1".to_owned()),
         ..Default::default()
     }
 }
@@ -51,20 +50,22 @@ async fn encode_events_basic_counter() {
             MetricValue::Counter { value: 2.5 },
         )
         .with_timestamp(Some(
-            Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .and_then(|t| t.with_nanosecond(123456789))
+                .expect("invalid timestamp"),
         )),
         Metric::new(
             "healthcheck",
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         )
-        .with_tags(Some(
-            vec![("region".to_owned(), "local".to_owned())]
-                .into_iter()
-                .collect(),
-        ))
+        .with_tags(Some(metric_tags!("region" => "local")))
         .with_timestamp(Some(
-            Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .and_then(|t| t.with_nanosecond(123456789))
+                .expect("invalid timestamp"),
         )),
     ];
 
@@ -113,7 +114,7 @@ async fn encode_events_distribution() {
         "latency",
         MetricKind::Incremental,
         MetricValue::Distribution {
-            samples: vector_core::samples![11.0 => 100, 12.0 => 50],
+            samples: vector_lib::samples![11.0 => 100, 12.0 => 50],
             statistic: StatisticKind::Histogram,
         },
     )];

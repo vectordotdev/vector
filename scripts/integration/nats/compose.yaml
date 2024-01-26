@@ -1,0 +1,45 @@
+version: '3'
+
+services:
+  nats:
+    image: docker.io/library/nats:${CONFIG_VERSION}
+  nats-userpass:
+    image: docker.io/library/nats:${CONFIG_VERSION}
+    command:
+    - --user
+    - natsuser
+    - --pass
+    - natspass
+  nats-token:
+    image: docker.io/library/nats:${CONFIG_VERSION}
+    command:
+    - --auth
+    - secret
+  nats-nkey:
+    image: docker.io/library/nats:${CONFIG_VERSION}
+    command:
+    - --config
+    - /usr/share/nats/config/nats-nkey.conf
+    volumes:
+    - ../../../tests/data/nats:/usr/share/nats/config
+  nats-tls:
+    image: docker.io/library/nats:${CONFIG_VERSION}
+    command:
+    - --config
+    - /usr/share/nats/config/nats-tls.conf
+    volumes:
+    - ../../../tests/data/nats:/usr/share/nats/config
+  nats-tls-client-cert:
+    image: docker.io/library/nats:${CONFIG_VERSION}
+    command:
+    - --config
+    - /usr/share/nats/config/nats-tls-client-cert.conf
+    volumes:
+    - ../../../tests/data/nats:/usr/share/nats/config
+  nats-jwt:
+    image: docker.io/library/nats:${CONFIG_VERSION}
+    command:
+    - --config
+    - /usr/share/nats/config/nats-jwt.conf
+    volumes:
+    - ../../../tests/data/nats:/usr/share/nats/config

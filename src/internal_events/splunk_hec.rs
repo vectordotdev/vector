@@ -9,23 +9,26 @@ pub use self::source::*;
 mod sink {
     use metrics::{counter, decrement_gauge, increment_gauge};
     use serde_json::Error;
-    use vector_core::internal_event::InternalEvent;
+    use vector_lib::internal_event::InternalEvent;
+    use vector_lib::internal_event::{
+        error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+    };
 
     use crate::{
         event::metric::{MetricKind, MetricValue},
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,
     };
-    use vector_common::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {
-        pub error: vector_common::Error,
+        pub error: vector_lib::Error,
     }
 
     impl InternalEvent for SplunkEventEncodeError {
         fn emit(self) {
+            let reason = "Failed to encode Splunk HEC event as JSON.";
             error!(
-                message = "Error encoding Splunk HEC event to JSON.",
+                message = reason,
                 error = ?self.error,
                 error_code = "serializing_json",
                 error_type = error_type::ENCODER_FAILED,
@@ -38,6 +41,7 @@ mod sink {
                 "error_type" => error_type::ENCODER_FAILED,
                 "stage" => error_stage::PROCESSING,
             );
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
         }
     }
 
@@ -193,26 +197,10 @@ mod sink {
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
     use metrics::counter;
-    use vector_core::internal_event::InternalEvent;
+    use vector_lib::internal_event::InternalEvent;
 
     use crate::sources::splunk_hec::ApiError;
-    use vector_common::internal_event::{error_stage, error_type};
-
-    #[derive(Debug)]
-    pub struct SplunkHecRequestReceived<'a> {
-        pub path: &'a str,
-    }
-
-    impl<'a> InternalEvent for SplunkHecRequestReceived<'a> {
-        fn emit(self) {
-            debug!(
-                message = "Received one request.",
-                path = %self.path,
-                internal_log_rate_limit = true
-            );
-            counter!("requests_received_total", 1);
-        }
-    }
+    use vector_lib::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct SplunkHecRequestBodyInvalidError {
@@ -257,8 +245,6 @@ mod source {
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
             );
-            // deprecated
-            counter!("http_request_errors_total", 1);
         }
     }
 }

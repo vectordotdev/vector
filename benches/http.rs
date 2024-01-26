@@ -1,6 +1,5 @@
 use std::net::SocketAddr;
 
-use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
 use futures::TryFutureExt;
 use hyper::{
@@ -15,6 +14,7 @@ use vector::{
     test_util::{next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
     Error,
 };
+use vector_lib::codecs::{encoding::FramingConfig, TextSerializerConfig};
 
 fn benchmark_http(c: &mut Criterion) {
     let num_lines: usize = 1_000;
@@ -47,14 +47,16 @@ fn benchmark_http(c: &mut Criterion) {
                         config.add_sink(
                             "out",
                             &["in"],
-                            sinks::http::HttpSinkConfig {
+                            sinks::http::config::HttpSinkConfig {
                                 uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
                                 compression: *compression,
                                 method: Default::default(),
                                 auth: Default::default(),
                                 headers: Default::default(),
+                                payload_prefix: Default::default(),
+                                payload_suffix: Default::default(),
                                 batch,
-                                encoding: (None::<FramingConfig>, TextSerializerConfig::new())
+                                encoding: (None::<FramingConfig>, TextSerializerConfig::default())
                                     .into(),
                                 request: Default::default(),
                                 tls: Default::default(),

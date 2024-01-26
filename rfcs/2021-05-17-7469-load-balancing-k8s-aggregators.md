@@ -35,7 +35,7 @@ Today, scaling Vector horizontally (by increasing replicas) is a manual process 
 
 ## Internal Proposal
 
-Include a configuration for a dedicated reverse proxy that will be deployed as part of the vector-aggregator Helm chart. We should provide basic, but functional, configurations out-of-the box to enable users to "one click" install Vector as an aggregator. The proxy should dynamically resolve downsteam Vector instances and allow users to update the balance config to provide for more consistent targets in situations that require it (aggregation transforms). I propose our initially supported proxy should be HAProxy, with the next second being NGINX or Envoy. HAProxy, compared to NGINX, provides more metrics (exposed as JSON or in Prometheus format) and has native service discovery to dynamically populate its configuration. Lua can be used with NGINX to provide service discovery, for example the [nginx-ingress-controller](https://kubernetes.github.io/ingress-nginx/).
+Include a configuration for a dedicated reverse proxy that will be deployed as part of the vector-aggregator Helm chart. We should provide basic, but functional, configurations out-of-the box to enable users to "one click" install Vector as an aggregator. The proxy should dynamically resolve downstream Vector instances and allow users to update the balance config to provide for more consistent targets in situations that require it (aggregation transforms). I propose our initially supported proxy should be HAProxy, with the next second being NGINX or Envoy. HAProxy, compared to NGINX, provides more metrics (exposed as JSON or in Prometheus format) and has native service discovery to dynamically populate its configuration. Lua can be used with NGINX to provide service discovery, for example the [nginx-ingress-controller](https://kubernetes.github.io/ingress-nginx/).
 
 HAProxy intentionally has little support for proxying UDP, as of 2.3 there is support for forwarding syslog traffic however it doesn't allow for dynamic backend configuration greatly limiting the usability for us.
 
@@ -98,7 +98,7 @@ Project like Thanos and Loki have used hashrings to enable multi-tenancy, we cou
 
 * [x] Which reverse proxy to use? HAProxy, NGINX, Envoy, Traefik, etc. It should be widely used, battle-tested, support most/all protocols Vector uses, and preferably well understood by multiple members of our team.
 * [x] Should built-in load balancing capabilities be explored (where possible)? Internal load balancing options would simplify operations for end users who are all-in on Vector. - This is probably more appropriate on a different RFC, or per component.
-* [x] Do we always need to ensure requests are made to the same downstream aggregator, or only a specific subset of requests? - Default balancing will be `roundrobin`, with with documentations around setting to `source` as an alternative
+* [x] Do we always need to ensure requests are made to the same downstream aggregator, or only a specific subset of requests? - Default balancing will be `roundrobin`, with documentations around setting to `source` as an alternative
 * [x] Each `source` needs its unique port; what defaults and/or templating do we provide to the load balancer? - Out of the box configurations for Datadog agents and Vector agents
 * [x] How will users monitor the load balancer? Logs, metrics, and health. - We will provide out of the box configurations for Datadog agents and Vector to collect and process the proxy's logs and metrics, allowing the user to route them with the rest of their data.
 

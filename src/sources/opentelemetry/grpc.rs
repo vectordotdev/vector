@@ -1,24 +1,27 @@
+use futures::TryFutureExt;
+use tonic::{Request, Response, Status};
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::opentelemetry::proto::collector::logs::v1::{
+    logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
+};
+use vector_lib::{
+    config::LogNamespace,
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    EstimatedJsonEncodedSizeOf,
+};
+
 use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     sources::opentelemetry::LOGS,
     SourceSender,
 };
-use futures::TryFutureExt;
 
-use tonic::{Request, Response, Status};
-
-use opentelemetry_proto::proto::collector::logs::v1::{
-    logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
-};
-use vector_core::{
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    ByteSizeOf,
-};
-
-#[derive(Debug, Clone)]
-pub(crate) struct Service {
-    pub(crate) pipeline: SourceSender,
-    pub(crate) acknowledgements: bool,
+#[derive(Clone)]
+pub(super) struct Service {
+    pub pipeline: SourceSender,
+    pub acknowledgements: bool,
+    pub events_received: Registered<EventsReceived>,
+    pub log_namespace: LogNamespace,
 }
 
 #[tonic::async_trait]
@@ -31,13 +34,12 @@ impl LogsService for Service {
             .into_inner()
             .resource_logs
             .into_iter()
-            .flat_map(|v| v.into_iter())
+            .flat_map(|v| v.into_event_iter(self.log_namespace))
             .collect();
 
         let count = events.len();
-        let byte_size = events.size_of();
-
-        emit!(EventsReceived { count, byte_size });
+        let byte_size = events.estimated_json_encoded_size_of();
+        self.events_received.emit(CountByteSize(count, byte_size));
 
         let receiver = BatchNotifier::maybe_apply_to(self.acknowledgements, &mut events);
 
@@ -46,12 +48,14 @@ impl LogsService for Service {
             .send_batch_named(LOGS, events)
             .map_err(|error| {
                 let message = error.to_string();
-                emit!(StreamClosedError { error, count });
+                emit!(StreamClosedError { count });
                 Status::unavailable(message)
             })
             .and_then(|_| handle_batch_status(receiver))
             .await?;
-        Ok(Response::new(ExportLogsServiceResponse {}))
+        Ok(Response::new(ExportLogsServiceResponse {
+            partial_success: None,
+        }))
     }
 }
 

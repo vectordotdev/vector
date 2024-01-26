@@ -18,7 +18,7 @@ We can install Vector using an installation script or Docker:
 {{< tab title="Script" >}}
 
 ```shell
-curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
+curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash
 ```
 
 {{< /tab >}}
@@ -55,16 +55,20 @@ Vector topologies are defined using a [configuration file][config] that tells it
 * [Transforms] manipulate or change that observability data as it passes through your topology
 * [Sinks] send data onwards from Vector to external services or destinations
 
-Let's create a configuration file called `vector.toml`:
+Let's create a configuration file called `vector.yaml`:
 
-```toml filename="vector.toml"
-[sources.in]
-type = "stdin"
+```yaml filename="vector.yaml"
+sources:
+  in:
+    type: "stdin"
 
-[sinks.out]
-inputs = ["in"]
-type = "console"
-encoding.codec = "text"
+sinks:
+  out:
+    inputs:
+      - "in"
+    type: "console"
+    encoding:
+      codec: "text"
 ```
 
 Each component has a unique id and is prefixed with the type of the component, for example `sources` for a source. Our first component, `sources.in`, uses the [`stdin` source][stdin], which tells Vector to receive data over stdin and is given the ID `in`.
@@ -96,26 +100,31 @@ If you want to see something cool, try setting `encoding.codec = "json"` in the 
 
 ## Hello Syslog!
 
-Echoing events into the console isn't terribly exciting. Let's see what we can do with some real observability data by collecting and processing Syslog events. To do that, we'll add two new components to our configuration file. Here's our updated `vector.toml` configuration file:
+Echoing events into the console isn't terribly exciting. Let's see what we can do with some real observability data by collecting and processing Syslog events. To do that, we'll add two new components to our configuration file. Here's our updated `vector.yaml` configuration file:
 
-```toml filename="vector.toml"
-[sources.generate_syslog]
-type = "demo_logs"
-format = "syslog"
-count = 100
+```yaml filename="vector.yaml"
+sources:
+  generate_syslog:
+    type:   "demo_logs"
+    format: "syslog"
+    count:  100
 
-[transforms.remap_syslog]
-inputs = [ "generate_syslog"]
-type = "remap"
-source = '''
-  structured = parse_syslog!(.message)
-  . = merge(., structured)
-'''
+transforms:
+  remap_syslog:
+    inputs:
+      - "generate_syslog"
+    type:   "remap"
+    source: |
+            structured = parse_syslog!(.message)
+            . = merge(., structured)
 
-[sinks.emit_syslog]
-inputs = ["remap_syslog"]
-type = "console"
-encoding.codec = "json"
+sinks:
+  emit_syslog:
+    inputs:
+      - "remap_syslog"
+    type: "console"
+    encoding:
+      codec: "json"
 ```
 
 The first component uses the [`demo_logs` source][demo_logs], which creates sample log data that enables you to simulate different types of events in various formats.
@@ -158,7 +167,7 @@ We can see that Vector has parsed the Syslog message and created a structured ev
 
 ## What's next?
 
-We're just scatching the surface in this post. To get your hands dirty with Vector check out:
+We're just scratching the surface in this post. To get your hands dirty with Vector check out:
 
 * All of Vector's [sources][sources], [transforms][transforms], and [sinks][sinks].
 * The [Vector Remap Language][vrl], the heart of data processing in Vector.

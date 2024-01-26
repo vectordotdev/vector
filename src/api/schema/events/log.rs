@@ -1,12 +1,12 @@
+use std::borrow::Cow;
+
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
-use vector_common::encode_logfmt;
+use vector_lib::encode_logfmt;
+use vrl::event_path;
 
 use super::EventEncodingType;
-use crate::{
-    event::{self, Value},
-    topology::TapOutput,
-};
+use crate::{event, topology::TapOutput};
 
 #[derive(Debug, Clone)]
 pub struct Log {
@@ -19,12 +19,12 @@ impl Log {
         Self { output, event }
     }
 
-    pub fn get_message(&self) -> Option<String> {
-        Some(self.event.get("message")?.to_string_lossy())
+    pub fn get_message(&self) -> Option<Cow<'_, str>> {
+        Some(self.event.get(event_path!("message"))?.to_string_lossy())
     }
 
     pub fn get_timestamp(&self) -> Option<&DateTime<Utc>> {
-        self.event.get("timestamp")?.as_timestamp()
+        self.event.get(event_path!("timestamp"))?.as_timestamp()
     }
 }
 
@@ -48,7 +48,7 @@ impl Log {
 
     /// Log message
     async fn message(&self) -> Option<String> {
-        self.get_message()
+        self.get_message().map(Into::into)
     }
 
     /// Log timestamp
@@ -69,7 +69,10 @@ impl Log {
     }
 
     /// Get JSON field data on the log event, by field name
-    async fn json(&self, field: String) -> Option<&Value> {
-        self.event.get(field.as_str())
+    async fn json(&self, field: String) -> Option<String> {
+        self.event.get(event_path!(field.as_str())).map(|field| {
+            serde_json::to_string(field)
+                .expect("JSON serialization of trace event field failed. Please report.")
+        })
     }
 }

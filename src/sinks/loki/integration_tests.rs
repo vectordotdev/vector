@@ -1,18 +1,29 @@
 use std::convert::TryFrom;
+use std::sync::Arc;
 
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
-use vector_common::encode_logfmt;
-use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+use vector_lib::encode_logfmt;
+use vector_lib::lookup::{owned_value_path, PathPrefix};
+use vector_lib::{
+    config::{init_telemetry, LogNamespace, Tags, Telemetry},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+};
+use vrl::value::{kind::Collection, Kind};
 
 use super::config::{LokiConfig, OutOfOrderAction};
 use crate::{
     config::{log_schema, SinkConfig},
+    event::Value,
+    schema,
     sinks::{util::test::load_sink, VectorSink},
     template::Template,
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{
+            run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
+            DATA_VOLUME_SINK_TAGS, SINK_TAGS,
+        },
         generate_events_with_stream, generate_lines_with_stream, random_lines,
     },
 };
@@ -21,19 +32,18 @@ fn loki_address() -> String {
     std::env::var("LOKI_ADDRESS").unwrap_or_else(|_| "http://localhost:3100".into())
 }
 
-async fn build_sink(codec: &str) -> (uuid::Uuid, VectorSink) {
+async fn build_sink(codec: &str, remove_timestamp: bool) -> (uuid::Uuid, VectorSink) {
     let stream = uuid::Uuid::new_v4();
 
     let config = format!(
         r#"
             endpoint = "{}"
             labels = {{test_name = "placeholder"}}
-            encoding.codec = "{}"
-            remove_timestamp = false
+            encoding.codec = "{codec}"
+            remove_timestamp = {remove_timestamp}
             tenant_id = "default"
         "#,
         loki_address(),
-        codec
     );
 
     let (mut config, cx) = load_sink::<LokiConfig>(&config).unwrap();
@@ -91,9 +101,44 @@ fn event_generator(index: usize) -> Event {
     Event::Log(LogEvent::from(line_generator(index)))
 }
 
+/// A generator that creates a timestamp in the given field.
+/// This field is given the meaning of `timestamp` to ensure that in the Vector namespace
+/// we use this field as a timestamp.
+fn namespaced_timestamp_generator(
+    timestamp_field: String,
+    timestamp: chrono::DateTime<Utc>,
+) -> impl Fn(usize) -> Event {
+    move |index: usize| {
+        let mut log = LogEvent::default();
+        log.insert("message", line_generator(index));
+        log.insert(timestamp_field.as_str(), Value::from(timestamp));
+
+        // We need vector metadata for it to pick up that it is in the Vector namespace.
+        LogNamespace::Vector.insert_standard_vector_source_metadata(&mut log, "loki", Utc::now());
+
+        let schema = schema::Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Vector],
+        )
+        // Add a field that means the timestamp.
+        .with_event_field(
+            &owned_value_path!(&timestamp_field),
+            Kind::timestamp(),
+            Some("timestamp"),
+        );
+
+        let mut event = Event::from(log);
+        event
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(schema));
+
+        event
+    }
+}
+
 #[tokio::test]
 async fn text() {
-    let (stream, sink) = build_sink("text").await;
+    let (stream, sink) = build_sink("text", false).await;
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
@@ -106,6 +151,71 @@ async fn text() {
     assert_eq!(lines.len(), outputs.len());
     for (i, output) in outputs.iter().enumerate() {
         assert_eq!(output, &lines[i]);
+    }
+}
+
+#[tokio::test]
+async fn data_volume_tags() {
+    init_telemetry(
+        Telemetry {
+            tags: Tags {
+                emit_service: true,
+                emit_source: true,
+            },
+        },
+        true,
+    );
+
+    let (stream, sink) = build_sink("text", false).await;
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let (lines, events) = generate_lines_with_stream(line_generator, 10, Some(batch));
+    run_and_assert_data_volume_sink_compliance(sink, events, &DATA_VOLUME_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
+
+    let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+    assert_eq!(lines.len(), outputs.len());
+    for (i, output) in outputs.iter().enumerate() {
+        assert_eq!(output, &lines[i]);
+    }
+}
+
+#[tokio::test]
+async fn namespaced_timestamp() {
+    let (stream, sink) = build_sink("json", true).await;
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let timestamp = Utc::now() - Duration::minutes(5);
+    let (lines, events) = generate_events_with_stream(
+        namespaced_timestamp_generator("norknork".to_string(), timestamp),
+        10,
+        Some(batch),
+    );
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
+
+    let (timestamps, outputs) = fetch_stream(stream.to_string(), "default").await;
+    assert_eq!(lines.len(), outputs.len());
+    for (i, output) in outputs.iter().enumerate() {
+        let output = serde_json::from_str::<serde_json::Value>(output).unwrap();
+        let output = output.as_object().unwrap();
+
+        // The sink should have removed the `norknork` field because we have configured
+        // it to remove the timestamp field.
+        assert!(!output.contains_key("norknork"));
+
+        // The timestamp of the event needs to be the timestamp set in the `norknork`
+        // field since that was given the meaning of `timestamp`.
+        assert_eq!(
+            timestamp
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range"),
+            timestamps[i]
+        );
     }
 }
 
@@ -147,7 +257,7 @@ async fn text_with_gzip_compression() {
 
 #[tokio::test]
 async fn json() {
-    let (stream, sink) = build_sink("json").await;
+    let (stream, sink) = build_sink("json", false).await;
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_events_with_stream(event_generator, 10, Some(batch));
@@ -167,7 +277,7 @@ async fn json() {
 // https://github.com/vectordotdev/vector/issues/7815
 #[tokio::test]
 async fn json_nested_fields() {
-    let (stream, sink) = build_sink("json").await;
+    let (stream, sink) = build_sink("json", false).await;
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let generator = |idx| {
@@ -192,7 +302,7 @@ async fn json_nested_fields() {
 
 #[tokio::test]
 async fn logfmt() {
-    let (stream, sink) = build_sink("logfmt").await;
+    let (stream, sink) = build_sink("logfmt", false).await;
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (lines, events) = generate_events_with_stream(event_generator, 10, Some(batch));
@@ -253,7 +363,7 @@ async fn many_streams() {
         let index = (i % 5) * 2;
         let message = lines[index]
             .as_log()
-            .get(log_schema().message_key())
+            .get(log_schema().message_key_target_path().unwrap())
             .unwrap()
             .to_string_lossy();
         assert_eq!(output, &message);
@@ -263,7 +373,7 @@ async fn many_streams() {
         let index = ((i % 5) * 2) + 1;
         let message = lines[index]
             .as_log()
-            .get(log_schema().message_key())
+            .get(log_schema().message_key_target_path().unwrap())
             .unwrap()
             .to_string_lossy();
         assert_eq!(output, &message);
@@ -310,7 +420,7 @@ async fn interpolate_stream_key() {
     for (i, output) in outputs.iter().enumerate() {
         let message = lines[i]
             .as_log()
-            .get(log_schema().message_key())
+            .get(log_schema().message_key_target_path().unwrap())
             .unwrap()
             .to_string_lossy();
         assert_eq!(output, &message);
@@ -387,14 +497,15 @@ async fn out_of_order_drop() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            log_schema().timestamp_key(),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
-    events[batch_size]
-        .as_mut_log()
-        .insert(log_schema().timestamp_key(), base);
+    events[batch_size].as_mut_log().insert(
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+        base,
+    );
 
     let mut expected = events.clone();
     expected.remove(batch_size);
@@ -416,14 +527,15 @@ async fn out_of_order_accept() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            log_schema().timestamp_key(),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
-    events[batch_size]
-        .as_mut_log()
-        .insert(log_schema().timestamp_key(), base - Duration::seconds(1));
+    events[batch_size].as_mut_log().insert(
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+        base - Duration::seconds(1),
+    );
 
     // move out-of-order event to where it will appear in results
     let mut expected = events.clone();
@@ -447,21 +559,23 @@ async fn out_of_order_rewrite() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            log_schema().timestamp_key(),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
-    events[batch_size]
-        .as_mut_log()
-        .insert(log_schema().timestamp_key(), base);
+    events[batch_size].as_mut_log().insert(
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+        base,
+    );
 
     let mut expected = events.clone();
     let time = get_timestamp(&expected[batch_size - 1]);
-    // timestamp is rewriten with latest timestamp of the first batch
-    expected[batch_size]
-        .as_mut_log()
-        .insert(log_schema().timestamp_key(), time);
+    // timestamp is rewritten with latest timestamp of the first batch
+    expected[batch_size].as_mut_log().insert(
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+        time,
+    );
 
     test_out_of_order_events(
         OutOfOrderAction::RewriteTimestamp,
@@ -487,13 +601,13 @@ async fn out_of_order_per_partition() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            log_schema().timestamp_key(),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
 
     // So, since all of the events are of the same partition, and if there is concurrency,
-    // then if ordering inside paritions isn't upheld, the big line events will take longer
+    // then if ordering inside partitions isn't upheld, the big line events will take longer
     // time to flush than small line events so loki will receive smaller ones before large
     // ones hence out of order events.
     test_out_of_order_events(OutOfOrderAction::Drop, batch_size, events.clone(), events).await;
@@ -535,21 +649,26 @@ async fn test_out_of_order_events(
         assert_eq!(
             &expected[i]
                 .as_log()
-                .get(log_schema().message_key())
+                .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy(),
             output,
         )
     }
     for (i, ts) in timestamps.iter().enumerate() {
-        assert_eq!(get_timestamp(&expected[i]).timestamp_nanos(), *ts);
+        assert_eq!(
+            get_timestamp(&expected[i])
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range"),
+            *ts
+        );
     }
 }
 
 fn get_timestamp(event: &Event) -> DateTime<Utc> {
     *event
         .as_log()
-        .get(log_schema().timestamp_key())
+        .get((PathPrefix::Event, log_schema().timestamp_key().unwrap()))
         .unwrap()
         .as_timestamp()
         .unwrap()

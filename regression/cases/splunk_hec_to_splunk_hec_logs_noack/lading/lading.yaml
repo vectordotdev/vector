@@ -1,0 +1,13 @@
+generator:
+  - splunk_hec:
+      seed: [2, 3, 5, 7, 11, 13, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137]
+      target_uri: "http://localhost:8282/"
+      format: "json"
+      token: "abcd1234"
+      bytes_per_second: "100 Mb"
+      parallel_connections: 10
+      maximum_prebuild_cache_size_bytes: "256 Mb"
+
+blackhole:
+  - splunk_hec:
+      binding_addr: "0.0.0.0:8080"

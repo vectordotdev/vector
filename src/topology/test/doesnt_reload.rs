@@ -18,12 +18,12 @@ async fn topology_doesnt_reload_new_data_dir() {
     old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
     let mut new_config = old_config.clone();
 
-    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
+    let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
 
     new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
     topology
-        .reload_config_and_respawn(new_config.build().unwrap())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
         .await
         .unwrap();
 

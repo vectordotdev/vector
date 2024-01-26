@@ -26,14 +26,14 @@ module Vector
 
       private
         def from_git_log_commit(git_log_commit)
-          convetional_commit = ConventionalCommit.parse(git_log_commit.message)
-          hash = git_log_commit.to_h.merge(convetional_commit.to_h)
+          conventional_commit = ConventionalCommit.parse(git_log_commit.message)
+          hash = git_log_commit.to_h.merge(conventional_commit.to_h)
           new(hash)
         end
 
         def from_git_log_commit!(git_log_commit)
-          convetional_commit = ConventionalCommit.parse!(git_log_commit.message)
-          hash = git_log_commit.to_h.merge(convetional_commit.to_h)
+          conventional_commit = ConventionalCommit.parse!(git_log_commit.message)
+          hash = git_log_commit.to_h.merge(conventional_commit.to_h)
           new(hash)
         end
     end

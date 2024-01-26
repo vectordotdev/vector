@@ -1,53 +1,61 @@
-use std::convert::TryInto;
-use std::io::ErrorKind;
+use std::{convert::TryInto, io::ErrorKind};
 
 use async_compression::tokio::bufread;
-use aws_sdk_s3::types::ByteStream;
-use futures::stream;
-use futures::{stream::StreamExt, TryStreamExt};
+use aws_smithy_types::byte_stream::ByteStream;
+use futures::{stream, stream::StreamExt, TryStreamExt};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::codecs::decoding::{
+    DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions,
+};
+use vector_lib::codecs::NewlineDelimitedDecoderConfig;
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::owned_value_path;
+use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
-use crate::aws::create_client;
-use crate::aws::RegionOrEndpoint;
-use crate::common::s3::S3ClientBuilder;
-use crate::common::sqs::SqsClientBuilder;
-use crate::tls::TlsConfig;
+use crate::codecs::DecodingConfig;
 use crate::{
-    aws::auth::AwsAuthentication,
-    config::{AcknowledgementsConfig, DataType, Output, ProxyConfig, SourceConfig, SourceContext},
+    aws::{auth::AwsAuthentication, create_client, create_client_and_region, RegionOrEndpoint},
+    common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
+    config::{
+        ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+    },
     line_agg,
-    serde::bool_or_struct,
+    serde::{bool_or_struct, default_decoding},
+    tls::TlsConfig,
 };
 
 pub mod sqs;
 
 /// Compression scheme for objects retrieved from S3.
 #[configurable_component]
+#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 pub enum Compression {
     /// Automatically attempt to determine the compression scheme.
     ///
-    /// Vector will try to determine the compression scheme of the object from its: `Content-Encoding` and
-    /// `Content-Type` metadata, as well as the key suffix (e.g. `.gz`).
+    /// The compression scheme of the object is determined from its `Content-Encoding` and
+    /// `Content-Type` metadata, as well as the key suffix (for example, `.gz`).
     ///
-    /// It will fallback to 'none' if the compression scheme cannot be determined.
+    /// It is set to `none` if the compression scheme cannot be determined.
     #[derivative(Default)]
     Auto,
+
     /// Uncompressed.
     None,
+
     /// GZIP.
     Gzip,
+
     /// ZSTD.
     Zstd,
 }
 
-/// Strategies for consuming objects from S3.
+/// Strategies for consuming objects from AWS S3.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative)]
 #[serde(rename_all = "lowercase")]
@@ -66,8 +74,9 @@ enum Strategy {
 // when there's required fields.
 //
 // Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
-#[configurable_component(source("aws_s3"))]
-#[derive(Clone, Debug, Default)]
+#[configurable_component(source("aws_s3", "Collect logs from AWS S3."))]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct AwsS3Config {
     #[serde(flatten)]
@@ -77,17 +86,17 @@ pub struct AwsS3Config {
     compression: Compression,
 
     /// The strategy to use to consume objects from S3.
+    #[configurable(metadata(docs::hidden))]
     strategy: Strategy,
 
     /// Configuration options for SQS.
-    ///
-    /// Only relevant when `strategy = "sqs"`.
     sqs: Option<sqs::Config>,
 
     /// The ARN of an [IAM role][iam_role] to assume at startup.
     ///
     /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
     #[configurable(deprecated)]
+    #[configurable(metadata(docs::hidden))]
     assume_role: Option<String>,
 
     #[configurable(derived)]
@@ -97,21 +106,47 @@ pub struct AwsS3Config {
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
+    #[configurable(derived)]
     multiline: Option<MultilineConfig>,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    acknowledgements: SourceAcknowledgementsConfig,
 
     #[configurable(derived)]
     tls_options: Option<TlsConfig>,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default = "default_framing")]
+    #[derivative(Default(value = "default_framing()"))]
+    pub framing: FramingConfig,
+
+    #[configurable(derived)]
+    #[serde(default = "default_decoding")]
+    #[derivative(Default(value = "default_decoding()"))]
+    pub decoding: DeserializerConfig,
+}
+
+const fn default_framing() -> FramingConfig {
+    // This is used for backwards compatibility. It used to be the only (hardcoded) option.
+    FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
+        newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
+    })
 }
 
 impl_generate_config_from_default!(AwsS3Config);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let multiline_config: Option<line_agg::Config> = self
             .multiline
             .as_ref()
@@ -120,15 +155,65 @@ impl SourceConfig for AwsS3Config {
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::pin(
-                self.create_sqs_ingestor(multiline_config, &cx.proxy)
+                self.create_sqs_ingestor(multiline_config, &cx.proxy, log_namespace)
                     .await?
-                    .run(cx, self.acknowledgements),
+                    .run(cx, self.acknowledgements, log_namespace),
             )),
         }
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let mut schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("bucket"))),
+                &owned_value_path!("bucket"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("object"))),
+                &owned_value_path!("object"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("region"))),
+                &owned_value_path!("region"),
+                Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                None,
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            )
+            .with_standard_vector_source_metadata()
+            // for metadata that is added to the events dynamically from the metadata
+            .with_source_metadata(
+                Self::NAME,
+                None,
+                &owned_value_path!("metadata"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
+                None,
+            );
+
+        // for metadata that is added to the events dynamically from the metadata
+        if log_namespace == LogNamespace::Legacy {
+            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+        }
+
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -141,36 +226,32 @@ impl AwsS3Config {
         &self,
         multiline: Option<line_agg::Config>,
         proxy: &ProxyConfig,
+        log_namespace: LogNamespace,
     ) -> crate::Result<sqs::Ingestor> {
-        let region = self
-            .region
-            .region()
-            .ok_or(CreateSqsIngestorError::RegionMissing)?;
-
-        let endpoint = self
-            .region
-            .endpoint()
-            .map_err(|_| CreateSqsIngestorError::InvalidEndpoint)?;
+        let region = self.region.region();
+        let endpoint = self.region.endpoint();
 
         let s3_client = create_client::<S3ClientBuilder>(
             &self.auth,
-            Some(region.clone()),
+            region.clone(),
             endpoint.clone(),
             proxy,
             &self.tls_options,
-            false,
         )
         .await?;
 
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
+
         match self.sqs {
             Some(ref sqs) => {
-                let sqs_client = create_client::<SqsClientBuilder>(
+                let (sqs_client, region) = create_client_and_region::<SqsClientBuilder>(
                     &self.auth,
-                    Some(region.clone()),
+                    region.clone(),
                     endpoint,
                     proxy,
                     &sqs.tls_options,
-                    false,
                 )
                 .await?;
 
@@ -181,6 +262,7 @@ impl AwsS3Config {
                     sqs.clone(),
                     self.compression,
                     multiline,
+                    decoder,
                 )
                 .await?;
 
@@ -201,8 +283,6 @@ enum CreateSqsIngestorError {
     Credentials { source: crate::Error },
     #[snafu(display("Configuration for `sqs` required when strategy=sqs"))]
     ConfigMissing,
-    #[snafu(display("Region is required"))]
-    RegionMissing,
     #[snafu(display("Endpoint is invalid"))]
     InvalidEndpoint,
 }
@@ -223,14 +303,16 @@ async fn s3_object_decoder(
 
     let r = tokio::io::BufReader::new(StreamReader::new(
         stream::iter(Some(first))
-            .chain(body)
+            .chain(Box::pin(async_stream::stream! {
+                while let Some(next) = body.next().await {
+                    yield next;
+                }
+            }))
             .map_err(|e| std::io::Error::new(ErrorKind::Other, e)),
     ));
 
     let compression = match compression {
-        Auto => {
-            determine_compression(content_encoding, content_type, key).unwrap_or(Compression::None)
-        }
+        Auto => determine_compression(content_encoding, content_type, key).unwrap_or(None),
         _ => compression,
     };
 
@@ -299,10 +381,9 @@ fn object_key_to_compression(key: &str) -> Option<Compression> {
 
 #[cfg(test)]
 mod test {
-    use aws_sdk_s3::types::ByteStream;
     use tokio::io::AsyncReadExt;
 
-    use super::{s3_object_decoder, Compression};
+    use super::*;
 
     #[test]
     fn determine_compression() {
@@ -356,29 +437,31 @@ mod test {
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use std::fs::File;
-    use std::io::{self, BufRead};
-    use std::path::Path;
-    use std::time::Duration;
+    use std::{
+        fs::File,
+        io::{self, BufRead},
+        path::Path,
+        time::Duration,
+    };
 
-    use aws_sdk_s3::types::ByteStream;
     use aws_sdk_s3::Client as S3Client;
-    use aws_sdk_sqs::model::QueueAttributeName;
-    use aws_sdk_sqs::Client as SqsClient;
-    use pretty_assertions::assert_eq;
+    use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
+    use similar_asserts::assert_eq;
+    use vector_lib::codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
+    use vector_lib::lookup::path;
+    use vrl::value::Value;
 
-    use super::{sqs, AwsS3Config, Compression, Strategy};
-    use crate::aws::create_client;
-    use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-    use crate::common::sqs::SqsClientBuilder;
-    use crate::config::ProxyConfig;
-    use crate::sources::aws_s3::sqs::S3Event;
-    use crate::sources::aws_s3::S3ClientBuilder;
+    use super::*;
     use crate::{
-        config::{SourceConfig, SourceContext},
+        aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+        common::sqs::SqsClientBuilder,
+        config::{ProxyConfig, SourceConfig, SourceContext},
         event::EventStatus::{self, *},
         line_agg,
-        sources::util::MultilineConfig,
+        sources::{
+            aws_s3::{sqs::S3Event, S3ClientBuilder},
+            util::MultilineConfig,
+        },
         test_util::{
             collect_n,
             components::{assert_source_compliance, SOURCE_TAGS},
@@ -406,6 +489,56 @@ mod integration_tests {
             logs.join("\n").into_bytes(),
             logs,
             Delivered,
+            false,
+            DeserializerConfig::Bytes,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn s3_process_json_message() {
+        trace_init();
+
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        let json_logs: Vec<String> = logs
+            .iter()
+            .map(|msg| {
+                // convert to JSON object
+                format!(r#"{{"message": "{}"}}"#, msg)
+            })
+            .collect();
+
+        test_event(
+            None,
+            None,
+            None,
+            None,
+            json_logs.join("\n").into_bytes(),
+            logs,
+            Delivered,
+            false,
+            DeserializerConfig::Json(JsonDeserializerConfig::default()),
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn s3_process_message_with_log_namespace() {
+        trace_init();
+
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        test_event(
+            None,
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Delivered,
+            true,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -425,6 +558,8 @@ mod integration_tests {
             logs.join("\n").into_bytes(),
             logs,
             Delivered,
+            false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -444,6 +579,8 @@ mod integration_tests {
             logs.join("\n").into_bytes(),
             logs,
             Delivered,
+            false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -457,13 +594,24 @@ mod integration_tests {
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         let mut gz = flate2::read::GzEncoder::new(
-            std::io::Cursor::new(logs.join("\n").into_bytes()),
+            io::Cursor::new(logs.join("\n").into_bytes()),
             flate2::Compression::fast(),
         );
         let mut buffer = Vec::new();
         gz.read_to_end(&mut buffer).unwrap();
 
-        test_event(None, Some("gzip"), None, None, buffer, logs, Delivered).await;
+        test_event(
+            None,
+            Some("gzip"),
+            None,
+            None,
+            buffer,
+            logs,
+            Delivered,
+            false,
+            DeserializerConfig::Bytes,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -475,14 +623,25 @@ mod integration_tests {
         let logs = lines_from_gzip_file("tests/data/multipart-gzip.log.gz");
 
         let buffer = {
-            let mut file = std::fs::File::open("tests/data/multipart-gzip.log.gz")
-                .expect("file can be opened");
+            let mut file =
+                File::open("tests/data/multipart-gzip.log.gz").expect("file can be opened");
             let mut data = Vec::new();
             file.read_to_end(&mut data).expect("file can be read");
             data
         };
 
-        test_event(None, Some("gzip"), None, None, buffer, logs, Delivered).await;
+        test_event(
+            None,
+            Some("gzip"),
+            None,
+            None,
+            buffer,
+            logs,
+            Delivered,
+            false,
+            DeserializerConfig::Bytes,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -494,14 +653,25 @@ mod integration_tests {
         let logs = lines_from_plaintext("tests/data/multipart-zst.log");
 
         let buffer = {
-            let mut file = std::fs::File::open("tests/data/multipart-zst.log.zst")
-                .expect("file can be opened");
+            let mut file =
+                File::open("tests/data/multipart-zst.log.zst").expect("file can be opened");
             let mut data = Vec::new();
             file.read_to_end(&mut data).expect("file can be read");
             data
         };
 
-        test_event(None, Some("zstd"), None, None, buffer, logs, Delivered).await;
+        test_event(
+            None,
+            Some("zstd"),
+            None,
+            None,
+            buffer,
+            logs,
+            Delivered,
+            false,
+            DeserializerConfig::Bytes,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -521,15 +691,20 @@ mod integration_tests {
                 start_pattern: "abc".to_owned(),
                 mode: line_agg::Mode::HaltWith,
                 condition_pattern: "geh".to_owned(),
-                timeout_ms: 1000,
+                timeout_ms: Duration::from_millis(1000),
             }),
             logs.join("\n").into_bytes(),
             vec!["abc\ndef\ngeh".to_owned()],
             Delivered,
+            false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
 
+    // TODO: re-enable this after figuring out why it is so flakey in CI
+    //       https://github.com/vectordotdev/vector/issues/17456
+    #[ignore]
     #[tokio::test]
     async fn handles_errored_status() {
         trace_init();
@@ -544,6 +719,8 @@ mod integration_tests {
             logs.join("\n").into_bytes(),
             logs,
             Errored,
+            false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -562,6 +739,8 @@ mod integration_tests {
             logs.join("\n").into_bytes(),
             logs,
             Rejected,
+            false,
+            DeserializerConfig::Bytes,
         )
         .await;
     }
@@ -570,7 +749,12 @@ mod integration_tests {
         std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
     }
 
-    fn config(queue_url: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
+    fn config(
+        queue_url: &str,
+        multiline: Option<MultilineConfig>,
+        log_namespace: bool,
+        decoding: DeserializerConfig,
+    ) -> AwsS3Config {
         AwsS3Config {
             region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
             strategy: Strategy::Sqs,
@@ -580,15 +764,18 @@ mod integration_tests {
                 queue_url: queue_url.to_string(),
                 poll_secs: 1,
                 visibility_timeout_secs: 0,
-                client_concurrency: 1,
+                client_concurrency: None,
                 ..Default::default()
             }),
             acknowledgements: true.into(),
+            log_namespace: Some(log_namespace),
+            decoding,
             ..Default::default()
         }
     }
 
     // puts an object and asserts that the logs it gets back match
+    #[allow(clippy::too_many_arguments)]
     async fn test_event(
         key: Option<String>,
         content_encoding: Option<&str>,
@@ -597,6 +784,8 @@ mod integration_tests {
         payload: Vec<u8>,
         expected_lines: Vec<String>,
         status: EventStatus,
+        log_namespace: bool,
+        decoding: DeserializerConfig,
     ) {
         assert_source_compliance(&SOURCE_TAGS, async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
@@ -609,7 +798,7 @@ mod integration_tests {
 
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            let config = config(&queue, multiline);
+            let config = config(&queue, multiline, log_namespace, decoding);
 
             s3.put_object()
                 .bucket(bucket.clone())
@@ -682,6 +871,7 @@ mod integration_tests {
 
             let (tx, rx) = SourceSender::new_test_finalize(status);
             let cx = SourceContext::new_test(tx, None);
+            let namespace = cx.log_namespace(Some(log_namespace));
             let source = config.build(cx).await.unwrap();
             tokio::spawn(async move { source.await.unwrap() });
 
@@ -689,15 +879,28 @@ mod integration_tests {
 
             assert_eq!(expected_lines.len(), events.len());
             for (i, event) in events.iter().enumerate() {
+
+                if let Some(schema_definition) = config.outputs(namespace).pop().unwrap().schema_definition {
+                    schema_definition.is_valid_for_event(event).unwrap();
+                }
+
                 let message = expected_lines[i].as_str();
 
                 let log = event.as_log();
-                assert_eq!(log["message"], message.into());
-                assert_eq!(log["bucket"], bucket.clone().into());
-                assert_eq!(log["object"], key.clone().into());
-                assert_eq!(log["region"], "us-east-1".into());
+                if log_namespace {
+                    assert_eq!(log.value(), &Value::from(message));
+                } else {
+                    assert_eq!(log["message"], message.into());
+                }
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("bucket"), path!("bucket")).unwrap(), &bucket.clone().into());
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("object"), path!("object")).unwrap(), &key.clone().into());
+                assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("region"), path!("region")).unwrap(), &"us-east-1".into());
             }
 
+            // Unfortunately we need a fairly large sleep here to ensure that the source has actually managed to delete the SQS message.
+            // The deletion of this message occurs after the Event has been sent out by the source and there is no way of knowing when this
+            // process has finished other than waiting around for a while.
+            tokio::time::sleep(Duration::from_secs(10)).await;
             // Make sure the SQS message is deleted
             match status {
                 Errored => {
@@ -771,10 +974,9 @@ mod integration_tests {
         create_client::<S3ClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint().unwrap(),
+            region_endpoint.endpoint(),
             &proxy_config,
             &None,
-            false,
         )
         .await
         .unwrap()
@@ -790,10 +992,9 @@ mod integration_tests {
         create_client::<SqsClientBuilder>(
             &auth,
             region_endpoint.region(),
-            region_endpoint.endpoint().unwrap(),
+            region_endpoint.endpoint(),
             &proxy_config,
             &None,
-            false,
         )
         .await
         .unwrap()

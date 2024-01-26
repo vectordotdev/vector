@@ -1,6 +1,0 @@
-# issue: https://github.com/vectordotdev/vector/issues/6319
-# result: ["", "bar"]
-
-message_lines = ["foo", "bar"]
-message_lines[0] = ""
-message_lines

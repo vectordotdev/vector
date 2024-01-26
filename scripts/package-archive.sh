@@ -24,8 +24,7 @@ OVERWRITE=${OVERWRITE:-"true"}
 ARCHIVE_TYPE="${ARCHIVE_TYPE:-"tar.gz"}"
 NATIVE_BUILD="${NATIVE_BUILD:-"true"}"
 TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
-PROJECT_ROOT="$(pwd)"
-ARCHIVE_VERSION="${VECTOR_VERSION:-"$("$PROJECT_ROOT"/scripts/version.sh)"}"
+ARCHIVE_VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 
 #
 # Local Vars
@@ -87,6 +86,9 @@ fi
 cp -av README.md "$ARCHIVE_DIR/README.md$SUFFIX"
 # Create the license file for binary distributions (LICENSE + NOTICE)
 cat LICENSE NOTICE > "$ARCHIVE_DIR/LICENSE$SUFFIX"
+
+cp -av licenses "$ARCHIVE_DIR/licenses"
+cp -av LICENSE-3rdparty.csv "$ARCHIVE_DIR"
 
 # Copy the vector binary to /bin
 

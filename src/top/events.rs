@@ -17,7 +17,7 @@ pub fn capture_key_press() -> (mpsc::UnboundedReceiver<KeyCode>, oneshot::Sender
                 _ = &mut kill_rx => return,
                 Some(Ok(event)) = events.next() => {
                      if let Event::Key(k) = event {
-                        let _ = tx.clone().send(k.code);
+                        _ = tx.clone().send(k.code);
                     };
                 }
             }

@@ -1,12 +1,8 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
-use crate::{
-    emit,
-    event::metric::Metric,
-    internal_events::{ComponentEventsDropped, UNINTENTIONAL},
-};
-use vector_common::internal_event::{error_stage, error_type};
+use crate::event::metric::Metric;
 
 #[derive(Debug)]
 pub struct SematextMetricsInvalidMetricError<'a> {
@@ -31,8 +27,6 @@ impl<'a> InternalEvent for SematextMetricsInvalidMetricError<'a> {
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("processing_errors_total", 1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
@@ -58,8 +52,6 @@ impl<E: std::fmt::Display> InternalEvent for SematextMetricsEncodeEventError<E> 
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
         );
-        // deprecated
-        counter!("encode_errors_total", 1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }

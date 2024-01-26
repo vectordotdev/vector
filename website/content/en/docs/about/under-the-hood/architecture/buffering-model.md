@@ -222,7 +222,7 @@ space becomes available in the buffer.
 An important thing to note is that if space becomes available in the in-memory buffer, new events
 that Vector tries to buffer will go to in-memory buffer, even if there are still events in the disk
 buffer. Additionally, those new events in the in-memory buffer may be returned _before_ older events
-stored in the disk buffer. There are **no event ordering gaurantees** when using the overflow behavior for
+stored in the disk buffer. There are **no event ordering guarantees** when using the overflow behavior for
 a buffer topology.
 
 Additionally, the last buffer in a buffer topology cannot be set to the overflow mode. Naturally,

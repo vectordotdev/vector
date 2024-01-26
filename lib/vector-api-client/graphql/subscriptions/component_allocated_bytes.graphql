@@ -1,0 +1,8 @@
+subscription ComponentAllocatedBytesSubscription ($interval: Int!) {
+    componentAllocatedBytes(interval: $interval)  {
+        componentId
+        metric {
+            allocatedBytes
+        }
+    }
+}

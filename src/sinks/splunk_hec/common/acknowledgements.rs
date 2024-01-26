@@ -8,8 +8,8 @@ use std::{
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
-use vector_config::configurable_component;
-use vector_core::event::EventStatus;
+use vector_lib::configurable::configurable_component;
+use vector_lib::event::EventStatus;
 
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
@@ -25,28 +25,30 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(default)]
+#[configurable(metadata(docs::advanced))]
 pub struct HecClientAcknowledgementsConfig {
-    /// Controls if the sink will integrate with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
+    /// Controls if the sink integrates with [Splunk HEC indexer acknowledgements][splunk_indexer_ack_docs] for end-to-end acknowledgements.
     ///
     /// [splunk_indexer_ack_docs]: https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck
     pub indexer_acknowledgements_enabled: bool,
 
-    /// The amount of time, in seconds, to wait in between queries to the Splunk HEC indexer acknowledgement endpoint.
+    /// The amount of time to wait between queries to the Splunk HEC indexer acknowledgement endpoint.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
     pub query_interval: NonZeroU8,
 
-    /// The maximum number of times an acknowledgement ID will be queried for its status.
+    /// The maximum number of times an acknowledgement ID is queried for its status.
     pub retry_limit: NonZeroU8,
 
     /// The maximum number of pending acknowledgements from events sent to the Splunk HEC collector.
     ///
-    /// Once reached, the sink will begin applying backpressure.
+    /// Once reached, the sink begins applying backpressure.
     pub max_pending_acks: NonZeroU64,
 
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         flatten,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub inner: AcknowledgementsConfig,
 }
@@ -121,7 +123,8 @@ impl HecAckClient {
                     let acked_ack_ids = ack_query_response
                         .acks
                         .iter()
-                        .filter_map(|(ack_id, ack_status)| ack_status.then(|| *ack_id))
+                        .filter(|&(_ack_id, ack_status)| *ack_status)
+                        .map(|(ack_id, _ack_status)| *ack_id)
                         .collect::<Vec<u64>>();
                     self.finalize_delivered_ack_ids(acked_ack_ids.as_slice());
                     self.expire_ack_ids_with_status(EventStatus::Rejected);
@@ -161,7 +164,7 @@ impl HecAckClient {
         let mut removed_count = 0.0;
         for ack_id in ack_ids {
             if let Some((_, ack_event_status_sender)) = self.acks.remove(ack_id) {
-                let _ = ack_event_status_sender.send(EventStatus::Delivered);
+                _ = ack_event_status_sender.send(EventStatus::Delivered);
                 removed_count += 1.0;
                 debug!(message = "Finalized ack id.", ?ack_id);
             }
@@ -196,7 +199,7 @@ impl HecAckClient {
         let mut removed_count = 0.0;
         for ack_id in expired_ack_ids {
             if let Some((_, ack_event_status_sender)) = self.acks.remove(&ack_id) {
-                let _ = ack_event_status_sender.send(status);
+                _ = ack_event_status_sender.send(status);
                 removed_count += 1.0;
             }
         }
@@ -221,6 +224,7 @@ impl HecAckClient {
                 "/services/collector/ack",
                 None,
                 MetadataFields::default(),
+                false,
             )
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 
@@ -284,7 +288,7 @@ mod tests {
 
     use futures_util::{stream::FuturesUnordered, StreamExt};
     use tokio::sync::oneshot::{self, Receiver};
-    use vector_core::{config::proxy::ProxyConfig, event::EventStatus};
+    use vector_lib::{config::proxy::ProxyConfig, event::EventStatus};
 
     use super::HecAckClient;
     use crate::{
@@ -325,7 +329,7 @@ mod tests {
     fn test_get_ack_query_body() {
         let mut ack_client = get_ack_client(1);
         let ack_ids = (0..100).collect::<Vec<u64>>();
-        let _ = populate_ack_client(&mut ack_client, &ack_ids);
+        _ = populate_ack_client(&mut ack_client, &ack_ids);
         let expected_ack_body = HecAckStatusRequest { acks: ack_ids };
 
         let mut ack_request_body = ack_client.get_ack_query_body();
@@ -337,7 +341,7 @@ mod tests {
     fn test_decrement_retries() {
         let mut ack_client = get_ack_client(1);
         let ack_ids = (0..100).collect::<Vec<u64>>();
-        let _ = populate_ack_client(&mut ack_client, &ack_ids);
+        _ = populate_ack_client(&mut ack_client, &ack_ids);
 
         let mut ack_request_body = ack_client.get_ack_query_body();
         ack_request_body.acks.sort_unstable();

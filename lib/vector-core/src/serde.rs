@@ -2,10 +2,9 @@ use std::{fmt, marker::PhantomData};
 
 use serde::{de, Deserialize, Deserializer};
 
-/// Answers "Is it possible to skip serializing this value, because it's the
-/// default?"
+/// Answers "Is this value in it's default state?" which can be used to skip serializing the value.
 #[inline]
-pub fn skip_serializing_if_default<E: Default + PartialEq>(e: &E) -> bool {
+pub fn is_default<E: Default + PartialEq>(e: &E) -> bool {
     e == &E::default()
 }
 
@@ -84,8 +83,7 @@ pub mod ascii_char {
             Ok(character as u8)
         } else {
             Err(de::Error::custom(format!(
-                "invalid character: {}, expected character in ASCII range",
-                character
+                "invalid character: {character}, expected character in ASCII range"
             )))
         }
     }

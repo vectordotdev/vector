@@ -390,7 +390,7 @@ Congratulations, now you are ingesting logs from AWS CloudWatch Logs in a robust
 manner. You can now use Vector to transform and forward these logs to your
 destinations of choice.
 
-Any troubles getting this to work? Let us know via [Github
+Any troubles getting this to work? Let us know via [GitHub
 issues](https://github.com/vectordotdev/vector/issues/new/choose) or [drop into the
 `#aws` channel on our discord server.](https://chat.vector.dev)
 

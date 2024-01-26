@@ -33,8 +33,9 @@ undertagline = "Collect, transform, and route all your observability data with o
 subtagline = "Vector is deployed over 1,000,000 times per month by Fortune 500 companies and startups"
 alpine_js_version = "2.8.2"
 ionicons_version = "5.4.0"
+openssl_version = "3.1"
 site_logo = "img/vector-open-graph.png"
-display_banner = false # Whether to display the top banner in layouts/partials/banner.html
+display_banner = true # Whether to display the top banner in layouts/partials/banner.html
 favicon = "favicon.ico"
 
 # Update this every time there's a new "generation" of the site. Incrementing this forces the browser to refresh any
@@ -143,8 +144,13 @@ weight = 5
 
 [[languages.en.menus.navbar]]
 name = "Support"
-url = "https://www.datadoghq.com/product/observability-pipelines"
+url = "/community"
 weight = 6
+
+[[languages.en.menus.navbar]]
+name = "Observability Pipelines"
+url = "https://www.datadoghq.com/product/observability-pipelines"
+weight = 7
 
 # Footer menu
 [[languages.en.menus.footer]]
@@ -159,10 +165,28 @@ parent = "about"
 weight = 1
 
 [[languages.en.menus.footer]]
+name = "What is Observability Pipelines?"
+url = "/docs/about/what-is-observability-pipelines"
+parent = "about"
+weight = 2
+
+[[languages.en.menus.footer]]
 name = "Contact us"
 url = "/community"
 parent = "about"
-weight = 2
+weight = 3
+
+[[languages.en.menus.footer]]
+name = "Privacy"
+url = "https://www.datadoghq.com/legal/privacy/"
+parent = "about"
+weight = 4
+
+[[languages.en.menus.footer]]
+name = "Cookies"
+url = "https://www.datadoghq.com/legal/cookies/"
+parent = "about"
+weight = 5
 
 [[languages.en.menus.footer]]
 name = "Components"
@@ -248,26 +272,33 @@ url = "https://chat.vector.dev"
 parent = "community"
 weight = 3
 
-# Extra links under the "Meta" section in the docs
-[[languages.en.menus.meta]]
-name = "Privacy"
-url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
-weight = 1
+[[languages.en.menus.footer]]
+name = "Download"
+url = "/download"
+identifier = "download"
+weight = 5
 
+[[languages.en.menus.footer]]
+name = "Releases"
+url = "/releases"
+weight = 1
+parent = "download"
+
+# Extra links under the "Meta" section in the docs
 [[languages.en.menus.meta]]
 name = "Security"
 url = "https://github.com/vectordotdev/vector/security/policy"
-weight = 2
+weight = 1
 
 [[languages.en.menus.meta]]
 name = "Releases"
 url = "https://github.com/vectordotdev/vector/blob/master/RELEASES.md"
-weight = 3
+weight = 2
 
 [[languages.en.menus.meta]]
 name = "Versioning"
 url = "https://github.com/vectordotdev/vector/blob/master/VERSIONING.md"
-weight = 4
+weight = 3
 
 # Buttons in "community" section on main page
 [[languages.en.menus.community]]
@@ -307,17 +338,6 @@ name = "RSS"
 params = { color = "rss-orange", icon = "rss" }
 url = "/blog/index.xml"
 weight = 4
-
-# Links in subfooter
-[[languages.en.menus.subfooter]]
-name = "Security policy"
-url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
-weight = 1
-
-[[languages.en.menus.subfooter]]
-name = "Privacy policy"
-url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
-weight = 2
 
 [security]
   enableInlineShortcodes = false

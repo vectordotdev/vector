@@ -12,43 +12,49 @@ use futures::StreamExt;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
-use vector_common::{finalization::BatchStatusReceiver, finalizer::UnorderedFinalizer};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::{finalization::BatchStatusReceiver, finalizer::UnorderedFinalizer};
 use warp::Rejection;
 
 use super::ApiError;
-use crate::{config::AcknowledgementsConfig, event::BatchStatus, shutdown::ShutdownSignal};
+use crate::{event::BatchStatus, shutdown::ShutdownSignal};
 
 /// Acknowledgement configuration for the `splunk_hec` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(default)]
 pub struct HecAcknowledgementsConfig {
-    #[serde(flatten)]
-    pub inner: AcknowledgementsConfig,
+    /// Enables end-to-end acknowledgements.
+    pub enabled: Option<bool>,
 
-    /// The maximum number of ack statuses pending query across all channels.
+    /// The maximum number of acknowledgement statuses pending query across all channels.
     ///
     /// Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting.
     ///
     /// Minimum of `1`.
+    #[configurable(metadata(docs::human_name = "Max Number of Pending Acknowledgements"))]
     pub max_pending_acks: NonZeroU64,
 
     /// The maximum number of Splunk HEC channels clients can use with this source.
     ///
     /// Minimum of `1`.
+    #[configurable(metadata(docs::human_name = "Max Number of Acknowledgement Channels"))]
     pub max_number_of_ack_channels: NonZeroU64,
 
-    /// The maximum number of ack statuses pending query for a single channel.
+    /// The maximum number of acknowledgement statuses pending query for a single channel.
     ///
     /// Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting.
     ///
     /// Minimum of `1`.
+    #[configurable(metadata(
+        docs::human_name = "Max Number of Pending Acknowledgements Per Channel"
+    ))]
     pub max_pending_acks_per_channel: NonZeroU64,
 
     /// Whether or not to remove channels after idling for `max_idle_time` seconds.
     ///
-    /// A channel is idling if it is not used for sending data or querying ack statuses.
+    /// A channel is idling if it is not used for sending data or querying acknowledgement statuses.
+    #[configurable(metadata(docs::human_name = "Acknowledgement Idle Cleanup"))]
     pub ack_idle_cleanup: bool,
 
     /// The amount of time, in seconds, a channel is allowed to idle before removal.
@@ -62,7 +68,7 @@ pub struct HecAcknowledgementsConfig {
 impl Default for HecAcknowledgementsConfig {
     fn default() -> Self {
         Self {
-            inner: AcknowledgementsConfig::default(),
+            enabled: None,
             max_pending_acks: NonZeroU64::new(10_000_000).unwrap(),
             max_number_of_ack_channels: NonZeroU64::new(1_000_000).unwrap(),
             max_pending_acks_per_channel: NonZeroU64::new(1_000_000).unwrap(),
@@ -75,7 +81,7 @@ impl Default for HecAcknowledgementsConfig {
 impl From<bool> for HecAcknowledgementsConfig {
     fn from(enabled: bool) -> Self {
         Self {
-            inner: enabled.into(),
+            enabled: Some(enabled),
             ..Default::default()
         }
     }
@@ -197,7 +203,7 @@ impl Channel {
     fn new(max_pending_acks_per_channel: u64, shutdown: ShutdownSignal) -> Self {
         let ack_ids_status = Arc::new(Mutex::new(RoaringTreemap::new()));
         let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
-        let (ack_event_finalizer, mut ack_stream) = UnorderedFinalizer::new(shutdown);
+        let (ack_event_finalizer, mut ack_stream) = UnorderedFinalizer::new(Some(shutdown));
         tokio::spawn(async move {
             while let Some((status, ack_id)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
@@ -277,7 +283,7 @@ mod tests {
     use std::num::NonZeroU64;
 
     use tokio::{time, time::sleep};
-    use vector_core::event::{BatchNotifier, EventFinalizer, EventStatus};
+    use vector_lib::event::{BatchNotifier, EventFinalizer, EventStatus};
 
     use super::{Channel, HecAcknowledgementsConfig, IndexerAcknowledgement};
     use crate::shutdown::ShutdownSignal;
@@ -368,7 +374,7 @@ mod tests {
     async fn test_indexer_ack_exceed_max_pending_acks_drop_acks() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_pending_acks: NonZeroU64::new(10).unwrap(),
             ..Default::default()
         };
@@ -411,7 +417,7 @@ mod tests {
     async fn test_indexer_ack_exceed_max_pending_acks_server_busy() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_pending_acks: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -435,7 +441,7 @@ mod tests {
     async fn test_indexer_ack_create_channels() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ..Default::default()
         };
         let idx_ack = IndexerAcknowledgement::new(config, shutdown);
@@ -464,7 +470,7 @@ mod tests {
     async fn test_indexer_ack_create_channels_exceed_max_number_of_ack_channels() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -485,7 +491,7 @@ mod tests {
     async fn test_indexer_ack_channel_idle_expiration() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
             ack_idle_cleanup: true,
             max_idle_time: NonZeroU64::new(1).unwrap(),
@@ -508,7 +514,7 @@ mod tests {
     async fn test_indexer_ack_channel_active_does_not_expire() {
         let shutdown = ShutdownSignal::noop();
         let config = HecAcknowledgementsConfig {
-            inner: true.into(),
+            enabled: Some(true),
             ack_idle_cleanup: true,
             max_idle_time: NonZeroU64::new(2).unwrap(),
             ..Default::default()

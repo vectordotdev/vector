@@ -24,6 +24,18 @@ As an additional note, `rustfmt` sometimes can fail to format code within macros
 to see such code that doesn't look like it's formatted correctly, you may need to manually tweak it
 if `rustfmt` cannot be persuaded to format it correctly for you. :)
 
+### Const strings
+
+When re-typing the same raw string literal more than once, this can lead to typo
+errors, especially when names ares similar. In general, when reasonable, it is
+preferred to use [Compile-time constants](https://doc.rust-lang.org/std/keyword.const.html)
+when dealing with non-dynamic strings. For example, when working with field names
+for event metadata.
+
+As this has not always been a consistently enforced code style for the project,
+please take the opportunity to update existing raw strings to use constants
+when modifying existing code
+
 ## Code Organization
 
 Code is primarily split into two main directories: `lib/` and `src/`.
@@ -217,7 +229,7 @@ would know that the queue size was _currently_ zero but we'd also know that we j
   [Component
   Specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md).
 - **Don't** emit metrics in tight loops. Each metric emission carries an overhead, and emitting them
-  in tight loops can cause that overhead to become noticable in terms of CPU usage and throughput
+  in tight loops can cause that overhead to become noticeable in terms of CPU usage and throughput
   reduction. Instead of incrementing a counter every time a loop iteration occurs, you might
   consider incrementing a local variable instead, and then emitting that sum after the loop is over.
 - **Don't** update a counter to measure the total number of operations/events/etc if you're already
@@ -258,7 +270,7 @@ most portable and well-tested. In cases where the standard library atomics canno
 when using a 64-bit atomic but wanting to support a 32-bit platform, or support a platform without
 atomic instructions at all, we prefer to use
 **[`crossbeam-utils`](https://docs.rs/crossbeam-utils)** and its `AtomicCell` helper. This type will
-automatically handle either using native atomic support or ensuring mutally exclusive access, and
+automatically handle either using native atomic support or ensuring mutually exclusive access, and
 handle it in a transparent way. It uses a fixed acquire/release ordering that generally provides the
 expected behavior when using atomics, but may not be suitable for usages which require stronger
 ordering.
@@ -298,7 +310,7 @@ itself for use cases where pooling is desired.
 
 Synchronization can be a very common sight when writing multi-threaded code in any language, and
 this document does not aim to familiarize you with all of the common synchronization primitives and
-their intended usage. Instesd, however, there are some caveats that you must be aware of when using
+their intended usage. Instead, however, there are some caveats that you must be aware of when using
 synchronization primitives in synchronous versus asynchronous code.
 
 Generally speaking, developers will lean on the synchronization primitives in `std::sync`, such as
@@ -315,3 +327,22 @@ you'll need to use an asynchronous-specific synchronization primitives, namely t
 itself. The documentation on `tokio`'s own
 [`Mutex`](https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html), for example, calls out the
 specifics of when and where you might need to use it vs the one from `std::sync`.
+
+
+## New Configuration Fields vs CLI flags
+
+Vector makes the distinction between configuration items that are essential to understand data
+pipelines and runtime flags that determine the details of the runtime behavior. The main configuration
+generally lives in a file in the current directory or in `/etc/vector`.
+
+Examples of main configuration fields are source, transformation, and sink declaration, as well as
+information about where any disk buffers should be persisted.
+
+For configuration items that purely inform details of Vector's runtime behavior, CLI flags without
+corresponding configuration fields should be used.
+
+An example of a runtime flag is
+`vector run --no-graceful-shutdown-limit`, which tells Vector to ignore SIGINTs and to continue running
+as normal until a SIGKILL is received. In this case, as the configuration describes the desired runtime
+behavior in a specific environment and not to the underlying data pipeline, no corresponding field in
+the configuration file should exist.

@@ -2,8 +2,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use tokio::time::Duration;
-use vector_buffers::{BufferConfig, BufferType, WhenFull};
-use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
+use vector_lib::buffers::{BufferConfig, BufferType, WhenFull};
+use vector_lib::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
 use crate::{config::Config, test_util, test_util::start_topology};
 use crate::{config::SinkOuter, test_util::mock::backpressure_source};
@@ -11,7 +11,7 @@ use crate::{test_util::mock::backpressure_sink, topology::builder::SOURCE_SENDER
 
 // Based on how we pump events from `SourceSender` into `Fanout`, there's always one extra event we
 // may pull out of `SourceSender` but can't yet send into `Fanout`, so we account for that here.
-pub(self) const EXTRA_SOURCE_PUMP_EVENT: usize = 1;
+const EXTRA_SOURCE_PUMP_EVENT: usize = 1;
 
 /// Connects a single source to a single sink and makes sure the sink backpressure is propagated
 /// to the source.
@@ -32,7 +32,7 @@ async fn serial_backpressure() {
     config.add_source("in", backpressure_source(&source_counter));
     config.add_sink("out", &["in"], backpressure_sink(events_to_sink));
 
-    let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (_topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
     wait_until_expected(&source_counter, expected_sourced_events).await;
@@ -63,7 +63,7 @@ async fn default_fan_out() {
 
     config.add_sink("out2", &["in"], backpressure_sink(events_to_sink));
 
-    let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (_topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
     wait_until_expected(&source_counter, expected_sourced_events).await;
@@ -103,7 +103,7 @@ async fn buffer_drop_fan_out() {
     });
     config.add_sink_outer("out2", sink_outer);
 
-    let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (_topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
     wait_until_expected(&source_counter, expected_sourced_events).await;
@@ -147,7 +147,7 @@ async fn multiple_inputs_backpressure() {
     config.add_source("in2", backpressure_source(&source_counter));
     config.add_sink("out", &["in1", "in2"], backpressure_sink(events_to_sink));
 
-    let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    let (_topology, _) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
     wait_until_expected(&source_counter, expected_sourced_events).await;

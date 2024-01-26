@@ -5,7 +5,7 @@ use hyper::Body;
 use indexmap::IndexMap;
 use tokio::time;
 use url::Url;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     config::{self, provider::ProviderConfig, ProxyConfig},
@@ -51,10 +51,7 @@ pub struct HttpConfig {
     tls_options: Option<TlsConfig>,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 }
 

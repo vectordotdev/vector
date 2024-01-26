@@ -1,39 +1,115 @@
-use metrics::counter;
+use std::sync::Arc;
+
+use metrics::{register_counter, Counter};
 use tracing::trace;
 
-use crate::internal_event::InternalEvent;
+use crate::config::ComponentKey;
+
+use super::{CountByteSize, OptionalTag, Output, SharedString};
 
 pub const DEFAULT_OUTPUT: &str = "_default";
 
-#[derive(Debug)]
-pub struct EventsSent<'a> {
-    pub count: usize,
-    pub byte_size: usize,
-    pub output: Option<&'a str>,
-}
-
-impl<'a> InternalEvent for EventsSent<'a> {
-    fn emit(self) {
-        if let Some(output) = self.output {
-            trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size, output = %output);
+crate::registered_event!(
+    EventsSent {
+        output: Option<SharedString>,
+    } => {
+        events: Counter = if let Some(output) = &self.output {
+            register_counter!("component_sent_events_total", "output" => output.clone())
         } else {
-            trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
+            register_counter!("component_sent_events_total")
+        },
+        event_bytes: Counter = if let Some(output) = &self.output {
+            register_counter!("component_sent_event_bytes_total", "output" => output.clone())
+        } else {
+            register_counter!("component_sent_event_bytes_total")
+        },
+        output: Option<SharedString> = self.output,
+    }
+
+    fn emit(&self, data: CountByteSize) {
+        let CountByteSize(count, byte_size) = data;
+
+        match &self.output {
+            Some(output) => {
+                trace!(message = "Events sent.", count = %count, byte_size = %byte_size.get(), output = %output);
+            }
+            None => {
+                trace!(message = "Events sent.", count = %count, byte_size = %byte_size.get());
+            }
         }
 
-        if self.count > 0 {
-            if let Some(output) = self.output {
-                counter!("component_sent_events_total", self.count as u64, "output" => output.to_owned());
-                counter!("events_out_total", self.count as u64, "output" => output.to_owned());
-                counter!("component_sent_event_bytes_total", self.byte_size as u64, "output" => output.to_owned());
-            } else {
-                counter!("component_sent_events_total", self.count as u64);
-                counter!("events_out_total", self.count as u64);
-                counter!("component_sent_event_bytes_total", self.byte_size as u64);
-            }
+        self.events.increment(count as u64);
+        self.event_bytes.increment(byte_size.get() as u64);
+    }
+);
+
+impl From<Output> for EventsSent {
+    fn from(output: Output) -> Self {
+        Self { output: output.0 }
+    }
+}
+
+/// Makes a list of the tags to use with the events sent event.
+fn make_tags(
+    source: &OptionalTag<Arc<ComponentKey>>,
+    service: &OptionalTag<String>,
+) -> Vec<(&'static str, String)> {
+    let mut tags = Vec::new();
+    if let OptionalTag::Specified(tag) = source {
+        tags.push((
+            "source",
+            tag.as_ref()
+                .map_or_else(|| "-".to_string(), |tag| tag.id().to_string()),
+        ));
+    }
+
+    if let OptionalTag::Specified(tag) = service {
+        tags.push(("service", tag.clone().unwrap_or("-".to_string())));
+    }
+
+    tags
+}
+
+crate::registered_event!(
+    TaggedEventsSent {
+        source: OptionalTag<Arc<ComponentKey>>,
+        service: OptionalTag<String>,
+    } => {
+        events: Counter = {
+            register_counter!("component_sent_events_total", &make_tags(&self.source, &self.service))
+        },
+        event_bytes: Counter = {
+            register_counter!("component_sent_event_bytes_total", &make_tags(&self.source, &self.service))
+        },
+    }
+
+    fn emit(&self, data: CountByteSize) {
+        let CountByteSize(count, byte_size) = data;
+        trace!(message = "Events sent.", %count, %byte_size);
+
+        self.events.increment(count as u64);
+        self.event_bytes.increment(byte_size.get() as u64);
+    }
+
+    fn register(_fixed: (), tags: TaggedEventsSent) {
+        super::register(tags)
+    }
+);
+
+impl TaggedEventsSent {
+    #[must_use]
+    pub fn new_empty() -> Self {
+        Self {
+            source: OptionalTag::Specified(None),
+            service: OptionalTag::Specified(None),
         }
     }
 
-    fn name(&self) -> Option<&'static str> {
-        Some("EventsSent")
+    #[must_use]
+    pub fn new_unspecified() -> Self {
+        Self {
+            source: OptionalTag::Ignored,
+            service: OptionalTag::Ignored,
+        }
     }
 }

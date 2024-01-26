@@ -83,7 +83,10 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
     .keys(params)
     .filter(k => filter(params[k]))
     .forEach(k => {
-      obj[k] = getExampleValue(params[k], deepFilter);
+      let value = getExampleValue(params[k], deepFilter);
+      if (value) {
+        obj[k] = value;
+      }
     });
 
   return obj;
@@ -96,7 +99,7 @@ const toToml = (obj) => {
 
 // Convert object to YAML string
 const toYaml = (obj) => {
-  return `---\n${YAML.stringify(obj)}`;
+  return `${YAML.stringify(obj)}`;
 }
 
 // Convert object to JSON string (indented)

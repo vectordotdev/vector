@@ -5,7 +5,8 @@ use tracing::Instrument;
 use super::{create_buffer_v2_with_max_data_file_size, read_next, read_next_some};
 use crate::{
     assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
-    assert_reader_writer_v2_file_positions, await_timeout, set_data_file_length,
+    assert_reader_last_writer_next_positions, assert_reader_writer_v2_file_positions,
+    await_timeout, set_data_file_length,
     test::{acknowledge, install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
     variants::disk_v2::{
         common::{DEFAULT_FLUSH_INTERVAL, MAX_FILE_ID},
@@ -667,7 +668,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
             drop(ledger);
 
             // Now, we need to load the data file we just left off on and modify it so that it
-            // appears corrupted and triggers the writer to skip it during initiailization, thus
+            // appears corrupted and triggers the writer to skip it during initialization, thus
             // pushing the writer to skip to next data file.  We do this by simply truncating it in
             // the middle of record, which _also_ has the effect that the data file is technically
             // not full anymore.
@@ -819,4 +820,111 @@ async fn writer_updates_ledger_when_buffered_writer_reports_implicit_flush() {
         }
     })
     .await;
+}
+
+#[tokio::test]
+async fn reader_writer_positions_aligned_through_multiple_files_and_records() {
+    // This test ensures that the reader/writer position stay aligned through multiple records and
+    // data files. This is to say, that, if we write 5 records, each with 10 events, and then read
+    // and acknowledge all of those events... the writer's next record ID should be 51 (the 50th
+    // event would correspond to ID 50, so next ID would be 51) and the reader's last read record ID
+    // should be 50.
+    //
+    // Testing this across multiple data files isn't super germane to the position logic, but it
+    // just ensures we're also testing that aspect.
+
+    let _a = install_tracing_helpers();
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Create our buffer with an arbitrarily low maximum data file size. We'll use this to
+            // control how many records make it into a given data file. Just another way to ensure
+            // we're testing the position logic with multiple writes to one data file, one write to
+            // a data file, etc.
+            let (mut writer, mut reader, ledger) =
+                create_buffer_v2_with_max_data_file_size(data_dir, 256).await;
+
+            // We'll write multi-event records with N events based on these sizes, and as we do so,
+            // we'll assert that our writer position moves as expected after the write, and that
+            // after reading and acknowledging, the reader position also moves as expected.
+            let record_sizes = &[176, 52, 91, 137, 54, 87];
+
+            let mut expected_writer_position = ledger.state().get_next_writer_record_id();
+            let mut expected_reader_position = ledger.state().get_last_reader_record_id();
+            let mut trailing_reader_position_delta = 0;
+
+            for record_size in record_sizes {
+                // Initial check before writing/reading the next record.
+                assert_reader_last_writer_next_positions!(
+                    ledger,
+                    expected_reader_position,
+                    expected_writer_position
+                );
+
+                let record = MultiEventRecord::new(*record_size);
+                assert_eq!(
+                    record.event_count(),
+                    usize::try_from(*record_size).unwrap_or(usize::MAX)
+                );
+
+                writer
+                    .write_record(record)
+                    .await
+                    .expect("write should not fail");
+                writer.flush().await.expect("flush should not fail");
+
+                expected_writer_position += u64::from(*record_size);
+
+                // Make sure the writer position advanced after flushing.
+                assert_reader_last_writer_next_positions!(
+                    ledger,
+                    expected_reader_position,
+                    expected_writer_position
+                );
+
+                let record_via_read = read_next_some(&mut reader).await;
+                assert_eq!(record_via_read, MultiEventRecord::new(*record_size));
+                acknowledge(record_via_read).await;
+
+                // Increment the expected reader position by the trailing reader position delta, and
+                // then now that we've done a read, we should be able to have seen actually move
+                // forward.
+                expected_reader_position += trailing_reader_position_delta;
+                assert_reader_last_writer_next_positions!(
+                    ledger,
+                    expected_reader_position,
+                    expected_writer_position
+                );
+
+                // Set the trailing reader position delta to the record we just read.
+                //
+                // We do it this way because reads themselves have to drive acknowledgement logic to
+                // then drive updates to the ledger, so we will only see the change in the reader's
+                // position the _next_ time we do a read.
+                trailing_reader_position_delta = u64::from(*record_size);
+            }
+
+            // Close the writer and do a final read, thus driving the acknowledgement logic, and
+            // position update logic, before we do our final position check.
+            writer.close();
+            assert_eq!(reader.next().await, Ok(None));
+
+            // Calculate the absolute reader/writer positions we would expect based on all of the
+            // records/events written and read. This is to double check our work and make sure that
+            // the "expected" positions didn't hide any bugs from us.
+            let expected_final_reader_position =
+                record_sizes.iter().copied().map(u64::from).sum::<u64>();
+            let expected_final_writer_position = expected_final_reader_position + 1;
+
+            assert_reader_last_writer_next_positions!(
+                ledger,
+                expected_final_reader_position,
+                expected_final_writer_position
+            );
+        }
+    });
+
+    let parent = trace_span!("reader_writer_positions_aligned_through_multiple_files_and_records");
+    fut.instrument(parent.or_current()).await;
 }

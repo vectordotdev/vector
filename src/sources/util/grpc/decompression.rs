@@ -18,9 +18,11 @@ use std::future::Future;
 use tokio::{pin, select};
 use tonic::{body::BoxBody, metadata::AsciiMetadataValue, Status};
 use tower::{Layer, Service};
-use vector_common::internal_event::{
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
+
+use crate::internal_events::{GrpcError, GrpcInvalidCompressionSchemeError};
 
 // Every gRPC message has a five byte header:
 // - a compressed flag (u8, 0/1 for compressed/decompressed)
@@ -81,8 +83,7 @@ impl Default for State {
 fn new_decompressor() -> GzDecoder<Vec<u8>> {
     // Create the backing buffer for the decompressor and set the compression flag to false (0) and pre-allocate
     // the space for the length prefix, which we'll fill out once we've finalized the decompressor.
-    let mut buf = Vec::new();
-    buf.resize(GRPC_MESSAGE_HEADER_LEN, 0x00);
+    let buf = vec![0; GRPC_MESSAGE_HEADER_LEN];
 
     GzDecoder::new(buf)
 }
@@ -247,6 +248,7 @@ async fn drive_request<F, E>(
 ) -> Result<Response<BoxBody>, E>
 where
     F: Future<Output = Result<Response<BoxBody>, E>>,
+    E: std::fmt::Display,
 {
     let body_decompression = drive_body_decompression(source, destination);
 
@@ -275,15 +277,21 @@ where
         }
     };
 
-    // If the response indicates success, then emit the necessary metrics.
-    let should_emit = match &result {
-        Ok(res) => res.status().is_success(),
-        Err(_) => false,
+    // If the response indicates success, then emit the necessary metrics
+    // otherwise emit the error.
+    match &result {
+        Ok(res) if res.status().is_success() => {
+            bytes_received.emit(ByteSize(body_bytes_received));
+        }
+        Ok(res) => {
+            emit!(GrpcError {
+                error: format!("Received {}", res.status())
+            });
+        }
+        Err(error) => {
+            emit!(GrpcError { error: &error });
+        }
     };
-
-    if should_emit {
-        bytes_received.emit(ByteSize(body_bytes_received));
-    }
 
     result
 }
@@ -298,6 +306,7 @@ impl<S> Service<Request<Body>> for DecompressionAndMetrics<S>
 where
     S: Service<Request<Body>, Response = Response<BoxBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
+    S::Error: std::fmt::Display,
 {
     type Response = Response<BoxBody>;
     type Error = S::Error;
@@ -310,7 +319,10 @@ where
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         match CompressionScheme::from_encoding_header(&req) {
             // There was a header for the encoding, but it was either invalid data or a scheme we don't support.
-            Err(status) => Box::pin(async move { Ok(status.to_http()) }),
+            Err(status) => {
+                emit!(GrpcInvalidCompressionSchemeError { status: &status });
+                Box::pin(async move { Ok(status.to_http()) })
+            }
 
             // The request either isn't using compression, or it has indicated compression may be used and we know we
             // can support decompression based on the indicated compression scheme... so wrap the body to decompress, if

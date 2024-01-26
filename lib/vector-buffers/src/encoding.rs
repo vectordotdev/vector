@@ -7,7 +7,7 @@ pub trait AsMetadata: Sized {
     /// Converts this metadata value into its integer representation.
     fn into_u32(self) -> u32;
 
-    /// Converts an integer repentation of metadata into its real type, if possible.
+    /// Converts an integer representation of metadata into its real type, if possible.
     ///
     /// If the given integer does not represent a valid representation of the given metadata type,
     /// possibly due to including bits not valid for the type, and so on, then `None` will be
@@ -40,7 +40,7 @@ impl AsMetadata for () {
 /// ## Implementation
 ///
 /// As designed, an implementor would define a primary encoding scheme, schema version, and so on,
-/// that matched how an object would be encoded.  This is acquired from `get_metadata` by code tht
+/// that matched how an object would be encoded.  This is acquired from `get_metadata` by code that
 /// depends on `Encodable` and will be stored alongside the encoded object.  When the encoded object
 /// is later read back, and the caller wants to decode it, they would also read the metadata and do
 /// two things: check that the metadata is still valid for this implementation by calling
@@ -177,7 +177,7 @@ impl<T: FixedEncodable> Encodable for T {
 
     fn get_metadata() -> Self::Metadata {}
 
-    fn can_decode(_: Self::Metadata) -> bool {
+    fn can_decode((): Self::Metadata) -> bool {
         true
     }
 
@@ -189,7 +189,7 @@ impl<T: FixedEncodable> Encodable for T {
         FixedEncodable::encoded_size(self)
     }
 
-    fn decode<B: Buf + Clone>(_: Self::Metadata, buffer: B) -> Result<Self, Self::DecodeError> {
+    fn decode<B: Buf + Clone>((): Self::Metadata, buffer: B) -> Result<Self, Self::DecodeError> {
         <Self as FixedEncodable>::decode(buffer)
     }
 }

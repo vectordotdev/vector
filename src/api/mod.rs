@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 mod handler;
 mod schema;
 mod server;

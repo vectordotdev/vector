@@ -4,12 +4,12 @@ use std::{
     time::Duration,
 };
 
-use chrono::{DateTime, NaiveDateTime, Utc};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
+use chrono::NaiveDateTime;
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
 use once_cell::sync::Lazy;
+use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
@@ -18,16 +18,20 @@ use tonic::{
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use vector_common::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::lookup::owned_value_path;
+use vector_lib::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
+use vrl::path;
+use vrl::value::{kind::Collection, Kind};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
+    config::{DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     internal_events::{
@@ -41,8 +45,8 @@ use crate::{
     SourceSender,
 };
 
-const MIN_ACK_DEADLINE_SECS: i32 = 10;
-const MAX_ACK_DEADLINE_SECS: i32 = 600;
+const MIN_ACK_DEADLINE_SECS: u64 = 10;
+const MAX_ACK_DEADLINE_SECS: u64 = 600;
 
 // We use a bounded channel for the acknowledgement ID communication
 // between the request stream and receiver. During benchmark runs,
@@ -58,11 +62,13 @@ type Finalizer = UnorderedFinalizer<Vec<String>>;
 // objects, which causes a clippy ding on this block. We don't
 // directly control the generated code, so allow this lint here.
 #[allow(clippy::clone_on_ref_ptr)]
+// https://github.com/hyperium/tonic/issues/1350
+#[allow(clippy::missing_const_for_fn)]
 #[allow(warnings)]
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 
-    use vector_core::ByteSizeOf;
+    use vector_lib::ByteSizeOf;
 
     impl ByteSizeOf for StreamingPullResponse {
         fn allocated_bytes(&self) -> usize {
@@ -115,19 +121,27 @@ pub(crate) enum PubsubError {
 static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 
 /// Configuration for the `gcp_pubsub` source.
-#[configurable_component(source("gcp_pubsub"))]
+#[serde_as]
+#[configurable_component(source(
+    "gcp_pubsub",
+    "Fetch observability events from GCP's Pub/Sub messaging system."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
     /// The project name from which to pull logs.
+    #[configurable(metadata(docs::examples = "my-log-source-project"))]
     pub project: String,
 
     /// The subscription within the project which is configured to receive logs.
+    #[configurable(metadata(docs::examples = "my-vector-source-subscription"))]
     pub subscription: String,
 
     /// The endpoint from which to pull data.
-    pub endpoint: Option<String>,
+    #[configurable(metadata(docs::examples = "https://us-central1-pubsub.googleapis.com"))]
+    #[serde(default = "default_endpoint")]
+    pub endpoint: String,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
@@ -142,33 +156,59 @@ pub struct PubsubConfig {
     /// The number of messages in a response to mark a stream as
     /// "busy". This is used to determine if more streams should be
     /// started.
+    ///
+    /// The GCP Pub/Sub servers send responses with 100 or more messages when
+    /// the subscription is busy.
     #[serde(default = "default_full_response")]
     pub full_response_size: usize,
 
     /// How often to poll the currently active streams to see if they
     /// are all busy and so open a new stream.
     #[serde(default = "default_poll_time")]
-    pub poll_time_seconds: f64,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    #[configurable(metadata(docs::human_name = "Poll Time"))]
+    pub poll_time_seconds: Duration,
 
     /// The acknowledgement deadline, in seconds, to use for this stream.
     ///
     /// Messages that are not acknowledged when this deadline expires may be retransmitted.
-    pub ack_deadline_secs: Option<i32>,
+    #[serde(default = "default_ack_deadline")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Acknowledgement Deadline"))]
+    pub ack_deadline_secs: Duration,
 
-    /// Deprecated, old name of `ack_deadline_secs`.
-    pub ack_deadline_seconds: Option<i32>,
+    /// The acknowledgement deadline, in seconds, to use for this stream.
+    ///
+    /// Messages that are not acknowledged when this deadline expires may be retransmitted.
+    #[configurable(
+        deprecated = "This option has been deprecated, use `ack_deadline_secs` instead."
+    )]
+    pub ack_deadline_seconds: Option<u16>,
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
-    pub retry_delay_secs: Option<f64>,
+    #[serde(default = "default_retry_delay")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    #[configurable(metadata(docs::human_name = "Retry Delay"))]
+    pub retry_delay_secs: Duration,
 
-    /// Deprecated, old name of `retry_delay_secs`.
+    /// The amount of time, in seconds, to wait between retry attempts after an error.
+    #[configurable(
+        deprecated = "This option has been deprecated, use `retry_delay_secs` instead."
+    )]
     pub retry_delay_seconds: Option<f64>,
 
     /// The amount of time, in seconds, with no received activity
     /// before sending a keepalive request. If this is set larger than
     /// `60`, you may see periodic errors sent from the server.
     #[serde(default = "default_keepalive")]
-    pub keepalive_secs: f64,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    #[configurable(metadata(docs::human_name = "Keepalive"))]
+    pub keepalive_secs: Duration,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
@@ -182,19 +222,23 @@ pub struct PubsubConfig {
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    pub acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
-const fn default_ack_deadline() -> i32 {
-    600
+fn default_endpoint() -> String {
+    PUBSUB_URL.to_string()
 }
 
-const fn default_retry_delay() -> f64 {
-    1.0
+const fn default_ack_deadline() -> Duration {
+    Duration::from_secs(600)
 }
 
-const fn default_keepalive() -> f64 {
-    60.0
+const fn default_retry_delay() -> Duration {
+    Duration::from_secs(1)
+}
+
+const fn default_keepalive() -> Duration {
+    Duration::from_secs(60)
 }
 
 const fn default_max_concurrency() -> usize {
@@ -205,44 +249,37 @@ const fn default_full_response() -> usize {
     100
 }
 
-const fn default_poll_time() -> f64 {
-    2.0
+const fn default_poll_time() -> Duration {
+    Duration::from_secs(2)
 }
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "gcp_pubsub")]
 impl SourceConfig for PubsubConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
-        let ack_deadline_secs = match (self.ack_deadline_secs, self.ack_deadline_seconds) {
-            (Some(ads), None) => ads,
-            (None, Some(ads)) => {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        let ack_deadline_secs = match self.ack_deadline_seconds {
+            None => self.ack_deadline_secs,
+            Some(ads) => {
                 warn!("The `ack_deadline_seconds` setting is deprecated, use `ack_deadline_secs` instead.");
-                ads
+                Duration::from_secs(ads as u64)
             }
-            (Some(_), Some(_)) => return Err(PubsubError::BothAckDeadlineSecsAndSeconds.into()),
-            (None, None) => default_ack_deadline(),
         };
-        if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs) {
+        if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs.as_secs()) {
             return Err(PubsubError::InvalidAckDeadline.into());
         }
 
-        let retry_delay_secs = match (self.retry_delay_secs, self.retry_delay_seconds) {
-            (Some(rds), None) => rds,
-            (None, Some(rds)) => {
+        let retry_delay_secs = match self.retry_delay_seconds {
+            None => self.retry_delay_secs,
+            Some(rds) => {
                 warn!("The `retry_delay_seconds` setting is deprecated, use `retry_delay_secs` instead.");
-                rds
+                Duration::from_secs_f64(rds)
             }
-            (Some(_), Some(_)) => return Err(PubsubError::BothRetryDelaySecsAndSeconds.into()),
-            (None, None) => default_retry_delay(),
         };
 
         let auth = self.auth.build(Scope::PubSub).await?;
 
-        let mut uri: Uri = self
-            .endpoint
-            .as_deref()
-            .unwrap_or(PUBSUB_URL)
-            .parse()
-            .context(UriSnafu)?;
+        let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
         auth.apply_uri(&mut uri);
 
         let tls = TlsSettings::from_options(&self.tls)?;
@@ -262,9 +299,13 @@ impl SourceConfig for PubsubConfig {
 
         let token_generator = auth.spawn_regenerate_token();
 
+        let protocol = uri
+            .scheme()
+            .map(|scheme| Protocol(scheme.to_string().into()))
+            .unwrap_or(Protocol::HTTP);
+
         let source = PubsubSource {
             endpoint,
-            uri,
             auth,
             token_generator,
             subscription: format!(
@@ -274,28 +315,55 @@ impl SourceConfig for PubsubConfig {
             decoder: DecodingConfig::new(
                 self.framing.clone(),
                 self.decoding.clone(),
-                LogNamespace::Legacy,
+                log_namespace,
             )
-            .build(),
-            acknowledgements: cx.do_acknowledgements(&self.acknowledgements),
+            .build()?,
+            acknowledgements: cx.do_acknowledgements(self.acknowledgements),
             shutdown: cx.shutdown,
             out: cx.out,
             ack_deadline_secs,
-            retry_delay: Duration::from_secs_f64(retry_delay_secs),
-            keepalive: Duration::from_secs_f64(self.keepalive_secs),
+            retry_delay: retry_delay_secs,
+            keepalive: self.keepalive_secs,
             concurrency: Default::default(),
             full_response_size: self.full_response_size,
+            log_namespace,
+            bytes_received: register!(BytesReceived::from(protocol)),
+            events_received: register!(EventsReceived),
         }
-        .run_all(
-            self.max_concurrency,
-            Duration::from_secs_f64(self.poll_time_seconds),
-        )
+        .run_all(self.max_concurrency, self.poll_time_seconds)
         .map_err(|error| error!(message = "Source failed.", %error));
         Ok(Box::pin(source))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = self
+            .decoding
+            .schema_definition(log_namespace)
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                PubsubConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("timestamp"))),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp().or_undefined(),
+                Some("timestamp"),
+            )
+            .with_source_metadata(
+                PubsubConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("attributes"))),
+                &owned_value_path!("attributes"),
+                Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                None,
+            )
+            .with_source_metadata(
+                PubsubConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("message_id"))),
+                &owned_value_path!("message_id"),
+                Kind::bytes(),
+                None,
+            );
+
+        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -308,13 +376,12 @@ impl_generate_config_from_default!(PubsubConfig);
 #[derive(Clone)]
 struct PubsubSource {
     endpoint: Endpoint,
-    uri: Uri,
     auth: GcpAuthenticator,
     token_generator: watch::Receiver<()>,
     subscription: String,
     decoder: Decoder,
     acknowledgements: bool,
-    ack_deadline_secs: i32,
+    ack_deadline_secs: Duration,
     shutdown: ShutdownSignal,
     out: SourceSender,
     retry_delay: Duration,
@@ -324,6 +391,9 @@ struct PubsubSource {
     // would result in repeatedly re-opening the stream on idle.
     concurrency: Arc<AtomicUsize>,
     full_response_size: usize,
+    log_namespace: LogNamespace,
+    bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
 }
 
 enum State {
@@ -440,15 +510,8 @@ impl PubsubSource {
         let mut stream = stream.into_inner();
 
         let (finalizer, mut ack_stream) =
-            Finalizer::maybe_new(self.acknowledgements, self.shutdown.clone());
+            Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
         let mut pending_acks = 0;
-
-        let protocol = self
-            .uri
-            .scheme()
-            .map(|scheme| Protocol(scheme.to_string().into()))
-            .unwrap_or(Protocol::HTTP);
-        let bytes_received = register!(BytesReceived::from(protocol));
 
         loop {
             tokio::select! {
@@ -470,7 +533,6 @@ impl PubsubSource {
                             &ack_ids_sender,
                             &mut pending_acks,
                             busy_flag,
-                            &bytes_received,
                         ).await;
                     }
                     Some(Err(error)) => break translate_error(error),
@@ -515,7 +577,7 @@ impl PubsubSource {
     ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
-        let stream_ack_deadline_seconds = self.ack_deadline_secs;
+        let stream_ack_deadline_seconds = self.ack_deadline_secs.as_secs() as i32;
         let ack_ids = ReceiverStream::new(ack_ids).ready_chunks(ACK_QUEUE_SIZE);
 
         stream::once(async move {
@@ -548,19 +610,18 @@ impl PubsubSource {
         ack_ids: &mpsc::Sender<Vec<String>>,
         pending_acks: &mut usize,
         busy_flag: &Arc<AtomicBool>,
-        bytes_received: &Registered<BytesReceived>,
     ) {
         if response.received_messages.len() >= self.full_response_size {
             busy_flag.store(true, Ordering::Relaxed);
         }
-        bytes_received.emit(ByteSize(response.size_of()));
+        self.bytes_received.emit(ByteSize(response.size_of()));
 
         let (batch, notifier) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let (events, ids) = self.parse_messages(response.received_messages, batch).await;
 
         let count = events.len();
         match self.out.send_batch(events).await {
-            Err(error) => emit!(StreamClosedError { error, count }),
+            Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
                 None => ack_ids
                     .send(ids)
@@ -597,7 +658,7 @@ impl PubsubSource {
     }
 
     fn parse_message<'a>(
-        &self,
+        &'a self,
         message: proto::PubsubMessage,
         batch: &'a Option<BatchNotifier>,
     ) -> impl Iterator<Item = Event> + 'a {
@@ -605,25 +666,39 @@ impl PubsubSource {
             message
                 .attributes
                 .into_iter()
-                .map(|(key, value)| (key, Value::Bytes(value.into())))
+                .map(|(key, value)| (key.into(), Value::Bytes(value.into())))
                 .collect(),
         );
+        let log_namespace = self.log_namespace;
         util::decode_message(
             self.decoder.clone(),
             "gcp_pubsub",
             &message.data,
             message.publish_time.map(|dt| {
-                DateTime::from_utc(
-                    NaiveDateTime::from_timestamp(dt.seconds, dt.nanos as u32),
-                    Utc,
-                )
+                NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
+                    .expect("invalid timestamp")
+                    .and_utc()
             }),
             batch,
+            log_namespace,
+            &self.events_received,
         )
         .map(move |mut event| {
             if let Some(log) = event.maybe_as_log_mut() {
-                log.insert("message_id", message.message_id.clone());
-                log.insert("attributes", attributes.clone());
+                log_namespace.insert_source_metadata(
+                    PubsubConfig::NAME,
+                    log,
+                    Some(LegacyKey::Overwrite(path!("message_id"))),
+                    path!("message_id"),
+                    message.message_id.clone(),
+                );
+                log_namespace.insert_source_metadata(
+                    PubsubConfig::NAME,
+                    log,
+                    Some(LegacyKey::Overwrite(path!("attributes"))),
+                    path!("attributes"),
+                    attributes.clone(),
+                )
             }
             event
         })
@@ -671,11 +746,92 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
+    use vector_lib::lookup::OwnedTargetPath;
+    use vector_lib::schema::Definition;
+
     use super::*;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PubsubConfig>();
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = PubsubConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definitions = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("gcp_pubsub", "timestamp"),
+                    Kind::timestamp().or_undefined(),
+                    Some("timestamp"),
+                )
+                .with_metadata_field(
+                    &owned_value_path!("gcp_pubsub", "attributes"),
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("gcp_pubsub", "message_id"),
+                    Kind::bytes(),
+                    None,
+                );
+
+        assert_eq!(definitions, Some(expected_definition));
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = PubsubConfig::default();
+
+        let definitions = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
+
+        let expected_definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(
+            &owned_value_path!("timestamp"),
+            Kind::timestamp().or_undefined(),
+            Some("timestamp"),
+        )
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("attributes"),
+            Kind::object(Collection::empty().with_unknown(Kind::bytes())),
+            None,
+        )
+        .with_event_field(&owned_value_path!("message_id"), Kind::bytes(), None);
+
+        assert_eq!(definitions, Some(expected_definition));
     }
 }
 
@@ -683,13 +839,15 @@ mod tests {
 mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
 
+    use base64::prelude::{Engine as _, BASE64_STANDARD};
+    use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
     use http::method::Method;
     use hyper::{Request, StatusCode};
     use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
-    use vector_common::btreemap;
+    use vrl::btreemap;
 
     use super::*;
     use crate::config::{ComponentKey, ProxyConfig};
@@ -700,7 +858,7 @@ mod integration_tests {
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: Lazy<String> =
         Lazy::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
-    const ACK_DEADLINE: u64 = 10; // Minimum custom deadline allowed by Pub/Sub
+    static ACK_DEADLINE: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
     #[tokio::test]
     async fn oneshot() {
@@ -791,7 +949,7 @@ mod integration_tests {
             assert_eq!(tester.pull_count(10).await, 0);
 
             // Wait for the acknowledgement deadline to expire
-            tokio::time::sleep(Duration::from_secs(ACK_DEADLINE + 1)).await;
+            tokio::time::sleep(*ACK_DEADLINE + Duration::from_secs(1)).await;
 
             // All messages are still acknowledged
             assert_eq!(tester.pull_count(10).await, 0);
@@ -817,7 +975,7 @@ mod integration_tests {
             assert_eq!(tester.pull_count(10).await, 0);
 
             // Wait for the acknowledgement deadline to expire
-            tokio::time::sleep(std::time::Duration::from_secs(ACK_DEADLINE + 1)).await;
+            tokio::time::sleep(*ACK_DEADLINE + Duration::from_secs(1)).await;
 
             // All messages are still in the queue
             assert_eq!(tester.pull_count(10).await, 1);
@@ -846,7 +1004,9 @@ mod integration_tests {
     fn now_trunc() -> DateTime<Utc> {
         let start = Utc::now().timestamp();
         // Truncate the milliseconds portion, the hard way.
-        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(start, 0), Utc)
+        NaiveDateTime::from_timestamp_opt(start, 0)
+            .expect("invalid timestamp")
+            .and_utc()
     }
 
     struct Tester {
@@ -875,7 +1035,7 @@ mod integration_tests {
 
             let body = json!({
                 "topic": format!("projects/{}/topics/{}", PROJECT, this.topic),
-                "ackDeadlineSeconds": ACK_DEADLINE,
+                "ackDeadlineSeconds": *ACK_DEADLINE,
             });
             this.request(Method::PUT, "subscriptions/{sub}", body).await;
 
@@ -893,12 +1053,12 @@ mod integration_tests {
             let config = PubsubConfig {
                 project: PROJECT.into(),
                 subscription: self.subscription.clone(),
-                endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
+                endpoint: gcp::PUBSUB_ADDRESS.clone(),
                 auth: GcpAuthConfig {
                     skip_authentication: true,
                     ..Default::default()
                 },
-                ack_deadline_secs: Some(ACK_DEADLINE as i32),
+                ack_deadline_secs: *ACK_DEADLINE,
                 ..Default::default()
             };
             let (mut ctx, shutdown) = SourceContext::new_shutdown(&self.component, tx);
@@ -918,7 +1078,7 @@ mod integration_tests {
             let lines: Vec<_> = test_util::random_lines(44).take(count).collect();
             let messages: Vec<_> = lines
                 .iter()
-                .map(|message| base64::encode(&message))
+                .map(|input| BASE64_STANDARD.encode(input))
                 .map(|data| json!({ "data": data, "attributes": attributes.clone() }))
                 .collect();
             let body = json!({ "messages": messages });
@@ -1011,7 +1171,7 @@ mod integration_tests {
                 .clone();
             assert_eq!(logattr.len(), attributes.len());
             for (a, b) in logattr.into_iter().zip(&attributes) {
-                assert_eq!(&a.0, b.0);
+                assert_eq!(&a.0, b.0.as_str());
                 assert_eq!(a.1, b.1.clone().into());
             }
         }

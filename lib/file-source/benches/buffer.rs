@@ -57,7 +57,7 @@ fn read_until_bench(c: &mut Criterion) {
         let delimiter: [u8; 1] = [param.delim];
         group.bench_with_input(BenchmarkId::new("read_until", param), &param, |b, _| {
             b.iter(|| {
-                let _ = read_until_with_max_size(
+                _ = read_until_with_max_size(
                     &mut reader,
                     &mut position,
                     &delimiter,

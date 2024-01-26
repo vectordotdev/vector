@@ -17,7 +17,7 @@ such as the `timestamp`, `message`, and `host`. Until recently, the
 default names of these fields were not easily customizable. You either had to
 set these names within the [source][docs.sources] itself, or rename these fields
 using the [`rename_fields` transform][docs.transforms.remap]. While this
-works, it's combersome and is not obvious to anyone reading your Vector
+works, it's cumbersome and is not obvious to anyone reading your Vector
 configuration file. Enter Vector's new [global log
 schema][docs.global-options#log_schema]. These new options allow you to change
 the default names for the [`message_key`][docs.global-options#message_key],

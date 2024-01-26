@@ -27,8 +27,8 @@ remap: functions: parse_csv: {
 		},
 	]
 	internal_failure_reasons: [
-		"delimiter must be a single-byte utf8 character",
-		"`value` isn't a valid CSV string",
+		"The delimiter must be a single-byte UTF-8 character.",
+		"`value` is not a valid CSV string.",
 	]
 	return: types: ["array"]
 

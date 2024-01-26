@@ -1,20 +1,21 @@
 [package]
 name = "opentelemetry-proto"
-version = "0.0.0"
+version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
 [build-dependencies]
-prost-build = { version = "0.11.1", default-features = false}
-tonic-build = { version = "0.8", default-features = false, features = ["prost", "transport"] }
+prost-build = { version = "0.12", default-features = false}
+tonic-build = { version = "0.10", default-features = false, features = ["prost", "transport"] }
 
 [dependencies]
-tonic = { version = "0.8", default-features = false, features = ["codegen", "gzip", "prost", "tls", "tls-roots", "transport"] }
-chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-prost = { version = "0.11.0", default-features = false, features = ["std"] }
-bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
-vector-core = { path = "../vector-core", default-features = false }
-value = {path = "../value"}
+bytes = { version = "1.5.0", default-features = false, features = ["serde"] }
+chrono = { version = "0.4.31", default-features = false, features = ["serde"] }
 hex = { version = "0.4.3", default-features = false, features = ["std"] }
-ordered-float = { version = "3.1.0", default-features = false }
+lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false }
+ordered-float = { version = "4.2.0", default-features = false }
+prost = { version = "0.12", default-features = false, features = ["std"] }
+tonic = { version = "0.10", default-features = false, features = ["codegen", "gzip", "prost", "tls", "tls-roots", "transport"] }
+vrl.workspace = true
+vector-core = { path = "../vector-core", default-features = false }

@@ -1,5 +1,4 @@
 use std::{
-    collections::BTreeMap,
     error, fmt,
     num::{ParseFloatError, ParseIntError},
     str::Utf8Error,
@@ -8,7 +7,10 @@ use std::{
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+use crate::{
+    event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+    sources::util::extract_tag_key_and_value,
+};
 
 static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
 static NONALPHANUM: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z_\-0-9\.]").unwrap());
@@ -48,11 +50,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
         parts.get(3)
     };
     let tags = tags.filter(|s| s.starts_with('#'));
-    let tags = if let Some(t) = tags {
-        Some(parse_tags(t)?)
-    } else {
-        None
-    };
+    let tags = tags.map(parse_tags).transpose()?;
 
     let metric = match metric_type {
         "c" => {
@@ -70,7 +68,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             let val: f64 = parts[0].parse()?;
             Metric::new(
                 name, MetricKind::Incremental, MetricValue::Distribution {
-                    samples: vector_core::samples![convert_to_base_units(unit, val) => sample_rate as u32],
+                    samples: vector_lib::samples![convert_to_base_units(unit, val) => sample_rate as u32],
                     statistic: convert_to_statistic(unit),
                 },
             ).with_tags(tags)
@@ -128,27 +126,18 @@ fn parse_sampling(input: &str) -> Result<f64, ParseError> {
     }
 }
 
-fn parse_tags(input: &str) -> Result<BTreeMap<String, String>, ParseError> {
+/// Statsd (and dogstatsd) support bare, single and multi-value tags.
+fn parse_tags(input: &&str) -> Result<MetricTags, ParseError> {
     if !input.starts_with('#') || input.len() < 2 {
         return Err(ParseError::Malformed(
             "expected non empty '#'-prefixed tags component",
         ));
     }
 
-    let mut result = BTreeMap::new();
-
-    let chunks = input[1..].split(',').collect::<Vec<_>>();
-    for chunk in chunks {
-        let pair: Vec<_> = chunk.split(':').collect();
-        let key = &pair[0];
-        // same as in telegraf plugin:
-        // if tag value is not provided, use "true"
-        // https://github.com/influxdata/telegraf/blob/master/plugins/inputs/statsd/datadog.go#L152
-        let value = pair.get(1).unwrap_or(&"true");
-        result.insert((*key).to_owned(), (*value).to_owned());
-    }
-
-    Ok(result)
+    Ok(input[1..]
+        .split(',')
+        .map(extract_tag_key_and_value)
+        .collect())
 }
 
 fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {
@@ -208,7 +197,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-vector_common::impl_event_data_eq!(ParseError);
+vector_lib::impl_event_data_eq!(ParseError);
 
 impl error::Error for ParseError {}
 
@@ -226,7 +215,8 @@ impl From<ParseFloatError> for ParseError {
 
 #[cfg(test)]
 mod test {
-    use vector_common::assert_event_data_eq;
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::{event::metric::TagValue, metric_tags};
 
     use super::{parse, sanitize_key, sanitize_sampling};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
@@ -252,14 +242,30 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_tags(Some(
-                vec![
-                    ("tag1".to_owned(), "true".to_owned()),
-                    ("tag2".to_owned(), "value".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))),
+            .with_tags(Some(metric_tags!(
+                "tag1" => TagValue::Bare,
+                "tag2" => "value",
+            )))),
+        );
+    }
+
+    #[test]
+    fn enhanced_tags() {
+        assert_event_data_eq!(
+            parse("foo:1|c|#tag1,tag2:valueA,tag2:valueB,tag3:value,tag3,tag4:"),
+            Ok(Metric::new(
+                "foo",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(metric_tags!(
+                "tag1" => TagValue::Bare,
+                "tag2" => "valueA",
+                "tag2" => "valueB",
+                "tag3" => "value",
+                "tag3" => TagValue::Bare,
+                "tag4" => "",
+            )))),
         );
     }
 
@@ -295,7 +301,7 @@ mod test {
                 "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![0.320 => 10],
+                    samples: vector_lib::samples![0.320 => 10],
                     statistic: StatisticKind::Histogram
                 },
             )),
@@ -310,19 +316,15 @@ mod test {
                 "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![320.0 => 10],
+                    samples: vector_lib::samples![320.0 => 10],
                     statistic: StatisticKind::Histogram
                 },
             )
-            .with_tags(Some(
-                vec![
-                    ("region".to_owned(), "us-west1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                    ("e".to_owned(), "".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))),
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west1",
+                "production" => TagValue::Bare,
+                "e" => "",
+            )))),
         );
     }
 
@@ -334,19 +336,15 @@ mod test {
                 "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![320.0 => 10],
+                    samples: vector_lib::samples![320.0 => 10],
                     statistic: StatisticKind::Summary
                 },
             )
-            .with_tags(Some(
-                vec![
-                    ("region".to_owned(), "us-west1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                    ("e".to_owned(), "".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ))),
+            .with_tags(Some(metric_tags!(
+                "region" => "us-west1",
+                "production" => TagValue::Bare,
+                "e" => "",
+            )))),
         );
     }
 

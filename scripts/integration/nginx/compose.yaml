@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  squid:
+    image: docker.io/babim/squid
+    depends_on:
+    - nginx-proxy
+    networks:
+    - default
+    - proxy
+  nginx:
+    image: docker.io/nginx:${CONFIG_VERSION}
+    volumes:
+    - ../../../tests/data/nginx/:/etc/nginx:ro
+    networks:
+    - default
+  nginx-proxy:
+    image: docker.io/nginx:${CONFIG_VERSION}
+    volumes:
+    - ../../../tests/data/nginx/:/etc/nginx:ro
+    networks:
+    - proxy
+
+networks:
+  proxy: {}

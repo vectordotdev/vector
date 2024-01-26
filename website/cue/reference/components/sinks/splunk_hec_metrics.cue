@@ -6,13 +6,14 @@ components: sinks: splunk_hec_metrics: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Splunk"]
 		stateful: false
 	}
 
 	features: {
+		auto_generated:   true
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
@@ -65,69 +66,7 @@ components: sinks: splunk_hec_metrics: {
 		notices: []
 	}
 
-	configuration: sinks._splunk_hec.configuration & {
-		default_namespace: {
-			common: false
-			description: """
-				Used as a namespace for metrics that don't have it.
-				A namespace will be prefixed to a metric's name.
-				"""
-			required: false
-			type: string: {
-				default: null
-				examples: ["service"]
-			}
-		}
-		endpoint: {
-			description: "The base URL of the Splunk instance."
-			required:    true
-			type: string: {
-				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
-			}
-		}
-		host_key: {
-			common:      true
-			description: """
-        				The name of the field to be used as the hostname sent to Splunk HEC. This overrides the
-        				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-        				"""
-			required:    false
-			type: string: {
-				default: null
-				examples: ["hostname"]
-			}
-		}
-		index: {
-			common:      true
-			description: "The name of the index where send the events to. If not specified, the default index is used."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["{{ host }}", "custom_index"]
-				syntax: "template"
-			}
-		}
-		source: {
-			common:      true
-			description: "The source of events sent to this sink. If unset, the Splunk collector will set it."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
-				syntax: "template"
-			}
-		}
-		sourcetype: {
-			common:      true
-			description: "The sourcetype of events sent to this sink. If unset, Splunk will default to httpevent."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["{{ sourcetype }}", "_json", "httpevent"]
-				syntax: "template"
-			}
-		}
-	}
+	configuration: base.components.sinks.splunk_hec_metrics.configuration
 
 	input: {
 		logs: false
@@ -144,5 +83,12 @@ components: sinks: splunk_hec_metrics: {
 
 	telemetry: components.sinks.splunk_hec_logs.telemetry
 
-	how_it_works: sinks._splunk_hec.how_it_works
+	how_it_works: sinks._splunk_hec.how_it_works & {
+		multi_value_tags: {
+			title: "Multivalue Tags"
+			body: """
+				If Splunk receives a tag with multiple values it will only take the last value specified,
+				so Vector only sends this last value.
+				"""
+		}}
 }

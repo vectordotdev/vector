@@ -1,23 +1,30 @@
 use chrono::Utc;
-use codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use fakedata::logs::*;
 use futures::StreamExt;
 use rand::seq::SliceRandom;
+use serde_with::serde_as;
 use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_lib::codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
+use vector_lib::lookup::{owned_value_path, path};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    EstimatedJsonEncodedSizeOf,
+};
+use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, Output, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, SourceOutput},
     internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -25,43 +32,56 @@ use crate::{
 };
 
 /// Configuration for the `demo_logs` source.
-#[configurable_component(source("demo_logs"))]
+#[serde_as]
+#[configurable_component(source(
+    "demo_logs",
+    "Generate fake log events, which can be useful for testing and demos."
+))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-#[serde(default)]
 pub struct DemoLogsConfig {
     /// The amount of time, in seconds, to pause between each batch of output lines.
     ///
-    /// The default is one batch per second. In order to remove the delay and output batches as quickly as possible, set
+    /// The default is one batch per second. To remove the delay and output batches as quickly as possible, set
     /// `interval` to `0.0`.
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
-    pub interval: f64,
+    #[serde(default = "default_interval")]
+    #[configurable(metadata(docs::examples = 1.0, docs::examples = 0.1, docs::examples = 0.01,))]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    pub interval: Duration,
 
     /// The total number of lines to output.
     ///
     /// By default, the source continuously prints logs (infinitely).
     #[derivative(Default(value = "default_count()"))]
+    #[serde(default = "default_count")]
     pub count: usize,
 
     #[serde(flatten)]
+    #[configurable(metadata(
+        docs::enum_tag_description = "The format of the randomly generated output."
+    ))]
     pub format: OutputFormat,
 
     #[configurable(derived)]
     #[derivative(Default(value = "default_framing_message_based()"))]
+    #[serde(default = "default_framing_message_based")]
     pub framing: FramingConfig,
 
     #[configurable(derived)]
     #[derivative(Default(value = "default_decoding()"))]
+    #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 
-    /// The namespace to use for logs. This overrides the global setting
+    /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
+    #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
 }
 
-const fn default_interval() -> f64 {
-    1.0
+const fn default_interval() -> Duration {
+    Duration::from_secs(1)
 }
 
 const fn default_count() -> usize {
@@ -79,6 +99,9 @@ pub enum DemoLogsConfigError {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(tag = "format", rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The format of the randomly generated output."
+))]
 pub enum OutputFormat {
     /// Lines are chosen at random from the list specified using `lines`.
     Shuffle {
@@ -86,26 +109,41 @@ pub enum OutputFormat {
         #[serde(default)]
         sequence: bool,
         /// The list of lines to output.
+        #[configurable(metadata(docs::examples = "lines_example()"))]
         lines: Vec<String>,
     },
 
-    /// Randomly generated logs in [Apache common](\(urls.apache_common)) format.
+    /// Randomly generated logs in [Apache common][apache_common] format.
+    ///
+    /// [apache_common]: https://httpd.apache.org/docs/current/logs.html#common
     ApacheCommon,
 
-    /// Randomly generated logs in [Apache error](\(urls.apache_error)) format.
+    /// Randomly generated logs in [Apache error][apache_error] format.
+    ///
+    /// [apache_error]: https://httpd.apache.org/docs/current/logs.html#errorlog
     ApacheError,
 
-    /// Randomly generated logs in Syslog format ([RFC 5424](\(urls.syslog_5424))).
+    /// Randomly generated logs in Syslog format ([RFC 5424][syslog_5424]).
+    ///
+    /// [syslog_5424]: https://tools.ietf.org/html/rfc5424
     #[serde(alias = "rfc5424")]
     Syslog,
 
-    /// Randomly generated logs in Syslog format ([RFC 3164](\(urls.syslog_3164))).
+    /// Randomly generated logs in Syslog format ([RFC 3164][syslog_3164]).
+    ///
+    /// [syslog_3164]: https://tools.ietf.org/html/rfc3164
     #[serde(alias = "rfc3164")]
     BsdSyslog,
 
-    /// Randomly generated HTTP server logs in [JSON](\(urls.json)) format.
+    /// Randomly generated HTTP server logs in [JSON][json] format.
+    ///
+    /// [json]: https://en.wikipedia.org/wiki/JSON
     #[derivative(Default)]
     Json,
+}
+
+const fn lines_example() -> [&'static str; 2] {
+    ["line1", "line2"]
 }
 
 impl OutputFormat {
@@ -156,7 +194,7 @@ impl DemoLogsConfig {
     pub fn repeat(
         lines: Vec<String>,
         count: usize,
-        interval: f64,
+        interval: Duration,
         log_namespace: Option<bool>,
     ) -> Self {
         Self {
@@ -174,7 +212,7 @@ impl DemoLogsConfig {
 }
 
 async fn demo_logs_source(
-    interval: f64,
+    interval: Duration,
     count: usize,
     format: OutputFormat,
     decoder: Decoder,
@@ -182,11 +220,11 @@ async fn demo_logs_source(
     mut out: SourceSender,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    let maybe_interval: Option<f64> = (interval != 0.0).then_some(interval);
-
-    let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
+    let interval: Option<Duration> = (interval != Duration::ZERO).then_some(interval);
+    let mut interval = interval.map(time::interval);
 
     let bytes_received = register!(BytesReceived::from(Protocol::NONE));
+    let events_received = register!(EventsReceived);
 
     for n in 0..count {
         if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
@@ -205,31 +243,29 @@ async fn demo_logs_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(EventsReceived {
-                        count,
-                        byte_size: events.size_of()
-                    });
+                    let byte_size = events.estimated_json_encoded_size_of();
+                    events_received.emit(CountByteSize(count, byte_size));
                     let now = Utc::now();
 
                     let events = events.into_iter().map(|mut event| {
                         let log = event.as_mut_log();
-                        log_namespace.insert_vector_metadata(
+                        log_namespace.insert_standard_vector_source_metadata(
                             log,
-                            log_schema().source_type_key(),
-                            "source_type",
-                            "demo_logs",
-                        );
-                        log_namespace.insert_vector_metadata(
-                            log,
-                            log_schema().timestamp_key(),
-                            "ingest_timestamp",
+                            DemoLogsConfig::NAME,
                             now,
+                        );
+                        log_namespace.insert_source_metadata(
+                            DemoLogsConfig::NAME,
+                            log,
+                            Some(LegacyKey::InsertIfEmpty(path!("service"))),
+                            path!("service"),
+                            "vector",
                         );
 
                         event
                     });
-                    out.send_batch(events).await.map_err(|error| {
-                        emit!(StreamClosedError { error, count });
+                    out.send_batch(events).await.map_err(|_| {
+                        emit!(StreamClosedError { count });
                     })?;
                 }
                 Err(error) => {
@@ -249,13 +285,15 @@ async fn demo_logs_source(
 impl_generate_config_from_default!(DemoLogsConfig);
 
 #[async_trait::async_trait]
+#[typetag::serde(name = "demo_logs")]
 impl SourceConfig for DemoLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         self.format.validate()?;
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
         Ok(Box::pin(demo_logs_source(
             self.interval,
             self.count,
@@ -267,7 +305,7 @@ impl SourceConfig for DemoLogsConfig {
         )))
     }
 
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config. The source config overrides the global setting,
         // and is merged here.
         let log_namespace = global_log_namespace.merge(self.log_namespace);
@@ -275,9 +313,19 @@ impl SourceConfig for DemoLogsConfig {
         let schema_definition = self
             .decoding
             .schema_definition(log_namespace)
-            .with_standard_vector_source_metadata();
+            .with_standard_vector_source_metadata()
+            .with_source_metadata(
+                DemoLogsConfig::NAME,
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
+                &owned_value_path!("service"),
+                Kind::bytes(),
+                Some("service"),
+            );
 
-        vec![Output::default(self.decoding.output_type()).with_schema_definition(schema_definition)]
+        vec![SourceOutput::new_logs(
+            self.decoding.output_type(),
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -306,16 +354,16 @@ mod tests {
     }
 
     async fn runit(config: &str) -> impl Stream<Item = Event> {
-        let (tx, rx) = SourceSender::new_test();
-        let config: DemoLogsConfig = toml::from_str(config).unwrap();
-        let decoder = DecodingConfig::new(
-            default_framing_message_based(),
-            default_decoding(),
-            LogNamespace::Legacy,
-        )
-        .build();
-
         assert_source_compliance(&SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let config: DemoLogsConfig = toml::from_str(config).unwrap();
+            let decoder = DecodingConfig::new(
+                default_framing_message_based(),
+                default_decoding(),
+                LogNamespace::Legacy,
+            )
+            .build()
+            .unwrap();
             demo_logs_source(
                 config.interval,
                 config.count,
@@ -327,9 +375,10 @@ mod tests {
             )
             .await
             .unwrap();
+
+            rx
         })
-        .await;
-        rx
+        .await
     }
 
     #[test]
@@ -352,7 +401,7 @@ mod tests {
 
     #[tokio::test]
     async fn shuffle_demo_logs_copies_lines() {
-        let message_key = log_schema().message_key();
+        let message_key = log_schema().message_key().unwrap().to_string();
         let mut rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two", "three", "four"]
@@ -392,7 +441,7 @@ mod tests {
 
     #[tokio::test]
     async fn shuffle_demo_logs_adds_sequence() {
-        let message_key = log_schema().message_key();
+        let message_key = log_schema().message_key().unwrap().to_string();
         let mut rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two"]
@@ -492,7 +541,7 @@ mod tests {
 
     #[tokio::test]
     async fn json_format_generates_output() {
-        let message_key = log_schema().message_key();
+        let message_key = log_schema().message_key().unwrap().to_string();
         let mut rx = runit(
             r#"format = "json"
             count = 5"#,

@@ -1,8 +1,6 @@
-pub mod sort;
-
 use std::cmp::Ordering;
 
-use vector_core::event::metric::{Metric, MetricValue, Sample};
+use vector_lib::event::metric::{Metric, MetricValue, Sample};
 
 use crate::sinks::util::{
     batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
@@ -20,7 +18,7 @@ pub use self::split::*;
 /// Batching mostly means that we will aggregate away timestamp information, and apply metric-specific compression to
 /// improve the performance of the pipeline. In particular, only the latest in a series of metrics are output, and
 /// incremental metrics are summed into the output buffer. Any conversion of metrics is handled by the normalization
-/// type `N: MetricNormalize`. Further, distribution metrics have their their samples compressed with
+/// type `N: MetricNormalize`. Further, distribution metrics have their samples compressed with
 /// `compress_distribution` below.
 ///
 /// Note: This has been deprecated, please do not use when creating new Sinks.
@@ -125,15 +123,13 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
 }
 
 #[cfg(test)]
-pub(self) mod tests {
-    use std::collections::BTreeMap;
-
-    use pretty_assertions::assert_eq;
-    use vector_core::event::MetricKind;
+mod tests {
+    use similar_asserts::assert_eq;
+    use vector_lib::event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind};
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::{
-        event::metric::{MetricKind::*, MetricValue, StatisticKind},
         sinks::util::BatchSettings,
         test_util::metrics::{AbsoluteMetricNormalizer, IncrementalMetricNormalizer},
     };
@@ -146,7 +142,7 @@ pub(self) mod tests {
             kind,
             MetricValue::Counter { value },
         )
-        .with_tags(Some(tag(tagstr)))
+        .with_tags(Some(metric_tags!(tagstr => "true")))
     }
 
     pub fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
@@ -168,7 +164,7 @@ pub(self) mod tests {
             format!("dist-{}", num),
             kind,
             MetricValue::Distribution {
-                samples: vector_core::samples![num as f64 => rate],
+                samples: vector_lib::samples![num as f64 => rate],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -185,7 +181,7 @@ pub(self) mod tests {
             format!("buckets-{}", num),
             kind,
             MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![
+                buckets: vector_lib::buckets![
                     1.0 => cfactor,
                     bpower.exp2() => cfactor * 2,
                     4.0f64.powf(bpower) => cfactor * 4
@@ -201,7 +197,7 @@ pub(self) mod tests {
             format!("quantiles-{}", num),
             kind,
             MetricValue::AggregatedSummary {
-                quantiles: vector_core::quantiles![
+                quantiles: vector_lib::quantiles![
                     0.0 => factor,
                     0.5 => factor * 2.0,
                     1.0 => factor * 4.0
@@ -210,12 +206,6 @@ pub(self) mod tests {
                 sum: factor * 7.0,
             },
         )
-    }
-
-    fn tag(name: &str) -> BTreeMap<String, String> {
-        vec![(name.to_owned(), "true".to_owned())]
-            .into_iter()
-            .collect()
     }
 
     fn rebuffer<State: MetricNormalize + Default>(metrics: Vec<Metric>) -> Buffer {
@@ -575,7 +565,7 @@ pub(self) mod tests {
 
     #[test]
     fn compress_distributions() {
-        let mut samples = vector_core::samples![
+        let mut samples = vector_lib::samples![
             2.0 => 12,
             2.0 => 12,
             3.0 => 13,
@@ -587,7 +577,7 @@ pub(self) mod tests {
 
         assert_eq!(
             compress_distribution(&mut samples),
-            vector_core::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
+            vector_lib::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
         );
     }
 

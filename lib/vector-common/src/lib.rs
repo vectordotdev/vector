@@ -12,28 +12,27 @@
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
 
-#[cfg(feature = "aws_cloudwatch_logs_subscription")]
-pub mod aws_cloudwatch_logs_subscription;
-
 #[cfg(feature = "btreemap")]
-pub mod btreemap;
+pub use vrl::btreemap;
 
 #[cfg(feature = "byte_size_of")]
 pub mod byte_size_of;
 
+pub mod json_size;
+
 pub mod config;
 
 #[cfg(feature = "conversion")]
-pub mod conversion;
-#[cfg(feature = "conversion")]
-pub mod datetime;
-#[cfg(feature = "conversion")]
-pub use datetime::TimeZone;
+pub use vrl::compiler::TimeZone;
 
 #[cfg(feature = "encoding")]
-pub mod encode_key_value;
-#[cfg(feature = "encoding")]
-pub mod encode_logfmt;
+pub mod encode_logfmt {
+    pub use vrl::core::encode_logfmt::*;
+}
+
+pub mod conversion {
+    pub use vrl::compiler::conversion::*;
+}
 
 pub mod event_data_eq;
 pub use event_data_eq::EventDataEq;
@@ -47,13 +46,12 @@ pub use finalizer::EmptyStream;
 
 pub mod internal_event;
 
+pub mod request_metadata;
+
 pub mod shutdown;
 
 #[cfg(feature = "sensitive_string")]
 pub mod sensitive_string;
-
-#[cfg(feature = "tokenize")]
-pub mod tokenize;
 
 pub mod trigger;
 

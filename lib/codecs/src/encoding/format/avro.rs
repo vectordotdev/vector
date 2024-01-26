@@ -22,7 +22,7 @@ impl AvroSerializerConfig {
 
     /// Build the `AvroSerializer` from this configuration.
     pub fn build(&self) -> Result<AvroSerializer, BuildError> {
-        let schema = avro_rs::Schema::parse_str(&self.avro.schema)
+        let schema = apache_avro::Schema::parse_str(&self.avro.schema)
             .map_err(|error| format!("Failed building Avro serializer: {}", error))?;
         Ok(AvroSerializer { schema })
     }
@@ -44,18 +44,22 @@ impl AvroSerializerConfig {
 #[derive(Clone, Debug)]
 pub struct AvroSerializerOptions {
     /// The Avro schema.
+    #[configurable(metadata(
+        docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#
+    ))]
+    #[configurable(metadata(docs::human_name = "Schema JSON"))]
     pub schema: String,
 }
 
 /// Serializer that converts an `Event` to bytes using the Apache Avro format.
 #[derive(Debug, Clone)]
 pub struct AvroSerializer {
-    schema: avro_rs::Schema,
+    schema: apache_avro::Schema,
 }
 
 impl AvroSerializer {
     /// Creates a new `AvroSerializer`.
-    pub const fn new(schema: avro_rs::Schema) -> Self {
+    pub const fn new(schema: apache_avro::Schema) -> Self {
         Self { schema }
     }
 }
@@ -65,9 +69,9 @@ impl Encoder<Event> for AvroSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.into_log();
-        let value = avro_rs::to_value(log)?;
+        let value = apache_avro::to_value(log)?;
         let value = value.resolve(&self.schema)?;
-        let bytes = avro_rs::to_avro_datum(&self.schema, value)?;
+        let bytes = apache_avro::to_avro_datum(&self.schema, value)?;
         buffer.put_slice(&bytes);
         Ok(())
     }
@@ -77,8 +81,8 @@ impl Encoder<Event> for AvroSerializer {
 mod tests {
     use bytes::BytesMut;
     use indoc::indoc;
-    use vector_common::btreemap;
     use vector_core::event::{LogEvent, Value};
+    use vrl::btreemap;
 
     use super::*;
 

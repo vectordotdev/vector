@@ -1,0 +1,31 @@
+version: '3'
+
+services:
+  datadog-trace-agent:
+    image: docker.io/datadog/agent:${CONFIG_VERSION}
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_APM_ENABLED=true
+    - DD_APM_DD_URL=http://runner:8082
+    - DD_HEALTH_PORT=8183
+    - DD_CMD_PORT=5002
+    - DD_USE_DOGSTATSD=false
+    - DD_APM_MAX_TPS=999999
+    - DD_APM_ERROR_TPS=999999
+    - DD_APM_MAX_MEMORY=0
+    - DD_APM_MAX_CPU_PERCENT=0
+    - DD_HOSTNAME=datadog-trace-agent
+  datadog-trace-agent-to-vector:
+    image: docker.io/datadog/agent:${CONFIG_VERSION}
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_APM_ENABLED=true
+    - DD_APM_DD_URL=http://runner:8081
+    - DD_HEALTH_PORT=8183
+    - DD_CMD_PORT=5002
+    - DD_USE_DOGSTATSD=false
+    - DD_APM_MAX_TPS=999999
+    - DD_APM_ERROR_TPS=999999
+    - DD_APM_MAX_MEMORY=0
+    - DD_APM_MAX_CPU_PERCENT=0
+    - DD_HOSTNAME=datadog-trace-agent-to-vector

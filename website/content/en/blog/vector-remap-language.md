@@ -110,29 +110,34 @@ Parsing this log, without VRL, looks like this:
 {{< tabs default="Vector" >}}
 {{< tab title="Vector" >}}
 
-```toml title="vector.toml"
+```yaml title="vector.yaml"
 # ... sources ...
 
-# Parse the internal Syslog log
-[transforms.parse_syslog]
-type = "regex_parser"
-inputs = ["parse_docker"]
-patterns = ['^(?P<host>\S+) (?P<client>\S+) (?P<user>\S+) \[(?<timestamp>[\w:/]+\s[+\-]\d{4})\] "(?<method>\S+) (?<resource>.+?) (?<protocol>\S+)" (?<status>\d{3}) (?<bytes_out>\S+)$']
-field = "log"
+transforms:
+  parse_syslog:
+    type: regex_parser
+    inputs:
+      - parse_docker
+    patterns:
+      - '^(?P<host>\S+) (?P<client>\S+) (?P<user>\S+) \[(?<timestamp>[\w:/]+\s[+\-]\d{4})\] "(?<method>\S+) (?<resource>.+?) (?<protocol>\S+)" (?<status>\d{3}) (?<bytes_out>\S+)$'
+    field: log
 
-# Remove Docker time and log fields since they are duplicative
-[transform.remove_log]
-type = "remove_fields"
-inputs = ["parse_syslog"]
-fields = ["time", "log"]
+  remove_log:
+    type: remove_fields
+    inputs:
+      - parse_syslog
+    fields:
+      - time
+      - log
 
-# Coerce parsed fields
-[transforms.coerce_fields]
-type = "coercer"
-inputs = ["remove_log"]
-types.timestamp = "timestamp"
-types.status = "int"
-types.bytes_out = "int"
+  coerce_fields:
+    type: coercer
+    inputs:
+      - remove_log
+    types:
+      timestamp: timestamp
+      status: int
+      bytes_out: int
 
 # ... sinks ...
 ```
@@ -224,20 +229,20 @@ transformation.
 
 Instead of conflating these concerns, like Logstash, Fluentd, and others, Vector
 separates them, allowing you to choose your preferred configuration language
-(TOML, YAML, or JSON) while offering a purpose-built language for data
+(YAML, TOML or JSON) while offering a purpose-built language for data
 transformation (VRL). But is VRL really necessary? Couldn't you leverage Lua,
-Javascript, or any other existing language?
+JavaScript, or any other existing language?
 
 ### Runtime transforms are slow and unsafe {#runtime-problems}
 
 **Runtime** transforms enable you to modify event data using the full power of a
-programming language runtime, such as Lua or Javascript. They're robust enough
+programming language runtime, such as Lua or JavaScript. They're robust enough
 to handle even the thorniest use cases, but they have significant downsides that
 make them high-risk for critical infrastructure like observability pipelines:
 
 1. First, you pay a **significant performance penalty**. For example, on
    average, Lua is about 60% slower than Vector's Rust-based static transforms,
-   and other runtimes like Javascript are even slower.
+   and other runtimes like JavaScript are even slower.
 
 2. Second, there are **severe security and safety risks** that make them show
    stoppers for critical infrastructure like observability pipelines. Things
@@ -308,7 +313,7 @@ Resulting in this output:
 As you can see, the above configuration is *significantly* easier to write,
 read, and manage. Also, it maintains optimal performance and doesn't present the
 [various security and safety](#runtime-problems) problems that come with runtime
-transforms like Lua and Javascript. You'll notice we threw in an extra field,
+transforms like Lua and JavaScript. You'll notice we threw in an extra field,
 `internal_request`, to demonstrate how VRL solves otherwise difficult tasks for
 static transforms.
 

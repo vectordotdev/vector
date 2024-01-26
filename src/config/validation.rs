@@ -1,13 +1,13 @@
 use crate::config::schema;
-use crate::topology::schema::merged_definition;
 use futures_util::{stream, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use heim::{disk::Partition, units::information::byte};
 use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
-use vector_core::internal_event::DEFAULT_OUTPUT;
+use vector_lib::{buffers::config::DiskUsage, internal_event::DEFAULT_OUTPUT};
 
 use super::{
-    builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource, SourceConfig, TransformConfig,
+    builder::ConfigBuilder, transform::get_transform_output_ids, ComponentKey, Config, OutputId,
+    Resource,
 };
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
@@ -44,12 +44,14 @@ pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result
 pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
-    if config.sources.is_empty() {
-        errors.push("No sources defined in the config.".to_owned());
-    }
+    if !config.allow_empty {
+        if config.sources.is_empty() {
+            errors.push("No sources defined in the config.".to_owned());
+        }
 
-    if config.sinks.is_empty() {
-        errors.push("No sinks defined in the config.".to_owned());
+        if config.sinks.is_empty() {
+            errors.push("No sinks defined in the config.".to_owned());
+        }
     }
 
     // Helper for below
@@ -98,7 +100,7 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
         let mut frequencies = HashMap::new();
         for input in inputs {
-            let entry = frequencies.entry(input.clone()).or_insert(0usize);
+            let entry = frequencies.entry(input).or_insert(0usize);
             *entry += 1;
         }
 
@@ -172,12 +174,12 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
 
-        if transform
-            .inner
-            .outputs(&definition)
-            .iter()
-            .map(|output| output.port.as_deref().unwrap_or(""))
-            .any(|name| name == DEFAULT_OUTPUT)
+        if get_transform_output_ids(
+            transform.inner.as_ref(),
+            key.clone(),
+            config.schema.log_namespace(),
+        )
+        .any(|output| matches!(output.port, Some(output) if output == DEFAULT_OUTPUT))
         {
             errors.push(format!(
                 "Transform {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
@@ -246,35 +248,32 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
     };
 
     // Now build a mapping of buffer IDs/usage configuration to the mountpoint they reside on.
-    let mountpoint_buffer_mapping =
-        configured_disk_buffers
-            .into_iter()
-            .fold(HashMap::new(), |mut mappings, usage| {
-                let canonicalized_data_dir = usage
-                    .data_dir()
-                    .canonicalize()
-                    .unwrap_or_else(|_| usage.data_dir().to_path_buf());
-                let mountpoint = mountpoints
-                    .keys()
-                    .find(|mountpoint| canonicalized_data_dir.starts_with(mountpoint));
+    let mountpoint_buffer_mapping = configured_disk_buffers.into_iter().fold(
+        HashMap::new(),
+        |mut mappings: HashMap<PathBuf, Vec<DiskUsage>>, usage| {
+            let canonicalized_data_dir = usage
+                .data_dir()
+                .canonicalize()
+                .unwrap_or_else(|_| usage.data_dir().to_path_buf());
+            let mountpoint = mountpoints
+                .keys()
+                .find(|mountpoint| canonicalized_data_dir.starts_with(mountpoint));
 
-                match mountpoint {
-                    None => warn!(
-                        buffer_id = usage.id().id(),
-                        data_dir = usage.data_dir().to_string_lossy().as_ref(),
-                        canonicalized_data_dir = canonicalized_data_dir.to_string_lossy().as_ref(),
-                        message = "Found no matching mountpoint for buffer data directory.",
-                    ),
-                    Some(mountpoint) => {
-                        mappings
-                            .entry(mountpoint.clone())
-                            .or_insert_with(Vec::new)
-                            .push(usage);
-                    }
+            match mountpoint {
+                None => warn!(
+                    buffer_id = usage.id().id(),
+                    data_dir = usage.data_dir().to_string_lossy().as_ref(),
+                    canonicalized_data_dir = canonicalized_data_dir.to_string_lossy().as_ref(),
+                    message = "Found no matching mountpoint for buffer data directory.",
+                ),
+                Some(mountpoint) => {
+                    mappings.entry(mountpoint.clone()).or_default().push(usage);
                 }
+            }
 
-                mappings
-            });
+            mappings
+        },
+    );
 
     // Finally, we have a mapping of disk buffers, based on their underlying mountpoint. Go through
     // and check to make sure the sum total of `max_size` for all buffers associated with each
@@ -325,7 +324,6 @@ async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap
 
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
-    let mut cache = HashMap::new();
 
     let source_ids = config.sources.iter().flat_map(|(key, source)| {
         source
@@ -342,18 +340,13 @@ pub fn warnings(config: &Config) -> Vec<String> {
             .collect::<Vec<_>>()
     });
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
-        transform
-            .inner
-            .outputs(&merged_definition(&transform.inputs, config, &mut cache))
-            .iter()
-            .map(|output| {
-                if let Some(port) = &output.port {
-                    ("transform", OutputId::from((key, port.clone())))
-                } else {
-                    ("transform", OutputId::from(key))
-                }
-            })
-            .collect::<Vec<_>>()
+        get_transform_output_ids(
+            transform.inner.as_ref(),
+            key.clone(),
+            config.schema.log_namespace(),
+        )
+        .map(|output| ("transform", output))
+        .collect::<Vec<_>>()
     });
 
     for (input_type, id) in transform_ids.chain(source_ids) {

@@ -1,7 +1,10 @@
 use metrics::{counter, gauge};
-use vector_core::{internal_event::InternalEvent, update_counter};
-
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::{internal_event::InternalEvent, update_counter};
+use vector_lib::{
+    internal_event::{error_stage, error_type},
+    json_size::JsonSize,
+};
+use vrl::path::OwnedTargetPath;
 
 #[derive(Debug)]
 pub struct KafkaBytesReceived<'a> {
@@ -32,7 +35,7 @@ impl<'a> InternalEvent for KafkaBytesReceived<'a> {
 
 #[derive(Debug)]
 pub struct KafkaEventsReceived<'a> {
-    pub byte_size: usize,
+    pub byte_size: JsonSize,
     pub count: usize,
     pub topic: &'a str,
     pub partition: i32,
@@ -50,12 +53,10 @@ impl<'a> InternalEvent for KafkaEventsReceived<'a> {
         counter!("component_received_events_total", self.count as u64, "topic" => self.topic.to_string(), "partition" => self.partition.to_string());
         counter!(
             "component_received_event_bytes_total",
-            self.byte_size as u64,
+            self.byte_size.get() as u64,
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
         );
-        // deprecated
-        counter!("events_in_total", self.count as u64);
     }
 }
 
@@ -72,6 +73,7 @@ impl InternalEvent for KafkaOffsetUpdateError {
             error_code = "kafka_offset_update",
             error_type = error_type::READER_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -79,8 +81,6 @@ impl InternalEvent for KafkaOffsetUpdateError {
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::SENDING,
         );
-        // deprecated
-        counter!("consumer_offset_updates_failed_total", 1);
     }
 }
 
@@ -97,6 +97,7 @@ impl InternalEvent for KafkaReadError {
             error_code = "reading_message",
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
@@ -104,14 +105,13 @@ impl InternalEvent for KafkaReadError {
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("events_failed_total", 1);
     }
 }
 
 #[derive(Debug)]
 pub struct KafkaStatisticsReceived<'a> {
     pub statistics: &'a rdkafka::Statistics,
+    pub expose_lag_metrics: bool,
 }
 
 impl InternalEvent for KafkaStatisticsReceived<'_> {
@@ -147,29 +147,36 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
             "kafka_consumed_messages_bytes_total",
             self.statistics.rxmsg_bytes as u64
         );
+
+        if self.expose_lag_metrics {
+            for (topic_id, topic) in &self.statistics.topics {
+                for (partition_id, partition) in &topic.partitions {
+                    gauge!("kafka_consumer_lag", partition.consumer_lag as f64, "topic_id" => topic_id.clone(), "partition_id" => partition_id.to_string());
+                }
+            }
+        }
     }
 }
 
 pub struct KafkaHeaderExtractionError<'a> {
-    pub header_field: &'a str,
+    pub header_field: &'a OwnedTargetPath,
 }
 
 impl InternalEvent for KafkaHeaderExtractionError<'_> {
     fn emit(self) {
         error!(
             message = "Failed to extract header. Value should be a map of String -> Bytes.",
-            error_code = "extracing_header",
+            error_code = "extracting_header",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
-            header_field = self.header_field,
+            header_field = self.header_field.to_string(),
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total", 1,
-            "error_code" => "extracing_header",
+            "error_code" => "extracting_header",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
         );
-        // deprecated
-        counter!("kafka_header_extraction_failures_total", 1);
     }
 }

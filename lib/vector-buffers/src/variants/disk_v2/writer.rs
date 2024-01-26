@@ -39,7 +39,7 @@ use crate::{
     Bufferable,
 };
 
-/// Error that occurred during calls to [`Writer`].
+/// Error that occurred during calls to [`BufferWriter`].
 #[derive(Debug, Snafu)]
 pub enum WriterError<T>
 where
@@ -73,7 +73,7 @@ where
 
     /// A record reported that it contained more events than the number of bytes when encoded.
     ///
-    /// This is nonsensicial because we don't intend to ever support encoding zero-sized types
+    /// This is nonsensical because we don't intend to ever support encoding zero-sized types
     /// through the buffer, and the logic we use to count the number of actual events in the buffer
     /// transitively depends on not being able to represent more than one event per encoded byte.
     #[snafu(display(
@@ -89,7 +89,7 @@ where
     /// The encoder encountered an issue during encoding.
     ///
     /// For common encoders, failure to write all of the bytes of the input will be the most common
-    /// error, and in fact, some some encoders, it's the only possible error that can occur.
+    /// error, and in fact, some encoders, it's the only possible error that can occur.
     #[snafu(display("failed to encode record: {:?}", source))]
     FailedToEncode {
         source: <T as Encodable>::EncodeError,
@@ -109,7 +109,7 @@ where
 
     /// The writer failed to validate the last written record.
     ///
-    /// Specifically, for `Writer`, this can only ever be returned when creating the buffer, during
+    /// Specifically, for `BufferWriter`, this can only ever be returned when creating the buffer, during
     /// validation of the last written record.  While it's technically possible that it may be
     /// something else, this error is most likely to occur when the records in a buffer were written
     /// in a different version of Vector that cannot be decoded in this version of Vector.
@@ -187,7 +187,7 @@ where
     fn from(e: CompositeSerializerError<StdInfallible, AllocScratchError, StdInfallible>) -> Self {
         match e {
             CompositeSerializerError::ScratchSpaceError(sse) => WriterError::FailedToSerialize {
-                reason: format!("insufficient space to serialize encoded record: {}", sse),
+                reason: format!("insufficient space to serialize encoded record: {sse}"),
             },
             // Only our scratch space strategy is fallible, so we should never get here.
             _ => unreachable!(),
@@ -228,7 +228,7 @@ pub(super) struct FlushResult {
 
 /// Wraps an [`AsyncWrite`] value and buffers individual writes, while signalling implicit flushes.
 ///
-/// As the [`Writer`] must track when writes have theoretically made it to disk, we care about
+/// As the [`BufferWriter`] must track when writes have theoretically made it to disk, we care about
 /// situations where the internal write buffer for a data file has been flushed to make room.  In
 /// order to provide this information, we track the number of events represented by a record when
 /// writing its serialized form.
@@ -322,7 +322,7 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         self.unflushed_events = 0;
         self.buf.clear();
 
-        result.map(|_| {
+        result.map(|()| {
             Some(FlushResult {
                 events_flushed,
                 bytes_flushed,
@@ -398,7 +398,7 @@ where
             "must always be able to fit at least one record into a data file"
         );
 
-        // We subtract the length of the record header from our allowe maximum record size, because we have to make sure
+        // We subtract the length of the record header from our allowed maximum record size, because we have to make sure
         // that when we go to actually wrap and serialize the encoded record, we're limiting the actual bytes we write
         // to disk to within `max_record_size`.
         //
@@ -472,7 +472,7 @@ where
             record.encode(&mut encode_buf)
         };
         let encoded_len = encode_result
-            .map(|_| self.encode_buf.len())
+            .map(|()| self.encode_buf.len())
             .context(FailedToEncodeSnafu)?;
         if encoded_len > self.max_record_size {
             return Err(WriterError::RecordTooLarge {
@@ -709,7 +709,7 @@ where
 
 /// Writes records to the buffer.
 #[derive(Debug)]
-pub struct Writer<T, FS>
+pub struct BufferWriter<T, FS>
 where
     FS: Filesystem,
     FS::File: Unpin,
@@ -727,17 +727,17 @@ where
     _t: PhantomData<T>,
 }
 
-impl<T, FS> Writer<T, FS>
+impl<T, FS> BufferWriter<T, FS>
 where
     T: Bufferable,
     FS: Filesystem + fmt::Debug + Clone,
     FS::File: Unpin,
 {
-    /// Creates a new [`Writer`] attached to the given [`Ledger`].
+    /// Creates a new [`BufferWriter`] attached to the given [`Ledger`].
     pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
         let config = ledger.config().clone();
         let next_record_id = ledger.state().get_next_writer_record_id();
-        Writer {
+        BufferWriter {
             ledger,
             config,
             writer: None,
@@ -975,7 +975,7 @@ where
         // waiting for the reader to delete it if it already exists and hasn't been fully read yet,
         // etc.
         //
-        // Essentially, we defer tthe actual skipping to avoid deadlocking here trying to open a
+        // Essentially, we defer the actual skipping to avoid deadlocking here trying to open a
         // data file we might not be able to open yet.
         if should_skip_to_next_file {
             self.reset();
@@ -1345,14 +1345,14 @@ where
     }
 }
 
-impl<T, FS> Writer<T, FS>
+impl<T, FS> BufferWriter<T, FS>
 where
     FS: Filesystem,
     FS::File: Unpin,
 {
     /// Closes this [`Writer`], marking it as done.
     ///
-    /// Closing the writer signals to the reader that that no more records will be written until the
+    /// Closing the writer signals to the reader that no more records will be written until the
     /// buffer is reopened.  Writers and readers effectively share a "session", so until the writer
     /// and reader both close, the buffer cannot be reopened by another Vector instance.
     ///
@@ -1368,7 +1368,7 @@ where
     }
 }
 
-impl<T, FS> Drop for Writer<T, FS>
+impl<T, FS> Drop for BufferWriter<T, FS>
 where
     FS: Filesystem,
     FS::File: Unpin,

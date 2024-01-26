@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use vector_core::event::{metric::MetricData, Metric, MetricValue};
+use vector_lib::event::{metric::MetricData, Metric, MetricValue};
 
 #[allow(clippy::large_enum_variant)]
 enum SplitState {
@@ -76,8 +76,8 @@ impl<S: MetricSplit> MetricSplitter<S> {
     }
 }
 
-impl<S: Default> MetricSplitter<S> {
-    pub fn default() -> Self {
+impl<S: Default> Default for MetricSplitter<S> {
+    fn default() -> Self {
         Self {
             splitter: S::default(),
         }
@@ -93,7 +93,7 @@ impl<S> From<S> for MetricSplitter<S> {
 /// A splitter that separates an aggregated summary into its various parts.
 ///
 /// Generally speaking, all metric types supported by Vector have way to be added to and removed from other instances of
-/// themselves, such as merging two counters by adding together their values, or merging two distributions simpky be
+/// themselves, such as merging two counters by adding together their values, or merging two distributions simply be
 /// adding all of their samples together.
 ///
 /// However, one particular metric type is not amenable to these operations: aggregated summaries. Hailing from
@@ -154,7 +154,7 @@ impl MetricSplit for AggregatedSummarySplitter {
                 for quantile in quantiles {
                     let mut quantile_series = series.clone();
                     quantile_series
-                        .insert_tag(String::from("quantile"), quantile.to_quantile_string());
+                        .replace_tag(String::from("quantile"), quantile.to_quantile_string());
                     let quantile_data = MetricData::from_parts(
                         time,
                         kind,
@@ -189,7 +189,7 @@ impl MetricSplit for AggregatedSummarySplitter {
 mod tests {
     use std::collections::BTreeSet;
 
-    use vector_core::event::{
+    use vector_lib::event::{
         metric::{Bucket, MetricTags, Quantile, Sample},
         Metric, MetricKind, MetricValue, StatisticKind,
     };

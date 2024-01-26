@@ -1,5 +1,0 @@
-# result: [{ "ok": { "foo": [null, null, 1.0] } }, { "bar": { "baz": null } }]
-
-foo = 1
-.ok.foo[2], err.bar.baz = 1 / foo
-[., err]

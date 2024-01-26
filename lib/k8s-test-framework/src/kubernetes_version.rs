@@ -35,7 +35,7 @@ pub async fn get(kubectl_command: &str) -> Result<K8sVersion> {
 }
 
 /// Maps K8s version metadata to struct to provide accessor
-/// methoads for use in testing framework
+/// methods for use in testing framework
 #[derive(Debug)]
 pub struct K8sVersion {
     /// Server Major Version

@@ -67,7 +67,7 @@ metrics - [RFC][dd-agent-metric-rfc]), unrelated, metric stream coming out of th
 Vector event ingested representing APM stats will have to be routed along with traces, and most often they will follow a
 different path that other plain metrics/logs received from a `core-agent`. Thus it is suggested to re-arrange the
 `datadog_agent` source, many option are available (Additional details on what exactly are "Datadog Agents" can be
-found in the trace support [RFC][trace-support-pr] and may provide relevant context for undermentionned points):
+found in the trace support [RFC][trace-support-pr] and may provide relevant context for undermentioned points):
 
 * Keeping a single `datadog_agent` source:
   * and add a settings to switch between agent kind: `agent: <TYPE>` where `<TYPE>`
@@ -137,9 +137,9 @@ The Vector `datadog_agent` source would accept all supported data type including
 Vector event (logs or metrics depending on the implementation) including all metadata as tags/fields, so filtering could
 be done later in the topology on both APM stats and traces.
 
-In order to avoid complex and unreliable `route` transforms to properly differenciate logs from traces (as the latter
+In order to avoid complex and unreliable `route` transforms to properly differentiate logs from traces (as the latter
 will be represented as logs inside Vector), and plain metrics (received from the core Agent) from APM stats metrics
-(received from the `trace-agent`) we can plan to extand the behaviour that was added to the [remap
+(received from the `trace-agent`) we can plan to extend the behaviour that was added to the [remap
 transform][failed-event-routing]. This would translate to the following kind of config, easy to read, easy to adapt:
 
 ```toml
@@ -178,11 +178,11 @@ And finally API key management will be the same as it is for other Datadog sourc
 
 ### Implementation
 
-Each group is relatively independant:
+Each group is relatively independent:
 
 * Reorganise the `datadog_agent` source:
   * Extend the `named_outputs` feature, that is available four transforms, to sources so they can expose multiple named
-    outputs (`<SRC_ID>.<OUTPUT_NAME>)`). The feature for transform was initialy add in [this PR][named-outputs-pr],
+    outputs (`<SRC_ID>.<OUTPUT_NAME>)`). The feature for transform was initially add in [this PR][named-outputs-pr],
     subsequent work on it is tracked [here][[named-outputs-improvements].
   * Add the following `named_outputs` in the `datadog_agent`: `<SRC_ID>.traces`, `<SRC_ID>.apm_stats`,
     `<SRC_ID>.metrics`, `<SRC_ID>.logs`. Note that the non suffixed output should have a predictable behaviour, so we
@@ -236,7 +236,7 @@ Regarding the fact that we could ignore/drop incoming APM stats:
 
 * Either completely drop APM stats, but this is not really an option as it would lead to user experience degradation
 * Or disable sampling on the `trace-agent` side and compute APM stats in the `datadog-trace` sink, this could work but
-  this is a lot for a initial implementation (it would required plain ddsketch suppor on top of the computation logic)
+  this is a lot for a initial implementation (it would required plain ddsketch support on top of the computation logic)
   and to match the accuracy of current APM stats, Vector would have to receive 100% of traces, which may not always be
   possible. But this would pave the wayfor generic APM stats computation wherever the traces come from.
 
@@ -256,8 +256,8 @@ alternative would be to handle different Datadog Agent in a dedicated source:
 * Or source types are mapped to Datadog types: `datadog_logs`, `datadog_metrics` & `datadog_traces` (`datadog-agent`
   would probably became an alias for `datadog_logs` or `datadog_metrics` before being deprecated),
 
-This would lead to the following config, functionnally identical to the [snippet above](#user-experience), a bit longer
-but still very straighforward and easily readable (note that having multiple binding addresses may translate to more
+This would lead to the following config, functionally identical to the [snippet above](#user-experience), a bit longer
+but still very straightforward and easily readable (note that having multiple binding addresses may translate to more
 parameter in later work around helm charts):
 
 ```toml

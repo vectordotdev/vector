@@ -3,13 +3,14 @@ use std::{collections::BTreeSet, sync::Arc};
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
 use serde_json::{json, Value as JsonValue};
-use vector_common::btreemap;
-use vector_core::{
+use vector_lib::{
     event::{Event, Metric, MetricKind, MetricValue},
-    ByteSizeOf,
+    metric_tags, ByteSizeOf,
 };
+use vrl::owned_value_path;
 
 use super::sink::{process_metric, HecProcessedEvent};
+use crate::sinks::splunk_hec::common::config_host_key;
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
@@ -31,7 +32,7 @@ fn get_counter() -> Metric {
         MetricValue::Counter { value: 26.8 },
     )
     .with_timestamp(Some(timestamp))
-    .with_tags(Some(btreemap! {
+    .with_tags(Some(metric_tags! {
         "template_index".to_string() => "index_value".to_string(),
         "template_source".to_string() => "source_value".to_string(),
         "template_sourcetype".to_string() => "sourcetype_value".to_string(),
@@ -70,7 +71,7 @@ fn get_processed_event(
         sourcetype.as_ref(),
         source.as_ref(),
         index.as_ref(),
-        "host",
+        Some(&owned_value_path!("host")),
         default_namespace,
     )
     .unwrap()
@@ -135,7 +136,7 @@ fn test_process_metric_unsupported_type_returns_none() {
         sourcetype,
         source,
         index,
-        "host_key",
+        Some(&owned_value_path!("host_key")),
         default_namespace
     )
     .is_none());
@@ -320,7 +321,7 @@ async fn splunk_passthrough_token() {
     let config = HecMetricsSinkConfig {
         default_token: "token".to_owned().into(),
         endpoint: format!("http://{}", addr),
-        host_key: "host".into(),
+        host_key: config_host_key(),
         index: None,
         sourcetype: None,
         source: None,
@@ -331,7 +332,7 @@ async fn splunk_passthrough_token() {
         acknowledgements: Default::default(),
         default_namespace: None,
     };
-    let cx = SinkContext::new_test();
+    let cx = SinkContext::default();
 
     let (sink, _) = config.build(cx).await.unwrap();
 

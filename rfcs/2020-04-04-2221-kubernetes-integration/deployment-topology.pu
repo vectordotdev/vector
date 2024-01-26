@@ -5,7 +5,7 @@ sprite $vector ./vector.svg
 
 skinparam ComponentFontColor MediumBlue
 
-cloud "Kubernetens\nCluster" as cluster {
+cloud "Kubernetes\nCluster" as cluster {
   node "Worker\nNode" as node1 {
     component "<$vector>" as node1_vector
 

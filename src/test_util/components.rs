@@ -13,7 +13,7 @@ use futures::{stream, SinkExt, Stream, StreamExt};
 use futures_util::Future;
 use once_cell::sync::Lazy;
 use tokio::{pin, select, time::sleep};
-use vector_core::event_test_util;
+use vector_lib::event_test_util;
 
 use crate::{
     config::{SourceConfig, SourceContext},
@@ -42,12 +42,7 @@ pub const HTTP_PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
 pub const HTTP_PUSH_SOURCE_TAGS: [&str; 2] = ["http_path", "protocol"];
 
 /// The standard set of tags for all generic socket-based sources that accept connections i.e. `TcpSource`.
-pub const SOCKET_PUSH_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
-
-/// The standard set of tags for all generic socket-based sources that accept connections i.e. `TcpSource`, but
-/// specifically sources that experience high cardinality i.e. many many clients, where emitting metrics with the peer
-/// address as a tag would represent too high of a cost to pay.
-pub const SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS: [&str; 1] = ["protocol"];
+pub const SOCKET_PUSH_SOURCE_TAGS: [&str; 1] = ["protocol"];
 
 /// The standard set of tags for all generic socket-based sources that poll connections i.e. Redis.
 pub const SOCKET_PULL_SOURCE_TAGS: [&str; 2] = ["remote_addr", "protocol"];
@@ -57,6 +52,8 @@ pub const FILE_SOURCE_TAGS: [&str; 1] = ["file"];
 
 /// The most basic set of tags for sinks, regardless of whether or not they push data or have it pulled out.
 pub const SINK_TAGS: [&str; 1] = ["protocol"];
+
+pub const DATA_VOLUME_SINK_TAGS: [&str; 2] = ["source", "service"];
 
 /// The standard set of tags for all sinks that write a file.
 pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
@@ -120,6 +117,17 @@ pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
     }
 });
 
+pub static DATA_VOLUME_SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
+    ComponentTests {
+        events: &["BytesSent", "EventsSent"], // EventsReceived is emitted in the topology
+        tagged_counters: &[
+            "component_sent_events_total",
+            "component_sent_event_bytes_total",
+        ],
+        untagged_counters: &[],
+    }
+});
+
 /// The component test specification for sinks which simply expose data, or do not otherwise "send" it anywhere.
 pub static NONSENDING_SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
     events: &["EventsSent"],
@@ -167,7 +175,7 @@ pub fn init_test() {
 fn has_tags(metric: &Metric, names: &[&str]) -> bool {
     metric
         .tags()
-        .map(|tags| names.iter().all(|name| tags.contains_key(*name)))
+        .map(|tags| names.iter().all(|name| tags.contains_key(name)))
         .unwrap_or_else(|| names.is_empty())
 }
 
@@ -217,10 +225,7 @@ impl ComponentTester {
                     .map(|m| {
                         let tags = m
                             .tags()
-                            .map(|t| {
-                                let tag_keys = t.keys().cloned().collect::<Vec<_>>();
-                                format!("{{{}}}", tag_keys.join(","))
-                            })
+                            .map(|t| format!("{{{}}}", itertools::join(t.keys(), ",")))
                             .unwrap_or_default();
                         format!("\n    -> Found similar metric `{}{}`", m.name(), tags)
                     })
@@ -245,7 +250,6 @@ impl ComponentTester {
 }
 
 /// Runs and returns a future and asserts that the provided test specification passes.
-#[track_caller]
 pub async fn assert_source<T>(
     tests: &Lazy<ComponentTests>,
     tags: &[&str],
@@ -261,13 +265,11 @@ pub async fn assert_source<T>(
 }
 
 /// Convenience wrapper for running source tests.
-#[track_caller]
 pub async fn assert_source_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     assert_source(&SOURCE_TESTS, tags, f).await
 }
 
 /// Runs source tests with timeout and asserts happy path compliance.
-#[track_caller]
 pub async fn run_and_assert_source_compliance<SC>(
     source: SC,
     timeout: Duration,
@@ -280,7 +282,6 @@ where
 }
 
 /// Runs source tests with an event count limit and asserts happy path compliance.
-#[track_caller]
 pub async fn run_and_assert_source_compliance_n<SC>(
     source: SC,
     event_count: usize,
@@ -294,7 +295,6 @@ where
 }
 
 /// Runs and returns a future and asserts that the provided test specification passes.
-#[track_caller]
 pub async fn assert_source_error<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
 
@@ -306,7 +306,6 @@ pub async fn assert_source_error<T>(tags: &[&str], f: impl Future<Output = T>) -
 }
 
 /// Runs source tests with timeout and asserts error path compliance.
-#[track_caller]
 pub async fn run_and_assert_source_error<SC>(
     source: SC,
     timeout: Duration,
@@ -340,7 +339,6 @@ where
     run_and_assert_source_advanced(source, setup, timeout, event_count, &SOURCE_TESTS, tags).await
 }
 
-#[track_caller]
 pub async fn run_and_assert_source_advanced<SC>(
     source: SC,
     setup: impl FnOnce(&mut SourceContext),
@@ -409,7 +407,6 @@ where
     .await
 }
 
-#[track_caller]
 pub async fn assert_transform_compliance<T>(f: impl Future<Output = T>) -> T {
     init_test();
 
@@ -421,7 +418,6 @@ pub async fn assert_transform_compliance<T>(f: impl Future<Output = T>) -> T {
 }
 
 /// Convenience wrapper for running sink tests
-#[track_caller]
 pub async fn assert_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
 
@@ -432,7 +428,6 @@ pub async fn assert_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>
     result
 }
 
-#[track_caller]
 pub async fn run_and_assert_sink_compliance<S, I>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = I> + Send,
@@ -445,7 +440,32 @@ where
     .await;
 }
 
-#[track_caller]
+/// Convenience wrapper for running sink tests
+pub async fn assert_data_volume_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+    init_test();
+
+    let result = f.await;
+
+    DATA_VOLUME_SINK_TESTS.assert(tags);
+
+    result
+}
+
+pub async fn run_and_assert_data_volume_sink_compliance<S, I>(
+    sink: VectorSink,
+    events: S,
+    tags: &[&str],
+) where
+    S: Stream<Item = I> + Send,
+    I: Into<EventArray>,
+{
+    assert_data_volume_sink_compliance(tags, async move {
+        let events = events.map(Into::into);
+        sink.run(events).await.expect("Running sink failed")
+    })
+    .await;
+}
+
 pub async fn assert_nonsending_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
 
@@ -456,7 +476,6 @@ pub async fn assert_nonsending_sink_compliance<T>(tags: &[&str], f: impl Future<
     result
 }
 
-#[track_caller]
 pub async fn run_and_assert_nonsending_sink_compliance<S, I>(
     sink: VectorSink,
     events: S,
@@ -473,7 +492,6 @@ pub async fn run_and_assert_nonsending_sink_compliance<S, I>(
 }
 
 /// Convenience wrapper for running sink error tests
-#[track_caller]
 pub async fn assert_sink_error<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
 
@@ -484,7 +502,6 @@ pub async fn assert_sink_error<T>(tags: &[&str], f: impl Future<Output = T>) -> 
     result
 }
 
-#[track_caller]
 pub async fn run_and_assert_sink_error<S, I>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = I> + Send,

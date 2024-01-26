@@ -1,17 +1,24 @@
-use std::{collections::HashMap, error, pin::Pin};
+use std::{collections::HashMap, error, pin::Pin, sync::Arc, time::Instant};
 
 use futures::{Stream, StreamExt};
-use vector_common::internal_event::{emit, EventsSent, DEFAULT_OUTPUT};
-use vector_common::EventDataEq;
+use vector_common::internal_event::{
+    self, register, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
+};
+use vector_common::{byte_size_of::ByteSizeOf, json_size::JsonSize, EventDataEq};
 
+use crate::config::{ComponentKey, OutputId};
+use crate::event::EventMutRef;
+use crate::schema::Definition;
 use crate::{
-    config::Output,
-    event::{into_event_stream, Event, EventArray, EventContainer, EventRef},
+    config,
+    event::{
+        into_event_stream, EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef,
+    },
     fanout::{self, Fanout},
-    ByteSizeOf,
+    schema,
 };
 
-#[cfg(any(feature = "lua"))]
+#[cfg(feature = "lua")]
 pub mod runtime_transform;
 
 /// Transforms come in two variants. Functions, or tasks.
@@ -34,34 +41,6 @@ impl Transform {
     /// where possible.
     pub fn function(v: impl FunctionTransform + 'static) -> Self {
         Transform::Function(Box::new(v))
-    }
-
-    /// Mutably borrow the inner transform as a function transform.
-    ///
-    /// # Panics
-    ///
-    /// If the transform is not a [`FunctionTransform`] this will panic.
-    pub fn as_function(&mut self) -> &mut Box<dyn FunctionTransform> {
-        match self {
-            Transform::Function(t) => t,
-            _ => panic!(
-                "Called `Transform::as_function` on something that was not a function variant."
-            ),
-        }
-    }
-
-    /// Transmute the inner transform into a function transform.
-    ///
-    /// # Panics
-    ///
-    /// If the transform is not a [`FunctionTransform`] this will panic.
-    pub fn into_function(self) -> Box<dyn FunctionTransform> {
-        match self {
-            Transform::Function(t) => t,
-            _ => panic!(
-                "Called `Transform::into_function` on something that was not a function variant."
-            ),
-        }
     }
 
     /// Create a new synchronous transform.
@@ -98,20 +77,6 @@ impl Transform {
     /// TODO
     pub fn event_task(v: impl TaskTransform<Event> + 'static) -> Self {
         Transform::Task(Box::new(WrapEventTask(v)))
-    }
-
-    /// Mutably borrow the inner transform as a task transform.
-    ///
-    /// # Panics
-    ///
-    /// If the transform is a [`FunctionTransform`] this will panic.
-    pub fn as_task(&mut self) -> &mut Box<dyn TaskTransform<EventArray>> {
-        match self {
-            Transform::Task(t) => t,
-            _ => {
-                panic!("Called `Transform::as_task` on something that was not a task variant.")
-            }
-        }
     }
 
     /// Transmute the inner transform into a task transform.
@@ -212,14 +177,24 @@ impl SyncTransform for Box<dyn FunctionTransform> {
     }
 }
 
+struct TransformOutput {
+    fanout: Fanout,
+    events_sent: Registered<EventsSent>,
+    log_schema_definitions: HashMap<OutputId, Arc<schema::Definition>>,
+    output_id: Arc<OutputId>,
+}
+
 pub struct TransformOutputs {
-    outputs_spec: Vec<Output>,
-    primary_output: Option<Fanout>,
-    named_outputs: HashMap<String, Fanout>,
+    outputs_spec: Vec<config::TransformOutput>,
+    primary_output: Option<TransformOutput>,
+    named_outputs: HashMap<String, TransformOutput>,
 }
 
 impl TransformOutputs {
-    pub fn new(outputs_in: Vec<Output>) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
+    pub fn new(
+        outputs_in: Vec<config::TransformOutput>,
+        component_key: &ComponentKey,
+    ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
         let outputs_spec = outputs_in.clone();
         let mut primary_output = None;
         let mut named_outputs = HashMap::new();
@@ -227,13 +202,43 @@ impl TransformOutputs {
 
         for output in outputs_in {
             let (fanout, control) = Fanout::new();
+
+            let log_schema_definitions = output
+                .log_schema_definitions
+                .into_iter()
+                .map(|(id, definition)| (id, Arc::new(definition)))
+                .collect();
+
             match output.port {
                 None => {
-                    primary_output = Some(fanout);
+                    primary_output = Some(TransformOutput {
+                        fanout,
+                        events_sent: register(EventsSent::from(internal_event::Output(Some(
+                            DEFAULT_OUTPUT.into(),
+                        )))),
+                        log_schema_definitions,
+                        output_id: Arc::new(OutputId {
+                            component: component_key.clone(),
+                            port: None,
+                        }),
+                    });
                     controls.insert(None, control);
                 }
                 Some(name) => {
-                    named_outputs.insert(name.clone(), fanout);
+                    named_outputs.insert(
+                        name.clone(),
+                        TransformOutput {
+                            fanout,
+                            events_sent: register(EventsSent::from(internal_event::Output(Some(
+                                name.clone().into(),
+                            )))),
+                            log_schema_definitions,
+                            output_id: Arc::new(OutputId {
+                                component: component_key.clone(),
+                                port: Some(name.clone()),
+                            }),
+                        },
+                    );
                     controls.insert(Some(name.clone()), control);
                 }
             }
@@ -263,34 +268,65 @@ impl TransformOutputs {
         buf: &mut TransformOutputsBuf,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         if let Some(primary) = self.primary_output.as_mut() {
-            let count = buf.primary_buffer.as_ref().map_or(0, OutputBuffer::len);
-            let byte_size = buf.primary_buffer.as_ref().map_or(0, ByteSizeOf::size_of);
-            buf.primary_buffer
+            let buf = buf
+                .primary_buffer
                 .as_mut()
-                .expect("mismatched outputs")
-                .send(primary)
-                .await?;
-            emit(EventsSent {
-                count,
-                byte_size,
-                output: Some(DEFAULT_OUTPUT),
-            });
+                .unwrap_or_else(|| unreachable!("mismatched outputs"));
+            Self::send_single_buffer(buf, primary).await?;
         }
-
         for (key, buf) in &mut buf.named_buffers {
-            let count = buf.len();
-            let byte_size = buf.size_of();
-            buf.send(self.named_outputs.get_mut(key).expect("unknown output"))
-                .await?;
-            emit(EventsSent {
-                count,
-                byte_size,
-                output: Some(key.as_ref()),
-            });
+            let output = self
+                .named_outputs
+                .get_mut(key)
+                .unwrap_or_else(|| unreachable!("unknown output"));
+            Self::send_single_buffer(buf, output).await?;
         }
-
         Ok(())
     }
+
+    async fn send_single_buffer(
+        buf: &mut OutputBuffer,
+        output: &mut TransformOutput,
+    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+        for event in buf.events_mut() {
+            update_runtime_schema_definition(
+                event,
+                &output.output_id,
+                &output.log_schema_definitions,
+            );
+        }
+        let count = buf.len();
+        let byte_size = buf.estimated_json_encoded_size_of();
+        buf.send(&mut output.fanout).await?;
+        output.events_sent.emit(CountByteSize(count, byte_size));
+        Ok(())
+    }
+}
+
+#[allow(clippy::implicit_hasher)]
+/// `event`: The event that will be updated
+/// `output_id`: The `output_id` that the current even is being sent to (will be used as the new `parent_id`)
+/// `log_schema_definitions`: A mapping of parent `OutputId` to definitions, that will be used to lookup the new runtime definition of the event
+pub fn update_runtime_schema_definition(
+    mut event: EventMutRef,
+    output_id: &Arc<OutputId>,
+    log_schema_definitions: &HashMap<OutputId, Arc<Definition>>,
+) {
+    if let EventMutRef::Log(log) = &mut event {
+        if let Some(parent_component_id) = log.metadata().upstream_id() {
+            if let Some(definition) = log_schema_definitions.get(parent_component_id) {
+                log.metadata_mut().set_schema_definition(definition);
+            }
+        } else {
+            // there is no parent defined. That means this event originated from a component that
+            // isn't able to track the source, such as `reduce` or `lua`. In these cases, all of the
+            // schema definitions _must_ be the same, so the first one is picked
+            if let Some(definition) = log_schema_definitions.values().next() {
+                log.metadata_mut().set_schema_definition(definition);
+            }
+        }
+    }
+    event.metadata_mut().set_upstream_id(Arc::clone(output_id));
 }
 
 #[derive(Debug, Clone)]
@@ -300,7 +336,7 @@ pub struct TransformOutputsBuf {
 }
 
 impl TransformOutputsBuf {
-    pub fn new_with_capacity(outputs_in: Vec<Output>, capacity: usize) -> Self {
+    pub fn new_with_capacity(outputs_in: Vec<config::TransformOutput>, capacity: usize) -> Self {
         let mut primary_buffer = None;
         let mut named_buffers = HashMap::new();
 
@@ -321,34 +357,26 @@ impl TransformOutputsBuf {
         }
     }
 
-    pub fn push(&mut self, event: Event) {
-        self.primary_buffer
-            .as_mut()
-            .expect("no default output")
-            .push(event);
+    /// Adds a new event to the named output buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no output with the given name.
+    pub fn push(&mut self, name: Option<&str>, event: Event) {
+        match name {
+            Some(name) => self.named_buffers.get_mut(name),
+            None => self.primary_buffer.as_mut(),
+        }
+        .expect("unknown output")
+        .push(event);
     }
 
-    pub fn push_named(&mut self, name: &str, event: Event) {
-        self.named_buffers
-            .get_mut(name)
-            .expect("unknown output")
-            .push(event);
-    }
-
-    pub fn append(&mut self, slice: &mut Vec<Event>) {
-        self.primary_buffer
-            .as_mut()
-            .expect("no default output")
-            .append(slice);
-    }
-
-    pub fn append_named(&mut self, name: &str, slice: &mut Vec<Event>) {
-        self.named_buffers
-            .get_mut(name)
-            .expect("unknown output")
-            .append(slice);
-    }
-
+    /// Drains the default output buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no default output.
+    #[cfg(any(feature = "test", test))]
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.primary_buffer
             .as_mut()
@@ -356,6 +384,12 @@ impl TransformOutputsBuf {
             .drain()
     }
 
+    /// Drains the named output buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no output with the given name.
+    #[cfg(any(feature = "test", test))]
     pub fn drain_named(&mut self, name: &str) -> impl Iterator<Item = Event> + '_ {
         self.named_buffers
             .get_mut(name)
@@ -363,32 +397,19 @@ impl TransformOutputsBuf {
             .drain()
     }
 
-    pub fn extend(&mut self, events: impl Iterator<Item = Event>) {
-        self.primary_buffer
-            .as_mut()
-            .expect("no default output")
-            .extend(events);
-    }
-
+    /// Takes the default output buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no default output.
+    #[cfg(any(feature = "test", test))]
     pub fn take_primary(&mut self) -> OutputBuffer {
         std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
     }
 
+    #[cfg(any(feature = "test", test))]
     pub fn take_all_named(&mut self) -> HashMap<String, OutputBuffer> {
         std::mem::take(&mut self.named_buffers)
-    }
-
-    pub fn len(&self) -> usize {
-        self.primary_buffer.as_ref().map_or(0, OutputBuffer::len)
-            + self
-                .named_buffers
-                .iter()
-                .map(|(_, buf)| buf.len())
-                .sum::<usize>()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 }
 
@@ -397,8 +418,8 @@ impl ByteSizeOf for TransformOutputsBuf {
         self.primary_buffer.size_of()
             + self
                 .named_buffers
-                .iter()
-                .map(|(_, buf)| buf.size_of())
+                .values()
+                .map(ByteSizeOf::size_of)
                 .sum::<usize>()
     }
 }
@@ -461,6 +482,7 @@ impl OutputBuffer {
         })
     }
 
+    #[cfg(any(feature = "test", test))]
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.0.drain(..).flat_map(EventArray::into_events)
     }
@@ -469,8 +491,9 @@ impl OutputBuffer {
         &mut self,
         output: &mut Fanout,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+        let send_start = Some(Instant::now());
         for array in std::mem::take(&mut self.0) {
-            output.send(array).await?;
+            output.send(array, send_start).await?;
         }
 
         Ok(())
@@ -478,6 +501,10 @@ impl OutputBuffer {
 
     fn iter_events(&self) -> impl Iterator<Item = EventRef> {
         self.0.iter().flat_map(EventArray::iter_events)
+    }
+
+    fn events_mut(&mut self) -> impl Iterator<Item = EventMutRef> {
+        self.0.iter_mut().flat_map(EventArray::iter_events_mut)
     }
 
     pub fn into_events(self) -> impl Iterator<Item = Event> {
@@ -505,6 +532,15 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
     }
 }
 
+impl EstimatedJsonEncodedSizeOf for OutputBuffer {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
+        self.0
+            .iter()
+            .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
+            .sum()
+    }
+}
+
 impl From<Vec<Event>> for OutputBuffer {
     fn from(events: Vec<Event>) -> Self {
         let mut result = Self::default();
@@ -520,7 +556,7 @@ impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for Wra
         self: Box<Self>,
         stream: Pin<Box<dyn Stream<Item = EventArray> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = EventArray> + Send>> {
-        // This is an aweful lot of boxes
+        // This is an awful lot of boxes
         let stream = stream.flat_map(into_event_stream).boxed();
         Box::new(self.0).transform(stream).map(Into::into).boxed()
     }

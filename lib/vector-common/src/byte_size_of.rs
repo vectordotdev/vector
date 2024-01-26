@@ -7,7 +7,7 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde_json::{value::RawValue, Value as JsonValue};
 use smallvec::SmallVec;
-use value::Value;
+use vrl::value::{KeyString, Value};
 
 pub trait ByteSizeOf {
     /// Returns the in-memory size of this type
@@ -24,7 +24,7 @@ pub trait ByteSizeOf {
     ///
     /// This function returns the total number of bytes that have been allocated
     /// interior to this type instance. It does not include any bytes that are
-    /// captured by [`std::mem::size_of`] except for any bytes that are iterior
+    /// captured by [`std::mem::size_of`] except for any bytes that are interior
     /// to this type. For instance, `BTreeMap<String, Vec<u8>>` would count all
     /// bytes for `String` and `Vec<u8>` instances but not the exterior bytes
     /// for `BTreeMap`.
@@ -53,6 +53,12 @@ impl ByteSizeOf for BytesMut {
 }
 
 impl ByteSizeOf for String {
+    fn allocated_bytes(&self) -> usize {
+        self.len()
+    }
+}
+
+impl ByteSizeOf for KeyString {
     fn allocated_bytes(&self) -> usize {
         self.len()
     }
@@ -187,5 +193,25 @@ impl ByteSizeOf for Value {
 impl ByteSizeOf for DateTime<Utc> {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+}
+
+impl<K, V> ByteSizeOf for indexmap::IndexMap<K, V>
+where
+    K: ByteSizeOf,
+    V: ByteSizeOf,
+{
+    fn allocated_bytes(&self) -> usize {
+        self.iter()
+            .fold(0, |acc, (k, v)| acc + k.size_of() + v.size_of())
+    }
+}
+
+impl<T> ByteSizeOf for indexmap::IndexSet<T>
+where
+    T: ByteSizeOf,
+{
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(ByteSizeOf::size_of).sum()
     }
 }

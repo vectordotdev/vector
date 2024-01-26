@@ -1,12 +1,22 @@
-use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
+use std::{
+    collections::HashMap,
+    convert::{Infallible, TryFrom},
+    fmt,
+    net::SocketAddr,
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
+use hyper::{service::make_service_fn, Server};
+use tokio::net::TcpStream;
+use tower::ServiceBuilder;
 use tracing::Span;
-use vector_core::{
+use vector_lib::{
+    config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
     filters::{
@@ -19,12 +29,13 @@ use warp::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, SourceContext},
+    config::SourceContext,
+    http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
-    sources::http::HttpMethod,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    sources::util::http::HttpMethod,
+    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 
@@ -36,13 +47,29 @@ use super::{
 
 #[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
+    // This function can be defined to enrich events with additional HTTP
+    // metadata. This function should be used rather than internal enrichment so
+    // that accurate byte count metrics can be emitted.
+    fn enrich_events(
+        &self,
+        _events: &mut [Event],
+        _request_path: &str,
+        _headers_config: &HeaderMap,
+        _query_parameters: &HashMap<String, String>,
+    ) {
+    }
+
     fn build_events(
         &self,
         body: Bytes,
-        header_map: HeaderMap,
-        query_parameters: HashMap<String, String>,
+        header_map: &HeaderMap,
+        query_parameters: &HashMap<String, String>,
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
+
+    fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
+        decode(encoding_header, body)
+    }
 
     #[allow(clippy::too_many_arguments)]
     fn run(
@@ -50,19 +77,20 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         address: SocketAddr,
         path: &str,
         method: HttpMethod,
+        response_code: StatusCode,
         strict_path: bool,
         tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
-        acknowledgements: AcknowledgementsConfig,
+        acknowledgements: SourceAcknowledgementsConfig,
+        keepalive_settings: KeepaliveConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
-        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(acknowledgements);
         Ok(Box::pin(async move {
-            let span = Span::current();
             let mut filter: BoxedFilter<()> = match method {
                 HttpMethod::Head => warp::head().boxed(),
                 HttpMethod::Get => warp::get().boxed(),
@@ -102,38 +130,45 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .and_then(
                     move |path: FullPath,
                           auth_header,
-                          encoding_header,
+                          encoding_header: Option<String>,
                           headers: HeaderMap,
                           body: Bytes,
                           query_parameters: HashMap<String, String>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
-                        emit!(HttpBytesReceived {
-                            byte_size: body.len(),
-                            http_path,
-                            protocol,
-                        });
 
                         let events = auth
                             .is_valid(&auth_header)
-                            .and_then(|()| decode(&encoding_header, body))
+                            .and_then(|()| self.decode(encoding_header.as_deref(), body))
                             .and_then(|body| {
-                                self.build_events(body, headers, query_parameters, path.as_str())
-                            })
-                            .map(|events| {
-                                emit!(HttpEventsReceived {
-                                    count: events.len(),
-                                    byte_size: events.size_of(),
+                                emit!(HttpBytesReceived {
+                                    byte_size: body.len(),
                                     http_path,
                                     protocol,
                                 });
+                                self.build_events(body, &headers, &query_parameters, path.as_str())
+                            })
+                            .map(|mut events| {
+                                emit!(HttpEventsReceived {
+                                    count: events.len(),
+                                    byte_size: events.estimated_json_encoded_size_of(),
+                                    http_path,
+                                    protocol,
+                                });
+
+                                self.enrich_events(
+                                    &mut events,
+                                    path.as_str(),
+                                    &headers,
+                                    &query_parameters,
+                                );
+
                                 events
                             });
 
-                        handle_request(events, acknowledgements, cx.out.clone())
+                        handle_request(events, acknowledgements, response_code, cx.out.clone())
                     },
-                )
-                .with(warp::trace(move |_info| span.clone()));
+                );
 
             let ping = warp::get().and(warp::path("ping")).map(|| "pong");
             let routes = svc.or(ping).recover(|r: Rejection| async move {
@@ -143,21 +178,41 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 } else {
                     //other internal error - will return 500 internal server error
                     emit!(HttpInternalError {
-                        message: "Internal error."
+                        message: &format!("Internal error: {:?}", r)
                     });
                     Err(r)
                 }
             });
 
+            let span = Span::current();
+            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+                let svc = ServiceBuilder::new()
+                    .layer(build_http_trace_layer(span.clone()))
+                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                        MaxConnectionAgeLayer::new(
+                            Duration::from_secs(secs),
+                            keepalive_settings.max_connection_age_jitter_factor,
+                            conn.peer_addr(),
+                        )
+                    }))
+                    .service(warp::service(routes.clone()));
+                futures_util::future::ok::<_, Infallible>(svc)
+            });
+
             info!(message = "Building HTTP server.", address = %address);
 
-            let listener = tls.bind(&address).await.unwrap();
-            warp::serve(routes)
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    cx.shutdown.map(|_| ()),
-                )
-                .await;
+            let listener = tls.bind(&address).await.map_err(|err| {
+                error!("An error occurred: {:?}.", err);
+            })?;
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(make_svc)
+                .with_graceful_shutdown(cx.shutdown.map(|_| ()))
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })?;
+
             Ok(())
         }))
     }
@@ -176,6 +231,7 @@ impl warp::reject::Reject for RejectShuttingDown {}
 async fn handle_request(
     events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,
+    response_code: StatusCode,
     mut out: SourceSender,
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
@@ -184,13 +240,13 @@ async fn handle_request(
 
             let count = events.len();
             out.send_batch(events)
-                .map_err(move |error: crate::source_sender::ClosedError| {
+                .map_err(|_| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
-                    emit!(StreamClosedError { error, count });
+                    emit!(StreamClosedError { count });
                     warp::reject::custom(RejectShuttingDown)
                 })
-                .and_then(|_| handle_batch_status(receiver))
+                .and_then(|_| handle_batch_status(response_code, receiver))
                 .await
         }
         Err(error) => {
@@ -201,12 +257,13 @@ async fn handle_request(
 }
 
 async fn handle_batch_status(
+    success_response_code: StatusCode,
     receiver: Option<BatchStatusReceiver>,
 ) -> Result<impl warp::Reply, Rejection> {
     match receiver {
-        None => Ok(warp::reply()),
+        None => Ok(success_response_code),
         Some(receiver) => match receiver.await {
-            BatchStatus::Delivered => Ok(warp::reply()),
+            BatchStatus::Delivered => Ok(success_response_code),
             BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error delivering contents to sink".into(),

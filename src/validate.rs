@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
@@ -6,7 +8,8 @@ use exitcode::ExitCode;
 
 use crate::{
     config::{self, Config, ConfigDiff},
-    topology::{self, builder::Pieces},
+    extra_context::ExtraContext,
+    topology::{self, builder::TopologyPieces},
 };
 
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
@@ -52,8 +55,8 @@ pub struct Opts {
 
     /// Any number of Vector config files to validate.
     /// Format is detected from the file name.
-    /// If none are specified the default config path `/etc/vector/vector.toml`
-    /// will be targeted.
+    /// If none are specified, the default config path `/etc/vector/vector.yaml`
+    /// is targeted.
     #[arg(env = "VECTOR_CONFIG", value_delimiter(','))]
     pub paths: Vec<PathBuf>,
 
@@ -141,14 +144,6 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         .map_err(&mut report_error)
         .ok()?;
 
-    // Check secrets in configuration
-    #[cfg(feature = "enterprise")]
-    {
-        config::loading::schema::check_sensitive_fields_from_paths(&paths, &builder)
-            .map_err(&mut report_error)
-            .ok()?;
-    }
-
     // Build
     let (config, build_warnings) = builder
         .build_with_warnings()
@@ -191,8 +186,10 @@ async fn validate_components(
     config: &Config,
     diff: &ConfigDiff,
     fmt: &mut Formatter,
-) -> Option<Pieces> {
-    match topology::builder::build_pieces(config, diff, HashMap::new()).await {
+) -> Option<TopologyPieces> {
+    match topology::TopologyPieces::build(config, diff, HashMap::new(), ExtraContext::default())
+        .await
+    {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)
@@ -209,7 +206,7 @@ async fn validate_healthchecks(
     opts: &Opts,
     config: &Config,
     diff: &ConfigDiff,
-    pieces: &mut Pieces,
+    pieces: &mut TopologyPieces,
     fmt: &mut Formatter,
 ) -> bool {
     if !config.healthchecks.enabled {
@@ -227,6 +224,7 @@ async fn validate_healthchecks(
             fmt.error(error);
         };
 
+        trace!("Healthcheck for {id} starting.");
         match tokio::spawn(healthcheck).await {
             Ok(Ok(_)) => {
                 if config
@@ -247,6 +245,7 @@ async fn validate_healthchecks(
             }
             Err(_) => failed(format!("Health check for \"{}\" panicked", id)),
         }
+        trace!("Healthcheck for {id} done.");
     }
 
     validated
@@ -408,7 +407,7 @@ impl Formatter {
             .as_ref()
             .lines()
             .map(|line| {
-                String::from_utf8_lossy(&strip_ansi_escapes::strip(line).unwrap())
+                String::from_utf8_lossy(&strip_ansi_escapes::strip(line))
                     .chars()
                     .count()
             })

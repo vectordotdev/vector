@@ -22,8 +22,8 @@ pub use incoming::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener
 pub use maybe_tls::MaybeTls;
 pub use settings::{
     MaybeTlsSettings, TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
-    TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH, TEST_PEM_CLIENT_KEY_PATH, TEST_PEM_CRT_PATH,
-    TEST_PEM_INTERMEDIATE_CA_PATH, TEST_PEM_KEY_PATH,
+    PEM_START_MARKER, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH, TEST_PEM_CLIENT_KEY_PATH,
+    TEST_PEM_CRT_PATH, TEST_PEM_INTERMEDIATE_CA_PATH, TEST_PEM_KEY_PATH,
 };
 
 pub type Result<T> = std::result::Result<T, TlsError>;

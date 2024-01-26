@@ -1,0 +1,5 @@
+# Ingest data by tailing one or more files
+type: "file"
+include: # supports globbing
+  - "/var/log/apache2/*.log"
+ignore_older_secs: 86400 # 1 day

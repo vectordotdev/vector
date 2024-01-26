@@ -11,8 +11,7 @@ use std::{
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use once_cell::sync::Lazy;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
-use vector_config::NamedComponent;
-use vector_core::internal_event::DEFAULT_OUTPUT;
+use vector_lib::internal_event::DEFAULT_OUTPUT;
 
 use crate::{
     api::schema::{
@@ -20,15 +19,14 @@ use crate::{
         filter::{self, filter_items},
         relay, sort,
     },
-    config::{ComponentKey, Config, TransformConfig},
+    config::{get_transform_output_ids, ComponentKey, Config},
     filter_check,
 };
-use crate::{config::SourceConfig, topology::schema::merged_definition};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
-    field(name = "component_id", type = "String"),
-    field(name = "component_type", type = "String")
+    field(name = "component_id", ty = "String"),
+    field(name = "component_type", ty = "String")
 )]
 pub enum Component {
     Source(source::Source),
@@ -254,7 +252,6 @@ impl ComponentsSubscription {
 
 /// Update the 'global' configuration that will be consumed by component queries
 pub fn update_config(config: &Config) {
-    let mut cache = HashMap::new();
     let mut new_components = HashMap::new();
 
     // Sources
@@ -291,12 +288,13 @@ pub fn update_config(config: &Config) {
                 component_key: component_key.clone(),
                 component_type: transform.inner.get_component_name().to_string(),
                 inputs: transform.inputs.clone(),
-                outputs: transform
-                    .inner
-                    .outputs(&merged_definition(&transform.inputs, config, &mut cache))
-                    .into_iter()
-                    .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
-                    .collect(),
+                outputs: get_transform_output_ids(
+                    transform.inner.as_ref(),
+                    "".into(),
+                    config.schema.log_namespace(),
+                )
+                .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
+                .collect(),
             })),
         );
     }
@@ -316,15 +314,15 @@ pub fn update_config(config: &Config) {
     // Get the component_ids of existing components
     let existing_component_keys = state::get_component_keys();
     let new_component_keys = new_components
-        .iter()
-        .map(|(component_key, _)| component_key.clone())
+        .keys()
+        .cloned()
         .collect::<HashSet<ComponentKey>>();
 
     // Publish all components that have been removed
     existing_component_keys
         .difference(&new_component_keys)
         .for_each(|component_key| {
-            let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
+            _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
                 state::component_by_component_key(component_key)
                     .expect("Couldn't get component by key"),
             ));
@@ -334,7 +332,7 @@ pub fn update_config(config: &Config) {
     new_component_keys
         .difference(&existing_component_keys)
         .for_each(|component_key| {
-            let _ = COMPONENT_CHANGED.send(ComponentChanged::Added(
+            _ = COMPONENT_CHANGED.send(ComponentChanged::Added(
                 new_components.get(component_key).unwrap().clone(),
             ));
         });
@@ -375,13 +373,13 @@ mod tests {
             Component::Transform(transform::Transform(transform::Data {
                 component_key: ComponentKey::from("parse_json"),
                 component_type: "json".to_string(),
-                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
+                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")].into(),
                 outputs: vec![],
             })),
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("devnull"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")].into(),
             })),
         ]
     }
@@ -505,17 +503,17 @@ mod tests {
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("a"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")].into(),
             })),
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("b"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")].into(),
             })),
             Component::Transform(transform::Transform(transform::Data {
                 component_key: ComponentKey::from("c"),
                 component_type: "json".to_string(),
-                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
+                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")].into(),
                 outputs: vec![],
             })),
             Component::Source(source::Source(source::Data {

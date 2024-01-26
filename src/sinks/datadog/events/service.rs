@@ -8,7 +8,11 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_core::{internal_event::CountByteSize, stream::DriverResponse};
+use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    request_metadata::{GroupedCountByteSize, MetaDescriptive},
+    sensitive_string::SensitiveString,
+};
 
 use crate::{
     event::EventStatus,
@@ -22,7 +26,7 @@ use crate::{
 pub struct DatadogEventsResponse {
     pub(self) event_status: EventStatus,
     pub http_status: http::StatusCode,
-    pub event_byte_size: usize,
+    pub event_byte_size: GroupedCountByteSize,
 }
 
 impl DriverResponse for DatadogEventsResponse {
@@ -30,11 +34,11 @@ impl DriverResponse for DatadogEventsResponse {
         self.event_status
     }
 
-    fn events_sent(&self) -> CountByteSize {
-        CountByteSize(1, self.event_byte_size)
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.event_byte_size
     }
 
-    fn bytes_sent(&self) -> Option<(usize, &str)> {
+    fn bytes_sent(&self) -> Option<usize> {
         // HttpBatchService emits EndpointBytesSend
         None
     }
@@ -42,6 +46,9 @@ impl DriverResponse for DatadogEventsResponse {
 
 #[derive(Clone)]
 pub struct DatadogEventsService {
+    // TODO: `HttpBatchService` has been deprecated for direct use in sinks.
+    //       This sink should undergo a refactor to utilize the `HttpService`
+    //       instead, which extracts much of the boilerplate code for `Service`.
     batch_http_service:
         HttpBatchService<Ready<Result<http::Request<Bytes>, crate::Error>>, DatadogEventsRequest>,
 }
@@ -49,7 +56,7 @@ pub struct DatadogEventsService {
 impl DatadogEventsService {
     pub fn new(
         endpoint: http::Uri,
-        default_api_key: String,
+        default_api_key: SensitiveString,
         http_client: HttpClient<Body>,
     ) -> Self {
         let batch_http_service = HttpBatchService::new(http_client, move |req| {
@@ -57,7 +64,7 @@ impl DatadogEventsService {
 
             let api_key = match req.metadata.api_key.as_ref() {
                 Some(x) => x.as_ref(),
-                None => default_api_key.as_str(),
+                None => default_api_key.inner(),
             };
 
             let request = Request::post(&endpoint)
@@ -78,16 +85,19 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    // Emission of Error internal event is handled upstream by the caller
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: DatadogEventsRequest) -> Self::Future {
+    // Emission of Error internal event is handled upstream by the caller
+    fn call(&mut self, mut req: DatadogEventsRequest) -> Self::Future {
         let mut http_service = self.batch_http_service.clone();
 
         Box::pin(async move {
+            let metadata = std::mem::take(req.metadata_mut());
             http_service.ready().await?;
-            let event_byte_size = req.metadata.event_byte_size;
+            let event_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
             let http_response = http_service.call(req).await?;
             let event_status = if http_response.is_successful() {
                 EventStatus::Delivered

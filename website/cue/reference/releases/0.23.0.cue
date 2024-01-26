@@ -26,6 +26,7 @@ releases: "0.23.0": {
 	known_issues: [
 		"Vector shuts down when a configured source codec (`decoding.codec`) receives invalid data. Fixed in v0.23.1.",
 		"The `elasticsearch` sink doesn't evaluate templated configuration options like the `index` configuration before applying the `only_fields` and `except_fields` options, causing templates to fail to be evaluated if they used a field that was dropped. Fixed in v0.23.1.",
+		"The `datadog_traces` sink APM stats calculation does not correctly aggregate the stats in the way that is expected by the APM backend of Datadog, causing incorrect individual span metrics observed in the Datadog UI. Fixed in v0.25.2.",
 	]
 
 	description: """
@@ -240,7 +241,7 @@ releases: "0.23.0": {
 			type: "fix"
 			scopes: ["tag_cardinality_limit transform"]
 			description: """
-				The `tag_cardinality_limit` now corretly deserializes the `action` option. Previously it would return an
+				The `tag_cardinality_limit` now correctly deserializes the `action` option. Previously it would return an
 				error when trying to configure this option.
 				"""
 			pr_numbers: [12979]
@@ -502,7 +503,7 @@ releases: "0.23.0": {
 			description: """
 				Due to changes to the [tool we use for cross-compiling Vector](https://github.com/cross-rs/cross),
 				support for operating systems with old versions of `libc` and `libstdc++` were dropped for the
-				`x86-uknown_linux-gnu` target. Vector now requires that the host system has `libc` >= 2.18 and
+				`x86-unknown_linux-gnu` target. Vector now requires that the host system has `libc` >= 2.18 and
 				`libstdc++` >= 3.4.21 with support for ABI version 1.3.8.
 
 				Known OSes that this affects:
@@ -540,7 +541,7 @@ releases: "0.23.0": {
 		{sha: "c2ba151ac037a01584c1493d876af8e16f31b5bf", date: "2022-05-21 09:23:30 UTC", description: "bump EmbarkStudios/cargo-deny-action from 1.3.0 to 1.3.1", pr_number:                                        12811, scopes: ["ci"], type:                                           "chore", breaking_change:       false, author: "dependabot[bot]", files_count:       1, insertions_count:   2, deletions_count:    2},
 		{sha: "46a91d623ade84b5480c9fcf027cdabe2df2f111", date: "2022-05-24 03:06:36 UTC", description: "Implement `EncodingConfig`/`EncodingConfigWithFraming`", pr_number:                                          12765, scopes: ["codecs"], type:                                       "chore", breaking_change:       false, author: "Pablo Sichert", files_count:         9, insertions_count:   229, deletions_count:  41},
 		{sha: "3b7f75de203154fccf192aaa249aa8695a185920", date: "2022-05-23 23:30:13 UTC", description: "Update lading", pr_number:                                                                                   12776, scopes: [], type:                                               "chore", breaking_change:       false, author: "Brian L. Troutwine", files_count:    1, insertions_count:   1, deletions_count:    1},
-		{sha: "f3603d40e5fffe270958d50bb7d0085972f8e22d", date: "2022-05-24 11:55:45 UTC", description: "Annotate logs with node labels", pr_number:                                                                  12730, scopes: ["kubenetes_logs"], type:                               "feat", breaking_change:        false, author: "Maksim Nabokikh", files_count:       9, insertions_count:   307, deletions_count:  23},
+		{sha: "f3603d40e5fffe270958d50bb7d0085972f8e22d", date: "2022-05-24 11:55:45 UTC", description: "Annotate logs with node labels", pr_number:                                                                  12730, scopes: ["kubernetes_logs"], type:                              "feat", breaking_change:        false, author: "Maksim Nabokikh", files_count:       9, insertions_count:   307, deletions_count:  23},
 		{sha: "57d4ca8a7cbbed4636c5fabceffda21eb857de89", date: "2022-05-24 14:29:31 UTC", description: "parse_nginx_log upstream label", pr_number:                                                                  12819, scopes: ["vrl"], type:                                          "fix", breaking_change:         false, author: "Maksim Nabokikh", files_count:       2, insertions_count:   21, deletions_count:   0},
 		{sha: "b530718e961b6d4a0a4ba9428fdcccb41a8a8e18", date: "2022-05-24 18:14:24 UTC", description: "Don't enable & start service by default on Debian", pr_number:                                               12650, scopes: ["releasing"], type:                                    "fix", breaking_change:         false, author: "Aarni Koskela", files_count:         2, insertions_count:   41, deletions_count:   0},
 		{sha: "259c87fbaf0fa088f9de0cf8d243b86fa7085b7a", date: "2022-05-25 00:32:05 UTC", description: "bump console-subscriber from 0.1.5 to 0.1.6", pr_number:                                                     12828, scopes: ["deps"], type:                                         "chore", breaking_change:       false, author: "dependabot[bot]", files_count:       2, insertions_count:   5, deletions_count:    5},
