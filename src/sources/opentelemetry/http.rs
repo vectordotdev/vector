@@ -88,8 +88,19 @@ pub(crate) fn build_warp_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
 ) -> BoxedFilter<(Response,)> {
-    let log_filters = build_warp_log_filter(acknowledgements, log_namespace, out.clone(), bytes_received.clone(), events_received.clone());
-    let trace_filters = build_warp_trace_filter(acknowledgements, out.clone(), bytes_received, events_received);
+    let log_filters = build_warp_log_filter(
+        acknowledgements,
+        log_namespace,
+        out.clone(),
+        bytes_received.clone(),
+        events_received.clone(),
+    );
+    let trace_filters = build_warp_trace_filter(
+        acknowledgements,
+        out.clone(),
+        bytes_received,
+        events_received,
+    );
     log_filters.or(trace_filters).unify().boxed()
 }
 
@@ -114,7 +125,13 @@ fn build_warp_log_filter(
                 decode_log_body(body, log_namespace, &events_received)
             });
 
-            handle_request(events, acknowledgements, out.clone(), super::LOGS, ExportLogsServiceResponse::default())
+            handle_request(
+                events,
+                acknowledgements,
+                out.clone(),
+                super::LOGS,
+                ExportLogsServiceResponse::default(),
+            )
         })
         .boxed()
 }
@@ -139,7 +156,13 @@ fn build_warp_trace_filter(
                 decode_trace_body(body, &events_received)
             });
 
-            handle_request(events, acknowledgements, out.clone(), super::TRACES, ExportTraceServiceResponse::default())
+            handle_request(
+                events,
+                acknowledgements,
+                out.clone(),
+                super::TRACES,
+                ExportTraceServiceResponse::default(),
+            )
         })
         .boxed()
 }
@@ -201,8 +224,7 @@ async fn handle_request(
     mut out: SourceSender,
     output: &str,
     resp: impl Message,
-) -> Result<Response, Rejection> 
-{
+) -> Result<Response, Rejection> {
     match events {
         Ok(mut events) => {
             let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
@@ -214,11 +236,9 @@ async fn handle_request(
             })?;
 
             match receiver {
-                None => Ok(protobuf(resp)
-                .into_response()),
+                None => Ok(protobuf(resp).into_response()),
                 Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => Ok(protobuf(resp)
-                    .into_response()),
+                    BatchStatus::Delivered => Ok(protobuf(resp).into_response()),
                     BatchStatus::Errored => Err(warp::reject::custom(Status {
                         code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
                         message: "Error delivering contents to sink".into(),

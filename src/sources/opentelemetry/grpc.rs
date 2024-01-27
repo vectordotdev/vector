@@ -2,8 +2,12 @@ use futures::TryFutureExt;
 use tonic::{Request, Response, Status};
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::opentelemetry::proto::collector::{
-    trace::v1::{trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse},
-    logs::v1::{logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse},
+    logs::v1::{
+        logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
+    },
+    trace::v1::{
+        trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
+    },
 };
 use vector_lib::{
     config::LogNamespace,
@@ -66,7 +70,11 @@ impl LogsService for Service {
 }
 
 impl Service {
-    async fn handle_events(&self, mut events: Vec<Event>, log_name: &'static str) -> Result<(), Status> {
+    async fn handle_events(
+        &self,
+        mut events: Vec<Event>,
+        log_name: &'static str,
+    ) -> Result<(), Status> {
         let count = events.len();
         let byte_size = events.estimated_json_encoded_size_of();
         self.events_received.emit(CountByteSize(count, byte_size));

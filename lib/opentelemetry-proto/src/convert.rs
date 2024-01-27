@@ -1,20 +1,26 @@
-use std::collections::BTreeMap;
-use vrl::value::KeyString;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use lookup::path;
 use ordered_float::NotNan;
+use std::collections::BTreeMap;
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     event::{Event, LogEvent, TraceEvent},
 };
-use vrl::{event_path, value::{ObjectMap, Value}};
+use vrl::value::KeyString;
+use vrl::{
+    event_path,
+    value::{ObjectMap, Value},
+};
 
 use super::proto::{
     common::v1::{any_value::Value as PBValue, KeyValue},
     logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
-    trace::v1::{ResourceSpans, Span, Status as SpanStatus, span::{Event as SpanEvent, Link}},
     resource::v1::Resource,
+    trace::v1::{
+        span::{Event as SpanEvent, Link},
+        ResourceSpans, Span, Status as SpanStatus,
+    },
 };
 
 const SOURCE_NAME: &str = "opentelemetry";
@@ -52,7 +58,7 @@ impl ResourceSpans {
         let resource = self.resource;
         let now = Utc::now();
 
-        self.scope_spans 
+        self.scope_spans
             .into_iter()
             .flat_map(|instrumentation_library_spans| instrumentation_library_spans.spans)
             .map(move |span| {
@@ -118,27 +124,57 @@ impl ResourceSpan {
         trace.insert(event_path!("trace_id"), Value::from(span.trace_id));
         trace.insert(event_path!("span_id"), Value::from(span.span_id));
         trace.insert(event_path!("trace_state"), span.trace_state);
-        trace.insert(event_path!("parent_span_id"), Value::from(span.parent_span_id));
+        trace.insert(
+            event_path!("parent_span_id"),
+            Value::from(span.parent_span_id),
+        );
         trace.insert(event_path!("name"), span.name);
         trace.insert(event_path!("kind"), span.kind);
-        trace.insert(event_path!("start_time_unix_nano"), Value::from(Utc.timestamp_nanos(span.start_time_unix_nano as i64)));
-        trace.insert(event_path!("end_time_unix_nano"), Value::from(Utc.timestamp_nanos(span.end_time_unix_nano as i64)));
+        trace.insert(
+            event_path!("start_time_unix_nano"),
+            Value::from(Utc.timestamp_nanos(span.start_time_unix_nano as i64)),
+        );
+        trace.insert(
+            event_path!("end_time_unix_nano"),
+            Value::from(Utc.timestamp_nanos(span.end_time_unix_nano as i64)),
+        );
         if !span.attributes.is_empty() {
-            trace.insert(event_path!("attributes"), kv_list_into_value(span.attributes));
+            trace.insert(
+                event_path!("attributes"),
+                kv_list_into_value(span.attributes),
+            );
         }
-        trace.insert(event_path!("dropped_attributes_count"), Value::from(span.dropped_attributes_count));
+        trace.insert(
+            event_path!("dropped_attributes_count"),
+            Value::from(span.dropped_attributes_count),
+        );
         if !span.events.is_empty() {
-            trace.insert(event_path!("events"), Value::Array(span.events.into_iter().map(Into::into).collect()));
+            trace.insert(
+                event_path!("events"),
+                Value::Array(span.events.into_iter().map(Into::into).collect()),
+            );
         }
-        trace.insert(event_path!("dropped_events_count"), Value::from(span.dropped_events_count));
+        trace.insert(
+            event_path!("dropped_events_count"),
+            Value::from(span.dropped_events_count),
+        );
         if !span.links.is_empty() {
-            trace.insert(event_path!("links"), Value::Array(span.links.into_iter().map(Into::into).collect()));
+            trace.insert(
+                event_path!("links"),
+                Value::Array(span.links.into_iter().map(Into::into).collect()),
+            );
         }
-        trace.insert(event_path!("dropped_links_count"), Value::from(span.dropped_links_count));
+        trace.insert(
+            event_path!("dropped_links_count"),
+            Value::from(span.dropped_links_count),
+        );
         trace.insert(event_path!("status"), Value::from(span.status));
         if let Some(resource) = self.resource {
             if !resource.attributes.is_empty() {
-                trace.insert(event_path!(RESOURCE_KEY), kv_list_into_value(resource.attributes));
+                trace.insert(
+                    event_path!(RESOURCE_KEY),
+                    kv_list_into_value(resource.attributes),
+                );
             }
         }
         trace.insert(event_path!("ingest_timestamp"), Value::from(now));
@@ -290,23 +326,32 @@ impl ResourceLog {
 
 impl From<SpanEvent> for Value {
     fn from(ev: SpanEvent) -> Self {
-        let mut obj: BTreeMap<KeyString, Value>  = BTreeMap::new();
+        let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
         obj.insert("name".into(), ev.name.into());
-        obj.insert("time_unix_nano".into(), Value::Timestamp(Utc.timestamp_nanos(ev.time_unix_nano as i64)));
+        obj.insert(
+            "time_unix_nano".into(),
+            Value::Timestamp(Utc.timestamp_nanos(ev.time_unix_nano as i64)),
+        );
         obj.insert("attributes".into(), kv_list_into_value(ev.attributes));
-        obj.insert("dropped_attributes_count".into(), Value::Integer(ev.dropped_attributes_count as i64));
+        obj.insert(
+            "dropped_attributes_count".into(),
+            Value::Integer(ev.dropped_attributes_count as i64),
+        );
         Value::Object(obj)
     }
 }
 
 impl From<Link> for Value {
     fn from(link: Link) -> Self {
-        let mut obj: BTreeMap<KeyString, Value>  = BTreeMap::new();
+        let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
         obj.insert("trace_id".into(), Value::from(link.trace_id));
         obj.insert("span_id".into(), Value::from(link.span_id));
         obj.insert("trace_state".into(), link.trace_state.into());
         obj.insert("attributes".into(), kv_list_into_value(link.attributes));
-        obj.insert("dropped_attributes_count".into(), Value::Integer(link.dropped_attributes_count as i64));
+        obj.insert(
+            "dropped_attributes_count".into(),
+            Value::Integer(link.dropped_attributes_count as i64),
+        );
         Value::Object(obj)
     }
 }

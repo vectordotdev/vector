@@ -63,12 +63,12 @@ where
     Ok(())
 }
 
-// This is a bit of a ugly hack to allow us to run two services on the same port. 
+// This is a bit of a ugly hack to allow us to run two services on the same port.
 // I just don't know how to convert the generic type with associated types into a Vec<Box<trait object>>.
-pub async fn run_grpc_tuple_server<S,T>(
+pub async fn run_grpc_tuple_server<S, T>(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
-    services: (S,T),
+    services: (S, T),
     shutdown: ShutdownSignal,
 ) -> crate::Result<()>
 where
