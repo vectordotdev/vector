@@ -63,6 +63,48 @@ where
     Ok(())
 }
 
+// This is a bit of a ugly hack to allow us to run two services on the same port. 
+// I just don't know how to convert the generic type with associated types into a Vec<Box<trait object>>.
+pub async fn run_grpc_tuple_server<S,T>(
+    address: SocketAddr,
+    tls_settings: MaybeTlsSettings,
+    services: (S,T),
+    shutdown: ShutdownSignal,
+) -> crate::Result<()>
+where
+    S: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
+        + NamedService
+        + Clone
+        + Send
+        + 'static,
+    S::Future: Send + 'static,
+    T: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
+        + NamedService
+        + Clone
+        + Send
+        + 'static,
+    T::Future: Send + 'static,
+{
+    let span = Span::current();
+    let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
+    let listener = tls_settings.bind(&address).await?;
+    let stream = listener.accept_stream();
+
+    info!(%address, "Building gRPC server.");
+
+    Server::builder()
+        .layer(build_grpc_trace_layer(span.clone()))
+        .layer(DecompressionAndMetricsLayer)
+        .add_service(services.0)
+        .add_service(services.1)
+        .serve_with_incoming_shutdown(stream, shutdown.map(|token| tx.send(token).unwrap()))
+        .await?;
+
+    drop(rx.await);
+
+    Ok(())
+}
+
 /// Builds a [TraceLayer] configured for a gRPC server.
 ///
 /// This layer emits gPRC specific telemetry for messages received/sent and handler duration.

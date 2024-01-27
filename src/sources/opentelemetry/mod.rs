@@ -22,7 +22,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_lib::opentelemetry::proto::collector::{
     trace::v1::trace_service_server::TraceServiceServer,
-    //logs::v1::logs_service_server::LogsServiceServer,
+    logs::v1::logs_service_server::LogsServiceServer,
 };
 use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace},
@@ -41,7 +41,7 @@ use crate::{
     },
     http::KeepaliveConfig,
     serde::bool_or_struct,
-    sources::{util::grpc::run_grpc_server, Source},
+    sources::{util::grpc::run_grpc_tuple_server, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -144,14 +144,15 @@ impl SourceConfig for OpentelemetryConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(&self.grpc.tls, true)?;
-        // let log_service = LogsServiceServer::new(Service {
-        //     pipeline: cx.out.clone(),
-        //     acknowledgements,
-        //     log_namespace,
-        //     events_received: events_received.clone(),
-        // })
-        // .accept_compressed(CompressionEncoding::Gzip)
-        // .max_decoding_message_size(usize::MAX);
+        
+        let log_service = LogsServiceServer::new(Service {
+            pipeline: cx.out.clone(),
+            acknowledgements,
+            log_namespace,
+            events_received: events_received.clone(),
+        })
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(usize::MAX);
 
         let trace_service = TraceServiceServer::new(Service {
             pipeline: cx.out.clone(),
@@ -162,10 +163,10 @@ impl SourceConfig for OpentelemetryConfig {
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
-        let grpc_source = run_grpc_server(
+        let grpc_source = run_grpc_tuple_server(
             self.grpc.address,
             grpc_tls_settings,
-            trace_service,
+            (log_service, trace_service),
             cx.shutdown.clone(),
         )
         .map_err(|error| {
