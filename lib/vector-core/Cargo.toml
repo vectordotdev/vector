@@ -10,7 +10,7 @@ async-graphql = { version = "7.0.1", default-features = false, features = ["play
 async-trait = { version = "0.1", default-features = false }
 bitmask-enum = { version = "2.2.3", default-features = false }
 bytes = { version = "1.5.0", default-features = false, features = ["serde"] }
-chrono = { version = "0.4.31", default-features = false, features = ["serde"] }
+chrono.workspace = true
 crossbeam-utils = { version = "0.8.19", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 dyn-clone = { version = "1.0.16", default-features = false }
@@ -27,7 +27,7 @@ lookup = { package = "vector-lookup", path = "../vector-lookup" }
 metrics = "0.21.1"
 metrics-tracing-context = { version = "0.14.0", default-features = false }
 metrics-util = { version = "0.15.1", default-features = false, features = ["registry"] }
-mlua = { version = "0.9.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.9.5", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.4", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.19", default-features = false }
 ordered-float = { version = "4.2.0", default-features = false }
