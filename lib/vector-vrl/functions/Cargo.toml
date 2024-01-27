@@ -8,3 +8,6 @@ license = "MPL-2.0"
 
 [dependencies]
 vrl.workspace = true
+
+chrono = { version = "0.4.31", default-features = false }
+iana-time-zone = "0.1.59"
