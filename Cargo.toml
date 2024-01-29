@@ -1115,7 +1115,23 @@ transforms-tag_cardinality_limit = ["dep:bloomy", "dep:hashbrown"]
 transforms-throttle = ["dep:governor"]
 
 # Sinks
-sinks = ["sinks-logs", "sinks-metrics"]
+sinks-metrics = [
+  "sinks-appsignal",
+  "sinks-aws_cloudwatch_metrics",
+  "sinks-blackhole",
+  "sinks-console",
+  "sinks-datadog_metrics",
+  "sinks-greptimedb",
+  "sinks-humio",
+  "sinks-influxdb",
+  "sinks-kafka",
+  "sinks-prometheus",
+  "sinks-sematext",
+  "sinks-statsd",
+  "sinks-sumo_logic"
+  "sinks-vector",
+  "sinks-splunk_hec"
+]sinks = ["sinks-logs", "sinks-metrics"]
 sinks-logs = [
   "sinks-amqp",
   "sinks-appsignal",
@@ -1158,23 +1174,6 @@ sinks-logs = [
   "sinks-vector",
   "sinks-webhdfs",
   "sinks-websocket",
-]
-sinks-metrics = [
-  "sinks-appsignal",
-  "sinks-aws_cloudwatch_metrics",
-  "sinks-blackhole",
-  "sinks-console",
-  "sinks-datadog_metrics",
-  "sinks-greptimedb",
-  "sinks-humio",
-  "sinks-influxdb",
-  "sinks-kafka",
-  "sinks-prometheus",
-  "sinks-sematext",
-  "sinks-statsd",
-  "sinks-sumo_logic",
-  "sinks-vector",
-  "sinks-splunk_hec",
 ]
 
 sinks-amqp = ["lapin"]
