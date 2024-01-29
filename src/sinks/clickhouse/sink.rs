@@ -4,6 +4,8 @@ use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimite
 use super::service::{ClickhouseRequest, ClickhouseRetryLogic, ClickhouseService};
 use crate::sinks::prelude::*;
 
+use crate::sinks::clickhouse::config::Format;
+
 pub struct ClickhouseSink {
     batch_settings: BatcherSettings,
     compression: Compression,
@@ -12,6 +14,7 @@ pub struct ClickhouseSink {
     protocol: &'static str,
     database: Template,
     table: Template,
+    format: Format,
 }
 
 impl ClickhouseSink {
@@ -23,6 +26,7 @@ impl ClickhouseSink {
         protocol: &'static str,
         database: Template,
         table: Template,
+        format: Format,
     ) -> Self {
         Self {
             batch_settings,
@@ -38,6 +42,7 @@ impl ClickhouseSink {
             protocol,
             database,
             table,
+            format,
         }
     }
 
@@ -54,6 +59,7 @@ impl ClickhouseSink {
                 ClickhouseRequestBuilder {
                     compression: self.compression,
                     encoding: self.encoding,
+                    format: self.format,
                 },
             )
             .filter_map(|request| async {
@@ -85,6 +91,7 @@ impl StreamSink<Event> for ClickhouseSink {
 struct ClickhouseRequestBuilder {
     compression: Compression,
     encoding: (Transformer, Encoder<Framer>),
+    format: Format,
 }
 
 impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
@@ -124,6 +131,7 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
         ClickhouseRequest {
             database: key.database,
             table: key.table,
+            format: self.format,
             body: payload.into_payload(),
             compression: self.compression,
             finalizers,
