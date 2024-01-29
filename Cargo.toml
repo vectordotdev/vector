@@ -670,7 +670,6 @@ sinks-metrics = [
   "sinks-prometheus",
   "sinks-sematext",
   "sinks-statsd",
-  "sinks-sumo_logic",
   "sinks-vector",
   "sinks-splunk_hec"
 ]
