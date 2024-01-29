@@ -93,6 +93,8 @@ pub mod socket;
 pub mod splunk_hec;
 #[cfg(feature = "sinks-statsd")]
 pub mod statsd;
+#[cfg(feature = "sinks-sumo_logic")]
+pub mod sumo_logic;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
 #[cfg(feature = "sinks-webhdfs")]
