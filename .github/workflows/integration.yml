@@ -116,7 +116,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh amqp
+          command: bash scripts/ci-integration-test.sh int amqp
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.appsignal == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
@@ -125,7 +125,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  appsignal
+          command: bash scripts/ci-integration-test.sh int  appsignal
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.aws == 'true' }}
         name: aws
@@ -133,7 +133,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  aws
+          command: bash scripts/ci-integration-test.sh int  aws
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.axiom == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
@@ -142,7 +142,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  axiom
+          command: bash scripts/ci-integration-test.sh int  axiom
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.azure == 'true' }}
         name: azure
@@ -150,7 +150,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  azure
+          command: bash scripts/ci-integration-test.sh int  azure
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.clickhouse == 'true' }}
         name: clickhouse
@@ -158,7 +158,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  clickhouse
+          command: bash scripts/ci-integration-test.sh int  clickhouse
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.databend == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
@@ -167,7 +167,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  databend
+          command: bash scripts/ci-integration-test.sh int  databend
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-agent == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
@@ -176,7 +176,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  datadog-agent
+          command: bash scripts/ci-integration-test.sh int  datadog-agent
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-logs == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
@@ -185,7 +185,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  datadog-logs
+          command: bash scripts/ci-integration-test.sh int  datadog-logs
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
@@ -196,7 +196,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  datadog-metrics
+          command: bash scripts/ci-integration-test.sh int  datadog-metrics
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-traces == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
@@ -205,7 +205,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  datadog-traces
+          command: bash scripts/ci-integration-test.sh int  datadog-traces
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.dnstap == 'true' }}
         name: dnstap
@@ -213,7 +213,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  dnstap
+          command: bash scripts/ci-integration-test.sh int  dnstap
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.docker-logs == 'true' }}
         name: docker-logs
@@ -221,7 +221,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  docker-logs
+          command: bash scripts/ci-integration-test.sh int  docker-logs
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
         name: elasticsearch
@@ -229,7 +229,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  elasticsearch
+          command: bash scripts/ci-integration-test.sh int  elasticsearch
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
         name: eventstoredb
@@ -237,7 +237,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  eventstoredb
+          command: bash scripts/ci-integration-test.sh int  eventstoredb
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.fluent == 'true' }}
         name: fluent
@@ -245,7 +245,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  fluent
+          command: bash scripts/ci-integration-test.sh int  fluent
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.gcp == 'true' }}
         name: gcp
@@ -253,7 +253,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  gcp
+          command: bash scripts/ci-integration-test.sh int  gcp
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.greptimedb == 'true' }}
         name: greptimedb
@@ -261,7 +261,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  greptimedb
+          command: bash scripts/ci-integration-test.sh int  greptimedb
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
@@ -271,7 +271,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  humio
+          command: bash scripts/ci-integration-test.sh int  humio
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.http-client == 'true' }}
         name: http-client
@@ -279,7 +279,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  http-client
+          command: bash scripts/ci-integration-test.sh int  http-client
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.influxdb == 'true' }}
         name: influxdb
@@ -287,7 +287,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  influxdb
+          command: bash scripts/ci-integration-test.sh int  influxdb
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.kafka == 'true' }}
         name: kafka
@@ -295,7 +295,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  kafka
+          command: bash scripts/ci-integration-test.sh int  kafka
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.logstash == 'true' }}
         name: logstash
@@ -303,7 +303,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  logstash
+          command: bash scripts/ci-integration-test.sh int  logstash
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.loki == 'true' }}
         name: loki
@@ -311,7 +311,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  loki
+          command: bash scripts/ci-integration-test.sh int  loki
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.mongodb == 'true' }}
         name: mongodb
@@ -319,7 +319,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  mongodb
+          command: bash scripts/ci-integration-test.sh int  mongodb
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.nats == 'true' }}
         name: nats
@@ -327,7 +327,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  nats
+          command: bash scripts/ci-integration-test.sh int  nats
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.nginx == 'true' }}
         name: nginx
@@ -335,7 +335,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  nginx
+          command: bash scripts/ci-integration-test.sh int  nginx
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
@@ -345,7 +345,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  opentelemetry
+          command: bash scripts/ci-integration-test.sh int  opentelemetry
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.postgres == 'true' }}
         name: postgres
@@ -353,7 +353,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  postgres
+          command: bash scripts/ci-integration-test.sh int  postgres
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.prometheus == 'true' }}
         name: prometheus
@@ -361,7 +361,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  prometheus
+          command: bash scripts/ci-integration-test.sh int  prometheus
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.pulsar == 'true' }}
         name: pulsar
@@ -369,7 +369,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  pulsar
+          command: bash scripts/ci-integration-test.sh int  pulsar
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.redis == 'true' }}
         name: redis
@@ -377,7 +377,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  redis
+          command: bash scripts/ci-integration-test.sh int  redis
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' }}
         name: shutdown
@@ -385,7 +385,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  shutdown
+          command: bash scripts/ci-integration-test.sh int  shutdown
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.splunk == 'true' }}
         name: splunk
@@ -393,7 +393,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  splunk
+          command: bash scripts/ci-integration-test.sh int  splunk
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.webhdfs == 'true' }}
         name: webhdfs
@@ -401,7 +401,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  webhdfs
+          command: bash scripts/ci-integration-test.sh int  webhdfs
 
   integration-test-suite:
     name: Integration Test Suite
