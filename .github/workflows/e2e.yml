@@ -81,7 +81,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh e2e datadog-logs
+          command: bash scripts/ci-int-e2e-test.sh e2e datadog-logs
 
       - if: (github.event_name == 'schedule' || needs.changes.outputs.all-e2e == 'true' || needs.changes.outputs.e2e-datadog-metrics == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
@@ -90,7 +90,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh e2e datadog-metrics
+          command: bash scripts/ci-int-e2e-test.sh e2e datadog-metrics
 
 
   e2e-test-suite:

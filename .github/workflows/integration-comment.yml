@@ -100,7 +100,7 @@ jobs:
           # First one requires more time, as we need to build the image from scratch
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int amqp
+          command: bash scripts/ci-int-e2e-test.sh int amqp
 
       - name: appsignal
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-appsignal')
@@ -110,7 +110,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int appsignal
+          command: bash scripts/ci-int-e2e-test.sh int appsignal
 
       - name: aws
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-aws')
@@ -120,7 +120,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int aws
+          command: bash scripts/ci-int-e2e-test.sh int aws
 
       - name: axiom
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-axiom')
@@ -130,7 +130,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int axiom
+          command: bash scripts/ci-int-e2e-test.sh int axiom
 
       - name: azure
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-azure')
@@ -140,7 +140,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int azure
+          command: bash scripts/ci-int-e2e-test.sh int azure
 
       - name: clickhouse
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-clickhouse')
@@ -150,7 +150,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int clickhouse
+          command: bash scripts/ci-int-e2e-test.sh int clickhouse
 
       - name: databend
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-databend')
@@ -160,7 +160,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int databend
+          command: bash scripts/ci-int-e2e-test.sh int databend
 
       - name: datadog-agent
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-agent')
@@ -170,7 +170,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int datadog-agent
+          command: bash scripts/ci-int-e2e-test.sh int datadog-agent
 
       - name: datadog-logs
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-logs')
@@ -180,7 +180,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int datadog-logs
+          command: bash scripts/ci-int-e2e-test.sh int datadog-logs
 
       - name: datadog-metrics
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-metrics')
@@ -190,7 +190,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int datadog-metrics
+          command: bash scripts/ci-int-e2e-test.sh int datadog-metrics
 
       - name: datadog-traces
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-traces')
@@ -200,7 +200,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int datadog-traces
+          command: bash scripts/ci-int-e2e-test.sh int datadog-traces
 
       - name: dnstap
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-dnstap')
@@ -210,7 +210,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int dnstap
+          command: bash scripts/ci-int-e2e-test.sh int dnstap
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
@@ -222,7 +222,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int docker-logs
+          command: bash scripts/ci-int-e2e-test.sh int docker-logs
 
       - name: elasticsearch
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-elasticsearch')
@@ -232,7 +232,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int elasticsearch
+          command: bash scripts/ci-int-e2e-test.sh int elasticsearch
 
       - name: eventstoredb
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-eventstoredb')
@@ -242,7 +242,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int eventstoredb
+          command: bash scripts/ci-int-e2e-test.sh int eventstoredb
 
       - name: fluent
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-fluent')
@@ -252,7 +252,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int fluent
+          command: bash scripts/ci-int-e2e-test.sh int fluent
 
       - name: gcp
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-gcp')
@@ -262,7 +262,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int gcp
+          command: bash scripts/ci-int-e2e-test.sh int gcp
 
       - name: greptimedb
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-greptimedb')
@@ -272,7 +272,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int greptimedb
+          command: bash scripts/ci-int-e2e-test.sh int greptimedb
 
       - name: humio
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-humio')
@@ -282,7 +282,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int humio
+          command: bash scripts/ci-int-e2e-test.sh int humio
 
       - name: http-client
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-http-client')
@@ -292,7 +292,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int http-client
+          command: bash scripts/ci-int-e2e-test.sh int http-client
 
       - name: influxdb
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-influxdb')
@@ -302,7 +302,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int influxdb
+          command: bash scripts/ci-int-e2e-test.sh int influxdb
 
       - name: kafka
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-kafka')
@@ -312,7 +312,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int kafka
+          command: bash scripts/ci-int-e2e-test.sh int kafka
 
       - name: logstash
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-logstash')
@@ -322,7 +322,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int logstash
+          command: bash scripts/ci-int-e2e-test.sh int logstash
 
       - name: loki
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-loki')
@@ -332,7 +332,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int loki
+          command: bash scripts/ci-int-e2e-test.sh int loki
 
       - name: mongodb
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-mongodb')
@@ -342,7 +342,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int mongodb
+          command: bash scripts/ci-int-e2e-test.sh int mongodb
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
@@ -354,7 +354,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int nats
+          command: bash scripts/ci-int-e2e-test.sh int nats
 
       - name: nginx
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-nginx')
@@ -364,7 +364,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int nginx
+          command: bash scripts/ci-int-e2e-test.sh int nginx
 
       - name: opentelemetry
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-opentelemetry')
@@ -374,7 +374,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int opentelemetry
+          command: bash scripts/ci-int-e2e-test.sh int opentelemetry
 
       - name: postgres
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-postgres')
@@ -384,7 +384,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int postgres
+          command: bash scripts/ci-int-e2e-test.sh int postgres
 
       - name: prometheus
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-prometheus')
@@ -394,7 +394,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int prometheus
+          command: bash scripts/ci-int-e2e-test.sh int prometheus
 
       - name: pulsar
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-pulsar')
@@ -404,7 +404,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int pulsar
+          command: bash scripts/ci-int-e2e-test.sh int pulsar
 
       - name: redis
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-redis')
@@ -414,7 +414,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int redis
+          command: bash scripts/ci-int-e2e-test.sh int redis
 
       - name: shutdown
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-shutdown')
@@ -424,7 +424,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int shutdown
+          command: bash scripts/ci-int-e2e-test.sh int shutdown
 
       - name: splunk
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-splunk')
@@ -434,7 +434,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int splunk
+          command: bash scripts/ci-int-e2e-test.sh int splunk
 
       - name: webhdfs
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-webhdfs')
@@ -444,7 +444,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh int webhdfs
+          command: bash scripts/ci-int-e2e-test.sh int webhdfs
 
   e2e-tests:
     needs: prep-pr
@@ -465,7 +465,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh e2e datadog-logs
+          command: bash scripts/ci-int-e2e-test.sh e2e datadog-logs
 
       - name: datadog-e2e-metrics
         if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-e2e-metrics')
@@ -475,7 +475,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh e2e datadog-metrics
+          command: bash scripts/ci-int-e2e-test.sh e2e datadog-metrics
 
   update-pr-status:
     name: Signal result to PR
