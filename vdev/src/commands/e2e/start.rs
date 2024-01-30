@@ -1,14 +1,14 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::integration::IntegrationTest;
+use crate::testing::integration::E2ETest;
 
 /// Start an environment
 #[derive(Args, Debug)]
 #[command()]
 pub struct Cli {
-    /// The integration name
-    integration: String,
+    /// The e2e test name
+    test: String,
 
     /// The desired environment name to start. If omitted, the first environment name is used.
     environment: Option<String>,
@@ -16,9 +16,6 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::start::exec::<IntegrationTest>(
-            &self.integration,
-            &self.environment,
-        )
+        crate::commands::compose_tests::start::exec::<E2ETest>(&self.test, &self.environment)
     }
 }

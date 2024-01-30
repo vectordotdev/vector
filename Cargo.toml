@@ -740,13 +740,6 @@ nightly = []
 
 # Integration testing-related features
 all-integration-tests = [
-  # TODO: This is a temporary solution. When this GH issue
-  # https://github.com/vectordotdev/vector/issues/18829 , is worked, we will refactor
-  # to have a separate vdev e2e subcommand, and we can then use "all-e2e-tests" in
-  # that subcommand's processing. Until then the e2e tests must be included here
-  # in order for them to be exercised in CI.
-  "all-e2e-tests",
-
   "amqp-integration-tests",
   "appsignal-integration-tests",
   "aws-integration-tests",

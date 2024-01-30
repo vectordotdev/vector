@@ -52,6 +52,7 @@ dkr
 Dockerfiles
 DOOV
 Douban
+E2ETest
 Enot
 Evercoss
 Explay
