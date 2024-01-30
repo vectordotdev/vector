@@ -20,7 +20,7 @@
 
 ##------------------------------------------------------------------------------
 
-[transforms.remap_metadata]
+[transforms.remap_test_metadata]
   inputs = []
   type = "remap"
   source = '''
@@ -29,9 +29,9 @@
   '''
 
 [[tests]]
-  name = "remap_metadata"
+  name = "remap_test_metadata"
   [[tests.inputs]]
-    insert_at = "remap_metadata"
+    insert_at = "remap_test_metadata"
     type = "vrl"
     source = '''
       . = "Event"
@@ -39,7 +39,7 @@
     '''
 
   [[tests.outputs]]
-    extract_from = "remap_metadata"
+    extract_from = "remap_test_metadata"
     [[tests.outputs.conditions]]
       type = "vrl"
       source = '''
