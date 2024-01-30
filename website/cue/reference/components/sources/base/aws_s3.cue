@@ -528,7 +528,7 @@ base: components: sources: aws_s3: configuration: {
 				description: """
 					Whether to delete non-retryable messages.
 
-					If a message is rejected by the sink and not retryable, it will be deleted from the queue.
+					If a message is rejected by the sink and not retryable, it is deleted from the queue.
 					"""
 				required: false
 				type: bool: default: true
