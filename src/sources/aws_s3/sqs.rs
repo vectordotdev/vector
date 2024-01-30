@@ -102,9 +102,9 @@ pub(super) struct Config {
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
 
-    /// Whether to delete non-retryable messages
+    /// Whether to delete non-retryable messages.
     ///
-    /// If a message is rejected by the sink and not retryable, it will be deleted from the queue.
+    /// If a message is rejected by the sink and not retryable, it is deleted from the queue.
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_failed_message: bool,
