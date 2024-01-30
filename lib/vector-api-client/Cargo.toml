@@ -9,7 +9,7 @@ license = "MPL-2.0"
 [dependencies]
 
 # Serde
-serde = { version = "1.0.195", default-features = false, features = ["derive"] }
+serde.workspace = true
 serde_json.workspace = true
 
 # Error handling

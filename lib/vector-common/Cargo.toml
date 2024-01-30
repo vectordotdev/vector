@@ -25,7 +25,6 @@ conversion = [
 ]
 
 encoding = [
-  "serde",
   "dep:nom",
   "dep:snafu",
   "btreemap"
@@ -54,8 +53,8 @@ ordered-float = { version = "4.2.0", default-features = false }
 paste = "1.0.14"
 pin-project.workspace = true
 ryu = { version = "1", default-features = false }
+serde.workspace = true
 serde_json.workspace = true
-serde = { version = "1.0.195", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }
 stream-cancel = { version = "0.8.2", default-features = false }
