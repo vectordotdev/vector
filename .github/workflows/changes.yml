@@ -252,8 +252,8 @@ jobs:
     if: ${{ inputs.e2e_tests }}
     outputs:
       all-tests: ${{ steps.filter.outputs.all-tests}}
-      datadog-logs: ${{ steps.filter.outputs.e2e-datadog-logs }}
-      datadog-metrics: ${{ steps.filter.outputs.e2e-datadog-metrics }}
+      datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
+      datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
     steps:
       - uses: actions/checkout@v3
 
