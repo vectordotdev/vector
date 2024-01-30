@@ -230,6 +230,24 @@ pub(super) async fn validate() {
         "different number of unique Series contexts received"
     );
 
+    // The assertions we make below can be summarized as follows:
+    //   - For each metric type, we have a different set of assertions which are relevant to
+    //     the expectations for that metric type's behavior. For example, gauges are a last
+    //     write wins. While rates are taken as a summation over the time interval.
+    //
+    //   - The intake from each case (Agent only, and Agent->Vector) is stored in a data structure
+    //     that allows us to compare the consistency in the overall shape of the data collected
+    //     during the entire test duration, regardless of how requests are batched. This is because
+    //     the data is stored based on a timebucket, and not per request. And the timebuckets holding
+    //     data points are collected in BTreeMap, which means the sort order will be consistent,
+    //     regardless of whether the actual timestamps between the Agent only vs Agent+Vector cases
+    //     are identical (which they may not be, since there is no guarantee the compose services
+    //     started at the same time, nor that the Agent will instances will process in the same time).
+    //
+    //     Together, this means that data sets passing these validations confirm that the Vector version
+    //     used in the test case is not introducing inconsistencies in the data flowing between the
+    //     Agent and the Datadog backend.
+
     agent_intake
         .iter()
         .zip(vector_intake.iter())
