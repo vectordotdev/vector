@@ -50,7 +50,8 @@ jobs:
     if: always() && (
       github.event_name == 'schedule' || (
           needs.changes.outputs.all-e2e == 'true'
-            || needs.changes.outputs.e2e-datadog-logs == 'true'
+            || needs.changes.outputs.datadog-logs == 'true'
+            || needs.changes.outputs.datadog-metrics == 'true'
         )
       )
     timeout-minutes: 45
