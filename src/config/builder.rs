@@ -207,7 +207,6 @@ impl From<Config> for ConfigBuilder {
             secret,
             graceful_shutdown_duration,
             hash: _,
-            ..
         } = config;
 
         let transforms = transforms

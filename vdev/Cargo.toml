@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 anyhow = "1.0.79"
 cached = "0.48.0"
-chrono = { version = "0.4.31", default-features = false, features = ["serde", "clock"] }
+chrono.workspace = true
 clap.workspace = true
 clap-verbosity-flag = "2.1.2"
 clap_complete = "4.4.9"
@@ -32,7 +32,7 @@ paste = "1.0.14"
 regex = { version = "1.10.3", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.111"
+serde_json.workspace = true
 serde_yaml = "0.9.30"
 sha2 = "0.10.8"
 tempfile = "3.9.0"
