@@ -23,7 +23,7 @@ impl Cli {
         crate::commands::compose_tests::start::exec::<IntegrationTest>(
             &self.integration,
             &self.environment,
-            &self.build_all,
+            self.build_all,
         )
     }
 }

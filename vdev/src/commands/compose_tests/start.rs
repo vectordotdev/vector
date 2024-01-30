@@ -2,7 +2,11 @@ use anyhow::Result;
 
 use crate::testing::{config::ComposeTestConfig, integration::ComposeTestT};
 
-pub(crate) fn exec<T: ComposeTestT>(integration: &str, environment: &Option<String>) -> Result<()> {
+pub(crate) fn exec<T: ComposeTestT>(
+    integration: &str,
+    environment: &Option<String>,
+    build_all: bool,
+) -> Result<()> {
     let environment = if let Some(environment) = environment {
         environment.clone()
     } else {
@@ -12,5 +16,5 @@ pub(crate) fn exec<T: ComposeTestT>(integration: &str, environment: &Option<Stri
         env.clone()
     };
 
-    T::start(&T::generate(integration, environment, false, 0)?)
+    T::start(&T::generate(integration, environment, build_all, 0)?)
 }
