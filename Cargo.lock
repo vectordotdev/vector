@@ -4484,9 +4484,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
 dependencies = [
  "either",
 ]
@@ -5255,7 +5255,7 @@ version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aaade5f94e5829db58791664ba98f35fea6a3ffebc783becb51dc97c7a21abee"
 dependencies = [
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "once_cell",
  "proc-macro-error",
  "proc-macro2 1.0.78",
@@ -7099,7 +7099,7 @@ dependencies = [
  "cassowary",
  "crossterm",
  "indoc",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "lru",
  "paste",
  "stability",
@@ -9699,7 +9699,7 @@ dependencies = [
  "hex",
  "indexmap 2.1.0",
  "indicatif",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "log",
  "once_cell",
  "os_info",
@@ -9806,7 +9806,7 @@ dependencies = [
  "indoc",
  "infer 0.15.0",
  "inventory",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "k8s-openapi 0.18.0",
  "kube",
  "lapin",
@@ -10291,7 +10291,7 @@ dependencies = [
  "hostname",
  "indexmap 2.1.0",
  "indoc",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "lalrpop",
  "lalrpop-util",
  "md-5",
