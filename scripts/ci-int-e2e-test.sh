@@ -11,9 +11,9 @@ if [[ -z "${CI:-}" ]]; then
   exit 1
 fi
 
-if [ $# -ne 1 ]
+if [ $# -ne 2 ]
 then
-  echo "usage: $0 INTEGRATION"
+  echo "usage: $0 [int|e2e] TEST_NAME"
   exit 1
 fi
 
