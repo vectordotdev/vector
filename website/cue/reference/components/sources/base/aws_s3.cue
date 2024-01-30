@@ -526,7 +526,7 @@ base: components: sources: aws_s3: configuration: {
 			}
 			delete_failed_message: {
 				description: """
-					Whether to delete non-retryable messages
+					Whether to delete non-retryable messages.
 
 					If a message is rejected by the sink and not retryable, it will be deleted from the queue.
 					"""
