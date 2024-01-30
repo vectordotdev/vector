@@ -238,7 +238,7 @@ pub(super) async fn validate() {
     //   - The intake from each case (Agent only, and Agent->Vector) is stored in a data structure
     //     that allows us to compare the consistency in the overall shape of the data collected
     //     during the entire test duration, regardless of how requests are batched. This is because
-    //     the data is stored based on a timebucket, and not per request. And the timebuckets holding
+    //     the data is stored based on a time bucket, and not per request. And the time buckets holding
     //     data points are collected in BTreeMap, which means the sort order will be consistent,
     //     regardless of whether the actual timestamps between the Agent only vs Agent+Vector cases
     //     are identical (which they may not be, since there is no guarantee the compose services
