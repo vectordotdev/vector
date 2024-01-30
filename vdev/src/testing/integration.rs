@@ -146,9 +146,11 @@ pub(crate) trait ComposeTestT {
         // For end-to-end tests, we want to run vector as a service, leveraging the
         // image for the runner. So we must build that image before starting the
         // compose so that it is available.
-        compose_test
-            .runner
-            .build(Some(&compose_test.config.features))?;
+        if Self::DIRECTORY == E2E_TESTS_DIR {
+            compose_test
+                .runner
+                .build(Some(&compose_test.config.features))?;
+        }
 
         compose_test.config.check_required()?;
         if let Some(compose) = &compose_test.compose {
