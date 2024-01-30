@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: get_vector_timezone: {
-	category: "System"
+	category:    "System"
 	description: """
 		Returns the name of the timezone in the vector configuration
 		(see [global configuration options](\(urls.vector_configuration_global))).
