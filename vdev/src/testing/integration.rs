@@ -133,6 +133,7 @@ pub(crate) trait ComposeTestT {
             &compose_test.config.runner.env,
             Some(&compose_test.config.features),
             &args,
+            Self::DIRECTORY,
         )?;
 
         if !active {
@@ -149,7 +150,7 @@ pub(crate) trait ComposeTestT {
         if Self::DIRECTORY == E2E_TESTS_DIR {
             compose_test
                 .runner
-                .build(Some(&compose_test.config.features))?;
+                .build(Some(&compose_test.config.features), Self::DIRECTORY)?;
         }
 
         compose_test.config.check_required()?;

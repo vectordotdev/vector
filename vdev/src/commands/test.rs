@@ -53,6 +53,7 @@ impl Cli {
             &BTreeMap::default(),
             None,
             &args,
+            "",
         )
     }
 }
