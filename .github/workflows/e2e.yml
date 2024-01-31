@@ -1,5 +1,9 @@
 # End to End Suite
 #
+# Runs on:
+#   - PRs if there are code changes to the source files that are noted in `vdev e2e ci_paths`
+#   - MQ (always pass)
+#   - Scheduled: at midnight UTC Tues-Sat
 
 name: E2E Test Suite
 

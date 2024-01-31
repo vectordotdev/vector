@@ -89,7 +89,7 @@ jobs:
             || needs.changes.outputs.webhdfs == 'true'
         )
       )
-    timeout-minutes: 90
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v3
         with:

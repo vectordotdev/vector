@@ -458,7 +458,7 @@ jobs:
 
       - run: docker image prune -af ; docker container prune -f
       - name: e2e-datadog-logs
-        if: ${{ contains(github.event.comment.body, '/ci-run-integration-e2e-datadog-logs')
+        if: ${{ contains(github.event.comment.body, '/ci-run-e2e-datadog-logs')
           || contains(github.event.comment.body, '/ci-run-integration-all')
           || contains(github.event.comment.body, '/ci-run-all') }}
         uses: nick-fields/retry@v2
@@ -468,7 +468,7 @@ jobs:
           command: bash scripts/ci-int-e2e-test.sh e2e datadog-logs
 
       - name: datadog-e2e-metrics
-        if: ${{ contains(github.event.comment.body, '/ci-run-integration-datadog-e2e-metrics')
+        if: ${{ contains(github.event.comment.body, '/ci-run-e2e-datadog-metrics')
           || contains(github.event.comment.body, '/ci-run-integration-all')
           || contains(github.event.comment.body, '/ci-run-all') }}
         uses: nick-fields/retry@v2
