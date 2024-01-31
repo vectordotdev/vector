@@ -493,7 +493,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
-            None
+            None,
         )
         .await;
     }
@@ -522,7 +522,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Json(JsonDeserializerConfig::default()),
-            None
+            None,
         )
         .await;
     }
@@ -543,7 +543,7 @@ mod integration_tests {
             Delivered,
             true,
             DeserializerConfig::Bytes,
-            None
+            None,
         )
         .await;
     }
@@ -565,7 +565,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
-            None
+            None,
         )
         .await;
     }
@@ -587,7 +587,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
-            None
+            None,
         )
         .await;
     }
@@ -617,7 +617,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
-            None
+            None,
         )
         .await;
     }
@@ -648,7 +648,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
-            None
+            None,
         )
         .await;
     }
@@ -679,7 +679,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
-            None
+            None,
         )
         .await;
     }
@@ -708,7 +708,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
-            None
+            None,
         )
         .await;
     }
@@ -732,7 +732,7 @@ mod integration_tests {
             Errored,
             false,
             DeserializerConfig::Bytes,
-            None
+            None,
         )
         .await;
     }
@@ -753,7 +753,7 @@ mod integration_tests {
             Rejected,
             false,
             DeserializerConfig::Bytes,
-            None
+            None,
         )
         .await;
     }
@@ -777,7 +777,7 @@ mod integration_tests {
             Rejected,
             false,
             DeserializerConfig::Bytes,
-            Some(custom_options)
+            Some(custom_options),
         )
         .await;
     }
