@@ -130,6 +130,8 @@ chrono = { version = "0.4.33", default-features = false, features = ["clock", "s
 clap = { version = "4.4.18", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 indexmap = { version = "2.2.0", default-features = false, features = ["serde", "std"] }
 pin-project = { version = "1.1.4", default-features = false }
+proptest = "1.4"
+proptest-derive = "0.4.0"
 serde = { version = "1.0.196", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.112", default-features = false, features = ["raw_value", "std"] }
 vrl = { git = "https://github.com/vectordotdev/vrl", rev = "d54105b5aafe93f65f3d33063549a273d78d687d", features = ["arbitrary", "cli", "test", "test_framework"] }
@@ -364,7 +366,7 @@ criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.12.1", default-features = false, features = ["use_alloc"] }
 libc = "0.2.153"
 similar-asserts = "1.5.0"
-proptest = "1.4"
+proptest.workspace = true
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 rstest = {version = "0.18.2"}
