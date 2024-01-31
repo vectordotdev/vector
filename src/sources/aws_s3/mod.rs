@@ -486,7 +486,6 @@ mod integration_tests {
             None,
             None,
             None,
-            None,
             logs.join("\n").into_bytes(),
             logs,
             Delivered,
@@ -515,7 +514,6 @@ mod integration_tests {
             None,
             None,
             None,
-            None,
             json_logs.join("\n").into_bytes(),
             logs,
             Delivered,
@@ -532,7 +530,6 @@ mod integration_tests {
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         test_event(
-            None,
             None,
             None,
             None,
@@ -554,7 +551,6 @@ mod integration_tests {
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         test_event(
-            None,
             Some(key),
             None,
             None,
@@ -576,7 +572,6 @@ mod integration_tests {
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         test_event(
-            None,
             Some(key),
             None,
             None,
@@ -606,7 +601,6 @@ mod integration_tests {
         gz.read_to_end(&mut buffer).unwrap();
 
         test_event(
-            None,
             None,
             Some("gzip"),
             None,
@@ -638,7 +632,6 @@ mod integration_tests {
 
         test_event(
             None,
-            None,
             Some("gzip"),
             None,
             None,
@@ -669,7 +662,6 @@ mod integration_tests {
 
         test_event(
             None,
-            None,
             Some("zstd"),
             None,
             None,
@@ -692,7 +684,6 @@ mod integration_tests {
             .collect();
 
         test_event(
-            None,
             None,
             None,
             None,
@@ -725,7 +716,6 @@ mod integration_tests {
             None,
             None,
             None,
-            None,
             logs.join("\n").into_bytes(),
             logs,
             Errored,
@@ -746,45 +736,10 @@ mod integration_tests {
             None,
             None,
             None,
-            None,
             logs.join("\n").into_bytes(),
             logs,
             Rejected,
             false,
-            DeserializerConfig::Bytes,
-        )
-        .await;
-    }
-    #[tokio::test]
-    async fn handles_failed_status_without_deletion() {
-        trace_init();
-    
-        let logs: Vec<String> = random_lines(100).take(10).collect();
-    
-        // Create a configuration specific to this test, with delete_failed_message set to false
-        let sqs = sqs_client().await;
-        let queue = create_queue(&sqs).await;
-        let mut s3_config = config(
-            &queue,
-            None, 
-            false, 
-            DeserializerConfig::Bytes,
-        );
-    
-        if let Some(ref mut sqs_config) = s3_config.sqs {
-            sqs_config.delete_failed_message = false;
-        }
-    
-        test_event(
-            Some(s3_config),
-            None,
-            None, 
-            None,
-            None, 
-            logs.join("\n").into_bytes(), 
-            logs,
-            Rejected, 
-            false, 
             DeserializerConfig::Bytes,
         )
         .await;
@@ -822,7 +777,6 @@ mod integration_tests {
     // puts an object and asserts that the logs it gets back match
     #[allow(clippy::too_many_arguments)]
     async fn test_event(
-        s3_config: Option<AwsS3Config>,
         key: Option<String>,
         content_encoding: Option<&str>,
         content_type: Option<&str>,
@@ -844,12 +798,7 @@ mod integration_tests {
 
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            let s3_config = match s3_config {
-                Some(cfg) => cfg,
-                None => {
-                    config(&queue, multiline, log_namespace, decoding) 
-                },
-            };
+            let config = config(&queue, multiline, log_namespace, decoding);
 
             s3.put_object()
                 .bucket(bucket.clone())
@@ -923,7 +872,7 @@ mod integration_tests {
             let (tx, rx) = SourceSender::new_test_finalize(status);
             let cx = SourceContext::new_test(tx, None);
             let namespace = cx.log_namespace(Some(log_namespace));
-            let source = s3_config.build(cx).await.unwrap();
+            let source = config.build(cx).await.unwrap();
             tokio::spawn(async move { source.await.unwrap() });
 
             let events = collect_n(rx, expected_lines.len()).await;
@@ -931,7 +880,7 @@ mod integration_tests {
             assert_eq!(expected_lines.len(), events.len());
             for (i, event) in events.iter().enumerate() {
 
-                if let Some(schema_definition) = s3_config.outputs(namespace).pop().unwrap().schema_definition {
+                if let Some(schema_definition) = config.outputs(namespace).pop().unwrap().schema_definition {
                     schema_definition.is_valid_for_event(event).unwrap();
                 }
 
@@ -956,9 +905,6 @@ mod integration_tests {
             match status {
                 Errored => {
                     // need to wait up to the visibility timeout before it will be counted again
-                    assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
-                }
-                Rejected if !s3_config.sqs.unwrap().delete_failed_message => {
                     assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
                 }
                 _ => {
