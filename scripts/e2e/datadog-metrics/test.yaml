@@ -1,0 +1,27 @@
+features:
+- e2e-tests-datadog
+
+test: "e2e"
+
+test_filter: 'datadog::metrics::'
+
+runner:
+  env:
+    VECTOR_RECEIVE_PORT: '8081'
+    FAKE_INTAKE_AGENT_ENDPOINT: 'http://fakeintake-agent:80'
+    FAKE_INTAKE_VECTOR_ENDPOINT: 'http://fakeintake-vector:80'
+
+matrix:
+  # validate against the Agent latest nightly and also stable v6 and v7
+  agent_version: ['latest', '6', '7']
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/common/datadog.rs"
+- "src/sources/datadog_agent/**"
+- "src/internal_events/datadog_*"
+- "src/sinks/datadog/metrics/**"
+- "src/sinks/util/**"
+- "scripts/integration/datadog-e2e/metrics/**"
+- "tests/data/e2e/datadog/metrics/**"

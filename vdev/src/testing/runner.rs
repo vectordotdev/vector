@@ -80,8 +80,14 @@ pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
 }
 
 pub trait TestRunner {
-    fn test(&self, outer_env: &Environment, inner_env: &Environment, args: &[String])
-        -> Result<()>;
+    fn test(
+        &self,
+        outer_env: &Environment,
+        inner_env: &Environment,
+        features: Option<&[String]>,
+        args: &[String],
+        directory: &str,
+    ) -> Result<()>;
 }
 
 pub trait ContainerTestRunner: TestRunner {
@@ -129,7 +135,7 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(RunnerState::Missing)
     }
 
-    fn ensure_running(&self) -> Result<()> {
+    fn ensure_running(&self, features: Option<&[String]>, directory: &str) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
             RunnerState::Created | RunnerState::Exited => self.start()?,
@@ -140,7 +146,7 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build()?;
+                self.build(features, directory)?;
                 self.ensure_volumes()?;
                 self.create()?;
                 self.start()?;
@@ -168,8 +174,8 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(())
     }
 
-    fn build(&self) -> Result<()> {
-        let dockerfile: PathBuf = [app::path(), "scripts", "integration", "Dockerfile"]
+    fn build(&self, features: Option<&[String]>, directory: &str) -> Result<()> {
+        let dockerfile: PathBuf = [app::path(), "scripts", directory, "Dockerfile"]
             .iter()
             .collect();
         let mut command = dockercmd(["build"]);
@@ -187,6 +193,8 @@ pub trait ContainerTestRunner: TestRunner {
             "vector-test-runner=true",
             "--build-arg",
             &format!("RUST_VERSION={}", get_rust_version()),
+            "--build-arg",
+            &format!("FEATURES={}", features.unwrap_or(&[]).join(",")),
             ".",
         ]);
 
@@ -264,9 +272,11 @@ where
         &self,
         outer_env: &Environment,
         inner_env: &Environment,
+        features: Option<&[String]>,
         args: &[String],
+        directory: &str,
     ) -> Result<()> {
-        self.ensure_running()?;
+        self.ensure_running(features, directory)?;
 
         let mut command = dockercmd(["exec"]);
         if *IS_A_TTY {
@@ -398,7 +408,9 @@ impl TestRunner for LocalTestRunner {
         &self,
         outer_env: &Environment,
         inner_env: &Environment,
+        _features: Option<&[String]>,
         args: &[String],
+        _directory: &str,
     ) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);

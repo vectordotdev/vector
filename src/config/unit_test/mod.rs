@@ -32,7 +32,7 @@ use crate::{
         self, loading, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
         TestDefinition, TestInput, TestInputValue, TestOutput,
     },
-    event::{Event, LogEvent, Value},
+    event::{Event, EventMetadata, LogEvent, Value},
     signal,
     topology::{builder::TopologyPieces, RunningTopology},
 };
@@ -581,7 +581,12 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                 result
                     .program
                     .resolve(&mut ctx)
-                    .map(|v| Event::Log(LogEvent::from(v.clone())))
+                    .map(|_| {
+                        Event::Log(LogEvent::from_parts(
+                            target.value.clone(),
+                            EventMetadata::default_with_value(target.metadata.clone()),
+                        ))
+                    })
                     .map_err(|e| e.to_string())
             } else {
                 Err("input type 'vrl' requires the field 'source'".to_string())

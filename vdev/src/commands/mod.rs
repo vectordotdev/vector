@@ -1,6 +1,8 @@
 use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 
+mod compose_tests;
+
 /// This macro simplifies the generation of CLI subcommand invocation structures by combining the
 /// creation of the command enum and implementation of the dispatch function into one simple list.
 #[macro_export]
@@ -75,6 +77,7 @@ cli_commands! {
     mod complete,
     mod config,
     mod crate_versions,
+    mod e2e,
     mod exec,
     mod features,
     mod fmt,
