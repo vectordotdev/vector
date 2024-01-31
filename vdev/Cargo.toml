@@ -20,7 +20,7 @@ directories = "5.0.1"
 dunce = "1.0.4"
 glob = { version = "0.3.1", default-features = false }
 hex = "0.4.3"
-indexmap = { version = "2.0", default-features = false, features = ["serde", "std"] }
+indexmap.workspace = true
 indicatif = { version = "0.17.7", features = ["improved_unicode"] }
 itertools = "0.12.1"
 log = "0.4.20"
