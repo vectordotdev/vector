@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::integration::IntegrationTest;
+use crate::testing::integration::E2ETest;
 
-/// Execute integration tests
+/// Execute end-to-end tests
 ///
 /// If an environment is named, it is used to run the test. If the environment was not previously started,
 /// it is started before the test is run and stopped afterwards.
@@ -14,8 +14,8 @@ use crate::testing::integration::IntegrationTest;
 #[derive(Args, Debug)]
 #[command()]
 pub struct Cli {
-    /// The desired integration
-    integration: String,
+    /// The desired e2e test
+    e2e_test: String,
 
     /// The desired environment (optional)
     environment: Option<String>,
@@ -34,8 +34,8 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::test::exec::<IntegrationTest>(
-            &self.integration,
+        crate::commands::compose_tests::test::exec::<E2ETest>(
+            &self.e2e_test,
             &self.environment,
             self.build_all,
             self.retries.unwrap_or_default(),

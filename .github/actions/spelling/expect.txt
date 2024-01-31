@@ -449,6 +449,7 @@ gnux
 gny
 Godbolt
 gogoproto
+gohai
 goldberg
 goldmark
 GPB

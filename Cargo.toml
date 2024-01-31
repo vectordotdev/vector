@@ -23,6 +23,10 @@ bench = false
 name = "integration"
 path = "tests/integration/lib.rs"
 
+[[test]]
+name = "e2e"
+path = "tests/e2e/mod.rs"
+
 [[bin]]
 name = "graphql-schema"
 path = "src/api/schema/gen.rs"
@@ -739,7 +743,7 @@ enterprise = [
 # Identifies that the build is a nightly build
 nightly = []
 
-# Testing-related features
+# Integration testing-related features
 all-integration-tests = [
   "amqp-integration-tests",
   "appsignal-integration-tests",
@@ -845,6 +849,18 @@ webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
+
+# End-to-End testing-related features
+all-e2e-tests = [
+  "e2e-tests-datadog"
+]
+
+e2e-tests-datadog = [
+  "sources-datadog_agent",
+  "sinks-datadog_logs",
+  "sinks-datadog_metrics"
+]
+
 vector-api-tests = [
   "sources-demo_logs",
   "transforms-log_to_metric",
