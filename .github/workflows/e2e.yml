@@ -82,7 +82,7 @@ jobs:
       - if: (github.event_name == 'schedule' || needs.changes.outputs.all-e2e == 'true' || needs.changes.outputs.e2e-datadog-logs == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: e2e-datadog-logs
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 35
           max_attempts: 3
@@ -91,7 +91,7 @@ jobs:
       - if: (github.event_name == 'schedule' || needs.changes.outputs.all-e2e == 'true' || needs.changes.outputs.e2e-datadog-metrics == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: e2e-datadog-metrics
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 35
           max_attempts: 3
