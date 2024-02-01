@@ -22,7 +22,7 @@ serde.workspace = true
 serde_json.workspace = true
 serde_with = { version = "3.5.0", default-features = false, features = ["std"] }
 snafu = { version = "0.7.5", default-features = false }
-toml = { version = "0.8.8", default-features = false }
+toml = { version = "0.8.9", default-features = false }
 tracing = { version = "0.1.34", default-features = false }
 url = { version = "2.5.0", default-features = false, features = ["serde"] }
 http = { version = "0.2.9", default-features = false }
