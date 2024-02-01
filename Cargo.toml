@@ -19,14 +19,6 @@ name = "vector"
 test = false
 bench = false
 
-[[test]]
-name = "integration"
-path = "tests/integration/lib.rs"
-
-[[test]]
-name = "e2e"
-path = "tests/e2e/mod.rs"
-
 [[bin]]
 name = "graphql-schema"
 path = "src/api/schema/gen.rs"
@@ -40,6 +32,14 @@ path = "src/config/loading/secret_backend_example.rs"
 test = false
 bench = false
 required-features = ["secret-backend-example"]
+
+[[test]]
+name = "integration"
+path = "tests/integration/lib.rs"
+
+[[test]]
+name = "e2e"
+path = "tests/e2e/mod.rs"
 
 # CI-based builds use full release optimization.  See scripts/environment/release-flags.sh.
 # This results in roughly a 5% reduction in performance when compiling locally vs when
@@ -129,8 +129,9 @@ members = [
 chrono = { version = "0.4.33", default-features = false, features = ["clock", "serde"] }
 clap = { version = "4.4.18", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 pin-project = { version = "1.1.4", default-features = false }
-serde = { version = "1.0.196", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.112", default-features = false, features = ["raw_value", "std"] }
+serde = { version = "1.0.196", default-features = false, features = ["alloc", "derive", "rc"] }
+toml = { version = "0.8.9", default-features = false, features = ["display", "parse"] }
 vrl = { version = "0.9.1", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
@@ -321,7 +322,7 @@ syslog = { version = "6.1.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.4", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 tokio-postgres = { version = "0.7.10", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["connect"], optional = true}
-toml = { version = "0.8.8", default-features = false, features = ["parse", "display"] }
+toml.workspace = true
 tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 hickory-proto = { version = "0.24.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.15", default-features = false }
