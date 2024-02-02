@@ -303,29 +303,19 @@ impl Runner {
             // around if we can avoid it.
             tokio::time::sleep(Duration::from_secs(2)).await;
 
-            let skip_input_driver_metrics =
-                self.configuration.component_type == ComponentType::Source;
-
-            let source_is_controlled_edge =
-                self.configuration.component_type != ComponentType::Source;
-
             let input_driver = spawn_input_driver(
                 test_case.events.clone(),
                 input_tx,
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
-                skip_input_driver_metrics,
-                source_is_controlled_edge,
+                self.configuration.component_type == ComponentType::Source,
             );
-
-            let skip_output_driver_metrics =
-                self.configuration.component_type == ComponentType::Sink;
 
             let output_driver = spawn_output_driver(
                 output_rx,
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
-                skip_output_driver_metrics,
+                self.configuration.component_type == ComponentType::Sink,
             );
 
             // At this point, the component topology is running, and all input/output/telemetry
@@ -545,8 +535,7 @@ fn spawn_input_driver(
     input_tx: Sender<TestEvent>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     mut maybe_encoder: Option<Encoder<encoding::Framer>>,
-    _skip_input_driver_metrics: bool,
-    source_is_controlled_edge: bool,
+    is_source: bool,
 ) -> JoinHandle<()> {
     let input_runner_metrics = Arc::clone(runner_metrics);
 
@@ -554,7 +543,7 @@ fn spawn_input_driver(
     let now = Utc::now();
 
     tokio::spawn(async move {
-        for input_event in input_events {
+        for mut input_event in input_events {
             input_tx
                 .send(input_event.clone())
                 .await
@@ -564,37 +553,20 @@ fn spawn_input_driver(
             // be used in the Validators, as the "expected" case.
             let mut input_runner_metrics = input_runner_metrics.lock().await;
 
-            let (modified, mut event) = match input_event.clone() {
-                TestEvent::Passthrough(event) => (false, event),
-                TestEvent::Modified { modified, event } => (modified, event),
-            };
-
-            event
-                .as_log()
-                .get_timestamp()
-                .unwrap()
-                .as_timestamp_unwrap();
-
             // the controlled edge (vector source) adds metadata to the event when it is received.
             // thus we need to add it here so the expected values for the comparisons on transforms
             // and sinks are accurate.
-            if source_is_controlled_edge {
-                if let Event::Log(ref mut log) = event {
+            if !is_source {
+                if let Event::Log(ref mut log) = input_event.get_event() {
                     log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
                 }
             }
 
-            let input_event = match &input_event {
-                TestEvent::Passthrough(_) => TestEvent::Passthrough(event.clone()),
-                TestEvent::Modified { modified, event: _ } => TestEvent::Modified {
-                    modified: *modified,
-                    event: event.clone(),
-                },
-            };
+            let (modified, event) = input_event.clone().get();
 
             if let Some(encoder) = maybe_encoder.as_mut() {
                 let mut buffer = BytesMut::new();
-                encode_test_event(encoder, &mut buffer, input_event.clone());
+                encode_test_event(encoder, &mut buffer, input_event);
 
                 input_runner_metrics.sent_bytes_total += buffer.len() as u64;
             }
@@ -605,6 +577,8 @@ fn spawn_input_driver(
             } else {
                 input_runner_metrics.sent_events_total += 1;
 
+                // The event is wrapped in a Vec to match the actual event storage in
+                // the real topology
                 input_runner_metrics.sent_event_bytes_total +=
                     vec![event].estimated_json_encoded_size_of().get() as u64;
             }
@@ -617,7 +591,7 @@ fn spawn_output_driver(
     mut output_rx: Receiver<Vec<Event>>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     maybe_encoder: Option<Encoder<encoding::Framer>>,
-    skip_output_driver_metrics: bool,
+    is_sink: bool,
 ) -> JoinHandle<Vec<Event>> {
     let output_runner_metrics = Arc::clone(runner_metrics);
 
@@ -631,7 +605,9 @@ fn spawn_output_driver(
             let mut output_runner_metrics = output_runner_metrics.lock().await;
 
             for output_event in events {
-                if !skip_output_driver_metrics {
+                if !is_sink {
+                    // The event is wrapped in a Vec to match the actual event storage in
+                    // the real topology
                     output_runner_metrics.received_event_bytes_total += vec![output_event.clone()]
                         .estimated_json_encoded_size_of()
                         .get()
