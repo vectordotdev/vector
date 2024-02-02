@@ -14,8 +14,8 @@ pub(super) struct HoneycombSvcRequestBuilder {
     pub(super) api_key: SensitiveString,
 }
 
-impl HttpServiceRequestBuilder for HoneycombSvcRequestBuilder {
-    fn build(&self, body: Bytes) -> Request<Bytes> {
+impl HttpServiceRequestBuilder<()> for HoneycombSvcRequestBuilder {
+    fn build(&self, body: Bytes, _metadata: ()) -> Request<Bytes> {
         let request = Request::post(&self.uri).header(HTTP_HEADER_HONEYCOMB, self.api_key.inner());
 
         request

@@ -1,70 +1,23 @@
-use bytes::Bytes;
-use http::{
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-    Request, Response, StatusCode, Uri,
-};
-use hyper::{body, Body};
-use snafu::ResultExt;
-use std::task::{Context, Poll};
-use tracing::Instrument;
+//! Service implementation for the `Clickhouse` sink.
 
+use super::sink::PartitionKey;
 use crate::{
-    http::{Auth, HttpClient, HttpError},
+    http::{Auth, HttpError},
     sinks::{
         prelude::*,
-        util::{http::HttpRetryLogic, retries::RetryAction},
+        util::{
+            http::{HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+            retries::RetryAction,
+        },
         UriParseSnafu,
     },
 };
-
-#[derive(Debug, Clone)]
-pub struct ClickhouseRequest {
-    pub database: String,
-    pub table: String,
-    pub body: Bytes,
-    pub compression: Compression,
-    pub finalizers: EventFinalizers,
-    pub metadata: RequestMetadata,
-}
-
-impl MetaDescriptive for ClickhouseRequest {
-    fn get_metadata(&self) -> &RequestMetadata {
-        &self.metadata
-    }
-
-    fn metadata_mut(&mut self) -> &mut RequestMetadata {
-        &mut self.metadata
-    }
-}
-
-impl Finalizable for ClickhouseRequest {
-    fn take_finalizers(&mut self) -> EventFinalizers {
-        self.finalizers.take_finalizers()
-    }
-}
-
-pub struct ClickhouseResponse {
-    http_response: Response<Bytes>,
-    events_byte_size: GroupedCountByteSize,
-    raw_byte_size: usize,
-}
-
-impl DriverResponse for ClickhouseResponse {
-    fn event_status(&self) -> EventStatus {
-        match self.http_response.status().is_success() {
-            true => EventStatus::Delivered,
-            false => EventStatus::Rejected,
-        }
-    }
-
-    fn events_sent(&self) -> &GroupedCountByteSize {
-        &self.events_byte_size
-    }
-
-    fn bytes_sent(&self) -> Option<usize> {
-        Some(self.raw_byte_size)
-    }
-}
+use bytes::Bytes;
+use http::{
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
+    Request, StatusCode, Uri,
+};
+use snafu::ResultExt;
 
 #[derive(Debug, Default, Clone)]
 pub struct ClickhouseRetryLogic {
@@ -73,7 +26,7 @@ pub struct ClickhouseRetryLogic {
 
 impl RetryLogic for ClickhouseRetryLogic {
     type Error = HttpError;
-    type Response = ClickhouseResponse;
+    type Response = HttpResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         self.inner.is_retriable_error(error)
@@ -105,85 +58,43 @@ impl RetryLogic for ClickhouseRetryLogic {
     }
 }
 
-/// `ClickhouseService` is a `Tower` service used to send logs to Clickhouse.
 #[derive(Debug, Clone)]
-pub struct ClickhouseService {
-    client: HttpClient,
-    auth: Option<Auth>,
-    endpoint: Uri,
-    skip_unknown_fields: bool,
-    date_time_best_effort: bool,
+pub(super) struct ClickhouseServiceRequestBuilder {
+    pub(super) auth: Option<Auth>,
+    pub(super) endpoint: Uri,
+    pub(super) skip_unknown_fields: bool,
+    pub(super) date_time_best_effort: bool,
+    pub(super) compression: Compression,
 }
 
-impl ClickhouseService {
-    /// Creates a new `ClickhouseService`.
-    pub const fn new(
-        client: HttpClient,
-        auth: Option<Auth>,
-        endpoint: Uri,
-        skip_unknown_fields: bool,
-        date_time_best_effort: bool,
-    ) -> Self {
-        Self {
-            client,
-            auth,
-            endpoint,
-            skip_unknown_fields,
-            date_time_best_effort,
-        }
-    }
-}
-
-impl Service<ClickhouseRequest> for ClickhouseService {
-    type Response = ClickhouseResponse;
-    type Error = crate::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    // Emission of Error internal event is handled upstream by the caller.
-    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    // Emission of Error internal event is handled upstream by the caller.
-    fn call(&mut self, request: ClickhouseRequest) -> Self::Future {
-        let mut client = self.client.clone();
-        let auth = self.auth.clone();
-
-        // Build the URI outside of the boxed future to avoid unnecessary clones.
+impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
+    fn build(&self, body: Bytes, metadata: PartitionKey) -> Request<Bytes> {
         let uri = set_uri_query(
             &self.endpoint,
-            &request.database,
-            &request.table,
+            &metadata.database,
+            &metadata.table,
             self.skip_unknown_fields,
             self.date_time_best_effort,
-        );
+        )
+        .expect("building uri failed unexpectedly");
 
-        Box::pin(async move {
-            let mut builder = Request::post(&uri?)
-                .header(CONTENT_TYPE, "application/x-ndjson")
-                .header(CONTENT_LENGTH, request.body.len());
-            if let Some(ce) = request.compression.content_encoding() {
-                builder = builder.header(CONTENT_ENCODING, ce);
-            }
-            if let Some(auth) = auth {
-                builder = auth.apply_builder(builder);
-            }
+        let auth: Option<Auth> = self.auth.clone();
 
-            let http_request = builder
-                .body(Body::from(request.body))
-                .expect("building HTTP request failed unexpectedly");
+        let mut builder = Request::post(&uri)
+            .header(CONTENT_TYPE, "application/x-ndjson")
+            .header(CONTENT_LENGTH, body.len());
+        if let Some(ce) = self.compression.content_encoding() {
+            builder = builder.header(CONTENT_ENCODING, ce);
+        }
+        if let Some(auth) = auth {
+            builder = auth.apply_builder(builder);
+        }
 
-            let response = client.call(http_request).in_current_span().await?;
-            let (parts, body) = response.into_parts();
-            let body = body::to_bytes(body).await?;
-            Ok(ClickhouseResponse {
-                http_response: hyper::Response::from_parts(parts, body),
-                raw_byte_size: request.metadata.request_encoded_size(),
-                events_byte_size: request
-                    .metadata
-                    .into_events_estimated_json_encoded_byte_size(),
-            })
-        })
+        let request = builder
+            .body(body)
+            .expect("building HTTP request failed unexpectedly");
+
+        request
     }
 }
 

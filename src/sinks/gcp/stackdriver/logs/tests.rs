@@ -220,7 +220,7 @@ async fn correct_request() {
         auth: GcpAuthenticator::None,
     };
 
-    let request = stackdriver_logs_service_request_builder.build(body);
+    let request = stackdriver_logs_service_request_builder.build(body, ());
     let (parts, body) = request.into_parts();
     let json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
 

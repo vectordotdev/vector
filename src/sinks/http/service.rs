@@ -42,8 +42,8 @@ impl HttpSinkRequestBuilder {
     }
 }
 
-impl HttpServiceRequestBuilder for HttpSinkRequestBuilder {
-    fn build(&self, body: Bytes) -> Request<Bytes> {
+impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
+    fn build(&self, body: Bytes, _metadata: ()) -> Request<Bytes> {
         let method: Method = self.method.into();
         let uri: Uri = self.uri.uri.clone();
         let mut builder = Request::builder().method(method).uri(uri);

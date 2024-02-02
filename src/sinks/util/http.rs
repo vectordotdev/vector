@@ -607,34 +607,37 @@ pub fn validate_headers(
 
 /// Request type for use in the `Service` implementation of HTTP stream sinks.
 #[derive(Clone)]
-pub struct HttpRequest {
+pub struct HttpRequest<T: Send> {
     payload: Bytes,
     finalizers: EventFinalizers,
     request_metadata: RequestMetadata,
+    other_metadata: T,
 }
 
-impl HttpRequest {
+impl<T: Send> HttpRequest<T> {
     /// Creates a new `HttpRequest`.
     pub fn new(
         payload: Bytes,
         finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
+        other_metadata: T,
     ) -> Self {
         Self {
             payload,
             finalizers,
             request_metadata,
+            other_metadata,
         }
     }
 }
 
-impl Finalizable for HttpRequest {
+impl<T: Send> Finalizable for HttpRequest<T> {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.finalizers.take_finalizers()
     }
 }
 
-impl MetaDescriptive for HttpRequest {
+impl<T: Send> MetaDescriptive for HttpRequest<T> {
     fn get_metadata(&self) -> &RequestMetadata {
         &self.request_metadata
     }
@@ -644,7 +647,7 @@ impl MetaDescriptive for HttpRequest {
     }
 }
 
-impl ByteSizeOf for HttpRequest {
+impl<T: Send> ByteSizeOf for HttpRequest<T> {
     fn allocated_bytes(&self) -> usize {
         self.payload.allocated_bytes() + self.finalizers.allocated_bytes()
     }
@@ -696,30 +699,30 @@ impl ItemBatchSize<Event> for HttpJsonBatchSizer {
 }
 
 /// HTTP request builder for HTTP stream sinks using the generic `HttpService`
-pub trait HttpServiceRequestBuilder {
-    fn build(&self, body: Bytes) -> Request<Bytes>;
+pub trait HttpServiceRequestBuilder<T> {
+    fn build(&self, body: Bytes, metadata: T) -> Request<Bytes>;
 }
 
 /// Generic 'Service' implementation for HTTP stream sinks.
 #[derive(Clone)]
-pub struct HttpService<B> {
+pub struct HttpService<B, T: Send> {
     batch_service:
-        HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HttpRequest>,
+        HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HttpRequest<T>>,
     _phantom: PhantomData<B>,
 }
 
-impl<B> HttpService<B>
+impl<B, T: Send + 'static> HttpService<B, T>
 where
-    B: HttpServiceRequestBuilder + std::marker::Sync + std::marker::Send + 'static,
+    B: HttpServiceRequestBuilder<T> + std::marker::Sync + std::marker::Send + 'static,
 {
     pub fn new(http_client: HttpClient<Body>, http_request_builder: B) -> Self {
         let http_request_builder = Arc::new(http_request_builder);
 
-        let batch_service = HttpBatchService::new(http_client, move |req: HttpRequest| {
+        let batch_service = HttpBatchService::new(http_client, move |req: HttpRequest<T>| {
             let request_builder = Arc::clone(&http_request_builder);
 
             let fut: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
-                Box::pin(async move { Ok(request_builder.build(req.payload)) });
+                Box::pin(async move { Ok(request_builder.build(req.payload, req.other_metadata)) });
 
             fut
         });
@@ -730,9 +733,9 @@ where
     }
 }
 
-impl<B> Service<HttpRequest> for HttpService<B>
+impl<B, T: Send + 'static> Service<HttpRequest<T>> for HttpService<B, T>
 where
-    B: HttpServiceRequestBuilder + std::marker::Sync + std::marker::Send + 'static,
+    B: HttpServiceRequestBuilder<T> + std::marker::Sync + std::marker::Send + 'static,
 {
     type Response = HttpResponse;
     type Error = crate::Error;
@@ -742,7 +745,10 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, mut request: HttpRequest) -> Self::Future {
+    fn call(&mut self, mut request: HttpRequest<T>) -> Self::Future
+    where
+        T: Send,
+    {
         let mut http_service = self.batch_service.clone();
 
         // NOTE: By taking the metadata here, when passing the request to `call()` below,

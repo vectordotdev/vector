@@ -1,17 +1,20 @@
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
+//! Configuration for the `Clickhouse` sink.
 
 use super::{
-    service::{ClickhouseRetryLogic, ClickhouseService},
-    sink::ClickhouseSink,
+    request_builder::ClickhouseRequestBuilder,
+    service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
+    sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
     http::{get_http_scheme_from_uri, Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde},
+        util::{http::HttpService, RealtimeSizeBasedDefaultBatchSettings, UriSerde},
     },
 };
+use http::{Request, StatusCode, Uri};
+use hyper::Body;
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 
 /// Configuration for the `clickhouse` sink.
 #[configurable_component(sink("clickhouse", "Deliver log data to a ClickHouse database."))]
@@ -84,33 +87,49 @@ impl SinkConfig for ClickhouseConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
-        let service = ClickhouseService::new(
-            client.clone(),
-            auth.clone(),
-            endpoint.clone(),
-            self.skip_unknown_fields,
-            self.date_time_best_effort,
-        );
+        let sumo_logic_service_request_builder = ClickhouseServiceRequestBuilder {
+            auth: auth.clone(),
+            endpoint: endpoint.clone(),
+            skip_unknown_fields: self.skip_unknown_fields,
+            date_time_best_effort: self.date_time_best_effort,
+            compression: self.compression,
+        };
+
+        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
+            HttpService::new(client.clone(), sumo_logic_service_request_builder);
 
         let request_limits = self.request.into_settings();
+
         let service = ServiceBuilder::new()
             .settings(request_limits, ClickhouseRetryLogic::default())
             .service(service);
 
         let batch_settings = self.batch.into_batcher_settings()?;
+
         let database = self.database.clone().unwrap_or_else(|| {
             "default"
                 .try_into()
                 .expect("'default' should be a valid template")
         });
+
+        let request_builder = ClickhouseRequestBuilder {
+            compression: self.compression,
+            encoding: (
+                self.encoding.clone(),
+                Encoder::<Framer>::new(
+                    NewlineDelimitedEncoderConfig.build().into(),
+                    JsonSerializerConfig::default().build().into(),
+                ),
+            ),
+        };
+
         let sink = ClickhouseSink::new(
             batch_settings,
-            self.compression,
-            self.encoding.clone(),
             service,
             protocol,
             database,
             self.table.clone(),
+            request_builder,
         );
 
         let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
