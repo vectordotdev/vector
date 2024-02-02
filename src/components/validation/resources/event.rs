@@ -87,13 +87,6 @@ impl TestEvent {
         }
     }
 
-    pub fn is_modified(&self) -> bool {
-        match self {
-            Self::Passthrough(_) => false,
-            Self::Modified { modified, .. } => *modified,
-        }
-    }
-
     pub fn get(self) -> (bool, Event) {
         match self {
             Self::Passthrough(event) => (false, event),
