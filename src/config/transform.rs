@@ -122,6 +122,8 @@ pub struct TransformContext {
 
     pub schema: SchemaOptions,
 
+    /// Extra context data provided by the running app and shared across all components. This can be
+    /// used to pass shared settings or other data from outside the components.
     pub extra_context: ExtraContext,
 }
 
