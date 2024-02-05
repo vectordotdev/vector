@@ -402,8 +402,8 @@ pub struct KeepaliveConfig {
     /// by sending a `Connection: close` header on the HTTP response.
     ///
     ///
-    /// Set this to a large value to disable this feature (in the future setting this to `null`
-    /// should be possible).
+    /// Set this to a large value like `100000000` to disable this feature (in the future setting
+    /// this to `null` should be possible).
     ///
     /// A random jitter configured by `max_connection_age_jitter_factor` is added
     /// to the specified duration to spread out connection storms.
