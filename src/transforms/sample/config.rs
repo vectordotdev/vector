@@ -106,7 +106,6 @@ impl TransformConfig for SampleConfig {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::{
         event::LogEvent, test_util::components::assert_transform_compliance,

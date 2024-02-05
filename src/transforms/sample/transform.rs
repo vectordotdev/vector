@@ -100,9 +100,8 @@ impl FunctionTransform for Sample {
 
 #[cfg(test)]
 mod tests {
-    use approx::assert_relative_eq;
-
     use super::*;
+
     use crate::{
         conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
@@ -111,6 +110,7 @@ mod tests {
         transforms::test::transform_one,
         transforms::OutputBuffer,
     };
+    use approx::assert_relative_eq;
 
     fn condition_contains(key: &str, needle: &str) -> Condition {
         let vrl_config = VrlConfig {
