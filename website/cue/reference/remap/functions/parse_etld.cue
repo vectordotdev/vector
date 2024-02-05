@@ -54,11 +54,11 @@ remap: functions: parse_etld: {
 		{
 			title: "Parse eTLD with unknown suffix"
 			source: #"""
-				parse_etld!("vector.unknowndev")
+				parse_etld!("vector.acmecorp")
 				"""#
 			return: {
-				etld:   "unknowndev"
-				etld_plus: "unknowndev"
+				etld:   "acmecorp"
+				etld_plus: "acmecorp"
 				known_suffix: false
 			}
 		},
