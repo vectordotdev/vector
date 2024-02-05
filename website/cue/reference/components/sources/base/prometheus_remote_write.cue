@@ -66,6 +66,8 @@ base: components: sources: prometheus_remote_write: configuration: {
 					The maximum amount of time a connection may exist before it is closed
 					by sending a `Connection: close` header on the HTTP response.
 
+					Only applies to HTTP/0.9, HTTP/1.0, and HTTP/1.1 requests.
+
 					A random jitter configured by `max_connection_age_jitter_factor` is added
 					to the specified duration to spread out connection storms.
 					"""
