@@ -266,7 +266,6 @@ fn spawn_output_http_server(
             let mut decoder = decoder.clone();
 
             async move {
-                let mut output_runner_metrics = output_runner_metrics.lock().await;
                 match hyper::body::to_bytes(request.into_body()).await {
                     Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
                     Ok(body) => {
@@ -274,6 +273,8 @@ fn spawn_output_http_server(
                         loop {
                             match decoder.decode_eof(&mut body) {
                                 Ok(Some((events, byte_size))) => {
+                                    let mut output_runner_metrics =
+                                        output_runner_metrics.lock().await;
                                     debug!("HTTP server external output resource decoded {byte_size} bytes.");
 
                                     // Update the runner metrics for the received events. This will later
@@ -285,8 +286,7 @@ fn spawn_output_http_server(
 
                                     events.iter().for_each(|event| {
                                         output_runner_metrics.received_event_bytes_total +=
-                                            event.clone().estimated_json_encoded_size_of().get()
-                                                as u64;
+                                            event.estimated_json_encoded_size_of().get() as u64;
                                     });
 
                                     output_tx

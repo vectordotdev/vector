@@ -558,7 +558,7 @@ fn spawn_input_driver(
     let now = Utc::now();
 
     tokio::spawn(async move {
-        for input_event in input_events {
+        for mut input_event in input_events {
             input_tx
                 .send(input_event.clone())
                 .await
@@ -568,39 +568,20 @@ fn spawn_input_driver(
             // be used in the Validators, as the "expected" case.
             let mut input_runner_metrics = input_runner_metrics.lock().await;
 
-            let (failure_case, mut event) = match input_event.clone() {
-                TestEvent::Passthrough(event) => (false, event),
-                TestEvent::PassthroughFail(event) => (true, event),
-                TestEvent::Modified { modified, event } => (modified, event),
-            };
-
-            event
-                .as_log()
-                .get_timestamp()
-                .unwrap()
-                .as_timestamp_unwrap();
-
             // the controlled edge (vector source) adds metadata to the event when it is received.
             // thus we need to add it here so the expected values for the comparisons on transforms
             // and sinks are accurate.
             if component_type != ComponentType::Source {
-                if let Event::Log(ref mut log) = event {
+                if let Event::Log(ref mut log) = input_event.get_event() {
                     log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
                 }
             }
 
-            let input_event = match &input_event {
-                TestEvent::Passthrough(_) => TestEvent::Passthrough(event.clone()),
-                TestEvent::PassthroughFail(_) => TestEvent::PassthroughFail(event.clone()),
-                TestEvent::Modified { modified, event: _ } => TestEvent::Modified {
-                    modified: *modified,
-                    event: event.clone(),
-                },
-            };
+            let (failure_case, event) = input_event.clone().get();
 
             if let Some(encoder) = maybe_encoder.as_mut() {
                 let mut buffer = BytesMut::new();
-                encode_test_event(encoder, &mut buffer, input_event.clone());
+                encode_test_event(encoder, &mut buffer, input_event);
 
                 input_runner_metrics.sent_bytes_total += buffer.len() as u64;
             }
@@ -617,6 +598,8 @@ fn spawn_input_driver(
             if !failure_case || component_type == ComponentType::Sink {
                 input_runner_metrics.sent_events_total += 1;
 
+                // The event is wrapped in a Vec to match the actual event storage in
+                // the real topology
                 input_runner_metrics.sent_event_bytes_total +=
                     vec![event].estimated_json_encoded_size_of().get() as u64;
             }
@@ -644,10 +627,10 @@ fn spawn_output_driver(
 
             for output_event in events {
                 if component_type != ComponentType::Sink {
-                    output_runner_metrics.received_event_bytes_total += vec![output_event.clone()]
-                        .estimated_json_encoded_size_of()
-                        .get()
-                        as u64;
+                    // The event is wrapped in a Vec to match the actual event storage in
+                    // the real topology
+                    output_runner_metrics.received_event_bytes_total +=
+                        vec![&output_event].estimated_json_encoded_size_of().get() as u64;
 
                     if let Some(encoder) = maybe_encoder.as_ref() {
                         let mut buffer = BytesMut::new();
