@@ -12,7 +12,7 @@ const K8S_LOGS_DIR: &str = "/var/log/pods";
 /// The delimiter used in the log path.
 const LOG_PATH_DELIMITER: &str = "_";
 
-/// Delimiters for for different OS
+/// Delimiters for different OS
 const WINDOWS_DELIMITER: &str = "\\";
 const LINUX_DELIMITER: &str = "/";
 
