@@ -618,7 +618,7 @@ transforms-sample = ["transforms-impl-sample"]
 transforms-tag_cardinality_limit = ["dep:bloomy", "dep:hashbrown"]
 transforms-throttle = ["dep:governor"]
 
-# implememtation types for transforms
+# Implementations of transforms
 transforms-impl-sample = []
 
 # Sinks
