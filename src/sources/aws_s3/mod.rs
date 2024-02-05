@@ -438,6 +438,8 @@ mod test {
 #[cfg(test)]
 mod integration_tests {
     use std::{
+        any::Any,
+        collections::HashMap,
         fs::File,
         io::{self, BufRead},
         path::Path,
@@ -491,6 +493,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -519,6 +522,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Json(JsonDeserializerConfig::default()),
+            None,
         )
         .await;
     }
@@ -539,6 +543,7 @@ mod integration_tests {
             Delivered,
             true,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -560,6 +565,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -581,6 +587,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -610,6 +617,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -640,6 +648,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -670,6 +679,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -698,6 +708,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -721,6 +732,7 @@ mod integration_tests {
             Errored,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -741,6 +753,31 @@ mod integration_tests {
             Rejected,
             false,
             DeserializerConfig::Bytes,
+            None,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn handles_failed_status_without_deletion() {
+        trace_init();
+
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        let mut custom_options: HashMap<String, Box<dyn Any>> = HashMap::new();
+        custom_options.insert("delete_failed_message".to_string(), Box::new(false));
+
+        test_event(
+            None,
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Rejected,
+            false,
+            DeserializerConfig::Bytes,
+            Some(custom_options),
         )
         .await;
     }
@@ -786,6 +823,7 @@ mod integration_tests {
         status: EventStatus,
         log_namespace: bool,
         decoding: DeserializerConfig,
+        custom_options: Option<HashMap<String, Box<dyn Any>>>,
     ) {
         assert_source_compliance(&SOURCE_TAGS, async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
@@ -798,7 +836,16 @@ mod integration_tests {
 
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            let config = config(&queue, multiline, log_namespace, decoding);
+            let mut config = config(&queue, multiline, log_namespace, decoding);
+
+            if let Some(false) = custom_options
+                .as_ref()
+                .and_then(|opts| opts.get("delete_failed_message"))
+                .and_then(|val| val.downcast_ref::<bool>())
+                .copied()
+            {
+                config.sqs.as_mut().unwrap().delete_failed_message = false;
+            }
 
             s3.put_object()
                 .bucket(bucket.clone())
@@ -905,6 +952,9 @@ mod integration_tests {
             match status {
                 Errored => {
                     // need to wait up to the visibility timeout before it will be counted again
+                    assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
+                }
+                Rejected if !config.sqs.unwrap().delete_failed_message => {
                     assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
                 }
                 _ => {

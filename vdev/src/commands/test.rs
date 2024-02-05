@@ -51,7 +51,9 @@ impl Cli {
         runner.test(
             &parse_env(self.env.unwrap_or_default()),
             &BTreeMap::default(),
+            None,
             &args,
+            "",
         )
     }
 }
