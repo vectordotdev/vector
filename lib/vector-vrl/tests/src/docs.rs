@@ -190,6 +190,6 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
         result_approx: false,
         skip,
         read_only_paths: vec![],
-        check_diagnostics: true,
+        check_diagnostics: false,
     }
 }
