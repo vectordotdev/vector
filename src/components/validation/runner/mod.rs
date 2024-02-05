@@ -608,10 +608,8 @@ fn spawn_output_driver(
                 if !is_sink {
                     // The event is wrapped in a Vec to match the actual event storage in
                     // the real topology
-                    output_runner_metrics.received_event_bytes_total += vec![output_event.clone()]
-                        .estimated_json_encoded_size_of()
-                        .get()
-                        as u64;
+                    output_runner_metrics.received_event_bytes_total +=
+                        vec![&output_event].estimated_json_encoded_size_of().get() as u64;
 
                     if let Some(encoder) = maybe_encoder.as_ref() {
                         let mut buffer = BytesMut::new();
