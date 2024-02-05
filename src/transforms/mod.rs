@@ -4,6 +4,8 @@ use std::collections::HashSet;
 
 use snafu::Snafu;
 
+mod sample;
+
 #[cfg(feature = "transforms-aggregate")]
 pub mod aggregate;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
@@ -24,8 +26,6 @@ pub mod reduce;
 pub mod remap;
 #[cfg(feature = "transforms-route")]
 pub mod route;
-#[cfg(feature = "transforms-sample")]
-pub mod sample;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]

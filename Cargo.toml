@@ -614,9 +614,12 @@ transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []
 transforms-remap = []
 transforms-route = []
-transforms-sample = []
+transforms-sample = ["transforms-impl-sample"]
 transforms-tag_cardinality_limit = ["dep:bloomy", "dep:hashbrown"]
 transforms-throttle = ["dep:governor"]
+
+# implememtation types for transforms
+transforms-impl-sample = []
 
 # Sinks
 sinks = ["sinks-logs", "sinks-metrics"]
