@@ -1,7 +1,6 @@
 mod chrono;
 mod datetime;
 mod encoding_rs;
-mod http;
 mod indexmap;
 mod no_proxy;
 mod serde_with;
