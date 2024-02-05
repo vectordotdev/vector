@@ -80,7 +80,6 @@ Hisense
 Huawei
 Hyundai
 Ideapad
-IDN
 Infinix
 Instacart
 Intenso
@@ -330,6 +329,7 @@ htmltest
 https
 humungus
 icecream
+idn
 ifeq
 ifneq
 imobile
