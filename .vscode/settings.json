@@ -1,0 +1,6 @@
+{
+    "rust-analyzer.cargo.noDefaultFeatures": true,
+    "rust-analyzer.cargo.features": [
+        "mqtt-integration-tests",
+    ],
+}
