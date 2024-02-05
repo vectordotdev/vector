@@ -19,10 +19,6 @@ name = "vector"
 test = false
 bench = false
 
-[[test]]
-name = "integration"
-path = "tests/integration/lib.rs"
-
 [[bin]]
 name = "graphql-schema"
 path = "src/api/schema/gen.rs"
@@ -36,6 +32,14 @@ path = "src/config/loading/secret_backend_example.rs"
 test = false
 bench = false
 required-features = ["secret-backend-example"]
+
+[[test]]
+name = "integration"
+path = "tests/integration/lib.rs"
+
+[[test]]
+name = "e2e"
+path = "tests/e2e/mod.rs"
 
 # CI-based builds use full release optimization.  See scripts/environment/release-flags.sh.
 # This results in roughly a 5% reduction in performance when compiling locally vs when
@@ -122,8 +126,12 @@ members = [
 ]
 
 [workspace.dependencies]
-pin-project = { version = "1.1.4", default-features = false }
+chrono = { version = "0.4.33", default-features = false, features = ["clock", "serde"] }
 clap = { version = "4.4.18", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+pin-project = { version = "1.1.4", default-features = false }
+serde_json = { version = "1.0.112", default-features = false, features = ["raw_value", "std"] }
+serde = { version = "1.0.196", default-features = false, features = ["alloc", "derive", "rc"] }
+toml = { version = "0.8.9", default-features = false, features = ["display", "parse"] }
 vrl = { version = "0.9.1", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
@@ -170,14 +178,14 @@ aws-sdk-cloudwatchlogs = { version = "1.3.0", default-features = false, features
 aws-sdk-elasticsearch = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-sdk-firehose = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-sdk-kinesis = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
-aws-types = { version = "1.1.3", default-features = false, optional = true }
-aws-sigv4 = { version = "1.1.3", default-features = false, features = ["sign-http"], optional = true }
+aws-types = { version = "1.1.4", default-features = false, optional = true }
+aws-sigv4 = { version = "1.1.4", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest"], optional = true }
-aws-credential-types = { version = "1.1.3", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-credential-types = { version = "1.1.4", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream"], optional = true }
 aws-smithy-types = { version = "1.0.2", default-features = false, optional = true }
 aws-smithy-runtime-api = { version = "1.1.3", default-features = false, optional = true }
-aws-smithy-runtime = { version = "1.1.3", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
+aws-smithy-runtime = { version = "1.1.4", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
 aws-smithy-async = { version = "1.0.2", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
@@ -193,10 +201,10 @@ opendal = {version = "0.44", default-features = false, features = ["native-tls",
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.4", default-features = false, features = ["decompression-gzip", "trace"]}
 # Serde
-serde = { version = "1.0.195", default-features = false, features = ["derive"] }
+serde.workspace = true
 serde-toml-merge = { version = "0.3.3", default-features = false }
 serde_bytes = { version = "0.11.14", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.111", default-features = false, features = ["raw_value"] }
+serde_json.workspace = true
 serde_with = { version = "3.5.0", default-features = false, features = ["macros", "std"] }
 serde_yaml = { version = "0.9.30", default-features = false }
 
@@ -244,7 +252,7 @@ bloomy  = { version = "1.2.0", default-features = false, optional = true }
 bollard = { version = "0.15.0", default-features = false, features = ["ssl", "chrono"], optional = true }
 bytes = { version = "1.5.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.3.0", default-features = false }
-chrono = { version = "0.4.31", default-features = false, features = ["serde"] }
+chrono.workspace = true
 chrono-tz = { version = "0.8.5", default-features = false }
 cidr-utils = { version = "0.6.1", default-features = false }
 colored = { version = "2.1.0", default-features = false }
@@ -274,13 +282,13 @@ hyper-proxy = { version = "0.9.1", default-features = false, features = ["openss
 indexmap = { version = "2.1.0", default-features = false, features = ["serde", "std"] }
 infer = { version = "0.15.0", default-features = false, optional = true}
 indoc = { version = "2.0.4", default-features = false }
-inventory = { version = "0.3.14", default-features = false }
-itertools = { version = "0.12.0", default-features = false, optional = false, features = ["use_alloc"] }
+inventory = { version = "0.3.15", default-features = false }
+itertools = { version = "0.12.1", default-features = false, optional = false, features = ["use_alloc"] }
 k8s-openapi = { version = "0.18.0", default-features = false, features = ["api", "v1_26"], optional = true }
 kube = { version = "0.82.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.1", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
-lru = { version = "0.12.1", default-features = false, optional = true }
+lru = { version = "0.12.2", default-features = false, optional = true }
 maxminddb = { version = "0.24.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.8.0", default-features = false, features = ["tokio-runtime"], optional = true }
@@ -314,7 +322,7 @@ syslog = { version = "6.1.0", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.4", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 tokio-postgres = { version = "0.7.10", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["connect"], optional = true}
-toml = { version = "0.8.8", default-features = false, features = ["parse", "display"] }
+toml.workspace = true
 tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 hickory-proto = { version = "0.24.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.15", default-features = false }
@@ -346,15 +354,15 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.13", default-features = false }
-aws-smithy-runtime = { version = "1.1.3", default-features = false, features = ["tls-rustls"] }
+aws-smithy-runtime = { version = "1.1.4", default-features = false, features = ["tls-rustls"] }
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { version = "0.17", default-features = false }
 base64 = "0.21.7"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
-itertools = { version = "0.12.0", default-features = false, features = ["use_alloc"] }
-libc = "0.2.152"
+itertools = { version = "0.12.1", default-features = false, features = ["use_alloc"] }
+libc = "0.2.153"
 similar-asserts = "1.5.0"
 proptest = "1.4"
 quickcheck = "1.0.3"
@@ -736,7 +744,7 @@ enterprise = [
 # Identifies that the build is a nightly build
 nightly = []
 
-# Testing-related features
+# Integration testing-related features
 all-integration-tests = [
   "amqp-integration-tests",
   "appsignal-integration-tests",
@@ -842,6 +850,18 @@ webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
+
+# End-to-End testing-related features
+all-e2e-tests = [
+  "e2e-tests-datadog"
+]
+
+e2e-tests-datadog = [
+  "sources-datadog_agent",
+  "sinks-datadog_logs",
+  "sinks-datadog_metrics"
+]
+
 vector-api-tests = [
   "sources-demo_logs",
   "transforms-log_to_metric",
