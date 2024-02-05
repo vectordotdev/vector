@@ -80,6 +80,7 @@ Hisense
 Huawei
 Hyundai
 Ideapad
+IDN
 Infinix
 Instacart
 Intenso
