@@ -34,6 +34,7 @@ remap: expressions: variable: {
 			title: "Simple variable"
 			source: #"""
 				my_variable = 1
+				my_variable
 				"""#
 			return: 1
 		},

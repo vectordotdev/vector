@@ -59,8 +59,9 @@ remap: functions: log: {
 				if err != null {
 					log(err, level: "error")
 				}
+				ts
 				"""#
-			return: null
+			return: 0
 		},
 	]
 }

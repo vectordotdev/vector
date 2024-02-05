@@ -32,6 +32,7 @@ remap: functions: mod: {
 			title: "Calculate the remainder of two integers"
 			source: #"""
 				remainder = mod(5, 2)
+				remainder
 				"""#
 			return: 1
 		},
