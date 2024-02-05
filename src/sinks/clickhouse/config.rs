@@ -6,7 +6,7 @@ use super::{
     sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
-    http::{get_http_scheme_from_uri, Auth, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{http::HttpService, RealtimeSizeBasedDefaultBatchSettings, UriSerde},
@@ -80,11 +80,11 @@ impl_generate_config_from_default!(ClickhouseConfig);
 impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = self.endpoint.with_default_parts().uri;
-        let protocol = get_http_scheme_from_uri(&endpoint);
 
         let auth = self.auth.choose_one(&self.endpoint.auth)?;
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
+
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let sumo_logic_service_request_builder = ClickhouseServiceRequestBuilder {
@@ -126,7 +126,6 @@ impl SinkConfig for ClickhouseConfig {
         let sink = ClickhouseSink::new(
             batch_settings,
             service,
-            protocol,
             database,
             self.table.clone(),
             request_builder,

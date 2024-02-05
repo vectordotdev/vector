@@ -6,7 +6,6 @@ use crate::sinks::{prelude::*, util::http::HttpRequest};
 pub struct ClickhouseSink<S> {
     batch_settings: BatcherSettings,
     service: S,
-    protocol: &'static str,
     database: Template,
     table: Template,
     request_builder: ClickhouseRequestBuilder,
@@ -19,10 +18,9 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub fn new(
+    pub const fn new(
         batch_settings: BatcherSettings,
         service: S,
-        protocol: &'static str,
         database: Template,
         table: Template,
         request_builder: ClickhouseRequestBuilder,
@@ -30,7 +28,6 @@ where
         Self {
             batch_settings,
             service,
-            protocol,
             database,
             table,
             request_builder,
@@ -59,7 +56,6 @@ where
                 }
             })
             .into_driver(self.service)
-            .protocol(self.protocol)
             .run()
             .await
     }

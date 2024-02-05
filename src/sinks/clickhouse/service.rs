@@ -90,11 +90,9 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             builder = auth.apply_builder(builder);
         }
 
-        let request = builder
+        builder
             .body(body)
-            .expect("building HTTP request failed unexpectedly");
-
-        request
+            .expect("building HTTP request failed unexpectedly")
     }
 }
 
