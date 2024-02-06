@@ -12,6 +12,7 @@ mod native_json;
 mod protobuf;
 #[cfg(feature = "syslog")]
 mod syslog;
+mod vrl;
 
 use ::bytes::Bytes;
 pub use avro::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
@@ -30,6 +31,8 @@ use vector_core::config::LogNamespace;
 use vector_core::event::Event;
 
 pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
+
+pub use self::vrl::{VrlDeserializer, VrlDeserializerConfig, VrlDeserializerOptions};
 
 /// Parse structured events from bytes.
 pub trait Deserializer: DynClone + Send + Sync {

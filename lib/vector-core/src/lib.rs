@@ -43,7 +43,7 @@ pub mod time;
 pub mod tls;
 pub mod transform;
 #[cfg(feature = "vrl")]
-mod vrl;
+pub mod vrl;
 
 use float_eq::FloatEq;
 use std::path::PathBuf;

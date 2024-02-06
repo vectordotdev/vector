@@ -35,14 +35,14 @@ vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-common = { path = "../vector-config-common", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
-vector-core = { path = "../vector-core", default-features = false }
+vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 
 [dev-dependencies]
 futures = { version = "0.3", default-features = false }
 indoc = { version = "2", default-features = false }
 tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.5.0"
-vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
+vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 rstest = "0.18.2"
 vrl.workspace = true
