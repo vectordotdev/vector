@@ -18,7 +18,6 @@ pub struct Sample {
 }
 
 impl Sample {
-    #![allow(dead_code)]
     pub const fn new(
         name: String,
         rate: u64,
