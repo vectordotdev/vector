@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use rand::Rng;
 use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
 use snafu::{ResultExt, Snafu};
 use vector_lib::codecs::JsonSerializerConfig;
@@ -75,13 +76,13 @@ pub struct MqttSinkConfig {
 #[allow(clippy::enum_variant_names)]
 pub enum MqttQoS {
     /// AtLeastOnce.
+    #[derivative(Default)]
     AtLeastOnce,
 
     /// AtMostOnce.
     AtMostOnce,
 
     /// ExactlyOnce.
-    #[derivative(Default)]
     ExactlyOnce,
 }
 
@@ -100,7 +101,13 @@ const fn default_port() -> u16 {
 }
 
 fn default_client_id() -> String {
-    "vector".to_string()
+    let hash = rand::thread_rng()
+        .sample_iter(&rand_distr::Alphanumeric)
+        .take(6)
+        .map(char::from)
+        .collect::<String>();
+
+    format!("vectorSink{hash}")
 }
 
 const fn default_keep_alive() -> u16 {
@@ -156,8 +163,10 @@ impl SinkConfig for MqttSinkConfig {
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum ConfigurationError {
-    #[snafu(display("Client id is not allowed to be empty"))]
+    #[snafu(display("Client ID is not allowed to be empty."))]
     EmptyClientId,
+    #[snafu(display("Username and password must be either both provided or both missing."))]
+    InvalidCredentials,
 }
 
 impl MqttSinkConfig {
@@ -169,8 +178,16 @@ impl MqttSinkConfig {
         let mut options = MqttOptions::new(&self.client_id, &self.host, self.port);
         options.set_keep_alive(Duration::from_secs(self.keep_alive.into()));
         options.set_clean_session(self.clean_session);
-        if let (Some(user), Some(password)) = (&self.user, &self.password) {
-            options.set_credentials(user, password);
+        match (&self.user, &self.password) {
+            (Some(user), Some(password)) => {
+                options.set_credentials(user, password);
+            }
+            (None, None) => {}
+            _ => {
+                return Err(MqttError::Configuration {
+                    source: ConfigurationError::InvalidCredentials,
+                });
+            }
         }
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
