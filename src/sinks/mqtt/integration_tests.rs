@@ -53,9 +53,10 @@ async fn mqtt_happy() {
 
     let num_events = 10;
     let (input, events) = random_lines_with_stream(100, num_events, None);
-    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
     let (tx, mut rx) = tokio::sync::mpsc::channel(10);
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+    let mut ready_tx = Some(ready_tx);
 
     tokio::spawn(async move {
         loop {
@@ -63,6 +64,15 @@ async fn mqtt_happy() {
                 tokio::time::timeout(Duration::from_secs(1), eventloop.poll()).await
             {
                 let msg = try_msg.expect("Cannot extract the message");
+                if let Event::Incoming(Incoming::SubAck(_)) = msg {
+                    ready_tx
+                        .take()
+                        .expect("We cannot receive multiple SubAcks in the same test.")
+                        .send(())
+                        .expect("Cannot send readiness signal.");
+                    continue;
+                }
+
                 if let Event::Incoming(Incoming::Publish(publish)) = msg {
                     let message =
                         serde_json::from_slice::<serde_json::Value>(&publish.payload).unwrap();
@@ -76,6 +86,9 @@ async fn mqtt_happy() {
             }
         }
     });
+
+    ready_rx.await.expect("Cannot receive readiness signal.");
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
     let mut messages = Vec::new();
 
