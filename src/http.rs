@@ -399,8 +399,10 @@ pub fn build_http_trace_layer(
 #[derive(Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct KeepaliveConfig {
-    /// The maximum amount of time a connection may exist before it is closed
-    /// by sending a `Connection: close` header on the HTTP response.
+    /// The maximum amount of time a connection may exist before it is closed by sending
+    /// a `Connection: close` header on the HTTP response. Set this to a large value like
+    /// `100000000` to "disable" this feature
+    ///
     ///
     /// Only applies to HTTP/0.9, HTTP/1.0, and HTTP/1.1 requests.
     ///
