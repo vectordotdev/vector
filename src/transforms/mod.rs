@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use snafu::Snafu;
 
-mod sample;
+pub mod sample;
 
 #[cfg(feature = "transforms-aggregate")]
 pub mod aggregate;
