@@ -611,7 +611,7 @@ pub struct HttpRequest<T: Send> {
     payload: Bytes,
     finalizers: EventFinalizers,
     request_metadata: RequestMetadata,
-    other_metadata: T,
+    additional_metadata: Option<T>,
 }
 
 impl<T: Send> HttpRequest<T> {
@@ -620,14 +620,30 @@ impl<T: Send> HttpRequest<T> {
         payload: Bytes,
         finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
-        other_metadata: T,
+        additional_metadata: Option<T>,
     ) -> Self {
         Self {
             payload,
             finalizers,
             request_metadata,
-            other_metadata,
+            additional_metadata,
         }
+    }
+
+    pub const fn get_additional_metadata(&self) -> Option<&T> {
+        self.additional_metadata.as_ref()
+    }
+
+    pub const fn get_request_metadata(&self) -> &RequestMetadata {
+        &self.request_metadata
+    }
+
+    pub const fn get_finalizers(&self) -> &EventFinalizers {
+        &self.finalizers
+    }
+
+    pub const fn get_payload(&self) -> &Bytes {
+        &self.payload
     }
 }
 
@@ -699,8 +715,8 @@ impl ItemBatchSize<Event> for HttpJsonBatchSizer {
 }
 
 /// HTTP request builder for HTTP stream sinks using the generic `HttpService`
-pub trait HttpServiceRequestBuilder<T> {
-    fn build(&self, body: Bytes, metadata: T) -> Request<Bytes>;
+pub trait HttpServiceRequestBuilder<T: Send> {
+    fn build(&self, request: HttpRequest<T>) -> Request<Bytes>;
 }
 
 /// Generic 'Service' implementation for HTTP stream sinks.
@@ -722,7 +738,7 @@ where
             let request_builder = Arc::clone(&http_request_builder);
 
             let fut: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
-                Box::pin(async move { Ok(request_builder.build(req.payload, req.other_metadata)) });
+                Box::pin(async move { Ok(request_builder.build(req)) });
 
             fut
         });

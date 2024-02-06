@@ -3,7 +3,10 @@
 use bytes::Bytes;
 use http::{Request, Uri};
 
-use crate::{gcp::GcpAuthenticator, sinks::util::http::HttpServiceRequestBuilder};
+use crate::{
+    gcp::GcpAuthenticator,
+    sinks::util::http::{HttpRequest, HttpServiceRequestBuilder},
+};
 
 #[derive(Debug, Clone)]
 pub(super) struct StackdriverLogsServiceRequestBuilder {
@@ -12,14 +15,14 @@ pub(super) struct StackdriverLogsServiceRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<()> for StackdriverLogsServiceRequestBuilder {
-    fn build(&self, body: Bytes, _metadata: ()) -> Request<Bytes> {
-        let mut request = Request::post(self.uri.clone())
+    fn build(&self, request: HttpRequest<()>) -> Request<Bytes> {
+        let mut builder = Request::post(self.uri.clone())
             .header("Content-Type", "application/json")
-            .body(body)
+            .body(request.get_payload().clone())
             .unwrap();
 
-        self.auth.apply(&mut request);
+        self.auth.apply(&mut builder);
 
-        request
+        builder
     }
 }

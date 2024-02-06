@@ -87,7 +87,7 @@ impl SinkConfig for ClickhouseConfig {
 
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
-        let sumo_logic_service_request_builder = ClickhouseServiceRequestBuilder {
+        let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
             auth: auth.clone(),
             endpoint: endpoint.clone(),
             skip_unknown_fields: self.skip_unknown_fields,
@@ -96,7 +96,7 @@ impl SinkConfig for ClickhouseConfig {
         };
 
         let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
-            HttpService::new(client.clone(), sumo_logic_service_request_builder);
+            HttpService::new(client.clone(), clickhouse_service_request_builder);
 
         let request_limits = self.request.into_settings();
 

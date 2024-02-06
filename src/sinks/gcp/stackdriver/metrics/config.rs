@@ -9,7 +9,9 @@ use crate::{
         gcp,
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService, HttpServiceRequestBuilder},
+            http::{
+                http_response_retry_logic, HttpRequest, HttpService, HttpServiceRequestBuilder,
+            },
             service::TowerRequestConfigDefaults,
         },
     },
@@ -157,10 +159,10 @@ pub(super) struct StackdriverMetricsServiceRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<()> for StackdriverMetricsServiceRequestBuilder {
-    fn build(&self, body: Bytes, _metadata: ()) -> Request<Bytes> {
+    fn build(&self, request: HttpRequest<()>) -> Request<Bytes> {
         let mut request = Request::post(self.uri.clone())
             .header("Content-Type", "application/json")
-            .body(body)
+            .body(request.get_payload().clone())
             .unwrap();
 
         self.auth.apply(&mut request);

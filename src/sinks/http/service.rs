@@ -6,7 +6,10 @@ use indexmap::IndexMap;
 
 use crate::{
     http::Auth,
-    sinks::util::{http::HttpServiceRequestBuilder, UriSerde},
+    sinks::util::{
+        http::{HttpRequest, HttpServiceRequestBuilder},
+        UriSerde,
+    },
 };
 
 use super::config::HttpMethod;
@@ -43,7 +46,7 @@ impl HttpSinkRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
-    fn build(&self, body: Bytes, _metadata: ()) -> Request<Bytes> {
+    fn build(&self, request: HttpRequest<()>) -> Request<Bytes> {
         let method: Method = self.method.into();
         let uri: Uri = self.uri.uri.clone();
         let mut builder = Request::builder().method(method).uri(uri);
@@ -67,7 +70,7 @@ impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
 
         // The request building should not have errors at this point
         let mut request = builder
-            .body(body)
+            .body(request.get_payload().clone())
             .expect("Failed to assign body to request- builder has errors");
 
         if let Some(auth) = &self.auth {

@@ -19,7 +19,10 @@ use crate::{
             service::StackdriverLogsServiceRequestBuilder,
         },
         prelude::*,
-        util::{encoding::Encoder as _, http::HttpServiceRequestBuilder},
+        util::{
+            encoding::Encoder as _,
+            http::{HttpRequest, HttpServiceRequestBuilder},
+        },
     },
     test_util::{
         components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
@@ -220,7 +223,14 @@ async fn correct_request() {
         auth: GcpAuthenticator::None,
     };
 
-    let request = stackdriver_logs_service_request_builder.build(body, ());
+    let http_request = HttpRequest::new(
+        body,
+        EventFinalizers::default(),
+        RequestMetadata::default(),
+        None,
+    );
+
+    let request = stackdriver_logs_service_request_builder.build(http_request);
     let (parts, body) = request.into_parts();
     let json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
 

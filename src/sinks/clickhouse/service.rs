@@ -6,7 +6,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+            http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
             retries::RetryAction,
         },
         UriParseSnafu,
@@ -68,7 +68,11 @@ pub(super) struct ClickhouseServiceRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
-    fn build(&self, body: Bytes, metadata: PartitionKey) -> Request<Bytes> {
+    fn build(&self, request: HttpRequest<PartitionKey>) -> Request<Bytes> {
+        let metadata = request
+            .get_additional_metadata()
+            .expect("PartitionKey should have been set upstream");
+
         let uri = set_uri_query(
             &self.endpoint,
             &metadata.database,
@@ -82,7 +86,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
 
         let mut builder = Request::post(&uri)
             .header(CONTENT_TYPE, "application/x-ndjson")
-            .header(CONTENT_LENGTH, body.len());
+            .header(CONTENT_LENGTH, request.get_payload().len());
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header(CONTENT_ENCODING, ce);
         }
@@ -91,7 +95,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
         }
 
         builder
-            .body(body)
+            .body(request.get_payload().clone())
             .expect("building HTTP request failed unexpectedly")
     }
 }

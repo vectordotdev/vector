@@ -4,7 +4,7 @@ use bytes::Bytes;
 use http::{Request, Uri};
 use vector_lib::sensitive_string::SensitiveString;
 
-use crate::sinks::util::http::HttpServiceRequestBuilder;
+use crate::sinks::util::http::{HttpRequest, HttpServiceRequestBuilder};
 
 use super::config::HTTP_HEADER_HONEYCOMB;
 
@@ -15,11 +15,11 @@ pub(super) struct HoneycombSvcRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<()> for HoneycombSvcRequestBuilder {
-    fn build(&self, body: Bytes, _metadata: ()) -> Request<Bytes> {
-        let request = Request::post(&self.uri).header(HTTP_HEADER_HONEYCOMB, self.api_key.inner());
+    fn build(&self, request: HttpRequest<()>) -> Request<Bytes> {
+        let builder = Request::post(&self.uri).header(HTTP_HEADER_HONEYCOMB, self.api_key.inner());
 
-        request
-            .body(body)
+        builder
+            .body(request.get_payload().clone())
             .expect("Failed to assign body to request- builder has errors")
     }
 }
