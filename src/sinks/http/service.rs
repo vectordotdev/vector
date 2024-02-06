@@ -46,7 +46,7 @@ impl HttpSinkRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
-    fn build(&self, request: HttpRequest<()>) -> Request<Bytes> {
+    fn build(&self, mut request: HttpRequest<()>) -> Request<Bytes> {
         let method: Method = self.method.into();
         let uri: Uri = self.uri.uri.clone();
         let mut builder = Request::builder().method(method).uri(uri);
@@ -70,7 +70,7 @@ impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
 
         // The request building should not have errors at this point
         let mut request = builder
-            .body(request.get_payload().clone())
+            .body(request.take_payload())
             .expect("Failed to assign body to request- builder has errors");
 
         if let Some(auth) = &self.auth {

@@ -68,7 +68,7 @@ pub(super) struct ClickhouseServiceRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
-    fn build(&self, request: HttpRequest<PartitionKey>) -> Request<Bytes> {
+    fn build(&self, mut request: HttpRequest<PartitionKey>) -> Request<Bytes> {
         let metadata = request
             .get_additional_metadata()
             .expect("PartitionKey should have been set upstream");
@@ -84,9 +84,11 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
 
         let auth: Option<Auth> = self.auth.clone();
 
+        let payload = request.take_payload();
+
         let mut builder = Request::post(&uri)
             .header(CONTENT_TYPE, "application/x-ndjson")
-            .header(CONTENT_LENGTH, request.get_payload().len());
+            .header(CONTENT_LENGTH, payload.len());
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header(CONTENT_ENCODING, ce);
         }
@@ -95,7 +97,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
         }
 
         builder
-            .body(request.get_payload().clone())
+            .body(payload)
             .expect("building HTTP request failed unexpectedly")
     }
 }

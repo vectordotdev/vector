@@ -159,10 +159,10 @@ pub(super) struct StackdriverMetricsServiceRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<()> for StackdriverMetricsServiceRequestBuilder {
-    fn build(&self, request: HttpRequest<()>) -> Request<Bytes> {
+    fn build(&self, mut request: HttpRequest<()>) -> Request<Bytes> {
         let mut request = Request::post(self.uri.clone())
             .header("Content-Type", "application/json")
-            .body(request.get_payload().clone())
+            .body(request.take_payload())
             .unwrap();
 
         self.auth.apply(&mut request);

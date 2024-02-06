@@ -634,16 +634,8 @@ impl<T: Send> HttpRequest<T> {
         self.additional_metadata.as_ref()
     }
 
-    pub const fn get_request_metadata(&self) -> &RequestMetadata {
-        &self.request_metadata
-    }
-
-    pub const fn get_finalizers(&self) -> &EventFinalizers {
-        &self.finalizers
-    }
-
-    pub const fn get_payload(&self) -> &Bytes {
-        &self.payload
+    pub fn take_payload(&mut self) -> Bytes {
+        std::mem::take(&mut self.payload)
     }
 }
 

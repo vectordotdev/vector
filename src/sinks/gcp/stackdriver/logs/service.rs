@@ -15,10 +15,10 @@ pub(super) struct StackdriverLogsServiceRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<()> for StackdriverLogsServiceRequestBuilder {
-    fn build(&self, request: HttpRequest<()>) -> Request<Bytes> {
+    fn build(&self, mut request: HttpRequest<()>) -> Request<Bytes> {
         let mut builder = Request::post(self.uri.clone())
             .header("Content-Type", "application/json")
-            .body(request.get_payload().clone())
+            .body(request.take_payload())
             .unwrap();
 
         self.auth.apply(&mut builder);

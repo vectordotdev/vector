@@ -15,11 +15,11 @@ pub(super) struct HoneycombSvcRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<()> for HoneycombSvcRequestBuilder {
-    fn build(&self, request: HttpRequest<()>) -> Request<Bytes> {
+    fn build(&self, mut request: HttpRequest<()>) -> Request<Bytes> {
         let builder = Request::post(&self.uri).header(HTTP_HEADER_HONEYCOMB, self.api_key.inner());
 
         builder
-            .body(request.get_payload().clone())
+            .body(request.take_payload())
             .expect("Failed to assign body to request- builder has errors")
     }
 }
