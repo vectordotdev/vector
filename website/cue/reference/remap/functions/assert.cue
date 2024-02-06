@@ -43,7 +43,7 @@ remap: functions: assert: {
 		{
 			title: "Assertion (true)"
 			source: #"""
-				_ok, _err = assert("foo" == "foo", message: "\"foo\" must be \"foo\"!")
+				assert!("foo" == "foo", message: "\"foo\" must be \"foo\"!")
 				"""#
 			return: true
 		},

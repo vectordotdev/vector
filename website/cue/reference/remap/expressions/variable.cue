@@ -33,9 +33,10 @@ remap: expressions: variable: {
 		{
 			title: "Simple variable"
 			source: #"""
-				_my_variable = 1
+				my_variable = 1
+				my_variable == 1
 				"""#
-			return: 1
+			return: true
 		},
 		{
 			title: "Variable with path"

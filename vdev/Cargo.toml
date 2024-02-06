@@ -13,7 +13,7 @@ cached = "0.48.0"
 chrono.workspace = true
 clap.workspace = true
 clap-verbosity-flag = "2.1.2"
-clap_complete = "4.4.9"
+clap_complete = "4.4.10"
 confy = "0.6.0"
 directories = "5.0.1"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
@@ -35,5 +35,5 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml = "0.9.30"
 sha2 = "0.10.8"
-tempfile = "3.9.0"
+tempfile = "3.10.0"
 toml.workspace = true

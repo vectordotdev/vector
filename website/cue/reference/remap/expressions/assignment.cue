@@ -111,7 +111,8 @@ remap: expressions: assignment: {
 		{
 			title: "Variable assignment"
 			source: #"""
-				_my_variable = "Hello, World!"
+				my_variable = "Hello, World!"
+				.my_field = my_variable
 				"""#
 			return: "Hello, World!"
 		},

@@ -134,7 +134,7 @@ proptest = "1.4"
 proptest-derive = "0.4.0"
 serde_json = { version = "1.0.112", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.196", default-features = false, features = ["alloc", "derive", "rc"] }
-toml = { version = "0.8.9", default-features = false, features = ["display", "parse"] }
+toml = { version = "0.8.10", default-features = false, features = ["display", "parse"] }
 vrl = { git = "https://github.com/vectordotdev/vrl", rev = "5e956d9353d8c272c72016d6a38bd26f091be879", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
@@ -155,7 +155,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 async-stream = { version = "0.3.5", default-features = false }
 async-trait = { version = "0.1.77", default-features = false }
 futures = { version = "0.3.30", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.35.1", default-features = false, features = ["full"] }
+tokio = { version = "1.36.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.4", default-features = false }
 tokio-stream = { version = "0.1.14", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -198,7 +198,7 @@ azure_storage = { version = "0.17", default-features = false, optional = true }
 azure_storage_blobs = { version = "0.17", default-features = false, optional = true }
 
 # OpenDAL
-opendal = {version = "0.44", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
+opendal = {version = "0.45", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
 
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
@@ -208,7 +208,7 @@ serde.workspace = true
 serde-toml-merge = { version = "0.3.3", default-features = false }
 serde_bytes = { version = "0.11.14", default-features = false, features = ["std"], optional = true }
 serde_json.workspace = true
-serde_with = { version = "3.5.0", default-features = false, features = ["macros", "std"] }
+serde_with = { version = "3.6.0", default-features = false, features = ["macros", "std"] }
 serde_yaml = { version = "0.9.30", default-features = false }
 
 # Messagepack
@@ -235,7 +235,7 @@ async-graphql-warp = { version = "7.0.1", default-features = false, optional = t
 crossterm = { version = "0.27.0", default-features = false, features = ["event-stream", "windows"], optional = true }
 num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
-ratatui = { version = "0.25.0", optional = true, default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.26.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
 
@@ -371,9 +371,9 @@ proptest.workspace = true
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 rstest = {version = "0.18.2"}
-tempfile = "3.9.0"
+tempfile = "3.10.0"
 test-generator = "0.3.1"
-tokio = { version = "1.35.1", features = ["test-util"] }
+tokio = { version = "1.36.0", features = ["test-util"] }
 tokio-test = "0.4.3"
 tower-test = "0.4.0"
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
@@ -617,9 +617,12 @@ transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []
 transforms-remap = []
 transforms-route = []
-transforms-sample = []
+transforms-sample = ["transforms-impl-sample"]
 transforms-tag_cardinality_limit = ["dep:bloomy", "dep:hashbrown"]
 transforms-throttle = ["dep:governor"]
+
+# Implementations of transforms
+transforms-impl-sample = []
 
 # Sinks
 sinks = ["sinks-logs", "sinks-metrics"]
