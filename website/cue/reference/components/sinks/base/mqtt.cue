@@ -177,9 +177,9 @@ base: components: sinks: mqtt: configuration: {
 		description: "Supported Quality of Service types for MQTT."
 		required:    true
 		type: string: enum: {
-			atleastonce: "AtLeastOnce."
-			atmostonce:  "AtMostOnce."
-			exactlyonce: "ExactlyOnce."
+			at_least_once: "AtLeastOnce."
+			at_most_once:  "AtMostOnce."
+			exactly_once: "ExactlyOnce."
 		}
 	}
 	tls: {

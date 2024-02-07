@@ -38,14 +38,14 @@ async fn mqtt_happy() {
     healthcheck.await.expect("Health check failed");
 
     // prepare consumer
-    let mut mqttoptions = MqttOptions::new(
+    let mut mqtt_options = MqttOptions::new(
         "integration-test-consumer",
         mqtt_broker_address(),
         mqtt_broker_port(),
     );
-    mqttoptions.set_keep_alive(Duration::from_secs(5));
+    mqtt_options.set_keep_alive(Duration::from_secs(5));
 
-    let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
+    let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
     client
         .subscribe("test", QoS::AtLeastOnce)
         .await

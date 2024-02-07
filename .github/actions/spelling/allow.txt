@@ -52,6 +52,8 @@ dkr
 Dockerfiles
 DOOV
 Douban
+emqx
+eventloop
 Enot
 Evercoss
 Explay
@@ -167,6 +169,7 @@ Rockchip
 Roku
 Roundcube
 Rowling
+rumqttc
 SBT
 SKtelesys
 Salesforce
