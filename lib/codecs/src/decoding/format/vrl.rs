@@ -115,7 +115,7 @@ impl Deserializer for VrlDeserializer {
 impl VrlDeserializer {
     fn run_vrl(&self, event: Event, log_namespace: LogNamespace) -> vector_common::Result<Event> {
         let mut runtime = Runtime::default();
-        let mut target = VrlTarget::new(event, &self.program.info(), true);
+        let mut target = VrlTarget::new(event, self.program.info(), true);
         match runtime.resolve(&mut target, &self.program, &self.timezone) {
             Ok(_) => match target.into_events(log_namespace) {
                 TargetEvents::One(event) => Ok(event),
@@ -162,7 +162,7 @@ mod tests {
 
         // Syslog input
         let syslog_bytes = Bytes::from(
-            "<34>1 2024-02-06T15:04:05.000Z mymachine.example.com su - ID47 - 'su root' failed for lonvick on /dev/pts/8",
+            "<34>1 2024-02-06T15:04:05.000Z mymachine.example.com su - ID47 - 'su root' failed for user on /dev/pts/8",
         );
         let result = decoder.parse(syslog_bytes, LogNamespace::Vector).unwrap();
         assert_eq!(result.len(), 1);
@@ -176,7 +176,7 @@ mod tests {
                 "appname" => "su",
                 "facility" => "auth",
                 "hostname" => "mymachine.example.com",
-                "message" => "'su root' failed for lonvick on /dev/pts/8",
+                "message" => "'su root' failed for user on /dev/pts/8",
                 "msgid" => "ID47",
                 "severity" => "crit",
                 "timestamp" => "2024-02-06T15:04:05Z".parse::<DateTime<Utc>>().unwrap(),
@@ -233,6 +233,6 @@ mod tests {
         .build()
         .unwrap_err()
         .to_string();
-        assert!(error.contains("x"));
+        assert!(error.contains("error[E203]: syntax error"));
     }
 }
