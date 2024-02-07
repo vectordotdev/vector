@@ -343,7 +343,6 @@ base: components: sources: aws_sqs: configuration: {
 
 																If not set, `local` will be used.
 
-																[global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
 																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 																"""
 						required: false
