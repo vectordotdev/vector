@@ -35,8 +35,8 @@ remap: functions: parse_etld: {
 				parse_etld!("sub.sussex.ac.uk")
 				"""#
 			return: {
-				etld:   "ac.uk"
-				etld_plus: "ac.uk"
+				etld:         "ac.uk"
+				etld_plus:    "ac.uk"
 				known_suffix: true
 			}
 		},
@@ -46,8 +46,8 @@ remap: functions: parse_etld: {
 				parse_etld!("sub.sussex.ac.uk", plus_parts: 1)
 				"""#
 			return: {
-				etld:   "ac.uk"
-				etld_plus: "sussex.ac.uk"
+				etld:         "ac.uk"
+				etld_plus:    "sussex.ac.uk"
 				known_suffix: true
 			}
 		},
@@ -57,8 +57,8 @@ remap: functions: parse_etld: {
 				parse_etld!("vector.acmecorp")
 				"""#
 			return: {
-				etld:   "acmecorp"
-				etld_plus: "acmecorp"
+				etld:         "acmecorp"
+				etld_plus:    "acmecorp"
 				known_suffix: false
 			}
 		},
