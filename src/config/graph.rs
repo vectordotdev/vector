@@ -228,7 +228,7 @@ impl Graph {
                     stack.insert(n.clone());
                 } else {
                     // we came back to the node after exploring all its children - remove it from the stack and traversal
-                    stack.remove(&n);
+                    stack.shift_remove(&n);
                     traversal.pop_back();
                 }
                 let inputs = self
