@@ -6,6 +6,8 @@
 use serde::{Deserialize, Serialize};
 use vector_lib::{event::DatadogMetricOriginMetadata, sensitive_string::SensitiveString};
 
+pub mod proto;
+
 pub(crate) const DD_US_SITE: &str = "datadoghq.com";
 pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 

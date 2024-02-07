@@ -19,7 +19,10 @@ use vector_lib::{
 };
 
 use crate::{
-    common::datadog::{DatadogMetricType, DatadogSeriesMetric},
+    common::datadog::{
+        proto::metrics::{metric_payload, Metadata, MetricPayload, SketchPayload},
+        DatadogMetricType, DatadogSeriesMetric,
+    },
     config::log_schema,
     event::{
         metric::{Metric, MetricValue},
@@ -28,11 +31,7 @@ use crate::{
     internal_events::EventsReceived,
     schema,
     sources::{
-        datadog_agent::{
-            handle_request,
-            proto::metrics::{metric_payload, Metadata, MetricPayload, SketchPayload},
-            ApiKeyQueryParams, DatadogAgentSource,
-        },
+        datadog_agent::{handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::ErrorMessage,
     },
     SourceSender,

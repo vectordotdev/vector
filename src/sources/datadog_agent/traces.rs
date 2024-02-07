@@ -13,13 +13,10 @@ use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
+    common::datadog::proto::traces::{Span, TracePayload, TracerPayload},
     event::{Event, ObjectMap, TraceEvent, Value},
     sources::{
-        datadog_agent::{
-            handle_request,
-            proto::traces::{Span, TracePayload, TracerPayload},
-            ApiKeyQueryParams, DatadogAgentSource,
-        },
+        datadog_agent::{handle_request, ApiKeyQueryParams, DatadogAgentSource},
         util::ErrorMessage,
     },
     SourceSender,

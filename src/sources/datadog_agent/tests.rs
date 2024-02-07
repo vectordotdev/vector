@@ -24,7 +24,7 @@ use vrl::value::{Kind, ObjectMap};
 
 use crate::schema::Definition;
 use crate::{
-    common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
+    common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric, proto},
     config::{SourceConfig, SourceContext},
     event::{
         into_event_stream,
@@ -34,7 +34,7 @@ use crate::{
     schema,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
-        logs::decode_log_body, metrics::DatadogSeriesRequest, proto, DatadogAgentConfig,
+        logs::decode_log_body, metrics::DatadogSeriesRequest, DatadogAgentConfig,
         DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
     },
     test_util::{

@@ -5,7 +5,6 @@ mod tests;
 
 pub mod logs;
 pub mod metrics;
-pub(crate) mod proto;
 pub mod traces;
 
 use std::convert::Infallible;

@@ -270,7 +270,11 @@ mod tests {
     }
 
     fn create_gauge(name: &str, value: f64) -> Metric {
-        Metric::new(name.to_string(), MetricKind::Incremental, MetricValue::Gauge { value })
+        Metric::new(
+            name.to_string(),
+            MetricKind::Incremental,
+            MetricValue::Gauge { value },
+        )
     }
 
     #[test]
