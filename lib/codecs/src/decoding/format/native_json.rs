@@ -14,10 +14,7 @@ use vector_core::config::LogNamespace;
 #[derive(Debug, Clone, Default)]
 pub struct NativeJsonDeserializerConfig {
     /// Vector's native JSON-specific decoding options.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub native_json: NativeJsonDeserializerOptions,
 }
 
@@ -67,7 +64,7 @@ pub struct NativeJsonDeserializerOptions {
     /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
     #[serde(
         default = "default_lossy",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::is_default"
     )]
     #[derivative(Default(value = "default_lossy()"))]
     pub lossy: bool,

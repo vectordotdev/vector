@@ -19,6 +19,10 @@ on:
         required: false
         type: boolean
         default: false
+      e2e_tests:
+        required: false
+        type: boolean
+        default: false
       source:
         required: false
         type: boolean
@@ -41,7 +45,7 @@ on:
       k8s:
         value: ${{ jobs.source.outputs.k8s }}
       all-int:
-        value: ${{ jobs.int_tests.outputs.all-int }}
+        value: ${{ jobs.int_tests.outputs.all-tests }}
       amqp:
         value: ${{ jobs.int_tests.outputs.amqp }}
       appsignal:
@@ -110,6 +114,13 @@ on:
         value: ${{ jobs.int_tests.outputs.splunk }}
       webhdfs:
         value: ${{ jobs.int_tests.outputs.webhdfs }}
+      # e2e tests
+      all-e2e:
+        value: ${{ jobs.e2e_tests.outputs.all-tests }}
+      e2e-datadog-logs:
+        value: ${{ jobs.e2e_tests.outputs.datadog-logs }}
+      e2e-datadog-metrics:
+        value: ${{ jobs.e2e_tests.outputs.datadog-metrics }}
 
 jobs:
   # Detects changes that are not specific to integration tests
@@ -128,7 +139,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - uses: dorny/paths-filter@v2
+    - uses: dorny/paths-filter@v3
       id: filter
       with:
         base: ${{ inputs.base_ref }}
@@ -184,7 +195,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.int_tests }}
     outputs:
-      all-int: ${{ steps.filter.outputs.all-int}}
+      all-tests: ${{ steps.filter.outputs.all-tests}}
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
       aws: ${{ steps.filter.outputs.aws }}
@@ -228,7 +239,31 @@ jobs:
       - name: Create filter rules for integrations
         run: cargo vdev int ci-paths > int_test_filters.yaml
 
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: ${{ inputs.base_ref }}
+          ref: ${{ inputs.head_ref }}
+          filters: int_test_filters.yaml
+
+  # Detects changes that are specific to e2e tests
+  e2e_tests:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.e2e_tests }}
+    outputs:
+      all-tests: ${{ steps.filter.outputs.all-tests}}
+      datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
+      datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
+    steps:
+      - uses: actions/checkout@v3
+
+      # creates a yaml file that contains the filters for each test,
+      # extracted from the output of the `vdev int ci-paths` command, which
+      # sources the paths from the scripts/integration/.../test.yaml files
+      - name: Create filter rules for e2e tests
+        run: cargo vdev e2e ci-paths > int_test_filters.yaml
+
+      - uses: dorny/paths-filter@v3
         id: filter
         with:
           base: ${{ inputs.base_ref }}

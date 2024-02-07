@@ -28,7 +28,7 @@ impl RetryLogic for GreptimeDBRetryLogic {
 
 #[derive(Clone)]
 pub(super) struct GreptimeDBRequest {
-    items: Vec<InsertRequest>,
+    items: RowInsertRequests,
     finalizers: EventFinalizers,
     metadata: RequestMetadata,
 }
@@ -54,7 +54,7 @@ impl GreptimeDBRequest {
             NonZeroUsize::new(estimated_request_size).expect("request should never be zero length");
 
         GreptimeDBRequest {
-            items,
+            items: RowInsertRequests { inserts: items },
             finalizers,
             metadata: request_metadata_builder.with_request_size(request_size),
         }
@@ -179,7 +179,7 @@ impl Service<GreptimeDBRequest> for GreptimeDBService {
 
         Box::pin(async move {
             let metadata = req.metadata;
-            let result = client.insert(req.items).await?;
+            let result = client.row_insert(req.items).await?;
 
             Ok(GreptimeDBBatchOutput {
                 item_count: result,

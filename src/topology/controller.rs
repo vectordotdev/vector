@@ -121,7 +121,8 @@ impl TopologyController {
                 Ok(api_server) => {
                     emit!(ApiStarted {
                         addr: new_config.api.address.unwrap(),
-                        playground: new_config.api.playground
+                        playground: new_config.api.playground,
+                        graphql: new_config.api.graphql,
                     });
 
                     Some(api_server)

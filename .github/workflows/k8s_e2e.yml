@@ -25,13 +25,15 @@ on:
     - cron: '0 0 * * 2-6'
 
 concurrency:
-  # In flight runs will be canceled through re-trigger in the merge queue, scheduled run. The comment.html_url should always be unique.
+  # In flight runs will be canceled through re-trigger in the merge queue, scheduled run, or if
+  # additional PR commits are pushed. The comment.html_url should always be unique.
+  #
   # Note that technically this workflow can run on PRs which have code changes that affect K8s. Choosing not to add the PR commit to
   # the concurrency group settings- since that would result in new PR commits canceling out manual runs on any PR that doesn't flag
   # change detection. This is a "conservative" approach that means we may have some runs that could be canceled, but it's safer than
   # having user's runs canceled when they shouldn't be. In practice this shouldn't happen very often given this component does not change
   # often so any increased cost from the conservative approach should be negligible.
-  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.event.merge_group.head_sha || github.event.schedule }}
+  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.ref || github.event.schedule }}
   cancel-in-progress: true
 
 env:
@@ -90,7 +92,7 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry

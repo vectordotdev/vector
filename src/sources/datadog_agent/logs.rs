@@ -161,8 +161,13 @@ pub(crate) fn decode_log_body(
                                 log.metadata_mut().set_datadog_api_key(Arc::clone(k));
                             }
 
+                            let logs_schema_definition = source
+                                .logs_schema_definition
+                                .as_ref()
+                                .unwrap_or_else(|| panic!("registered log schema required"));
+
                             log.metadata_mut()
-                                .set_schema_definition(&source.logs_schema_definition);
+                                .set_schema_definition(logs_schema_definition);
                         }
 
                         decoded.push(event);

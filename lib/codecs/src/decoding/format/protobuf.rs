@@ -24,10 +24,7 @@ use super::Deserializer;
 #[derive(Debug, Clone, Default)]
 pub struct ProtobufDeserializerConfig {
     /// Protobuf-specific decoding options.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub protobuf: ProtobufDeserializerOptions,
 }
 

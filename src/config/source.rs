@@ -17,7 +17,7 @@ use vector_lib::{
 };
 
 use super::{schema, ComponentKey, ProxyConfig, Resource};
-use crate::{shutdown::ShutdownSignal, SourceSender};
+use crate::{extra_context::ExtraContext, shutdown::ShutdownSignal, SourceSender};
 
 pub type BoxedSource = Box<dyn SourceConfig>;
 
@@ -51,10 +51,7 @@ impl<T: SourceConfig + 'static> From<T> for BoxedSource {
 #[derive(Clone, Debug)]
 pub struct SourceOuter {
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_lib::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
     #[serde(default, skip)]
@@ -134,6 +131,10 @@ pub struct SourceContext {
     /// Given a source can expose multiple [`SourceOutput`] channels, the ID is tied to the identifier of
     /// that `SourceOutput`.
     pub schema_definitions: HashMap<Option<String>, schema::Definition>,
+
+    /// Extra context data provided by the running app and shared across all components. This can be
+    /// used to pass shared settings or other data from outside the components.
+    pub extra_context: ExtraContext,
 }
 
 impl SourceContext {
@@ -154,6 +155,7 @@ impl SourceContext {
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
                 schema: Default::default(),
+                extra_context: Default::default(),
             },
             shutdown,
         )
@@ -173,6 +175,7 @@ impl SourceContext {
             acknowledgements: false,
             schema_definitions: schema_definitions.unwrap_or_default(),
             schema: Default::default(),
+            extra_context: Default::default(),
         }
     }
 

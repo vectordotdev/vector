@@ -83,6 +83,7 @@ urls: {
 	aws_s3_sse:                                 "\(aws_docs)/AmazonS3/latest/dev/UsingServerSideEncryption.html"
 	aws_s3_storage_classes:                     "https://aws.amazon.com/s3/storage-classes/"
 	aws_s3_tags:                                "\(aws_docs)/AmazonS3/latest/user-guide/add-object-tags.html"
+	aws_sns_api:                                "\(aws_docs)/AWSSimpleNotificationService/latest/APIReference/Welcome.html"
 	aws_sqs:                                    "https://aws.amazon.com/sqs/"
 	aws_sqs_api:                                "\(aws_docs)/AWSSimpleQueueService/latest/APIReference/Welcome.html"
 	aws_sqs_create:                             "\(aws_docs)/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-configure-create-queue.html"

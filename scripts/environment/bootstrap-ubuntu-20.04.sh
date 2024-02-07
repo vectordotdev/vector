@@ -206,3 +206,6 @@ EOF
 rustc-wrapper = "$RUSTC_WRAPPER"
 EOF
 fi
+
+mkdir -p /var/lib/vector
+chmod 777 /var/lib/vector
