@@ -20,7 +20,7 @@ releases: "0.35.1": {
 			description: """
 				The HTTP server-based sources that support the new
 				`keepalive.max_connection_age_secs` now only apply this setting for HTTP/0.9,
-				HTTP/1.0, and HTTP/1.1 connections since the implementation, which sends
+				HTTP/1.0, and HTTP/1.1 connections, since the implementation, which sends
 				a `Connection: Close` header, does not apply to HTTP/2 and HTTP/3 connections.
 				"""
 			pr_numbers: [19801]
