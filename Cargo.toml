@@ -135,7 +135,7 @@ proptest-derive = "0.4.0"
 serde_json = { version = "1.0.112", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.196", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.10", default-features = false, features = ["display", "parse"] }
-vrl = { git = "https://github.com/vectordotdev/vrl", rev = "5e956d9353d8c272c72016d6a38bd26f091be879", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { version = "0.11.0", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
 pin-project.workspace = true
