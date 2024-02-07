@@ -140,6 +140,7 @@ base: components: sources: http_client: configuration: {
 															[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
 															[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
 															"""
+						vrl: "TODO"
 					}
 				}
 			}
@@ -222,6 +223,36 @@ base: components: sources: http_client: configuration: {
 						"""
 					required: false
 					type: bool: default: true
+				}
+			}
+			vrl: {
+				description:   "VRL-specific decoding options."
+				relevant_when: "codec = \"vrl\""
+				required:      true
+				type: object: options: {
+					source: {
+						description: """
+																The [Vector Remap Language][vrl] (VRL) program to execute for each event.
+
+																[vrl]: https://vector.dev/docs/reference/vrl
+																"""
+						required: true
+						type: string: {}
+					}
+					timezone: {
+						description: """
+																The name of the timezone to apply to timestamp conversions that do not contain an explicit
+																time zone. The time zone name may be any name in the [TZ database][tz_database], or `local`
+																to indicate system local time.
+
+																If not set, `local` will be used.
+
+																[global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
+																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+																"""
+						required: false
+						type: string: examples: ["local", "America/New_York", "EST5EDT"]
+					}
 				}
 			}
 		}
