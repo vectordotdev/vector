@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
-use rumqttc::{AsyncClient, ClientError, ConnectionError, EventLoop, MqttOptions};
+use rumqttc::{AsyncClient, EventLoop, MqttOptions};
 use snafu::{ResultExt, Snafu};
 use vector_lib::tls::TlsError;
 
+use crate::internal_events::MqttConnectionError;
 use crate::sinks::prelude::*;
 
 use super::{
@@ -18,12 +19,8 @@ use super::{
 pub enum MqttError {
     #[snafu(display("invalid topic template: {}", source))]
     TopicTemplate { source: TemplateParseError },
-    #[snafu(display("MQTT connection error: {}", source))]
-    Connection { source: ConnectionError },
     #[snafu(display("TLS error: {}", source))]
     Tls { source: TlsError },
-    #[snafu(display("MQTT client error: {}", source))]
-    Client { source: ClientError },
     #[snafu(display("MQTT configuration error: {}", source))]
     Configuration { source: ConfigurationError },
 }
@@ -104,7 +101,14 @@ impl MqttSink {
                 // delivery guarantees.
                 // We need this issue resolved first:
                 // https://github.com/bytebeamio/rumqtt/issues/349
-                let _ = connection.poll().await;
+                match connection.poll().await {
+                    Ok(_) => {}
+                    Err(connection_error) => {
+                        emit!(MqttConnectionError {
+                            error: connection_error
+                        });
+                    }
+                }
             }
         });
 
