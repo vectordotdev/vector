@@ -221,7 +221,7 @@ mod tests {
 
     fn metric(name: &str, value: f64) -> Metric {
         Metric::new(
-            name,
+            name.to_string(),
             MetricKind::Incremental,
             MetricValue::Counter { value },
         )

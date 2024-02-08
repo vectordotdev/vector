@@ -20,7 +20,7 @@ use vector_lib::{
 
 use crate::{
     common::datadog::{
-        proto::metrics::{metric_payload, Metadata, MetricPayload, SketchPayload},
+        proto::metrics::{Metadata, MetricPayload, MetricType, SketchPayload},
         DatadogMetricType, DatadogSeriesMetric,
     },
     config::log_schema,
@@ -314,7 +314,7 @@ pub(crate) fn decode_ddseries_v2(
             // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
             // serie.unit is omitted
             match serie.type_.enum_value() {
-                Ok(metric_payload::MetricType::COUNT) => serie
+                Ok(MetricType::COUNT) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
@@ -335,7 +335,7 @@ pub(crate) fn decode_ddseries_v2(
                         .with_namespace(namespace.clone())
                     })
                     .collect::<Vec<_>>(),
-                Ok(metric_payload::MetricType::GAUGE) => serie
+                Ok(MetricType::GAUGE) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
@@ -357,7 +357,7 @@ pub(crate) fn decode_ddseries_v2(
                         .with_interval_ms(non_rate_interval)
                     })
                     .collect::<Vec<_>>(),
-                Ok(metric_payload::MetricType::RATE) => serie
+                Ok(MetricType::RATE) => serie
                     .points
                     .iter()
                     .map(|dd_point| {
@@ -384,7 +384,7 @@ pub(crate) fn decode_ddseries_v2(
                         .with_namespace(namespace.clone())
                     })
                     .collect::<Vec<_>>(),
-                Ok(metric_payload::MetricType::UNSPECIFIED) | Err(_) => {
+                Ok(MetricType::UNSPECIFIED) | Err(_) => {
                     warn!("Unspecified metric type ({}).", serie.type_.value());
                     Vec::new()
                 }

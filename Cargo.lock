@@ -6944,7 +6944,7 @@ dependencies = [
 [[package]]
 name = "protobuf"
 version = "3.3.0"
-source = "git+https://github.com/vectordotdev/rust-protobuf.git?branch=tobz/chars-into-bytes#6c3ab5ab72da50f42b0a3e6794ab99f4e2bbd7e9"
+source = "git+https://github.com/vectordotdev/rust-protobuf.git?branch=tobz/chars-into-bytes#262be78eed50261c47111252a3146b959ecff85d"
 dependencies = [
  "bytes 1.5.0",
  "once_cell",
@@ -6995,7 +6995,7 @@ dependencies = [
 [[package]]
 name = "protobuf-support"
 version = "3.3.0"
-source = "git+https://github.com/vectordotdev/rust-protobuf.git?branch=tobz/chars-into-bytes#6c3ab5ab72da50f42b0a3e6794ab99f4e2bbd7e9"
+source = "git+https://github.com/vectordotdev/rust-protobuf.git?branch=tobz/chars-into-bytes#262be78eed50261c47111252a3146b959ecff85d"
 dependencies = [
  "thiserror",
 ]

@@ -6,7 +6,11 @@ mod include {
 
 /// Metrics-specific Protocol Buffers types.
 pub mod metrics {
-    pub use super::include::dd_metric::*;
+    pub use super::include::dd_metric::{
+        metric_payload::{MetricPoint, MetricSeries, MetricType, Resource},
+        sketch_payload::{sketch::Dogsketch, Sketch},
+        CommonMetadata, Metadata, MetricPayload, Origin, SketchPayload,
+    };
     pub use super::include::ddsketch_full::*;
 }
 

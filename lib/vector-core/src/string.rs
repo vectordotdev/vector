@@ -113,6 +113,17 @@ impl VectorString {
             Self::Static(s) => s.to_string(),
         }
     }
+
+    pub fn into_chars(self) -> Chars {
+        match self {
+            Self::Owned(s) => Chars::from(s),
+            Self::Shared(buf) => {
+                Chars::from_bytes(buf).expect("string bytes should always be valid UTF-8")
+            }
+            Self::Static(s) => Chars::from_bytes(Bytes::from_static(s.as_bytes()))
+                .expect("string bytes should always be valid UTF-8"),
+        }
+    }
 }
 
 impl fmt::Display for VectorString {
@@ -182,6 +193,12 @@ impl From<Chars> for VectorString {
 impl From<&'static str> for VectorString {
     fn from(value: &'static str) -> Self {
         Self::Owned(value.to_string())
+    }
+}
+
+impl From<VectorString> for Chars {
+    fn from(value: VectorString) -> Self {
+        value.into_chars()
     }
 }
 

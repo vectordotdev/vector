@@ -6,8 +6,8 @@ use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
 use tower::Service;
-use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::Region;
@@ -261,7 +261,9 @@ fn encode_events(
     for metric in metrics.into_iter() {
         let (mut series, data, _metadata) = metric.into_parts();
         let mut tags = series.tags.take().unwrap_or_default();
-        let namespace = series.name().namespace()
+        let namespace = series
+            .name()
+            .namespace()
             .unwrap_or_else(|| default_namespace);
         let label = series.name().name();
         let ts = encode_timestamp(data.time.timestamp);

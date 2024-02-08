@@ -24,7 +24,7 @@ use vrl::value::{Kind, ObjectMap};
 
 use crate::schema::Definition;
 use crate::{
-    common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric, proto},
+    common::datadog::{proto, DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     config::{SourceConfig, SourceContext},
     event::{
         into_event_stream,
@@ -961,12 +961,12 @@ async fn decode_sketches() {
             "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
         );
 
-        let sketch = proto::metrics::sketch_payload::Sketch {
+        let sketch = proto::metrics::Sketch {
             metric: "dd_sketch".into(),
             tags: vec!["foo:bar".into(), "foo:baz".into(), "foobar".into()],
             host: "a_host".into(),
             distributions: Vec::new(),
-            dogsketches: vec![proto::metrics::sketch_payload::sketch::Dogsketch {
+            dogsketches: vec![proto::metrics::Dogsketch {
                 ts: 1542182950,
                 cnt: 2,
                 min: 16.0,
@@ -1896,8 +1896,8 @@ async fn decode_series_endpoint_v2() {
         );
 
         let series = vec![
-            proto::metrics::metric_payload::MetricSeries {
-                resources: vec![proto::metrics::metric_payload::Resource {
+            proto::metrics::MetricSeries {
+                resources: vec![proto::metrics::Resource {
                     type_: "host".into(),
                     name: "random_host".into(),
                     ..Default::default()
@@ -1905,56 +1905,56 @@ async fn decode_series_endpoint_v2() {
                 metric: "namespace.dd_gauge".into(),
                 tags: vec!["foo:bar".into()],
                 points: vec![
-                    proto::metrics::metric_payload::MetricPoint {
+                    proto::metrics::MetricPoint {
                         value: 3.14,
                         timestamp: 1542182950,
                         ..Default::default()
                     },
-                    proto::metrics::metric_payload::MetricPoint {
+                    proto::metrics::MetricPoint {
                         value: 3.1415,
                         timestamp: 1542182951,
                         ..Default::default()
                     },
                 ],
-                type_: proto::metrics::metric_payload::MetricType::GAUGE.into(),
+                type_: proto::metrics::MetricType::GAUGE.into(),
                 unit: "".into(),
                 source_type_name: "a_random_source_type_name".into(),
                 interval: 10, // Dogstatsd sets Gauge interval to 10 by default
                 ..Default::default()
             },
-            proto::metrics::metric_payload::MetricSeries {
-                resources: vec![proto::metrics::metric_payload::Resource {
+            proto::metrics::MetricSeries {
+                resources: vec![proto::metrics::Resource {
                     type_: "host".into(),
                     name: "another_random_host".into(),
                     ..Default::default()
                 }],
                 metric: "another_namespace.dd_rate".into(),
                 tags: vec!["foo:bar:baz".into(), "foo:bizbaz".into()],
-                points: vec![proto::metrics::metric_payload::MetricPoint {
+                points: vec![proto::metrics::MetricPoint {
                     value: 3.14,
                     timestamp: 1542182950,
                     ..Default::default()
                 }],
-                type_: proto::metrics::metric_payload::MetricType::RATE.into(),
+                type_: proto::metrics::MetricType::RATE.into(),
                 unit: "".into(),
                 source_type_name: "another_random_source_type_name".into(),
                 interval: 10,
                 ..Default::default()
             },
-            proto::metrics::metric_payload::MetricSeries {
-                resources: vec![proto::metrics::metric_payload::Resource {
+            proto::metrics::MetricSeries {
+                resources: vec![proto::metrics::Resource {
                     type_: "host".into(),
                     name: "a_host".into(),
                     ..Default::default()
                 }],
                 metric: "dd_count".into(),
                 tags: vec!["foobar".into()],
-                points: vec![proto::metrics::metric_payload::MetricPoint {
+                points: vec![proto::metrics::MetricPoint {
                     value: 16777216_f64,
                     timestamp: 1542182955,
                     ..Default::default()
                 }],
-                type_: proto::metrics::metric_payload::MetricType::COUNT.into(),
+                type_: proto::metrics::MetricType::COUNT.into(),
                 unit: "".into(),
                 source_type_name: "a_very_random_source_type_name".into(),
                 interval: 0,

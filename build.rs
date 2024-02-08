@@ -171,9 +171,10 @@ fn main() {
         let codegen_customize = protobuf_codegen::Customize::default()
             .tokio_bytes(true)
             .tokio_bytes_for_string(true)
+            .generate_accessors(true)
             .generate_getter(true)
             .gen_mod_rs(true)
-            .lite_runtime(true);
+            .lite_runtime(false);
 
         protobuf_codegen::Codegen::new()
             .protoc()

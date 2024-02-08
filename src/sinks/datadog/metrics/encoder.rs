@@ -8,6 +8,7 @@ use std::{
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
+use protobuf::{reflect::MessageDescriptor, Chars, CodedOutputStream, MessageField};
 use snafu::{ResultExt, Snafu};
 use vector_lib::request_metadata::GroupedCountByteSize;
 use vector_lib::{
@@ -20,9 +21,8 @@ use vector_lib::{
 use super::config::{DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
     common::datadog::{
-        DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
+        proto, DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
     },
-    proto::fds::protobuf_descriptors,
     sinks::util::{encode_namespace, request_builder::EncodeResult, Compression, Compressor},
 };
 
@@ -42,11 +42,6 @@ pub(super) static ORIGIN_PRODUCT_VALUE: Lazy<u32> = Lazy::new(|| {
         })
         .unwrap_or(DEFAULT_DD_ORIGIN_PRODUCT_VALUE)
 });
-
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
-mod ddmetric_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
 
 #[derive(Debug, Snafu)]
 pub enum CreateError {
@@ -441,7 +436,7 @@ fn generate_proto_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
     maybe_source_type: Option<&str>,
     origin_product_value: u32,
-) -> Option<ddmetric_proto::Metadata> {
+) -> Option<proto::metrics::Metadata> {
     generate_origin_metadata(maybe_pass_through, maybe_source_type, origin_product_value).map(
         |origin| {
             if origin.product().is_none()
@@ -455,12 +450,15 @@ fn generate_proto_metadata(
                     service = origin.service()
                 );
             }
-            ddmetric_proto::Metadata {
-                origin: Some(ddmetric_proto::Origin {
+
+            proto::metrics::Metadata {
+                origin: MessageField::some(proto::metrics::Origin {
                     origin_product: origin.product().unwrap_or_default(),
                     origin_category: origin.category().unwrap_or_default(),
                     origin_service: origin.service().unwrap_or_default(),
+                    ..Default::default()
                 }),
+                ..Default::default()
             }
         },
     )
@@ -469,14 +467,13 @@ fn generate_proto_metadata(
 fn get_sketch_payload_sketches_field_number() -> u32 {
     static SKETCH_PAYLOAD_SKETCHES_FIELD_NUM: OnceLock<u32> = OnceLock::new();
     *SKETCH_PAYLOAD_SKETCHES_FIELD_NUM.get_or_init(|| {
-        let descriptors = protobuf_descriptors();
-        let descriptor = descriptors
-            .get_message_by_name("datadog.agentpayload.SketchPayload")
-            .expect("should not fail to find `SketchPayload` message in descriptor pool");
-
-        descriptor
-            .get_field_by_name("sketches")
-            .map(|field| field.number())
+        let message_descriptor = MessageDescriptor::for_type::<proto::metrics::SketchPayload>();
+        message_descriptor
+            .field_by_name("sketches")
+            .map(|field| {
+                u32::try_from(field.number())
+                    .expect("Protocol Buffers field numbers may never be negative")
+            })
             .expect("`sketches` field must exist in `SketchPayload` message")
     })
 }
@@ -484,14 +481,13 @@ fn get_sketch_payload_sketches_field_number() -> u32 {
 fn get_series_payload_series_field_number() -> u32 {
     static SERIES_PAYLOAD_SERIES_FIELD_NUM: OnceLock<u32> = OnceLock::new();
     *SERIES_PAYLOAD_SERIES_FIELD_NUM.get_or_init(|| {
-        let descriptors = protobuf_descriptors();
-        let descriptor = descriptors
-            .get_message_by_name("datadog.agentpayload.MetricPayload")
-            .expect("should not fail to find `MetricPayload` message in descriptor pool");
-
-        descriptor
-            .get_field_by_name("series")
-            .map(|field| field.number())
+        let message_descriptor = MessageDescriptor::for_type::<proto::metrics::MetricPayload>();
+        message_descriptor
+            .field_by_name("series")
+            .map(|field| {
+                u32::try_from(field.number())
+                    .expect("Protocol Buffers field numbers may never be negative")
+            })
             .expect("`series` field must exist in `MetricPayload` message")
     })
 }
@@ -502,7 +498,7 @@ fn sketch_to_proto_message(
     default_namespace: &Option<Arc<str>>,
     log_schema: &'static LogSchema,
     origin_product_value: u32,
-) -> Option<ddmetric_proto::sketch_payload::Sketch> {
+) -> Option<proto::metrics::Sketch> {
     if ddsketch.is_empty() {
         return None;
     }
@@ -512,9 +508,8 @@ fn sketch_to_proto_message(
     let mut tags = metric.tags().cloned().unwrap_or_default();
     let host = log_schema
         .host_key()
-        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
-        .unwrap_or_default()
-        .into_string();
+        .and_then(|key| tags.remove(key.to_string().as_str()))
+        .unwrap_or_default();
     let tags = encode_tags(&tags);
 
     let cnt = ddsketch.count() as i64;
@@ -544,12 +539,12 @@ fn sketch_to_proto_message(
 
     trace!(?metadata, "Generated sketch metadata.");
 
-    Some(ddmetric_proto::sketch_payload::Sketch {
+    Some(proto::metrics::Sketch {
         metric: name,
         tags,
-        host,
+        host: host.into(),
         distributions: Vec::new(),
-        dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
+        dogsketches: vec![proto::metrics::Dogsketch {
             ts,
             cnt,
             min,
@@ -558,8 +553,10 @@ fn sketch_to_proto_message(
             sum,
             k,
             n,
+            ..Default::default()
         }],
-        metadata,
+        metadata: MessageField::from_option(metadata),
+        ..Default::default()
     })
 }
 
@@ -568,7 +565,7 @@ fn series_to_proto_message(
     default_namespace: &Option<Arc<str>>,
     log_schema: &'static LogSchema,
     origin_product_value: u32,
-) -> Result<ddmetric_proto::metric_payload::MetricSeries, EncoderError> {
+) -> Result<proto::metrics::MetricSeries, EncoderError> {
     let metric_name = get_namespaced_name(metric, default_namespace);
     let mut tags = metric.tags().cloned().unwrap_or_default();
 
@@ -578,25 +575,24 @@ fn series_to_proto_message(
         .host_key()
         .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
     {
-        resources.push(ddmetric_proto::metric_payload::Resource {
-            r#type: "host".to_string(),
-            name: host.into_string(),
+        resources.push(proto::metrics::Resource {
+            type_: Chars::from_static("host"),
+            name: host.into(),
+            ..Default::default()
         });
     }
 
     // In the `datadog_agent` source, the tag is added as `device` for the V1 endpoint
     // and `resource.device` for the V2 endpoint.
     if let Some(device) = tags.remove("device").or(tags.remove("resource.device")) {
-        resources.push(ddmetric_proto::metric_payload::Resource {
-            r#type: "device".to_string(),
-            name: device.into_string(),
+        resources.push(proto::metrics::Resource {
+            type_: Chars::from_static("device"),
+            name: device.into(),
+            ..Default::default()
         });
     }
 
-    let source_type_name = tags
-        .remove("source_type_name")
-        .unwrap_or_default()
-        .into_string();
+    let source_type_name = tags.remove("source_type_name").unwrap_or_default();
 
     let tags = encode_tags(&tags);
 
@@ -613,41 +609,19 @@ fn series_to_proto_message(
     // our internal representation is in milliseconds but the expected output is in seconds
     let maybe_interval = metric.interval_ms().map(|i| i.get() / 1000);
 
-    let (points, metric_type) = match metric.value() {
+    let (value, metric_type) = match metric.value() {
         MetricValue::Counter { value } => {
             if let Some(interval) = maybe_interval {
                 // When an interval is defined, it implies the value should be in a per-second form,
                 // so we need to get back to seconds from our milliseconds-based interval, and then
                 // divide our value by that amount as well.
-                let value = *value / (interval as f64);
-                (
-                    vec![ddmetric_proto::metric_payload::MetricPoint { value, timestamp }],
-                    ddmetric_proto::metric_payload::MetricType::Rate,
-                )
+                (*value / (interval as f64), proto::metrics::MetricType::RATE)
             } else {
-                (
-                    vec![ddmetric_proto::metric_payload::MetricPoint {
-                        value: *value,
-                        timestamp,
-                    }],
-                    ddmetric_proto::metric_payload::MetricType::Count,
-                )
+                (*value, proto::metrics::MetricType::COUNT)
             }
         }
-        MetricValue::Set { values } => (
-            vec![ddmetric_proto::metric_payload::MetricPoint {
-                value: values.len() as f64,
-                timestamp,
-            }],
-            ddmetric_proto::metric_payload::MetricType::Gauge,
-        ),
-        MetricValue::Gauge { value } => (
-            vec![ddmetric_proto::metric_payload::MetricPoint {
-                value: *value,
-                timestamp,
-            }],
-            ddmetric_proto::metric_payload::MetricType::Gauge,
-        ),
+        MetricValue::Set { values } => (values.len() as f64, proto::metrics::MetricType::GAUGE),
+        MetricValue::Gauge { value } => (*value, proto::metrics::MetricType::GAUGE),
         // NOTE: AggregatedSummary will have been previously split into counters and gauges during normalization
         value => {
             // this case should have already been surfaced by encode_single_metric() so this should never be reached
@@ -658,33 +632,44 @@ fn series_to_proto_message(
         }
     };
 
-    Ok(ddmetric_proto::metric_payload::MetricSeries {
+    Ok(proto::metrics::MetricSeries {
         resources,
-        metric: metric_name,
+        metric: metric_name.into(),
         tags,
-        points,
-        r#type: metric_type.into(),
-        // unit is omitted
-        unit: "".to_string(),
-        source_type_name,
-        interval: maybe_interval.unwrap_or(0) as i64,
-        metadata,
+        points: vec![proto::metrics::MetricPoint {
+            timestamp,
+            value,
+            ..Default::default()
+        }],
+        type_: metric_type.into(),
+        unit: Chars::new(),
+        source_type_name: source_type_name.into(),
+        interval: maybe_interval.unwrap_or(0).into(),
+        metadata: MessageField::from_option(metadata),
+        ..Default::default()
     })
 }
 
-// Manually write the field tag and then encode the Message payload directly as a length-delimited message.
-fn encode_proto_key_and_message<T, B>(msg: T, tag: u32, buf: &mut B) -> Result<(), EncoderError>
+fn encode_proto_key_and_message<T, B>(
+    msg: T,
+    field_number: u32,
+    buf: &mut B,
+) -> Result<(), EncoderError>
 where
-    T: prost::Message,
+    T: protobuf::MessageFull,
     B: BufMut,
 {
-    prost::encoding::encode_key(tag, prost::encoding::WireType::LengthDelimited, buf);
-
-    msg.encode_length_delimited(buf)
+    let mut buf_writer = buf.writer();
+    let mut output_stream = CodedOutputStream::new(&mut buf_writer);
+    output_stream
+        .write_message(field_number, &msg)
         .map_err(|_| EncoderError::ProtoEncodingFailed)
 }
 
-fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) -> String {
+fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) -> Chars {
+    // TODO: this is suboptimal since we're likely always getting a namespace from the source metric
+    // coming from the DD agent, so we're needlessly deconstructing it at the source and then
+    // reassembling it here.
     encode_namespace(
         metric
             .namespace()
@@ -692,15 +677,20 @@ fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) ->
         '.',
         metric.name(),
     )
+    .into()
 }
 
-fn encode_tags(tags: &MetricTags) -> Vec<String> {
+fn encode_tags(tags: &MetricTags) -> Vec<Chars> {
+    // TODO: this is suboptimal since we're always creating new strings no matter what, similiar to
+    // metric namespaces, where tags come in and get split from their `key:value` form, and then we
+    // just end up reassembling those pieces here
     let mut pairs: Vec<_> = tags
         .iter_all()
         .map(|(name, value)| match value {
             Some(value) => format!("{}:{}", name, value),
-            None => name.into(),
+            None => name.to_string(),
         })
+        .map(Chars::from)
         .collect();
     pairs.sort();
     pairs
@@ -868,11 +858,11 @@ fn generate_series_metrics(
     };
 
     Ok(vec![DatadogSeriesMetric {
-        metric: name,
+        metric: name.to_string(),
         r#type: metric_type,
         interval: maybe_interval,
         points,
-        tags,
+        tags: tags.map(|tags| tags.into_iter().map(|s| s.to_string()).collect()),
         host,
         source_type_name,
         device,
@@ -1002,7 +992,7 @@ mod tests {
         arbitrary::any, collection::btree_map, num::f64::POSITIVE as ARB_POSITIVE_F64, prop_assert,
         proptest, strategy::Strategy, string::string_regex,
     };
-    use prost::Message;
+    use protobuf::{CodedOutputStream, Enum as _, Message as _};
     use vector_lib::{
         config::{log_schema, LogSchema},
         event::{
@@ -1015,14 +1005,14 @@ mod tests {
     };
 
     use super::{
-        ddmetric_proto, encode_proto_key_and_message, encode_tags, encode_timestamp,
-        generate_series_metrics, get_compressor, get_sketch_payload_sketches_field_number,
-        max_compression_overhead_len, max_uncompressed_header_len, series_to_proto_message,
-        sketch_to_proto_message, validate_payload_size_limits, write_payload_footer,
-        write_payload_header, DatadogMetricsEncoder, EncoderError,
+        encode_proto_key_and_message, encode_tags, encode_timestamp, generate_series_metrics,
+        get_compressor, get_sketch_payload_sketches_field_number, max_compression_overhead_len,
+        max_uncompressed_header_len, proto, series_to_proto_message, sketch_to_proto_message,
+        validate_payload_size_limits, write_payload_footer, write_payload_header,
+        DatadogMetricsEncoder, EncoderError,
     };
     use crate::{
-        common::datadog::DatadogMetricType,
+        common::datadog::{proto::metrics::MetricType, DatadogMetricType},
         sinks::datadog::metrics::{
             config::{DatadogMetricsEndpoint, SeriesApiVersion},
             encoder::{DEFAULT_DD_ORIGIN_PRODUCT_VALUE, ORIGIN_PRODUCT_VALUE},
@@ -1123,13 +1113,13 @@ mod tests {
             }
         }
 
-        let sketch_payload = ddmetric_proto::SketchPayload {
-            metadata: None,
-            sketches,
-        };
+        let mut sketch_payload = proto::metrics::SketchPayload::new();
+        sketch_payload.set_sketches(sketches);
 
         // Now try encoding this sketch payload, and then try to compress it.
-        sketch_payload.encode(buf).unwrap()
+        let mut writer = buf.writer();
+        let mut output_stream = CodedOutputStream::new(&mut writer);
+        sketch_payload.write_to(&mut output_stream).unwrap();
     }
 
     #[test]
@@ -1226,7 +1216,7 @@ mod tests {
                 DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
             )
             .unwrap();
-            assert_eq!(series_proto.r#type, 2);
+            assert_eq!(series_proto.type_.value(), MetricType::RATE.value());
             assert_eq!(series_proto.interval, expected_interval as i64);
             assert_eq!(series_proto.points.len(), 1);
             assert_eq!(series_proto.points[0].value, expected_value);
@@ -1283,7 +1273,7 @@ mod tests {
                 DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
             )
             .unwrap();
-            assert_eq!(series_proto.r#type, 3);
+            assert_eq!(series_proto.type_.value(), MetricType::GAUGE.value());
             assert_eq!(series_proto.interval, expected_interval as i64);
             assert_eq!(series_proto.points.len(), 1);
             assert_eq!(series_proto.points[0].value, expected_value);
