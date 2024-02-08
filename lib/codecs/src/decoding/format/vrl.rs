@@ -171,8 +171,13 @@ mod tests {
     }
 
     #[test]
-    fn test_returned_expression() {
-        let source = indoc!(r#"{ "a" : 1 }"#);
+    fn test_ignored_returned_expression() {
+        let source = indoc!(
+            r#"
+            . = { "a" : 1 }
+            { "b" : 9 }
+        "#
+        );
 
         let decoder = make_decoder(source);
 
