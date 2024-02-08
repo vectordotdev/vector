@@ -413,6 +413,12 @@ cli: {
 						checks and health checks
 						"""
 				}
+				"skip-healthchecks": {
+					_short: "ne"
+					description: """
+						Disables health checks during validation.
+						"""
+				}
 				"deny-warnings": {
 					_short:      "d"
 					description: "Fail validation on warnings"
