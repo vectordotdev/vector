@@ -4,7 +4,6 @@ use vrl::compiler::Function;
 use vrl::path::OwnedTargetPath;
 
 pub mod get_secret;
-pub mod get_vector_timezone;
 pub mod remove_secret;
 pub mod set_secret;
 pub mod set_semantic_meaning;
@@ -24,6 +23,5 @@ pub fn all() -> Vec<Box<dyn Function>> {
         Box::new(get_secret::GetSecret) as _,
         Box::new(remove_secret::RemoveSecret) as _,
         Box::new(set_secret::SetSecret) as _,
-        Box::new(get_vector_timezone::GetVectorTimezone) as _,
     ]
 }

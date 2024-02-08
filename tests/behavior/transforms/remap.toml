@@ -2152,20 +2152,20 @@
          .a != ""
        '''
 
- [transforms.remap_function_get_vector_timezone]
+ [transforms.remap_function_get_timezone_name]
    inputs = []
    type = "remap"
    source = """
-     .a = get_vector_timezone!()
+     .a = get_timezone_name!()
    """
  [[tests]]
-   name = "remap_function_get_vector_timezone"
+   name = "remap_function_get_timezone_name"
    [tests.input]
-     insert_at = "remap_function_get_vector_timezone"
+     insert_at = "remap_function_get_timezone_name"
      type = "log"
      [tests.input.log_fields]
    [[tests.outputs]]
-     extract_from = "remap_function_get_vector_timezone"
+     extract_from = "remap_function_get_timezone_name"
      [[tests.outputs.conditions]]
        type = "vrl"
        source = '''

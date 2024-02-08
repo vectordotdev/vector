@@ -10298,8 +10298,6 @@ dependencies = [
 name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
- "chrono",
- "iana-time-zone",
  "vrl",
 ]
 
