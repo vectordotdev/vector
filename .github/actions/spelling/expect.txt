@@ -220,6 +220,7 @@ customizability
 customtype
 cwl
 Dailywarehousing
+dalegaard
 daschl
 dashmap
 datadir
