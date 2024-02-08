@@ -84,7 +84,7 @@ impl VrlDeserializerConfig {
     }
 }
 
-/// Deserializer that builds `Event`s from a byte frame containing protobuf.
+/// Deserializer that builds `Event`s from a byte frame containing logs compatible with VRL.
 #[derive(Debug, Clone)]
 pub struct VrlDeserializer {
     program: Program,

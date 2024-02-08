@@ -262,7 +262,9 @@ pub enum DeserializerConfig {
         avro: AvroDeserializerOptions,
     },
 
-    /// TODO
+    /// Decodes the raw bytes as a string and passes them as input to a [VRL][vrl] program.
+    ///
+    /// [vrl]: https://vector.dev/docs/reference/vrl
     Vrl(VrlDeserializerConfig),
 }
 
