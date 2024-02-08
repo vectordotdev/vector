@@ -119,21 +119,21 @@ remap: functions: redact: {
 			return: "my id is ***"
 		},
 		{
-			title: "Replace with SHA-2 hash",
+			title: "Replace with SHA-2 hash"
 			source: #"""
-			   redact("my id is 123456", filters: [r'\d+'], redactor: "sha2")
-			   """#
+				redact("my id is 123456", filters: [r'\d+'], redactor: "sha2")
+				"""#
 			return: "my id is GEtTedW1p6tC094dDKH+3B8P+xSnZz69AmpjaXRd63I="
 		},
 		{
-			title: "Replace with SHA-3 hash",
+			title: "Replace with SHA-3 hash"
 			source: #"""
 				redact("my id is 123456", filters: [r'\d+'], redactor: "sha3")
 				"""#
 			return: "my id is ZNCdmTDI7PeeUTFnpYjLdUObdizo+bIupZdl8yqnTKGdLx6X3JIqPUlUWUoFBikX+yTR+OcvLtAqWO11NPlNJw=="
 		},
 		{
-			title: "Replace with SHA-256 hash using hex encoding",
+			title: "Replace with SHA-256 hash using hex encoding"
 			source: #"""
 				redact("my id is 123456", filters: [r'\d+'], redactor: {"type": "sha2", "variant": "SHA-256", "encoding": "base16"})
 				"""#
