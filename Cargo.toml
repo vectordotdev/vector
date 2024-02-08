@@ -135,7 +135,7 @@ proptest-derive = "0.4.0"
 serde_json = { version = "1.0.112", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.196", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.10", default-features = false, features = ["display", "parse"] }
-vrl = { git = "https://github.com/vectordotdev/vrl", rev = "5e956d9353d8c272c72016d6a38bd26f091be879", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { version = "0.11.0", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
 pin-project.workspace = true
@@ -217,7 +217,7 @@ rmpv = { version = "1.0.1", default-features = false, features = ["with-serde"],
 
 # Prost / Protocol Buffers
 prost = { version = "0.12", default-features = false, features = ["std"] }
-prost-reflect = { version = "0.12", default-features = false, optional = true }
+prost-reflect = { version = "0.13", default-features = false, optional = true }
 prost-types = { version = "0.12", default-features = false, optional = true }
 
 # GCP
@@ -856,6 +856,7 @@ webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
+component-test-utils = []
 
 # End-to-End testing-related features
 all-e2e-tests = [
