@@ -237,6 +237,6 @@ impl MetricSet {
     ///
     /// If the series existed and was removed, returns `true`.  Otherwise, `false`.
     pub fn remove(&mut self, series: &MetricSeries) -> bool {
-        self.0.remove(series).is_some()
+        self.0.shift_remove(series).is_some()
     }
 }
