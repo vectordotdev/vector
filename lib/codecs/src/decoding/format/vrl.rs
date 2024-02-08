@@ -108,20 +108,24 @@ impl Deserializer for VrlDeserializer {
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let event = parse_bytes(bytes, log_namespace);
         match self.run_vrl(event, log_namespace) {
-            Ok(event) => Ok(smallvec![event]),
+            Ok(events) => Ok(events),
             Err(e) => Err(e),
         }
     }
 }
 
 impl VrlDeserializer {
-    fn run_vrl(&self, event: Event, log_namespace: LogNamespace) -> vector_common::Result<Event> {
+    fn run_vrl(
+        &self,
+        event: Event,
+        log_namespace: LogNamespace,
+    ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let mut runtime = Runtime::default();
         let mut target = VrlTarget::new(event, self.program.info(), true);
         match runtime.resolve(&mut target, &self.program, &self.timezone) {
             Ok(_) => match target.into_events(log_namespace) {
-                TargetEvents::One(event) => Ok(event),
-                TargetEvents::Logs(_) => Err("multiple targets are not supported".into()),
+                TargetEvents::One(event) => Ok(smallvec![event]),
+                TargetEvents::Logs(events_iter) => Ok(SmallVec::from_iter(events_iter)),
                 TargetEvents::Traces(_) => Err("trace targets are not supported".into()),
             },
             Err(e) => Err(e.to_string().into()),
@@ -197,6 +201,21 @@ mod tests {
             *event.as_log().get(&OwnedTargetPath::event_root()).unwrap(),
             btreemap! { "a" => 1 }.into()
         );
+    }
+
+    #[test]
+    fn test_multiple_events() {
+        let source = indoc!(". = [0,1,2]");
+        let decoder = make_decoder(source);
+        let log_bytes = Bytes::from("some bytes");
+        let result = decoder.parse(log_bytes, LogNamespace::Vector).unwrap();
+        assert_eq!(result.len(), 3);
+        for (i, event) in result.iter().enumerate() {
+            assert_eq!(
+                *event.as_log().get(&OwnedTargetPath::event_root()).unwrap(),
+                i.into()
+            );
+        }
     }
 
     #[test]
