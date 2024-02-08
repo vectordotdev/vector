@@ -79,6 +79,20 @@ impl TestEvent {
             Self::Modified { event, .. } => event,
         }
     }
+
+    pub fn get_event(&mut self) -> &mut Event {
+        match self {
+            Self::Passthrough(event) => event,
+            Self::Modified { event, .. } => event,
+        }
+    }
+
+    pub fn get(self) -> (bool, Event) {
+        match self {
+            Self::Passthrough(event) => (false, event),
+            Self::Modified { modified, event } => (modified, event),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]

@@ -216,15 +216,18 @@ impl UnitTestBuildMetadata {
         Ok(inputs
             .into_iter()
             .map(|(insert_at, events)| {
-                let mut source_config = template_sources.remove(&insert_at).unwrap_or_else(|| {
-                    // At this point, all inputs should have been validated to
-                    // correspond with valid transforms, and all valid transforms
-                    // have a source attached.
-                    panic!(
-                        "Invalid input: cannot insert at {:?}",
-                        insert_at.to_string()
-                    )
-                });
+                let mut source_config =
+                    template_sources
+                        .shift_remove(&insert_at)
+                        .unwrap_or_else(|| {
+                            // At this point, all inputs should have been validated to
+                            // correspond with valid transforms, and all valid transforms
+                            // have a source attached.
+                            panic!(
+                                "Invalid input: cannot insert at {:?}",
+                                insert_at.to_string()
+                            )
+                        });
                 source_config.events.extend(events);
                 let id: &str = self
                     .source_ids
