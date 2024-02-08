@@ -21,7 +21,6 @@ andy
 ansicpg
 anumber
 anycondition
-anymap
 anypb
 apievent
 apipodspec
@@ -168,7 +167,6 @@ clibtype
 clickhouse
 clonable
 cloudresourcemanager
-cloudsmith
 cloudwatchlogs
 cmark
 CMK
@@ -328,8 +326,8 @@ EOIG
 EOL'ed
 Err'ing
 errorf
-Errorsfor
 esb
+esensar
 esque
 etheus
 etl
@@ -657,7 +655,6 @@ maybeanothertest
 mbean
 mcache
 mcr
-meh
 meln
 memfd
 memmap
@@ -1238,7 +1235,6 @@ wktpointer
 wmem
 woooooow
 woothee
-wor
 wordlist
 workdir
 workstreams
