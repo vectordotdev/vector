@@ -33,7 +33,7 @@ concurrency:
   # change detection. This is a "conservative" approach that means we may have some runs that could be canceled, but it's safer than
   # having user's runs canceled when they shouldn't be. In practice this shouldn't happen very often given this component does not change
   # often so any increased cost from the conservative approach should be negligible.
-  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.event_number || github.event.merge_group.head_sha || github.event.schedule }}
+  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.ref || github.event.schedule }}
   cancel-in-progress: true
 
 env:
@@ -92,7 +92,7 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry

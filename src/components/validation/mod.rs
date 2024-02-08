@@ -14,6 +14,14 @@ pub use self::runner::*;
 pub use self::test_case::{TestCase, TestCaseExpectation};
 pub use self::validators::*;
 
+pub mod component_names {
+    pub const TEST_SOURCE_NAME: &str = "test_source";
+    pub const TEST_SINK_NAME: &str = "test_sink";
+    pub const TEST_TRANSFORM_NAME: &str = "test_transform";
+    pub const TEST_INPUT_SOURCE_NAME: &str = "input_source";
+    pub const TEST_OUTPUT_SINK_NAME: &str = "output_sink";
+}
+
 /// Component types that can be validated.
 // TODO: We should centralize this in `vector-common` or something, where both this code and the
 // configuration schema stuff (namely the proc macros that use this) can share it.
@@ -173,15 +181,16 @@ macro_rules! register_validatable_component {
 /// Input and Output runners populate this structure as they send and receive events.
 /// The structure is passed into the validator to use as the expected values for the
 /// metrics that the components under test actually output.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RunnerMetrics {
     pub received_events_total: u64,
     pub received_event_bytes_total: u64,
     pub received_bytes_total: u64,
-    pub sent_bytes_total: u64, // a reciprocal for received_bytes_total
+    pub sent_bytes_total: u64,
     pub sent_event_bytes_total: u64,
     pub sent_events_total: u64,
     pub errors_total: u64,
+    pub discarded_events_total: u64,
 }
 
 #[cfg(all(test, feature = "component-validation-tests"))]

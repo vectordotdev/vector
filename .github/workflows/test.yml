@@ -6,8 +6,8 @@ on:
     types: [checks_requested]
 
 concurrency:
-  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
+  # `github.ref` is unique for MQ runs and PRs
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -45,7 +45,7 @@ jobs:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         name: Cache Cargo registry + index
         with:
           path: |

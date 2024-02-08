@@ -2,24 +2,24 @@ pub mod config;
 mod io;
 mod telemetry;
 
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use bytes::BytesMut;
+use chrono::Utc;
 use tokio::{
     runtime::Builder,
     select,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Mutex,
+    },
     task::JoinHandle,
 };
 use tokio_util::codec::Encoder as _;
 
-use vector_lib::codecs::encoding;
-use vector_lib::{event::Event, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    codecs::encoding, config::LogNamespace, event::Event, EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::Encoder,
@@ -234,7 +234,7 @@ impl Runner {
                 )
                 .await;
 
-            debug!("Component topology configuration built and telemetry collector spawned.");
+            info!("Component topology configuration built and telemetry collector spawned.");
 
             // Create the data structure that the input and output runners will use to store
             // their received/sent metrics. This is then shared with the Validator for comparison
@@ -255,22 +255,23 @@ impl Runner {
                 &self.configuration,
                 &input_task_coordinator,
                 &output_task_coordinator,
+                &runner_metrics,
             )?;
             let input_tx = runner_input.into_sender(controlled_edges.input);
             let output_rx = runner_output.into_receiver(controlled_edges.output);
-            debug!("External resource (if any) and controlled edges built and spawned.");
+            info!("External resource (if any) and controlled edges built and spawned.");
 
             // Now with any external resource spawned, as well as any tasks for handling controlled
             // edges, we'll wait for all of those tasks to report that they're ready to go and
             // listening, etc.
             let input_task_coordinator = input_task_coordinator.started().await;
-            debug!("All input task(s) started.");
+            info!("All input task(s) started.");
 
             let telemetry_task_coordinator = telemetry_task_coordinator.started().await;
-            debug!("All telemetry task(s) started.");
+            info!("All telemetry task(s) started.");
 
             let output_task_coordinator = output_task_coordinator.started().await;
-            debug!("All output task(s) started.");
+            info!("All output task(s) started.");
 
             // At this point, we need to actually spawn the configured component topology so that it
             // runs, and make sure we have a way to tell it when to shutdown so that we can properly
@@ -307,12 +308,14 @@ impl Runner {
                 input_tx,
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
+                self.configuration.component_type == ComponentType::Source,
             );
 
             let output_driver = spawn_output_driver(
                 output_rx,
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
+                self.configuration.component_type == ComponentType::Sink,
             );
 
             // At this point, the component topology is running, and all input/output/telemetry
@@ -329,20 +332,31 @@ impl Runner {
                 .expect("input driver task should not have panicked");
 
             input_task_coordinator.shutdown().await;
-            debug!("Input task(s) have been shutdown.");
+            info!("Input task(s) have been shutdown.");
+
+            // Without this, not all internal metric events are received for sink components under test.
+            // TODO: This is awful and needs a proper solution.
+            //       I think we are going to need to setup distinct task sync logic potentially for each
+            //       combination of Source/Sink + Resource direction Push/Pull
+            if self.configuration.component_type == ComponentType::Sink {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
 
             telemetry_task_coordinator.shutdown().await;
-            debug!("Telemetry task(s) have been shutdown.");
+            info!("Telemetry task(s) have been shutdown.");
 
             topology_task_coordinator.shutdown().await;
-            debug!("Component topology task has been shutdown.");
+            info!("Component topology task has been shutdown.");
 
             output_task_coordinator.shutdown().await;
-            debug!("Output task(s) have been shutdown.");
+            info!("Output task(s) have been shutdown.");
 
             let output_events = output_driver
                 .await
-                .expect("input driver task should not have panicked");
+                .expect("output driver task should not have panicked");
+
+            info!("Collected runner metrics: {:?}", runner_metrics);
+            let final_runner_metrics = runner_metrics.lock().await;
 
             // Run the relevant data -- inputs, outputs, telemetry, etc -- through each validator to
             // get the validation results for this test.
@@ -363,7 +377,7 @@ impl Runner {
                         &input_events,
                         &output_events,
                         &telemetry_events,
-                        &runner_metrics.lock().unwrap(),
+                        &final_runner_metrics,
                     )
                 })
                 .collect();
@@ -421,6 +435,7 @@ fn build_external_resource(
     configuration: &ValidationConfiguration,
     input_task_coordinator: &TaskCoordinator<Configuring>,
     output_task_coordinator: &TaskCoordinator<Configuring>,
+    runner_metrics: &Arc<Mutex<RunnerMetrics>>,
 ) -> Result<(RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>), vector_lib::Error> {
     let component_type = configuration.component_type();
     let maybe_external_resource = configuration.external_resource();
@@ -436,7 +451,7 @@ fn build_external_resource(
             let (tx, rx) = mpsc::channel(1024);
             let resource =
                 maybe_external_resource.expect("a source must always have an external resource");
-            resource.spawn_as_input(rx, input_task_coordinator);
+            resource.spawn_as_input(rx, input_task_coordinator, runner_metrics);
 
             Ok((
                 RunnerInput::External(tx),
@@ -456,7 +471,7 @@ fn build_external_resource(
             let (tx, rx) = mpsc::channel(1024);
             let resource =
                 maybe_external_resource.expect("a sink must always have an external resource");
-            resource.spawn_as_output(tx, output_task_coordinator)?;
+            resource.spawn_as_output(tx, output_task_coordinator, runner_metrics)?;
 
             Ok((
                 RunnerInput::Controlled,
@@ -488,22 +503,22 @@ fn spawn_component_topology(
             .expect("should not fail to build current-thread runtime");
 
         test_runtime.block_on(async move {
-            debug!("Building component topology...");
+            info!("Building component topology...");
 
             let (topology, mut crash_rx) =
                 RunningTopology::start_init_validated(config, extra_context)
                     .await
                     .unwrap();
 
-            debug!("Component topology built and spawned.");
+            info!("Component topology built and spawned.");
             topology_started.mark_as_done();
 
             select! {
                 // We got the signal to shutdown, so stop the topology gracefully.
                 _ = topology_shutdown_handle.wait() => {
-                    debug!("Shutdown signal received, stopping topology...");
+                    info!("Shutdown signal received, stopping topology...");
                     topology.stop().await;
-                    debug!("Component topology stopped gracefully.")
+                    info!("Component topology stopped gracefully.")
                 },
                 _ = crash_rx.recv() => {
                     error!("Component topology under validation unexpectedly crashed.");
@@ -520,11 +535,15 @@ fn spawn_input_driver(
     input_tx: Sender<TestEvent>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     mut maybe_encoder: Option<Encoder<encoding::Framer>>,
+    is_source: bool,
 ) -> JoinHandle<()> {
     let input_runner_metrics = Arc::clone(runner_metrics);
 
+    let log_namespace = LogNamespace::Legacy;
+    let now = Utc::now();
+
     tokio::spawn(async move {
-        for input_event in input_events {
+        for mut input_event in input_events {
             input_tx
                 .send(input_event.clone())
                 .await
@@ -532,19 +551,25 @@ fn spawn_input_driver(
 
             // Update the runner metrics for the sent event. This will later
             // be used in the Validators, as the "expected" case.
-            let mut input_runner_metrics = input_runner_metrics.lock().unwrap();
+            let mut input_runner_metrics = input_runner_metrics.lock().await;
+
+            // the controlled edge (vector source) adds metadata to the event when it is received.
+            // thus we need to add it here so the expected values for the comparisons on transforms
+            // and sinks are accurate.
+            if !is_source {
+                if let Event::Log(ref mut log) = input_event.get_event() {
+                    log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
+                }
+            }
+
+            let (modified, event) = input_event.clone().get();
 
             if let Some(encoder) = maybe_encoder.as_mut() {
                 let mut buffer = BytesMut::new();
-                encode_test_event(encoder, &mut buffer, input_event.clone());
+                encode_test_event(encoder, &mut buffer, input_event);
 
                 input_runner_metrics.sent_bytes_total += buffer.len() as u64;
             }
-
-            let (modified, event) = match input_event {
-                TestEvent::Passthrough(event) => (false, event),
-                TestEvent::Modified { modified, event } => (modified, event),
-            };
 
             // account for failure case
             if modified {
@@ -552,10 +577,13 @@ fn spawn_input_driver(
             } else {
                 input_runner_metrics.sent_events_total += 1;
 
+                // The event is wrapped in a Vec to match the actual event storage in
+                // the real topology
                 input_runner_metrics.sent_event_bytes_total +=
                     vec![event].estimated_json_encoded_size_of().get() as u64;
             }
         }
+        trace!("Input driver sent all events.");
     })
 }
 
@@ -563,6 +591,7 @@ fn spawn_output_driver(
     mut output_rx: Receiver<Vec<Event>>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     maybe_encoder: Option<Encoder<encoding::Framer>>,
+    is_sink: bool,
 ) -> JoinHandle<Vec<Event>> {
     let output_runner_metrics = Arc::clone(runner_metrics);
 
@@ -573,23 +602,25 @@ fn spawn_output_driver(
 
             // Update the runner metrics for the received event. This will later
             // be used in the Validators, as the "expected" case.
-            let mut output_runner_metrics = output_runner_metrics.lock().unwrap();
+            let mut output_runner_metrics = output_runner_metrics.lock().await;
 
             for output_event in events {
-                output_runner_metrics.received_events_total += 1;
-                output_runner_metrics.received_event_bytes_total += vec![output_event.clone()]
-                    .estimated_json_encoded_size_of()
-                    .get()
-                    as u64;
+                if !is_sink {
+                    // The event is wrapped in a Vec to match the actual event storage in
+                    // the real topology
+                    output_runner_metrics.received_event_bytes_total +=
+                        vec![&output_event].estimated_json_encoded_size_of().get() as u64;
 
-                if let Some(encoder) = maybe_encoder.as_ref() {
-                    let mut buffer = BytesMut::new();
-                    encoder
-                        .clone()
-                        .encode(output_event, &mut buffer)
-                        .expect("should not fail to encode output event");
+                    if let Some(encoder) = maybe_encoder.as_ref() {
+                        let mut buffer = BytesMut::new();
+                        encoder
+                            .clone()
+                            .encode(output_event, &mut buffer)
+                            .expect("should not fail to encode output event");
 
-                    output_runner_metrics.received_bytes_total += buffer.len() as u64;
+                        output_runner_metrics.received_events_total += 1;
+                        output_runner_metrics.received_bytes_total += buffer.len() as u64;
+                    }
                 }
             }
         }

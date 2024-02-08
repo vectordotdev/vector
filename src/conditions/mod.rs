@@ -9,9 +9,9 @@ pub(crate) mod is_metric;
 pub(crate) mod is_trace;
 mod vrl;
 
+pub use self::datadog_search::{DatadogSearchConfig, DatadogSearchRunner};
 pub use self::vrl::VrlConfig;
 use self::{
-    datadog_search::{DatadogSearchConfig, DatadogSearchRunner},
     is_log::{check_is_log, check_is_log_with_context},
     is_metric::{check_is_metric, check_is_metric_with_context},
     is_trace::{check_is_trace, check_is_trace_with_context},

@@ -524,6 +524,15 @@ base: components: sources: aws_s3: configuration: {
 					unit: "tasks"
 				}
 			}
+			delete_failed_message: {
+				description: """
+					Whether to delete non-retryable messages.
+
+					If a message is rejected by the sink and not retryable, it is deleted from the queue.
+					"""
+				required: false
+				type: bool: default: true
+			}
 			delete_message: {
 				description: """
 					Whether to delete the message once it is processed.
