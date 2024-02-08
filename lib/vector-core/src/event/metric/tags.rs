@@ -38,6 +38,12 @@ impl From<&String> for TagValue {
     }
 }
 
+impl From<VectorString> for TagValue {
+    fn from(value: VectorString) -> Self {
+        Self::Value(value)
+    }
+}
+
 impl From<Option<String>> for TagValue {
     fn from(value: Option<String>) -> Self {
         match value {

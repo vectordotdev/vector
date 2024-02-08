@@ -138,6 +138,12 @@ impl PartialEq<VectorString> for VectorString {
     }
 }
 
+impl PartialEq<&str> for VectorString {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
 impl PartialOrd for VectorString {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.as_str().partial_cmp(other.as_str())

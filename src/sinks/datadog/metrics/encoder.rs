@@ -10,20 +10,20 @@ use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
 use protobuf::{reflect::MessageDescriptor, Chars, CodedOutputStream, MessageField};
 use snafu::{ResultExt, Snafu};
-use vector_lib::request_metadata::GroupedCountByteSize;
 use vector_lib::{
     config::{log_schema, telemetry, LogSchema},
     event::{metric::MetricSketch, DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue},
     metrics::AgentDDSketch,
     EstimatedJsonEncodedSizeOf,
 };
+use vector_lib::{request_metadata::GroupedCountByteSize, string::VectorString};
 
 use super::config::{DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
     common::datadog::{
         proto, DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
     },
-    sinks::util::{encode_namespace, request_builder::EncodeResult, Compression, Compressor},
+    sinks::util::{request_builder::EncodeResult, Compression, Compressor},
 };
 
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
@@ -134,15 +134,28 @@ struct EncoderState {
     byte_size: GroupedCountByteSize,
 }
 
-impl Default for EncoderState {
-    fn default() -> Self {
+impl EncoderState {
+    fn new() -> Self {
         Self {
             writer: get_compressor(),
             written: 0,
-            buf: Vec::with_capacity(1024),
+            buf: Vec::with_capacity(16_384),
             processed: Vec::new(),
             byte_size: telemetry().create_request_count_byte_size(),
         }
+    }
+
+    fn reset_state(&mut self) -> Self {
+        // Take our encoding buffer out separately before we swap `self`, this way we avoid
+        // allocating an entirely brand new encoding buffer and save at least one large allocation.
+        let old_buf = mem::take(&mut self.buf);
+
+        let old_self = mem::replace(self, EncoderState::new());
+
+        // This replaces the new empty encoding buffer with our old buffer.
+        let _ = mem::replace(&mut self.buf, old_buf);
+
+        old_self
     }
 }
 
@@ -189,7 +202,7 @@ impl DatadogMetricsEncoder {
             default_namespace: default_namespace.map(Arc::from),
             uncompressed_limit,
             compressed_limit,
-            state: EncoderState::default(),
+            state: EncoderState::new(),
             log_schema: log_schema(),
             origin_product_value: *ORIGIN_PRODUCT_VALUE,
         })
@@ -198,7 +211,7 @@ impl DatadogMetricsEncoder {
 
 impl DatadogMetricsEncoder {
     fn reset_state(&mut self) -> EncoderState {
-        mem::take(&mut self.state)
+        self.state.reset_state()
     }
 
     fn encode_single_metric(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
@@ -508,9 +521,9 @@ fn sketch_to_proto_message(
     let mut tags = metric.tags().cloned().unwrap_or_default();
     let host = log_schema
         .host_key()
-        .and_then(|key| tags.remove(key.to_string().as_str()))
+        .and_then(|_| tags.remove("host"))
         .unwrap_or_default();
-    let tags = encode_tags(&tags);
+    let tags = encode_tags_protobuf(tags);
 
     let cnt = ddsketch.count() as i64;
     let min = ddsketch
@@ -540,7 +553,7 @@ fn sketch_to_proto_message(
     trace!(?metadata, "Generated sketch metadata.");
 
     Some(proto::metrics::Sketch {
-        metric: name,
+        metric: name.into(),
         tags,
         host: host.into(),
         distributions: Vec::new(),
@@ -573,7 +586,7 @@ fn series_to_proto_message(
 
     if let Some(host) = log_schema
         .host_key()
-        .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
+        .map(|_| tags.remove("host").unwrap_or_default())
     {
         resources.push(proto::metrics::Resource {
             type_: Chars::from_static("host"),
@@ -594,7 +607,7 @@ fn series_to_proto_message(
 
     let source_type_name = tags.remove("source_type_name").unwrap_or_default();
 
-    let tags = encode_tags(&tags);
+    let encoded_tags = encode_tags_protobuf(tags);
 
     let event_metadata = metric.metadata();
     let metadata = generate_proto_metadata(
@@ -635,7 +648,7 @@ fn series_to_proto_message(
     Ok(proto::metrics::MetricSeries {
         resources,
         metric: metric_name.into(),
-        tags,
+        tags: encoded_tags,
         points: vec![proto::metrics::MetricPoint {
             timestamp,
             value,
@@ -666,31 +679,42 @@ where
         .map_err(|_| EncoderError::ProtoEncodingFailed)
 }
 
-fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) -> Chars {
+fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) -> VectorString {
     // TODO: this is suboptimal since we're likely always getting a namespace from the source metric
     // coming from the DD agent, so we're needlessly deconstructing it at the source and then
     // reassembling it here.
-    encode_namespace(
-        metric
-            .namespace()
-            .or_else(|| default_namespace.as_ref().map(|s| s.as_ref())),
-        '.',
-        metric.name(),
-    )
-    .into()
+    let maybe_namespace = metric.namespace().or_else(|| default_namespace.as_deref());
+    match maybe_namespace {
+        Some(namespace) => format!("{}.{}", namespace, metric.name()).into(),
+        None => metric.series().name().name.clone(),
+    }
 }
 
-fn encode_tags(tags: &MetricTags) -> Vec<Chars> {
+fn encode_tags(tags: MetricTags) -> Vec<VectorString> {
     // TODO: this is suboptimal since we're always creating new strings no matter what, similiar to
     // metric namespaces, where tags come in and get split from their `key:value` form, and then we
     // just end up reassembling those pieces here
     let mut pairs: Vec<_> = tags
-        .iter_all()
-        .map(|(name, value)| match value {
-            Some(value) => format!("{}:{}", name, value),
-            None => name.to_string(),
+        .into_iter_all()
+        .map(|(name, value)| match value.into_option() {
+            Some(value) => format!("{}:{}", name, value).into(),
+            None => name,
         })
-        .map(Chars::from)
+        .collect();
+    pairs.sort();
+    pairs
+}
+
+fn encode_tags_protobuf(tags: MetricTags) -> Vec<Chars> {
+    // TODO: this is suboptimal since we're always creating new strings no matter what, similiar to
+    // metric namespaces, where tags come in and get split from their `key:value` form, and then we
+    // just end up reassembling those pieces here
+    let mut pairs: Vec<_> = tags
+        .into_iter_all()
+        .map(|(name, value)| match value.into_option() {
+            Some(value) => format!("{}:{}", name, value).into(),
+            None => name.into(),
+        })
         .collect();
     pairs.sort();
     pairs
@@ -808,16 +832,14 @@ fn generate_series_metrics(
     let name = get_namespaced_name(metric, default_namespace);
 
     let mut tags = metric.tags().cloned().unwrap_or_default();
-    let host = log_schema.host_key().map(|key| {
-        tags.remove(key.to_string().as_str())
-            .unwrap_or_default()
-            .into_string()
-    });
+    let host = log_schema
+        .host_key()
+        .map(|_| tags.remove("host").unwrap_or_default());
 
-    let source_type_name = tags.remove("source_type_name").map(|s| s.into_string());
-    let device = tags.remove("device").map(|s| s.into_string());
+    let source_type_name = tags.remove("source_type_name");
+    let device = tags.remove("device");
     let ts = encode_timestamp(metric.timestamp());
-    let tags = Some(encode_tags(&tags));
+    let encoded_tags = encode_tags(tags);
 
     // our internal representation is in milliseconds but the expected output is in seconds
     let maybe_interval = metric.interval_ms().map(|i| i.get() / 1000);
@@ -858,11 +880,11 @@ fn generate_series_metrics(
     };
 
     Ok(vec![DatadogSeriesMetric {
-        metric: name.to_string(),
+        metric: name,
         r#type: metric_type,
         interval: maybe_interval,
         points,
-        tags: tags.map(|tags| tags.into_iter().map(|s| s.to_string()).collect()),
+        tags: Some(encoded_tags),
         host,
         source_type_name,
         device,
@@ -1125,7 +1147,7 @@ mod tests {
     #[test]
     fn test_encode_tags() {
         assert_eq!(
-            encode_tags(&tags()),
+            encode_tags(tags()),
             vec![
                 "empty_tag",
                 "multi_value:one",

@@ -4,7 +4,9 @@
 #![allow(dead_code)]
 #![allow(unreachable_pub)]
 use serde::{Deserialize, Serialize};
-use vector_lib::{event::DatadogMetricOriginMetadata, sensitive_string::SensitiveString};
+use vector_lib::{
+    event::DatadogMetricOriginMetadata, sensitive_string::SensitiveString, string::VectorString,
+};
 
 pub mod proto;
 
@@ -13,17 +15,17 @@ pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesMetric {
-    pub(crate) metric: String,
+    pub(crate) metric: VectorString,
     pub(crate) r#type: DatadogMetricType,
     pub(crate) interval: Option<u32>,
     pub(crate) points: Vec<DatadogPoint<f64>>,
-    pub(crate) tags: Option<Vec<String>>,
+    pub(crate) tags: Option<Vec<VectorString>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) host: Option<String>,
+    pub(crate) host: Option<VectorString>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) source_type_name: Option<String>,
+    pub(crate) source_type_name: Option<VectorString>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) device: Option<String>,
+    pub(crate) device: Option<VectorString>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) metadata: Option<DatadogSeriesMetricMetadata>,
 }

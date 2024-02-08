@@ -265,7 +265,7 @@ pub(crate) fn decode_ddseries_v2(
         .series
         .into_iter()
         .flat_map(|serie| {
-            let (namespace, name) = namespace_name_from_dd_metric_shared(serie.metric);
+            let (namespace, name) = namespace_name_from_dd_metric(serie.metric.into());
             let mut tags = into_metric_tags_shared(serie.tags);
 
             let event_metadata = get_event_metadata(serie.metadata.as_ref());
@@ -303,7 +303,7 @@ pub(crate) fn decode_ddseries_v2(
                 if r.type_().eq("host") {
                     log_schema()
                         .host_key()
-                        .and_then(|key| tags.replace(key.to_string(), r.name));
+                        .and_then(|_| tags.replace("host", r.name));
                 } else {
                     // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
                     tags.replace(format!("resource.{}", r.type_()), r.name);
@@ -437,14 +437,14 @@ fn decode_datadog_series_v1(
     Ok(decoded_metrics)
 }
 
-fn into_metric_tags(tags: Vec<String>) -> MetricTags {
+fn into_metric_tags(tags: Vec<VectorString>) -> MetricTags {
     tags.into_iter()
         .map(|full_tag| {
             // tag_chunk is expected to be formatted as "tag_name:tag_value"
             // If no colon is found, then it is classified as a Bare tag.
             match full_tag.split_once(':') {
                 // the notation `tag:` is valid for StatsD. The effect is an empty string value.
-                Some((prefix, suffix)) => (prefix.to_string().into(), suffix.to_string().into()),
+                Some((prefix, suffix)) => (prefix, TagValue::Value(suffix)),
                 None => (full_tag, TagValue::Bare),
             }
         })
@@ -474,10 +474,8 @@ fn into_vector_metric(
 ) -> Vec<Event> {
     let mut tags = into_metric_tags(dd_metric.tags.unwrap_or_default());
 
-    if let Some(key) = log_schema().host_key() {
-        dd_metric
-            .host
-            .and_then(|host| tags.replace(key.to_string(), host));
+    if let Some(_) = log_schema().host_key() {
+        dd_metric.host.and_then(|host| tags.replace("host", host));
     }
 
     dd_metric
@@ -485,7 +483,7 @@ fn into_vector_metric(
         .and_then(|source| tags.replace("source_type_name", source));
     dd_metric.device.and_then(|dev| tags.replace("device", dev));
 
-    let (namespace, name) = namespace_name_from_dd_metric(&dd_metric.metric);
+    let (namespace, name) = namespace_name_from_dd_metric(dd_metric.metric);
 
     match dd_metric.r#type {
         DatadogMetricType::Count => dd_metric
@@ -503,7 +501,7 @@ fn into_vector_metric(
                         .expect("invalid timestamp"),
                 ))
                 .with_tags(Some(tags.clone()))
-                .with_namespace(namespace.map(|s| s.to_string()))
+                .with_namespace(namespace.clone())
             })
             .collect::<Vec<_>>(),
         DatadogMetricType::Gauge => dd_metric
@@ -521,7 +519,7 @@ fn into_vector_metric(
                         .expect("invalid timestamp"),
                 ))
                 .with_tags(Some(tags.clone()))
-                .with_namespace(namespace.map(|s| s.to_string()))
+                .with_namespace(namespace.clone())
             })
             .collect::<Vec<_>>(),
         // Agent sends rate only for dogstatsd counter https://github.com/DataDog/datadog-agent/blob/f4a13c6dca5e2da4bb722f861a8ac4c2f715531d/pkg/metrics/counter.go#L8-L10
@@ -546,7 +544,7 @@ fn into_vector_metric(
                 // dd_metric.interval is in seconds, convert to ms
                 .with_interval_ms(NonZeroU32::new(i * 1000))
                 .with_tags(Some(tags.clone()))
-                .with_namespace(namespace.map(|s| s.to_string()))
+                .with_namespace(namespace.clone())
             })
             .collect::<Vec<_>>(),
     }
@@ -567,21 +565,9 @@ fn into_vector_metric(
 
 /// Parses up to the first '.' of the input metric name into a namespace.
 /// If no delimiter, the namespace is None type.
-fn namespace_name_from_dd_metric(dd_metric_name: &str) -> (Option<&str>, &str) {
-    // ex: "system.fs.util" -> ("system", "fs.util")
-    match dd_metric_name.split_once('.') {
-        Some((namespace, name)) => (Some(namespace), name),
-        None => (None, dd_metric_name),
-    }
-}
-
-/// Parses up to the first '.' of the input metric name into a namespace.
-/// If no delimiter, the namespace is None type.
-fn namespace_name_from_dd_metric_shared(
-    dd_metric_name: Chars,
+fn namespace_name_from_dd_metric(
+    dd_metric_name: VectorString,
 ) -> (Option<VectorString>, VectorString) {
-    let dd_metric_name = VectorString::from(dd_metric_name);
-
     // ex: "system.fs.util" -> ("system", "fs.util")
     match dd_metric_name.split_once('.') {
         Some((namespace, name)) => (Some(namespace), name),
@@ -599,11 +585,11 @@ pub(crate) fn decode_ddsketch(
         .sketches
         .into_iter()
         .flat_map(|sketch_series| {
-            let (namespace, name) = namespace_name_from_dd_metric_shared(sketch_series.metric);
+            let (namespace, name) = namespace_name_from_dd_metric(sketch_series.metric.into());
             let mut tags = into_metric_tags_shared(sketch_series.tags);
             log_schema()
                 .host_key()
-                .and_then(|key| tags.replace(key.to_string(), sketch_series.host));
+                .and_then(|_| tags.replace("host", sketch_series.host));
 
             let event_metadata = get_event_metadata(sketch_series.metadata.as_ref());
 
