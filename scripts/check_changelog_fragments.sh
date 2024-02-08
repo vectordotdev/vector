@@ -17,7 +17,7 @@ if [ ! -d "${CHANGELOG_DIR}" ]; then
 fi
 
 # diff-filter=A lists only added files
-FRAGMENTS=$(git diff --name-only --diff-filter=A origin/master ${CHANGELOG_DIR})
+FRAGMENTS=$(git diff --name-only --diff-filter=A --merge-base origin/master ${CHANGELOG_DIR})
 
 if [ -z "$FRAGMENTS" ]; then
   echo "No changelog fragments detected"
