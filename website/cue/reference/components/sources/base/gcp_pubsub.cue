@@ -271,6 +271,8 @@ base: components: sources: gcp_pubsub: configuration: {
 					source: {
 						description: """
 																The [Vector Remap Language][vrl] (VRL) program to execute for each event.
+																Note that the final contents of the `.` target will be used as the decoding result.
+																Compilation error or use of 'abort' in a program will result in a decoding error.
 
 																[vrl]: https://vector.dev/docs/reference/vrl
 																"""

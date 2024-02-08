@@ -26,6 +26,9 @@ pub struct VrlDeserializerConfig {
 #[derivative(Default)]
 pub struct VrlDeserializerOptions {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
+    /// Note that the final contents of the `.` target will be used as the decoding result.
+    /// Compilation error or use of 'abort' in a program will result in a decoding error.
+    ///
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
     pub source: String,
@@ -166,6 +169,23 @@ mod tests {
             btreemap! { "message" => "Hello VRL" }.into()
         );
     }
+
+    #[test]
+    fn test_returned_expression() {
+        let source = indoc!(r#"{ "a" : 1 }"#);
+
+        let decoder = make_decoder(source);
+
+        let log_bytes = Bytes::from("some bytes");
+        let result = decoder.parse(log_bytes, LogNamespace::Vector).unwrap();
+        assert_eq!(result.len(), 1);
+        let event = result.first().unwrap();
+        assert_eq!(
+            *event.as_log().get(&OwnedTargetPath::event_root()).unwrap(),
+            btreemap! { "a" => 1 }.into()
+        );
+    }
+
     #[test]
     fn test_syslog_and_cef_input() {
         let source = indoc!(
@@ -253,5 +273,16 @@ mod tests {
         .unwrap_err()
         .to_string();
         assert!(error.contains("error[E203]: syntax error"));
+    }
+
+    #[test]
+    fn test_abort() {
+        let decoder = make_decoder("abort");
+        let log_bytes = Bytes::from(r#"{ "message": "Hello VRL" }"#);
+        let error = decoder
+            .parse(log_bytes, LogNamespace::Vector)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("aborted"));
     }
 }
