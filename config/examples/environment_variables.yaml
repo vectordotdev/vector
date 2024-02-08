@@ -15,7 +15,7 @@ sources:
     type: "file"
     include: [ "/var/log/apache2/*.log" ]
     # ignore files older than 1 day
-    ignore_older: 86400
+    ignore_older_secs: 86400
 
 # Add a field based on the value of the HOSTNAME env var
 # Docs: https://vector.dev/docs/reference/transforms/remap
