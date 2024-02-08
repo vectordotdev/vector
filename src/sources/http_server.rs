@@ -134,7 +134,7 @@ pub struct SimpleHttpConfig {
     path_key: OptionalValuePath,
 
 
-    /// The event key in which the the remote ip is stored.
+    /// The event key in which the remote ip is stored.
     #[serde(default = "default_host_key")]
     #[configurable(metadata(docs::examples = "hostname"))]
     host_key: OptionalValuePath,
