@@ -153,6 +153,7 @@ mod tests {
     fn test_json_message() {
         let source = indoc!(
             r#"
+            %m1 = "metadata"
             . = string!(.)
             . = parse_json!(.)
             "#
@@ -167,6 +168,13 @@ mod tests {
         assert_eq!(
             *event.as_log().get(&OwnedTargetPath::event_root()).unwrap(),
             btreemap! { "message" => "Hello VRL" }.into()
+        );
+        assert_eq!(
+            *event
+                .as_log()
+                .get(&OwnedTargetPath::metadata_root())
+                .unwrap(),
+            btreemap! { "m1" => "metadata" }.into()
         );
     }
 
