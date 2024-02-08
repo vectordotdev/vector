@@ -198,6 +198,13 @@ impl SimpleHttpConfig {
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
+            .with_source_metadata(
+                SimpleHttpConfig::NAME,
+                Some(LegacyKey::Overwrite(owned_value_path!("host"))),
+                &owned_value_path!("host"),
+                Kind::bytes(),
+                None,
+            )
             .with_standard_vector_source_metadata();
 
         // for metadata that is added to the events dynamically from config options
@@ -1491,6 +1498,11 @@ mod tests {
                     None,
                 )
                 .with_metadata_field(
+                    &owned_value_path!(SimpleHttpConfig::NAME, "host"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
@@ -1520,6 +1532,7 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("path"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("host"), Kind::bytes(), None)
         .unknown_fields(Kind::bytes());
 
         assert_eq!(definitions, Some(expected_definition))

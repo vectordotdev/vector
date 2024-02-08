@@ -1,0 +1,1 @@
+cargo nextest run --workspace --no-fail-fast --no-default-features --features "default" 

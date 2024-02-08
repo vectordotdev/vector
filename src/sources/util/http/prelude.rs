@@ -197,7 +197,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         MaxConnectionAgeLayer::new(
                             Duration::from_secs(secs),
                             keepalive_settings.max_connection_age_jitter_factor,
-                            conn.peer_addr(),
+                            remote_addr,
                         )
                     }))
                     .map_request(move |mut request: hyper::Request<_>| {
