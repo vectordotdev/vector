@@ -12,7 +12,7 @@ path = "tests/bin/generate-avro-fixtures.rs"
 [dependencies]
 apache-avro = { version = "0.16.0", default-features = false }
 bytes = { version = "1", default-features = false }
-chrono = { version = "0.4", default-features = false }
+chrono.workspace = true
 csv-core = { version = "0.1.10", default-features = false }
 derivative = { version = "2", default-features = false }
 dyn-clone = { version = "1", default-features = false }
@@ -23,8 +23,8 @@ ordered-float = { version = "4.2.0", default-features = false }
 prost = { version = "0.12.3", default-features = false, features = ["std"] }
 prost-reflect = { version = "0.12", default-features = false, features = ["serde"] }
 regex = { version = "1.10.3", default-features = false, features = ["std", "perf"] }
-serde = { version = "1", default-features = false, features = ["derive"] }
-serde_json = { version = "1", default-features = false }
+serde.workspace = true
+serde_json.workspace = true
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
 syslog_loose = { version = "0.21", default-features = false, optional = true }

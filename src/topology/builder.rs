@@ -330,6 +330,7 @@ impl<'a> Builder<'a> {
                 acknowledgements: source.sink_acknowledgements,
                 schema_definitions,
                 schema: self.config.schema,
+                extra_context: self.extra_context.clone(),
             };
             let source = source.inner.build(context).await;
             let server = match source {
@@ -464,6 +465,7 @@ impl<'a> Builder<'a> {
                 schema_definitions,
                 merged_schema_definition: merged_definition.clone(),
                 schema: self.config.schema,
+                extra_context: self.extra_context.clone(),
             };
 
             let node = TransformNode::from_parts(

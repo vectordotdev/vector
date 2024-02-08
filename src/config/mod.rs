@@ -1,5 +1,4 @@
 #![allow(missing_docs)]
-use std::fs::File;
 use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
@@ -113,8 +112,6 @@ pub struct Config {
     #[cfg(feature = "enterprise")]
     pub enterprise: Option<enterprise::Options>,
     pub global: GlobalOptions,
-    #[serde(skip)]
-    pub data_dir_lock: Option<File>,
     pub healthchecks: HealthcheckOptions,
     sources: IndexMap<ComponentKey, SourceOuter>,
     sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
