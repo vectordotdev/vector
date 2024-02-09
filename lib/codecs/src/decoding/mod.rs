@@ -9,8 +9,9 @@ use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
-    GelfDeserializerConfig, GelfDeserializerOptions, JsonDeserializer, JsonDeserializerConfig,
-    JsonDeserializerOptions, NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
+    GelfDeserializerConfig, GelfDeserializerOptions, InfluxdbDeserializer,
+    InfluxdbDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions,
+    NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
     NativeJsonDeserializerConfig, NativeJsonDeserializerOptions, ProtobufDeserializer,
     ProtobufDeserializerConfig, ProtobufDeserializerOptions,
 };
@@ -253,6 +254,11 @@ pub enum DeserializerConfig {
     /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
     Gelf(GelfDeserializerConfig),
 
+    /// Decodes the raw bytes as a [Influxdb Line Protocol][influxdb] message.
+    ///
+    /// [influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
+    Influxdb(InfluxdbDeserializerConfig),
+
     /// Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
     ///
     /// [apache_avro]: https://avro.apache.org/
@@ -299,6 +305,12 @@ impl From<NativeJsonDeserializerConfig> for DeserializerConfig {
     }
 }
 
+impl From<InfluxdbDeserializerConfig> for DeserializerConfig {
+    fn from(config: InfluxdbDeserializerConfig) -> Self {
+        Self::Influxdb(config)
+    }
+}
+
 impl DeserializerConfig {
     /// Build the `Deserializer` from this configuration.
     pub fn build(&self) -> vector_common::Result<Deserializer> {
@@ -319,6 +331,7 @@ impl DeserializerConfig {
             }
             DeserializerConfig::NativeJson(config) => Ok(Deserializer::NativeJson(config.build())),
             DeserializerConfig::Gelf(config) => Ok(Deserializer::Gelf(config.build())),
+            DeserializerConfig::Influxdb(config) => Ok(Deserializer::Influxdb(config.build())),
         }
     }
 
@@ -330,6 +343,7 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes
             | DeserializerConfig::Json(_)
             | DeserializerConfig::Gelf(_)
+            | DeserializerConfig::Influxdb(_)
             | DeserializerConfig::NativeJson(_) => {
                 FramingConfig::NewlineDelimited(Default::default())
             }
@@ -354,6 +368,7 @@ impl DeserializerConfig {
             DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
             DeserializerConfig::NativeJson(config) => config.output_type(),
             DeserializerConfig::Gelf(config) => config.output_type(),
+            DeserializerConfig::Influxdb(config) => config.output_type(),
         }
     }
 
@@ -372,6 +387,7 @@ impl DeserializerConfig {
             DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::NativeJson(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Gelf(config) => config.schema_definition(log_namespace),
+            DeserializerConfig::Influxdb(config) => config.schema_definition(log_namespace),
         }
     }
 
@@ -402,7 +418,8 @@ impl DeserializerConfig {
                 DeserializerConfig::Json(_)
                 | DeserializerConfig::NativeJson(_)
                 | DeserializerConfig::Bytes
-                | DeserializerConfig::Gelf(_),
+                | DeserializerConfig::Gelf(_)
+                | DeserializerConfig::Influxdb(_),
                 _,
             ) => "text/plain",
             #[cfg(feature = "syslog")]
@@ -433,6 +450,8 @@ pub enum Deserializer {
     Boxed(BoxedDeserializer),
     /// Uses a `GelfDeserializer` for deserialization.
     Gelf(GelfDeserializer),
+    /// Uses a `InfluxdbDeserializer` for deserialization.
+    Influxdb(InfluxdbDeserializer),
 }
 
 impl format::Deserializer for Deserializer {
@@ -452,6 +471,7 @@ impl format::Deserializer for Deserializer {
             Deserializer::NativeJson(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Boxed(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Gelf(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Influxdb(deserializer) => deserializer.parse(bytes, log_namespace),
         }
     }
 }
