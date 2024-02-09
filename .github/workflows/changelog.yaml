@@ -23,6 +23,9 @@ jobs:
     env:
       PR_HAS_LABEL: ${{ contains( github.event.pull_request.labels.*.name, 'no-changelog') }}
     steps:
+        # checkout full depth because in the check_changelog_fragments script, we need to specify a
+        # merge base. If we only shallow clone the repo, git may not have enough history to determine
+        # the base.
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
