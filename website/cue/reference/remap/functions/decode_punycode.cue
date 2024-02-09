@@ -21,14 +21,14 @@ remap: functions: decode_punycode: {
 		{
 			title: "Decode a punycode encoded internationalized domain name"
 			source: """
-				decode_punycode("www.xn--caf-dma.com")
+				decode_punycode!("www.xn--caf-dma.com")
 				"""
 			return: "www.café.com"
 		},
 		{
 			title: "Decode an ASCII only string"
 			source: """
-				encode_punycode("www.cafe.com")
+				encode_punycode!("www.cafe.com")
 				"""
 			return: "www.cafe.com"
 		},

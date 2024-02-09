@@ -21,21 +21,21 @@ remap: functions: encode_punycode: {
 		{
 			title: "Encode an internationalized domain name"
 			source: """
-				encode_punycode("www.café.com")
+				encode_punycode!("www.café.com")
 				"""
 			return: "www.xn--caf-dma.com"
 		},
 		{
 			title: "Encode an internationalized domain name with mixed case"
 			source: """
-				encode_punycode("www.CAFé.com")
+				encode_punycode!("www.CAFé.com")
 				"""
 			return: "www.xn--caf-dma.com"
 		},
 		{
 			title: "Encode an ASCII only string"
 			source: """
-				encode_punycode("www.cafe.com")
+				encode_punycode!("www.cafe.com")
 				"""
 			return: "www.cafe.com"
 		},
