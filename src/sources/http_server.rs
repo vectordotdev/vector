@@ -134,7 +134,11 @@ pub struct SimpleHttpConfig {
     path_key: OptionalValuePath,
 
 
-    /// The event key in which the remote ip is stored.
+    /// Overrides the name of the log field used to add the remote ip to each event.
+    ///
+    /// By default, the [global `log_schema.host_key` option](global_host_key) is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "default_host_key")]
     #[configurable(metadata(docs::examples = "hostname"))]
     host_key: OptionalValuePath,
