@@ -18,6 +18,7 @@ pub struct ClickhouseSink {
 }
 
 impl ClickhouseSink {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         batch_settings: BatcherSettings,
         compression: Compression,

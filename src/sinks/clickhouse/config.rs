@@ -23,6 +23,7 @@ use crate::{
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
+#[allow(clippy::enum_variant_names)]
 pub enum Format {
     #[derivative(Default)]
     /// JSONEachRow.
