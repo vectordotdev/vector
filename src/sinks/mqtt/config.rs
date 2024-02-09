@@ -36,8 +36,7 @@ pub struct MqttSinkConfig {
     pub password: Option<String>,
 
     /// MQTT client ID.
-    #[serde(default = "default_client_id")]
-    pub client_id: String,
+    pub client_id: Option<String>,
 
     /// Connection keep-alive interval.
     #[serde(default = "default_keep_alive")]
@@ -100,16 +99,6 @@ const fn default_port() -> u16 {
     1883
 }
 
-fn default_client_id() -> String {
-    let hash = rand::thread_rng()
-        .sample_iter(&rand_distr::Alphanumeric)
-        .take(6)
-        .map(char::from)
-        .collect::<String>();
-
-    format!("vectorSink{hash}")
-}
-
 const fn default_keep_alive() -> u16 {
     60
 }
@@ -125,7 +114,7 @@ impl Default for MqttSinkConfig {
             port: default_port(),
             user: None,
             password: None,
-            client_id: default_client_id(),
+            client_id: None,
             keep_alive: default_keep_alive(),
             clean_session: default_clean_session(),
             tls: None,
@@ -171,11 +160,20 @@ pub enum ConfigurationError {
 
 impl MqttSinkConfig {
     fn build_connector(&self) -> Result<MqttConnector, MqttError> {
-        if self.client_id.is_empty() {
+        let client_id = self.client_id.clone().unwrap_or_else(|| {
+            let hash = rand::thread_rng()
+                .sample_iter(&rand_distr::Alphanumeric)
+                .take(6)
+                .map(char::from)
+                .collect::<String>();
+            format!("vectorSink{hash}")
+        });
+
+        if client_id.is_empty() {
             return Err(ConfigurationError::EmptyClientId).context(ConfigurationSnafu);
         }
         let tls = MaybeTlsSettings::from_config(&self.tls, false).context(TlsSnafu)?;
-        let mut options = MqttOptions::new(&self.client_id, &self.host, self.port);
+        let mut options = MqttOptions::new(&client_id, &self.host, self.port);
         options.set_keep_alive(Duration::from_secs(self.keep_alive.into()));
         options.set_clean_session(self.clean_session);
         match (&self.user, &self.password) {
