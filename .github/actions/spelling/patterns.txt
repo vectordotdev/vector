@@ -227,3 +227,6 @@ user:P@ssw0rd
 
 # Ignore punycode
 \bxn--[-0-9a-z]+
+
+# changelog.d fragment authors line
+^authors: .*$

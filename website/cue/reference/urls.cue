@@ -186,6 +186,7 @@ urls: {
 	endler_dev:                                 "https://endler.dev/"
 	enrichment_tables_concept:                  "/docs/reference/glossary/#enrichment-tables"
 	eof:                                        "\(wikipedia)/wiki/End-of-file#EOF_character"
+	etld:                                       "https://developer.mozilla.org/en-US/docs/Glossary/eTLD"
 	etsy:                                       "https://www.etsy.com"
 	event_proto:                                "\(vector_repo)/blob/master/lib/vector-core/proto/event.proto"
 	eventstoredb_stats_client:                  "https://developers.eventstore.com/server/v21.2/docs/diagnostics/stats.html"

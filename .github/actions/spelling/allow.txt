@@ -278,6 +278,7 @@ downsides
 downwardapi
 emoji
 esbuild
+etld
 fakeintake
 fargate
 fibonacci
@@ -423,6 +424,7 @@ servlet
 Sinjo
 sublocation
 sundar
+svcb
 snyk
 socketaddr
 solarwinds
