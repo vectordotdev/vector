@@ -82,6 +82,20 @@ impl Default for LengthDelimitedDecoder {
 }
 
 impl Clone for LengthDelimitedDecoder {
+    // This has been fixed with https://github.com/tokio-rs/tokio/pull/4089,
+    // however we are blocked on upgrading to a new release of `tokio-util`
+    // that includes the `Clone` implementation:
+    // https://github.com/vectordotdev/vector/issues/11257.
+    //
+    // This is an awful implementation for `Clone` since it resets the
+    // internal state. However, it works for our use case because we
+    // generally only clone a codec that has not been mutated yet.
+    //
+    // Ideally, `tokio_util::codec::LengthDelimitedCodec` should implement
+    // `Clone` and it doesn't look like it was a deliberate decision to
+    // leave out the implementation. All of its internal fields implement
+    // `Clone`, so adding an implementation for `Clone` could be contributed
+    // to the upstream repo easily by adding it to the `derive` macro.
     fn clone(&self) -> Self {
         Self::new_with_max_frame_length(self.0.max_frame_length())
     }
