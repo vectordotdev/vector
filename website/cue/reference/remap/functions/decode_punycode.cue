@@ -30,7 +30,7 @@ remap: functions: decode_punycode: {
 		{
 			title: "Decode an ASCII only string"
 			source: """
-				encode_punycode!("www.cafe.com")
+				decode_punycode!("www.cafe.com")
 				"""
 			return: "www.cafe.com"
 		},
