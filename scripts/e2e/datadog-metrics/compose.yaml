@@ -1,0 +1,82 @@
+version: '3'
+
+services:
+
+  # Emits metrics to the Agent only path
+  dogstatsd-client-agent:
+    build: ./dogstatsd_client
+    environment:
+    - STATSD_HOST=datadog-agent
+    depends_on:
+      - datadog-agent
+
+  # Emits metrics to the Agent-Vector path
+  dogstatsd-client-vector:
+    build: ./dogstatsd_client
+    environment:
+    - STATSD_HOST=datadog-agent-vector
+    depends_on:
+      - datadog-agent-vector
+
+  # Sends metric data received from the Emitter to the `fakeintake-agent` service
+  datadog-agent:
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
+    depends_on:
+      - fakeintake-agent
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_HOSTNAME=datadog-agent
+    volumes:
+    # The Agent config file
+    - ${PWD}/tests/data/e2e/datadog/metrics/agent_only.yaml:/etc/datadog-agent/datadog.yaml
+
+  # Sends metric data received from the Emitter to the `vector` service
+  datadog-agent-vector:
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
+    depends_on:
+      - vector
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_HOSTNAME=datadog-agent-vector
+    volumes:
+    # The Agent config file
+    - ${PWD}/tests/data/e2e/datadog/metrics/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
+
+  # Receives metric data from the `datadog-agent-vector` service and sends
+  # to the `fakeintake-vector` service.
+  vector:
+    depends_on:
+      - fakeintake-vector
+    build:
+      context: ${PWD}
+    # re-using the integration test runner image since it already has
+    # compiled vector on it.
+    image: ${CONFIG_VECTOR_IMAGE}
+    environment:
+      - FEATURES=e2e-tests-datadog
+    working_dir: /home/vector
+    network_mode: host
+    command:
+      - "/usr/bin/vector"
+      - "-vvv"
+      - "-c"
+      - "/home/vector/tests/data/e2e/datadog/metrics/vector.toml"
+    volumes:
+      - ${PWD}:/home/vector
+
+  # Receives metric data from the `datadog-agent` service. Is queried by the test runner
+  # which does the validation of consistency with the other fakeintake service.
+  fakeintake-agent:
+    image: docker.io/datadog/fakeintake:latest
+
+  # Receives metric data from the `datadog-agent-vector` service. Is queried by the test runner
+  # which does the validation of consistency with the other fakeintake service.
+  fakeintake-vector:
+    image: docker.io/datadog/fakeintake:latest
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+
+volumes:
+  target: {}

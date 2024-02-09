@@ -220,6 +220,7 @@ customizability
 customtype
 cwl
 Dailywarehousing
+dalegaard
 daschl
 dashmap
 datadir
@@ -327,6 +328,7 @@ EOL'ed
 Err'ing
 errorf
 esb
+esensar
 esque
 etheus
 etl
@@ -446,6 +448,7 @@ gnux
 gny
 Godbolt
 gogoproto
+gohai
 goldberg
 goldmark
 GPB
