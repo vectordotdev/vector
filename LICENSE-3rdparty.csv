@@ -540,6 +540,7 @@ stringprep,https://github.com/sfackler/rust-stringprep,MIT OR Apache-2.0,Steven 
 strip-ansi-escapes,https://github.com/luser/strip-ansi-escapes,Apache-2.0 OR MIT,Ted Mielczarek <ted@mielczarek.org>
 strsim,https://github.com/dguo/strsim-rs,MIT,Danny Guo <danny@dannyguo.com>
 strsim,https://github.com/dguo/strsim-rs,MIT,Danny Guo <dannyguo91@gmail.com>
+strsim,https://github.com/rapidfuzz/strsim-rs,MIT,"Danny Guo <danny@dannyguo.com>, maxbachmann <oss@maxbachmann.de>"
 structopt,https://github.com/TeXitoi/structopt,Apache-2.0 OR MIT,"Guillaume Pinot <texitoi@texitoi.eu>, others"
 structopt-derive,https://github.com/TeXitoi/structopt,Apache-2.0 OR MIT,Guillaume Pinot <texitoi@texitoi.eu>
 strum,https://github.com/Peternator7/strum,MIT,Peter Glotfelty <peter.glotfelty@microsoft.com>
