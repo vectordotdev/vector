@@ -26,7 +26,7 @@ remap: functions: parse_etld: {
 		},
 	]
 	internal_failure_reasons: [
-		"unable to determine eTLD for `value`"
+		"unable to determine eTLD for `value`",
 	]
 	return: types: ["object"]
 
