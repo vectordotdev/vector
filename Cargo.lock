@@ -586,10 +586,10 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "ring",
- "rustls",
- "rustls-native-certs",
- "rustls-pemfile",
- "rustls-webpki",
+ "rustls 0.21.8",
+ "rustls-native-certs 0.6.3",
+ "rustls-pemfile 1.0.3",
+ "rustls-webpki 0.101.7",
  "serde",
  "serde_json",
  "serde_nanos",
@@ -598,7 +598,7 @@ dependencies = [
  "time",
  "tokio",
  "tokio-retry",
- "tokio-rustls",
+ "tokio-rustls 0.24.1",
  "tracing 0.1.40",
  "url",
 ]
@@ -1147,7 +1147,7 @@ dependencies = [
  "once_cell",
  "pin-project-lite",
  "pin-utils",
- "rustls",
+ "rustls 0.21.8",
  "tokio",
  "tracing 0.1.40",
 ]
@@ -1544,10 +1544,10 @@ dependencies = [
  "hyperlocal",
  "log",
  "pin-project-lite",
- "rustls",
- "rustls-native-certs",
- "rustls-pemfile",
- "rustls-webpki",
+ "rustls 0.21.8",
+ "rustls-native-certs 0.6.3",
+ "rustls-pemfile 1.0.3",
+ "rustls-webpki 0.101.7",
  "serde",
  "serde_derive",
  "serde_json",
@@ -2219,7 +2219,7 @@ dependencies = [
  "futures-core",
  "prost 0.12.3",
  "prost-types 0.12.3",
- "tonic",
+ "tonic 0.10.2",
  "tracing-core 0.1.32",
 ]
 
@@ -2241,7 +2241,7 @@ dependencies = [
  "thread_local",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.10.2",
  "tracing 0.1.40",
  "tracing-core 0.1.32",
  "tracing-subscriber",
@@ -3678,7 +3678,7 @@ dependencies = [
  "serde_json",
  "strum 0.25.0",
  "strum_macros 0.25.3",
- "tonic",
+ "tonic 0.10.2",
  "tonic-build 0.10.2",
 ]
 
@@ -3698,7 +3698,7 @@ dependencies = [
  "snafu 0.7.5",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.10.2",
  "tonic-build 0.9.2",
  "tower",
 ]
@@ -4219,10 +4219,10 @@ dependencies = [
  "http 0.2.9",
  "hyper",
  "log",
- "rustls",
- "rustls-native-certs",
+ "rustls 0.21.8",
+ "rustls-native-certs 0.6.3",
  "tokio",
- "tokio-rustls",
+ "tokio-rustls 0.24.1",
 ]
 
 [[package]]
@@ -5317,8 +5317,8 @@ dependencies = [
  "percent-encoding",
  "rand 0.8.5",
  "rustc_version_runtime",
- "rustls",
- "rustls-pemfile",
+ "rustls 0.21.8",
+ "rustls-pemfile 1.0.3",
  "serde",
  "serde_bytes",
  "serde_with 1.14.0",
@@ -5330,7 +5330,7 @@ dependencies = [
  "take_mut",
  "thiserror",
  "tokio",
- "tokio-rustls",
+ "tokio-rustls 0.24.1",
  "tokio-util",
  "trust-dns-proto",
  "trust-dns-resolver",
@@ -5973,8 +5973,8 @@ dependencies = [
  "ordered-float 4.2.0",
  "prost 0.12.3",
  "prost-build 0.12.3",
- "tonic",
- "tonic-build 0.10.2",
+ "tonic 0.11.0",
+ "tonic-build 0.11.0",
  "vector-core",
  "vector-lookup",
  "vrl",
@@ -7410,8 +7410,8 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
- "rustls",
- "rustls-pemfile",
+ "rustls 0.21.8",
+ "rustls-pemfile 1.0.3",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -7419,7 +7419,7 @@ dependencies = [
  "system-configuration",
  "tokio",
  "tokio-native-tls",
- "tokio-rustls",
+ "tokio-rustls 0.24.1",
  "tokio-util",
  "tower-service",
  "url",
@@ -7697,8 +7697,22 @@ checksum = "446e14c5cda4f3f30fe71863c34ec70f5ac79d6087097ad0bb433e1be5edf04c"
 dependencies = [
  "log",
  "ring",
- "rustls-webpki",
+ "rustls-webpki 0.101.7",
  "sct",
+]
+
+[[package]]
+name = "rustls"
+version = "0.22.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e87c9956bd9807afa1f77e0f7594af32566e830e088a5576d27c5b6f30f49d41"
+dependencies = [
+ "log",
+ "ring",
+ "rustls-pki-types",
+ "rustls-webpki 0.102.2",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]
@@ -7708,7 +7722,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9aace74cb666635c918e9c12bc0d348266037aa8eb599b5cba565709a8dff00"
 dependencies = [
  "openssl-probe",
- "rustls-pemfile",
+ "rustls-pemfile 1.0.3",
+ "schannel",
+ "security-framework",
+]
+
+[[package]]
+name = "rustls-native-certs"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f1fb85efa936c42c6d5fc28d2629bb51e4b2f4b8a5211e297d599cc5a093792"
+dependencies = [
+ "openssl-probe",
+ "rustls-pemfile 2.0.0",
+ "rustls-pki-types",
  "schannel",
  "security-framework",
 ]
@@ -7723,12 +7750,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-pemfile"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35e4980fa29e4c4b212ffb3db068a564cbf560e51d3944b7c88bd8bf5bec64f4"
+dependencies = [
+ "base64 0.21.7",
+ "rustls-pki-types",
+]
+
+[[package]]
+name = "rustls-pki-types"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a716eb65e3158e90e17cd93d855216e27bde02745ab842f2cab4a39dba1bacf"
+
+[[package]]
 name = "rustls-webpki"
 version = "0.101.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b6275d1ee7a1cd780b64aca7726599a1dbc893b1e64144529e55c3c2f745765"
 dependencies = [
  "ring",
+ "untrusted",
+]
+
+[[package]]
+name = "rustls-webpki"
+version = "0.102.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "faaa0a62740bedb9b2ef5afa303da42764c012f743917351dc9a237ea1663610"
+dependencies = [
+ "ring",
+ "rustls-pki-types",
  "untrusted",
 ]
 
@@ -8734,7 +8788,7 @@ checksum = "4da30af7998f51ee1aa48ab24276fe303a697b004e31ff542b192c088d5630a5"
 dependencies = [
  "cfg-if",
  "native-tls",
- "rustls-pemfile",
+ "rustls-pemfile 1.0.3",
 ]
 
 [[package]]
@@ -9045,7 +9099,18 @@ version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c28327cf380ac148141087fbfb9de9d7bd4e84ab5d2c28fbc911d753de8a7081"
 dependencies = [
- "rustls",
+ "rustls 0.21.8",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-rustls"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "775e0c0f0adb3a2f22a00c4745d728b479985fc15ee7ca6a2608388c5569860f"
+dependencies = [
+ "rustls 0.22.2",
+ "rustls-pki-types",
  "tokio",
 ]
 
@@ -9082,7 +9147,7 @@ checksum = "212d5dcb2a1ce06d81107c3d0ffa3121fe974b73f068c8282cb1c32328113b6c"
 dependencies = [
  "futures-util",
  "log",
- "rustls",
+ "rustls 0.21.8",
  "tokio",
  "tungstenite",
 ]
@@ -9169,6 +9234,36 @@ dependencies = [
  "axum",
  "base64 0.21.7",
  "bytes 1.5.0",
+ "h2 0.3.24",
+ "http 0.2.9",
+ "http-body",
+ "hyper",
+ "hyper-timeout",
+ "percent-encoding",
+ "pin-project",
+ "prost 0.12.3",
+ "rustls 0.21.8",
+ "rustls-pemfile 1.0.3",
+ "tokio",
+ "tokio-rustls 0.24.1",
+ "tokio-stream",
+ "tower",
+ "tower-layer",
+ "tower-service",
+ "tracing 0.1.40",
+]
+
+[[package]]
+name = "tonic"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76c4eb7a4e9ef9d4763600161f12f5070b92a578e1b634db88a6887844c91a13"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "axum",
+ "base64 0.21.7",
+ "bytes 1.5.0",
  "flate2",
  "h2 0.3.24",
  "http 0.2.9",
@@ -9178,11 +9273,11 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost 0.12.3",
- "rustls",
- "rustls-native-certs",
- "rustls-pemfile",
+ "rustls-native-certs 0.7.0",
+ "rustls-pemfile 2.0.0",
+ "rustls-pki-types",
  "tokio",
- "tokio-rustls",
+ "tokio-rustls 0.25.0",
  "tokio-stream",
  "tower",
  "tower-layer",
@@ -9208,6 +9303,19 @@ name = "tonic-build"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d021fc044c18582b9a2408cd0dd05b1596e3ecdb5c4df822bb0183545683889"
+dependencies = [
+ "prettyplease 0.2.15",
+ "proc-macro2 1.0.78",
+ "prost-build 0.12.3",
+ "quote 1.0.35",
+ "syn 2.0.48",
+]
+
+[[package]]
+name = "tonic-build"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be4ef6dd70a610078cb4e338a0f79d06bc759ff1b22d2120c2ff02ae264ba9c2"
 dependencies = [
  "prettyplease 0.2.15",
  "proc-macro2 1.0.78",
@@ -9977,8 +10085,8 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "toml",
- "tonic",
- "tonic-build 0.10.2",
+ "tonic 0.11.0",
+ "tonic-build 0.11.0",
  "tower",
  "tower-http",
  "tower-test",
@@ -10220,7 +10328,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml",
- "tonic",
+ "tonic 0.11.0",
  "tracing 0.1.40",
  "tracing-core 0.1.32",
  "tracing-subscriber",
@@ -10512,7 +10620,7 @@ dependencies = [
  "mime_guess",
  "percent-encoding",
  "pin-project",
- "rustls-pemfile",
+ "rustls-pemfile 1.0.3",
  "scoped-tls",
  "serde",
  "serde_json",
