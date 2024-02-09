@@ -24,6 +24,8 @@ jobs:
       PR_HAS_LABEL: ${{ contains( github.event.pull_request.labels.*.name, 'no-changelog') }}
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Generate authentication token
         # don't run this step if the PR is from a fork or dependabot since the secrets won't exist
