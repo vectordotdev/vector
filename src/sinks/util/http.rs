@@ -611,7 +611,7 @@ pub struct HttpRequest<T: Send> {
     payload: Bytes,
     finalizers: EventFinalizers,
     request_metadata: RequestMetadata,
-    additional_metadata: Option<T>,
+    additional_metadata: T,
 }
 
 impl<T: Send> HttpRequest<T> {
@@ -620,7 +620,7 @@ impl<T: Send> HttpRequest<T> {
         payload: Bytes,
         finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
-        additional_metadata: Option<T>,
+        additional_metadata: T,
     ) -> Self {
         Self {
             payload,
@@ -630,8 +630,8 @@ impl<T: Send> HttpRequest<T> {
         }
     }
 
-    pub const fn get_additional_metadata(&self) -> Option<&T> {
-        self.additional_metadata.as_ref()
+    pub const fn get_additional_metadata(&self) -> &T {
+        &self.additional_metadata
     }
 
     pub fn take_payload(&mut self) -> Bytes {

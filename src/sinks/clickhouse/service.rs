@@ -69,9 +69,7 @@ pub(super) struct ClickhouseServiceRequestBuilder {
 
 impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
     fn build(&self, mut request: HttpRequest<PartitionKey>) -> Request<Bytes> {
-        let metadata = request
-            .get_additional_metadata()
-            .expect("PartitionKey should have been set upstream");
+        let metadata = request.get_additional_metadata();
 
         let uri = set_uri_query(
             &self.endpoint,

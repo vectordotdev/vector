@@ -48,10 +48,10 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
             payload.into_payload(),
             finalizers,
             request_metadata,
-            Some(PartitionKey {
+            PartitionKey {
                 database: key.database,
                 table: key.table,
-            }),
+            },
         )
     }
 }
