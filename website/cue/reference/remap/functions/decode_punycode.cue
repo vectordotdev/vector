@@ -15,7 +15,7 @@ remap: functions: decode_punycode: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not valid `punycode`"
+		"`value` is not valid `punycode`",
 	]
 	return: types: ["string"]
 

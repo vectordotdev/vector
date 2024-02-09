@@ -15,7 +15,7 @@ remap: functions: encode_punycode: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` can not be encoded to `punycode`"
+		"`value` can not be encoded to `punycode`",
 	]
 	return: types: ["string"]
 
