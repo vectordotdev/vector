@@ -225,5 +225,8 @@ user:P@ssw0rd
 # Ignore base64 encoded values in Prometheus Pushgateway URL paths
 /.+@base64/.+
 
+# Ignore punycode
+\bxn--[-0-9a-z]+
+
 # changelog.d fragment authors line
 ^authors: .*$

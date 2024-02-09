@@ -330,6 +330,7 @@ htmltest
 https
 humungus
 icecream
+idn
 ifeq
 ifneq
 imobile
