@@ -113,11 +113,17 @@ impl Filter<LogEvent> for EventFilter {
 
                 array_match("tags", move |values| values.contains(&value_bytes))
             }
-            // Everything else is matched by string equality.
-            Field::Reserved(field) | Field::Attribute(field) => {
+            // Reserved values are matched by string equality.
+            Field::Reserved(field) => {
                 let to_match = to_match.to_owned();
 
                 string_match(field, move |value| value == to_match)
+            }
+            // Attribute values can be strings or numeric types
+            Field::Attribute(field) => {
+                let to_match = to_match.to_owned();
+
+                string_or_numeric_match(field, move |value| value == to_match)
             }
         }
     }
@@ -269,6 +275,25 @@ impl Filter<LogEvent> for EventFilter {
             }
         }
     }
+}
+
+/// Returns a `Matcher` that returns true if the log event resolves to a string or
+/// numeric which matches the provided `func`.
+fn string_or_numeric_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
+where
+    S: Into<String>,
+    F: Fn(Cow<str>) -> bool + Send + Sync + Clone + 'static,
+{
+    let field = field.into();
+
+    Run::boxed(move |log: &LogEvent| {
+        match log.parse_path_and_get_value(field.as_str()).ok().flatten() {
+            Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
+            Some(Value::Integer(v)) => func(v.to_string().into()),
+            Some(Value::Float(v)) => func(v.to_string().into()),
+            _ => false,
+        }
+    })
 }
 
 /// Returns a `Matcher` that returns true if the log event resolves to a string which
@@ -559,19 +584,19 @@ mod test {
                 log_event!["a" => "bla"],
                 log_event!["tags" => vec!["a:bla"]],
             ),
-            // Attribute match.
+            // String attribute match.
             (
                 "@a:bla",
                 log_event!["a" => "bla"],
                 log_event!["tags" => vec!["a:bla"]],
             ),
-            // Attribute match (negate).
+            // String attribute match (negate).
             (
                 "NOT @a:bla",
                 log_event!["tags" => vec!["a:bla"]],
                 log_event!["a" => "bla"],
             ),
-            // Attribute match (negate w/-).
+            // String attribute match (negate w/-).
             (
                 "-@a:bla",
                 log_event!["tags" => vec!["a:bla"]],
@@ -595,6 +620,22 @@ mod test {
                 log_event!["tags" => vec!["a:bla"]],
                 log_event!["a" => "bla"],
             ),
+            // Integer attribute match.
+            (
+                "@a:200",
+                log_event!["a" => 200],
+                log_event!["tags" => vec!["a:200"]],
+            ),
+            // Integer attribute match (negate w/-).
+            ("-@a:200", log_event!["a" => 199], log_event!["a" => 200]),
+            // Float attribute match.
+            (
+                "@a:0.75",
+                log_event!["a" => 0.75],
+                log_event!["tags" => vec!["a:0.75"]],
+            ),
+            // Float attribute match (negate w/-).
+            ("-@a:0.75", log_event!["a" => 0.74], log_event!["a" => 0.75]),
             // Wildcard prefix.
             (
                 "*bla",
