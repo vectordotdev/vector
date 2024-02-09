@@ -2,6 +2,7 @@
     feature = "sources-apache_metrics",
     feature = "sources-aws_ecs_metrics",
     feature = "sources-aws_kinesis_firehose",
+    feature = "sinks-elasticsearch",
     feature = "sources-http-client",
     feature = "sources-utils-http",
 ))]

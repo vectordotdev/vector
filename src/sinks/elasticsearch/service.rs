@@ -20,6 +20,7 @@ use super::{ElasticsearchCommon, ElasticsearchConfig};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     http::HttpClient,
+    internal_events::ElasticsearchResponseError,
     sinks::util::{
         auth::Auth,
         http::{HttpBatchService, RequestConfig},
@@ -211,13 +212,25 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
     if status.is_success() {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
+            emit!(ElasticsearchResponseError::new(
+                "Response contained errors.",
+                response
+            ));
             EventStatus::Rejected
         } else {
             EventStatus::Delivered
         }
     } else if status.is_server_error() {
+        emit!(ElasticsearchResponseError::new(
+            "Response contained errors.",
+            response
+        ));
         EventStatus::Errored
     } else {
+        emit!(ElasticsearchResponseError::new(
+            "Response contained errors.",
+            response
+        ));
         EventStatus::Rejected
     }
 }
