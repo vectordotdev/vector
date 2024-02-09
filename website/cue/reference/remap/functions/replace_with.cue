@@ -22,24 +22,23 @@ remap: functions: replace_with: {
 
 	arguments: [
 		{
-			name:          "value"
-			description:   "The original string."
-			required:      true
-			type:          ["string"]
+			name:        "value"
+			description: "The original string."
+			required:    true
+			type: ["string"]
 		},
 		{
-			name:          "pattern"
-			description:   "Replace all matches of this pattern. Must be a regular expression."
-			required:       true
-			type:          ["regex"]
+			name:        "pattern"
+			description: "Replace all matches of this pattern. Must be a regular expression."
+			required:    true
+			type: ["regex"]
 		},
 		{
-			name:          "count"
-			description:   "The maximum number of replacements to perform. `-1` means replace all
-			matches."
-			required:      false
-			default:       -1
-			type:          ["integer"]
+			name:        "count"
+			description: "The maximum number of replacements to perform. `-1` means replace all matches."
+			required:    false
+			default:     -1
+			type: ["integer"]
 		},
 	]
 	internal_failure_reasons: []
@@ -48,38 +47,38 @@ remap: functions: replace_with: {
 		{
 			title: "Capitalize words"
 			source: #"""
-				replace_with("apples and bananas", r'\b(\w)(\w*)') -> |match| {
-					upcase!(match.captures[0]) + string!(match.captures[1])
-				}
-			"""#
+					replace_with("apples and bananas", r'\b(\w)(\w*)') -> |match| {
+						upcase!(match.captures[0]) + string!(match.captures[1])
+					}
+				"""#
 			return: "Apples And Bananas"
 		},
 		{
 			title: "Replace with hash"
 			source: #"""
-				replace_with("email from test@example.com", r'\w+@example.com') -> |match| {
-					sha2(match.string, variant: "SHA-512/224")
-				}
-			"""#
+					replace_with("email from test@example.com", r'\w+@example.com') -> |match| {
+						sha2(match.string, variant: "SHA-512/224")
+					}
+				"""#
 			return: "email from adf6e1bc4415d24912bd93072ad34ef825a7b6eb3bf53f68def1fc17"
 		},
 		{
 			title: "Replace first instance"
 			source: #"""
-				replace_with("Apples and Apples", r'(?i)apples|cones', count: 1) -> |match| {
-					"Pine" + downcase(match.string)
-				}
-			"""#
+					replace_with("Apples and Apples", r'(?i)apples|cones', count: 1) -> |match| {
+						"Pine" + downcase(match.string)
+					}
+				"""#
 			return: "Pineapples and Apples"
 		},
 		{
 			title: "Named capture group"
 			source: #"""
-				replace_with("level=error A message", r'level=(?P<level>\w+)') -> |match| {
-					lvl = upcase!(match.level)
-					"[{{lvl}}]"
-				}
-			"""#
+					replace_with("level=error A message", r'level=(?P<level>\w+)') -> |match| {
+						lvl = upcase!(match.level)
+						"[{{lvl}}]"
+					}
+				"""#
 			return: "[ERROR] A message"
 		},
 	]
