@@ -14,7 +14,9 @@ remap: functions: decode_punycode: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reasons: []
+	internal_failure_reasons: [
+		"`value` can not be decoded from `punycode` (takes more than 63 encoded bytes, the DNS limit)"
+	]
 	return: types: ["string"]
 
 	examples: [
