@@ -12,9 +12,8 @@ const K8S_LOGS_DIR: &str = "/var/log/pods";
 /// The delimiter used in the log path.
 const LOG_PATH_DELIMITER: &str = "_";
 
-/// Delimiters for different OS
-const WINDOWS_DELIMITER: &str = "\\";
-const LINUX_DELIMITER: &str = "/";
+/// Separator for different OS
+const MAIN_SEPARATOR: char = std::path::MAIN_SEPARATOR;
 
 /// Builds absolute log directory path for a pod sandbox.
 ///
@@ -38,15 +37,7 @@ pub(super) fn build_pod_logs_directory(
 ///
 /// Inspired by <https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L186>
 pub(super) fn parse_log_file_path(path: &str) -> Option<LogFileInfo<'_>> {
-    let delimiter;
-
-    if path.chars().nth(4) == Some('/') {
-        delimiter = LINUX_DELIMITER;
-    } else {
-        delimiter = WINDOWS_DELIMITER;
-    }
-
-    let mut components = path.rsplit(&delimiter);
+    let mut components = path.rsplit(MAIN_SEPARATOR);
 
     let _log_file_name = components.next()?;
     let container_name = components.next()?;
