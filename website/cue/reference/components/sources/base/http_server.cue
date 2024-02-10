@@ -345,6 +345,20 @@ base: components: sources: http_server: configuration: {
 			items: type: string: examples: ["User-Agent", "X-My-Custom-Header", "X-*", "*"]
 		}
 	}
+	host_key: {
+		description: """
+			Overrides the name of the log field used to add the remote ip to each event.
+
+			By default, the [global `log_schema.host_key` option](global_host_key) is used.
+
+			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+			"""
+		required: false
+		type: string: {
+			default: "host"
+			examples: ["hostname"]
+		}
+	}
 	keepalive: {
 		description: "Configuration of HTTP server keepalive parameters."
 		required:    false
