@@ -2,7 +2,7 @@
 
 use super::{
     request_builder::ClickhouseRequestBuilder,
-    service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
+    service::{ClickhouseResponse, ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
     sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
@@ -95,8 +95,11 @@ impl SinkConfig for ClickhouseConfig {
             compression: self.compression,
         };
 
-        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
-            HttpService::new(client.clone(), clickhouse_service_request_builder);
+        let service: HttpService<
+            ClickhouseServiceRequestBuilder,
+            PartitionKey,
+            ClickhouseResponse,
+        > = HttpService::new(client.clone(), clickhouse_service_request_builder);
 
         let request_limits = self.request.into_settings();
 

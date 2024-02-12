@@ -6,7 +6,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+            http::{HttpRequest, HttpRetryLogic, HttpServiceRequestBuilder},
             retries::RetryAction,
         },
         UriParseSnafu,
@@ -15,7 +15,7 @@ use crate::{
 use bytes::Bytes;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-    Request, StatusCode, Uri,
+    Request, Response, StatusCode, Uri,
 };
 use snafu::ResultExt;
 
@@ -24,18 +24,60 @@ pub struct ClickhouseRetryLogic {
     inner: HttpRetryLogic,
 }
 
+#[derive(Clone)]
+pub(super) struct ClickhouseResponse {
+    http_response: Response<Bytes>,
+    events_byte_size: GroupedCountByteSize,
+    raw_byte_size: usize,
+}
+
+impl DriverResponse for ClickhouseResponse {
+    fn http_response(&self) -> Response<Bytes> {
+        self.http_response
+    }
+
+    fn event_status(&self) -> EventStatus {
+        match self.http_response.status().is_success() {
+            true => EventStatus::Delivered,
+            false => EventStatus::Rejected,
+        }
+    }
+
+    fn events_sent(&self) -> &GroupedCountByteSize {
+        &self.events_byte_size
+    }
+
+    fn bytes_sent(&self) -> Option<usize> {
+        Some(self.raw_byte_size)
+    }
+
+    fn new(
+        http_response: Response<Bytes>,
+        events_byte_size: GroupedCountByteSize,
+        raw_byte_size: usize,
+    ) -> Self {
+        Self {
+            http_response,
+            events_byte_size,
+            raw_byte_size,
+        }
+    }
+}
+
 impl RetryLogic for ClickhouseRetryLogic {
     type Error = HttpError;
-    type Response = HttpResponse;
+    type Response = ClickhouseResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         self.inner.is_retriable_error(error)
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-        match response.http_response.status() {
+        let http_response = response.http_response();
+
+        match http_response.status() {
             StatusCode::INTERNAL_SERVER_ERROR => {
-                let body = response.http_response.body();
+                let body = http_response.body();
 
                 // Currently, ClickHouse returns 500's incorrect data and type mismatch errors.
                 // This attempts to check if the body starts with `Code: {code_num}` and to not
@@ -53,7 +95,7 @@ impl RetryLogic for ClickhouseRetryLogic {
                     RetryAction::Retry(String::from_utf8_lossy(body).to_string().into())
                 }
             }
-            _ => self.inner.should_retry_response(&response.http_response),
+            _ => self.inner.should_retry_response(&http_response),
         }
     }
 }

@@ -1,6 +1,9 @@
 use std::{collections::VecDeque, fmt, future::poll_fn, task::Poll};
 
+use super::FuturesUnorderedCount;
+use bytes::Bytes;
 use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
+use http::Response;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
@@ -12,9 +15,8 @@ use vector_common::internal_event::{
 use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive};
 use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
 
-use super::FuturesUnorderedCount;
-
 pub trait DriverResponse {
+    fn http_response(&self) -> Response<Bytes>;
     fn event_status(&self) -> EventStatus;
     fn events_sent(&self) -> &GroupedCountByteSize;
 
@@ -24,6 +26,12 @@ pub trait DriverResponse {
     fn bytes_sent(&self) -> Option<usize> {
         None
     }
+
+    fn new(
+        http_response: Response<Bytes>,
+        events_byte_size: GroupedCountByteSize,
+        raw_byte_size: usize,
+    ) -> Self;
 }
 
 /// Drives the interaction between a stream of items and a service which processes them
@@ -251,7 +259,9 @@ mod tests {
         time::Duration,
     };
 
+    use bytes::Bytes;
     use futures_util::stream;
+    use http::Response;
     use rand::{prelude::StdRng, SeedableRng};
     use rand_distr::{Distribution, Pareto};
     use tokio::{
@@ -319,12 +329,26 @@ mod tests {
     }
 
     impl DriverResponse for DelayResponse {
+        fn http_response(&self) -> Response<bytes::Bytes> {
+            Response::new(Bytes::new())
+        }
+
         fn event_status(&self) -> EventStatus {
             EventStatus::Delivered
         }
 
         fn events_sent(&self) -> &GroupedCountByteSize {
             &self.events_sent
+        }
+
+        fn new(
+            _http_response: http::Response<bytes::Bytes>,
+            events_byte_size: GroupedCountByteSize,
+            _raw_byte_size: usize,
+        ) -> Self {
+            Self {
+                events_sent: events_byte_size,
+            }
         }
     }
 

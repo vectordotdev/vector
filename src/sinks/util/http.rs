@@ -662,6 +662,8 @@ impl<T: Send> ByteSizeOf for HttpRequest<T> {
 }
 
 /// Response type for use in the `Service` implementation of HTTP stream sinks.
+///
+/// http_response must be cloneable
 pub struct HttpResponse {
     pub http_response: Response<Bytes>,
     pub events_byte_size: GroupedCountByteSize,
@@ -669,6 +671,10 @@ pub struct HttpResponse {
 }
 
 impl DriverResponse for HttpResponse {
+    fn http_response(&self) -> Response<Bytes> {
+        self.http_response
+    }
+
     fn event_status(&self) -> EventStatus {
         if self.http_response.is_successful() {
             EventStatus::Delivered
@@ -686,14 +692,63 @@ impl DriverResponse for HttpResponse {
     fn bytes_sent(&self) -> Option<usize> {
         Some(self.raw_byte_size)
     }
+
+    fn new(
+        http_response: Response<Bytes>,
+        events_byte_size: GroupedCountByteSize,
+        raw_byte_size: usize,
+    ) -> Self {
+        HttpResponse {
+            http_response: http_response,
+            events_byte_size,
+            raw_byte_size,
+        }
+    }
 }
 
+// pub struct DynamicResponse<R: DriverResponse + Send + 'static + Sync> {
+//     actual_response: R,
+// }
+
+// impl<R: DriverResponse + Send + 'static + Sync> DynamicResponse<R> {
+//     pub fn new(actual_response: R) -> Self {
+//         DynamicResponse { actual_response }
+//     }
+// }
+
+// impl<R: DriverResponse + Send + 'static + Sync> DriverResponse for DynamicResponse<R> {
+//     fn http_response(&self) -> Response<Bytes> {
+//         self.actual_response.http_response()
+//     }
+
+//     fn event_status(&self) -> EventStatus {
+//         self.actual_response.event_status()
+//     }
+
+//     fn events_sent(&self) -> &GroupedCountByteSize {
+//         self.actual_response.events_sent()
+//     }
+
+//     fn bytes_sent(&self) -> Option<usize> {
+//         self.actual_response.bytes_sent()
+//     }
+
+//     //This should NOT be called on DynamicResponse, only the actual_response
+//     fn new(
+//         http_response: Response<Bytes>,
+//         events_byte_size: GroupedCountByteSize,
+//         raw_byte_size: usize,
+//     ) -> Self {
+//         DynamicResponse {
+//             actual_response: R::new(http_response, events_byte_size, raw_byte_size),
+//         }
+//     }
+// }
+
 /// Creates a `RetryLogic` for use with `HttpResponse`.
-pub fn http_response_retry_logic() -> HttpStatusRetryLogic<
-    impl Fn(&HttpResponse) -> StatusCode + Clone + Send + Sync + 'static,
-    HttpResponse,
-> {
-    HttpStatusRetryLogic::new(|req: &HttpResponse| req.http_response.status())
+pub fn http_response_retry_logic<R: DriverResponse + Send + 'static + Sync>(
+) -> HttpStatusRetryLogic<impl Fn(&R) -> StatusCode + Clone + Send + Sync + 'static, R> {
+    HttpStatusRetryLogic::new(|req: &R| req.http_response().status())
 }
 
 /// Uses the estimated json encoded size to determine batch sizing.
@@ -713,13 +768,14 @@ pub trait HttpServiceRequestBuilder<T: Send> {
 
 /// Generic 'Service' implementation for HTTP stream sinks.
 #[derive(Clone)]
-pub struct HttpService<B, T: Send> {
+pub struct HttpService<B, T: Send, R: DriverResponse + Send + 'static + Sync> {
     batch_service:
         HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HttpRequest<T>>,
     _phantom: PhantomData<B>,
+    _more_phantom: PhantomData<R>,
 }
 
-impl<B, T: Send + 'static> HttpService<B, T>
+impl<B, T: Send + 'static, R: DriverResponse + Send + 'static + Sync> HttpService<B, T, R>
 where
     B: HttpServiceRequestBuilder<T> + std::marker::Sync + std::marker::Send + 'static,
 {
@@ -737,15 +793,17 @@ where
         Self {
             batch_service,
             _phantom: PhantomData,
+            _more_phantom: PhantomData,
         }
     }
 }
 
-impl<B, T: Send + 'static> Service<HttpRequest<T>> for HttpService<B, T>
+impl<B, T: Send + 'static, R: DriverResponse + Send + 'static + Sync> Service<HttpRequest<T>>
+    for HttpService<B, T, R>
 where
     B: HttpServiceRequestBuilder<T> + std::marker::Sync + std::marker::Send + 'static,
 {
-    type Response = HttpResponse;
+    type Response = R;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -768,11 +826,7 @@ where
         Box::pin(async move {
             let http_response = http_service.call(request).await?;
 
-            Ok(HttpResponse {
-                http_response,
-                events_byte_size,
-                raw_byte_size,
-            })
+            Ok(R::new(http_response, events_byte_size, raw_byte_size))
         })
     }
 }
