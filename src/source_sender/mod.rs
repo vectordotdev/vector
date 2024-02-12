@@ -526,7 +526,7 @@ impl Inner {
     }
 }
 
-fn get_timestamp_millis(value: &Value) -> Option<i64> {
+const fn get_timestamp_millis(value: &Value) -> Option<i64> {
     match value {
         Value::Timestamp(timestamp) => Some(timestamp.timestamp_millis()),
         _ => None,
