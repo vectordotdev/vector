@@ -64,6 +64,7 @@ pub struct MqttSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 
     #[configurable(derived)]
+    #[serde(default = "default_qos")]
     pub quality_of_service: MqttQoS,
 }
 
@@ -107,6 +108,10 @@ const fn default_clean_session() -> bool {
     false
 }
 
+const fn default_qos() -> MqttQoS {
+    MqttQoS::AtLeastOnce
+}
+
 impl Default for MqttSinkConfig {
     fn default() -> Self {
         Self {
@@ -121,7 +126,7 @@ impl Default for MqttSinkConfig {
             topic: Template::try_from("vector").expect("Cannot parse as a template"),
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: AcknowledgementsConfig::default(),
-            quality_of_service: Default::default(),
+            quality_of_service: MqttQoS::default(),
         }
     }
 }
