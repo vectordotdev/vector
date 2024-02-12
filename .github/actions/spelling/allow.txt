@@ -23,6 +23,8 @@ Arival
 Arnova
 Asus
 Atlassian
+atleastonce
+atmostonce
 Attab
 Audiosonic
 avsc
@@ -57,6 +59,7 @@ emqx
 eventloop
 Enot
 Evercoss
+exactlyonce
 Explay
 FAQs
 FDO
