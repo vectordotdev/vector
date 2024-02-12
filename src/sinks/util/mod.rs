@@ -20,7 +20,7 @@ pub mod snappy;
 pub mod socket_bytes_sink;
 pub mod statistic;
 pub mod tcp;
-#[cfg(any(test, feature = "test-util"))]
+#[cfg(any(test, feature = "test-utils"))]
 pub mod test;
 pub mod udp;
 #[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
