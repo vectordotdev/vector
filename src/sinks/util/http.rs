@@ -753,10 +753,7 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, mut request: HttpRequest<T>) -> Self::Future
-    where
-        T: Send,
-    {
+    fn call(&mut self, mut request: HttpRequest<T>) -> Self::Future {
         let mut http_service = self.batch_service.clone();
 
         // NOTE: By taking the metadata here, when passing the request to `call()` below,
