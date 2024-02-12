@@ -8,7 +8,7 @@ use tracing::Span;
 use vector_lib::buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 use vector_lib::buffers::EventCount;
 use vector_lib::event::array::EventArrayIntoIter;
-#[cfg(test)]
+#[cfg(any(test, feature = "source-sender-test-utils"))]
 use vector_lib::event::{into_event_stream, EventStatus};
 use vector_lib::finalization::{AddBatchNotifier, BatchNotifier};
 use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
@@ -31,7 +31,7 @@ pub use errors::{ClosedError, StreamSendError};
 
 pub(crate) const CHUNK_SIZE: usize = 1000;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "source-sender-test-utils"))]
 const TEST_BUFFER_SIZE: usize = 100;
 
 const LAG_TIME_NAME: &str = "source_lag_time_seconds";
@@ -174,7 +174,7 @@ impl SourceSender {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "source-sender-test-utils"))]
     pub fn new_test_sender_with_buffer(n: usize) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let lag_time = Some(register_histogram!(LAG_TIME_NAME));
         let output_id = OutputId {
@@ -192,14 +192,14 @@ impl SourceSender {
         )
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "source-sender-test-utils"))]
     pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
         let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
         let recv = recv.into_stream().flat_map(into_event_stream);
         (pipe, recv)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "source-sender-test-utils"))]
     pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
         let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
         // In a source test pipeline, there is no sink to acknowledge
@@ -216,7 +216,7 @@ impl SourceSender {
         (pipe, recv)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "source-sender-test-utils"))]
     pub fn new_test_errors(
         error_at: impl Fn(usize) -> bool,
     ) -> (Self, impl Stream<Item = Event> + Unpin) {
@@ -242,7 +242,7 @@ impl SourceSender {
         (pipe, recv)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "source-sender-test-utils"))]
     pub fn add_outputs(
         &mut self,
         status: EventStatus,
