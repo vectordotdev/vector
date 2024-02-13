@@ -186,6 +186,22 @@ base: components: sinks: clickhouse: configuration: {
 		required:    true
 		type: string: examples: ["http://localhost:8123"]
 	}
+	format: {
+		description: """
+			Data format.
+
+			The format to parse input data.
+			"""
+		required: false
+		type: string: {
+			default: "json_each_row"
+			enum: {
+				json_as_object: "JSONAsObject."
+				json_as_string: "JSONAsString."
+				json_each_row:  "JSONEachRow."
+			}
+		}
+	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.

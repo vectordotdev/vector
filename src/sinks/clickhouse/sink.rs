@@ -1,6 +1,6 @@
 //! Implementation of the `clickhouse` sink.
 
-use super::request_builder::ClickhouseRequestBuilder;
+use super::{config::Format, request_builder::ClickhouseRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
 
 pub struct ClickhouseSink<S> {
@@ -8,6 +8,7 @@ pub struct ClickhouseSink<S> {
     service: S,
     database: Template,
     table: Template,
+    format: Format,
     request_builder: ClickhouseRequestBuilder,
 }
 
@@ -23,6 +24,7 @@ where
         service: S,
         database: Template,
         table: Template,
+        format: Format,
         request_builder: ClickhouseRequestBuilder,
     ) -> Self {
         Self {
@@ -30,6 +32,7 @@ where
             service,
             database,
             table,
+            format,
             request_builder,
         }
     }
@@ -38,9 +41,10 @@ where
         let batch_settings = self.batch_settings;
 
         input
-            .batched_partitioned(KeyPartitioner::new(self.database, self.table), || {
-                batch_settings.as_byte_size_config()
-            })
+            .batched_partitioned(
+                KeyPartitioner::new(self.database, self.table, self.format),
+                || batch_settings.as_byte_size_config(),
+            )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(
                 default_request_builder_concurrency_limit(),
@@ -82,17 +86,23 @@ where
 pub(super) struct PartitionKey {
     pub database: String,
     pub table: String,
+    pub format: Format,
 }
 
 /// KeyPartitioner that partitions events by (database, table) pair.
 struct KeyPartitioner {
     database: Template,
     table: Template,
+    format: Format,
 }
 
 impl KeyPartitioner {
-    const fn new(database: Template, table: Template) -> Self {
-        Self { database, table }
+    const fn new(database: Template, table: Template, format: Format) -> Self {
+        Self {
+            database,
+            table,
+            format,
+        }
     }
 
     fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
@@ -116,6 +126,10 @@ impl Partitioner for KeyPartitioner {
     fn partition(&self, item: &Self::Item) -> Self::Key {
         let database = Self::render(&self.database, item, "database_key")?;
         let table = Self::render(&self.table, item, "table_key")?;
-        Some(PartitionKey { database, table })
+        Some(PartitionKey {
+            database,
+            table,
+            format: self.format,
+        })
     }
 }

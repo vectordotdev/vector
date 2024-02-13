@@ -735,20 +735,42 @@ impl Drop for RunningJournalctl {
 }
 
 fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
-    if let Some(host) = log.remove(event_path!(HOSTNAME)) {
-        log_namespace.insert_source_metadata(
-            JournaldConfig::NAME,
-            log,
-            log_schema().host_key().map(LegacyKey::Overwrite),
-            path!("host"),
-            host,
-        );
+    match log_namespace {
+        LogNamespace::Vector => {
+            if let Some(host) = log
+                .get(metadata_path!(JournaldConfig::NAME, "metadata"))
+                .and_then(|meta| meta.get(HOSTNAME))
+            {
+                log.insert(metadata_path!(JournaldConfig::NAME, "host"), host.clone());
+            }
+        }
+        LogNamespace::Legacy => {
+            if let Some(host) = log.remove(event_path!(HOSTNAME)) {
+                log_namespace.insert_source_metadata(
+                    JournaldConfig::NAME,
+                    log,
+                    log_schema().host_key().map(LegacyKey::Overwrite),
+                    path!("host"),
+                    host,
+                );
+            }
+        }
     }
 
     // Create a Utc timestamp from an existing log field if present.
-    let timestamp = log
-        .get(event_path!(SOURCE_TIMESTAMP))
-        .or_else(|| log.get(event_path!(RECEIVED_TIMESTAMP)))
+    let timestamp_value = match log_namespace {
+        LogNamespace::Vector => log
+            .get(metadata_path!(JournaldConfig::NAME, "metadata"))
+            .and_then(|meta| {
+                meta.get(SOURCE_TIMESTAMP)
+                    .or_else(|| meta.get(RECEIVED_TIMESTAMP))
+            }),
+        LogNamespace::Legacy => log
+            .get(event_path!(SOURCE_TIMESTAMP))
+            .or_else(|| log.get(event_path!(RECEIVED_TIMESTAMP))),
+    };
+
+    let timestamp = timestamp_value
         .filter(|&ts| ts.is_bytes())
         .and_then(|ts| {
             String::from_utf8_lossy(ts.as_bytes().unwrap())

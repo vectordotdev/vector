@@ -51,6 +51,7 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
             PartitionKey {
                 database: key.database,
                 table: key.table,
+                format: key.format,
             },
         )
     }

@@ -163,7 +163,7 @@ releases: "0.35.0": {
 				close` header in the response. While this parameter is crucial for managing the
 				lifespan of persistent, incoming connections to Vector and for effective load
 				balancing, it can be disabled by setting `keepalive.max_connection_age_secs` to
-				`null`.
+				 a large number like `100000000`.
 				"""
 			pr_numbers: [19141]
 		},

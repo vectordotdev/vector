@@ -4,6 +4,7 @@ use super::sink::PartitionKey;
 use crate::{
     http::{Auth, HttpError},
     sinks::{
+        clickhouse::config::Format,
         prelude::*,
         util::{
             http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
@@ -75,6 +76,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             &self.endpoint,
             &metadata.database,
             &metadata.table,
+            metadata.format,
             self.skip_unknown_fields,
             self.date_time_best_effort,
         )
@@ -104,6 +106,7 @@ fn set_uri_query(
     uri: &Uri,
     database: &str,
     table: &str,
+    format: Format,
     skip_unknown: bool,
     date_time_best_effort: bool,
 ) -> crate::Result<Uri> {
@@ -111,9 +114,10 @@ fn set_uri_query(
         .append_pair(
             "query",
             format!(
-                "INSERT INTO \"{}\".\"{}\" FORMAT JSONEachRow",
+                "INSERT INTO \"{}\".\"{}\" FORMAT {}",
                 database,
-                table.replace('\"', "\\\"")
+                table.replace('\"', "\\\""),
+                format
             )
             .as_str(),
         )
@@ -148,21 +152,43 @@ mod tests {
             &"http://localhost:80".parse().unwrap(),
             "my_database",
             "my_table",
+            Format::JsonEachRow,
             false,
             true,
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?input_format_import_nested_json=1&date_time_input_format=best_effort&query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
+        assert_eq!(uri.to_string(), "http://localhost:80/?\
+                                     input_format_import_nested_json=1&\
+                                     date_time_input_format=best_effort&\
+                                     query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
 
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
             "my_database",
             "my_\"table\"",
+            Format::JsonEachRow,
             false,
             false,
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?input_format_import_nested_json=1&query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
+        assert_eq!(uri.to_string(), "http://localhost:80/?\
+                                     input_format_import_nested_json=1&\
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
+
+        let uri = set_uri_query(
+            &"http://localhost:80".parse().unwrap(),
+            "my_database",
+            "my_\"table\"",
+            Format::JsonAsObject,
+            true,
+            true,
+        )
+        .unwrap();
+        assert_eq!(uri.to_string(), "http://localhost:80/?\
+                                     input_format_import_nested_json=1&\
+                                     input_format_skip_unknown_fields=1&\
+                                     date_time_input_format=best_effort&\
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject");
     }
 
     #[test]
@@ -171,6 +197,7 @@ mod tests {
             &"localhost:80".parse().unwrap(),
             "my_database",
             "my_table",
+            Format::JsonEachRow,
             false,
             false,
         )
