@@ -368,4 +368,15 @@ base: components: sources: file: configuration: {
 			unit: "seconds"
 		}
 	}
+	rotate_wait_secs: {
+		description: """
+			How long to keep an open handle to a rotated log file.
+			The default value represents "no limit"
+			"""
+		required: false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "seconds"
+		}
+	}
 }
