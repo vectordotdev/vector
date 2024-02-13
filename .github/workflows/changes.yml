@@ -263,7 +263,7 @@ jobs:
       - name: Create filter rules for e2e tests
         run: cargo vdev e2e ci-paths > int_test_filters.yaml
 
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v3
         id: filter
         with:
           base: ${{ inputs.base_ref }}
