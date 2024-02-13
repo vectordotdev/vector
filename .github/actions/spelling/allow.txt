@@ -378,7 +378,6 @@ minimalistic
 minio
 minishift
 mkfile
-mladedav
 mongod
 motorola
 mountpoint
@@ -456,7 +455,6 @@ workarounds
 XCHACHA
 XSALSA
 yandex
-zamazan
 zeek
 zookeeper
 zst
