@@ -514,7 +514,7 @@ impl HttpSource for SimpleHttpSource {
                         now,
                     );
 
-                    source_ip.map(|addr| {
+                    if let Some(addr) = source_ip {
                         self.log_namespace.insert_source_metadata(
                             SimpleHttpConfig::NAME,
                             log,
@@ -522,7 +522,7 @@ impl HttpSource for SimpleHttpSource {
                             path!("host"),
                             socket_addr_to_ip_string(&addr),
                         );
-                    });
+                    }
                 }
                 _ => {
                     continue;
