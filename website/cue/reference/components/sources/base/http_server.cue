@@ -347,7 +347,7 @@ base: components: sources: http_server: configuration: {
 	}
 	host_key: {
 		description: """
-			Overrides the name of the log field used to add the remote ip to each event.
+			Overrides the name of the log field used to add the remote IP to each event.
 
 			By default, the [global `log_schema.host_key` option](global_host_key) is used.
 
