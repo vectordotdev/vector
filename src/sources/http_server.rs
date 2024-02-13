@@ -24,8 +24,8 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     components::validation::*,
     config::{
-        log_schema, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
+        log_schema, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::{Event, Value},
     http::KeepaliveConfig,
@@ -132,7 +132,6 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_path_key")]
     #[configurable(metadata(docs::examples = "vector_http_path"))]
     path_key: OptionalValuePath,
-
 
     /// Overrides the name of the log field used to add the remote ip to each event.
     ///
@@ -328,7 +327,6 @@ fn default_path_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("path"))
 }
 
-
 fn default_host_key() -> OptionalValuePath {
     log_schema().host_key().cloned().into()
 }
@@ -356,6 +354,11 @@ fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
         list.dedup();
     }
     list
+}
+
+/// Convert [`SocketAddr`] into a string, returning only the IP address.
+fn socket_addr_to_ip_string(addr: &SocketAddr) -> String {
+    addr.ip().to_string()
 }
 
 #[derive(Clone)]
@@ -517,7 +520,7 @@ impl HttpSource for SimpleHttpSource {
                             log,
                             self.host_key.path.as_ref().map(LegacyKey::Overwrite),
                             path!("host"),
-                            addr.to_string(),
+                            socket_addr_to_ip_string(&addr),
                         );
                     });
                 }
@@ -603,7 +606,7 @@ mod tests {
         SourceSender,
     };
 
-    use super::{remove_duplicates, SimpleHttpConfig};
+    use super::{remove_duplicates, socket_addr_to_ip_string, SimpleHttpConfig};
 
     #[test]
     fn generate_config() {
@@ -1608,5 +1611,43 @@ mod tests {
                 list_dedup
             );
         }
+    }
+
+    #[test]
+    fn validate_remote_ip_format() {
+        let socket_addr = SocketAddr::new("0.0.0.0".parse().unwrap(), 8080);
+
+        let output = socket_addr_to_ip_string(&socket_addr);
+
+        let expected = "0.0.0.0".to_string();
+
+        assert_eq!(output, expected);
+    }
+
+    /// This indicates that provided IPv6 addresses, the rust formatter will try to compress the representation of the address.
+    #[test]
+    fn validate_remote_ip_format_ipv6() {
+        let socket_addr = SocketAddr::new(
+            "0000:0000:0000:0000:0000:0000:0000:0001".parse().unwrap(),
+            8080,
+        );
+
+        let output = socket_addr_to_ip_string(&socket_addr);
+
+        let expected = "::1".to_string();
+
+        assert_eq!(output, expected);
+    }
+
+    /// this test is to ensure that the format macro is not used to format the socket address, and
+    /// the output of the format macro changes based on the expression
+    #[test]
+    fn validate_format_macro_socket_addr() {
+        let socket_addr = SocketAddr::new("127.0.0.1".parse().unwrap(), 5432);
+
+        let wrong = format!("{:.4}", socket_addr.ip());
+        let right = socket_addr_to_ip_string(&socket_addr);
+
+        assert_ne!(wrong, right);
     }
 }
