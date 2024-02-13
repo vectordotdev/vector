@@ -61,7 +61,7 @@ Much of Vector's reference documentation is automatically compiled from source c
 To regenerate this content, run:
 
 ```bash
-cargo vdev build component-docs
+make generate-component-docs
 ```
 
 ### Formatting

@@ -76,6 +76,8 @@ The process for adding this is simply to have the last line of the file be in th
 
     authors: <author1_gh_username>, <author2_gh_username>, <...>
 
+Do not include a leading `@` when specifying your username.
+
 ## Example
 
 Here is an example of a changelog fragment that adds a breaking change explanation.

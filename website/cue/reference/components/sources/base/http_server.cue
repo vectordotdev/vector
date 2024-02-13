@@ -142,6 +142,11 @@ base: components: sources: http_server: configuration: {
 						[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
 						[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
 						"""
+					vrl: """
+						Decodes the raw bytes as a string and passes them as input to a [VRL][vrl] program.
+
+						[vrl]: https://vector.dev/docs/reference/vrl
+						"""
 				}
 			}
 			gelf: {
@@ -223,6 +228,37 @@ base: components: sources: http_server: configuration: {
 						"""
 					required: false
 					type: bool: default: true
+				}
+			}
+			vrl: {
+				description:   "VRL-specific decoding options."
+				relevant_when: "codec = \"vrl\""
+				required:      true
+				type: object: options: {
+					source: {
+						description: """
+																The [Vector Remap Language][vrl] (VRL) program to execute for each event.
+																Note that the final contents of the `.` target will be used as the decoding result.
+																Compilation error or use of 'abort' in a program will result in a decoding error.
+
+																[vrl]: https://vector.dev/docs/reference/vrl
+																"""
+						required: true
+						type: string: {}
+					}
+					timezone: {
+						description: """
+																The name of the timezone to apply to timestamp conversions that do not contain an explicit
+																time zone. The time zone name may be any name in the [TZ database][tz_database], or `local`
+																to indicate system local time.
+
+																If not set, `local` will be used.
+
+																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+																"""
+						required: false
+						type: string: examples: ["local", "America/New_York", "EST5EDT"]
+					}
 				}
 			}
 		}
@@ -375,8 +411,11 @@ base: components: sources: http_server: configuration: {
 			}
 			max_connection_age_secs: {
 				description: """
-					The maximum amount of time a connection may exist before it is closed
-					by sending a `Connection: close` header on the HTTP response.
+					The maximum amount of time a connection may exist before it is closed by sending
+					a `Connection: close` header on the HTTP response. Set this to a large value like
+					`100000000` to "disable" this feature
+
+					Only applies to HTTP/0.9, HTTP/1.0, and HTTP/1.1 requests.
 
 					A random jitter configured by `max_connection_age_jitter_factor` is added
 					to the specified duration to spread out connection storms.

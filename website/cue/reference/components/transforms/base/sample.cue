@@ -27,10 +27,12 @@ base: components: transforms: sample: configuration: {
 		description: """
 			The rate at which events are forwarded, expressed as `1/N`.
 
-			For example, `rate = 10` means 1 out of every 10 events are forwarded and the rest are
+			For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
 			dropped.
 			"""
 		required: true
-		type: uint: {}
+		type: uint: examples: [
+			1500,
+		]
 	}
 }

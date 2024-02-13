@@ -112,294 +112,296 @@ jobs:
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.amqp == 'true' }}
         name: amqp
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh amqp
+          command: bash scripts/ci-int-e2e-test.sh int amqp
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.appsignal == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: appsignal
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  appsignal
+          command: bash scripts/ci-int-e2e-test.sh int  appsignal
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.aws == 'true' }}
         name: aws
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  aws
+          command: bash scripts/ci-int-e2e-test.sh int  aws
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.axiom == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: axiom
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  axiom
+          command: bash scripts/ci-int-e2e-test.sh int  axiom
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.azure == 'true' }}
         name: azure
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  azure
+          command: bash scripts/ci-int-e2e-test.sh int  azure
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.clickhouse == 'true' }}
         name: clickhouse
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  clickhouse
+          command: bash scripts/ci-int-e2e-test.sh int  clickhouse
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.databend == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: databend
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  databend
+          command: bash scripts/ci-int-e2e-test.sh int  databend
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-agent == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: datadog-agent
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  datadog-agent
+          command: bash scripts/ci-int-e2e-test.sh int  datadog-agent
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-logs == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: datadog-logs
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  datadog-logs
+          command: bash scripts/ci-int-e2e-test.sh int  datadog-logs
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-metrics == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: datadog-metrics
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  datadog-metrics
+          command: bash scripts/ci-int-e2e-test.sh int  datadog-metrics
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-traces == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: datadog-traces
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  datadog-traces
+          command: bash scripts/ci-int-e2e-test.sh int  datadog-traces
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.dnstap == 'true' }}
         name: dnstap
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  dnstap
-
-      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+          command: bash scripts/ci-int-e2e-test.sh int  dnstap
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.docker-logs == 'true' }}
         name: docker-logs
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  docker-logs
+          command: bash scripts/ci-int-e2e-test.sh int  docker-logs
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
         name: elasticsearch
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  elasticsearch
+          command: bash scripts/ci-int-e2e-test.sh int  elasticsearch
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
         name: eventstoredb
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  eventstoredb
+          command: bash scripts/ci-int-e2e-test.sh int  eventstoredb
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.fluent == 'true' }}
         name: fluent
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  fluent
+          command: bash scripts/ci-int-e2e-test.sh int  fluent
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.gcp == 'true' }}
         name: gcp
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  gcp
+          command: bash scripts/ci-int-e2e-test.sh int  gcp
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.greptimedb == 'true' }}
         name: greptimedb
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  greptimedb
-
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.humio == 'true' }}
-        name: humio
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  humio
-
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.http-client == 'true' }}
-        name: http-client
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  http-client
-
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.influxdb == 'true' }}
-        name: influxdb
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  influxdb
-
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.kafka == 'true' }}
-        name: kafka
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  kafka
-
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.logstash == 'true' }}
-        name: logstash
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  logstash
-
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.loki == 'true' }}
-        name: loki
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  loki
-
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.mongodb == 'true' }}
-        name: mongodb
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  mongodb
+          command: bash scripts/ci-int-e2e-test.sh int  greptimedb
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.nats == 'true' }}
-        name: nats
-        uses: nick-fields/retry@v2
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.humio == 'true' }}
+        name: humio
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  nats
+          command: bash scripts/ci-int-e2e-test.sh int  humio
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.http-client == 'true' }}
+        name: http-client
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-int-e2e-test.sh int  http-client
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.influxdb == 'true' }}
+        name: influxdb
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-int-e2e-test.sh int  influxdb
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.kafka == 'true' }}
+        name: kafka
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-int-e2e-test.sh int  kafka
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.logstash == 'true' }}
+        name: logstash
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-int-e2e-test.sh int  logstash
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.loki == 'true' }}
+        name: loki
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-int-e2e-test.sh int  loki
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.mongodb == 'true' }}
+        name: mongodb
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-int-e2e-test.sh int  mongodb
+
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.nats == 'true' }}
+        name: nats
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-int-e2e-test.sh int  nats
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.nginx == 'true' }}
         name: nginx
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  nginx
+          command: bash scripts/ci-int-e2e-test.sh int  nginx
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.opentelemetry == 'true' }}
         name: opentelemetry
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  opentelemetry
+          command: bash scripts/ci-int-e2e-test.sh int  opentelemetry
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.postgres == 'true' }}
         name: postgres
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  postgres
+          command: bash scripts/ci-int-e2e-test.sh int  postgres
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.prometheus == 'true' }}
         name: prometheus
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  prometheus
+          command: bash scripts/ci-int-e2e-test.sh int  prometheus
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.pulsar == 'true' }}
         name: pulsar
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  pulsar
+          command: bash scripts/ci-int-e2e-test.sh int  pulsar
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.redis == 'true' }}
         name: redis
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  redis
+          command: bash scripts/ci-int-e2e-test.sh int  redis
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' }}
         name: shutdown
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  shutdown
+          command: bash scripts/ci-int-e2e-test.sh int  shutdown
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.splunk == 'true' }}
         name: splunk
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  splunk
+          command: bash scripts/ci-int-e2e-test.sh int  splunk
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.webhdfs == 'true' }}
         name: webhdfs
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-integration-test.sh  webhdfs
+          command: bash scripts/ci-int-e2e-test.sh int  webhdfs
 
   integration-test-suite:
     name: Integration Test Suite

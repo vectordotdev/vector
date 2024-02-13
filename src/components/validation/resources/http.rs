@@ -20,8 +20,11 @@ use tokio::{
 };
 use tokio_util::codec::Decoder;
 
-use crate::components::validation::sync::{Configuring, TaskCoordinator};
-use vector_lib::event::Event;
+use crate::components::validation::{
+    sync::{Configuring, TaskCoordinator},
+    RunnerMetrics,
+};
+use vector_lib::{event::Event, EstimatedJsonEncodedSizeOf};
 
 use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 
@@ -43,11 +46,12 @@ impl HttpResourceConfig {
         codec: ResourceCodec,
         input_rx: mpsc::Receiver<TestEvent>,
         task_coordinator: &TaskCoordinator<Configuring>,
+        runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     ) {
         match direction {
             // The source will pull data from us.
             ResourceDirection::Pull => {
-                spawn_input_http_server(self, codec, input_rx, task_coordinator)
+                spawn_input_http_server(self, codec, input_rx, task_coordinator, runner_metrics)
             }
             // We'll push data to the source.
             ResourceDirection::Push => {
@@ -62,6 +66,7 @@ impl HttpResourceConfig {
         codec: ResourceCodec,
         output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
+        runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     ) -> vector_lib::Result<()> {
         match direction {
             // We'll pull data from the sink.
@@ -73,7 +78,7 @@ impl HttpResourceConfig {
             )),
             // The sink will push data to us.
             ResourceDirection::Push => {
-                spawn_output_http_server(self, codec, output_tx, task_coordinator)
+                spawn_output_http_server(self, codec, output_tx, task_coordinator, runner_metrics)
             }
         }
     }
@@ -86,6 +91,7 @@ fn spawn_input_http_server(
     codec: ResourceCodec,
     mut input_rx: mpsc::Receiver<TestEvent>,
     task_coordinator: &TaskCoordinator<Configuring>,
+    runner_metrics: &Arc<Mutex<RunnerMetrics>>,
 ) {
     // This HTTP server will poll the input receiver for input events and buffer them. When a
     // request comes in on the right path/method, one buffered input event will be sent back. If no
@@ -97,8 +103,11 @@ fn spawn_input_http_server(
     let encoder = codec.into_encoder();
     let sendable_events = Arc::clone(&outstanding_events);
 
-    let (resource_notifier, http_server_shutdown_tx) =
-        spawn_http_server(task_coordinator, &config, move |_| {
+    let (resource_notifier, http_server_shutdown_tx) = spawn_http_server(
+        task_coordinator,
+        &config,
+        runner_metrics,
+        move |_request, _runner_metrics| {
             let sendable_events = Arc::clone(&sendable_events);
             let mut encoder = encoder.clone();
 
@@ -116,12 +125,14 @@ fn spawn_input_http_server(
                     StatusCode::OK.into_response()
                 }
             }
-        });
+        },
+    );
 
     // Now we'll create and spawn the resource's core logic loop which drives the buffering of input
     // events and working with the HTTP server as they're consumed.
     let resource_started = task_coordinator.track_started();
     let resource_completed = task_coordinator.track_completed();
+
     tokio::spawn(async move {
         resource_started.mark_as_done();
         debug!("HTTP server external input resource started.");
@@ -140,7 +151,10 @@ fn spawn_input_http_server(
                         let mut outstanding_events = outstanding_events.lock().await;
                         outstanding_events.push_back(event);
                     },
-                    None => input_finished = true,
+                    None => {
+                        trace!("HTTP server external input resource input is finished.");
+                        input_finished = true;
+                    },
                 },
 
                 _ = resource_notifier.notified() => {
@@ -159,10 +173,15 @@ fn spawn_input_http_server(
                 },
             }
         }
-
         // Mark ourselves as completed now that we've sent all inputs to the source, and
         // additionally signal the HTTP server to also gracefully shutdown.
         _ = http_server_shutdown_tx.send(());
+
+        // TODO - currently we are getting lucky in the testing of `http_client` source... if the source tries to query
+        // this server but we have already shut down the thread, then it will generate an error which can throw off our error
+        // validation.
+        // I think the solution involves adding synchronization to wait here for the runner to tell us to shutdown.
+
         resource_completed.mark_as_done();
 
         debug!("HTTP server external input resource completed.");
@@ -230,6 +249,7 @@ fn spawn_output_http_server(
     codec: ResourceCodec,
     output_tx: mpsc::Sender<Vec<Event>>,
     task_coordinator: &TaskCoordinator<Configuring>,
+    runner_metrics: &Arc<Mutex<RunnerMetrics>>,
 ) -> vector_lib::Result<()> {
     // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
     // via an output sender. We accept/collect events until we're told to shutdown.
@@ -237,8 +257,11 @@ fn spawn_output_http_server(
     // First, we'll build and spawn our HTTP server.
     let decoder = codec.into_decoder()?;
 
-    let (_, http_server_shutdown_tx) =
-        spawn_http_server(task_coordinator, &config, move |request| {
+    let (_, http_server_shutdown_tx) = spawn_http_server(
+        task_coordinator,
+        &config,
+        runner_metrics,
+        move |request, output_runner_metrics| {
             let output_tx = output_tx.clone();
             let mut decoder = decoder.clone();
 
@@ -249,7 +272,23 @@ fn spawn_output_http_server(
                         let mut body = BytesMut::from(&body[..]);
                         loop {
                             match decoder.decode_eof(&mut body) {
-                                Ok(Some((events, _byte_size))) => {
+                                Ok(Some((events, byte_size))) => {
+                                    let mut output_runner_metrics =
+                                        output_runner_metrics.lock().await;
+                                    debug!("HTTP server external output resource decoded {byte_size} bytes.");
+
+                                    // Update the runner metrics for the received events. This will later
+                                    // be used in the Validators, as the "expected" case.
+                                    output_runner_metrics.received_bytes_total += byte_size as u64;
+
+                                    output_runner_metrics.received_events_total +=
+                                        events.len() as u64;
+
+                                    events.iter().for_each(|event| {
+                                        output_runner_metrics.received_event_bytes_total +=
+                                            event.estimated_json_encoded_size_of().get() as u64;
+                                    });
+
                                     output_tx
                                         .send(events.to_vec())
                                         .await
@@ -262,13 +301,15 @@ fn spawn_output_http_server(
                     }
                 }
             }
-        });
+        },
+    );
 
     // Now we'll create and spawn the resource's core logic loop which simply waits for the runner
     // to instruct us to shutdown, and when that happens, cascades to shutting down the HTTP server.
     let resource_started = task_coordinator.track_started();
     let resource_completed = task_coordinator.track_completed();
     let mut resource_shutdown_rx = task_coordinator.register_for_shutdown();
+
     tokio::spawn(async move {
         resource_started.mark_as_done();
         debug!("HTTP server external output resource started.");
@@ -299,10 +340,11 @@ fn spawn_output_http_client(
 fn spawn_http_server<H, F, R>(
     task_coordinator: &TaskCoordinator<Configuring>,
     config: &HttpResourceConfig,
+    runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     handler: H,
 ) -> (Arc<Notify>, oneshot::Sender<()>)
 where
-    H: Fn(Request<Body>) -> F + Clone + Send + 'static,
+    H: Fn(Request<Body>, Arc<Mutex<RunnerMetrics>>) -> F + Clone + Send + 'static,
     F: Future<Output = R> + Send,
     R: IntoResponse,
 {
@@ -326,6 +368,8 @@ where
     let (http_server_shutdown_tx, http_server_shutdown_rx) = oneshot::channel();
     let resource_notifier = Arc::new(Notify::new());
     let server_notifier = Arc::clone(&resource_notifier);
+
+    let output_runner_metrics = Arc::clone(runner_metrics);
 
     tokio::spawn(async move {
         // Create our HTTP server by binding as early as possible to return an error if we can't
@@ -353,7 +397,7 @@ where
                 StatusCode::METHOD_NOT_ALLOWED
             })
             .on(method_filter, move |request: Request<Body>| {
-                let request_handler = handler(request);
+                let request_handler = handler(request, output_runner_metrics);
                 let notifier = Arc::clone(&server_notifier);
 
                 async move {

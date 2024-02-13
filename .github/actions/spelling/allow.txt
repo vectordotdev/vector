@@ -52,6 +52,7 @@ dkr
 Dockerfiles
 DOOV
 Douban
+E2ETest
 Enot
 Evercoss
 Explay
@@ -277,6 +278,8 @@ downsides
 downwardapi
 emoji
 esbuild
+etld
+fakeintake
 fargate
 fibonacci
 fileapi
@@ -327,6 +330,7 @@ htmltest
 https
 humungus
 icecream
+idn
 ifeq
 ifneq
 imobile
@@ -419,6 +423,8 @@ security-tab
 servlet
 Sinjo
 sublocation
+sundar
+svcb
 snyk
 socketaddr
 solarwinds
@@ -426,6 +432,7 @@ splunk
 ssh
 staticuser
 symbian
+tanushri
 timeframe
 timeseries
 timespan
