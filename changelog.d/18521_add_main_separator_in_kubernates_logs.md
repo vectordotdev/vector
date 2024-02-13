@@ -1,1 +1,0 @@
-Added MAIN_SEPARATOR as a separator for parse_log_file_path in the kubernates_logs source. Parsing paths for different OS has become correct.
