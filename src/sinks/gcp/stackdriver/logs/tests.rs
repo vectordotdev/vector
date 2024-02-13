@@ -227,7 +227,7 @@ async fn correct_request() {
         body,
         EventFinalizers::default(),
         RequestMetadata::default(),
-        None,
+        (),
     );
 
     let request = stackdriver_logs_service_request_builder.build(http_request);
