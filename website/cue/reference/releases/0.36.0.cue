@@ -7,18 +7,18 @@ releases: "0.36.0": {
 	whats_next: []
 
 	description: """
-			The Vector team is pleased to announce version 0.36.0!
+		The Vector team is pleased to announce version 0.36.0!
 
-			There are no breaking changes in this release.
+		There are no breaking changes in this release.
 
-			In addition to the usual enhancements and bug fixes, this release also includes
+		In addition to the usual enhancements and bug fixes, this release also includes
 
-			- A new `prometheus_pushgateway` source to receive Prometheus data
+		- A new `prometheus_pushgateway` source to receive Prometheus data
 
-			A reminder that the `repositories.timber.io` package repositories will be decommissioned on
-			February 28th, 2024. Please see the [release
-			highlight](/highlights/2023-11-07-new-linux-repos) for details about this change and
-			instructions on how to migrate.
+		A reminder that the `repositories.timber.io` package repositories will be decommissioned on
+		February 28th, 2024. Please see the [release
+		highlight](/highlights/2023-11-07-new-linux-repos) for details about this change and
+		instructions on how to migrate.
 		"""
 
 	changelog: [
