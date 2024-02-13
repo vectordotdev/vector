@@ -14,7 +14,7 @@ releases: "0.36.0": {
 		In addition to the usual enhancements and bug fixes, this release also includes
 
 		- A new `prometheus_pushgateway` source to receive Prometheus data
-		- A new 'vrl' decoder that can be used to decode data in sources using a VRL program
+		- A new `vrl` decoder that can be used to decode data in sources using a VRL program
 
 		A reminder that the `repositories.timber.io` package repositories will be decommissioned on
 		February 28th, 2024. Please see the [release
