@@ -25,8 +25,9 @@ use super::transform::Sample;
 pub struct SampleConfig {
     /// The rate at which events are forwarded, expressed as `1/N`.
     ///
-    /// For example, `rate = 10` means 1 out of every 10 events are forwarded and the rest are
+    /// For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
     /// dropped.
+    #[configurable(metadata(docs::examples = 1500))]
     pub rate: u64,
 
     /// The name of the field whose value is hashed to determine if the event should be
@@ -40,7 +41,7 @@ pub struct SampleConfig {
     ///
     /// This can be useful to, for example, ensure that all logs for a given transaction are
     /// sampled together, but that overall `1/N` transactions are sampled.
-    #[configurable(metadata(docs::examples = "message",))]
+    #[configurable(metadata(docs::examples = "message"))]
     pub key_field: Option<String>,
 
     /// A logical condition used to exclude events from sampling.

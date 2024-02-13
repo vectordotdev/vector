@@ -284,6 +284,7 @@ downsides
 downwardapi
 emoji
 esbuild
+etld
 fakeintake
 fargate
 fibonacci
@@ -335,6 +336,7 @@ htmltest
 https
 humungus
 icecream
+idn
 ifeq
 ifneq
 imobile
@@ -429,6 +431,7 @@ servlet
 Sinjo
 sublocation
 sundar
+svcb
 snyk
 socketaddr
 solarwinds
