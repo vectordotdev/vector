@@ -3342,6 +3342,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "flume"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55ac459de2512911e4b674ce33cf20befaba382d05b62b008afc1c8b57cbf181"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "spin 0.9.8",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4807,7 +4818,7 @@ dependencies = [
  "async-reactor-trait",
  "async-trait",
  "executor-trait",
- "flume",
+ "flume 0.10.14",
  "futures-core",
  "futures-io",
  "parking_lot",
@@ -6327,7 +6338,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d894b67aa7a4bf295db5e85349078c604edaa6fa5c8721e8eca3c7729a27f2ac"
 dependencies = [
  "doc-comment",
- "flume",
+ "flume 0.10.14",
  "parking_lot",
  "tracing 0.1.40",
 ]
@@ -7604,6 +7615,24 @@ dependencies = [
  "rustc_version 0.4.0",
  "syn 2.0.48",
  "unicode-ident",
+]
+
+[[package]]
+name = "rumqttc"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d8941c6791801b667d52bfe9ff4fc7c968d4f3f9ae8ae7abdaaa1c966feafc8"
+dependencies = [
+ "bytes 1.5.0",
+ "flume 0.11.0",
+ "futures-util",
+ "log",
+ "rustls-native-certs",
+ "rustls-pemfile",
+ "rustls-webpki",
+ "thiserror",
+ "tokio",
+ "tokio-rustls",
 ]
 
 [[package]]
@@ -9949,6 +9978,7 @@ dependencies = [
  "rmpv",
  "roaring",
  "rstest",
+ "rumqttc",
  "seahash",
  "semver 1.0.21",
  "serde",
