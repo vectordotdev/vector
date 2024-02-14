@@ -405,6 +405,17 @@ base: components: sources: kubernetes_logs: configuration: {
 			}
 		}
 	}
+	rotate_wait_secs: {
+		description: """
+			How long to keep an open handle to a rotated log file.
+			The default value represents "no limit"
+			"""
+		required: false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "seconds"
+		}
+	}
 	self_node_name: {
 		description: """
 			The name of the Kubernetes [Node][node] that is running.
