@@ -374,6 +374,12 @@ mod test {
                 log_event!["tags" => vec!["a:foo"]], // Pass
                 log_event!["tags" => vec!["b:foo"]], // Fail
             ),
+            // Tag exists with - in name.
+            (
+                "_exists_:a-b",                        // Source
+                log_event!["tags" => vec!["a-b:foo"]], // Pass
+                log_event!["tags" => vec!["ab:foo"]],  // Fail
+            ),
             // Tag exists (negate).
             (
                 "NOT _exists_:a",
@@ -392,6 +398,15 @@ mod test {
                 log_event!["b" => "foo"],
                 log_event!["a" => "foo"],
             ),
+            // Attribute with - in name, exists.
+            // TODO: this is a test case which exists in the Datadog implementation of the feature.
+            //       in our implementation, it fails because parse_path_and_get_value, indicates that
+            //       the `-` in the field name is an invalid field name.
+            // (
+            //     "_exists_:@foo-bar",
+            //     log_event!["foo-bar" => "foo"],
+            //     log_event!["foobar" => "foo"],
+            // ),
             // Attribute exists (negate).
             (
                 "NOT _exists_:@b",
@@ -596,6 +611,64 @@ mod test {
                 log_event!["tags" => vec!["a:bla"]],
                 log_event!["a" => "bla"],
             ),
+            // String attribute match single character.
+            ("@a:b", log_event!["a" => "b"], log_event!["a" => "c"]),
+            // String attribute match special chars
+            (
+                "@a:va\\/lue",
+                log_event!["a" => "va/lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match escaped && chars
+            (
+                "@a:va\\&&lue",
+                log_event!["a" => "va&&lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match escaped spaces
+            (
+                "@a:va\\ lue",
+                log_event!["a" => "va lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match escaped || chars
+            (
+                "@a:va\\||lue",
+                log_event!["a" => "va||lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match escaped () chars
+            (
+                "@a:va\\(lue",
+                log_event!["a" => "va(lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match escaped * chars
+            (
+                "@a:va\\*lue",
+                log_event!["a" => "va*lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match ~ chars
+            // TODO: in Datadog, this character does not need to be escaped.
+            (
+                "@a:va\\~lue",
+                log_event!["a" => "va~lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match ^ chars
+            // TODO: in Datadog, this character does not need to be escaped.
+            (
+                "@a:va\\^lue",
+                log_event!["a" => "va^lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match / chars
+            (
+                "@a:va/lue",
+                log_event!["a" => "va/lue"],
+                log_event!["a" => "value"],
+            ),
             // String attribute match (negate w/-).
             (
                 "-@a:bla",
@@ -722,18 +795,18 @@ mod test {
             (
                 "c:*b*la*",
                 log_event!["tags" => vec!["c:foobla"]],
-                log_event!["custom" => r#"{"title": "foobla"}"#],
+                log_event!["custom" => r#"{"title" => "foobla"}"#],
             ),
             // Multiple wildcards - tag (negate).
             (
                 "NOT c:*b*la*",
-                log_event!["custom" => r#"{"title": "foobla"}"#],
+                log_event!["custom" => r#"{"title" => "foobla"}"#],
                 log_event!["tags" => vec!["c:foobla"]],
             ),
             // Multiple wildcards - tag (negate w/-).
             (
                 "-c:*b*la*",
-                log_event!["custom" => r#"{"title": "foobla"}"#],
+                log_event!["custom" => r#"{"title" => "foobla"}"#],
                 log_event!["tags" => vec!["c:foobla"]],
             ),
             // Wildcard prefix - attribute.
@@ -1046,6 +1119,36 @@ mod test {
                 "-@f:{1 TO 100}",
                 log_event!["f" => 100],
                 log_event!["f" => 50],
+            ),
+            // OR of two values
+            (
+                "@field:(value1 OR value2)",
+                log_event!["field" => "value1"],
+                log_event!["field" => "value"],
+            ),
+            // OR of two values
+            (
+                "@field:value1 OR @field:value2",
+                log_event!["field" => "value1"],
+                log_event!["field" => "value"],
+            ),
+            // negate OR of two values
+            (
+                "-@field:value1 OR -@field:value2",
+                log_event!["field" => "value"],
+                log_event!["field" => "value2"],
+            ),
+            // default AND of two values
+            (
+                "@field:value @field2:value2",
+                log_event!["field" => "value", "field2" => "value2"],
+                log_event!["field" => "value", "field2" => "value3"],
+            ),
+            // handles newline
+            (
+                "@field:(value1 OR \n value2)",
+                log_event!["field" => "value1"],
+                log_event!["field" => "value"],
             ),
         ]
     }
