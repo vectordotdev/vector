@@ -3,7 +3,8 @@ use std::io::Cursor;
 use futures::{stream, StreamExt};
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 use tracing::Instrument;
-use vector_common::finalization::Finalizable;
+use vector_common::finalization::{AddBatchNotifier, BatchStatus, Finalizable};
+use vector_common::finalization::{BatchNotifier};
 
 use super::{create_default_buffer_v2, read_next, read_next_some};
 use crate::{
@@ -12,6 +13,7 @@ use crate::{
     variants::disk_v2::{tests::create_default_buffer_v2_with_usage, writer::RecordWriter},
     EventCount,
 };
+use crate::variants::disk_v2::WriterError;
 
 #[tokio::test]
 async fn basic_read_write_loop() {
@@ -137,6 +139,42 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
 
     let parent = trace_span!("reader_exits_cleanly_when_writer_done_and_in_flight_acks");
     fut.instrument(parent.or_current()).await;
+}
+
+#[tokio::test]
+// This test case is to showcase a bug in vector, where it acknowledge the batch notifier even though record not written in disk buffer
+async fn archive_record_acknowledge_event_even_when_error() {
+    let mut record_writer =
+        RecordWriter::new(Cursor::new(Vec::new()), 99, 16_384, 100, 50);
+    let mut record = SizedRecord::new(1);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    record.add_batch_notifier(batch);
+
+    match record_writer.archive_record(1, record) {
+        Ok(_) => {
+            assert!(false, "Was expecting WriterError::DataFileFull but got Ok")
+        },
+        Err(we) => match we {
+            WriterError::DataFileFull {
+                record: _old_record,
+                serialized_len: _,
+            } => {
+                match receiver.try_recv() {
+                    // Ok case imply source s acknowledge with delivered rather it should not have acknowledged it yet.
+                    Ok(status) => {
+                        assert!(status == BatchStatus::Delivered, "Was expecting batch status to delivered even though archive_record failed");
+                    }
+                    _ => {
+                        assert!(false, "Was expecting receiver to complete.");
+                    }
+                }
+            },
+            _ => {
+                assert!(false, "Was expecting WriterError::DataFileFull but got other Error");
+            }
+        }
+    }
+
 }
 
 #[tokio::test]
