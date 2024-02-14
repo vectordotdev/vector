@@ -96,6 +96,8 @@ on:
         value: ${{ jobs.int_tests.outputs.loki }}
       mongodb:
         value: ${{ jobs.int_tests.outputs.mongodb }}
+      mqtt:
+        value: ${{ jobs.int_tests.outputs.mqtt }}
       nats:
         value: ${{ jobs.int_tests.outputs.nats }}
       nginx:
@@ -221,6 +223,7 @@ jobs:
       logstash: ${{ steps.filter.outputs.logstash }}
       loki: ${{ steps.filter.outputs.loki }}
       mongodb: ${{ steps.filter.outputs.mongodb }}
+      mqtt: ${{ steps.filter.outputs.mqtt }}
       nats: ${{ steps.filter.outputs.nats }}
       nginx: ${{ steps.filter.outputs.nginx }}
       opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
