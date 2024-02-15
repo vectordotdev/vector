@@ -1,0 +1,6 @@
+- name: happy path
+  expectation: success
+  events:
+    - simple message 1
+    - simple message 2
+    - simple message 3

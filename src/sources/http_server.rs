@@ -22,14 +22,13 @@ use vector_lib::{
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    components::validation::*,
+    components::validation::prelude::*,
     config::{
         GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
         SourceOutput,
     },
     event::{Event, Value},
     http::KeepaliveConfig,
-    register_validatable_component,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
         http::{add_query_parameters, HttpMethod},

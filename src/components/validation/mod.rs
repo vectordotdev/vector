@@ -8,6 +8,16 @@ mod validators;
 
 use crate::config::{BoxedSink, BoxedSource, BoxedTransform};
 
+/// For components implementing `ValidatableComponent`
+pub mod prelude {
+    pub use super::ExternalResource;
+    pub use super::HttpResourceConfig;
+    pub use super::ResourceDirection;
+    pub use super::ValidatableComponent;
+    pub use super::ValidationConfiguration;
+    pub use crate::register_validatable_component;
+}
+
 pub use self::resources::*;
 #[cfg(feature = "component-validation-runner")]
 pub use self::runner::*;
@@ -210,6 +220,7 @@ mod tests {
     #[test_resources("tests/validation/components/**/*.yaml")]
     fn validate_component(test_case_data_path: &str) {
         let test_case_data_path = PathBuf::from(test_case_data_path.to_string());
+
         if !test_case_data_path.exists() {
             panic!("Component validation test invoked with path to test case data that could not be found: {}", test_case_data_path.to_string_lossy());
         }

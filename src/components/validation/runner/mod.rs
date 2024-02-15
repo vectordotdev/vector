@@ -339,7 +339,7 @@ impl Runner {
             //       I think we are going to need to setup distinct task sync logic potentially for each
             //       combination of Source/Sink + Resource direction Push/Pull
             if self.configuration.component_type == ComponentType::Sink {
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_secs(5)).await;
             }
 
             telemetry_task_coordinator.shutdown().await;
@@ -494,7 +494,11 @@ fn spawn_component_topology(
     let mut config = config_builder
         .build()
         .expect("config should not have any errors");
-    config.healthchecks.set_require_healthy(Some(true));
+
+    // It's possible we could extend the framework to allow specifying logic to
+    // handle that, but I don't see much value currently since the healthcheck is
+    // not enforced for components, and it doesn't impact the internal telemetry.
+    config.healthchecks.set_require_healthy(Some(false));
 
     _ = std::thread::spawn(move || {
         let test_runtime = Builder::new_current_thread()
