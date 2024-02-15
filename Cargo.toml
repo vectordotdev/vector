@@ -127,7 +127,7 @@ members = [
 
 [workspace.dependencies]
 chrono = { version = "0.4.34", default-features = false, features = ["clock", "serde"] }
-clap = { version = "4.4.18", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.0", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 indexmap = { version = "2.2.3", default-features = false, features = ["serde", "std"] }
 pin-project = { version = "1.1.4", default-features = false }
 proptest = "1.4"
