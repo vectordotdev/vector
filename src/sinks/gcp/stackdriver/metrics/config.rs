@@ -2,6 +2,10 @@ use bytes::Bytes;
 use goauth::scopes::Scope;
 use http::{Request, Uri};
 
+use super::{
+    request_builder::{StackdriverMetricsEncoder, StackdriverMetricsRequestBuilder},
+    sink::StackdriverMetricsSink,
+};
 use crate::{
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
@@ -14,13 +18,10 @@ use crate::{
             },
             service::TowerRequestConfigDefaults,
         },
+        HTTPRequestBuilderSnafu,
     },
 };
-
-use super::{
-    request_builder::{StackdriverMetricsEncoder, StackdriverMetricsRequestBuilder},
-    sink::StackdriverMetricsSink,
-};
+use snafu::ResultExt;
 
 #[derive(Clone, Copy, Debug)]
 pub struct StackdriverMetricsTowerRequestConfigDefaults;
@@ -159,15 +160,17 @@ pub(super) struct StackdriverMetricsServiceRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<()> for StackdriverMetricsServiceRequestBuilder {
-    fn build(&self, mut request: HttpRequest<()>) -> Request<Bytes> {
-        let mut request = Request::post(self.uri.clone())
-            .header("Content-Type", "application/json")
+    fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+        let builder = Request::post(self.uri.clone()).header("Content-Type", "application/json");
+
+        let mut request = builder
             .body(request.take_payload())
-            .unwrap();
+            .context(HTTPRequestBuilderSnafu)
+            .map_err(Into::<crate::Error>::into)?;
 
         self.auth.apply(&mut request);
 
-        request
+        Ok(request)
     }
 }
 

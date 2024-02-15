@@ -5,8 +5,12 @@ use http::{Request, Uri};
 
 use crate::{
     gcp::GcpAuthenticator,
-    sinks::util::http::{HttpRequest, HttpServiceRequestBuilder},
+    sinks::{
+        util::http::{HttpRequest, HttpServiceRequestBuilder},
+        HTTPRequestBuilderSnafu,
+    },
 };
+use snafu::ResultExt;
 
 #[derive(Debug, Clone)]
 pub(super) struct StackdriverLogsServiceRequestBuilder {
@@ -15,14 +19,16 @@ pub(super) struct StackdriverLogsServiceRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<()> for StackdriverLogsServiceRequestBuilder {
-    fn build(&self, mut request: HttpRequest<()>) -> Request<Bytes> {
-        let mut builder = Request::post(self.uri.clone())
-            .header("Content-Type", "application/json")
+    fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+        let builder = Request::post(self.uri.clone()).header("Content-Type", "application/json");
+
+        let mut request = builder
             .body(request.take_payload())
-            .unwrap();
+            .context(HTTPRequestBuilderSnafu)
+            .map_err(Into::<crate::Error>::into)?;
 
-        self.auth.apply(&mut builder);
+        self.auth.apply(&mut request);
 
-        builder
+        Ok(request)
     }
 }
