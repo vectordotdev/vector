@@ -23,6 +23,8 @@ Arival
 Arnova
 Asus
 Atlassian
+atleastonce
+atmostonce
 Attab
 Audiosonic
 avsc
@@ -53,8 +55,11 @@ Dockerfiles
 DOOV
 Douban
 E2ETest
+emqx
+eventloop
 Enot
 Evercoss
+exactlyonce
 Explay
 FAQs
 FDO
@@ -168,6 +173,7 @@ Rockchip
 Roku
 Roundcube
 Rowling
+rumqttc
 SBT
 SKtelesys
 Salesforce
