@@ -118,7 +118,6 @@ pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
     }
 });
 
-///
 pub static DATA_VOLUME_SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
     ComponentTests {
         events: &["BytesSent", "EventsSent"], // EventsReceived is emitted in the topology
@@ -341,7 +340,7 @@ where
     run_and_assert_source_advanced(source, setup, timeout, event_count, &SOURCE_TESTS, tags).await
 }
 
-/// Runs and asserts source test specifcations with configurations.
+/// Runs and asserts source test specifications with configurations.
 pub async fn run_and_assert_source_advanced<SC>(
     source: SC,
     setup: impl FnOnce(&mut SourceContext),
