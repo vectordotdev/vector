@@ -7,6 +7,7 @@ jobs:
   cross-linux:
     name: Cross - ${{ matrix.target }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       CARGO_INCREMENTAL: 0
     strategy:
@@ -79,6 +80,7 @@ jobs:
   update-pr-status:
     name: (PR comment) Signal result to PR
     runs-on: ubuntu-20.04
+    timeout-minutes: 5
     needs: cross-linux
     if: needs.cross-linux.result == 'success' && github.event_name == 'issue_comment'
     steps:

@@ -48,6 +48,7 @@ jobs:
   prep-pr:
     name: (PR comment) Signal pending to PR
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: contains(github.event.comment.body, '/ci-run-integration') || contains(github.event.comment.body, '/ci-run-all')
     steps:
       - name: Generate authentication token
@@ -82,6 +83,7 @@ jobs:
   integration-tests:
     needs: prep-pr
     runs-on: [linux, ubuntu-20.04-4core]
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v3
         with:
@@ -459,6 +461,7 @@ jobs:
   e2e-tests:
     needs: prep-pr
     runs-on: [linux, ubuntu-20.04-8core]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v3
         with:
@@ -490,6 +493,7 @@ jobs:
   update-pr-status:
     name: Signal result to PR
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs:
       - integration-tests
       - e2e-tests

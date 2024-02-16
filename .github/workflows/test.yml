@@ -36,6 +36,7 @@ jobs:
   checks:
     name: Checks
     runs-on: [linux, ubuntu-20.04-8core]
+    timeout-minutes: 45
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -122,6 +123,7 @@ jobs:
   all-checks:
     name: Test Suite
     runs-on: ubuntu-20.04
+    timeout-minutes: 5
     if: always()
     needs: [changes, checks]
     env:

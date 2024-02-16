@@ -128,6 +128,7 @@ jobs:
   # Detects changes that are not specific to integration tests
   source:
     runs-on: ubuntu-20.04
+    timeout-minutes: 5
     if: ${{ inputs.source }}
     outputs:
       source: ${{ steps.filter.outputs.source }}
@@ -195,6 +196,7 @@ jobs:
   # Detects changes that are specific to integration tests
   int_tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: ${{ inputs.int_tests }}
     outputs:
       all-tests: ${{ steps.filter.outputs.all-tests}}
@@ -252,6 +254,7 @@ jobs:
   # Detects changes that are specific to e2e tests
   e2e_tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: ${{ inputs.e2e_tests }}
     outputs:
       all-tests: ${{ steps.filter.outputs.all-tests}}

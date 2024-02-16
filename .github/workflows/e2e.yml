@@ -50,6 +50,7 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: [linux, ubuntu-20.04-8core]
+    timeout-minutes: 30
     needs: changes
     if: always() && (
       github.event_name == 'schedule' || (
@@ -101,6 +102,7 @@ jobs:
   e2e-test-suite:
     name: E2E Test Suite
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: always()
     needs: e2e-tests
     env:

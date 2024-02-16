@@ -6,6 +6,7 @@ on:
 jobs:
   unit-mac:
     runs-on: macos-13
+    timeout-minutes: 90
     env:
       CARGO_INCREMENTAL: 0
     steps:

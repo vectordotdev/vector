@@ -29,6 +29,7 @@ jobs:
   generate-publish-metadata:
     name: Generate Publish-related Metadata
     runs-on: ubuntu-20.04
+    timeout-minutes: 5
     outputs:
       vector_version: ${{ steps.generate-publish-metadata.outputs.vector_version }}
       vector_build_desc: ${{ steps.generate-publish-metadata.outputs.vector_build_desc }}
@@ -45,6 +46,7 @@ jobs:
   build-x86_64-unknown-linux-musl-packages:
     name: Build Vector for x86_64-unknown-linux-musl (.tar.gz)
     runs-on: [linux, release-builder]
+    timeout-minutes: 60
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -71,6 +73,7 @@ jobs:
     name: Build Vector for x86_64-unknown-linux-gnu (.tar.gz, DEB, RPM)
     runs-on: [linux, release-builder]
     needs: generate-publish-metadata
+    timeout-minutes: 60
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
@@ -95,6 +98,7 @@ jobs:
   build-aarch64-unknown-linux-musl-packages:
     name: Build Vector for aarch64-unknown-linux-musl (.tar.gz)
     runs-on: [linux, release-builder]
+    timeout-minutes: 60
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -122,6 +126,7 @@ jobs:
   build-aarch64-unknown-linux-gnu-packages:
     name: Build Vector for aarch64-unknown-linux-gnu (.tar.gz)
     runs-on: [linux, release-builder]
+    timeout-minutes: 60
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -149,6 +154,7 @@ jobs:
   build-armv7-unknown-linux-gnueabihf-packages:
     name: Build Vector for armv7-unknown-linux-gnueabihf (.tar.gz)
     runs-on: [linux, release-builder]
+    timeout-minutes: 60
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -176,6 +182,7 @@ jobs:
   build-armv7-unknown-linux-musleabihf-packages:
     name: Build Vector for armv7-unknown-linux-musleabihf (.tar.gz)
     runs-on: [linux, release-builder]
+    timeout-minutes: 60
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -203,6 +210,7 @@ jobs:
   build-x86_64-apple-darwin-packages:
     name: Build Vector for x86_64-apple-darwin (.tar.gz)
     runs-on: macos-latest-xl
+    timeout-minutes: 90
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -231,6 +239,7 @@ jobs:
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
     runs-on: [windows, release-builder]
+    timeout-minutes: 90
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -277,6 +286,7 @@ jobs:
   deb-verify:
     name: Verify DEB Packages
     runs-on: ubuntu-20.04
+    timeout-minutes: 5
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
@@ -322,6 +332,7 @@ jobs:
   rpm-verify:
     name: Verify RPM Packages
     runs-on: ubuntu-20.04
+    timeout-minutes: 5
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
@@ -371,6 +382,7 @@ jobs:
   macos-verify:
     name: Verify macOS Package
     runs-on: macos-12
+    timeout-minutes: 5
     needs:
       - generate-publish-metadata
       - build-x86_64-apple-darwin-packages
@@ -393,6 +405,7 @@ jobs:
   publish-docker:
     name: Publish to Docker
     runs-on: ubuntu-20.04
+    timeout-minutes: 15
     needs:
       - generate-publish-metadata
       - build-aarch64-unknown-linux-gnu-packages
@@ -465,6 +478,7 @@ jobs:
   publish-s3:
     name: Publish to S3
     runs-on: ubuntu-20.04
+    timeout-minutes: 10
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
@@ -537,6 +551,7 @@ jobs:
     # We only publish to GitHub for versioned releases, not nightlies.
     if: inputs.channel == 'release'
     runs-on: ubuntu-20.04
+    timeout-minutes: 10
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
@@ -613,6 +628,7 @@ jobs:
     # We only publish to Homebrew for versioned releases, not nightlies.
     if: inputs.channel == 'release'
     runs-on: ubuntu-20.04
+    timeout-minutes: 10
     needs:
       - generate-publish-metadata
       - publish-s3
@@ -631,6 +647,7 @@ jobs:
   generate-sha256sum:
     name: Generate SHA256 checksums
     runs-on: ubuntu-20.04
+    timeout-minutes: 5
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages

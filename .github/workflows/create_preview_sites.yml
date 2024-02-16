@@ -25,6 +25,7 @@ on:
 jobs:
   create_preview_site:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
 
     # Get the artifacts with the PR number and branch name
