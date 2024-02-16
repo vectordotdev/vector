@@ -50,7 +50,7 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: [linux, ubuntu-20.04-8core]
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: changes
     if: always() && (
       github.event_name == 'schedule' || (
@@ -59,7 +59,6 @@ jobs:
             || needs.changes.outputs.e2e-datadog-metrics == 'true'
         )
       )
-    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v3
         with:
