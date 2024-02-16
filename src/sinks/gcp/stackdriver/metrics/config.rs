@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use goauth::scopes::Scope;
-use http::{Request, Uri};
+use http::{header::CONTENT_TYPE, Request, Uri};
 
 use super::{
     request_builder::{StackdriverMetricsEncoder, StackdriverMetricsRequestBuilder},
@@ -161,7 +161,7 @@ pub(super) struct StackdriverMetricsServiceRequestBuilder {
 
 impl HttpServiceRequestBuilder<()> for StackdriverMetricsServiceRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
-        let builder = Request::post(self.uri.clone()).header("Content-Type", "application/json");
+        let builder = Request::post(self.uri.clone()).header(CONTENT_TYPE, "application/json");
 
         let mut request = builder
             .body(request.take_payload())
