@@ -449,7 +449,7 @@ impl HttpSource for SimpleHttpSource {
         request_path: &str,
         headers_config: &HeaderMap,
         query_parameters: &HashMap<String, String>,
-        source_ip: Option<SocketAddr>,
+        source_ip: Option<&SocketAddr>,
     ) {
         let now = Utc::now();
         for event in events.iter_mut() {
@@ -520,7 +520,7 @@ impl HttpSource for SimpleHttpSource {
                             log,
                             self.host_key.path.as_ref().map(LegacyKey::Overwrite),
                             path!("host"),
-                            socket_addr_to_ip_string(&addr),
+                            socket_addr_to_ip_string(addr),
                         );
                     }
                 }

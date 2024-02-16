@@ -3,6 +3,7 @@ use std::{
     convert::{Infallible, TryFrom},
     fmt,
     net::SocketAddr,
+    sync::Arc,
     time::Duration,
 };
 
@@ -56,7 +57,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         _request_path: &str,
         _headers_config: &HeaderMap,
         _query_parameters: &HashMap<String, String>,
-        _source_ip: Option<SocketAddr>,
+        _source_ip: Option<&SocketAddr>,
     ) {
     }
 
@@ -164,7 +165,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     path.as_str(),
                                     &headers,
                                     &query_parameters,
-                                    addr.map(|PeerAddr(inner_addr)| inner_addr),
+                                    addr.map(|PeerAddr(inner_addr)| inner_addr).as_deref(),
                                 );
 
                                 events
@@ -191,6 +192,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             let span = Span::current();
             let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let remote_addr = conn.peer_addr();
+                let remote_addr_ref = Arc::new(remote_addr);
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
@@ -201,7 +203,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         )
                     }))
                     .map_request(move |mut request: hyper::Request<_>| {
-                        request.extensions_mut().insert(PeerAddr(remote_addr));
+                        request
+                            .extensions_mut()
+                            .insert(PeerAddr::new(Arc::clone(&remote_addr_ref)));
                         request
                     })
                     .service(warp::service(routes.clone()));
@@ -229,7 +233,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
 #[derive(Clone)]
 #[repr(transparent)]
-struct PeerAddr(SocketAddr);
+struct PeerAddr(Arc<SocketAddr>);
+
+impl PeerAddr {
+    fn new(addr: Arc<SocketAddr>) -> Self {
+        Self(addr)
+    }
+}
 
 struct RejectShuttingDown;
 
