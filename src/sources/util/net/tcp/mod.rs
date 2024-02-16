@@ -1,4 +1,4 @@
-mod request_limiter;
+pub mod request_limiter;
 
 use std::{io, mem::drop, net::SocketAddr, time::Duration};
 
@@ -42,9 +42,9 @@ use crate::{
     SourceSender,
 };
 
-const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
+pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
 
-async fn try_bind_tcp_listener(
+pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
     tls: &MaybeTlsSettings,
