@@ -112,7 +112,7 @@ impl KeyPartitioner {
                 emit!(TemplateRenderingError {
                     error,
                     field: Some(field),
-                    drop_event: true,
+                    drop_event: false,
                 });
             })
             .ok()
