@@ -1,15 +1,11 @@
 //! Unit tests for the `http` sink.
 
-use std::{
-    io::{BufRead, BufReader},
-    sync::{atomic, Arc},
-};
+use std::sync::{atomic, Arc};
 
 use bytes::{Buf, Bytes};
 use flate2::{read::MultiGzDecoder, read::ZlibDecoder};
-use futures::{channel::mpsc, stream};
+use futures::stream;
 use headers::{Authorization, HeaderMapExt};
-use http::request::Parts;
 use hyper::{Body, Method, Response, StatusCode};
 use serde::{de, Deserialize};
 use vector_lib::codecs::{
@@ -27,12 +23,14 @@ use crate::{
         util::{
             encoding::Encoder as _,
             http::HeaderValidationError,
-            test::{build_test_server, build_test_server_generic, build_test_server_status},
+            test::{
+                build_test_server, build_test_server_generic, build_test_server_status,
+                get_received,
+            },
         },
     },
     test_util::{
-        components,
-        components::{COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
+        components::{self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
         next_addr, random_lines_with_stream,
     },
 };
@@ -539,23 +537,6 @@ where
         "zlib" => serde_json::from_reader(ZlibDecoder::new(buf.reader())).unwrap(),
         _ => panic!("undefined compression: {}", compression),
     }
-}
-
-async fn get_received(
-    rx: mpsc::Receiver<(Parts, Bytes)>,
-    assert_parts: impl Fn(Parts),
-) -> Vec<String> {
-    rx.flat_map(|(parts, body)| {
-        assert_parts(parts);
-        stream::iter(BufReader::new(MultiGzDecoder::new(body.reader())).lines())
-    })
-    .map(Result::unwrap)
-    .map(|line| {
-        let val: serde_json::Value = serde_json::from_str(&line).unwrap();
-        val.get("message").unwrap().as_str().unwrap().to_owned()
-    })
-    .collect::<Vec<_>>()
-    .await
 }
 
 async fn run_sink(extra_config: &str, assert_parts: impl Fn(http::request::Parts)) {

@@ -1,13 +1,18 @@
-use std::net::SocketAddr;
-
-use bytes::Bytes;
-use futures::{channel::mpsc, FutureExt, SinkExt, TryFutureExt};
+use bytes::{Buf, Bytes};
+use flate2::read::MultiGzDecoder;
+use futures::{channel::mpsc, stream, FutureExt, SinkExt, TryFutureExt};
+use futures_util::StreamExt;
+use http::request::Parts;
 use hyper::{
     body::HttpBody,
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server, StatusCode,
 };
 use serde::Deserialize;
+use std::{
+    io::{BufRead, BufReader},
+    net::SocketAddr,
+};
 use stream_cancel::{Trigger, Tripwire};
 
 use crate::{
@@ -105,4 +110,21 @@ where
         .map_err(|error| panic!("Server error: {}", error));
 
     (rx, trigger, server)
+}
+
+pub async fn get_received(
+    rx: mpsc::Receiver<(Parts, Bytes)>,
+    assert_parts: impl Fn(Parts),
+) -> Vec<String> {
+    rx.flat_map(|(parts, body)| {
+        assert_parts(parts);
+        stream::iter(BufReader::new(MultiGzDecoder::new(body.reader())).lines())
+    })
+    .map(Result::unwrap)
+    .map(|line| {
+        let val: serde_json::Value = serde_json::from_str(&line).unwrap();
+        val.get("message").unwrap().as_str().unwrap().to_owned()
+    })
+    .collect::<Vec<_>>()
+    .await
 }

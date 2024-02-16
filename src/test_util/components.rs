@@ -53,6 +53,7 @@ pub const FILE_SOURCE_TAGS: [&str; 1] = ["file"];
 /// The most basic set of tags for sinks, regardless of whether or not they push data or have it pulled out.
 pub const SINK_TAGS: [&str; 1] = ["protocol"];
 
+///
 pub const DATA_VOLUME_SINK_TAGS: [&str; 2] = ["source", "service"];
 
 /// The standard set of tags for all sinks that write a file.
@@ -117,6 +118,7 @@ pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
     }
 });
 
+///
 pub static DATA_VOLUME_SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
     ComponentTests {
         events: &["BytesSent", "EventsSent"], // EventsReceived is emitted in the topology
@@ -339,6 +341,7 @@ where
     run_and_assert_source_advanced(source, setup, timeout, event_count, &SOURCE_TESTS, tags).await
 }
 
+/// Runs and asserts source test specifcations with configurations.
 pub async fn run_and_assert_source_advanced<SC>(
     source: SC,
     setup: impl FnOnce(&mut SourceContext),
@@ -407,6 +410,7 @@ where
     .await
 }
 
+/// Runs and asserts compliance for transforms.
 pub async fn assert_transform_compliance<T>(f: impl Future<Output = T>) -> T {
     init_test();
 
@@ -428,6 +432,7 @@ pub async fn assert_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>
     result
 }
 
+/// Runs and asserts sink compliance.
 pub async fn run_and_assert_sink_compliance<S, I>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = I> + Send,
@@ -451,6 +456,7 @@ pub async fn assert_data_volume_sink_compliance<T>(tags: &[&str], f: impl Future
     result
 }
 
+/// Runs data volume sink tests and asserts compliance.
 pub async fn run_and_assert_data_volume_sink_compliance<S, I>(
     sink: VectorSink,
     events: S,
@@ -466,6 +472,7 @@ pub async fn run_and_assert_data_volume_sink_compliance<S, I>(
     .await;
 }
 
+/// Asserts compliance for nonsending sink tests.
 pub async fn assert_nonsending_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
 
@@ -476,6 +483,7 @@ pub async fn assert_nonsending_sink_compliance<T>(tags: &[&str], f: impl Future<
     result
 }
 
+/// Runs and asserts compliance for nonsending sink tests.
 pub async fn run_and_assert_nonsending_sink_compliance<S, I>(
     sink: VectorSink,
     events: S,
@@ -502,6 +510,7 @@ pub async fn assert_sink_error<T>(tags: &[&str], f: impl Future<Output = T>) -> 
     result
 }
 
+/// Runs and asserts sink error compliance.
 pub async fn run_and_assert_sink_error<S, I>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = I> + Send,
