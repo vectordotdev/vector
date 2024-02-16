@@ -10,7 +10,7 @@ use crate::{
             http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
             retries::RetryAction,
         },
-        UriParseSnafu,
+        HTTPRequestBuilderSnafu, UriParseSnafu,
     },
 };
 use bytes::Bytes;
@@ -69,7 +69,10 @@ pub(super) struct ClickhouseServiceRequestBuilder {
 }
 
 impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
-    fn build(&self, mut request: HttpRequest<PartitionKey>) -> Request<Bytes> {
+    fn build(
+        &self,
+        mut request: HttpRequest<PartitionKey>,
+    ) -> Result<Request<Bytes>, crate::Error> {
         let metadata = request.get_additional_metadata();
 
         let uri = set_uri_query(
@@ -79,8 +82,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             metadata.format,
             self.skip_unknown_fields,
             self.date_time_best_effort,
-        )
-        .expect("building uri failed unexpectedly");
+        )?;
 
         let auth: Option<Auth> = self.auth.clone();
 
@@ -98,7 +100,8 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
 
         builder
             .body(payload)
-            .expect("building HTTP request failed unexpectedly")
+            .context(HTTPRequestBuilderSnafu)
+            .map_err(Into::into)
     }
 }
 
