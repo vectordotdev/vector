@@ -48,6 +48,7 @@ jobs:
   validate:
     name: Validate comment
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: |
       github.event.issue.pull_request && ( contains(github.event.comment.body, '/ci-run-all')
           || contains(github.event.comment.body, '/ci-run-cli')
