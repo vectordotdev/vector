@@ -1,17 +1,53 @@
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
+//! Configuration for the `Clickhouse` sink.
 
 use super::{
-    service::{ClickhouseRetryLogic, ClickhouseService},
-    sink::ClickhouseSink,
+    request_builder::ClickhouseRequestBuilder,
+    service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
+    sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
-    http::{get_http_scheme_from_uri, Auth, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde},
+        util::{http::HttpService, RealtimeSizeBasedDefaultBatchSettings, UriSerde},
     },
 };
+use http::{Request, StatusCode, Uri};
+use hyper::Body;
+use std::fmt;
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+
+/// Data format.
+///
+/// The format used to parse input/output data.
+///
+/// [formats]: https://clickhouse.com/docs/en/interfaces/formats
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Hash)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+#[allow(clippy::enum_variant_names)]
+pub enum Format {
+    #[derivative(Default)]
+    /// JSONEachRow.
+    JsonEachRow,
+
+    /// JSONAsObject.
+    JsonAsObject,
+
+    /// JSONAsString.
+    JsonAsString,
+}
+
+impl fmt::Display for Format {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Format::JsonEachRow => write!(f, "JSONEachRow"),
+            Format::JsonAsObject => write!(f, "JSONAsObject"),
+            Format::JsonAsString => write!(f, "JSONAsString"),
+        }
+    }
+}
 
 /// Configuration for the `clickhouse` sink.
 #[configurable_component(sink("clickhouse", "Deliver log data to a ClickHouse database."))]
@@ -30,6 +66,10 @@ pub struct ClickhouseConfig {
     /// The database that contains the table that data is inserted into.
     #[configurable(metadata(docs::examples = "mydatabase"))]
     pub database: Option<Template>,
+
+    /// The format to parse input data.
+    #[serde(default)]
+    pub format: Format,
 
     /// Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema.
     #[serde(default)]
@@ -77,40 +117,56 @@ impl_generate_config_from_default!(ClickhouseConfig);
 impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = self.endpoint.with_default_parts().uri;
-        let protocol = get_http_scheme_from_uri(&endpoint);
 
         let auth = self.auth.choose_one(&self.endpoint.auth)?;
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
+
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
-        let service = ClickhouseService::new(
-            client.clone(),
-            auth.clone(),
-            endpoint.clone(),
-            self.skip_unknown_fields,
-            self.date_time_best_effort,
-        );
+        let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
+            auth: auth.clone(),
+            endpoint: endpoint.clone(),
+            skip_unknown_fields: self.skip_unknown_fields,
+            date_time_best_effort: self.date_time_best_effort,
+            compression: self.compression,
+        };
+
+        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
+            HttpService::new(client.clone(), clickhouse_service_request_builder);
 
         let request_limits = self.request.into_settings();
+
         let service = ServiceBuilder::new()
             .settings(request_limits, ClickhouseRetryLogic::default())
             .service(service);
 
         let batch_settings = self.batch.into_batcher_settings()?;
+
         let database = self.database.clone().unwrap_or_else(|| {
             "default"
                 .try_into()
                 .expect("'default' should be a valid template")
         });
+
+        let request_builder = ClickhouseRequestBuilder {
+            compression: self.compression,
+            encoding: (
+                self.encoding.clone(),
+                Encoder::<Framer>::new(
+                    NewlineDelimitedEncoderConfig.build().into(),
+                    JsonSerializerConfig::default().build().into(),
+                ),
+            ),
+        };
+
         let sink = ClickhouseSink::new(
             batch_settings,
-            self.compression,
-            self.encoding.clone(),
             service,
-            protocol,
             database,
             self.table.clone(),
+            self.format,
+            request_builder,
         );
 
         let healthcheck = Box::pin(healthcheck(client, endpoint, auth));

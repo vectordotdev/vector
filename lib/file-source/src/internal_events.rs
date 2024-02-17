@@ -9,7 +9,7 @@ pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
 
     fn emit_file_watch_error(&self, path: &Path, error: Error);
 
-    fn emit_file_unwatched(&self, path: &Path);
+    fn emit_file_unwatched(&self, path: &Path, reached_eof: bool);
 
     fn emit_file_deleted(&self, path: &Path);
 

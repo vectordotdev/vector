@@ -1,110 +1,16 @@
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vrl::value::Kind;
-use vrl::{event_path, owned_value_path};
+use vector_lib::config::LegacyKey;
+use vrl::event_path;
 
 use crate::{
-    conditions::{AnyCondition, Condition},
-    config::{
-        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
-        TransformOutput,
-    },
+    conditions::Condition,
     event::Event,
     internal_events::SampleEventDiscarded,
-    schema,
-    transforms::{FunctionTransform, OutputBuffer, Transform},
+    transforms::{FunctionTransform, OutputBuffer},
 };
-
-/// Configuration for the `sample` transform.
-#[configurable_component(transform(
-    "sample",
-    "Sample events from an event stream based on supplied criteria and at a configurable rate."
-))]
-#[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct SampleConfig {
-    /// The rate at which events are forwarded, expressed as `1/N`.
-    ///
-    /// For example, `rate = 10` means 1 out of every 10 events are forwarded and the rest are
-    /// dropped.
-    pub rate: u64,
-
-    /// The name of the field whose value is hashed to determine if the event should be
-    /// sampled.
-    ///
-    /// Each unique value for the key creates a bucket of related events to be sampled together
-    /// and the rate is applied to the buckets themselves to sample `1/N` buckets.  The overall rate
-    /// of sampling may differ from the configured one if values in the field are not uniformly
-    /// distributed. If left unspecified, or if the event doesn’t have `key_field`, then the
-    /// event is sampled independently.
-    ///
-    /// This can be useful to, for example, ensure that all logs for a given transaction are
-    /// sampled together, but that overall `1/N` transactions are sampled.
-    #[configurable(metadata(docs::examples = "message",))]
-    pub key_field: Option<String>,
-
-    /// A logical condition used to exclude events from sampling.
-    pub exclude: Option<AnyCondition>,
-}
-
-impl GenerateConfig for SampleConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            rate: 10,
-            key_field: None,
-            exclude: None::<AnyCondition>,
-        })
-        .unwrap()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "sample")]
-impl TransformConfig for SampleConfig {
-    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Sample::new(
-            self.rate,
-            self.key_field.clone(),
-            self.exclude
-                .as_ref()
-                .map(|condition| condition.build(&context.enrichment_tables))
-                .transpose()?,
-        )))
-    }
-
-    fn input(&self) -> Input {
-        Input::new(DataType::Log | DataType::Trace)
-    }
-
-    fn outputs(
-        &self,
-        _: vector_lib::enrichment::TableRegistry,
-        input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
-    ) -> Vec<TransformOutput> {
-        vec![TransformOutput::new(
-            DataType::Log | DataType::Trace,
-            input_definitions
-                .iter()
-                .map(|(output, definition)| {
-                    (
-                        output.clone(),
-                        definition.clone().with_source_metadata(
-                            SampleConfig::NAME,
-                            Some(LegacyKey::Overwrite(owned_value_path!("sample_rate"))),
-                            &owned_value_path!("sample_rate"),
-                            Kind::bytes(),
-                            None,
-                        ),
-                    )
-                })
-                .collect(),
-        )]
-    }
-}
 
 #[derive(Clone)]
 pub struct Sample {
+    name: String,
     rate: u64,
     key_field: Option<String>,
     exclude: Option<Condition>,
@@ -112,8 +18,17 @@ pub struct Sample {
 }
 
 impl Sample {
-    pub const fn new(rate: u64, key_field: Option<String>, exclude: Option<Condition>) -> Self {
+    // This function is dead code when the feature flag `transforms-impl-sample` is specified but not
+    // `transforms-sample`.
+    #![allow(dead_code)]
+    pub const fn new(
+        name: String,
+        rate: u64,
+        key_field: Option<String>,
+        exclude: Option<Condition>,
+    ) -> Self {
         Self {
+            name,
             rate,
             key_field,
             exclude,
@@ -166,7 +81,7 @@ impl FunctionTransform for Sample {
             match event {
                 Event::Log(ref mut event) => {
                     event.namespace().insert_source_metadata(
-                        SampleConfig::NAME,
+                        self.name.as_str(),
                         event,
                         Some(LegacyKey::Overwrite(vrl::path!("sample_rate"))),
                         vrl::path!("sample_rate"),
@@ -187,18 +102,17 @@ impl FunctionTransform for Sample {
 
 #[cfg(test)]
 mod tests {
-    use approx::assert_relative_eq;
-
     use super::*;
+
     use crate::{
         conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
         event::{Event, LogEvent, TraceEvent},
-        test_util::{components::assert_transform_compliance, random_lines},
-        transforms::test::{create_topology, transform_one},
+        test_util::random_lines,
+        transforms::test::transform_one,
+        transforms::OutputBuffer,
     };
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
+    use approx::assert_relative_eq;
 
     fn condition_contains(key: &str, needle: &str) -> Condition {
         let vrl_config = VrlConfig {
@@ -212,16 +126,12 @@ mod tests {
     }
 
     #[test]
-    fn generate_config() {
-        crate::test_util::test_generate_config::<SampleConfig>();
-    }
-
-    #[test]
     fn hash_samples_at_roughly_the_configured_rate() {
         let num_events = 10000;
 
         let events = random_events(num_events);
         let mut sampler = Sample::new(
+            "sample".to_string(),
             2,
             log_schema().message_key().map(ToString::to_string),
             Some(condition_contains(
@@ -243,6 +153,7 @@ mod tests {
 
         let events = random_events(num_events);
         let mut sampler = Sample::new(
+            "sample".to_string(),
             25,
             log_schema().message_key().map(ToString::to_string),
             Some(condition_contains(
@@ -267,6 +178,7 @@ mod tests {
     fn hash_consistently_samples_the_same_events() {
         let events = random_events(1000);
         let mut sampler = Sample::new(
+            "sample".to_string(),
             2,
             log_schema().message_key().map(ToString::to_string),
             Some(condition_contains(
@@ -301,6 +213,7 @@ mod tests {
         for key_field in &[None, log_schema().message_key().map(ToString::to_string)] {
             let event = Event::Log(LogEvent::from("i am important"));
             let mut sampler = Sample::new(
+                "sample".to_string(),
                 0,
                 key_field.clone(),
                 Some(condition_contains(
@@ -326,6 +239,7 @@ mod tests {
             let log = event.as_mut_log();
             log.insert("other_field", "foo");
             let mut sampler = Sample::new(
+                "sample".to_string(),
                 0,
                 key_field.clone(),
                 Some(condition_contains("other_field", "foo")),
@@ -347,6 +261,7 @@ mod tests {
             let events = random_events(10000);
             let message_key = log_schema().message_key().unwrap().to_string();
             let mut sampler = Sample::new(
+                "sample".to_string(),
                 10,
                 key_field.clone(),
                 Some(condition_contains(&message_key, "na")),
@@ -360,6 +275,7 @@ mod tests {
 
             let events = random_events(10000);
             let mut sampler = Sample::new(
+                "sample".to_string(),
                 25,
                 key_field.clone(),
                 Some(condition_contains(&message_key, "na")),
@@ -373,6 +289,7 @@ mod tests {
 
             // If the event passed the regex check, don't include the sampling rate
             let mut sampler = Sample::new(
+                "sample".to_string(),
                 25,
                 key_field.clone(),
                 Some(condition_contains(&message_key, "na")),
@@ -387,35 +304,12 @@ mod tests {
     fn handles_trace_event() {
         let event: TraceEvent = LogEvent::from("trace").into();
         let trace = Event::Trace(event);
-        let mut sampler = Sample::new(2, None, None);
+        let mut sampler = Sample::new("sample".to_string(), 2, None, None);
         let iterations = 0..2;
         let total_passed = iterations
             .filter_map(|_| transform_one(&mut sampler, trace.clone()))
             .count();
         assert_eq!(total_passed, 1);
-    }
-
-    #[tokio::test]
-    async fn emits_internal_events() {
-        assert_transform_compliance(async move {
-            let config = SampleConfig {
-                rate: 1,
-                key_field: None,
-                exclude: None,
-            };
-            let (tx, rx) = mpsc::channel(1);
-            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
-
-            let log = LogEvent::from("hello world");
-            tx.send(log.into()).await.unwrap();
-
-            _ = out.recv().await;
-
-            drop(tx);
-            topology.stop().await;
-            assert_eq!(out.recv().await, None);
-        })
-        .await
     }
 
     fn random_events(n: usize) -> Vec<Event> {

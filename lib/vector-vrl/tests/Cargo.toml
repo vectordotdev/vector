@@ -17,8 +17,8 @@ clap.workspace = true
 glob = "0.3"
 prettydiff = "0.6"
 regex = "1"
-serde = "1"
-serde_json = "1"
+serde.workspace = true
+serde_json.workspace = true
 tracing-subscriber = { version = "0.3.18", default-features = false, features = ["fmt"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]

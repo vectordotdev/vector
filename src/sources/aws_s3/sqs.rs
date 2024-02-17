@@ -102,6 +102,13 @@ pub(super) struct Config {
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
 
+    /// Whether to delete non-retryable messages.
+    ///
+    /// If a message is rejected by the sink and not retryable, it is deleted from the queue.
+    #[serde(default = "default_true")]
+    #[derivative(Default(value = "default_true()"))]
+    pub(super) delete_failed_message: bool,
+
     /// Number of concurrent tasks to create for polling the queue for messages.
     ///
     /// Defaults to the number of available CPUs on the system.
@@ -203,6 +210,7 @@ pub struct State {
     client_concurrency: usize,
     visibility_timeout_secs: i32,
     delete_message: bool,
+    delete_failed_message: bool,
     decoder: Decoder,
 }
 
@@ -237,6 +245,7 @@ impl Ingestor {
                 .unwrap_or_else(crate::num_threads),
             visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
+            delete_failed_message: config.delete_failed_message,
             decoder,
         });
 
@@ -609,9 +618,11 @@ impl IngestorProcess {
                         BatchStatus::Delivered => Ok(()),
                         BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
                         BatchStatus::Rejected => {
-                            // Sinks are responsible for emitting ComponentEventsDropped.
-                            // Failed events cannot be retried, so continue to delete the SQS source message.
-                            Ok(())
+                            if self.state.delete_failed_message {
+                                Ok(())
+                            } else {
+                                Err(ProcessingError::ErrorAcknowledgement)
+                            }
                         }
                     }
                 }

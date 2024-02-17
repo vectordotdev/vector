@@ -11,20 +11,21 @@ if [[ -z "${CI:-}" ]]; then
   exit 1
 fi
 
-if [ $# -ne 1 ]
+if [ $# -ne 2 ]
 then
-  echo "usage: $0 INTEGRATION"
+  echo "usage: $0 [int|e2e] TEST_NAME"
   exit 1
 fi
 
 set -x
 
-INTEGRATION=$1
+TEST_TYPE=$1 # either "int" or "e2e"
+TEST_NAME=$2
 
-cargo vdev -v int start "${INTEGRATION}"
+cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
 sleep 30
-cargo vdev -v int test --retries 2 -a "${INTEGRATION}"
+cargo vdev -v "${TEST_TYPE}" test --retries 2 -a "${TEST_NAME}"
 RET=$?
-cargo vdev -v int stop -a "${INTEGRATION}"
+cargo vdev -v "${TEST_TYPE}" stop -a "${TEST_NAME}"
 ./scripts/upload-test-results.sh
 exit $RET

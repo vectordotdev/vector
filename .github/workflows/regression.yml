@@ -47,6 +47,7 @@ jobs:
   # Only run this workflow if files changed in areas that could possibly introduce a regression
   should-run:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: github.event_name != 'pull_request'
     outputs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
@@ -110,6 +111,7 @@ jobs:
   compute-metadata:
     name: Compute metadata
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     needs: should-run
     if: github.event_name != 'merge_group' || needs.should-run.outputs.source_changed == 'true'
     outputs:
@@ -286,6 +288,7 @@ jobs:
   build-baseline:
     name: Build baseline Vector container
     runs-on: [linux, ubuntu-20.04-4core]
+    timeout-minutes: 30
     needs:
       - compute-metadata
     steps:
@@ -323,6 +326,7 @@ jobs:
   build-comparison:
     name: Build comparison Vector container
     runs-on: [linux, ubuntu-20.04-4core]
+    timeout-minutes: 30
     needs:
       - compute-metadata
     steps:
@@ -360,11 +364,12 @@ jobs:
   confirm-valid-credentials:
     name: Confirm AWS credentials are minimally valid
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     needs:
       - compute-metadata
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.1
+        uses: aws-actions/configure-aws-credentials@v4.0.2
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -381,6 +386,7 @@ jobs:
   upload-baseline-image-to-ecr:
     name: Upload baseline images to ECR
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     needs:
       - compute-metadata
       - confirm-valid-credentials
@@ -396,7 +402,7 @@ jobs:
           docker load --input baseline-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.1
+        uses: aws-actions/configure-aws-credentials@v4.0.2
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -419,6 +425,7 @@ jobs:
   upload-comparison-image-to-ecr:
     name: Upload comparison images to ECR
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     needs:
       - compute-metadata
       - confirm-valid-credentials
@@ -434,7 +441,7 @@ jobs:
           docker load --input comparison-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.1
+        uses: aws-actions/configure-aws-credentials@v4.0.2
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -457,6 +464,7 @@ jobs:
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
+    timeout-minutes: 45
     needs:
       - compute-metadata
       - upload-baseline-image-to-ecr
@@ -480,7 +488,7 @@ jobs:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.1
+        uses: aws-actions/configure-aws-credentials@v4.0.2
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -593,6 +601,7 @@ jobs:
   detect-regression:
     name: Determine regression status
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     needs:
       - submit-job
       - compute-metadata
@@ -600,7 +609,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.1
+        uses: aws-actions/configure-aws-credentials@v4.0.2
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -669,6 +678,7 @@ jobs:
   analyze-experiment:
     name: Download regression analysis & upload report
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     needs:
       - submit-job
       - compute-metadata
@@ -691,7 +701,7 @@ jobs:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.1
+        uses: aws-actions/configure-aws-credentials@v4.0.2
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -782,6 +792,7 @@ jobs:
   regression-detection-suite:
     name: Regression Detection Suite
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: always()
     needs:
       - compute-metadata

@@ -948,6 +948,7 @@ mod test {
                 acknowledgements: false,
                 schema: Default::default(),
                 schema_definitions: HashMap::default(),
+                extra_context: Default::default(),
             })
             .await
             .unwrap();

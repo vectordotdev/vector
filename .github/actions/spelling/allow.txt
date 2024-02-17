@@ -23,6 +23,8 @@ Arival
 Arnova
 Asus
 Atlassian
+atleastonce
+atmostonce
 Attab
 Audiosonic
 avsc
@@ -52,8 +54,12 @@ dkr
 Dockerfiles
 DOOV
 Douban
+E2ETest
+emqx
+eventloop
 Enot
 Evercoss
+exactlyonce
 Explay
 FAQs
 FDO
@@ -167,6 +173,7 @@ Rockchip
 Roku
 Roundcube
 Rowling
+rumqttc
 SBT
 SKtelesys
 Salesforce
@@ -277,6 +284,8 @@ downsides
 downwardapi
 emoji
 esbuild
+etld
+fakeintake
 fargate
 fibonacci
 fileapi
@@ -327,6 +336,7 @@ htmltest
 https
 humungus
 icecream
+idn
 ifeq
 ifneq
 imobile
@@ -419,6 +429,8 @@ security-tab
 servlet
 Sinjo
 sublocation
+sundar
+svcb
 snyk
 socketaddr
 solarwinds
@@ -426,6 +438,7 @@ splunk
 ssh
 staticuser
 symbian
+tanushri
 timeframe
 timeseries
 timespan
