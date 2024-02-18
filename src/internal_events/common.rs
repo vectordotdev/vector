@@ -26,7 +26,7 @@ impl InternalEvent for EndpointBytesReceived<'_> {
             "endpoint" => self.endpoint.to_owned(),
         );
         histogram!(
-            "component_received_event_size_bytes", self.byte_size as u64,
+            "component_received_bytes", self.byte_size as f64,
             "protocol" => self.protocol.to_owned(),
             "endpoint" => self.endpoint.to_owned(),
         );

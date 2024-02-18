@@ -370,6 +370,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              component_received_events_total.tags
 		}
+		component_received_bytes: {
+			description:       string | *"The size in bytes of each event received by the source."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              component_received_events_total.tags
+		}
 		component_received_events_total: {
 			description: """
 				The number of events accepted by this component either from tagged
