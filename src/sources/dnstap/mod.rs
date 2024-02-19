@@ -249,6 +249,10 @@ mod integration_tests {
     use futures::StreamExt;
     use serde_json::json;
     use tokio::time;
+    use vector_lib::event::Event;
+    use vector_lib::lookup::lookup_v2::OptionalValuePath;
+
+    use self::unix::UnixConfig;
 
     use super::*;
     use crate::{
@@ -267,17 +271,19 @@ mod integration_tests {
             tokio::spawn(async move {
                 let socket = get_socket(raw_data, query_type);
 
-                UnixConfig {
-                    max_frame_length: 102400,
-                    host_key: Some(OptionalValuePath::from(owned_value_path!("key"))),
-                    socket_path: socket,
-                    raw_data_only: Some(raw_data),
-                    multithreaded: Some(false),
-                    max_frame_handling_tasks: Some(100000),
-                    socket_file_mode: Some(511),
-                    socket_receive_buffer_size: Some(10485760),
-                    socket_send_buffer_size: Some(10485760),
-                    log_namespace: None,
+                DnstapConfig {
+                    mode: Mode::Unix(UnixConfig {
+                        max_frame_length: 102400,
+                        host_key: Some(OptionalValuePath::from(owned_value_path!("key"))),
+                        socket_path: socket,
+                        raw_data_only: Some(raw_data),
+                        multithreaded: Some(false),
+                        max_frame_handling_tasks: Some(100000),
+                        socket_file_mode: Some(511),
+                        socket_receive_buffer_size: Some(10485760),
+                        socket_send_buffer_size: Some(10485760),
+                        log_namespace: None,
+                    }),
                 }
                 .build(SourceContext::new_test(sender, None))
                 .await
