@@ -21,10 +21,7 @@ use futures::{
     sink::{Sink, SinkExt},
     stream::{self, StreamExt, TryStreamExt},
 };
-use futures_util::{
-    future::{BoxFuture, OptionFuture},
-    FutureExt,
-};
+use futures_util::{future::BoxFuture, Future, FutureExt};
 use listenfd::ListenFd;
 use tokio::{
     self,
@@ -393,6 +390,7 @@ pub trait TcpFrameHandler: FrameHandler {
     fn receive_buffer_bytes(&self) -> Option<usize>;
     fn max_connection_duration_secs(&self) -> Option<u64>;
     fn max_connections(&self) -> Option<u32>;
+    fn insert_tls_client_metadata(&mut self, metadata: Option<CertificateMetadata>);
 }
 
 /**
@@ -510,7 +508,7 @@ pub fn build_framestream_tcp_source(
 
 #[allow(clippy::too_many_arguments)]
 async fn handle_stream(
-    frame_handler: impl TcpFrameHandler + Send + Sync + Clone + 'static,
+    mut frame_handler: impl TcpFrameHandler + Send + Sync + Clone + 'static,
     mut shutdown_signal: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     _tripwire: BoxFuture<'static, ()>,
@@ -549,19 +547,13 @@ async fn handle_stream(
         });
     });
 
-    let _certificate_metadata = socket
+    let certificate_metadata = socket
         .get_ref()
         .ssl_stream()
         .and_then(|stream| stream.ssl().peer_certificate())
         .map(CertificateMetadata::from);
 
-    let _connection_close_timeout = OptionFuture::from(
-        frame_handler
-            .max_connection_duration_secs()
-            .map(|timeout_secs| tokio::time::sleep(Duration::from_secs(timeout_secs))),
-    );
-
-    // tokio::pin!(connection_close_timeout);
+    frame_handler.insert_tls_client_metadata(certificate_metadata);
 
     let span = info_span!("connection");
     span.record("peer_addr", &field::debug(&peer_addr));
@@ -584,23 +576,6 @@ async fn handle_stream(
         },
     );
 }
-
-// fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
-//     debug!("Start graceful shutdown.");
-//     // Close our write part of TCP socket to signal the other side
-//     // that it should stop writing and close the channel.
-//     if let Some(stream) = socket.get_ref() {
-//         let socket = SockRef::from(stream);
-//         if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
-//             warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
-//         }
-//         false
-//     } else {
-//         // Connection hasn't yet been established so we are done here.
-//         debug!("Closing connection that hasn't yet been fully established.");
-//         true
-//     }
-// }
 
 /**
  * Based off of the build_unix_source function.
@@ -746,12 +721,12 @@ pub fn build_framestream_unix_source(
     Ok(Box::pin(fut))
 }
 
-fn build_framestream_source(
+fn build_framestream_source<T: Send + 'static>(
     frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
     socket: impl AsyncRead + AsyncWrite + Send + 'static,
     received_from: Option<Bytes>,
     out: SourceSender,
-    shutdown: ShutdownSignal,
+    shutdown: impl Future<Output = T> + Unpin + Send + 'static,
     span: Span,
     active_task_nums: Arc<AtomicU32>,
     error_mapper: impl FnMut(std::io::Error) -> () + Send + 'static,
@@ -768,7 +743,7 @@ fn build_framestream_source(
     let mut fs_reader = FrameStreamReader::new(Box::new(sock_sink), content_type);
     let frame_handler_copy = frame_handler.clone();
     let frames = sock_stream
-        .take_until(shutdown.clone())
+        .take_until(shutdown)
         .map_err(error_mapper)
         .filter_map(move |frame| {
             future::ready(match frame {
@@ -879,7 +854,7 @@ mod test {
     use vector_lib::{
         config::{LegacyKey, LogNamespace},
         tcp::TcpKeepaliveConfig,
-        tls::MaybeTls,
+        tls::{CertificateMetadata, MaybeTls},
     };
     use vector_lib::{
         lookup::{owned_value_path, path, OwnedValuePath},
@@ -1151,6 +1126,8 @@ mod test {
         fn max_connections(&self) -> Option<u32> {
             self.max_connections
         }
+
+        fn insert_tls_client_metadata(&mut self, _: Option<CertificateMetadata>) {}
     }
 
     fn init_framestream_tcp(

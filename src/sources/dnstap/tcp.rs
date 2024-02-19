@@ -9,9 +9,10 @@ use vector_lib::internal_event::{
 };
 use vector_lib::lookup::{owned_value_path, path};
 use vector_lib::tcp::TcpKeepaliveConfig;
-use vector_lib::tls::{MaybeTlsSettings, TlsSourceConfig};
+use vector_lib::tls::{CertificateMetadata, MaybeTlsSettings, TlsSourceConfig};
 use vector_lib::EstimatedJsonEncodedSizeOf;
 use vrl::path::{OwnedValuePath, PathPrefix};
+use vrl::value::ObjectMap;
 
 use crate::internal_events::{DnstapParseError, SocketEventsReceived, SocketMode};
 use crate::sources::util::framestream::{FrameHandler, TcpFrameHandler};
@@ -175,6 +176,7 @@ pub struct DnstapFrameHandler {
     shutdown_timeout_secs: Duration,
     tls: MaybeTlsSettings,
     tls_client_metadata_key: Option<OwnedValuePath>,
+    tls_client_metadata: Option<ObjectMap>,
     receive_buffer_bytes: Option<usize>,
     max_connection_duration_secs: Option<u64>,
     max_connections: Option<u32>,
@@ -211,6 +213,7 @@ impl DnstapFrameHandler {
             shutdown_timeout_secs: config.shutdown_timeout_secs,
             tls,
             tls_client_metadata_key,
+            tls_client_metadata: None,
             receive_buffer_bytes: config.receive_buffer_bytes,
             max_connection_duration_secs: config.max_connection_duration_secs,
             max_connections: config.connection_limit,
@@ -248,6 +251,18 @@ impl FrameHandler for DnstapFrameHandler {
                 self.host_key.as_ref().map(LegacyKey::Overwrite),
                 path!("host"),
                 host,
+            );
+        }
+
+        if let Some(tls_client_metadata) = &self.tls_client_metadata {
+            self.log_namespace.insert_source_metadata(
+                super::DnstapConfig::NAME,
+                &mut log_event,
+                self.tls_client_metadata_key
+                    .as_ref()
+                    .map(LegacyKey::Overwrite),
+                path!("tls_client_metadata"),
+                tls_client_metadata.clone(),
             );
         }
 
@@ -341,5 +356,13 @@ impl TcpFrameHandler for DnstapFrameHandler {
 
     fn max_connections(&self) -> Option<u32> {
         self.max_connections
+    }
+
+    fn insert_tls_client_metadata(&mut self, metadata: Option<CertificateMetadata>) {
+        self.tls_client_metadata = metadata.map(|c| {
+            let mut metadata = ObjectMap::new();
+            metadata.insert("subject".into(), c.subject().into());
+            metadata
+        });
     }
 }
