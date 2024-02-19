@@ -150,7 +150,7 @@ impl SourceConfig for DnstapConfig {
                 let frame_handler =
                     tcp::DnstapFrameHandler::new(config.clone(), tls, log_namespace);
 
-                build_framestream_tcp_source(frame_handler, cx, false.into(), DnstapConfig::NAME)
+                build_framestream_tcp_source(frame_handler, cx.shutdown, cx.out)
             }
             #[cfg(unix)]
             Mode::Unix(config) => {

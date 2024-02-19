@@ -37,14 +37,12 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{length_delimited, Framed};
 use tracing::{field, Instrument, Span};
 use vector_lib::{
-    config::SourceAcknowledgementsConfig,
     lookup::OwnedValuePath,
     tcp::TcpKeepaliveConfig,
     tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsSettings},
 };
 
 use crate::{
-    config::SourceContext,
     event::Event,
     internal_events::{
         ConnectionOpen, OpenGauge, SocketBindError, SocketMode, SocketReceiveError,
@@ -403,16 +401,13 @@ pub trait TcpFrameHandler: FrameHandler {
  **/
 pub fn build_framestream_tcp_source(
     frame_handler: impl TcpFrameHandler + Send + Sync + Clone + 'static,
-    cx: SourceContext,
-    acknowledgements: SourceAcknowledgementsConfig,
-    source_name: &'static str,
+    shutdown: ShutdownSignal,
+    out: SourceSender,
 ) -> crate::Result<Source> {
     let addr = frame_handler.address();
     let tls = frame_handler.tls();
-    let shutdown = cx.shutdown.clone();
-    let out = cx.out.clone();
-
-    let acknowledgements = cx.do_acknowledgements(acknowledgements);
+    let shutdown = shutdown.clone();
+    let out = out.clone();
 
     Ok(Box::pin(async move {
         let listenfd = ListenFd::from_env();
@@ -495,9 +490,7 @@ pub fn build_framestream_tcp_source(
                             tripwire,
                             peer_addr,
                             out,
-                            acknowledgements,
                             request_limiter,
-                            source_name,
                         );
 
                         tokio::spawn(
@@ -523,9 +516,7 @@ async fn handle_stream(
     _tripwire: BoxFuture<'static, ()>,
     peer_addr: SocketAddr,
     out: SourceSender,
-    _acknowledgements: bool,
     _request_limiter: RequestLimiter,
-    _source_name: &'static str,
 ) {
     tokio::select! {
         result = socket.handshake() => {
@@ -859,6 +850,8 @@ fn wait_for_task_quota(active_task_nums: &Arc<AtomicU32>, max_tasks: u32) {
 
 #[cfg(test)]
 mod test {
+    use futures_util::Stream;
+    use std::net::SocketAddr;
     #[cfg(unix)]
     use std::{
         path::PathBuf,
@@ -868,6 +861,7 @@ mod test {
         },
         thread,
     };
+    use tokio::net::TcpStream;
 
     use bytes::{buf::Buf, Bytes, BytesMut};
     use futures::{
@@ -882,18 +876,26 @@ mod test {
         time::{Duration, Instant},
     };
     use tokio_util::codec::{length_delimited, Framed};
-    use vector_lib::config::{LegacyKey, LogNamespace};
-    use vector_lib::lookup::{owned_value_path, path, OwnedValuePath};
+    use vector_lib::{
+        config::{LegacyKey, LogNamespace},
+        tcp::TcpKeepaliveConfig,
+        tls::MaybeTls,
+    };
+    use vector_lib::{
+        lookup::{owned_value_path, path, OwnedValuePath},
+        tls::MaybeTlsSettings,
+    };
 
     use super::{
-        build_framestream_unix_source, spawn_event_handling_tasks, ControlField, ControlHeader,
-        FrameHandler, UnixFrameHandler,
+        build_framestream_tcp_source, build_framestream_unix_source, spawn_event_handling_tasks,
+        ControlField, ControlHeader, FrameHandler, TcpFrameHandler, UnixFrameHandler,
     };
     use crate::{
         config::{log_schema, ComponentKey},
         event::{Event, LogEvent},
         shutdown::SourceShutdownCoordinator,
-        test_util::{collect_n, collect_n_stream},
+        sources::util::net::SocketListenAddr,
+        test_util::{collect_n, collect_n_stream, next_addr},
         SourceSender,
     };
 
@@ -901,12 +903,8 @@ mod test {
     struct MockFrameHandler<F: Send + Sync + Clone + FnOnce() + 'static> {
         content_type: String,
         max_frame_length: usize,
-        socket_path: PathBuf,
         multithreaded: bool,
         max_frame_handling_tasks: u32,
-        socket_file_mode: Option<u32>,
-        socket_receive_buffer_size: Option<usize>,
-        socket_send_buffer_size: Option<usize>,
         extra_task_handling_routine: F,
         host_key: Option<OwnedValuePath>,
         timestamp_key: Option<OwnedValuePath>,
@@ -914,17 +912,68 @@ mod test {
         log_namespace: LogNamespace,
     }
 
+    #[derive(Clone)]
+    struct MockUnixFrameHandler<F: Send + Sync + Clone + FnOnce() + 'static> {
+        frame_handler: MockFrameHandler<F>,
+        socket_path: PathBuf,
+        socket_file_mode: Option<u32>,
+        socket_receive_buffer_size: Option<usize>,
+        socket_send_buffer_size: Option<usize>,
+    }
+
+    #[derive(Clone)]
+    struct MockTcpFrameHandler<F: Send + Sync + Clone + FnOnce() + 'static> {
+        frame_handler: MockFrameHandler<F>,
+        address: SocketListenAddr,
+        keepalive: Option<TcpKeepaliveConfig>,
+        shutdown_timeout_secs: Duration,
+        tls: MaybeTlsSettings,
+        tls_client_metadata_key: Option<OwnedValuePath>,
+        receive_buffer_bytes: Option<usize>,
+        max_connection_duration_secs: Option<u64>,
+        max_connections: Option<u32>,
+    }
+
+    impl<F: Send + Sync + Clone + FnOnce() + 'static> MockTcpFrameHandler<F> {
+        pub fn new(
+            addr: SocketAddr,
+            content_type: String,
+            multithreaded: bool,
+            extra_routine: F,
+        ) -> Self {
+            Self {
+                frame_handler: MockFrameHandler::new(content_type, multithreaded, extra_routine),
+                address: addr.into(),
+                keepalive: None,
+                shutdown_timeout_secs: Duration::from_secs(30),
+                tls: MaybeTls::Raw(()),
+                tls_client_metadata_key: None,
+                receive_buffer_bytes: None,
+                max_connection_duration_secs: None,
+                max_connections: None,
+            }
+        }
+    }
+
+    impl<F: Send + Sync + Clone + FnOnce() + 'static> MockUnixFrameHandler<F> {
+        pub fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
+            Self {
+                frame_handler: MockFrameHandler::new(content_type, multithreaded, extra_routine),
+                socket_path: tempfile::tempdir().unwrap().into_path().join("unix_test"),
+                socket_file_mode: None,
+                socket_receive_buffer_size: None,
+                socket_send_buffer_size: None,
+            }
+        }
+    }
+
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockFrameHandler<F> {
         pub fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
             Self {
                 content_type,
                 max_frame_length: bytesize::kib(100u64) as usize,
-                socket_path: tempfile::tempdir().unwrap().into_path().join("unix_test"),
                 multithreaded,
                 max_frame_handling_tasks: 0,
-                socket_file_mode: None,
-                socket_receive_buffer_size: None,
-                socket_send_buffer_size: None,
                 extra_task_handling_routine: extra_routine,
                 host_key: Some(owned_value_path!("test_framestream")),
                 timestamp_key: Some(owned_value_path!("my_timestamp")),
@@ -984,7 +1033,41 @@ mod test {
         }
     }
 
-    impl<F: Send + Sync + Clone + FnOnce() + 'static> UnixFrameHandler for MockFrameHandler<F> {
+    impl<F: Send + Sync + Clone + FnOnce() + 'static> FrameHandler for MockUnixFrameHandler<F> {
+        fn content_type(&self) -> String {
+            self.frame_handler.content_type()
+        }
+
+        fn max_frame_length(&self) -> usize {
+            self.frame_handler.max_frame_length()
+        }
+
+        fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+            self.frame_handler.handle_event(received_from, frame)
+        }
+
+        fn multithreaded(&self) -> bool {
+            self.frame_handler.multithreaded()
+        }
+
+        fn max_frame_handling_tasks(&self) -> u32 {
+            self.frame_handler.max_frame_handling_tasks()
+        }
+
+        fn host_key(&self) -> &Option<OwnedValuePath> {
+            self.frame_handler.host_key()
+        }
+
+        fn timestamp_key(&self) -> Option<&OwnedValuePath> {
+            self.frame_handler.timestamp_key()
+        }
+
+        fn source_type_key(&self) -> Option<&OwnedValuePath> {
+            self.frame_handler.source_type_key()
+        }
+    }
+
+    impl<F: Send + Sync + Clone + FnOnce() + 'static> UnixFrameHandler for MockUnixFrameHandler<F> {
         fn socket_path(&self) -> PathBuf {
             self.socket_path.clone()
         }
@@ -1000,6 +1083,95 @@ mod test {
         fn socket_send_buffer_size(&self) -> Option<usize> {
             self.socket_send_buffer_size
         }
+    }
+
+    impl<F: Send + Sync + Clone + FnOnce() + 'static> FrameHandler for MockTcpFrameHandler<F> {
+        fn content_type(&self) -> String {
+            self.frame_handler.content_type()
+        }
+
+        fn max_frame_length(&self) -> usize {
+            self.frame_handler.max_frame_length()
+        }
+
+        fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+            self.frame_handler.handle_event(received_from, frame)
+        }
+
+        fn multithreaded(&self) -> bool {
+            self.frame_handler.multithreaded()
+        }
+
+        fn max_frame_handling_tasks(&self) -> u32 {
+            self.frame_handler.max_frame_handling_tasks()
+        }
+
+        fn host_key(&self) -> &Option<OwnedValuePath> {
+            self.frame_handler.host_key()
+        }
+
+        fn timestamp_key(&self) -> Option<&OwnedValuePath> {
+            self.frame_handler.timestamp_key()
+        }
+
+        fn source_type_key(&self) -> Option<&OwnedValuePath> {
+            self.frame_handler.source_type_key()
+        }
+    }
+
+    impl<F: Send + Sync + Clone + FnOnce() + 'static> TcpFrameHandler for MockTcpFrameHandler<F> {
+        fn address(&self) -> SocketListenAddr {
+            self.address
+        }
+
+        fn keepalive(&self) -> Option<TcpKeepaliveConfig> {
+            self.keepalive
+        }
+
+        fn shutdown_timeout_secs(&self) -> Duration {
+            self.shutdown_timeout_secs
+        }
+
+        fn tls(&self) -> MaybeTlsSettings {
+            self.tls.clone()
+        }
+
+        fn tls_client_metadata_key(&self) -> Option<OwnedValuePath> {
+            self.tls_client_metadata_key.clone()
+        }
+
+        fn receive_buffer_bytes(&self) -> Option<usize> {
+            self.receive_buffer_bytes
+        }
+
+        fn max_connection_duration_secs(&self) -> Option<u64> {
+            self.max_connection_duration_secs
+        }
+
+        fn max_connections(&self) -> Option<u32> {
+            self.max_connections
+        }
+    }
+
+    fn init_framestream_tcp(
+        source_id: &str,
+        addr: &SocketAddr,
+        frame_handler: impl TcpFrameHandler + Send + Sync + Clone + 'static,
+        pipeline: SourceSender,
+    ) -> (JoinHandle<Result<(), ()>>, SourceShutdownCoordinator) {
+        let source_id = ComponentKey::from(source_id);
+        let mut shutdown = SourceShutdownCoordinator::default();
+        let (shutdown_signal, _) = shutdown.register_source(&source_id, false);
+        let server = build_framestream_tcp_source(frame_handler, shutdown_signal, pipeline)
+            .expect("Failed to build framestream tcp source.");
+
+        let join_handle = tokio::spawn(server);
+
+        while std::net::TcpStream::connect(addr).is_err() {
+            thread::sleep(Duration::from_millis(2));
+        }
+
+        (join_handle, shutdown)
     }
 
     fn init_framestream_unix(
@@ -1026,6 +1198,13 @@ mod test {
         }
 
         (socket_path, join_handle, shutdown)
+    }
+
+    async fn make_tcp_stream(
+        addr: SocketAddr,
+    ) -> Framed<TcpStream, length_delimited::LengthDelimitedCodec> {
+        let socket = TcpStream::connect(&addr).await.unwrap();
+        Framed::new(socket, length_delimited::Builder::new().new_codec())
     }
 
     async fn make_unix_stream(
@@ -1090,7 +1269,14 @@ mod test {
     }
 
     fn create_frame_handler(multithreaded: bool) -> impl UnixFrameHandler + Send + Sync + Clone {
-        MockFrameHandler::new("test_content".to_string(), multithreaded, move || {})
+        MockUnixFrameHandler::new("test_content".to_string(), multithreaded, move || {})
+    }
+
+    fn create_tcp_frame_handler(
+        addr: SocketAddr,
+        multithreaded: bool,
+    ) -> impl TcpFrameHandler + Send + Sync + Clone {
+        MockTcpFrameHandler::new(addr, "test_content".to_string(), multithreaded, move || {})
     }
 
     async fn signal_shutdown(source_name: &str, shutdown: &mut SourceShutdownCoordinator) {
@@ -1102,64 +1288,18 @@ mod test {
         assert!(shutdown_success);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn normal_framestream_singlethreaded() {
-        let source_name = "test_source";
-        let (tx, rx) = SourceSender::new_test();
-        let (path, source_handle, mut shutdown) =
-            init_framestream_unix(source_name, create_frame_handler(false), tx);
-        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
-
-        //1 - send READY frame (with content_type)
-        let content_type = Bytes::from(&b"test_content"[..]);
-        let ready_msg =
-            create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
-        send_control_frame(&mut sock_sink, ready_msg).await;
-
-        //2 - wait for ACCEPT frame
-        let mut frame_vec = collect_n_stream(&mut sock_stream, 2).await;
-        //take second element, because first will be empty (signifying control frame)
-        assert_eq!(frame_vec[0].as_ref().unwrap().len(), 0);
-        assert_accept_frame(frame_vec[1].as_mut().unwrap(), content_type);
-
-        //3 - send START frame
-        send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Start)).await;
-
-        //4 - send data
-        send_data_frames(
-            &mut sock_sink,
-            vec![Ok(Bytes::from("hello")), Ok(Bytes::from("world"))],
-        )
-        .await;
-        let events = collect_n(rx, 2).await;
-
-        //5 - send STOP frame
-        send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
-
-        assert_eq!(
-            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
-            "hello".into(),
-        );
-        assert_eq!(
-            events[1].as_log()[log_schema().message_key().unwrap().to_string()],
-            "world".into(),
-        );
-
-        drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
-
-        // Ensure source actually shut down successfully.
-        signal_shutdown(source_name, &mut shutdown).await;
-        _ = source_handle.await.unwrap();
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn normal_framestream_multithreaded() {
-        let source_name = "test_source";
-        let (tx, rx) = SourceSender::new_test();
-        let (path, source_handle, mut shutdown) =
-            init_framestream_unix(source_name, create_frame_handler(true), tx);
-        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
-
+    async fn test_normal_framestream<
+        T: Sink<Bytes, Error = std::io::Error> + Unpin,
+        U: Stream<Item = Result<BytesMut, std::io::Error>> + Unpin,
+        V: Stream<Item = Event> + Unpin,
+    >(
+        source_name: &str,
+        mut sock_sink: T,
+        mut sock_stream: U,
+        rx: V,
+        mut shutdown: SourceShutdownCoordinator,
+        source_handle: JoinHandle<Result<(), ()>>,
+    ) {
         //1 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
         let ready_msg =
@@ -1201,14 +1341,16 @@ mod test {
         _ = source_handle.await.unwrap();
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn multiple_content_types() {
-        let source_name = "test_source";
-        let (tx, _) = SourceSender::new_test();
-        let (path, source_handle, mut shutdown) =
-            init_framestream_unix(source_name, create_frame_handler(false), tx);
-        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
-
+    async fn test_multiple_content_types<
+        T: Sink<Bytes, Error = std::io::Error> + Unpin,
+        U: Stream<Item = Result<BytesMut, std::io::Error>> + Unpin,
+    >(
+        source_name: &str,
+        mut sock_sink: T,
+        mut sock_stream: U,
+        mut shutdown: SourceShutdownCoordinator,
+        source_handle: JoinHandle<Result<(), ()>>,
+    ) {
         //1 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
         let ready_msg = create_control_frame_with_content(
@@ -1229,6 +1371,117 @@ mod test {
         // Ensure source actually shut down successfully.
         signal_shutdown(source_name, &mut shutdown).await;
         _ = source_handle.await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn normal_framestream_singlethreaded_tcp() {
+        let source_name = "test_source";
+        let (tx, rx) = SourceSender::new_test();
+        let addr = next_addr();
+        let (source_handle, shutdown) = init_framestream_tcp(
+            source_name,
+            &addr,
+            create_tcp_frame_handler(addr, false),
+            tx,
+        );
+        let (sock_sink, sock_stream) = make_tcp_stream(addr).await.split();
+
+        test_normal_framestream(
+            source_name,
+            sock_sink,
+            sock_stream,
+            rx,
+            shutdown,
+            source_handle,
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn normal_framestream_singlethreaded_unix() {
+        let source_name = "test_source";
+        let (tx, rx) = SourceSender::new_test();
+        let (path, source_handle, shutdown) =
+            init_framestream_unix(source_name, create_frame_handler(false), tx);
+        let (sock_sink, sock_stream) = make_unix_stream(path).await.split();
+
+        test_normal_framestream(
+            source_name,
+            sock_sink,
+            sock_stream,
+            rx,
+            shutdown,
+            source_handle,
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn normal_framestream_multithreaded_tcp() {
+        let source_name = "test_source";
+        let (tx, rx) = SourceSender::new_test();
+        let addr = next_addr();
+        let (source_handle, shutdown) =
+            init_framestream_tcp(source_name, &addr, create_tcp_frame_handler(addr, true), tx);
+        let (sock_sink, sock_stream) = make_tcp_stream(addr).await.split();
+
+        test_normal_framestream(
+            source_name,
+            sock_sink,
+            sock_stream,
+            rx,
+            shutdown,
+            source_handle,
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn normal_framestream_multithreaded_unix() {
+        let source_name = "test_source";
+        let (tx, rx) = SourceSender::new_test();
+        let (path, source_handle, shutdown) =
+            init_framestream_unix(source_name, create_frame_handler(true), tx);
+        let (sock_sink, sock_stream) = make_unix_stream(path).await.split();
+
+        test_normal_framestream(
+            source_name,
+            sock_sink,
+            sock_stream,
+            rx,
+            shutdown,
+            source_handle,
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn multiple_content_types_tcp() {
+        let source_name = "test_source";
+        let (tx, _) = SourceSender::new_test();
+        let addr = next_addr();
+        let (source_handle, shutdown) = init_framestream_tcp(
+            source_name,
+            &addr,
+            create_tcp_frame_handler(addr, false),
+            tx,
+        );
+        let (sock_sink, sock_stream) = make_tcp_stream(addr).await.split();
+
+        test_multiple_content_types(source_name, sock_sink, sock_stream, shutdown, source_handle)
+            .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn multiple_content_types_unix() {
+        let source_name = "test_source";
+        let (tx, _) = SourceSender::new_test();
+        let (path, source_handle, shutdown) =
+            init_framestream_unix(source_name, create_frame_handler(false), tx);
+        let (sock_sink, sock_stream) = make_unix_stream(path).await.split();
+
+        test_multiple_content_types(source_name, sock_sink, sock_stream, shutdown, source_handle)
+            .await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
