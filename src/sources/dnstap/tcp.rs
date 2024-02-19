@@ -92,6 +92,12 @@ pub struct TcpConfig {
     /// (called `rawData`) and encoded as a base64 string.
     pub raw_data_only: Option<bool>,
 
+    /// Whether or not to concurrently process DNSTAP frames.
+    pub multithreaded: Option<bool>,
+
+    /// Maximum number of frames that can be processed concurrently.
+    pub max_frame_handling_tasks: Option<u32>,
+
     /// The namespace to use for logs. This overrides the global settings.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
@@ -120,6 +126,8 @@ impl TcpConfig {
             host_key: None,
             port_key: default_port_key(),
             raw_data_only: None,
+            multithreaded: None,
+            max_frame_handling_tasks: None,
             tls: None,
             receive_buffer_bytes: None,
             max_connection_duration_secs: None,
@@ -196,8 +204,8 @@ impl DnstapFrameHandler {
             max_frame_length: config.max_frame_length,
             content_type: "protobuf:dnstap.Dnstap".to_string(),
             raw_data_only: config.raw_data_only.unwrap_or(false),
-            multithreaded: false,
-            max_frame_handling_tasks: 1000,
+            multithreaded: config.multithreaded.unwrap_or(false),
+            max_frame_handling_tasks: config.max_frame_handling_tasks.unwrap_or(1000),
             address: config.address,
             keepalive: config.keepalive,
             shutdown_timeout_secs: config.shutdown_timeout_secs,
