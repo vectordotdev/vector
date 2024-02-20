@@ -8,7 +8,7 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-anyhow = "1.0.79"
+anyhow = "1.0.80"
 cached = "0.48.0"
 chrono.workspace = true
 clap.workspace = true
