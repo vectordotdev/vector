@@ -25,7 +25,7 @@ use crate::{
             http::HeaderValidationError,
             test::{
                 build_test_server, build_test_server_generic, build_test_server_status,
-                get_received,
+                get_received_gzip,
             },
         },
     },
@@ -288,7 +288,7 @@ async fn retries_on_no_connection() {
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let output_lines = get_received(rx, |parts| {
+        let output_lines = get_received_gzip(rx, |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/frames", parts.uri.path());
         })
@@ -334,7 +334,7 @@ async fn retries_on_temporary_error() {
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let output_lines = get_received(rx, |parts| {
+        let output_lines = get_received_gzip(rx, |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/frames", parts.uri.path());
         })
@@ -368,7 +368,8 @@ async fn fails_on_permanent_error() {
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 
-        let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
+        let output_lines =
+            get_received_gzip(rx, |_| unreachable!("There should be no lines")).await;
         assert!(output_lines.is_empty());
     })
     .await;
@@ -554,7 +555,7 @@ async fn run_sink(extra_config: &str, assert_parts: impl Fn(http::request::Parts
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-    let output_lines = get_received(rx, assert_parts).await;
+    let output_lines = get_received_gzip(rx, assert_parts).await;
 
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);

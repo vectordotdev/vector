@@ -1,5 +1,5 @@
 use bytes::{Buf, Bytes};
-use flate2::read::MultiGzDecoder;
+use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::{channel::mpsc, stream, FutureExt, SinkExt, TryFutureExt};
 use futures_util::StreamExt;
 use http::request::Parts;
@@ -112,13 +112,30 @@ where
     (rx, trigger, server)
 }
 
-pub async fn get_received(
+pub async fn get_received_gzip(
     rx: mpsc::Receiver<(Parts, Bytes)>,
     assert_parts: impl Fn(Parts),
 ) -> Vec<String> {
     rx.flat_map(|(parts, body)| {
         assert_parts(parts);
         stream::iter(BufReader::new(MultiGzDecoder::new(body.reader())).lines())
+    })
+    .map(Result::unwrap)
+    .map(|line| {
+        let val: serde_json::Value = serde_json::from_str(&line).unwrap();
+        val.get("message").unwrap().as_str().unwrap().to_owned()
+    })
+    .collect::<Vec<_>>()
+    .await
+}
+
+pub async fn get_received_zlib(
+    rx: mpsc::Receiver<(Parts, Bytes)>,
+    assert_parts: impl Fn(Parts),
+) -> Vec<String> {
+    rx.flat_map(|(parts, body)| {
+        assert_parts(parts);
+        stream::iter(BufReader::new(ZlibDecoder::new(body.reader())).lines())
     })
     .map(Result::unwrap)
     .map(|line| {
