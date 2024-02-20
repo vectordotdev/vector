@@ -259,7 +259,6 @@ impl ValidatableComponent for HttpClientConfig {
                 config,
                 None,
                 Some(external_resource),
-                None,
             )],
         )
     }

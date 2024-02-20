@@ -446,14 +446,9 @@ fn build_external_resource(
     let component_type = configuration.component_type();
     let maybe_external_resource = configuration.external_resource(test_case);
 
-    // use the provided input codec if specified, this generally occurs if we are testing error paths that
-    // necessitate being able to encode the input event for the input driver without error, but error on
-    // the encoding in the component under test.
-    let resource_codec = configuration.input_codec(test_case).or_else(|| {
-        maybe_external_resource
-            .as_ref()
-            .map(|resource| resource.codec.clone())
-    });
+    let resource_codec = maybe_external_resource
+        .as_ref()
+        .map(|resource| resource.codec.clone());
 
     let maybe_encoder = resource_codec.as_ref().map(|codec| codec.into_encoder());
 

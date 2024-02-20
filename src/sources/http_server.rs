@@ -298,7 +298,6 @@ impl ValidatableComponent for SimpleHttpConfig {
                 config,
                 None,
                 Some(external_resource),
-                None,
             )],
         )
     }

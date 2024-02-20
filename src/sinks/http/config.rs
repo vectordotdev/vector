@@ -312,71 +312,62 @@ impl ValidatableComponent for HttpSinkConfig {
         use std::str::FromStr;
         use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
 
-        let happy_config = Self {
-            uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
-                .expect("should never fail to parse"),
-            method: HttpMethod::Post,
-            encoding: EncodingConfigWithFraming::new(
-                None,
-                JsonSerializerConfig::new(MetricTagValues::Full).into(),
-                Transformer::default(),
-            ),
-            auth: None,
-            headers: None,
-            compression: Compression::default(),
-            batch: BatchConfig::default(),
-            request: RequestConfig::default(),
-            tls: None,
-            acknowledgements: AcknowledgementsConfig::default(),
-            payload_prefix: String::new(),
-            payload_suffix: String::new(),
-        };
-
-        let happy_external_resource = ExternalResource::new(
-            ResourceDirection::Push,
-            HttpResourceConfig::from_parts(
-                happy_config.uri.uri.clone(),
-                Some(happy_config.method.into()),
-            ),
-            happy_config.encoding.clone(),
-        );
-
-        // this config uses the Gelf serializer, which requires the "level" field to
-        // be an integer
-        let sad_config = Self {
-            uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
-                .expect("should never fail to parse"),
-            method: HttpMethod::Post,
-            encoding: EncodingConfigWithFraming::new(
-                None,
-                GelfSerializerConfig::new().into(),
-                Transformer::default(),
-            ),
-            auth: None,
-            headers: None,
-            compression: Compression::default(),
-            batch: BatchConfig::default(),
-            request: RequestConfig::default(),
-            tls: None,
-            acknowledgements: AcknowledgementsConfig::default(),
-            payload_prefix: String::new(),
-            payload_suffix: String::new(),
-        };
-
-        let sad_external_resource = ExternalResource::new(
-            ResourceDirection::Push,
-            HttpResourceConfig::from_parts(
-                sad_config.uri.uri.clone(),
-                Some(sad_config.method.into()),
-            ),
-            sad_config.encoding.clone(),
-        );
-
-        // this encoder is used to ingest the input event to the input driver (which we need to succeed)
-        let sad_encoder = EncodingConfigWithFraming::new(
+        let happy_encoder = EncodingConfigWithFraming::new(
             None,
             JsonSerializerConfig::new(MetricTagValues::Full).into(),
             Transformer::default(),
+        );
+
+        fn get_config(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
+            HttpSinkConfig {
+                uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
+                    .expect("should never fail to parse"),
+                method: HttpMethod::Post,
+                encoding,
+                auth: None,
+                headers: None,
+                compression: Compression::default(),
+                batch: BatchConfig::default(),
+                request: RequestConfig::default(),
+                tls: None,
+                acknowledgements: AcknowledgementsConfig::default(),
+                payload_prefix: String::new(),
+                payload_suffix: String::new(),
+            }
+        }
+
+        fn get_external_resource(
+            config: &HttpSinkConfig,
+            encoding: Option<EncodingConfigWithFraming>,
+        ) -> ExternalResource {
+            ExternalResource::new(
+                ResourceDirection::Push,
+                HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
+                if let Some(encoding) = encoding {
+                    encoding
+                } else {
+                    config.encoding.clone()
+                },
+            )
+        }
+
+        let happy_config = get_config(happy_encoder.clone());
+
+        let happy_external_resource = get_external_resource(&happy_config, None);
+
+        // this config uses the Gelf serializer, which requires the "level" field to
+        // be an integer
+        let sad_config = get_config(EncodingConfigWithFraming::new(
+            None,
+            GelfSerializerConfig::new().into(),
+            Transformer::default(),
+        ));
+
+        let sad_external_resource = get_external_resource(
+            &happy_config,
+            // the external resource needs to use an encoder that actually works, in order to
+            // get the event into the topology successfuly
+            Some(happy_encoder),
         );
 
         ValidationConfiguration::from_sink(
@@ -386,14 +377,12 @@ impl ValidatableComponent for HttpSinkConfig {
                     happy_config,
                     None,
                     Some(happy_external_resource),
-                    None,
                 ),
                 // this config only runs with the test case "encoding_error" in the yaml file.
                 ComponentTestCaseConfig::from_sink(
                     sad_config,
                     Some("encoding_error".to_owned()),
                     Some(sad_external_resource),
-                    Some(sad_encoder.into()),
                 ),
             ],
         )

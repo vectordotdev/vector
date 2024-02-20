@@ -64,10 +64,6 @@ pub struct ComponentTestCaseConfig {
     /// If specified, this name must match the `config_name` field of at least one of the test case events.
     test_case: Option<String>,
     external_resource: Option<ExternalResource>,
-    /// If specified, this codec is used instead of the one that the external resource uses. This is necessary
-    /// in order to allow testing failure paths where the ingest into the topology needs to succeed, but the
-    /// encoding of the event by the component under test needs to fail.
-    input_codec: Option<ResourceCodec>,
 }
 
 impl ComponentTestCaseConfig {
@@ -75,39 +71,33 @@ impl ComponentTestCaseConfig {
         config: C,
         test_case: Option<String>,
         external_resource: Option<ExternalResource>,
-        input_codec: Option<ResourceCodec>,
     ) -> Self {
         Self {
             config: ComponentConfiguration::Source(config.into()),
             test_case,
             external_resource,
-            input_codec,
         }
     }
     pub fn from_transform<C: Into<BoxedTransform>>(
         config: C,
         test_case: Option<String>,
         external_resource: Option<ExternalResource>,
-        input_codec: Option<ResourceCodec>,
     ) -> Self {
         Self {
             config: ComponentConfiguration::Transform(config.into()),
             test_case,
             external_resource,
-            input_codec,
         }
     }
     pub fn from_sink<C: Into<BoxedSink>>(
         config: C,
         test_case: Option<String>,
         external_resource: Option<ExternalResource>,
-        input_codec: Option<ResourceCodec>,
     ) -> Self {
         Self {
             config: ComponentConfiguration::Sink(config.into()),
             test_case,
             external_resource,
-            input_codec,
         }
     }
 }
@@ -199,12 +189,6 @@ impl ValidationConfiguration {
     pub fn external_resource(&self, test_case: Option<&String>) -> Option<ExternalResource> {
         self.get_comp_test_case(test_case)
             .and_then(|c| c.external_resource)
-    }
-
-    /// Gets the input codec for validating the component, if any.
-    pub fn input_codec(&self, test_case: Option<&String>) -> Option<ResourceCodec> {
-        self.get_comp_test_case(test_case)
-            .and_then(|c| c.input_codec)
     }
 }
 
