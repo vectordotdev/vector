@@ -364,20 +364,6 @@ impl DnsMessageParser {
 
             dns_message::RTYPE_WKS => self.parse_wks_rdata(rdata.anything()),
 
-            dns_message::RTYPE_HINFO => {
-                let mut decoder = BinDecoder::new(rdata.anything());
-                let cpu = parse_character_string(&mut decoder)?;
-                let os = parse_character_string(&mut decoder)?;
-                Ok((
-                    Some(format!(
-                        "\"{}\" \"{}\"",
-                        escape_string_for_text_representation(cpu),
-                        escape_string_for_text_representation(os)
-                    )),
-                    None,
-                ))
-            }
-
             dns_message::RTYPE_MINFO => {
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let rmailbx = parse_domain_name(&mut decoder)?;
@@ -657,6 +643,18 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
                 naptr.replacement().to_utf8()
             );
             Ok((Some(naptr_rdata), None))
+        }
+        RData::HINFO(hinfo) => {
+            let hinfo_data = format!(
+                r#""{}" "{}""#,
+                std::str::from_utf8(hinfo.cpu())
+                    .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
+                    .to_string(),
+                std::str::from_utf8(hinfo.os())
+                    .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
+                    .to_string(),
+            );
+            Ok((Some(hinfo_data), None))
         }
         RData::HTTPS(https) => {
             let https_data = format_svcb_record(&https.0);
@@ -1170,7 +1168,7 @@ mod tests {
             sshfp::{Algorithm, FingerprintType},
             svcb,
             tlsa::{CertUsage, Matching, Selector},
-            CAA, HTTPS, NAPTR, SSHFP, TLSA, TXT,
+            CAA, HINFO, HTTPS, NAPTR, SSHFP, TLSA, TXT,
         },
     };
 
@@ -1252,6 +1250,24 @@ mod tests {
             Some(r#"1 . alpn="h3,h2" ipv4hint="172.64.196.28,172.64.197.28" ipv6hint="2606:4700:e6::ac40:c41c,2606:4700:e6::ac40:c51c""#.to_string())
         );
         assert_eq!(dns_response_message.answer_section[0].record_type_id, 65u16);
+        assert_eq!(dns_response_message.answer_section[0].rdata_bytes, None);
+    }
+
+    #[test]
+    fn test_parse_response_with_hinfo_rdata() {
+        let raw_response_message_base64 =
+            "wS2BgAABAAEAAAAAB3RyYWNrZXIEZGxlcgNvcmcAAP8AAcAMAA0AAQAAC64ACQdSRkM4NDgyAA==";
+        let raw_response_message = BASE64
+            .decode(raw_response_message_base64.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let dns_response_message = DnsMessageParser::new(raw_response_message)
+            .parse_as_query_message()
+            .expect("Invalid DNS query message.");
+        assert_eq!(
+            dns_response_message.answer_section[0].rdata,
+            Some(r#""RFC8482" """#.to_string())
+        );
+        assert_eq!(dns_response_message.answer_section[0].record_type_id, 13u16);
         assert_eq!(dns_response_message.answer_section[0].rdata_bytes, None);
     }
 
@@ -1723,7 +1739,13 @@ mod tests {
 
     #[test]
     fn test_format_rdata_for_hinfo_type() {
-        test_format_rdata("BWludGVsBWxpbnV4", 13, "\"intel\" \"linux\"");
+        let rdata = RData::HINFO(HINFO::new("intel".to_string(), "linux".to_string()));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!(r#""intel" "linux""#, parsed.unwrap());
+        }
     }
 
     #[test]
