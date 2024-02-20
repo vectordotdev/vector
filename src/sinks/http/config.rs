@@ -366,7 +366,7 @@ impl ValidatableComponent for HttpSinkConfig {
         let sad_external_resource = get_external_resource(
             &happy_config,
             // the external resource needs to use an encoder that actually works, in order to
-            // get the event into the topology successfuly
+            // get the event into the topology sucessfully
             Some(happy_encoder),
         );
 

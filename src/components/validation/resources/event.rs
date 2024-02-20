@@ -75,7 +75,7 @@ pub enum TestEvent {
     /// The event is used, as-is, without modification.
     Passthrough(Event),
 
-    /// The event is expected to fail because an alernative encoder than the one specified in the confiuguration
+    /// The event is expected to fail because an alernative encoder than the one specified in the configuration
     /// is used to encode the event.
     FailWithAlternateEncoder(Event),
 
