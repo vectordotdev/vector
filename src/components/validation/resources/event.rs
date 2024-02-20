@@ -72,9 +72,8 @@ pub enum TestEvent {
     /// The event is used, as-is, without modification.
     Passthrough(Event),
 
-    /// The event is used, as-is, without modification by the framework, but we expect it to fail.
-    PassthroughFail(Event),
-
+    // /// The event is used, as-is, without modification by the framework, but we expect it to fail.
+    // PassthroughFail(Event),
     /// The event is potentially modified by the external resource.
     ///
     /// The modification made is dependent on the external resource, but this mode is made available
@@ -92,7 +91,6 @@ impl TestEvent {
     pub fn into_event(self) -> Event {
         match self {
             Self::Passthrough(event) => event,
-            Self::PassthroughFail(event) => event,
             Self::Modified { event, .. } => event,
         }
     }
@@ -100,7 +98,6 @@ impl TestEvent {
     pub fn get_event(&mut self) -> &mut Event {
         match self {
             Self::Passthrough(event) => event,
-            Self::PassthroughFail(event) => event,
             Self::Modified { event, .. } => event,
         }
     }
@@ -108,7 +105,6 @@ impl TestEvent {
     pub fn get(self) -> (bool, Event) {
         match self {
             Self::Passthrough(event) => (false, event),
-            Self::PassthroughFail(event) => (true, event),
             Self::Modified { modified, event } => (modified, event),
         }
     }
@@ -138,7 +134,10 @@ impl From<RawTestEvent> for TestEvent {
                 log_event.insert(name.as_str(), value);
 
                 if fail.unwrap_or_default() {
-                    TestEvent::PassthroughFail(event)
+                    TestEvent::Modified {
+                        modified: true,
+                        event,
+                    }
                 } else {
                     TestEvent::Passthrough(event)
                 }
@@ -153,32 +152,39 @@ pub fn encode_test_event(
     event: TestEvent,
 ) {
     match event {
-        TestEvent::Passthrough(event) | TestEvent::PassthroughFail(event) => {
+        TestEvent::Passthrough(event) => {
             // Encode the event normally.
             encoder
                 .encode(event, buf)
                 .expect("should not fail to encode input event");
         }
-        TestEvent::Modified { event, .. } => {
-            // This is a little fragile, but we check what serializer this encoder uses, and based
-            // on `Serializer::supports_json`, we choose an opposing codec. For example, if the
-            // encoder supports JSON, we'll use a serializer that doesn't support JSON, and vise
-            // versa.
-            let mut alt_encoder = if encoder.serializer().supports_json() {
-                Encoder::<encoding::Framer>::new(
-                    LengthDelimitedEncoder::new().into(),
-                    LogfmtSerializer::new().into(),
-                )
-            } else {
-                Encoder::<encoding::Framer>::new(
-                    NewlineDelimitedEncoder::new().into(),
-                    JsonSerializer::new(MetricTagValues::default()).into(),
-                )
-            };
+        TestEvent::Modified { event, modified } => {
+            if modified {
+                // This is a little fragile, but we check what serializer this encoder uses, and based
+                // on `Serializer::supports_json`, we choose an opposing codec. For example, if the
+                // encoder supports JSON, we'll use a serializer that doesn't support JSON, and vise
+                // versa.
+                let mut alt_encoder = if encoder.serializer().supports_json() {
+                    Encoder::<encoding::Framer>::new(
+                        LengthDelimitedEncoder::new().into(),
+                        LogfmtSerializer::new().into(),
+                    )
+                } else {
+                    Encoder::<encoding::Framer>::new(
+                        NewlineDelimitedEncoder::new().into(),
+                        JsonSerializer::new(MetricTagValues::default()).into(),
+                    )
+                };
 
-            alt_encoder
-                .encode(event, buf)
-                .expect("should not fail to encode input event");
+                alt_encoder
+                    .encode(event, buf)
+                    .expect("should not fail to encode input event");
+            } else {
+                // Encode the event normally.
+                encoder
+                    .encode(event, buf)
+                    .expect("should not fail to encode input event");
+            }
         }
     }
 }
