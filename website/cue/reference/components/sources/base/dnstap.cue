@@ -102,7 +102,7 @@ base: components: sources: dnstap: configuration: {
 	address: {
 		description: """
 			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
-			systemd socket activation.
+			`systemd` socket activation.
 
 			If a socket address is used, it _must_ include a port.
 			"""
