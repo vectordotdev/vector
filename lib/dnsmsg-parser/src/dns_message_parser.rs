@@ -1,12 +1,15 @@
-use std::fmt::Write as _;
 use std::str::Utf8Error;
+use std::{fmt::Write as _, ops::Deref};
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
 use hickory_proto::{
     error::ProtoError,
     op::{message::Message as TrustDnsMessage, Edns, Query},
     rr::{
-        dnssec::{rdata::DNSSECRData, Algorithm, SupportedAlgorithms},
+        dnssec::{
+            rdata::{DNSSECRData, DNSKEY},
+            Algorithm, SupportedAlgorithms,
+        },
         rdata::{
             caa::Value,
             opt::{EdnsCode, EdnsOption},
@@ -677,23 +680,8 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
                 );
                 Ok((Some(ds_rdata), None))
             }
-            DNSSECRData::DNSKEY(dnskey) => {
-                let dnskey_rdata = format!(
-                    "{} 3 {} {}",
-                    {
-                        if dnskey.revoke() {
-                            0b0000_0000_0000_0000
-                        } else if dnskey.zone_key() && dnskey.secure_entry_point() {
-                            0b0000_0001_0000_0001
-                        } else {
-                            0b0000_0001_0000_0000
-                        }
-                    },
-                    u8::from(dnskey.algorithm()),
-                    BASE64.encode(dnskey.public_key())
-                );
-                Ok((Some(dnskey_rdata), None))
-            }
+            DNSSECRData::CDNSKEY(cdnskey) => Ok((Some(format_dnskey(cdnskey.deref())), None)),
+            DNSSECRData::DNSKEY(dnskey) => Ok((Some(format_dnskey(dnskey)), None)),
             DNSSECRData::NSEC(nsec) => {
                 let nsec_rdata = format!(
                     "{} {}",
@@ -810,6 +798,23 @@ fn format_svcb_record(svcb: &SVCB) -> String {
             .map(|(key, value)| format!(r#"{}="{}""#, key, value.to_string().trim_end_matches(',')))
             .collect::<Vec<_>>()
             .join(" ")
+    )
+}
+
+fn format_dnskey(dnskey: &DNSKEY) -> String {
+    format!(
+        "{} 3 {} {}",
+        {
+            if dnskey.revoke() {
+                0b0000_0000_0000_0000
+            } else if dnskey.zone_key() && dnskey.secure_entry_point() {
+                0b0000_0001_0000_0001
+            } else {
+                0b0000_0001_0000_0000
+            }
+        },
+        u8::from(dnskey.algorithm()),
+        BASE64.encode(dnskey.public_key())
     )
 }
 
