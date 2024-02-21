@@ -520,6 +520,11 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
         RData::AAAA(ip) => Ok((Some(ip.to_string()), None)),
         RData::ANAME(name) => Ok((Some(name.to_string()), None)),
         RData::CNAME(name) => Ok((Some(name.to_string()), None)),
+        RData::CSYNC(csync) => {
+            // Using CSYNC's formatter since not all data is exposed otherwise
+            let csync_rdata = format!("{}", csync);
+            Ok((Some(csync_rdata), None))
+        }
         RData::MX(mx) => {
             let srv_rdata = format!("{} {}", mx.preference(), mx.exchange(),);
             Ok((Some(srv_rdata), None))
@@ -1195,7 +1200,7 @@ mod tests {
             sshfp::{Algorithm, FingerprintType},
             svcb,
             tlsa::{CertUsage, Matching, Selector},
-            CAA, HINFO, HTTPS, NAPTR, SSHFP, TLSA, TXT,
+            CAA, CSYNC, HINFO, HTTPS, NAPTR, SSHFP, TLSA, TXT,
         },
     };
 
@@ -1802,6 +1807,18 @@ mod tests {
         if let Ok((parsed, raw_rdata)) = rdata_text {
             assert!(raw_rdata.is_none());
             assert_eq!(r#""intel" "linux""#, parsed.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_csync_type() {
+        let types = vec![RecordType::A, RecordType::NS, RecordType::AAAA];
+        let rdata = RData::CSYNC(CSYNC::new(123, true, true, types));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!("123 3 A NS AAAA", parsed.unwrap());
         }
     }
 
