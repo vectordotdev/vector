@@ -140,9 +140,7 @@ where
         let reader = BufReader::new(decoder);
         stream::iter(reader.lines())
     })
-    .map(|result| {
-        result.expect("Error reading line") // Handle errors appropriately
-    })
+    .map(Result::unwrap)
     .map(|line| {
         let val: serde_json::Value = serde_json::from_str(&line).unwrap();
         val.get("message").unwrap().as_str().unwrap().to_owned()
