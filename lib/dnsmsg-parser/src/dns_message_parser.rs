@@ -673,6 +673,32 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
             let svcb_data = format_svcb_record(svcb);
             Ok((Some(svcb_data), None))
         }
+        RData::OPT(opt) => {
+            let opt_data = opt
+                .as_ref()
+                .iter()
+                .map(|(code, option)| {
+                    format!(
+                        "{}={}",
+                        u16::from(*code),
+                        match option {
+                            EdnsOption::DAU(ref algorithms)
+                            | EdnsOption::DHU(ref algorithms)
+                            | EdnsOption::N3U(ref algorithms) => format!("{}", algorithms),
+                            EdnsOption::Subnet(client_subnet) => format!("{:?}", client_subnet),
+                            EdnsOption::Unknown(_, data) => data
+                                .iter()
+                                .map(|b| format!("{:#04x}", b))
+                                .collect::<Vec<String>>()
+                                .join(" "),
+                            _ => "unknown".to_string(),
+                        }
+                    )
+                })
+                .collect::<Vec<String>>()
+                .join(",");
+            Ok((Some(opt_data), None))
+        }
         RData::DNSSEC(dnssec) => match dnssec {
             // See https://tools.ietf.org/html/rfc4034 for details
             // on dnssec related rdata formats
@@ -1175,6 +1201,7 @@ fn format_bytes_as_hex_string(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use std::{
+        collections::HashMap,
         net::{Ipv4Addr, Ipv6Addr},
         str::FromStr,
     };
@@ -1200,7 +1227,7 @@ mod tests {
             sshfp::{Algorithm, FingerprintType},
             svcb,
             tlsa::{CertUsage, Matching, Selector},
-            CAA, CSYNC, HINFO, HTTPS, NAPTR, SSHFP, TLSA, TXT,
+            CAA, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
         },
     };
 
@@ -1819,6 +1846,22 @@ mod tests {
         if let Ok((parsed, raw_rdata)) = rdata_text {
             assert!(raw_rdata.is_none());
             assert_eq!("123 3 A NS AAAA", parsed.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_opt_type() {
+        let mut options = HashMap::new();
+        options.insert(
+            EdnsCode::LLQ,
+            EdnsOption::Unknown(u16::from(EdnsCode::LLQ), vec![0x01; 18]),
+        );
+        let rdata = RData::OPT(OPT::new(options));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!("1=0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01", parsed.unwrap());
         }
     }
 
