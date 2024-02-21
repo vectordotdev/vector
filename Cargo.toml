@@ -184,7 +184,7 @@ aws-sdk-kinesis = { version = "1.3.0", default-features = false, features = ["be
 aws-types = { version = "1.1.5", default-features = false, optional = true }
 aws-sigv4 = { version = "1.1.5", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest"], optional = true }
-aws-credential-types = { version = "1.1.5", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-credential-types = { version = "1.1.6", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream"], optional = true }
 aws-smithy-types = { version = "1.1.6", default-features = false, optional = true }
 aws-smithy-runtime-api = { version = "1.1.6", default-features = false, optional = true }
