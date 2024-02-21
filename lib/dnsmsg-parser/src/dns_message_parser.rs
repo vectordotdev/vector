@@ -673,8 +673,10 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
             // on dnssec related rdata formats
             DNSSECRData::CDS(cds) => Ok((Some(format_ds_record(cds.deref())), None)),
             DNSSECRData::DS(ds) => Ok((Some(format_ds_record(ds)), None)),
-            DNSSECRData::CDNSKEY(cdnskey) => Ok((Some(format_dnskey(cdnskey.deref())), None)),
-            DNSSECRData::DNSKEY(dnskey) => Ok((Some(format_dnskey(dnskey)), None)),
+            DNSSECRData::CDNSKEY(cdnskey) => {
+                Ok((Some(format_dnskey_record(cdnskey.deref())), None))
+            }
+            DNSSECRData::DNSKEY(dnskey) => Ok((Some(format_dnskey_record(dnskey)), None)),
             DNSSECRData::NSEC(nsec) => {
                 let nsec_rdata = format!(
                     "{} {}",
@@ -794,7 +796,7 @@ fn format_svcb_record(svcb: &SVCB) -> String {
     )
 }
 
-fn format_dnskey(dnskey: &DNSKEY) -> String {
+fn format_dnskey_record(dnskey: &DNSKEY) -> String {
     format!(
         "{} 3 {} {}",
         {
