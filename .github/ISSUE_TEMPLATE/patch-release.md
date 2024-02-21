@@ -51,4 +51,6 @@ On the day of release:
 - [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
   - Follow the [instructions at the top of the mirror.yaml file](https://github.com/DataDog/images/blob/fbf12868e90d52e513ebca0389610dea8a3c7e1a/mirror.yaml#L33-L49).
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
+- [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
+  - [ ] `git checkout website && git reset --hard origin/v0.<current minor version>.<patch> && git push`
 - [ ] Kick-off post-mortems for any regressions resolved by the release
