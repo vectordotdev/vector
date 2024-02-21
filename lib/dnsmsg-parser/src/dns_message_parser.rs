@@ -2,6 +2,7 @@ use std::str::Utf8Error;
 use std::{fmt::Write as _, ops::Deref};
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
+use hickory_proto::rr::dnssec::rdata::DS;
 use hickory_proto::{
     error::ProtoError,
     op::{message::Message as TrustDnsMessage, Edns, Query},
@@ -670,16 +671,8 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
         RData::DNSSEC(dnssec) => match dnssec {
             // See https://tools.ietf.org/html/rfc4034 for details
             // on dnssec related rdata formats
-            DNSSECRData::DS(ds) => {
-                let ds_rdata = format!(
-                    "{} {} {} {}",
-                    ds.key_tag(),
-                    u8::from(ds.algorithm()),
-                    u8::from(ds.digest_type()),
-                    HEXUPPER.encode(ds.digest())
-                );
-                Ok((Some(ds_rdata), None))
-            }
+            DNSSECRData::CDS(cds) => Ok((Some(format_ds_record(cds.deref())), None)),
+            DNSSECRData::DS(ds) => Ok((Some(format_ds_record(ds)), None)),
             DNSSECRData::CDNSKEY(cdnskey) => Ok((Some(format_dnskey(cdnskey.deref())), None)),
             DNSSECRData::DNSKEY(dnskey) => Ok((Some(format_dnskey(dnskey)), None)),
             DNSSECRData::NSEC(nsec) => {
@@ -815,6 +808,16 @@ fn format_dnskey(dnskey: &DNSKEY) -> String {
         },
         u8::from(dnskey.algorithm()),
         BASE64.encode(dnskey.public_key())
+    )
+}
+
+fn format_ds_record(ds: &DS) -> String {
+    format!(
+        "{} {} {} {}",
+        ds.key_tag(),
+        u8::from(ds.algorithm()),
+        u8::from(ds.digest_type()),
+        HEXUPPER.encode(ds.digest())
     )
 }
 
