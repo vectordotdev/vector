@@ -772,6 +772,16 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
                 );
                 Ok((Some(sig_rdata), None))
             }
+            DNSSECRData::KEY(key) => {
+                let key_rdata = format!(
+                    "{} {} {} {}",
+                    key.flags(),
+                    u8::from(key.protocol()),
+                    u8::from(key.algorithm()),
+                    BASE64.encode(key.public_key())
+                );
+                Ok((Some(key_rdata), None))
+            }
             DNSSECRData::Unknown { code: _, rdata } => Ok((None, Some(rdata.anything().to_vec()))),
             _ => Err(DnsMessageParserError::SimpleError {
                 cause: format!("Unsupported rdata {:?}", rdata),
@@ -1154,11 +1164,18 @@ mod tests {
         str::FromStr,
     };
 
+    #[allow(deprecated)]
     use hickory_proto::rr::{
         dnssec::{
             rdata::{
-                dnskey::DNSKEY, ds::DS, nsec::NSEC, nsec3::NSEC3, nsec3param::NSEC3PARAM, sig::SIG,
-                DNSSECRData, RRSIG,
+                dnskey::DNSKEY,
+                ds::DS,
+                key::{KeyTrust, KeyUsage, Protocol, UpdateScope},
+                nsec::NSEC,
+                nsec3::NSEC3,
+                nsec3param::NSEC3PARAM,
+                sig::SIG,
+                DNSSECRData, KEY, RRSIG,
             },
             Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
         },
@@ -1627,6 +1644,36 @@ mod tests {
             assert!(raw_rdata.is_none());
             assert_eq!(
                 "NULL 8 0 0 2 1 5 www.example.com AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHR8=",
+                parsed.unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_key_type() {
+        let rdata = RData::DNSSEC(DNSSECRData::KEY(KEY::new(
+            KeyTrust::NotPrivate,
+            KeyUsage::Host,
+            #[allow(deprecated)]
+            UpdateScope {
+                zone: false,
+                strong: false,
+                unique: true,
+                general: true,
+            },
+            Protocol::DNSSEC,
+            DNSSEC_Algorithm::RSASHA256,
+            vec![
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                23, 24, 25, 26, 27, 28, 29, 29, 31,
+            ],
+        )));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!(
+                "16387 3 8 AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHR8=",
                 parsed.unwrap()
             );
         }
