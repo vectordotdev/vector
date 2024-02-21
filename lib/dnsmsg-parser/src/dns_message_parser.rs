@@ -2,19 +2,18 @@ use std::str::Utf8Error;
 use std::{fmt::Write as _, ops::Deref};
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
-use hickory_proto::rr::dnssec::rdata::DS;
 use hickory_proto::{
     error::ProtoError,
-    op::{message::Message as TrustDnsMessage, Edns, Query},
+    op::{message::Message as TrustDnsMessage, Query},
     rr::{
         dnssec::{
-            rdata::{DNSSECRData, DNSKEY},
+            rdata::{DNSSECRData, DNSKEY, DS},
             Algorithm, SupportedAlgorithms,
         },
         rdata::{
             caa::Value,
             opt::{EdnsCode, EdnsOption},
-            A, AAAA, NULL, SVCB,
+            A, AAAA, NULL, OPT, SVCB,
         },
         record_data::RData,
         resource::Record,
@@ -674,27 +673,10 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
             Ok((Some(svcb_data), None))
         }
         RData::OPT(opt) => {
-            let opt_data = opt
-                .as_ref()
+            let parsed = parse_edns_options(opt)?;
+            let opt_data = parsed
                 .iter()
-                .map(|(code, option)| {
-                    format!(
-                        "{}={}",
-                        u16::from(*code),
-                        match option {
-                            EdnsOption::DAU(ref algorithms)
-                            | EdnsOption::DHU(ref algorithms)
-                            | EdnsOption::N3U(ref algorithms) => format!("{}", algorithms),
-                            EdnsOption::Subnet(client_subnet) => format!("{:?}", client_subnet),
-                            EdnsOption::Unknown(_, data) => data
-                                .iter()
-                                .map(|b| format!("{:#04x}", b))
-                                .collect::<Vec<String>>()
-                                .join(" "),
-                            _ => "unknown".to_string(),
-                        }
-                    )
-                })
+                .map(|entry| format!("{}={}", entry.opt_name, entry.opt_data))
                 .collect::<Vec<String>>()
                 .join(",");
             Ok((Some(opt_data), None))
@@ -915,7 +897,7 @@ fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeade
 
 fn parse_edns(dns_message: &TrustDnsMessage) -> Option<DnsParserResult<OptPseudoSection>> {
     dns_message.extensions().as_ref().map(|edns| {
-        parse_edns_options(edns).map(|options| OptPseudoSection {
+        parse_edns_options(edns.options()).map(|options| OptPseudoSection {
             extended_rcode: edns.rcode_high(),
             version: edns.version(),
             dnssec_ok: edns.dnssec_ok(),
@@ -925,9 +907,8 @@ fn parse_edns(dns_message: &TrustDnsMessage) -> Option<DnsParserResult<OptPseudo
     })
 }
 
-fn parse_edns_options(edns: &Edns) -> DnsParserResult<Vec<EdnsOptionEntry>> {
-    edns.options()
-        .as_ref()
+fn parse_edns_options(edns: &OPT) -> DnsParserResult<Vec<EdnsOptionEntry>> {
+    edns.as_ref()
         .iter()
         .map(|(code, option)| match option {
             EdnsOption::DAU(algorithms)
@@ -1861,7 +1842,7 @@ mod tests {
         assert!(rdata_text.is_ok());
         if let Ok((parsed, raw_rdata)) = rdata_text {
             assert!(raw_rdata.is_none());
-            assert_eq!("1=0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01 0x01", parsed.unwrap());
+            assert_eq!("LLQ=AQEBAQEBAQEBAQEBAQEBAQEB", parsed.unwrap());
         }
     }
 
