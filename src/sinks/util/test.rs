@@ -116,28 +116,33 @@ pub async fn get_received_gzip(
     rx: mpsc::Receiver<(Parts, Bytes)>,
     assert_parts: impl Fn(Parts),
 ) -> Vec<String> {
-    rx.flat_map(|(parts, body)| {
-        assert_parts(parts);
-        stream::iter(BufReader::new(MultiGzDecoder::new(body.reader())).lines())
-    })
-    .map(Result::unwrap)
-    .map(|line| {
-        let val: serde_json::Value = serde_json::from_str(&line).unwrap();
-        val.get("message").unwrap().as_str().unwrap().to_owned()
-    })
-    .collect::<Vec<_>>()
-    .await
+    get_received(rx, assert_parts, |body| MultiGzDecoder::new(body.reader())).await
 }
 
 pub async fn get_received_zlib(
     rx: mpsc::Receiver<(Parts, Bytes)>,
     assert_parts: impl Fn(Parts),
 ) -> Vec<String> {
+    get_received(rx, assert_parts, |body| ZlibDecoder::new(body.reader())).await
+}
+
+async fn get_received<D>(
+    rx: mpsc::Receiver<(Parts, Bytes)>,
+    assert_parts: impl Fn(Parts),
+    decoder_maker: impl Fn(Bytes) -> D,
+) -> Vec<String>
+where
+    D: std::io::Read,
+{
     rx.flat_map(|(parts, body)| {
         assert_parts(parts);
-        stream::iter(BufReader::new(ZlibDecoder::new(body.reader())).lines())
+        let decoder = decoder_maker(body);
+        let reader = BufReader::new(decoder);
+        stream::iter(reader.lines())
     })
-    .map(Result::unwrap)
+    .map(|result| {
+        result.expect("Error reading line") // Handle errors appropriately
+    })
     .map(|line| {
         let val: serde_json::Value = serde_json::from_str(&line).unwrap();
         val.get("message").unwrap().as_str().unwrap().to_owned()
