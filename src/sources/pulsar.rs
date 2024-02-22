@@ -145,7 +145,7 @@ pub struct OAuth2Config {
     /// The credentials URL.
     ///
     /// A data URL is also supported.
-    #[configurable(metadata(docs::examples = "{OAUTH2_CREDENTIALS_URL}"))]
+    #[configurable(metadata(docs::examples = "${OAUTH2_CREDENTIALS_URL}"))]
     #[configurable(metadata(docs::examples = "file:///oauth2_credentials"))]
     #[configurable(metadata(docs::examples = "data:application/json;base64,cHVsc2FyCg=="))]
     credentials_url: String,
