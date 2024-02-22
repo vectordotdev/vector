@@ -10,7 +10,7 @@ use hickory_proto::{
         rdata::{
             caa::Value,
             opt::{EdnsCode, EdnsOption},
-            A, AAAA, NULL,
+            A, AAAA, NULL, SVCB,
         },
         record_data::RData,
         resource::Record,
@@ -658,6 +658,14 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
             );
             Ok((Some(naptr_rdata), None))
         }
+        RData::HTTPS(https) => {
+            let https_data = format_svcb_record(&https.0);
+            Ok((Some(https_data), None))
+        }
+        RData::SVCB(svcb) => {
+            let svcb_data = format_svcb_record(svcb);
+            Ok((Some(svcb_data), None))
+        }
         RData::DNSSEC(dnssec) => match dnssec {
             // See https://tools.ietf.org/html/rfc4034 for details
             // on dnssec related rdata formats
@@ -782,6 +790,19 @@ fn format_record_type(record_type: RecordType) -> Option<String> {
         RecordType::Unknown(code) => parse_unknown_record_type(code),
         _ => Some(record_type.to_string()),
     }
+}
+
+fn format_svcb_record(svcb: &SVCB) -> String {
+    format!(
+        "{} {} {}",
+        svcb.svc_priority(),
+        svcb.target_name(),
+        svcb.svc_params()
+            .iter()
+            .map(|(key, value)| format!(r#"{}="{}""#, key, value.to_string().trim_end_matches(',')))
+            .collect::<Vec<_>>()
+            .join(" ")
+    )
 }
 
 fn parse_response_code(rcode: u16) -> Option<&'static str> {
@@ -1147,8 +1168,9 @@ mod tests {
         rdata::{
             caa::KeyValue,
             sshfp::{Algorithm, FingerprintType},
+            svcb,
             tlsa::{CertUsage, Matching, Selector},
-            CAA, NAPTR, SSHFP, TLSA, TXT,
+            CAA, HTTPS, NAPTR, SSHFP, TLSA, TXT,
         },
     };
 
@@ -1214,6 +1236,23 @@ mod tests {
             .expect("Invalid DNS query message.");
         assert_eq!(dns_query_message.answer_section[0].rdata, None);
         assert_ne!(dns_query_message.answer_section[0].rdata_bytes, None);
+    }
+
+    #[test]
+    fn test_parse_response_with_https_rdata() {
+        let raw_response_message_base64 = "Oe2BgAABAAEAAAABBGNkbnAHc2FuamFnaANjb20AAEEAAcAMAEEAAQAAASwAPQABAAABAAYCaDMCaDIABAAIrEDEHKxAxRwABgAgJgZHAADmAAAAAAAArEDEHCYGRwAA5gAAAAAAAKxAxRwAACkE0AAAAAAAHAAKABjWOVAgEGik/gEAAABlwiAuXkvEOviB1sk=";
+        let raw_response_message = BASE64
+            .decode(raw_response_message_base64.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let dns_response_message = DnsMessageParser::new(raw_response_message)
+            .parse_as_query_message()
+            .expect("Invalid DNS query message.");
+        assert_eq!(
+            dns_response_message.answer_section[0].rdata,
+            Some(r#"1 . alpn="h3,h2" ipv4hint="172.64.196.28,172.64.197.28" ipv6hint="2606:4700:e6::ac40:c41c,2606:4700:e6::ac40:c51c""#.to_string())
+        );
+        assert_eq!(dns_response_message.answer_section[0].record_type_id, 65u16);
+        assert_eq!(dns_response_message.answer_section[0].rdata_bytes, None);
     }
 
     #[test]
@@ -1619,6 +1658,66 @@ mod tests {
         if let Ok((parsed, raw_rdata)) = rdata_text {
             assert!(raw_rdata.is_none());
             assert_eq!("61455 8 2 05060708", parsed.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_svcb_type() {
+        let rdata = RData::SVCB(svcb::SVCB::new(
+            1,
+            Name::root(),
+            vec![
+                (
+                    svcb::SvcParamKey::Alpn,
+                    svcb::SvcParamValue::Alpn(svcb::Alpn(vec!["h3".to_string(), "h2".to_string()])),
+                ),
+                (
+                    svcb::SvcParamKey::Ipv4Hint,
+                    svcb::SvcParamValue::Ipv4Hint(svcb::IpHint(vec![
+                        A(Ipv4Addr::new(104, 18, 36, 155)),
+                        A(Ipv4Addr::new(172, 64, 151, 101)),
+                    ])),
+                ),
+            ],
+        ));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!(
+                r#"1 . alpn="h3,h2" ipv4hint="104.18.36.155,172.64.151.101""#,
+                parsed.unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_https_type() {
+        let rdata = RData::HTTPS(HTTPS(svcb::SVCB::new(
+            1,
+            Name::root(),
+            vec![
+                (
+                    svcb::SvcParamKey::Alpn,
+                    svcb::SvcParamValue::Alpn(svcb::Alpn(vec!["h3".to_string(), "h2".to_string()])),
+                ),
+                (
+                    svcb::SvcParamKey::Ipv4Hint,
+                    svcb::SvcParamValue::Ipv4Hint(svcb::IpHint(vec![
+                        A(Ipv4Addr::new(104, 18, 36, 155)),
+                        A(Ipv4Addr::new(172, 64, 151, 101)),
+                    ])),
+                ),
+            ],
+        )));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!(
+                r#"1 . alpn="h3,h2" ipv4hint="104.18.36.155,172.64.151.101""#,
+                parsed.unwrap()
+            );
         }
     }
 

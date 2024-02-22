@@ -29,7 +29,7 @@ api: {
 			required: false
 			type: string: {
 				default: "127.0.0.1:8686"
-				examples: ["0.0.0.0:8686", "localhost:1234"]
+				examples: ["0.0.0.0:8686", "127.0.0.1:1234"]
 			}
 			description: """
 				The network address to which the API should bind. If you're running
@@ -44,7 +44,18 @@ api: {
 			description: """
 				Whether the [GraphQL Playground](\(urls.graphql_playground)) is enabled
 				for the API. The Playground is accessible via the `/playground` endpoint
-				of the address set using the `bind` parameter.
+				of the address set using the `bind` parameter. Note that the `playground`
+				endpoint will only be enabled if the `graphql` endpoint is also enabled.
+				"""
+		}
+		graphql: {
+			common:   true
+			required: false
+			type: bool: default: true
+			description: """
+				Whether the endpoint for receiving and processing GraphQL queries is
+				enabled for the API. The endpoint is accessible via the `/graphql`
+				endpoint of the address set using the `bind` parameter.
 				"""
 		}
 	}

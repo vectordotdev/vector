@@ -105,6 +105,7 @@ jobs:
     # Always run this so that pull_request triggers are marked as success.
     if: always()
     runs-on: ubuntu-20.04
+    timeout-minutes: 5
     needs:
       - changes
       - test-cli

@@ -60,7 +60,8 @@ updates:
       interval: "daily"
       time: "04:00" # UTC
     labels:
-      - "domain: deps"
+      - "domain: releasing"
+      - "no-changelog"
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
@@ -70,6 +71,7 @@ updates:
       interval: "daily"
     labels:
       - "domain: ci"
+      - "no-changelog"
     commit-message:
       prefix: "chore(ci)"
     groups:

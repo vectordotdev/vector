@@ -60,6 +60,7 @@ jobs:
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: [linux, ubuntu-20.04-4core]
+    timeout-minutes: 45
     needs: changes
     # Run this job even if `changes` job is skipped (non- pull request trigger)
     if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true') }}
@@ -126,6 +127,7 @@ jobs:
   compute-k8s-test-plan:
     name: Compute K8s test plan
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: changes
     # Run this job even if `changes` job is skipped
     if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true') }}
@@ -180,6 +182,7 @@ jobs:
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
     runs-on: [linux, ubuntu-20.04-4core]
+    timeout-minutes: 45
     needs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
@@ -233,6 +236,7 @@ jobs:
   final-result:
     name: K8s E2E Suite
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs:
       - changes
       - build-x86_64-unknown-linux-gnu

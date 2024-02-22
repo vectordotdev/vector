@@ -7,6 +7,7 @@ jobs:
 
   test-windows:
     runs-on: [windows, windows-2019-8core]
+    timeout-minutes: 60
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
