@@ -571,7 +571,7 @@ async fn handle_stream(
         move |error| {
             emit!(TcpSocketError {
                 error: &error,
-                peer_addr: peer_addr,
+                peer_addr,
             });
         },
     );
@@ -721,6 +721,7 @@ pub fn build_framestream_unix_source(
     Ok(Box::pin(fut))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_framestream_source<T: Send + 'static>(
     frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
     socket: impl AsyncRead + AsyncWrite + Send + 'static,
@@ -729,7 +730,7 @@ fn build_framestream_source<T: Send + 'static>(
     shutdown: impl Future<Output = T> + Unpin + Send + 'static,
     span: Span,
     active_task_nums: Arc<AtomicU32>,
-    error_mapper: impl FnMut(std::io::Error) -> () + Send + 'static,
+    error_mapper: impl FnMut(std::io::Error) + Send + 'static,
 ) {
     let content_type = frame_handler.content_type();
     let mut event_sink = out.clone();
