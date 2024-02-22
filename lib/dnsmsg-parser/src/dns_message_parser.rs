@@ -656,11 +656,9 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
             let hinfo_data = format!(
                 r#""{}" "{}""#,
                 std::str::from_utf8(hinfo.cpu())
-                    .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
-                    .to_string(),
+                    .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?,
                 std::str::from_utf8(hinfo.os())
-                    .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
-                    .to_string(),
+                    .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?,
             );
             Ok((Some(hinfo_data), None))
         }
