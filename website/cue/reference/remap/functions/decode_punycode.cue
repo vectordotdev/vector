@@ -15,7 +15,7 @@ remap: functions: decode_punycode: {
 		},
 		{
 			name:        "validate"
-			description: "Whether to validate the input string to check if it is a valid domain name."
+			description: "If enabled, checks if the input string is a valid domain name."
 			required:    false
 			type: ["boolean"]
 			default: true
