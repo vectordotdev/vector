@@ -111,7 +111,7 @@ impl TestEvent {
         }
     }
 
-    /// True if the the event should be rejected by the external resource in order to
+    /// True if the event should be rejected by the external resource in order to
     /// trigger a failure path.
     pub const fn should_reject(&self) -> bool {
         match self {
