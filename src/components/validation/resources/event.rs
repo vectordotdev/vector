@@ -1,6 +1,5 @@
 use bytes::BytesMut;
 use serde::Deserialize;
-use serde_json::Value;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 
@@ -32,18 +31,6 @@ pub enum RawTestEvent {
 
     ResourceReject {
         external_resource_rejects: EventData,
-    },
-
-    /// The event is created, and the specified field is added to it.
-    ///
-    /// This allows the ability to hit code paths where some codecs require specific fields to be of specific
-    /// types, thus allowing us to encode into the input runner without error, but encoding in the component
-    /// under test can be set up to fail.
-    WithField {
-        event: EventData,
-        name: String,
-        value: Value,
-        fail: Option<bool>,
     },
 }
 
@@ -83,10 +70,6 @@ pub enum TestEvent {
     /// is used to encode the event.
     FailWithAlternateEncoder(Event),
 
-    /// The event is expected to fail because during parsing of the test case YAML file, the specified field/value is
-    /// added to the event which should cause the component to error.
-    FailWithInjectedField(Event),
-
     /// The event encodes successfully but when the external resource receives that event, it should
     /// throw a failure.
     FailWithExternalResource(Event),
@@ -98,7 +81,6 @@ impl TestEvent {
         match self {
             Self::Passthrough(event) => event,
             Self::FailWithAlternateEncoder(event) => event,
-            Self::FailWithInjectedField(event) => event,
             Self::FailWithExternalResource(event) => event,
         }
     }
@@ -107,7 +89,6 @@ impl TestEvent {
         match self {
             Self::Passthrough(event) => event,
             Self::FailWithAlternateEncoder(event) => event,
-            Self::FailWithInjectedField(event) => event,
             Self::FailWithExternalResource(event) => event,
         }
     }
@@ -117,7 +98,6 @@ impl TestEvent {
         match self {
             Self::Passthrough(event) => (false, event),
             Self::FailWithAlternateEncoder(event) => (true, event),
-            Self::FailWithInjectedField(event) => (true, event),
             Self::FailWithExternalResource(event) => (true, event),
         }
     }
@@ -125,17 +105,13 @@ impl TestEvent {
     pub const fn should_fail(&self) -> bool {
         match self {
             Self::Passthrough(_) => false,
-            Self::FailWithAlternateEncoder(_)
-            | Self::FailWithInjectedField(_)
-            | Self::FailWithExternalResource(_) => true,
+            Self::FailWithAlternateEncoder(_) | Self::FailWithExternalResource(_) => true,
         }
     }
 
     pub const fn should_reject(&self) -> bool {
         match self {
-            Self::Passthrough(_)
-            | Self::FailWithAlternateEncoder(_)
-            | Self::FailWithInjectedField(_) => false,
+            Self::Passthrough(_) | Self::FailWithAlternateEncoder(_) => false,
             Self::FailWithExternalResource(_) => true,
         }
     }
@@ -156,22 +132,6 @@ impl From<RawTestEvent> for TestEvent {
             RawTestEvent::ResourceReject {
                 external_resource_rejects: event_data,
             } => TestEvent::FailWithExternalResource(event_data.into_event()),
-            RawTestEvent::WithField {
-                event,
-                name,
-                value,
-                fail,
-            } => {
-                let mut event = event.into_event();
-                let log_event = event.as_mut_log();
-                log_event.insert(name.as_str(), value);
-
-                if fail.unwrap_or_default() {
-                    TestEvent::FailWithInjectedField(event)
-                } else {
-                    TestEvent::Passthrough(event)
-                }
-            }
         }
     }
 }
@@ -182,9 +142,7 @@ pub fn encode_test_event(
     event: TestEvent,
 ) {
     match event {
-        TestEvent::Passthrough(event)
-        | TestEvent::FailWithInjectedField(event)
-        | TestEvent::FailWithExternalResource(event) => {
+        TestEvent::Passthrough(event) | TestEvent::FailWithExternalResource(event) => {
             // Encode the event normally.
             encoder
                 .encode(event, buf)
