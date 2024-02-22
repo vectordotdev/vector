@@ -1,6 +1,5 @@
 use bytes::BytesMut;
 use serde::Deserialize;
-use serde_json::Value;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 

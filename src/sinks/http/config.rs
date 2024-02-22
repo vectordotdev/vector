@@ -5,7 +5,7 @@ use hyper::Body;
 use indexmap::IndexMap;
 use vector_lib::codecs::{
     encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder, GelfSerializerConfig,
+    CharacterDelimitedEncoder,
 };
 
 use crate::{
