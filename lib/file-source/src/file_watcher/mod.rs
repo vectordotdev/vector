@@ -42,8 +42,10 @@ pub struct FileWatcher {
     devno: u64,
     inode: u64,
     is_dead: bool,
+    reached_eof: bool,
     last_read_attempt: Instant,
     last_read_success: Instant,
+    last_seen: Instant,
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
@@ -143,8 +145,10 @@ impl FileWatcher {
             devno,
             inode: ino,
             is_dead: false,
+            reached_eof: false,
             last_read_attempt: ts,
             last_read_success: ts,
+            last_seen: ts,
             max_line_bytes,
             line_delimiter,
             buf: BytesMut::new(),
@@ -176,6 +180,9 @@ impl FileWatcher {
 
     pub fn set_file_findable(&mut self, f: bool) {
         self.findable = f;
+        if f {
+            self.last_seen = Instant::now();
+        }
     }
 
     pub fn file_findable(&self) -> bool {
@@ -228,6 +235,7 @@ impl FileWatcher {
                     let buf = self.buf.split().freeze();
                     if buf.is_empty() {
                         // EOF
+                        self.reached_eof = true;
                         Ok(None)
                     } else {
                         Ok(Some(RawLine {
@@ -236,6 +244,7 @@ impl FileWatcher {
                         }))
                     }
                 } else {
+                    self.reached_eof = true;
                     Ok(None)
                 }
             }
@@ -267,6 +276,16 @@ impl FileWatcher {
     pub fn should_read(&self) -> bool {
         self.last_read_success.elapsed() < Duration::from_secs(10)
             || self.last_read_attempt.elapsed() > Duration::from_secs(10)
+    }
+
+    #[inline]
+    pub fn last_seen(&self) -> Instant {
+        self.last_seen
+    }
+
+    #[inline]
+    pub fn reached_eof(&self) -> bool {
+        self.reached_eof
     }
 }
 

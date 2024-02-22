@@ -15,14 +15,14 @@ crossbeam-utils = { version = "0.8.19", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 dyn-clone = { version = "1.0.16", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
-enumflags2 = { version = "0.7.8", default-features = false }
+enumflags2 = { version = "0.7.9", default-features = false }
 float_eq = { version = "1.0", default-features = false }
 futures = { version = "0.3.30", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false, features = ["std"] }
 headers = { version = "0.3.9", default-features = false }
 http = { version = "0.2.9", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "2.1.0", default-features = false, features = ["serde", "std"] }
+indexmap.workspace = true
 lookup = { package = "vector-lookup", path = "../vector-lookup" }
 metrics = "0.21.1"
 metrics-tracing-context = { version = "0.14.0", default-features = false }
@@ -42,11 +42,11 @@ regex = { version = "1.10.3", default-features = false, features = ["std", "perf
 ryu = { version = "1", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
-serde_with = { version = "3.5.0", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "3.6.1", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.5", default-features = false }
 socket2 = { version = "0.5.5", default-features = false }
-tokio = { version = "1.35.1", default-features = false, features = ["net"] }
+tokio = { version = "1.36.0", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.4", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
@@ -75,7 +75,7 @@ prost-build = "0.12"
 
 [dev-dependencies]
 base64 = "0.21.7"
-chrono-tz = { version = "0.8.5", default-features = false }
+chrono-tz = { version = "0.8.6", default-features = false }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1"
@@ -89,7 +89,7 @@ ndarray-stats = "0.5.1"
 noisy_float = "0.2.0"
 rand = "0.8.5"
 rand_distr = "0.4.3"
-serde_yaml = { version = "0.9.30", default-features = false }
+serde_yaml = { version = "0.9.32", default-features = false }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 

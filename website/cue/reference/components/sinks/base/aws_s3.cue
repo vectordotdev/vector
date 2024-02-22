@@ -940,6 +940,7 @@ base: components: sinks: aws_s3: configuration: {
 			default: "STANDARD"
 			enum: {
 				DEEP_ARCHIVE:        "Glacier Deep Archive."
+				EXPRESS_ONEZONE:     "High Performance (single Availability zone)."
 				GLACIER:             "Glacier Flexible Retrieval."
 				INTELLIGENT_TIERING: "Intelligent Tiering."
 				ONEZONE_IA:          "Infrequently Accessed (single Availability zone)."

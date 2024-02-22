@@ -17,7 +17,7 @@ if [ ! -d "${CHANGELOG_DIR}" ]; then
 fi
 
 # diff-filter=A lists only added files
-FRAGMENTS=$(git diff --name-only --diff-filter=A origin/master ${CHANGELOG_DIR})
+FRAGMENTS=$(git diff --name-only --diff-filter=A --merge-base origin/master ${CHANGELOG_DIR})
 
 if [ -z "$FRAGMENTS" ]; then
   echo "No changelog fragments detected"
@@ -61,7 +61,10 @@ while IFS= read -r fname; do
   # used for external contributor PRs.
   if [[ $1 == "--authors" ]]; then
     last=$( tail -n 1 "${CHANGELOG_DIR}/${fname}" )
-    if ! [[ "${last}" =~ ^(authors: .*)$ ]]; then
+    if [[ "${last}" =~ ^(authors: @.*)$ ]]; then
+      echo "invalid fragment contents: author should not be prefixed with @"
+      exit 1
+    elif ! [[ "${last}" =~ ^(authors: .*)$ ]]; then
       echo "invalid fragment contents: author option was specified but fragment ${fname} contains no authors."
       exit 1
     fi

@@ -11,6 +11,7 @@ jobs:
   add-contributor-to-project:
     name: Add contributor PR to Gardener project board
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: ${{ github.actor != 'dependabot[bot]' }}
     steps:
       - name: Generate authentication token
@@ -33,6 +34,7 @@ jobs:
   add-dependabot-to-project:
     name: Add dependabot PR to Gardener project board
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: ${{ github.actor == 'dependabot[bot]' }}
     steps:
       - uses: actions/add-to-project@v0.5.0

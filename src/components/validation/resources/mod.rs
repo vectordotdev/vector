@@ -164,6 +164,7 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::NativeJson { .. } => SerializerConfig::NativeJson,
         DeserializerConfig::Gelf { .. } => SerializerConfig::Gelf,
         DeserializerConfig::Avro { avro } => SerializerConfig::Avro { avro: avro.into() },
+        DeserializerConfig::Vrl { .. } => unimplemented!(),
     };
 
     serializer_config

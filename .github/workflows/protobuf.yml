@@ -16,6 +16,7 @@ concurrency:
 jobs:
   validate-protos:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       # Run `git checkout`
       - uses: actions/checkout@v3
