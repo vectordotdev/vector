@@ -299,7 +299,7 @@ fn spawn_output_http_server(
                             match decoder.decode_eof(&mut body) {
                                 Ok(Some((events, byte_size))) => {
                                     if should_reject {
-                                        info!("HTTP server external output resource decoded {byte_size} bytes but test case configured to reject");
+                                        info!("HTTP server external output resource decoded {byte_size} bytes but test case configured to reject.");
                                     } else {
                                         let mut output_runner_metrics =
                                             output_runner_metrics.lock().await;
