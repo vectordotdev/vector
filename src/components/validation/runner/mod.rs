@@ -636,8 +636,10 @@ fn spawn_input_driver(
 
                 // The event is wrapped in a Vec to match the actual event storage in
                 // the real topology
+                // input_runner_metrics.sent_event_bytes_total +=
+                //     vec![event].estimated_json_encoded_size_of().get() as u64;
                 input_runner_metrics.sent_event_bytes_total +=
-                    vec![event].estimated_json_encoded_size_of().get() as u64;
+                    event.estimated_json_encoded_size_of().get() as u64;
             }
         }
         info!("Input driver sent all events.");

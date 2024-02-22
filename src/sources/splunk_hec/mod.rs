@@ -11,7 +11,7 @@ use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
-use http::StatusCode;
+use http::{StatusCode, Uri};
 use hyper::{service::make_service_fn, Server};
 use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
@@ -19,10 +19,13 @@ use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::lookup::{self, event_path, owned_value_path};
 use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{codecs::BytesDecoderConfig, lookup::lookup_v2::OptionalValuePath};
+use vector_lib::{
+    codecs::BytesDeserializerConfig,
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
@@ -41,12 +44,15 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
+    codecs::DecodingConfig,
+    components::validation::prelude::*,
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent, Value},
     http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
+    register_validatable_component,
     serde::bool_or_struct,
     source_sender::ClosedError,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -129,6 +135,34 @@ impl Default for SplunkConfig {
         }
     }
 }
+
+impl ValidatableComponent for SplunkConfig {
+    fn validation_configuration() -> ValidationConfiguration {
+        let config = Self {
+            address: default_socket_address(),
+            ..Default::default()
+        };
+
+        let listen_addr_http = format!("http://{}/services/collector/raw", config.address);
+        let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
+
+        let framing = BytesDecoderConfig::new().into();
+        let decoding = BytesDeserializerConfig::default().into();
+
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(uri, None).with_headers(HashMap::from([(
+                "x-splunk-request-channel".to_string(),
+                "channel".to_string(),
+            )])),
+            DecodingConfig::new(framing, decoding, false.into()),
+        );
+
+        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
+    }
+}
+
+register_validatable_component!(SplunkConfig);
 
 fn default_socket_address() -> SocketAddr {
     SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8088)
@@ -999,21 +1033,33 @@ fn raw_event(
     events_received: &Registered<EventsReceived>,
 ) -> Result<Event, Rejection> {
     // Process gzip
-    let message: Value = if gzip {
+    let bytes: Bytes = if gzip {
         let mut data = Vec::new();
         match MultiGzDecoder::new(bytes.reader()).read_to_end(&mut data) {
             Ok(0) => return Err(ApiError::NoData.into()),
-            Ok(_) => Value::from(Bytes::from(data)),
+            Ok(_) => Bytes::from(data),
             Err(error) => {
                 emit!(SplunkHecRequestBodyInvalidError { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
     } else {
-        bytes.into()
+        bytes
     };
+    {
+        let log_event = LogEvent::from(bytes.clone());
+        // emit events received before enrichment, so metrics are accurate
+        events_received.emit(CountByteSize(1, log_event.estimated_json_encoded_size_of()));
+    }
 
-    // Construct event
+    // let log_event = LogEvent::from(bytes.clone());
+
+    // emit events received before enrichment, so metrics are accurate
+    // events_received.emit(CountByteSize(1, log_event.estimated_json_encoded_size_of()));
+
+    let message = Value::from(bytes);
+
+    // Construct event adhering to log namespacing
     let mut log = match log_namespace {
         LogNamespace::Vector => LogEvent::from(message),
         LogNamespace::Legacy => {
@@ -1058,7 +1104,6 @@ fn raw_event(
     }
 
     let event = Event::from(log);
-    events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
 
     Ok(event)
 }
