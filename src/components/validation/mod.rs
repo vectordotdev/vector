@@ -57,6 +57,51 @@ pub enum ComponentConfiguration {
     Sink(BoxedSink),
 }
 
+/// Component configuration for a test case.
+#[derive(Clone)]
+pub struct ComponentTestCaseConfig {
+    config: ComponentConfiguration,
+    /// If specified, this name must match the `config_name` field of at least one of the test case events.
+    test_case: Option<String>,
+    external_resource: Option<ExternalResource>,
+}
+
+impl ComponentTestCaseConfig {
+    pub fn from_source<C: Into<BoxedSource>>(
+        config: C,
+        test_case: Option<String>,
+        external_resource: Option<ExternalResource>,
+    ) -> Self {
+        Self {
+            config: ComponentConfiguration::Source(config.into()),
+            test_case,
+            external_resource,
+        }
+    }
+    pub fn from_transform<C: Into<BoxedTransform>>(
+        config: C,
+        test_case: Option<String>,
+        external_resource: Option<ExternalResource>,
+    ) -> Self {
+        Self {
+            config: ComponentConfiguration::Transform(config.into()),
+            test_case,
+            external_resource,
+        }
+    }
+    pub fn from_sink<C: Into<BoxedSink>>(
+        config: C,
+        test_case: Option<String>,
+        external_resource: Option<ExternalResource>,
+    ) -> Self {
+        Self {
+            config: ComponentConfiguration::Sink(config.into()),
+            test_case,
+            external_resource,
+        }
+    }
+}
+
 /// Configuration for validating a component.
 ///
 /// This type encompasses all of the required information for configuring and validating a
@@ -66,46 +111,45 @@ pub enum ComponentConfiguration {
 pub struct ValidationConfiguration {
     component_name: &'static str,
     component_type: ComponentType,
-    component_configuration: ComponentConfiguration,
-    external_resource: Option<ExternalResource>,
+    /// There may be only one `ComponentTestCaseConfig` necessary to execute all test cases, but some cases
+    /// require more advanced configuration in order to hit the code path desired.
+    component_configurations: Vec<ComponentTestCaseConfig>,
 }
 
 impl ValidationConfiguration {
     /// Creates a new `ValidationConfiguration` for a source.
-    pub fn from_source<C: Into<BoxedSource>>(
+    pub fn from_source(
         component_name: &'static str,
-        config: C,
-        external_resource: Option<ExternalResource>,
+        component_configurations: Vec<ComponentTestCaseConfig>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Source,
-            component_configuration: ComponentConfiguration::Source(config.into()),
-            external_resource,
+            component_configurations,
         }
     }
 
     /// Creates a new `ValidationConfiguration` for a transform.
-    pub fn from_transform(component_name: &'static str, config: impl Into<BoxedTransform>) -> Self {
+    pub fn from_transform(
+        component_name: &'static str,
+        component_configurations: Vec<ComponentTestCaseConfig>,
+    ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Transform,
-            component_configuration: ComponentConfiguration::Transform(config.into()),
-            external_resource: None,
+            component_configurations,
         }
     }
 
     /// Creates a new `ValidationConfiguration` for a sink.
-    pub fn from_sink<C: Into<BoxedSink>>(
+    pub fn from_sink(
         component_name: &'static str,
-        config: C,
-        external_resource: Option<ExternalResource>,
+        component_configurations: Vec<ComponentTestCaseConfig>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Sink,
-            component_configuration: ComponentConfiguration::Sink(config.into()),
-            external_resource,
+            component_configurations,
         }
     }
 
@@ -120,13 +164,31 @@ impl ValidationConfiguration {
     }
 
     /// Gets the configuration of the component.
-    pub fn component_configuration(&self) -> ComponentConfiguration {
-        self.component_configuration.clone()
+    pub fn component_configurations(&self) -> Vec<ComponentTestCaseConfig> {
+        self.component_configurations.clone()
+    }
+
+    fn get_comp_test_case(&self, test_case: Option<&String>) -> Option<ComponentTestCaseConfig> {
+        let empty = String::from("");
+        let test_case = test_case.unwrap_or(&empty);
+        self.component_configurations
+            .clone()
+            .into_iter()
+            .find(|c| c.test_case.as_ref().unwrap_or(&String::from("")) == test_case)
+    }
+
+    /// Gets the configuration of the component.
+    pub fn component_configuration_for_test_case(
+        &self,
+        test_case: Option<&String>,
+    ) -> Option<ComponentConfiguration> {
+        self.get_comp_test_case(test_case).map(|c| c.config)
     }
 
     /// Gets the external resource definition for validating the component, if any.
-    pub fn external_resource(&self) -> Option<ExternalResource> {
-        self.external_resource.clone()
+    pub fn external_resource(&self, test_case: Option<&String>) -> Option<ExternalResource> {
+        self.get_comp_test_case(test_case)
+            .and_then(|c| c.external_resource)
     }
 }
 
