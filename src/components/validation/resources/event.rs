@@ -30,6 +30,10 @@ pub enum RawTestEvent {
     /// is malformed in some way, which can be achieved without this test event variant.
     AlternateEncoder { fail_encoding_of: EventData },
 
+    ResourceReject {
+        external_resource_rejects: EventData,
+    },
+
     /// The event is created, and the specified field is added to it.
     ///
     /// This allows the ability to hit code paths where some codecs require specific fields to be of specific
@@ -82,6 +86,10 @@ pub enum TestEvent {
     /// The event is expected to fail because during parsing of the test case YAML file, the specified field/value is
     /// added to the event which should cause the component to error.
     FailWithInjectedField(Event),
+
+    /// The event encodes successfully but when the external resource receives that event, it should
+    /// throw a failure.
+    FailWithExternalResource(Event),
 }
 
 impl TestEvent {
@@ -91,6 +99,7 @@ impl TestEvent {
             Self::Passthrough(event) => event,
             Self::FailWithAlternateEncoder(event) => event,
             Self::FailWithInjectedField(event) => event,
+            Self::FailWithExternalResource(event) => event,
         }
     }
 
@@ -99,6 +108,7 @@ impl TestEvent {
             Self::Passthrough(event) => event,
             Self::FailWithAlternateEncoder(event) => event,
             Self::FailWithInjectedField(event) => event,
+            Self::FailWithExternalResource(event) => event,
         }
     }
 
@@ -108,6 +118,25 @@ impl TestEvent {
             Self::Passthrough(event) => (false, event),
             Self::FailWithAlternateEncoder(event) => (true, event),
             Self::FailWithInjectedField(event) => (true, event),
+            Self::FailWithExternalResource(event) => (true, event),
+        }
+    }
+
+    pub const fn should_fail(&self) -> bool {
+        match self {
+            Self::Passthrough(_) => false,
+            Self::FailWithAlternateEncoder(_)
+            | Self::FailWithInjectedField(_)
+            | Self::FailWithExternalResource(_) => true,
+        }
+    }
+
+    pub const fn should_reject(&self) -> bool {
+        match self {
+            Self::Passthrough(_)
+            | Self::FailWithAlternateEncoder(_)
+            | Self::FailWithInjectedField(_) => false,
+            Self::FailWithExternalResource(_) => true,
         }
     }
 }
@@ -124,6 +153,9 @@ impl From<RawTestEvent> for TestEvent {
             RawTestEvent::AlternateEncoder {
                 fail_encoding_of: event_data,
             } => TestEvent::FailWithAlternateEncoder(event_data.into_event()),
+            RawTestEvent::ResourceReject {
+                external_resource_rejects: event_data,
+            } => TestEvent::FailWithExternalResource(event_data.into_event()),
             RawTestEvent::WithField {
                 event,
                 name,
@@ -150,7 +182,9 @@ pub fn encode_test_event(
     event: TestEvent,
 ) {
     match event {
-        TestEvent::Passthrough(event) | TestEvent::FailWithInjectedField(event) => {
+        TestEvent::Passthrough(event)
+        | TestEvent::FailWithInjectedField(event)
+        | TestEvent::FailWithExternalResource(event) => {
             // Encode the event normally.
             encoder
                 .encode(event, buf)

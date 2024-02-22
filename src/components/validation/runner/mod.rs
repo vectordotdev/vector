@@ -31,7 +31,7 @@ use crate::{
 
 use super::{
     encode_test_event,
-    sync::{Configuring, TaskCoordinator},
+    sync::{Configuring, Started, TaskCoordinator},
     ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration, Validator,
 };
 
@@ -203,17 +203,17 @@ impl Runner {
 
         let component_type = self.configuration.component_type();
 
-        let test_cases = load_component_test_cases(self.test_case_data_path)?;
+        let test_cases = load_component_test_cases(&self.test_case_data_path)?;
         for test_case in test_cases {
             // Create a task coordinator for each relevant phase of the test.
             //
             // This provides us the granularity to know when the tasks associated with each phase
             // (inputs, component topology, outputs/telemetry, etc) have started, and the ability to
             // trigger them to shutdown and then wait until the associated tasks have completed.
-            let input_task_coordinator = TaskCoordinator::new();
-            let output_task_coordinator = TaskCoordinator::new();
-            let topology_task_coordinator = TaskCoordinator::new();
-            let telemetry_task_coordinator = TaskCoordinator::new();
+            let input_task_coordinator = TaskCoordinator::new("Input");
+            let output_task_coordinator = TaskCoordinator::new("Output");
+            let topology_task_coordinator = TaskCoordinator::new("Topology");
+            let telemetry_task_coordinator = TaskCoordinator::new("Telemetry");
 
             // First, we get a topology builder for the given component being validated.
             //
@@ -254,8 +254,9 @@ impl Runner {
             // For example, if we're validating a source, we would have added a filler sink for our
             // controlled output edge, which means we then need a server task listening for the
             // events sent by that sink.
+
             let (runner_input, runner_output, maybe_runner_encoder) = build_external_resource(
-                test_case.config_name.as_ref(),
+                &test_case,
                 &self.configuration,
                 &input_task_coordinator,
                 &output_task_coordinator,
@@ -268,13 +269,13 @@ impl Runner {
             // Now with any external resource spawned, as well as any tasks for handling controlled
             // edges, we'll wait for all of those tasks to report that they're ready to go and
             // listening, etc.
-            let input_task_coordinator = input_task_coordinator.started().await;
+            let mut input_task_coordinator = input_task_coordinator.started().await;
             info!("All input task(s) started.");
 
-            let telemetry_task_coordinator = telemetry_task_coordinator.started().await;
+            let mut telemetry_task_coordinator = telemetry_task_coordinator.started().await;
             info!("All telemetry task(s) started.");
 
-            let output_task_coordinator = output_task_coordinator.started().await;
+            let mut output_task_coordinator = output_task_coordinator.started().await;
             info!("All output task(s) started.");
 
             // At this point, we need to actually spawn the configured component topology so that it
@@ -285,7 +286,7 @@ impl Runner {
                 &topology_task_coordinator,
                 self.extra_context.clone(),
             );
-            let topology_task_coordinator = topology_task_coordinator.started().await;
+            let mut topology_task_coordinator = topology_task_coordinator.started().await;
 
             // Now we'll spawn two tasks: one for sending inputs, and one for collecting outputs.
             //
@@ -335,29 +336,16 @@ impl Runner {
                 .await
                 .expect("input driver task should not have panicked");
 
-            input_task_coordinator.shutdown().await;
-            info!("Input task(s) have been shutdown.");
-
-            // Without this, not all internal metric events are received for sink components under test.
-            // TODO: This is awful and needs a proper solution.
-            //       I think we are going to need to setup distinct task sync logic potentially for each
-            //       combination of Source/Sink + Resource direction Push/Pull
-            if self.configuration.component_type == ComponentType::Sink {
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            }
-
-            telemetry_task_coordinator.shutdown().await;
-            info!("Telemetry task(s) have been shutdown.");
-
-            topology_task_coordinator.shutdown().await;
-            info!("Component topology task has been shutdown.");
-
-            output_task_coordinator.shutdown().await;
-            info!("Output task(s) have been shutdown.");
-
-            let output_events = output_driver
-                .await
-                .expect("output driver task should not have panicked");
+            // Synchronize the shutdown of all tasks, and get the resulting output events
+            let output_events = self
+                .coordinate_shutdown(
+                    &mut input_task_coordinator,
+                    &mut telemetry_task_coordinator,
+                    &mut topology_task_coordinator,
+                    &mut output_task_coordinator,
+                    output_driver,
+                )
+                .await;
 
             info!("Collected runner metrics: {:?}", runner_metrics);
             let final_runner_metrics = runner_metrics.lock().await;
@@ -400,6 +388,50 @@ impl Runner {
 
         Ok(test_case_results)
     }
+
+    async fn coordinate_shutdown(
+        &self,
+        input_task_coordinator: &mut TaskCoordinator<Started>,
+        telemetry_task_coordinator: &mut TaskCoordinator<Started>,
+        topology_task_coordinator: &mut TaskCoordinator<Started>,
+        output_task_coordinator: &mut TaskCoordinator<Started>,
+        output_driver: JoinHandle<Vec<Event>>,
+    ) -> Vec<Event> {
+        // for sources, the output events are collected from the controlled edge (vector sink),
+        // and as such the coordination of shutdown of the tasks is more straight forward.
+        if self.configuration.component_type == ComponentType::Source {
+            input_task_coordinator.shutdown().await;
+
+            telemetry_task_coordinator.shutdown().await;
+
+            topology_task_coordinator.shutdown().await;
+
+            output_task_coordinator.shutdown().await;
+
+            output_driver
+                .await
+                .expect("output driver task should not have panicked")
+
+        // for sinks, we need drive the shutdown by ensuring that the output events have been
+        // processed by the external resource, which ensures that the input events have travelled
+        // all the way through the pipeline, and that the telemetry events have been processed
+        // before shutting down the telemetry and topology tasks.
+        } else {
+            input_task_coordinator.shutdown().await;
+
+            output_task_coordinator.shutdown().await;
+
+            let output_events = output_driver
+                .await
+                .expect("output driver task should not have panicked");
+
+            telemetry_task_coordinator.shutdown().await;
+
+            topology_task_coordinator.shutdown().await;
+
+            output_events
+        }
+    }
 }
 
 /// Loads all of the test cases for the given component.
@@ -418,7 +450,7 @@ impl Runner {
 /// during deserialization of the test case file, whether the error is I/O related in nature or due
 /// to invalid YAML, or not representing valid serialized test cases, then an error variant will be
 /// returned explaining the cause.
-fn load_component_test_cases(test_case_data_path: PathBuf) -> Result<Vec<TestCase>, String> {
+fn load_component_test_cases(test_case_data_path: &PathBuf) -> Result<Vec<TestCase>, String> {
     std::fs::File::open(test_case_data_path)
         .map_err(|e| {
             format!(
@@ -437,14 +469,14 @@ fn load_component_test_cases(test_case_data_path: PathBuf) -> Result<Vec<TestCas
 }
 
 fn build_external_resource(
-    test_case: Option<&String>,
+    test_case: &TestCase,
     configuration: &ValidationConfiguration,
     input_task_coordinator: &TaskCoordinator<Configuring>,
     output_task_coordinator: &TaskCoordinator<Configuring>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
 ) -> Result<(RunnerInput, RunnerOutput, Option<Encoder<encoding::Framer>>), vector_lib::Error> {
     let component_type = configuration.component_type();
-    let maybe_external_resource = configuration.external_resource(test_case);
+    let maybe_external_resource = configuration.external_resource(test_case.config_name.as_ref());
 
     let resource_codec = maybe_external_resource
         .as_ref()
@@ -481,7 +513,13 @@ fn build_external_resource(
             let (tx, rx) = mpsc::channel(1024);
             let resource =
                 maybe_external_resource.expect("a sink must always have an external resource");
-            resource.spawn_as_output(tx, output_task_coordinator, runner_metrics)?;
+
+            resource.spawn_as_output(
+                tx,
+                output_task_coordinator,
+                test_case.events.clone(),
+                runner_metrics,
+            )?;
 
             Ok((
                 RunnerInput::Controlled,
@@ -599,7 +637,7 @@ fn spawn_input_driver(
                     vec![event].estimated_json_encoded_size_of().get() as u64;
             }
         }
-        trace!("Input driver sent all events.");
+        info!("Input driver sent all events.");
     })
 }
 
@@ -614,6 +652,7 @@ fn spawn_output_driver(
     tokio::spawn(async move {
         let mut output_events = Vec::new();
         while let Some(events) = output_rx.recv().await {
+            info!("Output driver received {} events.", events.len());
             output_events.extend(events.clone());
 
             // Update the runner metrics for the received event. This will later

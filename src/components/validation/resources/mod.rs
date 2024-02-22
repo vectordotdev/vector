@@ -339,6 +339,7 @@ impl ExternalResource {
         self,
         output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
+        input_events: Vec<TestEvent>,
         runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     ) -> vector_lib::Result<()> {
         match self.definition {
@@ -347,6 +348,7 @@ impl ExternalResource {
                 self.codec,
                 output_tx,
                 task_coordinator,
+                input_events,
                 runner_metrics,
             ),
         }

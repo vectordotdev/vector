@@ -5,7 +5,7 @@ use hyper::Body;
 use indexmap::IndexMap;
 use vector_lib::codecs::{
     encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder, GelfSerializerConfig,
+    CharacterDelimitedEncoder,
 };
 
 use crate::{
@@ -312,79 +312,39 @@ impl ValidatableComponent for HttpSinkConfig {
         use std::str::FromStr;
         use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
 
-        let happy_encoder = EncodingConfigWithFraming::new(
-            None,
-            JsonSerializerConfig::new(MetricTagValues::Full).into(),
-            Transformer::default(),
-        );
+        let config = HttpSinkConfig {
+            uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
+                .expect("should never fail to parse"),
+            method: HttpMethod::Post,
+            encoding: EncodingConfigWithFraming::new(
+                None,
+                JsonSerializerConfig::new(MetricTagValues::Full).into(),
+                Transformer::default(),
+            ),
+            auth: None,
+            headers: None,
+            compression: Compression::default(),
+            batch: BatchConfig::default(),
+            request: RequestConfig::default(),
+            tls: None,
+            acknowledgements: AcknowledgementsConfig::default(),
+            payload_prefix: String::new(),
+            payload_suffix: String::new(),
+        };
 
-        fn get_config(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
-            HttpSinkConfig {
-                uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
-                    .expect("should never fail to parse"),
-                method: HttpMethod::Post,
-                encoding,
-                auth: None,
-                headers: None,
-                compression: Compression::default(),
-                batch: BatchConfig::default(),
-                request: RequestConfig::default(),
-                tls: None,
-                acknowledgements: AcknowledgementsConfig::default(),
-                payload_prefix: String::new(),
-                payload_suffix: String::new(),
-            }
-        }
-
-        fn get_external_resource(
-            config: &HttpSinkConfig,
-            encoding: Option<EncodingConfigWithFraming>,
-        ) -> ExternalResource {
-            ExternalResource::new(
-                ResourceDirection::Push,
-                HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
-                if let Some(encoding) = encoding {
-                    encoding
-                } else {
-                    config.encoding.clone()
-                },
-            )
-        }
-
-        let happy_config = get_config(happy_encoder.clone());
-
-        let happy_external_resource = get_external_resource(&happy_config, None);
-
-        // this config uses the Gelf serializer, which requires the "level" field to
-        // be an integer
-        let sad_config = get_config(EncodingConfigWithFraming::new(
-            None,
-            GelfSerializerConfig::new().into(),
-            Transformer::default(),
-        ));
-
-        let sad_external_resource = get_external_resource(
-            &happy_config,
-            // the external resource needs to use an encoder that actually works, in order to
-            // get the event into the topology successfully
-            Some(happy_encoder),
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
+            config.encoding.clone(),
         );
 
         ValidationConfiguration::from_sink(
             Self::NAME,
-            vec![
-                ComponentTestCaseConfig::from_sink(
-                    happy_config,
-                    None,
-                    Some(happy_external_resource),
-                ),
-                // this config only runs with the test case "encoding_error" in the yaml file.
-                ComponentTestCaseConfig::from_sink(
-                    sad_config,
-                    Some("encoding_error".to_owned()),
-                    Some(sad_external_resource),
-                ),
-            ],
+            vec![ComponentTestCaseConfig::from_sink(
+                config,
+                None,
+                Some(external_resource),
+            )],
         )
     }
 }
