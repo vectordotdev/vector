@@ -1,16 +1,20 @@
 package metadata
 
 base: components: sources: dnstap: configuration: {
-	mode: {
-		description: "The type of socket to use."
+	address: {
+		description: """
+			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
+			systemd socket activation.
+
+			If a socket address is used, it _must_ include a port.
+			"""
+		required: true
+		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
+	}
+	connection_limit: {
+		description: "The maximum number of TCP connections that are allowed at any given time."
 		required:    false
-		type: string: {
-			default: "unix"
-			enum: {
-				tcp:  "Listen on TCP."
-				unix: "Listen on Unix domain socket (UDS)"
-			}
-		}
+		type: uint: unit: "connections"
 	}
 	host_key: {
 		description: """
@@ -24,6 +28,24 @@ base: components: sources: dnstap: configuration: {
 			"""
 		required: false
 		type: string: {}
+	}
+	keepalive: {
+		description: "TCP keepalive settings for socket-based components."
+		required:    false
+		type: object: options: time_secs: {
+			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
+			required:    false
+			type: uint: unit: "seconds"
+		}
+	}
+	max_connection_duration_secs: {
+		description: """
+			Maximum duration to keep each connection open. Connections open for longer than this duration are closed.
+
+			This is helpful for load balancing long-lived connections.
+			"""
+		required: false
+		type: uint: unit: "seconds"
 	}
 	max_frame_handling_tasks: {
 		description: "Maximum number of frames that can be processed concurrently."
@@ -47,6 +69,19 @@ base: components: sources: dnstap: configuration: {
 		required:    false
 		type: bool: {}
 	}
+	port_key: {
+		description: """
+			Overrides the name of the log field used to add the peer host's port to each event.
+
+			The value will be the peer host's port i.e. `9000`.
+
+			By default, `"port"` is used.
+
+			Set to `""` to suppress this key.
+			"""
+		required: false
+		type: string: default: "port"
+	}
 	raw_data_only: {
 		description: """
 			Whether or not to skip parsing or decoding of DNSTAP frames.
@@ -57,6 +92,19 @@ base: components: sources: dnstap: configuration: {
 		required: false
 		type: bool: {}
 	}
+	receive_buffer_bytes: {
+		description: "The size of the receive buffer used for each connection."
+		required:    false
+		type: uint: unit: "bytes"
+	}
+	shutdown_timeout_secs: {
+		description: "The timeout before a connection is forcefully closed during shutdown."
+		required:    false
+		type: uint: {
+			default: 30
+			unit:    "seconds"
+		}
+	}
 	socket_file_mode: {
 		description: """
 			Unix file mode bits to be applied to the unix socket file as its designated file permissions.
@@ -64,8 +112,7 @@ base: components: sources: dnstap: configuration: {
 			Note: The file mode value can be specified in any numeric format supported by your configuration
 			language, but it is most intuitive to use an octal number.
 			"""
-		relevant_when: "mode = \"unix\""
-		required:      false
+		required: false
 		type: uint: {}
 	}
 	socket_path: {
@@ -75,8 +122,7 @@ base: components: sources: dnstap: configuration: {
 			The DNS server must be configured to send its DNSTAP data to this socket file. The socket file is created
 			if it doesn't already exist when the source first starts.
 			"""
-		relevant_when: "mode = \"unix\""
-		required:      true
+		required: true
 		type: string: {}
 	}
 	socket_receive_buffer_size: {
@@ -85,8 +131,7 @@ base: components: sources: dnstap: configuration: {
 
 			This should not typically needed to be changed.
 			"""
-		relevant_when: "mode = \"unix\""
-		required:      false
+		required: false
 		type: uint: unit: "bytes"
 	}
 	socket_send_buffer_size: {
@@ -95,66 +140,12 @@ base: components: sources: dnstap: configuration: {
 
 			This should not typically needed to be changed.
 			"""
-		relevant_when: "mode = \"unix\""
-		required:      false
+		required: false
 		type: uint: unit: "bytes"
-	}
-	address: {
-		description: """
-			The socket address to listen for connections on, or `systemd{#N}` to use the Nth socket passed by
-			`systemd` socket activation.
-
-			If a socket address is used, it _must_ include a port.
-			"""
-		relevant_when: "mode = \"tcp\""
-		required:      false
-		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
-	}
-	connection_limit: {
-		description:   "The maximum number of TCP connections that are allowed at any given time."
-		relevant_when: "mode = \"tcp\""
-		required:      false
-		type: uint: unit: "connections"
-	}
-	keepalive: {
-		description:   "TCP keepalive settings for socket-based components."
-		relevant_when: "mode = \"tcp\""
-		required:      false
-		type: object: options: time_secs: {
-			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
-			required:    false
-			type: uint: unit: "seconds"
-		}
-	}
-	max_connection_duration_secs: {
-		description: """
-			Maximum duration to keep each connection open. Connections open for longer than this duration are closed.
-
-			This is helpful for load balancing long-lived connections.
-			"""
-		relevant_when: "mode = \"tcp\""
-		required:      false
-		type: uint: unit: "seconds"
-	}
-	receive_buffer_bytes: {
-		description:   "The size of the receive buffer used for each connection."
-		relevant_when: "mode = \"tcp\""
-		required:      false
-		type: uint: unit: "bytes"
-	}
-	shutdown_timeout_secs: {
-		description:   "The timeout before a connection is forcefully closed during shutdown."
-		relevant_when: "mode = \"tcp\""
-		required:      false
-		type: uint: {
-			default: 30
-			unit:    "seconds"
-		}
 	}
 	tls: {
-		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
-		relevant_when: "mode = \"tcp\""
-		required:      false
+		description: "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
+		required:    false
 		type: object: options: {
 			alpn_protocols: {
 				description: """
