@@ -66,8 +66,8 @@ pub enum TestEvent {
     /// The event is used, as-is, without modification.
     Passthrough(Event),
 
-    /// The event is expected to fail because an alternative encoder than the one specified in the configuration
-    /// is used to encode the event.
+    /// The event is encoded using an encoding that differs from the component's
+    /// configured encoding, which should cause an error when the event is decoded.
     FailWithAlternateEncoder(Event),
 
     /// The event encodes successfully but when the external resource receives that event, it should
