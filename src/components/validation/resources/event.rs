@@ -75,12 +75,15 @@ pub enum TestEvent {
     /// The event is used, as-is, without modification.
     Passthrough(Event),
 
-    /// The event is expected to fail because an alternative encoder than the one specified in the configuration
-    /// is used to encode the event.
+    /// The event is encoded using an encoding that differs from the component's
+    /// configured encoding, which should cause an error when the event is decoded.
     FailWithAlternateEncoder(Event),
 
-    /// The event is expected to fail because during parsing of the test case YAML file, the specified field/value is
-    /// added to the event which should cause the component to error.
+    /// The event has an additional field injected prior to encoding, which should cause
+    /// an error when the event is decoded.
+    ///
+    /// This is useful for testing encodings that have strict schemas and cannot
+    /// handle arbitrary fields or differing data types for certain fields.
     FailWithInjectedField(Event),
 }
 
