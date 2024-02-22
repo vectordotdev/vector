@@ -267,10 +267,8 @@ fn spawn_output_http_server(
     // First, we'll build and spawn our HTTP server.
     let decoder = codec.into_decoder()?;
 
-    // the number of events we expect to decode from the sink.
+    // the number of events we expect to receive from the sink.
     // any happy path events + any events that are flagged as external resource should reject.
-    // in the later case, we want to make sure we've decoded the event in order for synchronization with the
-    // other tasks.
     let expected_output_events = input_events
         .iter()
         .filter(|te| !te.should_fail() || te.should_reject())
@@ -360,7 +358,7 @@ fn spawn_output_http_server(
         // Wait for the runner to tell us to shutdown
         resource_shutdown_rx.wait().await;
 
-        // if there are any events we need to decode, make sure they are processed
+        // ensure we've processed all events we expect to receive from the sink, if any.
         if expected_output_events > 0 {
             server_sent_all_rx.recv().await;
         }

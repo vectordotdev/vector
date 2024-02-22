@@ -29,6 +29,7 @@ pub enum RawTestEvent {
     /// is malformed in some way, which can be achieved without this test event variant.
     AlternateEncoder { fail_encoding_of: EventData },
 
+    /// The event will be rejected by the external resource.
     ResourceReject {
         external_resource_rejects: EventData,
     },
@@ -102,6 +103,7 @@ impl TestEvent {
         }
     }
 
+    /// True if the event should fail, false otherwise.
     pub const fn should_fail(&self) -> bool {
         match self {
             Self::Passthrough(_) => false,
@@ -109,6 +111,8 @@ impl TestEvent {
         }
     }
 
+    /// True if the the event should be rejected by the external resource in order to
+    /// trigger a failure path.
     pub const fn should_reject(&self) -> bool {
         match self {
             Self::Passthrough(_) | Self::FailWithAlternateEncoder(_) => false,

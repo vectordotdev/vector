@@ -389,6 +389,9 @@ impl Runner {
         Ok(test_case_results)
     }
 
+    // TODO I think a nice refactoring of the TaskCoordinator / it's usage in the Runner could be helpful
+    // , to organize all of the task coordinators into a single struct and have methods like `new()` and
+    // `shutdown()`.
     async fn coordinate_shutdown(
         &self,
         input_task_coordinator: &mut TaskCoordinator<Started>,
@@ -397,26 +400,11 @@ impl Runner {
         output_task_coordinator: &mut TaskCoordinator<Started>,
         output_driver: JoinHandle<Vec<Event>>,
     ) -> Vec<Event> {
-        // for sources, the output events are collected from the controlled edge (vector sink),
-        // and as such the coordination of shutdown of the tasks is more straight forward.
-        if self.configuration.component_type == ComponentType::Source {
-            input_task_coordinator.shutdown().await;
-
-            telemetry_task_coordinator.shutdown().await;
-
-            topology_task_coordinator.shutdown().await;
-
-            output_task_coordinator.shutdown().await;
-
-            output_driver
-                .await
-                .expect("output driver task should not have panicked")
-
         // for sinks, we need drive the shutdown by ensuring that the output events have been
         // processed by the external resource, which ensures that the input events have travelled
         // all the way through the pipeline, and that the telemetry events have been processed
         // before shutting down the telemetry and topology tasks.
-        } else {
+        if self.configuration.component_type == ComponentType::Sink {
             input_task_coordinator.shutdown().await;
 
             output_task_coordinator.shutdown().await;
@@ -430,6 +418,21 @@ impl Runner {
             topology_task_coordinator.shutdown().await;
 
             output_events
+
+        // for sources, and transforms the output events are collected from the controlled edge (vector sink),
+        // and as such the coordination of shutdown of the tasks is more straight forward.
+        } else {
+            input_task_coordinator.shutdown().await;
+
+            telemetry_task_coordinator.shutdown().await;
+
+            topology_task_coordinator.shutdown().await;
+
+            output_task_coordinator.shutdown().await;
+
+            output_driver
+                .await
+                .expect("output driver task should not have panicked")
         }
     }
 }
