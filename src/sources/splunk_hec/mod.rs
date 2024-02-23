@@ -52,7 +52,6 @@ use crate::{
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
-    register_validatable_component,
     serde::bool_or_struct,
     source_sender::ClosedError,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -140,6 +139,7 @@ impl ValidatableComponent for SplunkConfig {
     fn validation_configuration() -> ValidationConfiguration {
         let config = Self {
             address: default_socket_address(),
+            log_namespace: Some(true),
             ..Default::default()
         };
 
@@ -440,6 +440,7 @@ impl SplunkSource {
                             batch,
                             token.filter(|_| store_hec_token).map(Into::into),
                             log_namespace,
+                            events_received,
                         );
                         for result in iter {
                             match result {
@@ -452,11 +453,6 @@ impl SplunkSource {
                         }
 
                         if !events.is_empty() {
-                            events_received.emit(CountByteSize(
-                                events.len(),
-                                events.estimated_json_encoded_size_of(),
-                            ));
-
                             if let Err(ClosedError) = out.send_batch(events).await {
                                 return Err(Rejection::from(ApiError::ServerShutdown));
                             }
@@ -679,6 +675,8 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     token: Option<Arc<str>>,
     /// Lognamespace to put the events in
     log_namespace: LogNamespace,
+    /// handle to EventsReceived registry
+    events_received: Registered<EventsReceived>,
 }
 
 impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
@@ -690,6 +688,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         batch: Option<BatchNotifier>,
         token: Option<Arc<str>>,
         log_namespace: LogNamespace,
+        events_received: Registered<EventsReceived>,
     ) -> Self {
         EventIterator {
             deserializer,
@@ -720,6 +719,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             batch,
             token,
             log_namespace,
+            events_received,
         }
     }
 
@@ -844,6 +844,10 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 let event: Value = event.into();
                 let mut log = LogEvent::from(event);
 
+                // EstimatedJsonSizeOf must be calculated before enrichment
+                self.events_received
+                    .emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
+
                 // The timestamp is extracted from the message for the Legacy namespace.
                 self.log_namespace.insert_vector_metadata(
                     &mut log,
@@ -898,6 +902,11 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             },
             None => return Err(ApiError::MissingEventField { event: self.events }.into()),
         };
+
+        // EstimatedJsonSizeOf must be calculated before enrichment
+        self.events_received
+            .emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
+
         Ok(log)
     }
 }
@@ -1053,26 +1062,21 @@ fn raw_event(
     } else {
         bytes
     };
-    {
-        let log_event = LogEvent::from(bytes.clone());
-        // emit events received before enrichment, so metrics are accurate
-        events_received.emit(CountByteSize(1, log_event.estimated_json_encoded_size_of()));
-    }
-
-    // let log_event = LogEvent::from(bytes.clone());
-
-    // emit events received before enrichment, so metrics are accurate
-    // events_received.emit(CountByteSize(1, log_event.estimated_json_encoded_size_of()));
-
-    let message = Value::from(bytes);
 
     // Construct event adhering to log namespacing
+    // We need to calculate the estimated json size of the event BEFORE enrichment.
     let mut log = match log_namespace {
-        LogNamespace::Vector => LogEvent::from(message),
+        LogNamespace::Vector => {
+            let log_event = LogEvent::from(bytes);
+            events_received.emit(CountByteSize(1, log_event.estimated_json_encoded_size_of()));
+            log_event
+        }
         LogNamespace::Legacy => {
-            let mut log = LogEvent::default();
-            log.maybe_insert(log_schema().message_key_target_path(), message);
-            log
+            let message = Value::from(bytes);
+            let mut log_event = LogEvent::default();
+            log_event.maybe_insert(log_schema().message_key_target_path(), message);
+            events_received.emit(CountByteSize(1, log_event.estimated_json_encoded_size_of()));
+            log_event
         }
     };
 
@@ -1110,9 +1114,7 @@ fn raw_event(
         log = log.with_batch_notifier(&batch);
     }
 
-    let event = Event::from(log);
-
-    Ok(event)
+    Ok(Event::from(log))
 }
 
 #[derive(Clone, Copy, Debug, Snafu)]
