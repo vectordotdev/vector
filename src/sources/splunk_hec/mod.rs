@@ -11,7 +11,7 @@ use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
-use http::StatusCode;
+use http::{StatusCode, Uri};
 use hyper::{service::make_service_fn, Server};
 use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
@@ -19,10 +19,16 @@ use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::lookup::{self, event_path, owned_value_path};
 use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
+    codecs::decoding::DeserializerConfig,
+    lookup::{self, event_path, owned_value_path},
+};
+use vector_lib::{
+    codecs::BytesDecoderConfig,
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
@@ -41,6 +47,8 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
+    codecs::DecodingConfig,
+    components::validation::prelude::*,
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent, Value},
     http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
@@ -60,6 +68,8 @@ pub const CHANNEL: &str = "splunk_channel";
 pub const INDEX: &str = "splunk_index";
 pub const SOURCE: &str = "splunk_source";
 pub const SOURCETYPE: &str = "splunk_sourcetype";
+
+const X_SPLUNK_REQUEST_CHANNEL: &str = "x-splunk-request-channel";
 
 /// Configuration for the `splunk_hec` source.
 #[configurable_component(source("splunk_hec", "Receive logs from Splunk."))]
@@ -319,7 +329,7 @@ impl SplunkSource {
     fn event_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
             .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
-        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+        let splunk_channel_header = warp::header::optional::<String>(X_SPLUNK_REQUEST_CHANNEL);
 
         let splunk_channel = splunk_channel_header
             .and(splunk_channel_query_param)
@@ -399,6 +409,7 @@ impl SplunkSource {
                             batch,
                             token.filter(|_| store_hec_token).map(Into::into),
                             log_namespace,
+                            events_received,
                         );
                         for result in iter {
                             match result {
@@ -411,11 +422,6 @@ impl SplunkSource {
                         }
 
                         if !events.is_empty() {
-                            events_received.emit(CountByteSize(
-                                events.len(),
-                                events.estimated_json_encoded_size_of(),
-                            ));
-
                             if let Err(ClosedError) = out.send_batch(events).await {
                                 return Err(Rejection::from(ApiError::ServerShutdown));
                             }
@@ -607,7 +613,7 @@ impl SplunkSource {
     fn required_channel() -> BoxedFilter<(String,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
             .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
-        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+        let splunk_channel_header = warp::header::optional::<String>(X_SPLUNK_REQUEST_CHANNEL);
 
         splunk_channel_header
             .and(splunk_channel_query_param)
@@ -638,9 +644,12 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     token: Option<Arc<str>>,
     /// Lognamespace to put the events in
     log_namespace: LogNamespace,
+    /// handle to EventsReceived registry
+    events_received: Registered<EventsReceived>,
 }
 
 impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         deserializer: serde_json::StreamDeserializer<'de, R, JsonValue>,
         channel: Option<String>,
@@ -649,6 +658,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         batch: Option<BatchNotifier>,
         token: Option<Arc<str>>,
         log_namespace: LogNamespace,
+        events_received: Registered<EventsReceived>,
     ) -> Self {
         EventIterator {
             deserializer,
@@ -679,6 +689,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             batch,
             token,
             log_namespace,
+            events_received,
         }
     }
 
@@ -803,6 +814,10 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 let event: Value = event.into();
                 let mut log = LogEvent::from(event);
 
+                // EstimatedJsonSizeOf must be calculated before enrichment
+                self.events_received
+                    .emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
+
                 // The timestamp is extracted from the message for the Legacy namespace.
                 self.log_namespace.insert_vector_metadata(
                     &mut log,
@@ -857,6 +872,11 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             },
             None => return Err(ApiError::MissingEventField { event: self.events }.into()),
         };
+
+        // EstimatedJsonSizeOf must be calculated before enrichment
+        self.events_received
+            .emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
+
         Ok(log)
     }
 }
@@ -1022,6 +1042,8 @@ fn raw_event(
             log
         }
     };
+    // We need to calculate the estimated json size of the event BEFORE enrichment.
+    events_received.emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
 
     // Add channel
     log_namespace.insert_source_metadata(
@@ -1057,10 +1079,7 @@ fn raw_event(
         log = log.with_batch_notifier(&batch);
     }
 
-    let event = Event::from(log);
-    events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
-
-    Ok(event)
+    Ok(Event::from(log))
 }
 
 #[derive(Clone, Copy, Debug, Snafu)]
@@ -1219,6 +1238,41 @@ fn empty_response(code: StatusCode) -> Response {
 fn response_json(code: StatusCode, body: impl Serialize) -> Response {
     warp::reply::with_status(warp::reply::json(&body), code).into_response()
 }
+
+impl ValidatableComponent for SplunkConfig {
+    fn validation_configuration() -> ValidationConfiguration {
+        let config = Self {
+            address: default_socket_address(),
+            ..Default::default()
+        };
+
+        let listen_addr_http = format!("http://{}/services/collector/event", config.address);
+        let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
+
+        let framing = BytesDecoderConfig::new().into();
+        let decoding = DeserializerConfig::Json(Default::default());
+
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(uri, None).with_headers(HashMap::from([(
+                X_SPLUNK_REQUEST_CHANNEL.to_string(),
+                "channel".to_string(),
+            )])),
+            DecodingConfig::new(framing, decoding, false.into()),
+        );
+
+        ValidationConfiguration::from_source(
+            Self::NAME,
+            vec![ComponentTestCaseConfig::from_source(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
+    }
+}
+
+register_validatable_component!(SplunkConfig);
 
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
@@ -1403,7 +1457,7 @@ mod tests {
 
         b = match opts.channel {
             Some(c) => match c {
-                Channel::Header(v) => b.header("x-splunk-request-channel", v),
+                Channel::Header(v) => b.header(X_SPLUNK_REQUEST_CHANNEL, v),
                 Channel::QueryParam(v) => b.query(&[("channel", v)]),
             },
             None => b,
