@@ -20,6 +20,8 @@ use hickory_proto::{
 };
 use thiserror::Error;
 
+use crate::ede::{EDE, EDE_OPTION_CODE};
+
 use super::dns_message::{
     self, DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection,
     QueryHeader, QueryQuestion, UpdateHeader, ZoneInfo,
@@ -866,20 +868,39 @@ fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeade
 
 fn parse_edns(dns_message: &TrustDnsMessage) -> Option<DnsParserResult<OptPseudoSection>> {
     dns_message.extensions().as_ref().map(|edns| {
-        parse_edns_options(edns).map(|options| OptPseudoSection {
+        parse_edns_options(edns).map(|(ede, rest)| OptPseudoSection {
             extended_rcode: edns.rcode_high(),
             version: edns.version(),
             dnssec_ok: edns.dnssec_ok(),
             udp_max_payload_size: edns.max_payload(),
-            options,
+            ede,
+            options: rest,
         })
     })
 }
 
-fn parse_edns_options(edns: &Edns) -> DnsParserResult<Vec<EdnsOptionEntry>> {
-    edns.options()
+fn parse_edns_options(edns: &Edns) -> DnsParserResult<(Vec<EDE>, Vec<EdnsOptionEntry>)> {
+    let ede_opts: Vec<EDE> = edns
+        .options()
         .as_ref()
         .iter()
+        .filter_map(|(_, option)| {
+            if let EdnsOption::Unknown(EDE_OPTION_CODE, option) = option {
+                Some(
+                    EDE::from_bytes(option)
+                        .map_err(|source| DnsMessageParserError::TrustDnsError { source }),
+                )
+            } else {
+                None
+            }
+        })
+        .collect::<Result<Vec<EDE>, DnsMessageParserError>>()?;
+
+    let rest: Vec<EdnsOptionEntry> = edns
+        .options()
+        .as_ref()
+        .iter()
+        .filter(|(&code, _)| u16::from(code) != EDE_OPTION_CODE)
         .map(|(code, option)| match option {
             EdnsOption::DAU(algorithms)
             | EdnsOption::DHU(algorithms)
@@ -891,7 +912,9 @@ fn parse_edns_options(edns: &Edns) -> DnsParserResult<Vec<EdnsOptionEntry>> {
                 .map(|bytes| parse_edns_opt(*code, &bytes))
                 .map_err(|source| DnsMessageParserError::TrustDnsError { source }),
         })
-        .collect()
+        .collect::<Result<Vec<EdnsOptionEntry>, DnsMessageParserError>>()?;
+
+    Ok((ede_opts, rest))
 }
 
 fn parse_edns_opt_dnssec_algorithms(
@@ -1206,6 +1229,43 @@ mod tests {
                 .clone()
                 .unwrap(),
             "SOA"
+        );
+    }
+
+    #[test]
+    fn test_parse_as_query_message_with_ede() {
+        let raw_dns_message =
+            "szgAAAABAAAAAAABAmg1B2V4YW1wbGUDY29tAAAGAAEAACkE0AEBQAAABgAPAAIAFQ==";
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let parse_result = DnsMessageParser::new(raw_query_message).parse_as_query_message();
+        assert!(parse_result.is_ok());
+        let message = parse_result.expect("Message is not parsed.");
+        let opt_pseudo_section = message.opt_pseudo_section.expect("OPT section was missing");
+        assert_eq!(opt_pseudo_section.ede.len(), 1);
+        assert_eq!(opt_pseudo_section.ede[0].info_code(), 21u16);
+        assert_eq!(opt_pseudo_section.ede[0].purpose(), Some("Not Supported"));
+        assert_eq!(opt_pseudo_section.ede[0].extra_text(), None);
+    }
+
+    #[test]
+    fn test_parse_as_query_message_with_ede_with_extra_text() {
+        let raw_dns_message =
+            "szgAAAABAAAAAAABAmg1B2V4YW1wbGUDY29tAAAGAAEAACkE0AEBQAAAOQAPADUACW5vIFNFUCBtYXRjaGluZyB0aGUgRFMgZm91bmQgZm9yIGRuc3NlYy1mYWlsZWQub3JnLg==";
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let parse_result = DnsMessageParser::new(raw_query_message).parse_as_query_message();
+        assert!(parse_result.is_ok());
+        let message = parse_result.expect("Message is not parsed.");
+        let opt_pseudo_section = message.opt_pseudo_section.expect("OPT section was missing");
+        assert_eq!(opt_pseudo_section.ede.len(), 1);
+        assert_eq!(opt_pseudo_section.ede[0].info_code(), 9u16);
+        assert_eq!(opt_pseudo_section.ede[0].purpose(), Some("DNSKEY Missing"));
+        assert_eq!(
+            opt_pseudo_section.ede[0].extra_text(),
+            Some("no SEP matching the DS found for dnssec-failed.org.".to_string())
         );
     }
 

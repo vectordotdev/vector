@@ -8,6 +8,7 @@ use std::{
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
+use dnsmsg_parser::ede::EDE;
 use hickory_proto::{
     rr::domain::Name,
     serialize::binary::{BinDecodable, BinDecoder},
@@ -811,10 +812,38 @@ impl DnstapParser {
                 &DNSTAP_VALUE_PATHS.udp_max_payload_size,
                 edns.udp_max_payload_size,
             );
+            DnstapParser::log_edns_ede(event, prefix.concat(&DNSTAP_VALUE_PATHS.ede), &edns.ede);
             DnstapParser::log_edns_options(
                 event,
                 prefix.concat(&DNSTAP_VALUE_PATHS.options),
                 &edns.options,
+            );
+        }
+    }
+
+    fn log_edns_ede<'a>(event: &mut LogEvent, prefix: impl ValuePath<'a>, options: &[EDE]) {
+        options.iter().enumerate().for_each(|(i, entry)| {
+            let index_segment = path!(i as isize);
+            DnstapParser::log_edns_ede_entry(event, prefix.concat(index_segment), entry);
+        });
+    }
+
+    fn log_edns_ede_entry<'a>(event: &mut LogEvent, prefix: impl ValuePath<'a>, entry: &EDE) {
+        DnstapParser::insert(
+            event,
+            prefix.clone(),
+            &DNSTAP_VALUE_PATHS.info_code,
+            entry.info_code(),
+        );
+        if let Some(purpose) = entry.purpose() {
+            DnstapParser::insert(event, prefix.clone(), &DNSTAP_VALUE_PATHS.purpose, purpose);
+        }
+        if let Some(extra_text) = entry.extra_text() {
+            DnstapParser::insert(
+                event,
+                prefix.clone(),
+                &DNSTAP_VALUE_PATHS.extra_text,
+                extra_text,
             );
         }
     }
@@ -1065,6 +1094,37 @@ mod tests {
                             .naive_utc(),
                     ),
                 ),
+            ),
+        ]);
+
+        // The maps need to contain identical keys and values.
+        for (exp_key, exp_value) in expected_map {
+            let value = log_event.get(exp_key).unwrap();
+            assert_eq!(*value, exp_value);
+        }
+    }
+
+    #[test]
+    fn test_parse_dnstap_data_with_ede_options() {
+        let mut log_event = LogEvent::default();
+        let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zGgBy5wEIAxACGAEiEAAAAAAAAAAAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAGAAbQAAAAByZLM4AAAAAQAAAAAAAQJoNQdleGFtcGxlA2NvbQAABgABAAApBNABAUAAADkADwA1AAlubyBTRVAgbWF0Y2hpbmcgdGhlIERTIGZvdW5kIGZvciBkbnNzZWMtZmFpbGVkLm9yZy54AQ==";
+        let dnstap_data = BASE64_STANDARD
+            .decode(raw_dnstap_data)
+            .expect("Invalid base64 encoded data.");
+        let parse_result = DnstapParser::parse(&mut log_event, Bytes::from(dnstap_data));
+        assert!(parse_result.is_ok());
+
+        let expected_map: BTreeMap<&str, Value> = BTreeMap::from([
+            ("responseData.opt.ede[0].infoCode", Value::Integer(9)),
+            (
+                "responseData.opt.ede[0].purpose",
+                Value::Bytes(Bytes::from("DNSKEY Missing")),
+            ),
+            (
+                "responseData.opt.ede[0].extraText",
+                Value::Bytes(Bytes::from(
+                    "no SEP matching the DS found for dnssec-failed.org.",
+                )),
             ),
         ]);
 
