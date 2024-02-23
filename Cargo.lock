@@ -9864,6 +9864,7 @@ dependencies = [
  "aws-sdk-s3",
  "aws-sdk-sns",
  "aws-sdk-sqs",
+ "aws-sdk-sts",
  "aws-sigv4",
  "aws-smithy-async",
  "aws-smithy-http",

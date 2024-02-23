@@ -13,9 +13,10 @@ use aws_config::{
     sts::AssumeRoleProviderBuilder,
 };
 use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
+use aws_smithy_async::time::SystemTimeSource;
 use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
 use aws_smithy_runtime_api::client::identity::SharedIdentityCache;
-use aws_types::region::Region;
+use aws_types::{region::Region, SdkConfig};
 use serde_with::serde_as;
 use vector_lib::{config::proxy::ProxyConfig, sensitive_string::SensitiveString, tls::TlsConfig};
 use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
@@ -266,8 +267,20 @@ impl AwsAuthentication {
                 ..
             } => {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                let mut builder =
-                    AssumeRoleProviderBuilder::new(assume_role).region(auth_region.clone());
+
+                let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
+                let tls_connector = build_tls_connector(tls_settings)?;
+
+                let connector = HyperClientBuilder::new().build(tls_connector);
+                let config = SdkConfig::builder()
+                    .http_client(connector)
+                    .region(auth_region.clone())
+                    .time_source(SystemTimeSource::new())
+                    .build();
+
+                let mut builder = AssumeRoleProviderBuilder::new(assume_role)
+                    .region(auth_region.clone())
+                    .configure(&config);
 
                 if let Some(external_id) = external_id {
                     builder = builder.external_id(external_id)
