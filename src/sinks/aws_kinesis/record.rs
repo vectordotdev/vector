@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use aws_smithy_client::SdkError;
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use bytes::Bytes;
 
 use super::KinesisResponse;
@@ -29,5 +29,5 @@ pub trait SendRecord {
         &self,
         records: Vec<Self::T>,
         stream_name: String,
-    ) -> Result<KinesisResponse, SdkError<Self::E>>;
+    ) -> Result<KinesisResponse, SdkError<Self::E, HttpResponse>>;
 }

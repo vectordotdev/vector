@@ -1,5 +1,6 @@
 use crate::{
     components::validation::{
+        component_names::*,
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
         ComponentConfiguration, ComponentType, ValidationConfiguration,
@@ -21,17 +22,19 @@ pub struct TopologyBuilder {
     output_edge: Option<OutputEdge>,
 }
 
-pub const TEST_SOURCE_NAME: &str = "test_source";
-pub const TEST_SINK_NAME: &str = "test_sink";
-pub const TEST_TRANSFORM_NAME: &str = "test_transform";
-pub const TEST_INPUT_SOURCE_NAME: &str = "input_source";
-pub const TEST_OUTPUT_SINK_NAME: &str = "output_sink";
-
 impl TopologyBuilder {
     /// Creates a component topology for the given component configuration.
-    pub fn from_configuration(configuration: &ValidationConfiguration) -> Self {
-        let component_configuration = configuration.component_configuration();
-        match component_configuration {
+    pub fn from_configuration(
+        configuration: &ValidationConfiguration,
+        config_name: Option<&String>,
+    ) -> Result<Self, String> {
+        let component_configuration = configuration
+            .component_configuration_for_test_case(config_name)
+            .ok_or(format!(
+                "No test case name defined for configuration {:?}.",
+                config_name
+            ))?;
+        Ok(match component_configuration {
             ComponentConfiguration::Source(source) => {
                 debug_assert_eq!(configuration.component_type(), ComponentType::Source);
                 Self::from_source(source)
@@ -44,7 +47,7 @@ impl TopologyBuilder {
                 debug_assert_eq!(configuration.component_type(), ComponentType::Sink);
                 Self::from_sink(sink)
             }
-        }
+        })
     }
 
     /// Creates a component topology for validating a source.

@@ -1,0 +1,89 @@
+# Changelog
+#
+# Validates that a changelog entry was added.
+# Runs on PRs when:
+#   - opened/re-opened
+#   - new commits pushed
+#   - label is added or removed
+# Runs on merge queues, but just passes, because it is a required check.
+
+name: Changelog
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  # Due to merge queue requiring same status checks as PRs, must pass by default
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  validate-changelog:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    env:
+      PR_HAS_LABEL: ${{ contains( github.event.pull_request.labels.*.name, 'no-changelog') }}
+    steps:
+        # checkout full depth because in the check_changelog_fragments script, we need to specify a
+        # merge base. If we only shallow clone the repo, git may not have enough history to determine
+        # the base.
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Generate authentication token
+        # don't run this step if the PR is from a fork or dependabot since the secrets won't exist
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+        id: generate_token
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a
+        with:
+          app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
+
+      - name: Get PR comment author
+        # don't run this step if the PR is from a fork or dependabot since the secrets won't exist
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+        id: author
+        uses: tspascoal/get-user-teams-membership@v3
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+
+      - env:
+          # if the prior step did not run, this var will be ''
+          AUTHOR_IS_TEAM_MEMBER: ${{ steps.author.outputs.isTeamMember }}
+        run: |
+          if [[ $PR_HAS_LABEL == 'true' ]] ; then
+            echo "'no-changelog' label detected."
+            exit 0
+          fi
+
+          # helper script needs to reference the master branch to compare against
+          git fetch origin master:refs/remotes/origin/master
+
+          # If the PR author is an external contributor, validate that the
+          # changelog fragments added contain the author line for website rendering.
+          args=""
+          if [[ $AUTHOR_IS_TEAM_MEMBER != 'true' ]] ; then
+            echo "PR author detected to be an external contributor."
+            args="--authors"
+          fi
+
+          ./scripts/check_changelog_fragments.sh ${args}
+
+  check-changelog:
+    name: Changelog
+    runs-on: ubuntu-latest
+    needs: validate-changelog
+    if: always()
+    env:
+      FAILED: ${{ contains(needs.*.result, 'failure') }}
+    steps:
+      - name: exit
+        run: |
+          echo "failed=${{ env.FAILED }}"
+          if [[ "$FAILED" == "true" ]] ; then
+            exit 1
+          else
+            exit 0
+          fi

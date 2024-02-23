@@ -5,7 +5,7 @@ remap: {
 		name:        string
 		description: string
 		required:    bool
-		default?:    bool | string | int | [string, ...string]
+		default?: bool | string | int | [string, ...string]
 		type: [remap.#Type, ...remap.#Type]
 		enum?: #Enum
 	}
@@ -15,7 +15,7 @@ remap: {
 		name:        string
 		category:    #FunctionCategory
 		description: string
-		notices:     [string, ...string] | *[]
+		notices: [string, ...string] | *[]
 
 		arguments: [...#Argument]
 		return: {
@@ -25,6 +25,7 @@ remap: {
 		internal_failure_reasons: [...string]
 		examples?: [remap.#Example, ...remap.#Example]
 		deprecated: bool | *false
+		pure:       bool | *true
 	}
 
 	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Convert" | "Debug" | "Enrichment" | "Enumerate" | "Event" | "Path" | "Cryptography" | "IP" | "Number" | "Object" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type"

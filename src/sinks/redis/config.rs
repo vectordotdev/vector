@@ -111,7 +111,7 @@ pub struct RedisSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
 }
@@ -157,7 +157,7 @@ impl SinkConfig for RedisSinkConfig {
 impl RedisSinkConfig {
     pub(super) async fn build_client(&self) -> RedisResult<ConnectionManager> {
         let client = redis::Client::open(self.endpoint.as_str())?;
-        client.get_tokio_connection_manager().await
+        client.get_connection_manager().await
     }
 
     async fn healthcheck(mut conn: ConnectionManager) -> crate::Result<()> {

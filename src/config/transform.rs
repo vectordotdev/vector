@@ -19,6 +19,7 @@ use vector_lib::{
 use super::schema::Options as SchemaOptions;
 use super::OutputId;
 use super::{id::Inputs, ComponentKey};
+use crate::extra_context::ExtraContext;
 
 pub type BoxedTransform = Box<dyn TransformConfig>;
 
@@ -96,7 +97,6 @@ where
     }
 }
 
-#[derive(Debug)]
 pub struct TransformContext {
     // This is optional because currently there are a lot of places we use `TransformContext` that
     // may not have the relevant data available (e.g. tests). In the future it'd be nice to make it
@@ -121,6 +121,10 @@ pub struct TransformContext {
     pub merged_schema_definition: schema::Definition,
 
     pub schema: SchemaOptions,
+
+    /// Extra context data provided by the running app and shared across all components. This can be
+    /// used to pass shared settings or other data from outside the components.
+    pub extra_context: ExtraContext,
 }
 
 impl Default for TransformContext {
@@ -132,6 +136,7 @@ impl Default for TransformContext {
             schema_definitions: HashMap::from([(None, HashMap::new())]),
             merged_schema_definition: schema::Definition::any(),
             schema: SchemaOptions::default(),
+            extra_context: Default::default(),
         }
     }
 }

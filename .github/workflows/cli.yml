@@ -6,6 +6,7 @@ on:
 jobs:
   test-cli:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       CARGO_INCREMENTAL: 0
     steps:
@@ -16,7 +17,7 @@ jobs:
 
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@v2.0.0
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -34,7 +35,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Cache Cargo registry + index
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
@@ -54,7 +55,7 @@ jobs:
         if: always()
 
       - name: (PR comment) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@v2.0.0
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         if: always() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}

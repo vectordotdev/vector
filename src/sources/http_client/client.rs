@@ -253,7 +253,14 @@ impl ValidatableComponent for HttpClientConfig {
             config.get_decoding_config(None),
         );
 
-        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
+        ValidationConfiguration::from_source(
+            Self::NAME,
+            vec![ComponentTestCaseConfig::from_source(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
     }
 }
 

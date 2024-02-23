@@ -1,7 +1,7 @@
 use std::{convert::TryInto, io::ErrorKind};
 
 use async_compression::tokio::bufread;
-use aws_sdk_s3::types::ByteStream;
+use aws_smithy_types::byte_stream::ByteStream;
 use futures::{stream, stream::StreamExt, TryStreamExt};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
@@ -237,7 +237,6 @@ impl AwsS3Config {
             endpoint.clone(),
             proxy,
             &self.tls_options,
-            false,
         )
         .await?;
 
@@ -253,7 +252,6 @@ impl AwsS3Config {
                     endpoint,
                     proxy,
                     &sqs.tls_options,
-                    false,
                 )
                 .await?;
 
@@ -305,7 +303,11 @@ async fn s3_object_decoder(
 
     let r = tokio::io::BufReader::new(StreamReader::new(
         stream::iter(Some(first))
-            .chain(body)
+            .chain(Box::pin(async_stream::stream! {
+                while let Some(next) = body.next().await {
+                    yield next;
+                }
+            }))
             .map_err(|e| std::io::Error::new(ErrorKind::Other, e)),
     ));
 
@@ -379,10 +381,9 @@ fn object_key_to_compression(key: &str) -> Option<Compression> {
 
 #[cfg(test)]
 mod test {
-    use aws_sdk_s3::types::ByteStream;
     use tokio::io::AsyncReadExt;
 
-    use super::{s3_object_decoder, Compression};
+    use super::*;
 
     #[test]
     fn determine_compression() {
@@ -437,20 +438,22 @@ mod test {
 #[cfg(test)]
 mod integration_tests {
     use std::{
+        any::Any,
+        collections::HashMap,
         fs::File,
         io::{self, BufRead},
         path::Path,
         time::Duration,
     };
 
-    use aws_sdk_s3::{types::ByteStream, Client as S3Client};
-    use aws_sdk_sqs::{model::QueueAttributeName, Client as SqsClient};
+    use aws_sdk_s3::Client as S3Client;
+    use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
     use similar_asserts::assert_eq;
     use vector_lib::codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
     use vector_lib::lookup::path;
     use vrl::value::Value;
 
-    use super::{sqs, AwsS3Config, Compression, Strategy};
+    use super::*;
     use crate::{
         aws::{create_client, AwsAuthentication, RegionOrEndpoint},
         common::sqs::SqsClientBuilder,
@@ -490,6 +493,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -518,6 +522,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Json(JsonDeserializerConfig::default()),
+            None,
         )
         .await;
     }
@@ -538,6 +543,7 @@ mod integration_tests {
             Delivered,
             true,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -559,6 +565,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -580,6 +587,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -609,6 +617,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -639,6 +648,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -669,6 +679,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -697,6 +708,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -720,6 +732,7 @@ mod integration_tests {
             Errored,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -740,6 +753,31 @@ mod integration_tests {
             Rejected,
             false,
             DeserializerConfig::Bytes,
+            None,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn handles_failed_status_without_deletion() {
+        trace_init();
+
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        let mut custom_options: HashMap<String, Box<dyn Any>> = HashMap::new();
+        custom_options.insert("delete_failed_message".to_string(), Box::new(false));
+
+        test_event(
+            None,
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Rejected,
+            false,
+            DeserializerConfig::Bytes,
+            Some(custom_options),
         )
         .await;
     }
@@ -785,6 +823,7 @@ mod integration_tests {
         status: EventStatus,
         log_namespace: bool,
         decoding: DeserializerConfig,
+        custom_options: Option<HashMap<String, Box<dyn Any>>>,
     ) {
         assert_source_compliance(&SOURCE_TAGS, async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
@@ -797,7 +836,16 @@ mod integration_tests {
 
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            let config = config(&queue, multiline, log_namespace, decoding);
+            let mut config = config(&queue, multiline, log_namespace, decoding);
+
+            if let Some(false) = custom_options
+                .as_ref()
+                .and_then(|opts| opts.get("delete_failed_message"))
+                .and_then(|val| val.downcast_ref::<bool>())
+                .copied()
+            {
+                config.sqs.as_mut().unwrap().delete_failed_message = false;
+            }
 
             s3.put_object()
                 .bucket(bucket.clone())
@@ -896,10 +944,17 @@ mod integration_tests {
                 assert_eq!(namespace.get_source_metadata(AwsS3Config::NAME, log, path!("region"), path!("region")).unwrap(), &"us-east-1".into());
             }
 
+            // Unfortunately we need a fairly large sleep here to ensure that the source has actually managed to delete the SQS message.
+            // The deletion of this message occurs after the Event has been sent out by the source and there is no way of knowing when this
+            // process has finished other than waiting around for a while.
+            tokio::time::sleep(Duration::from_secs(10)).await;
             // Make sure the SQS message is deleted
             match status {
                 Errored => {
                     // need to wait up to the visibility timeout before it will be counted again
+                    assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
+                }
+                Rejected if !config.sqs.unwrap().delete_failed_message => {
                     assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
                 }
                 _ => {
@@ -972,7 +1027,6 @@ mod integration_tests {
             region_endpoint.endpoint(),
             &proxy_config,
             &None,
-            false,
         )
         .await
         .unwrap()
@@ -991,7 +1045,6 @@ mod integration_tests {
             region_endpoint.endpoint(),
             &proxy_config,
             &None,
-            false,
         )
         .await
         .unwrap()

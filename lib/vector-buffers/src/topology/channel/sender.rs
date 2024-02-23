@@ -21,7 +21,7 @@ pub enum SenderAdapter<T: Bufferable> {
     InMemory(LimitedSender<T>),
 
     /// The disk v2 buffer.
-    DiskV2(Arc<Mutex<disk_v2::Writer<T, ProductionFilesystem>>>),
+    DiskV2(Arc<Mutex<disk_v2::BufferWriter<T, ProductionFilesystem>>>),
 }
 
 impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
@@ -30,8 +30,8 @@ impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
     }
 }
 
-impl<T: Bufferable> From<disk_v2::Writer<T, ProductionFilesystem>> for SenderAdapter<T> {
-    fn from(v: disk_v2::Writer<T, ProductionFilesystem>) -> Self {
+impl<T: Bufferable> From<disk_v2::BufferWriter<T, ProductionFilesystem>> for SenderAdapter<T> {
+    fn from(v: disk_v2::BufferWriter<T, ProductionFilesystem>) -> Self {
         Self::DiskV2(Arc::new(Mutex::new(v)))
     }
 }

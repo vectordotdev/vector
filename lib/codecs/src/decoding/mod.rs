@@ -5,6 +5,7 @@ mod error;
 pub mod format;
 pub mod framing;
 
+use crate::decoding::format::{VrlDeserializer, VrlDeserializerConfig};
 use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
@@ -31,6 +32,8 @@ use vector_core::{
     event::Event,
     schema,
 };
+
+use self::format::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
 
 /// An error that occurred while decoding structured events from a byte stream /
 /// byte messages.
@@ -234,8 +237,35 @@ pub enum DeserializerConfig {
 
     /// Decodes the raw bytes as a [GELF][gelf] message.
     ///
+    /// This codec is experimental for the following reason:
+    ///
+    /// The GELF specification is more strict than the actual Graylog receiver.
+    /// Vector's decoder currently adheres more strictly to the GELF spec, with
+    /// the exception that some characters such as `@`  are allowed in field names.
+    ///
+    /// Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
+    /// by Graylog, and is much more relaxed than the GELF spec.
+    ///
+    /// Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
+    /// the codec may continue to relax the enforcement of specification.
+
+    ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
+    /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
     Gelf(GelfDeserializerConfig),
+
+    /// Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+    ///
+    /// [apache_avro]: https://avro.apache.org/
+    Avro {
+        /// Apache Avro-specific encoder options.
+        avro: AvroDeserializerOptions,
+    },
+
+    /// Decodes the raw bytes as a string and passes them as input to a [VRL][vrl] program.
+    ///
+    /// [vrl]: https://vector.dev/docs/reference/vrl
+    Vrl(VrlDeserializerConfig),
 }
 
 impl From<BytesDeserializerConfig> for DeserializerConfig {
@@ -279,6 +309,12 @@ impl DeserializerConfig {
     /// Build the `Deserializer` from this configuration.
     pub fn build(&self) -> vector_common::Result<Deserializer> {
         match self {
+            DeserializerConfig::Avro { avro } => Ok(Deserializer::Avro(
+                AvroDeserializerConfig {
+                    avro_options: avro.clone(),
+                }
+                .build(),
+            )),
             DeserializerConfig::Bytes => Ok(Deserializer::Bytes(BytesDeserializerConfig.build())),
             DeserializerConfig::Json(config) => Ok(Deserializer::Json(config.build())),
             DeserializerConfig::Protobuf(config) => Ok(Deserializer::Protobuf(config.build()?)),
@@ -289,12 +325,14 @@ impl DeserializerConfig {
             }
             DeserializerConfig::NativeJson(config) => Ok(Deserializer::NativeJson(config.build())),
             DeserializerConfig::Gelf(config) => Ok(Deserializer::Gelf(config.build())),
+            DeserializerConfig::Vrl(config) => Ok(Deserializer::Vrl(config.build()?)),
         }
     }
 
     /// Return an appropriate default framer for the given deserializer
     pub fn default_stream_framing(&self) -> FramingConfig {
         match self {
+            DeserializerConfig::Avro { .. } => FramingConfig::Bytes,
             DeserializerConfig::Native => FramingConfig::LengthDelimited,
             DeserializerConfig::Bytes
             | DeserializerConfig::Json(_)
@@ -305,12 +343,17 @@ impl DeserializerConfig {
             DeserializerConfig::Protobuf(_) => FramingConfig::Bytes,
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(_) => FramingConfig::NewlineDelimited(Default::default()),
+            DeserializerConfig::Vrl(_) => FramingConfig::Bytes,
         }
     }
 
     /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
         match self {
+            DeserializerConfig::Avro { avro } => AvroDeserializerConfig {
+                avro_options: avro.clone(),
+            }
+            .output_type(),
             DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
             DeserializerConfig::Json(config) => config.output_type(),
             DeserializerConfig::Protobuf(config) => config.output_type(),
@@ -319,12 +362,17 @@ impl DeserializerConfig {
             DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
             DeserializerConfig::NativeJson(config) => config.output_type(),
             DeserializerConfig::Gelf(config) => config.output_type(),
+            DeserializerConfig::Vrl(config) => config.output_type(),
         }
     }
 
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match self {
+            DeserializerConfig::Avro { avro } => AvroDeserializerConfig {
+                avro_options: avro.clone(),
+            }
+            .schema_definition(log_namespace),
             DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::Json(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Protobuf(config) => config.schema_definition(log_namespace),
@@ -333,6 +381,7 @@ impl DeserializerConfig {
             DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::NativeJson(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Gelf(config) => config.schema_definition(log_namespace),
+            DeserializerConfig::Vrl(config) => config.schema_definition(log_namespace),
         }
     }
 
@@ -355,13 +404,16 @@ impl DeserializerConfig {
                         },
                 }),
             ) => "application/json",
-            (DeserializerConfig::Native, _) => "application/octet-stream",
+            (DeserializerConfig::Native, _) | (DeserializerConfig::Avro { .. }, _) => {
+                "application/octet-stream"
+            }
             (DeserializerConfig::Protobuf(_), _) => "application/octet-stream",
             (
                 DeserializerConfig::Json(_)
                 | DeserializerConfig::NativeJson(_)
                 | DeserializerConfig::Bytes
-                | DeserializerConfig::Gelf(_),
+                | DeserializerConfig::Gelf(_)
+                | DeserializerConfig::Vrl(_),
                 _,
             ) => "text/plain",
             #[cfg(feature = "syslog")]
@@ -373,6 +425,8 @@ impl DeserializerConfig {
 /// Parse structured events from bytes.
 #[derive(Clone)]
 pub enum Deserializer {
+    /// Uses a `AvroDeserializer` for deserialization.
+    Avro(AvroDeserializer),
     /// Uses a `BytesDeserializer` for deserialization.
     Bytes(BytesDeserializer),
     /// Uses a `JsonDeserializer` for deserialization.
@@ -390,6 +444,8 @@ pub enum Deserializer {
     Boxed(BoxedDeserializer),
     /// Uses a `GelfDeserializer` for deserialization.
     Gelf(GelfDeserializer),
+    /// Uses a `VrlDeserializer` for deserialization.
+    Vrl(VrlDeserializer),
 }
 
 impl format::Deserializer for Deserializer {
@@ -399,6 +455,7 @@ impl format::Deserializer for Deserializer {
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         match self {
+            Deserializer::Avro(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Bytes(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Json(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Protobuf(deserializer) => deserializer.parse(bytes, log_namespace),
@@ -408,6 +465,7 @@ impl format::Deserializer for Deserializer {
             Deserializer::NativeJson(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Boxed(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Gelf(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Vrl(deserializer) => deserializer.parse(bytes, log_namespace),
         }
     }
 }

@@ -1,6 +1,6 @@
-//! The Prometheus Remote Write [`vector_core::sink::VectorSink`].
-//! Contains the [`vector_core::sink::VectorSink`] instance that is responsible
-//! for taking a stream of [`vector_core::event::Event`] and forwarding
+//! The Prometheus Remote Write sink.
+//! Contains the [`VectorSink`] instance that is responsible
+//! for taking a stream of [`Event`] and forwarding
 //! them to a server via the [Prometheus Remote Write protocol][remote_write].
 //!
 //! [remote_write]: https://prometheus.io/docs/concepts/remote_write_spec/
@@ -24,6 +24,7 @@ mod tests;
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests;
 
+#[cfg(all(test, feature = "sources-prometheus-remote-write"))]
 pub use config::RemoteWriteConfig;
 
 #[derive(Debug, Snafu)]

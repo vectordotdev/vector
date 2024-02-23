@@ -11,20 +11,20 @@ name = "integration"
 path = "tests/integration/lib.rs"
 
 [dependencies]
-chrono = { version = "0.4.31", default-features = false }
-chrono-tz = { version = "0.8.4", default-features = false }
+chrono.workspace = true
+chrono-tz = { version = "0.8.6", default-features = false }
 encoding_rs = { version = "0.8", default-features = false, features = ["alloc", "serde"] }
-indexmap = { version = "2.1.0", default-features = false, features = ["std"] }
+indexmap.workspace = true
 inventory = { version = "0.3" }
 no-proxy = { version = "0.3.4", default-features = false, features = ["serialize"] }
-num-traits = { version = "0.2.17", default-features = false }
-serde = { version = "1.0", default-features = false }
-serde_json = { version = "1.0", default-features = false, features = ["std"] }
-serde_with = { version = "3.4.0", default-features = false, features = ["std"] }
+num-traits = { version = "0.2.18", default-features = false }
+serde.workspace = true
+serde_json.workspace = true
+serde_with = { version = "3.6.1", default-features = false, features = ["std"] }
 snafu = { version = "0.7.5", default-features = false }
-toml = { version = "0.8.8", default-features = false }
+toml.workspace = true
 tracing = { version = "0.1.34", default-features = false }
-url = { version = "2.4.1", default-features = false, features = ["serde"] }
+url = { version = "2.5.0", default-features = false, features = ["serde"] }
 http = { version = "0.2.9", default-features = false }
 vrl.workspace = true
 vector-config-common = { path = "../vector-config-common" }
@@ -32,5 +32,5 @@ vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
 assert-json-diff = { version = "2", default-features = false }
-serde_with = { version = "3.4.0", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "3.6.1", default-features = false, features = ["std", "macros"] }
 vector-core = { path = "../vector-core", default-features = false, features = ["test"] }

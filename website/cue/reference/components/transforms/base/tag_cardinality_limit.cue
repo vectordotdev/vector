@@ -10,7 +10,7 @@ base: components: transforms: tag_cardinality_limit: configuration: {
 			"""
 		relevant_when: "mode = \"probabilistic\""
 		required:      false
-		type: uint: default: 5120000
+		type: uint: default: 5120
 	}
 	limit_exceeded_action: {
 		description: """

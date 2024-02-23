@@ -3,13 +3,13 @@ package metadata
 remap: functions: is_timestamp: {
 	category: "Type"
 	description: """
-		Check if the type of a `value` is a timestamp or not.
+		Check if `value`'s type is a timestamp.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check"#
+			description: #"The value to check if it is a timestamp."#
 			required:    true
 			type: ["any"]
 		},

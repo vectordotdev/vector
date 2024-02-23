@@ -571,7 +571,7 @@ impl MaybeTlsSettings {
 
     pub const fn http_protocol_name(&self) -> &'static str {
         match self {
-            MaybeTls::Raw(_) => "http",
+            MaybeTls::Raw(()) => "http",
             MaybeTls::Tls(_) => "https",
         }
     }

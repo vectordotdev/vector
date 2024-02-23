@@ -21,13 +21,12 @@ use super::{
     SourceOuter, TransformOuter,
 };
 use crate::{
-    common::datadog::get_api_base_endpoint,
+    common::datadog::{default_site, get_api_base_endpoint},
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
         datadog::{
-            default_site, logs::DatadogLogsConfig, metrics::DatadogMetricsConfig,
-            DatadogCommonConfig,
+            logs::DatadogLogsConfig, metrics::DatadogMetricsConfig, LocalDatadogCommonConfig,
         },
         util::{http::RequestConfig, retries::ExponentialBackoff},
     },
@@ -106,10 +105,7 @@ pub struct Options {
     pub max_retries: u32,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 
     /// A map of additional tags for metrics sent to Observability Pipelines.
@@ -395,7 +391,7 @@ pub(crate) fn report_on_reload(
 ) -> Option<EnterpriseReporter<BoxFuture<'static, ()>>> {
     attach_enterprise_components(config, &metadata);
 
-    let enterprise = match enterprise {
+    match enterprise {
         Some(enterprise) => {
             enterprise.send(report_configuration(config_paths, metadata));
             None
@@ -405,9 +401,7 @@ pub(crate) fn report_on_reload(
             enterprise.send(report_configuration(config_paths, metadata));
             Some(enterprise)
         }
-    };
-
-    enterprise
+    }
 }
 
 pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {
@@ -461,12 +455,11 @@ fn setup_logs_reporting(
 
     // Create a Datadog logs sink to consume and emit internal logs.
     let datadog_logs = DatadogLogsConfig {
-        dd_common: DatadogCommonConfig {
-            endpoint: datadog.endpoint.clone(),
-            site: datadog.site.clone(),
-            default_api_key: api_key.into(),
-            ..Default::default()
-        },
+        local_dd_common: LocalDatadogCommonConfig::new(
+            datadog.endpoint.clone(),
+            Some(datadog.site.clone()),
+            Some(api_key.into()),
+        ),
         request: RequestConfig {
             headers: IndexMap::from([(
                 "DD-EVP-ORIGIN".to_string(),
@@ -568,12 +561,11 @@ fn setup_metrics_reporting(
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
-        dd_common: DatadogCommonConfig {
-            endpoint: datadog.endpoint.clone(),
-            site: datadog.site.clone(),
-            default_api_key: api_key.into(),
-            ..Default::default()
-        },
+        local_dd_common: LocalDatadogCommonConfig::new(
+            datadog.endpoint.clone(),
+            Some(datadog.site.clone()),
+            Some(api_key.into()),
+        ),
         ..Default::default()
     };
 

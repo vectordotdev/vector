@@ -104,7 +104,9 @@ pub enum Mode {
         receive_buffer_bytes: Option<usize>,
     },
 
-    /// Listen on UDS. (Unix domain socket)
+    /// Listen on UDS (Unix domain socket). This only supports Unix stream sockets.
+    ///
+    /// For Unix datagram sockets, use the `socket` source instead.
     #[cfg(unix)]
     Unix {
         /// The Unix socket path.

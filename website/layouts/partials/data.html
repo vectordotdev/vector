@@ -692,6 +692,12 @@
           {{ if $func.deprecated }}
           {{ partial "badge.html" (dict "word" "deprecated" "color" "red" "inline" true "href" $href) }}
           {{ end }}
+          {{/* Pure Badge */}}
+          {{ if $func.pure }}
+          {{ partial "badge.html" (dict "word" "pure" "color" "green" "inline" true "href" $href) }}
+          {{ else }}
+          {{ partial "badge.html" (dict "word" "impure" "color" "yellow" "inline" true "href" $href) }}
+          {{ end }}
         </span>
       </span>
 

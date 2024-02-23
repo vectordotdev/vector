@@ -25,16 +25,16 @@ use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 //   suggest. We've elected to take a more strict approach to maintain backwards compatibility
 //   in the event that we need to change the behavior to be more relaxed, so that prior versions
 //   of vector will still work with the new relaxed decoding.
+//
+//   Additionally, Graylog's own GELF Output produces GELF messages with any field names present
+//   in the sending Stream, exceeding the specified field name character set.
 
 /// Config used to build a `GelfDeserializer`.
 #[configurable_component]
 #[derive(Debug, Clone, Default)]
 pub struct GelfDeserializerConfig {
     /// GELF-specific decoding options.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub gelf: GelfDeserializerOptions,
 }
 
@@ -90,7 +90,7 @@ pub struct GelfDeserializerOptions {
     /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
     #[serde(
         default = "default_lossy",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::is_default"
     )]
     #[derivative(Default(value = "default_lossy()"))]
     pub lossy: bool,

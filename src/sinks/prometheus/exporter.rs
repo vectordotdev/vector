@@ -38,7 +38,7 @@ use crate::{
         Event, EventStatus, Finalizable,
     },
     http::{build_http_trace_layer, Auth},
-    internal_events::{PrometheusNormalizationError, PrometheusServerRequestComplete},
+    internal_events::PrometheusNormalizationError,
     sinks::{
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet},
@@ -146,7 +146,7 @@ pub struct PrometheusExporterConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -488,10 +488,6 @@ impl PrometheusExporter {
 
             let inner = service_fn(move |req| {
                 let response = handler.handle(req, &metrics);
-
-                emit!(PrometheusServerRequestComplete {
-                    status_code: response.status(),
-                });
 
                 future::ok::<_, Infallible>(response)
             });

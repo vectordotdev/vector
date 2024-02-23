@@ -8,6 +8,7 @@ jobs:
 
   sync-install:
     runs-on: ubuntu-20.04
+    timeout-minutes: 10
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
@@ -16,7 +17,7 @@ jobs:
 
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@v2.0.0
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -40,7 +41,7 @@ jobs:
         run: make sync-install
 
       - name: (PR comment) Set latest commit status as failed
-        uses: myrotvorets/set-commit-status-action@v2.0.0
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         if: failure() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -51,9 +52,10 @@ jobs:
   test-install:
     needs: sync-install
     runs-on: ubuntu-20.04
+    timeout-minutes: 5
     steps:
       - run: sudo apt-get install --yes curl bc
-      - run:  curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash -s -- -y
+      - run:  curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash -s -- -y
       - run: ~/.vector/bin/vector --version
 
       - name: (PR comment) Get PR branch
@@ -63,7 +65,7 @@ jobs:
 
       - name: (PR comment) Set latest commit status as ${{ job.status }}
         if: github.event_name == 'issue_comment'
-        uses: myrotvorets/set-commit-status-action@v2.0.0
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}

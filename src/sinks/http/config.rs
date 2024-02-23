@@ -5,11 +5,12 @@ use hyper::Body;
 use indexmap::IndexMap;
 use vector_lib::codecs::{
     encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder,
+    CharacterDelimitedEncoder, GelfSerializerConfig,
 };
 
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
+    components::validation::ComponentTestCaseConfig,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
@@ -33,33 +34,33 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 #[configurable_component(sink("http", "Deliver observability event data to an HTTP server."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub(super) struct HttpSinkConfig {
+pub struct HttpSinkConfig {
     /// The full URI to make HTTP requests to.
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     #[configurable(metadata(docs::examples = "https://10.22.212.22:9000/endpoint"))]
-    pub(super) uri: UriSerde,
+    pub uri: UriSerde,
 
     /// The HTTP method to use when making the request.
     #[serde(default)]
-    pub(super) method: HttpMethod,
+    pub method: HttpMethod,
 
     #[configurable(derived)]
-    pub(super) auth: Option<Auth>,
+    pub auth: Option<Auth>,
 
     /// A list of custom headers to add to each request.
     #[configurable(deprecated = "This option has been deprecated, use `request.headers` instead.")]
     #[configurable(metadata(
         docs::additional_props_description = "An HTTP request header and it's value."
     ))]
-    pub(super) headers: Option<IndexMap<String, String>>,
+    pub headers: Option<IndexMap<String, String>>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) compression: Compression,
+    pub compression: Compression,
 
     #[serde(flatten)]
-    pub(super) encoding: EncodingConfigWithFraming,
+    pub encoding: EncodingConfigWithFraming,
 
     /// A string to prefix the payload with.
     ///
@@ -68,7 +69,7 @@ pub(super) struct HttpSinkConfig {
     /// If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "{\"data\":"))]
     #[serde(default)]
-    pub(super) payload_prefix: String,
+    pub payload_prefix: String,
 
     /// A string to suffix the payload with.
     ///
@@ -77,26 +78,26 @@ pub(super) struct HttpSinkConfig {
     /// If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "}"))]
     #[serde(default)]
-    pub(super) payload_suffix: String,
+    pub payload_suffix: String,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) request: RequestConfig,
+    pub request: RequestConfig,
 
     #[configurable(derived)]
-    pub(super) tls: Option<TlsConfig>,
+    pub tls: Option<TlsConfig>,
 
     #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
-    pub(super) acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 /// HTTP method.
@@ -108,7 +109,7 @@ pub(super) struct HttpSinkConfig {
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
-pub(super) enum HttpMethod {
+pub enum HttpMethod {
     /// GET.
     Get,
 
@@ -311,33 +312,80 @@ impl ValidatableComponent for HttpSinkConfig {
         use std::str::FromStr;
         use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
 
-        let config = Self {
-            uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
-                .expect("should never fail to parse"),
-            method: HttpMethod::Post,
-            encoding: EncodingConfigWithFraming::new(
-                None,
-                JsonSerializerConfig::new(MetricTagValues::Full).into(),
-                Transformer::default(),
-            ),
-            auth: None,
-            headers: None,
-            compression: Compression::default(),
-            batch: BatchConfig::default(),
-            request: RequestConfig::default(),
-            tls: None,
-            acknowledgements: AcknowledgementsConfig::default(),
-            payload_prefix: String::new(),
-            payload_suffix: String::new(),
-        };
-
-        let external_resource = ExternalResource::new(
-            ResourceDirection::Push,
-            HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
-            config.encoding.clone(),
+        let happy_encoder = EncodingConfigWithFraming::new(
+            None,
+            JsonSerializerConfig::new(MetricTagValues::Full).into(),
+            Transformer::default(),
         );
 
-        ValidationConfiguration::from_sink(Self::NAME, config, Some(external_resource))
+        fn get_config(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
+            HttpSinkConfig {
+                uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
+                    .expect("should never fail to parse"),
+                method: HttpMethod::Post,
+                encoding,
+                auth: None,
+                headers: None,
+                compression: Compression::default(),
+                batch: BatchConfig::default(),
+                request: RequestConfig::default(),
+                tls: None,
+                acknowledgements: AcknowledgementsConfig::default(),
+                payload_prefix: String::new(),
+                payload_suffix: String::new(),
+            }
+        }
+
+        fn get_external_resource(
+            config: &HttpSinkConfig,
+            encoding: Option<EncodingConfigWithFraming>,
+        ) -> ExternalResource {
+            ExternalResource::new(
+                ResourceDirection::Push,
+                HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
+                if let Some(encoding) = encoding {
+                    encoding
+                } else {
+                    config.encoding.clone()
+                },
+            )
+        }
+
+        let happy_config = get_config(happy_encoder.clone());
+
+        let happy_external_resource = get_external_resource(&happy_config, None);
+
+        // this config uses the Gelf serializer, which requires the "level" field to
+        // be an integer
+        let sad_config = get_config(EncodingConfigWithFraming::new(
+            None,
+            GelfSerializerConfig::new().into(),
+            Transformer::default(),
+        ));
+
+        let sad_external_resource = get_external_resource(
+            &happy_config,
+            // the external resource needs to use an encoder that actually works, in order to
+            // get the event into the topology successfully
+            Some(happy_encoder),
+        );
+
+        ValidationConfiguration::from_sink(
+            Self::NAME,
+            vec![
+                ComponentTestCaseConfig::from_sink(
+                    happy_config,
+                    None,
+                    Some(happy_external_resource),
+                ),
+                // this config only runs with the test case "encoding_error" in the yaml file.
+                ComponentTestCaseConfig::from_sink(
+                    sad_config,
+                    Some("encoding_error".to_owned()),
+                    Some(sad_external_resource),
+                ),
+            ],
+        )
     }
 }
 

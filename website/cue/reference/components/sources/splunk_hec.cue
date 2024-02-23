@@ -24,7 +24,7 @@ components: sources: splunk_hec: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: services.splunk
+				service: services.splunk_client
 
 				interface: socket: {
 					api: {
@@ -82,7 +82,6 @@ components: sources: splunk_hec: {
 		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
 		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
 		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total
-		requests_received_total:              components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 
 	how_it_works: {

@@ -1,13 +1,15 @@
 use std::collections::{BTreeMap, HashMap};
 
 use aws_sdk_s3::{
-    error::PutObjectError,
-    model::{ObjectCannedAcl, ServerSideEncryption, StorageClass},
+    operation::put_object::PutObjectError,
+    types::{ObjectCannedAcl, ServerSideEncryption, StorageClass},
     Client as S3Client,
 };
-use aws_smithy_client::SdkError;
+use aws_smithy_runtime_api::{
+    client::{orchestrator::HttpResponse, result::SdkError},
+    http::StatusCode,
+};
 use futures::FutureExt;
-use http::StatusCode;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
@@ -16,6 +18,7 @@ use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, RegionOrEndpoint},
     common::s3::S3ClientBuilder,
     config::ProxyConfig,
+    http::status,
     sinks::{util::retries::RetryLogic, Healthcheck},
     tls::TlsConfig,
 };
@@ -155,6 +158,9 @@ pub enum S3StorageClass {
     /// Infrequently Accessed.
     StandardIa,
 
+    /// High Performance (single Availability zone).
+    ExpressOnezone,
+
     /// Infrequently Accessed (single Availability zone).
     OnezoneIa,
 
@@ -172,6 +178,7 @@ impl From<S3StorageClass> for StorageClass {
             S3StorageClass::ReducedRedundancy => Self::ReducedRedundancy,
             S3StorageClass::IntelligentTiering => Self::IntelligentTiering,
             S3StorageClass::StandardIa => Self::StandardIa,
+            S3StorageClass::ExpressOnezone => Self::ExpressOnezone,
             S3StorageClass::OnezoneIa => Self::OnezoneIa,
             S3StorageClass::Glacier => Self::Glacier,
             S3StorageClass::DeepArchive => Self::DeepArchive,
@@ -305,7 +312,7 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
 pub struct S3RetryLogic;
 
 impl RetryLogic for S3RetryLogic {
-    type Error = SdkError<PutObjectError>;
+    type Error = SdkError<PutObjectError, HttpResponse>;
     type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
@@ -335,11 +342,14 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
         match req {
             Ok(_) => Ok(()),
             Err(error) => Err(match error {
-                SdkError::ServiceError(inner) => match inner.into_raw().http().status() {
-                    StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
-                    StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
-                    status => HealthcheckError::UnknownStatus { status }.into(),
-                },
+                SdkError::ServiceError(inner) => {
+                    let status = inner.into_raw().status();
+                    match status.as_u16() {
+                        status::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
+                        status::NOT_FOUND => HealthcheckError::UnknownBucket { bucket }.into(),
+                        _ => HealthcheckError::UnknownStatus { status }.into(),
+                    }
+                }
                 error => error.into(),
             }),
         }
@@ -357,7 +367,7 @@ pub async fn create_service(
     let endpoint = region.endpoint();
     let region = region.region();
     let client =
-        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options, true)
+        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options)
             .await?;
     Ok(S3Service::new(client))
 }
@@ -373,6 +383,7 @@ mod tests {
             ("DEEP_ARCHIVE", S3StorageClass::DeepArchive),
             ("GLACIER", S3StorageClass::Glacier),
             ("INTELLIGENT_TIERING", S3StorageClass::IntelligentTiering),
+            ("EXPRESS_ONEZONE", S3StorageClass::ExpressOnezone),
             ("ONEZONE_IA", S3StorageClass::OnezoneIa),
             ("REDUCED_REDUNDANCY", S3StorageClass::ReducedRedundancy),
             ("STANDARD", S3StorageClass::Standard),

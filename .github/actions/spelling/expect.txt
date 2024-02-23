@@ -167,7 +167,6 @@ clibtype
 clickhouse
 clonable
 cloudresourcemanager
-cloudsmith
 cloudwatchlogs
 cmark
 CMK
@@ -221,6 +220,7 @@ customizability
 customtype
 cwl
 Dailywarehousing
+dalegaard
 daschl
 dashmap
 datadir
@@ -327,8 +327,8 @@ EOIG
 EOL'ed
 Err'ing
 errorf
-Errorsfor
 esb
+esensar
 esque
 etheus
 etl
@@ -448,6 +448,7 @@ gnux
 gny
 Godbolt
 gogoproto
+gohai
 goldberg
 goldmark
 GPB
@@ -564,6 +565,7 @@ jmxrmi
 jmxtrans
 Jolokia
 jsn
+JSONAs
 jsonify
 jsonlines
 jstype
@@ -655,7 +657,6 @@ maybeanothertest
 mbean
 mcache
 mcr
-meh
 meln
 memfd
 memmap
@@ -1131,6 +1132,7 @@ toor
 topdir
 topojson
 toproto
+towncrier
 Toxiproxy
 Tpng
 Trauring
@@ -1235,7 +1237,6 @@ wktpointer
 wmem
 woooooow
 woothee
-wor
 wordlist
 workdir
 workstreams

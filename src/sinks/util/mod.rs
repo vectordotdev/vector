@@ -1,7 +1,7 @@
 pub mod adaptive_concurrency;
 pub mod auth;
 // https://github.com/mcarton/rust-derivative/issues/112
-#[allow(clippy::incorrect_clone_impl_on_copy_type)]
+#[allow(clippy::non_canonical_clone_impl)]
 pub mod batch;
 pub mod buffer;
 pub mod builder;
@@ -20,7 +20,7 @@ pub mod snappy;
 pub mod socket_bytes_sink;
 pub mod statistic;
 pub mod tcp;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 pub mod test;
 pub mod udp;
 #[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]

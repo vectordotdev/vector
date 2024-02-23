@@ -24,7 +24,7 @@ pub enum ReceiverAdapter<T: Bufferable> {
     InMemory(LimitedReceiver<T>),
 
     /// The disk v2 buffer.
-    DiskV2(disk_v2::Reader<T, ProductionFilesystem>),
+    DiskV2(disk_v2::BufferReader<T, ProductionFilesystem>),
 }
 
 impl<T: Bufferable> From<LimitedReceiver<T>> for ReceiverAdapter<T> {
@@ -33,8 +33,8 @@ impl<T: Bufferable> From<LimitedReceiver<T>> for ReceiverAdapter<T> {
     }
 }
 
-impl<T: Bufferable> From<disk_v2::Reader<T, ProductionFilesystem>> for ReceiverAdapter<T> {
-    fn from(v: disk_v2::Reader<T, ProductionFilesystem>) -> Self {
+impl<T: Bufferable> From<disk_v2::BufferReader<T, ProductionFilesystem>> for ReceiverAdapter<T> {
+    fn from(v: disk_v2::BufferReader<T, ProductionFilesystem>) -> Self {
         Self::DiskV2(v)
     }
 }

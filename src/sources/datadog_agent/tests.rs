@@ -14,11 +14,14 @@ use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
-use vector_lib::codecs::{
-    decoding::{Deserializer, DeserializerConfig, Framer},
-    BytesDecoder, BytesDeserializer,
-};
 use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+use vector_lib::{
+    codecs::{
+        decoding::{Deserializer, DeserializerConfig, Framer},
+        BytesDecoder, BytesDeserializer,
+    },
+    config::DataType,
+};
 use vector_lib::{
     config::LogNamespace,
     event::{metric::TagValue, MetricTags},
@@ -92,7 +95,7 @@ fn test_decode_log_body() {
             true,
             decoder,
             "http",
-            test_logs_schema_definition(),
+            Some(test_logs_schema_definition()),
             LogNamespace::Legacy,
         );
 
@@ -133,7 +136,7 @@ fn test_decode_log_body_empty_object() {
         true,
         decoder,
         "http",
-        test_logs_schema_definition(),
+        Some(test_logs_schema_definition()),
         LogNamespace::Legacy,
     );
 
@@ -1445,6 +1448,95 @@ async fn split_outputs() {
         }
     })
     .await;
+}
+
+#[test]
+fn test_config_outputs_with_disabled_data_types() {
+    struct TestCase {
+        multiple_outputs: bool,
+        disable_logs: bool,
+        disable_metrics: bool,
+        disable_traces: bool,
+    }
+
+    for TestCase {
+        multiple_outputs,
+        disable_logs,
+        disable_metrics,
+        disable_traces,
+    } in [
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: true,
+            disable_metrics: true,
+            disable_traces: true,
+        },
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: true,
+            disable_metrics: false,
+            disable_traces: false,
+        },
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: false,
+            disable_metrics: true,
+            disable_traces: false,
+        },
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: false,
+            disable_metrics: false,
+            disable_traces: true,
+        },
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: true,
+            disable_metrics: true,
+            disable_traces: false,
+        },
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: false,
+            disable_metrics: false,
+            disable_traces: false,
+        },
+        TestCase {
+            multiple_outputs: false,
+            disable_logs: true,
+            disable_metrics: true,
+            disable_traces: true,
+        },
+    ] {
+        let config = DatadogAgentConfig {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            tls: None,
+            store_api_key: true,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            acknowledgements: Default::default(),
+            multiple_outputs,
+            disable_logs,
+            disable_metrics,
+            disable_traces,
+            log_namespace: Some(false),
+            keepalive: Default::default(),
+        };
+
+        let outputs: Vec<DataType> = config
+            .outputs(LogNamespace::Legacy)
+            .into_iter()
+            .map(|output| output.ty)
+            .collect();
+        if multiple_outputs {
+            assert_eq!(outputs.contains(&DataType::Log), !disable_logs);
+            assert_eq!(outputs.contains(&DataType::Trace), !disable_traces);
+            assert_eq!(outputs.contains(&DataType::Metric), !disable_metrics);
+        } else {
+            assert!(outputs.contains(&DataType::all()));
+            assert!(outputs.len() == 1);
+        }
+    }
 }
 
 #[test]

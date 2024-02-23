@@ -21,52 +21,81 @@ fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc
 
 #[cfg(any(test, feature = "sources-prometheus-scrape"))]
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
-    vector_lib::prometheus::parser::parse_text(packet).map(reparse_groups)
+    vector_lib::prometheus::parser::parse_text(packet)
+        .map(|group| reparse_groups(group, vec![], false))
+}
+
+#[cfg(any(test, feature = "sources-prometheus-pushgateway"))]
+pub(super) fn parse_text_with_overrides(
+    packet: &str,
+    tag_overrides: impl IntoIterator<Item = (String, String)> + Clone,
+    aggregate_metrics: bool,
+) -> Result<Vec<Event>, ParserError> {
+    vector_lib::prometheus::parser::parse_text(packet)
+        .map(|group| reparse_groups(group, tag_overrides, aggregate_metrics))
 }
 
 #[cfg(feature = "sources-prometheus-remote-write")]
 pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
-    vector_lib::prometheus::parser::parse_request(request).map(reparse_groups)
+    vector_lib::prometheus::parser::parse_request(request)
+        .map(|group| reparse_groups(group, vec![], false))
 }
 
-fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
+fn reparse_groups(
+    groups: Vec<MetricGroup>,
+    tag_overrides: impl IntoIterator<Item = (String, String)> + Clone,
+    aggregate_metrics: bool,
+) -> Vec<Event> {
     let mut result = Vec::new();
     let start = Utc::now();
+
+    let metric_kind = if aggregate_metrics {
+        MetricKind::Incremental
+    } else {
+        MetricKind::Absolute
+    };
 
     for group in groups {
         match group.metrics {
             GroupKind::Counter(metrics) => {
                 for (key, metric) in metrics {
+                    let tags = combine_tags(key.labels, tag_overrides.clone());
+
                     let counter = Metric::new(
                         group.name.clone(),
-                        MetricKind::Absolute,
+                        metric_kind,
                         MetricValue::Counter {
                             value: metric.value,
                         },
                     )
                     .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                    .with_tags(MetricTags::from(key.labels).as_option());
+                    .with_tags(tags.as_option());
 
                     result.push(counter.into());
                 }
             }
             GroupKind::Gauge(metrics) | GroupKind::Untyped(metrics) => {
                 for (key, metric) in metrics {
+                    let tags = combine_tags(key.labels, tag_overrides.clone());
+
                     let gauge = Metric::new(
                         group.name.clone(),
+                        // Gauges are always absolute: aggregating them makes no sense
                         MetricKind::Absolute,
                         MetricValue::Gauge {
                             value: metric.value,
                         },
                     )
                     .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                    .with_tags(MetricTags::from(key.labels).as_option());
+                    .with_tags(tags.as_option());
 
                     result.push(gauge.into());
                 }
             }
             GroupKind::Histogram(metrics) => {
                 for (key, metric) in metrics {
+                    let tags = combine_tags(key.labels, tag_overrides.clone());
+
                     let mut buckets = metric.buckets;
                     buckets.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
                     for i in (1..buckets.len()).rev() {
@@ -82,7 +111,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                     result.push(
                         Metric::new(
                             group.name.clone(),
-                            MetricKind::Absolute,
+                            metric_kind,
                             MetricValue::AggregatedHistogram {
                                 buckets: buckets
                                     .into_iter()
@@ -96,16 +125,19 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                             },
                         )
                         .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                        .with_tags(MetricTags::from(key.labels).as_option())
+                        .with_tags(tags.as_option())
                         .into(),
                     );
                 }
             }
             GroupKind::Summary(metrics) => {
                 for (key, metric) in metrics {
+                    let tags = combine_tags(key.labels, tag_overrides.clone());
+
                     result.push(
                         Metric::new(
                             group.name.clone(),
+                            // Summaries are always absolute: aggregating them makes no sense
                             MetricKind::Absolute,
                             MetricValue::AggregatedSummary {
                                 quantiles: metric
@@ -121,7 +153,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                             },
                         )
                         .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
-                        .with_tags(MetricTags::from(key.labels).as_option())
+                        .with_tags(tags.as_option())
                         .into(),
                     );
                 }
@@ -130,6 +162,18 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
     }
 
     result
+}
+
+fn combine_tags(
+    base_tags: impl Into<MetricTags>,
+    tag_overrides: impl IntoIterator<Item = (String, String)>,
+) -> MetricTags {
+    let mut tags = base_tags.into();
+    for (k, v) in tag_overrides.into_iter() {
+        tags.replace(k, v);
+    }
+
+    tags
 }
 
 #[cfg(test)]
@@ -150,8 +194,10 @@ mod test {
             .expect("invalid timestamp")
     });
 
-    fn parse_text(text: &str) -> Result<Vec<Metric>, ParserError> {
-        super::parse_text(text).map(|events| events.into_iter().map(Event::into_metric).collect())
+    fn events_to_metrics(
+        events: Result<Vec<Event>, ParserError>,
+    ) -> Result<Vec<Metric>, ParserError> {
+        events.map(|events| events.into_iter().map(Event::into_metric).collect())
     }
 
     #[test]
@@ -162,7 +208,7 @@ mod test {
             # TYPE count counter
             http_requests_total 1027
             "##;
-        let result = parse_text(exp).unwrap();
+        let result = events_to_metrics(parse_text(exp)).unwrap();
         assert_eq!(result.len(), 1);
         assert!(result[0].timestamp().unwrap() >= now);
     }
@@ -176,7 +222,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "uptime",
                 MetricKind::Absolute,
@@ -193,7 +239,7 @@ mod test {
             # TYPE hidden counter
             "##;
 
-        assert_event_data_eq!(parse_text(exp), Ok(vec![]));
+        assert_event_data_eq!(events_to_metrics(parse_text(exp)), Ok(vec![]));
     }
 
     #[test]
@@ -203,7 +249,7 @@ mod test {
             name{labelname="val1",basename="basevalue"} NaN
             "#;
 
-        match parse_text(exp).unwrap()[0].value() {
+        match events_to_metrics(parse_text(exp)).unwrap()[0].value() {
             MetricValue::Counter { value } => {
                 assert!(value.is_nan());
             }
@@ -226,7 +272,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "name",
@@ -273,7 +319,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "http_requests_total",
@@ -308,7 +354,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "latency",
                 MetricKind::Absolute,
@@ -325,7 +371,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "metric_without_timestamp_and_labels",
                 MetricKind::Absolute,
@@ -342,7 +388,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "no_labels",
                 MetricKind::Absolute,
@@ -359,7 +405,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "msdos_file_access_time_seconds",
                 MetricKind::Absolute,
@@ -383,7 +429,7 @@ mod test {
             name{tag="}"} 0 1612411506789
             "#;
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "name",
                 MetricKind::Absolute,
@@ -402,7 +448,7 @@ mod test {
             name{tag="a,b"} 0 1612411506789
             "#;
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "name",
                 MetricKind::Absolute,
@@ -421,7 +467,7 @@ mod test {
             name{tag="\\n"} 0 1612411506789
             "#;
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "name",
                 MetricKind::Absolute,
@@ -440,7 +486,7 @@ mod test {
             name{tag=" * "} 0 1612411506789
             "#;
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "name",
                 MetricKind::Absolute,
@@ -458,7 +504,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "telemetry_scrape_size_bytes_count",
                 MetricKind::Absolute,
@@ -476,7 +522,7 @@ mod test {
             telemetry_scrape_size_bytes_count{registry="default",content_type} 1890 1612411506789
             "#;
 
-        assert!(parse_text(exp).is_err());
+        assert!(events_to_metrics(parse_text(exp)).is_err());
     }
 
     #[test]
@@ -485,7 +531,7 @@ mod test {
             telemetry_scrape_size_bytes_count{registry="default",content_type=} 1890 1612411506789
             "#;
 
-        assert!(parse_text(exp).is_err());
+        assert!(events_to_metrics(parse_text(exp)).is_err());
     }
 
     #[test]
@@ -495,7 +541,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "something_weird",
                 MetricKind::Absolute,
@@ -519,7 +565,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "latency",
@@ -551,7 +597,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "uptime",
@@ -582,7 +628,7 @@ mod test {
             latency{env="production"}
             "#;
 
-        assert!(parse_text(exp).is_err());
+        assert!(events_to_metrics(parse_text(exp)).is_err());
     }
 
     #[test]
@@ -592,7 +638,7 @@ mod test {
             123.0 1612411506789
             "##;
 
-        assert!(parse_text(exp).is_err());
+        assert!(events_to_metrics(parse_text(exp)).is_err());
     }
 
     #[test]
@@ -607,7 +653,7 @@ mod test {
             "##;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "uptime",
@@ -653,7 +699,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "http_request_duration_seconds",
                 MetricKind::Absolute,
@@ -681,7 +727,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "duration",
                 MetricKind::Absolute,
@@ -708,7 +754,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![Metric::new(
                 "duration",
                 MetricKind::Absolute,
@@ -769,7 +815,7 @@ mod test {
         "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
@@ -851,7 +897,7 @@ mod test {
             "#;
 
         assert_event_data_eq!(
-            parse_text(exp),
+            events_to_metrics(parse_text(exp)),
             Ok(vec![
                 Metric::new(
                     "rpc_duration_seconds",
@@ -913,7 +959,7 @@ mod test {
             "#;
 
         let now = Utc::now();
-        let result = parse_text(exp).expect("Parsing failed");
+        let result = events_to_metrics(parse_text(exp)).expect("Parsing failed");
         // Reset all the timestamps for comparison
         let result: Vec<_> = result
             .into_iter()
@@ -1017,6 +1063,217 @@ mod test {
                 .with_tags(Some(metric_tags! { "host" => "*", "status" => "scarce" }))
                 .with_timestamp(Some(*TIMESTAMP))
             ]
+        );
+    }
+
+    #[test]
+    fn test_overrides_nothing_overwritten() {
+        let exp = r#"
+            # TYPE jobs_total counter
+            # HELP jobs_total Total number of jobs
+            jobs_total{type="a"} 1.0 1612411506789
+            "#;
+
+        assert_event_data_eq!(
+            events_to_metrics(parse_text_with_overrides(exp, vec![], false)),
+            Ok(vec![Metric::new(
+                "jobs_total",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(metric_tags! { "type" => "a" }))
+            .with_timestamp(Some(*TIMESTAMP))]),
+        );
+    }
+
+    #[test]
+    fn test_overrides_label_overwritten() {
+        let exp = r#"
+            # TYPE jobs_total counter
+            # HELP jobs_total Total number of jobs
+            jobs_total{type="a"} 1.0 1612411506789
+            "#;
+
+        assert_event_data_eq!(
+            events_to_metrics(parse_text_with_overrides(
+                exp,
+                vec![("type".to_owned(), "b".to_owned())],
+                false
+            )),
+            Ok(vec![Metric::new(
+                "jobs_total",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(metric_tags! { "type" => "b" }))
+            .with_timestamp(Some(*TIMESTAMP))]),
+        );
+    }
+
+    // This matches the behaviour of the real Prometheus Pushgateway, which I
+    // tested manually.
+    #[test]
+    fn test_overrides_last_value_preferred() {
+        let exp = r#"
+            # TYPE jobs_total counter
+            # HELP jobs_total Total number of jobs
+            jobs_total{type="a"} 1.0 1612411506789
+            "#;
+
+        assert_event_data_eq!(
+            events_to_metrics(parse_text_with_overrides(
+                exp,
+                vec![
+                    ("type".to_owned(), "b".to_owned()),
+                    ("type".to_owned(), "c".to_owned())
+                ],
+                false
+            )),
+            Ok(vec![Metric::new(
+                "jobs_total",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(metric_tags! { "type" => "c" }))
+            .with_timestamp(Some(*TIMESTAMP))]),
+        );
+    }
+
+    #[test]
+    fn test_aggregation_enabled_only_aggregates_counter_and_histogram() {
+        let exp = r#"
+            # TYPE jobs_total counter
+            # HELP jobs_total Total number of jobs
+            jobs_total{type="a"} 1.0 1612411506789
+            # TYPE jobs_current gauge
+            # HELP jobs_current Current number of jobs
+            jobs_current{type="a"} 5.0 1612411506789
+            # TYPE jobs_distribution histogram
+            # HELP jobs_distribution Distribution of jobs
+            jobs_distribution_bucket{type="a",le="1"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="2.5"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="5"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="10"} 1.0 1612411506789
+            jobs_distribution_bucket{type="a",le="+Inf"} 1.0 1612411506789
+            jobs_distribution_sum{type="a"} 8.0 1612411506789
+            jobs_distribution_count{type="a"} 1.0 1612411506789
+            # TYPE jobs_summary summary
+            # HELP jobs_summary Summary of jobs
+            jobs_summary_sum{type="a"} 8.0 1612411506789
+            jobs_summary_count{type="a"} 1.0 1612411506789
+            "#;
+
+        assert_event_data_eq!(
+            events_to_metrics(parse_text_with_overrides(exp, vec![], true)),
+            Ok(vec![
+                Metric::new(
+                    "jobs_total",
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_current",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 5.0 },
+                )
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_distribution",
+                    MetricKind::Incremental,
+                    MetricValue::AggregatedHistogram {
+                        buckets: vector_lib::buckets![
+                            1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
+                        ],
+                        count: 1,
+                        sum: 8.0,
+                    },
+                )
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_summary",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedSummary {
+                        quantiles: vector_lib::quantiles![],
+                        count: 1,
+                        sum: 8.0,
+                    },
+                )
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
+            ]),
+        );
+    }
+
+    #[test]
+    fn test_aggregation_disabled_all_absolute() {
+        let exp = r#"
+            # TYPE jobs_total counter
+            # HELP jobs_total Total number of jobs
+            jobs_total{type="a"} 1.0 1612411506789
+            # TYPE jobs_current gauge
+            # HELP jobs_current Current number of jobs
+            jobs_current{type="a"} 5.0 1612411506789
+            # TYPE jobs_distribution histogram
+            # HELP jobs_distribution Distribution of jobs
+            jobs_distribution_bucket{type="a",le="1"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="2.5"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="5"} 0.0 1612411506789
+            jobs_distribution_bucket{type="a",le="10"} 1.0 1612411506789
+            jobs_distribution_bucket{type="a",le="+Inf"} 1.0 1612411506789
+            jobs_distribution_sum{type="a"} 8.0 1612411506789
+            jobs_distribution_count{type="a"} 1.0 1612411506789
+            # TYPE jobs_summary summary
+            # HELP jobs_summary Summary of jobs
+            jobs_summary_sum{type="a"} 8.0 1612411506789
+            jobs_summary_count{type="a"} 1.0 1612411506789
+            "#;
+
+        assert_event_data_eq!(
+            events_to_metrics(parse_text_with_overrides(exp, vec![], false)),
+            Ok(vec![
+                Metric::new(
+                    "jobs_total",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_current",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 5.0 },
+                )
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_distribution",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedHistogram {
+                        buckets: vector_lib::buckets![
+                            1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
+                        ],
+                        count: 1,
+                        sum: 8.0,
+                    },
+                )
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
+                Metric::new(
+                    "jobs_summary",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedSummary {
+                        quantiles: vector_lib::quantiles![],
+                        count: 1,
+                        sum: 8.0,
+                    },
+                )
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP)),
+            ]),
         );
     }
 }

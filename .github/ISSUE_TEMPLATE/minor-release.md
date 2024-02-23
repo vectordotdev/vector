@@ -16,15 +16,10 @@ The week before the release:
 - [ ] Check if there is a newer version of Alpine or Debian available to update the release images
       in `distribution/docker/`. Update if so.
 - [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
-- [ ] Add `changelog` key to generated cue file
-  - [ ] `git log --no-merges --cherry-pick --right-only <last release tag>...`
-  - [ ] Should be hand-written list of changes
-        ([example](https://github.com/vectordotdev/vector/blob/9fecdc8b5c45c613de2d01d4d2aee22be3a2e570/website/cue/reference/releases/0.19.0.cue#L44))
-  - [ ] Ensure any breaking changes are highlighted in the release upgrade guide
-  - [ ] Ensure any deprecations are highlighted in the release upgrade guide
-  - [ ] Ensure all notable features have a highlight written
   - [ ] Add description key to the generated cue file with a description of the release (see
         previous releases for examples).
+  - [ ] Ensure any breaking changes are highlighted in the release upgrade guide
+  - [ ] Ensure any deprecations are highlighted in the release upgrade guide
 - [ ] Update version number in `website/cue/reference/administration/interfaces/kubectl.cue`
 - [ ] Update version number in `distribution/install.sh`
 - [ ] Add new version to `website/cue/reference/versions.cue`
@@ -54,8 +49,6 @@ On the day of release:
 - [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Bump the release number in the `Cargo.toml` on master to the next major release
-- [ ] [Update Netlify deploy settings](https://app.netlify.com/sites/vector-project/settings/deploys#deploy-contexts)
-  - [ ] Update production branch to the new major version
-  - [ ] Update branch deploys to include the previous major version
-  - [ ] Add [branch subdomain](https://app.netlify.com/sites/vector-project/settings/domain) for previous version
+- [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
+  - [ ] `git checkout website && git reset --hard origin/v0.<new version number> && git push`
 - [ ] Kick-off post-mortems for any regressions resolved by the release

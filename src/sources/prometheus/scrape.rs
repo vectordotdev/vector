@@ -616,9 +616,7 @@ mod test {
             let query = metric.tag_value("query").expect("query must be tagged");
             let mut got: HashMap<String, Vec<String>> = HashMap::new();
             for (k, v) in url::form_urlencoded::parse(query.as_bytes()) {
-                got.entry(k.to_string())
-                    .or_insert_with(Vec::new)
-                    .push(v.to_string());
+                got.entry(k.to_string()).or_default().push(v.to_string());
             }
             for v in got.values_mut() {
                 v.sort();

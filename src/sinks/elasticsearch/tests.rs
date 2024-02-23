@@ -224,7 +224,7 @@ async fn handle_metrics() {
     let encoded_lines = encoded.split('\n').map(String::from).collect::<Vec<_>>();
     assert_eq!(encoded_lines.len(), 3); // there's an empty line at the end
     assert_eq!(
-        encoded_lines.get(0).unwrap(),
+        encoded_lines.first().unwrap(),
         r#"{"create":{"_index":"vector","_type":"_doc"}}"#
     );
     assert!(encoded_lines

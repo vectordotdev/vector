@@ -24,10 +24,7 @@ use super::Deserializer;
 #[derive(Debug, Clone, Default)]
 pub struct ProtobufDeserializerConfig {
     /// Protobuf-specific decoding options.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub protobuf: ProtobufDeserializerOptions,
 }
 
@@ -264,8 +261,8 @@ mod tests {
 
     #[test]
     fn deserialize_protobuf() {
-        let protobuf_bin_message_path = test_data_dir().join("person_someone.pb");
-        let protobuf_desc_path = test_data_dir().join("test_protobuf.desc");
+        let protobuf_bin_message_path = test_data_dir().join("pbs/person_someone.pb");
+        let protobuf_desc_path = test_data_dir().join("protos/test_protobuf.desc");
         let message_type = "test_protobuf.Person";
         let validate_log = |log: &LogEvent| {
             assert_eq!(log["name"], "someone".into());
@@ -287,8 +284,8 @@ mod tests {
 
     #[test]
     fn deserialize_protobuf3() {
-        let protobuf_bin_message_path = test_data_dir().join("person_someone3.pb");
-        let protobuf_desc_path = test_data_dir().join("test_protobuf3.desc");
+        let protobuf_bin_message_path = test_data_dir().join("pbs/person_someone3.pb");
+        let protobuf_desc_path = test_data_dir().join("protos/test_protobuf3.desc");
         let message_type = "test_protobuf3.Person";
         let validate_log = |log: &LogEvent| {
             assert_eq!(log["name"], "someone".into());
@@ -315,7 +312,7 @@ mod tests {
     #[test]
     fn deserialize_empty_buffer() {
         let protobuf_bin_message = "".to_string();
-        let protobuf_desc_path = test_data_dir().join("test_protobuf.desc");
+        let protobuf_desc_path = test_data_dir().join("protos/test_protobuf.desc");
         let message_type = "test_protobuf.Person";
         let validate_log = |log: &LogEvent| {
             assert_eq!(log["name"], "".into());
@@ -333,7 +330,7 @@ mod tests {
     fn deserialize_error_invalid_protobuf() {
         let input = Bytes::from("{ foo");
         let message_descriptor = get_message_descriptor(
-            &test_data_dir().join("test_protobuf.desc"),
+            &test_data_dir().join("protos/test_protobuf.desc"),
             "test_protobuf.Person",
         )
         .unwrap();

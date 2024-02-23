@@ -14,6 +14,14 @@ pub use self::runner::*;
 pub use self::test_case::{TestCase, TestCaseExpectation};
 pub use self::validators::*;
 
+pub mod component_names {
+    pub const TEST_SOURCE_NAME: &str = "test_source";
+    pub const TEST_SINK_NAME: &str = "test_sink";
+    pub const TEST_TRANSFORM_NAME: &str = "test_transform";
+    pub const TEST_INPUT_SOURCE_NAME: &str = "input_source";
+    pub const TEST_OUTPUT_SINK_NAME: &str = "output_sink";
+}
+
 /// Component types that can be validated.
 // TODO: We should centralize this in `vector-common` or something, where both this code and the
 // configuration schema stuff (namely the proc macros that use this) can share it.
@@ -49,6 +57,51 @@ pub enum ComponentConfiguration {
     Sink(BoxedSink),
 }
 
+/// Component configuration for a test case.
+#[derive(Clone)]
+pub struct ComponentTestCaseConfig {
+    config: ComponentConfiguration,
+    /// If specified, this name must match the `config_name` field of at least one of the test case events.
+    test_case: Option<String>,
+    external_resource: Option<ExternalResource>,
+}
+
+impl ComponentTestCaseConfig {
+    pub fn from_source<C: Into<BoxedSource>>(
+        config: C,
+        test_case: Option<String>,
+        external_resource: Option<ExternalResource>,
+    ) -> Self {
+        Self {
+            config: ComponentConfiguration::Source(config.into()),
+            test_case,
+            external_resource,
+        }
+    }
+    pub fn from_transform<C: Into<BoxedTransform>>(
+        config: C,
+        test_case: Option<String>,
+        external_resource: Option<ExternalResource>,
+    ) -> Self {
+        Self {
+            config: ComponentConfiguration::Transform(config.into()),
+            test_case,
+            external_resource,
+        }
+    }
+    pub fn from_sink<C: Into<BoxedSink>>(
+        config: C,
+        test_case: Option<String>,
+        external_resource: Option<ExternalResource>,
+    ) -> Self {
+        Self {
+            config: ComponentConfiguration::Sink(config.into()),
+            test_case,
+            external_resource,
+        }
+    }
+}
+
 /// Configuration for validating a component.
 ///
 /// This type encompasses all of the required information for configuring and validating a
@@ -58,46 +111,45 @@ pub enum ComponentConfiguration {
 pub struct ValidationConfiguration {
     component_name: &'static str,
     component_type: ComponentType,
-    component_configuration: ComponentConfiguration,
-    external_resource: Option<ExternalResource>,
+    /// There may be only one `ComponentTestCaseConfig` necessary to execute all test cases, but some cases
+    /// require more advanced configuration in order to hit the code path desired.
+    component_configurations: Vec<ComponentTestCaseConfig>,
 }
 
 impl ValidationConfiguration {
     /// Creates a new `ValidationConfiguration` for a source.
-    pub fn from_source<C: Into<BoxedSource>>(
+    pub fn from_source(
         component_name: &'static str,
-        config: C,
-        external_resource: Option<ExternalResource>,
+        component_configurations: Vec<ComponentTestCaseConfig>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Source,
-            component_configuration: ComponentConfiguration::Source(config.into()),
-            external_resource,
+            component_configurations,
         }
     }
 
     /// Creates a new `ValidationConfiguration` for a transform.
-    pub fn from_transform(component_name: &'static str, config: impl Into<BoxedTransform>) -> Self {
+    pub fn from_transform(
+        component_name: &'static str,
+        component_configurations: Vec<ComponentTestCaseConfig>,
+    ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Transform,
-            component_configuration: ComponentConfiguration::Transform(config.into()),
-            external_resource: None,
+            component_configurations,
         }
     }
 
     /// Creates a new `ValidationConfiguration` for a sink.
-    pub fn from_sink<C: Into<BoxedSink>>(
+    pub fn from_sink(
         component_name: &'static str,
-        config: C,
-        external_resource: Option<ExternalResource>,
+        component_configurations: Vec<ComponentTestCaseConfig>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Sink,
-            component_configuration: ComponentConfiguration::Sink(config.into()),
-            external_resource,
+            component_configurations,
         }
     }
 
@@ -112,13 +164,31 @@ impl ValidationConfiguration {
     }
 
     /// Gets the configuration of the component.
-    pub fn component_configuration(&self) -> ComponentConfiguration {
-        self.component_configuration.clone()
+    pub fn component_configurations(&self) -> Vec<ComponentTestCaseConfig> {
+        self.component_configurations.clone()
+    }
+
+    fn get_comp_test_case(&self, test_case: Option<&String>) -> Option<ComponentTestCaseConfig> {
+        let empty = String::from("");
+        let test_case = test_case.unwrap_or(&empty);
+        self.component_configurations
+            .clone()
+            .into_iter()
+            .find(|c| c.test_case.as_ref().unwrap_or(&String::from("")) == test_case)
+    }
+
+    /// Gets the configuration of the component.
+    pub fn component_configuration_for_test_case(
+        &self,
+        test_case: Option<&String>,
+    ) -> Option<ComponentConfiguration> {
+        self.get_comp_test_case(test_case).map(|c| c.config)
     }
 
     /// Gets the external resource definition for validating the component, if any.
-    pub fn external_resource(&self) -> Option<ExternalResource> {
-        self.external_resource.clone()
+    pub fn external_resource(&self, test_case: Option<&String>) -> Option<ExternalResource> {
+        self.get_comp_test_case(test_case)
+            .and_then(|c| c.external_resource)
     }
 }
 
@@ -173,15 +243,16 @@ macro_rules! register_validatable_component {
 /// Input and Output runners populate this structure as they send and receive events.
 /// The structure is passed into the validator to use as the expected values for the
 /// metrics that the components under test actually output.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RunnerMetrics {
     pub received_events_total: u64,
     pub received_event_bytes_total: u64,
     pub received_bytes_total: u64,
-    pub sent_bytes_total: u64, // a reciprocal for received_bytes_total
+    pub sent_bytes_total: u64,
     pub sent_event_bytes_total: u64,
     pub sent_events_total: u64,
     pub errors_total: u64,
+    pub discarded_events_total: u64,
 }
 
 #[cfg(all(test, feature = "component-validation-tests"))]
@@ -194,6 +265,7 @@ mod tests {
     use test_generator::test_resources;
 
     use crate::components::validation::{Runner, StandardValidators};
+    use crate::extra_context::ExtraContext;
 
     use super::{ComponentType, ValidatableComponentDescription, ValidationConfiguration};
 
@@ -279,7 +351,11 @@ mod tests {
             .build()
             .unwrap();
         rt.block_on(async {
-            let mut runner = Runner::from_configuration(configuration, test_case_data_path);
+            let mut runner = Runner::from_configuration(
+                configuration,
+                test_case_data_path,
+                ExtraContext::default(),
+            );
             runner.add_validator(StandardValidators::ComponentSpec);
 
             match runner.run_validation().await {

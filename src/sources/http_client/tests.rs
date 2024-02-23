@@ -179,9 +179,7 @@ async fn request_query_applied() {
         for (k, v) in
             url::form_urlencoded::parse(query.as_bytes().expect("byte conversion should succeed"))
         {
-            got.entry(k.to_string())
-                .or_insert_with(Vec::new)
-                .push(v.to_string());
+            got.entry(k.to_string()).or_default().push(v.to_string());
         }
         for v in got.values_mut() {
             v.sort();

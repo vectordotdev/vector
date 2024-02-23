@@ -133,7 +133,7 @@ pub(crate) fn generate_example(
     let mut errs = Vec::new();
 
     let mut source_names = Vec::new();
-    if let Some(source_types) = components.get(0) {
+    if let Some(source_types) = components.first() {
         let mut sources = IndexMap::new();
 
         for (i, source_expr) in source_types.iter().enumerate() {

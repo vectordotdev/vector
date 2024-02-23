@@ -5,10 +5,10 @@
 (?:^|/)amplify\.yml$
 (?:^|/)build_preview_sites\.yml$
 (?:^|/)create_preview_sites\.yml$
-(?:^|/)preview_site_trigger\.yml$
 (?:^|/)go\.sum$
 (?:^|/)package(?:-lock|)\.json$
 (?:^|/)Pipfile$
+(?:^|/)preview_site_trigger\.yml$
 (?:^|/)pyproject.toml
 (?:^|/)requirements(?:-dev|-doc|-test|)\.txt$
 (?:^|/)vendor/
@@ -16,6 +16,7 @@
 \.ai$
 \.all-contributorsrc$
 \.avi$
+\.avro$
 \.bmp$
 \.bz2$
 \.class$
@@ -81,6 +82,9 @@
 ^\Qbenches/transform/route.rs\E$
 ^\Qlib/codecs/tests/data/decoding/protobuf/test_protobuf.desc\E$
 ^\Qlib/codecs/tests/data/decoding/protobuf/test_protobuf3.desc\E$
+^\Qlib/codecs/tests/data/protobuf/protos/test.desc\E$
+^\Qlib/codecs/tests/data/protobuf/protos/test_protobuf.desc\E$
+^\Qlib/codecs/tests/data/protobuf/protos/test_protobuf3.desc\E$
 ^\Qlib/codecs/tests/data/protobuf/test.desc\E$
 ^\Qlib/codecs/tests/data/protobuf/test_protobuf.desc\E$
 ^\Qlib/codecs/tests/data/protobuf/test_protobuf3.desc\E$

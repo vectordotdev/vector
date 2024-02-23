@@ -262,36 +262,36 @@ impl<'a> Widgets<'a> {
             }
         }
 
-        let w = Table::new(items)
+        let widths: &[Constraint] = if is_allocation_tracking_enabled() {
+            &[
+                Constraint::Percentage(13), // ID
+                Constraint::Percentage(8),  // Output
+                Constraint::Percentage(4),  // Kind
+                Constraint::Percentage(9),  // Type
+                Constraint::Percentage(10), // Events In
+                Constraint::Percentage(12), // Bytes In
+                Constraint::Percentage(10), // Events Out
+                Constraint::Percentage(12), // Bytes Out
+                Constraint::Percentage(8),  // Errors
+                Constraint::Percentage(14), // Allocated Bytes
+            ]
+        } else {
+            &[
+                Constraint::Percentage(13), // ID
+                Constraint::Percentage(12), // Output
+                Constraint::Percentage(9),  // Kind
+                Constraint::Percentage(6),  // Type
+                Constraint::Percentage(12), // Events In
+                Constraint::Percentage(14), // Bytes In
+                Constraint::Percentage(12), // Events Out
+                Constraint::Percentage(14), // Bytes Out
+                Constraint::Percentage(8),  // Errors
+            ]
+        };
+        let w = Table::new(items, widths)
             .header(Row::new(header).bottom_margin(1))
             .block(Block::default().borders(Borders::ALL).title("Components"))
-            .column_spacing(2)
-            .widths(if is_allocation_tracking_enabled() {
-                &[
-                    Constraint::Percentage(13), // ID
-                    Constraint::Percentage(8),  // Output
-                    Constraint::Percentage(4),  // Kind
-                    Constraint::Percentage(9),  // Type
-                    Constraint::Percentage(10), // Events In
-                    Constraint::Percentage(12), // Bytes In
-                    Constraint::Percentage(10), // Events Out
-                    Constraint::Percentage(12), // Bytes Out
-                    Constraint::Percentage(8),  // Errors
-                    Constraint::Percentage(14), // Allocated Bytes
-                ]
-            } else {
-                &[
-                    Constraint::Percentage(13), // ID
-                    Constraint::Percentage(12), // Output
-                    Constraint::Percentage(9),  // Kind
-                    Constraint::Percentage(6),  // Type
-                    Constraint::Percentage(12), // Events In
-                    Constraint::Percentage(14), // Bytes In
-                    Constraint::Percentage(12), // Events Out
-                    Constraint::Percentage(14), // Bytes Out
-                    Constraint::Percentage(8),  // Errors
-                ]
-            });
+            .column_spacing(2);
         f.render_widget(w, area);
     }
 

@@ -1,12 +1,13 @@
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
-use aws_sdk_kinesis::{
-    model::{Record, ShardIteratorType},
-    types::DateTime,
-};
+use aws_sdk_kinesis::types::{Record, ShardIteratorType};
+use aws_smithy_types::DateTime;
+use futures::StreamExt;
+
 use tokio::time::{sleep, Duration};
 use vector_lib::codecs::TextSerializerConfig;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 
 use super::{config::KinesisClientBuilder, *};
 use crate::{
@@ -23,62 +24,69 @@ fn kinesis_address() -> String {
     std::env::var("KINESIS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
 }
 
-// TODO: temporarily disabling as this is failing
-//#[tokio::test]
-//async fn kinesis_put_records_with_partition_key() {
-//    let stream = gen_stream();
-//
-//    ensure_stream(stream.clone()).await;
-//
-//    let mut batch = BatchConfig::default();
-//    batch.max_events = Some(2);
-//
-//    let base = KinesisSinkBaseConfig {
-//        stream_name: stream.clone(),
-//        region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
-//        encoding: TextSerializerConfig::default().into(),
-//        compression: Compression::None,
-//        request: Default::default(),
-//        tls: Default::default(),
-//        auth: Default::default(),
-//        acknowledgements: Default::default(),
-//    };
-//
-//    let partition_key: String = "partition_key".to_string();
-//
-//    let config = KinesisStreamsSinkConfig {
-//        partition_key_field: Some(partition_key.clone()),
-//        batch,
-//        base,
-//    };
-//
-//    let cx = SinkContext::default();
-//
-//    let sink = config.build(cx).await.unwrap().0;
-//
-//    let timestamp = chrono::Utc::now().timestamp_millis();
-//
-//    let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
-//
-//    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
-//
-//    sleep(Duration::from_secs(1)).await;
-//
-//    let records = fetch_records(stream, timestamp).await.unwrap();
-//
-//    let mut output_lines = records
-//        .into_iter()
-//        .map(|e| {
-//            assert_eq!(Some(partition_key.as_str()), e.partition_key());
-//            e
-//        })
-//        .map(|e| String::from_utf8(e.data.unwrap().into_inner()).unwrap())
-//        .collect::<Vec<_>>();
-//
-//    input_lines.sort();
-//    output_lines.sort();
-//    assert_eq!(output_lines, input_lines)
-//}
+#[tokio::test]
+async fn kinesis_put_records_with_partition_key() {
+    let stream = gen_stream();
+
+    ensure_stream(stream.clone()).await;
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(2);
+
+    let partition_value = "a_value";
+
+    let partition_key = ConfigValuePath::try_from("partition_key".to_string()).unwrap();
+
+    let base = KinesisSinkBaseConfig {
+        stream_name: stream.clone(),
+        region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
+        encoding: TextSerializerConfig::default().into(),
+        compression: Compression::None,
+        request: Default::default(),
+        tls: Default::default(),
+        auth: Default::default(),
+        acknowledgements: Default::default(),
+        request_retry_partial: Default::default(),
+        partition_key_field: Some(partition_key.clone()),
+    };
+
+    let config = KinesisStreamsSinkConfig { batch, base };
+
+    let cx = SinkContext::default();
+
+    let sink = config.build(cx).await.unwrap().0;
+
+    let timestamp = chrono::Utc::now().timestamp_millis();
+
+    let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
+
+    let events = events.map(move |mut events| {
+        events.iter_logs_mut().for_each(move |log| {
+            log.insert("partition_key", partition_value);
+        });
+        events
+    });
+
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+
+    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
+    sleep(Duration::from_secs(1)).await;
+
+    let records = fetch_records(stream, timestamp).await.unwrap();
+
+    let mut output_lines = records
+        .into_iter()
+        .map(|e| {
+            assert_eq!(partition_value, e.partition_key());
+            e
+        })
+        .map(|e| String::from_utf8(e.data.into_inner()).unwrap())
+        .collect::<Vec<_>>();
+
+    input_lines.sort();
+    output_lines.sort();
+    assert_eq!(output_lines, input_lines)
+}
 
 #[tokio::test]
 async fn kinesis_put_records_without_partition_key() {
@@ -91,7 +99,7 @@ async fn kinesis_put_records_without_partition_key() {
 
     let base = KinesisSinkBaseConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", kinesis_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         compression: Compression::None,
         request: Default::default(),
@@ -99,13 +107,10 @@ async fn kinesis_put_records_without_partition_key() {
         auth: Default::default(),
         acknowledgements: Default::default(),
         request_retry_partial: Default::default(),
+        partition_key_field: None,
     };
 
-    let config = KinesisStreamsSinkConfig {
-        partition_key_field: None,
-        batch,
-        base,
-    };
+    let config = KinesisStreamsSinkConfig { batch, base };
 
     let cx = SinkContext::default();
 
@@ -117,13 +122,14 @@ async fn kinesis_put_records_without_partition_key() {
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
+    // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     sleep(Duration::from_secs(1)).await;
 
     let records = fetch_records(stream, timestamp).await.unwrap();
 
     let mut output_lines = records
         .into_iter()
-        .map(|e| String::from_utf8(e.data.unwrap().into_inner()).unwrap())
+        .map(|e| String::from_utf8(e.data.into_inner()).unwrap())
         .collect::<Vec<_>>();
 
     input_lines.sort();
@@ -144,7 +150,6 @@ async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec
         .stream_description
         .unwrap()
         .shards
-        .unwrap()
         .into_iter()
         .next()
         .expect("No shards");
@@ -152,7 +157,7 @@ async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec
     let resp = client
         .get_shard_iterator()
         .stream_name(stream_name)
-        .shard_id(shard.shard_id.unwrap())
+        .shard_id(shard.shard_id)
         .shard_iterator_type(ShardIteratorType::AtTimestamp)
         .timestamp(DateTime::from_millis(timestamp))
         .send()
@@ -165,23 +170,16 @@ async fn fetch_records(stream_name: String, timestamp: i64) -> crate::Result<Vec
         .set_limit(None)
         .send()
         .await?;
-    Ok(resp.records.unwrap_or_default())
+    Ok(resp.records)
 }
 
 async fn client() -> aws_sdk_kinesis::Client {
     let auth = AwsAuthentication::test_auth();
     let proxy = ProxyConfig::default();
-    let region = RegionOrEndpoint::with_both("localstack", kinesis_address());
-    create_client::<KinesisClientBuilder>(
-        &auth,
-        region.region(),
-        region.endpoint(),
-        &proxy,
-        &None,
-        true,
-    )
-    .await
-    .unwrap()
+    let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address());
+    create_client::<KinesisClientBuilder>(&auth, region.region(), region.endpoint(), &proxy, &None)
+        .await
+        .unwrap()
 }
 
 async fn ensure_stream(stream_name: String) {

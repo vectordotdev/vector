@@ -15,8 +15,12 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Make sure the running user has write
-			permissions to this directory.
+			By default, the [global `data_dir` option][global_data_dir] is used.
+			Make sure the running user has write permissions to this directory.
+
+			If this directory is specified, then Vector will attempt to create it.
+
+			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 			"""
 		required: false
 		type: string: examples: ["/var/local/lib/vector/"]
@@ -127,6 +131,16 @@ base: components: sources: kubernetes_logs: configuration: {
 				600,
 			]
 			unit: "seconds"
+		}
+	}
+	include_paths_glob_patterns: {
+		description: "A list of glob patterns to include while reading the files."
+		required:    false
+		type: array: {
+			default: [
+				"**/*",
+			]
+			items: type: string: examples: ["**/include/**"]
 		}
 	}
 	ingestion_timestamp_field: {
@@ -399,6 +413,17 @@ base: components: sources: kubernetes_logs: configuration: {
 				beginning: "Read from the beginning of the file."
 				end:       "Start reading from the current end of the file."
 			}
+		}
+	}
+	rotate_wait_secs: {
+		description: """
+			How long to keep an open handle to a rotated log file.
+			The default value represents "no limit"
+			"""
+		required: false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "seconds"
 		}
 	}
 	self_node_name: {

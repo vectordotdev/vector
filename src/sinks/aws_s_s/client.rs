@@ -1,5 +1,6 @@
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
+
 use super::{request_builder::SendMessageEntry, service::SendMessageResponse};
-use aws_sdk_sqs::types::SdkError;
 
 #[async_trait::async_trait]
 pub(super) trait Client<R>
@@ -10,5 +11,5 @@ where
         &self,
         entry: SendMessageEntry,
         byte_size: usize,
-    ) -> Result<SendMessageResponse, SdkError<R>>;
+    ) -> Result<SendMessageResponse, SdkError<R, HttpResponse>>;
 }

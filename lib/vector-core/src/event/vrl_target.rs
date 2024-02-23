@@ -282,8 +282,9 @@ impl Target for VrlTarget {
                         return Err(MetricPathError::SetPathError.to_string());
                     }
 
-                    if let Some(paths) =
-                        path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0)
+                    if let Some(paths) = path
+                        .to_alternative_components(MAX_METRIC_PATH_DEPTH)
+                        .first()
                     {
                         match paths.as_slice() {
                             ["tags"] => {
@@ -406,7 +407,7 @@ impl Target for VrlTarget {
                     if let Some(paths) = target_path
                         .path
                         .to_alternative_components(MAX_METRIC_PATH_DEPTH)
-                        .get(0)
+                        .first()
                     {
                         let removed_value = match paths.as_slice() {
                             ["namespace"] => metric.series.name.namespace.take().map(Into::into),
@@ -784,7 +785,7 @@ mod test {
             ),
             (
                 btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
-                owned_value_path!("foo", vec!["qux", r#"bar baz"#], "baz"),
+                owned_value_path!("foo", vec!["qux", r"bar baz"], "baz"),
                 Ok(Some(2.into())),
             ),
         ];
@@ -939,7 +940,7 @@ mod test {
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_value_path!(vec![r#"foo bar"#, "foo"]),
+                owned_value_path!(vec![r"foo bar", "foo"]),
                 false,
                 Some(BTreeMap::new().into()),
             ),
@@ -972,7 +973,7 @@ mod test {
                     "foo" => btreemap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
-                owned_value_path!("foo", r#"bar baz"#, 0),
+                owned_value_path!("foo", r"bar baz", 0),
                 false,
                 Some(
                     btreemap! {
@@ -987,7 +988,7 @@ mod test {
                     "foo" => btreemap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
-                owned_value_path!("foo", r#"bar baz"#, 0),
+                owned_value_path!("foo", r"bar baz", 0),
                 true,
                 Some(btreemap! { "bar" => "baz" }.into()),
             ),
