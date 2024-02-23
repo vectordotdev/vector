@@ -158,7 +158,14 @@ impl ValidatableComponent for SplunkConfig {
             DecodingConfig::new(framing, decoding, false.into()),
         );
 
-        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
+        ValidationConfiguration::from_source(
+            Self::NAME,
+            vec![ComponentTestCaseConfig::from_source(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
     }
 }
 

@@ -10,6 +10,7 @@ use crate::config::{BoxedSink, BoxedSource, BoxedTransform};
 
 /// For components implementing `ValidatableComponent`
 pub mod prelude {
+    pub use super::ComponentTestCaseConfig;
     pub use super::ExternalResource;
     pub use super::HttpResourceConfig;
     pub use super::ResourceDirection;

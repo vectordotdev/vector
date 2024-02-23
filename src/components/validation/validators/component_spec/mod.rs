@@ -30,7 +30,10 @@ impl Validator for ComponentSpecValidator {
         telemetry_events: &[Event],
         runner_metrics: &RunnerMetrics,
     ) -> Result<Vec<String>, Vec<String>> {
-        let expect_received_events = inputs.iter().filter(|te| *te.should_fail()).count();
+        let expect_received_events = inputs
+            .iter()
+            .filter(|te| !te.should_fail() || te.should_reject())
+            .count() as u64;
 
         for input in inputs {
             info!("Validator observed input event: {:?}", input);
@@ -280,14 +283,14 @@ fn compare_actual_to_expected(
 
     info!("{}: expected {}, actual {}.", metric_type, expected, actual,);
 
-    if actual != expected
+    if actual != expected &&
         // This is a bit messy. The issue is that EstimatedJsonSizeOf can be called by a component
         // on an event array, or on a single event. And we have no way of knowing which that is.
         // By default the input driver for the framework is not assuming it is an array, so we
         // check here if it matches what the array scenario would be, which is to add the size of
         // the brackets, for each event.
-        || (metric_type == ComponentMetricType::EventsReceivedBytes
-            && actual == expected + (expect_received_events * 2))
+        (metric_type != &ComponentMetricType::EventsReceivedBytes
+            || (actual != (expected + (expect_received_events * 2))))
     {
         errs.push(format!(
             "{}: expected {}, but received {}",

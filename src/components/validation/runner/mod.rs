@@ -634,10 +634,15 @@ fn spawn_input_driver(
             if !failure_case || component_type == ComponentType::Sink {
                 input_runner_metrics.sent_events_total += 1;
 
-                // The event is wrapped in a Vec to match the actual event storage in
-                // the real topology
-                // input_runner_metrics.sent_event_bytes_total +=
-                //     vec![event].estimated_json_encoded_size_of().get() as u64;
+                // This particular metric is tricky because a component can run the
+                // EstimatedJsonSizeOf calculation on a single event or an array of
+                // events. If it's an array of events, the size calculation includes
+                // the size of bracket ('[', ']') characters... But we have no way
+                // of knowing which case it will be. Indeed, there are even components
+                // where BOTH scenarios are possible, depending on how the component
+                // is configured.
+                // This is handled in the component spec validator code where we compare
+                // the actual to the expected.
                 input_runner_metrics.sent_event_bytes_total +=
                     event.estimated_json_encoded_size_of().get() as u64;
             }
