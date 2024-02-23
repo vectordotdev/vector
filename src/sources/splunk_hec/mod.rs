@@ -147,7 +147,7 @@ impl ValidatableComponent for SplunkConfig {
         let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
 
         let framing = BytesDecoderConfig::new().into();
-        let decoding = BytesDeserializerConfig::default().into();
+        let decoding = BytesDeserializerConfig.into();
 
         let external_resource = ExternalResource::new(
             ResourceDirection::Push,
@@ -680,6 +680,7 @@ struct EventIterator<'de, R: JsonRead<'de>> {
 }
 
 impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         deserializer: serde_json::StreamDeserializer<'de, R, JsonValue>,
         channel: Option<String>,
