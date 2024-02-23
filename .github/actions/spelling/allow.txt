@@ -164,6 +164,7 @@ pront
 Proscan
 Qmobilevn
 RPZ
+RRSIGs
 Rackspace
 Rathi
 Regza
@@ -282,6 +283,7 @@ dnsutils
 dockercmd
 downsides
 downwardapi
+ede
 emoji
 esbuild
 etld

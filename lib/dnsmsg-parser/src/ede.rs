@@ -54,7 +54,7 @@ impl EDE {
             24 => Some("Invalid Data"),
             25 => Some("Signature Expired before Valid"),
             26 => Some("Too Early"),
-            27 => Some("Unsupported NSEC3 Interations Value"),
+            27 => Some("Unsupported NSEC3 Iterations Value"),
             28 => Some("Unable to conform to policy"),
             29 => Some("Synthesized"),
             _ => None,
