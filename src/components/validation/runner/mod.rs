@@ -205,6 +205,14 @@ impl Runner {
 
         let test_cases = load_component_test_cases(&self.test_case_data_path)?;
         for test_case in test_cases {
+            println!("");
+            println!("");
+            info!(
+                "Running test '{}' case for component '{}' (type: {:?})...",
+                test_case.name,
+                self.configuration.component_name,
+                self.configuration.component_type()
+            );
             // Create a task coordinator for each relevant phase of the test.
             //
             // This provides us the granularity to know when the tasks associated with each phase
