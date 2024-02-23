@@ -1,13 +1,19 @@
 - name: happy path
   expectation: success
   events:
-    - event: simple message 1
-    - event: simple message 2
-    - event: simple message 3
+    - log_builder:
+        event: simple message 1
+    - log_builder:
+        event: simple message 2
+    - log_builder:
+        event: simple message 3
 - name: sad path
   expectation: partial_success
   events:
-    - event: simple message 1
-    - event: simple message 2
+    - log_builder:
+        event: simple message 1
+    - log_builder:
+        event: simple message 2
     - fail_encoding_of:
-        event: "simple message with wrong encoding"
+        log_builder:
+          event: "simple message with wrong encoding"

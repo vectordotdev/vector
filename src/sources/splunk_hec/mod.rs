@@ -138,41 +138,6 @@ impl Default for SplunkConfig {
     }
 }
 
-impl ValidatableComponent for SplunkConfig {
-    fn validation_configuration() -> ValidationConfiguration {
-        let config = Self {
-            address: default_socket_address(),
-            ..Default::default()
-        };
-
-        let listen_addr_http = format!("http://{}/services/collector/event", config.address);
-        let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
-
-        let framing = BytesDecoderConfig::new().into();
-        let decoding = DeserializerConfig::Json(Default::default());
-
-        let external_resource = ExternalResource::new(
-            ResourceDirection::Push,
-            HttpResourceConfig::from_parts(uri, None).with_headers(HashMap::from([(
-                "x-splunk-request-channel".to_string(),
-                "channel".to_string(),
-            )])),
-            DecodingConfig::new(framing, decoding, false.into()),
-        );
-
-        ValidationConfiguration::from_source(
-            Self::NAME,
-            vec![ComponentTestCaseConfig::from_source(
-                config,
-                None,
-                Some(external_resource),
-            )],
-        )
-    }
-}
-
-register_validatable_component!(SplunkConfig);
-
 fn default_socket_address() -> SocketAddr {
     SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8088)
 }
@@ -1276,6 +1241,41 @@ fn empty_response(code: StatusCode) -> Response {
 fn response_json(code: StatusCode, body: impl Serialize) -> Response {
     warp::reply::with_status(warp::reply::json(&body), code).into_response()
 }
+
+impl ValidatableComponent for SplunkConfig {
+    fn validation_configuration() -> ValidationConfiguration {
+        let config = Self {
+            address: default_socket_address(),
+            ..Default::default()
+        };
+
+        let listen_addr_http = format!("http://{}/services/collector/event", config.address);
+        let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
+
+        let framing = BytesDecoderConfig::new().into();
+        let decoding = DeserializerConfig::Json(Default::default());
+
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(uri, None).with_headers(HashMap::from([(
+                "x-splunk-request-channel".to_string(),
+                "channel".to_string(),
+            )])),
+            DecodingConfig::new(framing, decoding, false.into()),
+        );
+
+        ValidationConfiguration::from_source(
+            Self::NAME,
+            vec![ComponentTestCaseConfig::from_source(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
+    }
+}
+
+register_validatable_component!(SplunkConfig);
 
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]

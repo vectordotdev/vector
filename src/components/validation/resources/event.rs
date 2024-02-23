@@ -38,7 +38,7 @@ pub enum RawTestEvent {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(untagged)]
+#[serde(rename_all = "snake_case")]
 pub enum EventData {
     /// A simple log event.
     Log(String),
