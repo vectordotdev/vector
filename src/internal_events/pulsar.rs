@@ -1,6 +1,7 @@
-use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use metrics::{counter, register_counter, Counter};
+use vector_lib::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
+};
 
 #[derive(Debug)]
 pub struct PulsarSendingError {
@@ -52,3 +53,80 @@ impl<F: std::fmt::Display> InternalEvent for PulsarPropertyExtractionError<F> {
         );
     }
 }
+
+pub enum PulsarErrorEventType {
+    Read,
+    Ack,
+    NAck,
+}
+
+pub struct PulsarErrorEventData {
+    pub msg: String,
+    pub error_type: PulsarErrorEventType,
+}
+
+registered_event!(
+    PulsarErrorEvent => {
+        ack_errors: Counter = register_counter!(
+            "component_errors_total",
+            "error_code" => "acknowledge_message",
+            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+            "stage" => error_stage::RECEIVING,
+        ),
+
+        nack_errors: Counter = register_counter!(
+            "component_errors_total",
+            "error_code" => "negative_acknowledge_message",
+            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+            "stage" => error_stage::RECEIVING,
+        ),
+
+        read_errors: Counter = register_counter!(
+            "component_errors_total",
+            "error_code" => "reading_message",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        ),
+    }
+
+    fn emit(&self,error:PulsarErrorEventData) {
+        match error.error_type{
+            PulsarErrorEventType::Read => {
+                error!(
+                    message = "Failed to read message.",
+                    error = error.msg,
+                    error_code = "reading_message",
+                    error_type = error_type::READER_FAILED,
+                    stage = error_stage::RECEIVING,
+                    internal_log_rate_limit = true,
+                );
+
+                self.read_errors.increment(1_u64);
+            }
+            PulsarErrorEventType::Ack => {
+                error!(
+                    message = "Failed to acknowledge message.",
+                    error = error.msg,
+                    error_code = "acknowledge_message",
+                    error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                    stage = error_stage::RECEIVING,
+                    internal_log_rate_limit = true,
+                );
+
+                self.ack_errors.increment(1_u64);
+            }
+            PulsarErrorEventType::NAck => {
+                error!(
+                    message = "Failed to negatively acknowledge message.",
+                    error = error.msg,
+                    error_code = "negative_acknowledge_message",
+                    error_type = error_type::ACKNOWLEDGMENT_FAILED,
+                    stage = error_stage::RECEIVING,
+                    internal_log_rate_limit = true,
+                );
+
+                self.nack_errors.increment(1_u64);
+            }
+        }
+    }
+);
