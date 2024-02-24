@@ -11,7 +11,7 @@ use axum::{
     routing::{MethodFilter, MethodRouter},
     Router,
 };
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
 use hyper::{Body, Client, Server};
 use tokio::{
@@ -34,6 +34,7 @@ pub struct HttpResourceConfig {
     uri: Uri,
     method: Option<Method>,
     headers: Option<HashMap<String, String>>,
+    response_body: Option<Bytes>,
 }
 
 impl HttpResourceConfig {
@@ -42,11 +43,17 @@ impl HttpResourceConfig {
             uri,
             method,
             headers: None,
+            response_body: None,
         }
     }
 
     pub fn with_headers(mut self, headers: HashMap<String, String>) -> Self {
         self.headers = Some(headers);
+        self
+    }
+
+    pub fn with_response_body(mut self, body: Bytes) -> Self {
+        self.response_body = Some(body);
         self
     }
 
@@ -295,6 +302,8 @@ fn spawn_output_http_server(
 
     let (server_sent_all_tx, mut server_sent_all_rx) = mpsc::channel(1);
 
+    let response_body = config.response_body.clone();
+
     let (_, http_server_shutdown_tx) = spawn_http_server(
         task_coordinator,
         &config,
@@ -304,6 +313,7 @@ fn spawn_output_http_server(
             let mut decoder = decoder.clone();
             let mut decoded_events = 0;
             let server_sent_all_tx = server_sent_all_tx.clone();
+            let response_body = response_body.clone();
 
             async move {
                 match hyper::body::to_bytes(request.into_body()).await {
@@ -350,7 +360,11 @@ fn spawn_output_http_server(
                                         // emitting error events
                                         return StatusCode::BAD_REQUEST.into_response();
                                     } else {
-                                        return StatusCode::OK.into_response();
+                                        if let Some(body) = &response_body {
+                                            return body.clone().into_response();
+                                        } else {
+                                            return StatusCode::OK.into_response();
+                                        }
                                     }
                                 }
                                 Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),

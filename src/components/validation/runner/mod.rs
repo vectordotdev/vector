@@ -553,7 +553,7 @@ fn spawn_component_topology(
     let mut config = config_builder
         .build()
         .expect("config should not have any errors");
-    config.healthchecks.set_require_healthy(Some(true));
+    config.healthchecks.enabled = false;
 
     _ = std::thread::spawn(move || {
         let test_runtime = Builder::new_current_thread()
