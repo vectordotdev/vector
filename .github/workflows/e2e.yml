@@ -5,7 +5,9 @@
 #   - MQ (always pass)
 #   - Scheduled: at midnight UTC Tues-Sat
 
-name: E2E Test Suite
+
+
+#name: E2E Test Suite
 
 on:
   pull_request:
