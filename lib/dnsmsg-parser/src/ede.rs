@@ -83,16 +83,16 @@ impl BinEncodable for EDE {
 impl<'a> BinDecodable<'a> for EDE {
     fn read(decoder: &mut BinDecoder<'a>) -> ProtoResult<Self> {
         let info_code = decoder.read_u16()?.unverified();
-        if decoder.len() == 0 {
-            return Ok(Self {
-                info_code,
-                extra_text: None,
-            });
-        }
-        let extra_text = String::from_utf8(decoder.read_vec(decoder.len())?.unverified())?;
+        let extra_text = if decoder.len() == 0 {
+            None
+        } else {
+            Some(String::from_utf8(
+                decoder.read_vec(decoder.len())?.unverified(),
+            )?)
+        };
         Ok(Self {
             info_code,
-            extra_text: Some(extra_text),
+            extra_text,
         })
     }
 }
