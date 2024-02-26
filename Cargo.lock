@@ -2854,7 +2854,7 @@ checksum = "e5766087c2235fec47fafa4cfecc81e494ee679d0fd4a59887ea0919bfb0e4fc"
 dependencies = [
  "cfg-if",
  "libc",
- "socket2 0.5.5",
+ "socket2 0.5.6",
  "windows-sys 0.48.0",
 ]
 
@@ -4173,7 +4173,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.5",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.40",
@@ -4454,7 +4454,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b58db92f96b720de98181bbbe63c831e87005ab460c1bf306eb2622b4707997f"
 dependencies = [
- "socket2 0.5.5",
+ "socket2 0.5.6",
  "widestring 1.0.2",
  "windows-sys 0.48.0",
  "winreg",
@@ -8444,12 +8444,12 @@ dependencies = [
 
 [[package]]
 name = "socket2"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b5fac59a5cb5dd637972e5fca70daf0523c9067fcdc4842f053dae04a18f8e9"
+checksum = "05ffd9c0a93b7543e062e759284fcf5f5e3b098501104bfbdde4d404db792871"
 dependencies = [
  "libc",
- "windows-sys 0.48.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -8968,7 +8968,7 @@ dependencies = [
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2 0.5.5",
+ "socket2 0.5.6",
  "tokio-macros",
  "tracing 0.1.40",
  "windows-sys 0.48.0",
@@ -9048,7 +9048,7 @@ dependencies = [
  "postgres-protocol",
  "postgres-types",
  "rand 0.8.5",
- "socket2 0.5.5",
+ "socket2 0.5.6",
  "tokio",
  "tokio-util",
  "whoami",
@@ -9989,7 +9989,7 @@ dependencies = [
  "smpl_jwt",
  "snafu 0.7.5",
  "snap",
- "socket2 0.5.5",
+ "socket2 0.5.6",
  "stream-cancel",
  "strip-ansi-escapes",
  "syslog",
@@ -10240,7 +10240,7 @@ dependencies = [
  "similar-asserts",
  "smallvec",
  "snafu 0.7.5",
- "socket2 0.5.5",
+ "socket2 0.5.6",
  "tokio",
  "tokio-openssl",
  "tokio-stream",
