@@ -45,7 +45,7 @@ serde_json.workspace = true
 serde_with = { version = "3.6.1", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.5", default-features = false }
-socket2 = { version = "0.5.5", default-features = false }
+socket2 = { version = "0.5.6", default-features = false }
 tokio = { version = "1.36.0", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.4", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
