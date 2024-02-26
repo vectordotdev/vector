@@ -14,7 +14,10 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use hyper::{service::make_service_fn, Server};
 use serde::Serialize;
-use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
+use serde_json::{
+    de::{Read as JsonRead, StrRead},
+    Deserializer, Value as JsonValue,
+};
 use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
@@ -359,7 +362,7 @@ impl SplunkSource {
                       token: Option<String>,
                       channel: Option<String>,
                       remote: Option<SocketAddr>,
-                      xff: Option<String>,
+                      remote_addr: Option<String>,
                       gzip: bool,
                       body: Bytes,
                       path: warp::path::FullPath| {
@@ -401,16 +404,19 @@ impl SplunkSource {
 
                         let mut error = None;
                         let mut events = Vec::new();
-                        let iter = EventIterator::new(
-                            Deserializer::from_str(&body).into_iter::<JsonValue>(),
+
+                        let iter: EventIterator<'_, StrRead<'_>> = EventIteratorGenerator {
+                            deserializer: Deserializer::from_str(&body).into_iter::<JsonValue>(),
                             channel,
                             remote,
-                            xff,
+                            remote_addr,
                             batch,
-                            token.filter(|_| store_hec_token).map(Into::into),
+                            token: token.filter(|_| store_hec_token).map(Into::into),
                             log_namespace,
                             events_received,
-                        );
+                        }
+                        .into();
+
                         for result in iter {
                             match result {
                                 Ok(event) => events.push(event),
@@ -648,22 +654,24 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     events_received: Registered<EventsReceived>,
 }
 
-impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        deserializer: serde_json::StreamDeserializer<'de, R, JsonValue>,
-        channel: Option<String>,
-        remote: Option<SocketAddr>,
-        remote_addr: Option<String>,
-        batch: Option<BatchNotifier>,
-        token: Option<Arc<str>>,
-        log_namespace: LogNamespace,
-        events_received: Registered<EventsReceived>,
-    ) -> Self {
-        EventIterator {
-            deserializer,
+/// Intermediate struct to generate an `EventIterator`
+struct EventIteratorGenerator<'de, R: JsonRead<'de>> {
+    deserializer: serde_json::StreamDeserializer<'de, R, JsonValue>,
+    channel: Option<String>,
+    batch: Option<BatchNotifier>,
+    token: Option<Arc<str>>,
+    log_namespace: LogNamespace,
+    events_received: Registered<EventsReceived>,
+    remote: Option<SocketAddr>,
+    remote_addr: Option<String>,
+}
+
+impl<'de, R: JsonRead<'de>> From<EventIteratorGenerator<'de, R>> for EventIterator<'de, R> {
+    fn from(f: EventIteratorGenerator<'de, R>) -> Self {
+        Self {
+            deserializer: f.deserializer,
             events: 0,
-            channel: channel.map(Value::from),
+            channel: f.channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
                 // Extract the host field with the given priority:
@@ -673,26 +681,28 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 DefaultExtractor::new_with(
                     "host",
                     log_schema().host_key().cloned().into(),
-                    remote_addr
-                        .or_else(|| remote.map(|addr| addr.to_string()))
+                    f.remote_addr
+                        .or_else(|| f.remote.map(|addr| addr.to_string()))
                         .map(Value::from),
-                    log_namespace,
+                    f.log_namespace,
                 ),
-                DefaultExtractor::new("index", OptionalValuePath::new(INDEX), log_namespace),
-                DefaultExtractor::new("source", OptionalValuePath::new(SOURCE), log_namespace),
+                DefaultExtractor::new("index", OptionalValuePath::new(INDEX), f.log_namespace),
+                DefaultExtractor::new("source", OptionalValuePath::new(SOURCE), f.log_namespace),
                 DefaultExtractor::new(
                     "sourcetype",
                     OptionalValuePath::new(SOURCETYPE),
-                    log_namespace,
+                    f.log_namespace,
                 ),
             ],
-            batch,
-            token,
-            log_namespace,
-            events_received,
+            batch: f.batch,
+            token: f.token,
+            log_namespace: f.log_namespace,
+            events_received: f.events_received,
         }
     }
+}
 
+impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
     fn build_event(&mut self, mut json: JsonValue) -> Result<Event, Rejection> {
         // Construct Event from parsed json event
         let mut log = match self.log_namespace {
@@ -1457,7 +1467,7 @@ mod tests {
 
         b = match opts.channel {
             Some(c) => match c {
-                Channel::Header(v) => b.header(X_SPLUNK_REQUEST_CHANNEL, v),
+                Channel::Header(v) => b.header("x-splunk-request-channel", v),
                 Channel::QueryParam(v) => b.query(&[("channel", v)]),
             },
             None => b,
