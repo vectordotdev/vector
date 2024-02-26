@@ -19,15 +19,6 @@ impl EDE {
         }
     }
 
-    /// Returns the length in bytes of the EdnsOption
-    pub fn len(&self) -> u16 {
-        2 + self.extra_text.as_ref().map(|s| s.len()).unwrap_or(0) as u16
-    }
-
-    pub fn is_empty(&self) -> bool {
-        false
-    }
-
     // https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#extended-dns-error-codes
     pub fn purpose(&self) -> Option<&str> {
         match self.info_code {
