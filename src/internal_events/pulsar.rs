@@ -1,4 +1,6 @@
-use metrics::{counter, register_counter, Counter};
+use metrics::counter;
+#[cfg(feature = "sources-pulsar")]
+use metrics::{register_counter, Counter};
 use vector_lib::internal_event::{
     error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
 };
@@ -54,17 +56,20 @@ impl<F: std::fmt::Display> InternalEvent for PulsarPropertyExtractionError<F> {
     }
 }
 
+#[cfg(feature = "sources-pulsar")]
 pub enum PulsarErrorEventType {
     Read,
     Ack,
     NAck,
 }
 
+#[cfg(feature = "sources-pulsar")]
 pub struct PulsarErrorEventData {
     pub msg: String,
     pub error_type: PulsarErrorEventType,
 }
 
+#[cfg(feature = "sources-pulsar")]
 registered_event!(
     PulsarErrorEvent => {
         ack_errors: Counter = register_counter!(
