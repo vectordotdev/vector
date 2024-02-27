@@ -13,7 +13,7 @@ bytes = { version = "1.5.0", default-features = false, features = ["serde"] }
 chrono.workspace = true
 crossbeam-utils = { version = "0.8.19", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
-dyn-clone = { version = "1.0.16", default-features = false }
+dyn-clone = { version = "1.0.17", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 enumflags2 = { version = "0.7.9", default-features = false }
 float_eq = { version = "1.0", default-features = false }
