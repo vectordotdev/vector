@@ -372,7 +372,7 @@ proptest.workspace = true
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 rstest = {version = "0.18.2"}
-tempfile = "3.10.0"
+tempfile = "3.10.1"
 test-generator = "0.3.1"
 tokio = { version = "1.36.0", features = ["test-util"] }
 tokio-test = "0.4.3"
