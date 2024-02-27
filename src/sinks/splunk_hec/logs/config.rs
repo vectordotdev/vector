@@ -283,6 +283,10 @@ impl HecLogsSinkConfig {
 impl ValidatableComponent for HecLogsSinkConfig {
     fn validation_configuration() -> ValidationConfiguration {
         let endpoint = "http://127.0.0.1:9001".to_string();
+
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(1);
+
         let config = Self {
             endpoint: endpoint.clone(),
             default_token: "i_am_an_island".to_string().into(),
@@ -297,7 +301,7 @@ impl ValidatableComponent for HecLogsSinkConfig {
             //     Transformer::default(),
             // ),
             compression: Compression::default(),
-            batch: BatchConfig::default(),
+            batch,
             request: TowerRequestConfig {
                 timeout_secs: 2,
                 retry_attempts: 0,
@@ -305,7 +309,7 @@ impl ValidatableComponent for HecLogsSinkConfig {
             },
             tls: None,
             acknowledgements: HecClientAcknowledgementsConfig {
-                inner: AcknowledgementsConfig::DEFAULT,
+                indexer_acknowledgements_enabled: false,
                 ..Default::default()
             },
             timestamp_nanos_key: None,
@@ -322,14 +326,19 @@ impl ValidatableComponent for HecLogsSinkConfig {
 
         let endpoint = format!("{endpoint}/services/collector/raw");
 
+        // let mut bytes: Vec<u8> = Vec::new();
+        // let response = serde_json::json!({"ack_id": 0});
+        // serde_json::to_writer(&mut bytes, &response).unwrap();
+        // let response: Bytes = bytes.into();
+
         let external_resource = ExternalResource::new(
             ResourceDirection::Push,
             HttpResourceConfig::from_parts(
                 http::Uri::try_from(&endpoint).expect("should not fail to parse URI"),
                 None,
-            )
+            ),
             // TODO :::::::::::::::: fix meeeeeeeeeee
-            .with_response_body(serde_json::json!("ack_id": 0)),
+            // .with_response_body(response),
             config.encoding.clone(),
         );
 

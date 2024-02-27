@@ -298,11 +298,14 @@ fn spawn_output_http_server(
         .filter(|te| !te.should_fail() || te.should_reject())
         .count();
 
+    info!("HTTP server expects {} events.", expected_output_events);
+
     let should_reject = input_events.iter().filter(|te| te.should_reject()).count() > 0;
 
     let (server_sent_all_tx, mut server_sent_all_rx) = mpsc::channel(1);
 
     let response_body = config.response_body.clone();
+    let decoded_events = Arc::new(Mutex::new(0));
 
     let (_, http_server_shutdown_tx) = spawn_http_server(
         task_coordinator,
@@ -311,9 +314,9 @@ fn spawn_output_http_server(
         move |request, output_runner_metrics| {
             let output_tx = output_tx.clone();
             let mut decoder = decoder.clone();
-            let mut decoded_events = 0;
             let server_sent_all_tx = server_sent_all_tx.clone();
             let response_body = response_body.clone();
+            let decoded_events = decoded_events.clone();
 
             async move {
                 match hyper::body::to_bytes(request.into_body()).await {
@@ -339,6 +342,7 @@ fn spawn_output_http_server(
                                             events.len() as u64;
 
                                         events.iter().for_each(|event| {
+                                            info!("resource got_event: {:?}", event);
                                             output_runner_metrics.received_event_bytes_total +=
                                                 event.estimated_json_encoded_size_of().get() as u64;
                                         });
@@ -348,10 +352,17 @@ fn spawn_output_http_server(
                                             .await
                                             .expect("should not fail to send output event");
                                     }
-                                    decoded_events += events.len();
+                                    let mut decoded_events = decoded_events.lock().await;
+                                    *decoded_events += events.len();
+                                    info!(
+                                        "HTTP server external output resource decoded_events {}",
+                                        decoded_events
+                                    );
                                 }
                                 Ok(None) => {
-                                    if decoded_events == expected_output_events {
+                                    let decoded_events = decoded_events.lock().await;
+                                    if *decoded_events == expected_output_events {
+                                        info!("HTTP server external output resource server sent all events");
                                         // Signal the outer thread that all expected events have been processed
                                         let _ = server_sent_all_tx.send(1).await;
                                     }
@@ -391,6 +402,7 @@ fn spawn_output_http_server(
 
         // ensure we've processed all events we expect to receive from the sink, if any.
         if expected_output_events > 0 {
+            info!("HTTP server external output resource waiting for all events to be sent.");
             server_sent_all_rx.recv().await;
         }
 
