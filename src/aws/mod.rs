@@ -99,7 +99,7 @@ fn check_response(res: &HttpResponse) -> bool {
 /// Creates the http connector that has been configured to use the given proxy and TLS settings.
 /// All AWS requests should use this connector as the aws crates by default use RustTLS which we
 /// have turned off as we want to consistently use openssl.
-pub(self) fn connector(
+fn connector(
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
 ) -> crate::Result<SharedHttpClient> {
