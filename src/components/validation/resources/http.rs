@@ -11,7 +11,7 @@ use axum::{
     routing::{MethodFilter, MethodRouter},
     Router,
 };
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use http::{Method, Request, StatusCode, Uri};
 use hyper::{Body, Client, Server};
 use tokio::{
@@ -34,7 +34,6 @@ pub struct HttpResourceConfig {
     uri: Uri,
     method: Option<Method>,
     headers: Option<HashMap<String, String>>,
-    response_body: Option<Bytes>,
 }
 
 impl HttpResourceConfig {
@@ -43,17 +42,11 @@ impl HttpResourceConfig {
             uri,
             method,
             headers: None,
-            response_body: None,
         }
     }
 
     pub fn with_headers(mut self, headers: HashMap<String, String>) -> Self {
         self.headers = Some(headers);
-        self
-    }
-
-    pub fn with_response_body(mut self, body: Bytes) -> Self {
-        self.response_body = Some(body);
         self
     }
 
@@ -299,8 +292,6 @@ fn spawn_output_http_server(
     // rejected.
     let should_reject = input_events.iter().filter(|te| te.should_reject()).count() > 0;
 
-    let response_body = config.response_body.clone();
-
     let (_, http_server_shutdown_tx) = spawn_http_server(
         task_coordinator,
         &config,
@@ -308,7 +299,6 @@ fn spawn_output_http_server(
         move |request, output_runner_metrics| {
             let output_tx = output_tx.clone();
             let mut decoder = decoder.clone();
-            let response_body = response_body.clone();
 
             async move {
                 match hyper::body::to_bytes(request.into_body()).await {
@@ -334,7 +324,6 @@ fn spawn_output_http_server(
                                             events.len() as u64;
 
                                         events.iter().for_each(|event| {
-                                            info!("resource got_event: {:?}", event);
                                             output_runner_metrics.received_event_bytes_total +=
                                                 event.estimated_json_encoded_size_of().get() as u64;
                                         });
@@ -351,11 +340,7 @@ fn spawn_output_http_server(
                                         // emitting error events
                                         return StatusCode::BAD_REQUEST.into_response();
                                     } else {
-                                        if let Some(body) = &response_body {
-                                            return body.clone().into_response();
-                                        } else {
-                                            return StatusCode::OK.into_response();
-                                        }
+                                        return StatusCode::OK.into_response();
                                     }
                                 }
                                 Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),

@@ -118,8 +118,6 @@ where
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();
         let response = self.inner.call(req);
 
-        info!("splunk_service got response for n events: {}", events_count);
-
         Box::pin(async move {
             let response = response.await.map_err(Into::into)?;
             let event_status = if response.is_successful() {
