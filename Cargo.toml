@@ -181,6 +181,10 @@ aws-sdk-cloudwatchlogs = { version = "1.3.0", default-features = false, features
 aws-sdk-elasticsearch = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-sdk-firehose = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-sdk-kinesis = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
+# The sts crate is needed despite not being referred to anywhere in the code because we need to set the
+# `behavior-version-latest` feature. Without this we get a runtime panic when `auth.assume_role` authentication
+# is configured.
+aws-sdk-sts = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-types = { version = "1.1.6", default-features = false, optional = true }
 aws-sigv4 = { version = "1.1.6", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest"], optional = true }
@@ -464,6 +468,7 @@ aws-core = [
   "dep:aws-smithy-types",
   "dep:aws-smithy-runtime",
   "dep:aws-smithy-runtime-api",
+  "dep:aws-sdk-sts",
 ]
 
 # Anything that requires Protocol Buffers.
