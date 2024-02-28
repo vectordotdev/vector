@@ -3,7 +3,6 @@ pub mod auth;
 pub mod region;
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
-// use aws_config::{meta::region::ProvideRegion, retry::RetryConfig, Region, SdkConfig};
 use aws_config::{meta::region::ProvideRegion, retry::RetryConfig, Region, SdkConfig};
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::{
