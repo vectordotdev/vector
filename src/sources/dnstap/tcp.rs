@@ -1,3 +1,4 @@
+use ipnet::IpNet;
 use std::time::Duration;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
@@ -7,6 +8,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered,
 };
+use vector_lib::ipallowlist::IpAllowlistConfig;
 use vector_lib::lookup::{owned_value_path, path};
 use vector_lib::tcp::TcpKeepaliveConfig;
 use vector_lib::tls::{CertificateMetadata, MaybeTlsSettings, TlsSourceConfig};
@@ -70,6 +72,11 @@ pub struct TcpConfig {
     #[serde(default = "default_port_key")]
     pub port_key: OptionalValuePath,
 
+    /// List of allowed origin IP networks
+    ///
+    /// By default, no origin is allowed
+    permit_origin: IpAllowlistConfig,
+
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
@@ -129,6 +136,7 @@ impl TcpConfig {
             raw_data_only: None,
             multithreaded: None,
             max_frame_handling_tasks: None,
+            permit_origin: IpAllowlistConfig(Vec::new()),
             tls: None,
             receive_buffer_bytes: None,
             max_connection_duration_secs: None,
@@ -181,6 +189,7 @@ pub struct DnstapFrameHandler {
     max_connection_duration_secs: Option<u64>,
     max_connections: Option<u32>,
     max_frame_handling_tasks: u32,
+    allowlist: Vec<IpNet>,
     host_key: Option<OwnedValuePath>,
     timestamp_key: Option<OwnedValuePath>,
     source_type_key: Option<OwnedValuePath>,
@@ -217,6 +226,7 @@ impl DnstapFrameHandler {
             receive_buffer_bytes: config.receive_buffer_bytes,
             max_connection_duration_secs: config.max_connection_duration_secs,
             max_connections: config.connection_limit,
+            allowlist: config.permit_origin.0.iter().map(|net| net.0).collect(),
             host_key,
             timestamp_key: timestamp_key.cloned(),
             source_type_key: source_type_key.cloned(),
@@ -364,5 +374,9 @@ impl TcpFrameHandler for DnstapFrameHandler {
             metadata.insert("subject".into(), c.subject().into());
             metadata
         });
+    }
+
+    fn allowed_origins(&self) -> &[IpNet] {
+        &self.allowlist
     }
 }

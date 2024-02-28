@@ -200,6 +200,7 @@ impl SourceConfig for SyslogConfig {
                     cx,
                     false.into(),
                     connection_limit,
+                    None,
                     SyslogConfig::NAME,
                     log_namespace,
                 )

@@ -1,3 +1,4 @@
+use ipnet::IpNet;
 #[cfg(unix)]
 use std::os::unix::{fs::PermissionsExt, io::AsRawFd};
 use std::{
@@ -390,6 +391,7 @@ pub trait TcpFrameHandler: FrameHandler {
     fn receive_buffer_bytes(&self) -> Option<usize>;
     fn max_connection_duration_secs(&self) -> Option<u64>;
     fn max_connections(&self) -> Option<u32>;
+    fn allowed_origins(&self) -> &[IpNet];
     fn insert_tls_client_metadata(&mut self, metadata: Option<CertificateMetadata>);
 }
 
@@ -409,14 +411,25 @@ pub fn build_framestream_tcp_source(
 
     Ok(Box::pin(async move {
         let listenfd = ListenFd::from_env();
-        let listener = try_bind_tcp_listener(addr, listenfd, &tls)
-            .await
-            .map_err(|error| {
-                emit!(SocketBindError {
-                    mode: SocketMode::Tcp,
-                    error: &error,
-                })
-            })?;
+        let listener = try_bind_tcp_listener(
+            addr,
+            listenfd,
+            &tls,
+            Some(
+                frame_handler
+                    .allowed_origins()
+                    .iter()
+                    .map(|net| net.clone())
+                    .collect(),
+            ),
+        )
+        .await
+        .map_err(|error| {
+            emit!(SocketBindError {
+                mode: SocketMode::Tcp,
+                error: &error,
+            })
+        })?;
 
         info!(
             message = "Listening.",
@@ -1129,6 +1142,10 @@ mod test {
         }
 
         fn insert_tls_client_metadata(&mut self, _: Option<CertificateMetadata>) {}
+
+        fn allowed_origins(&self) -> &[String] {
+            todo!()
+        }
     }
 
     fn init_framestream_tcp(

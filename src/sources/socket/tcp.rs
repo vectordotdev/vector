@@ -1,4 +1,5 @@
 use std::time::Duration;
+use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use chrono::Utc;
 use serde_with::serde_as;
@@ -58,6 +59,11 @@ pub struct TcpConfig {
     #[serde(default = "default_port_key")]
     port_key: OptionalValuePath,
 
+    /// List of allowed origin IP networks
+    ///
+    /// By default, all origins are allowed
+    pub permit_origin: Option<IpAllowlistConfig>,
+
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
@@ -104,6 +110,7 @@ impl TcpConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: default_host_key(),
             port_key: default_port_key(),
+            permit_origin: None,
             tls: None,
             receive_buffer_bytes: None,
             max_connection_duration_secs: None,

@@ -5,6 +5,7 @@ use std::{io, mem::drop, net::SocketAddr, time::Duration};
 use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use futures_util::future::OptionFuture;
+use ipnet::IpNet;
 use listenfd::ListenFd;
 use smallvec::SmallVec;
 use socket2::SockRef;
@@ -48,6 +49,7 @@ pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
     tls: &MaybeTlsSettings,
+    allowlist: Option<Vec<IpNet>>,
 ) -> crate::Result<MaybeTlsListener> {
     match addr {
         SocketListenAddr::SocketAddr(addr) => tls.bind(&addr).await.map_err(Into::into),
@@ -60,6 +62,7 @@ pub async fn try_bind_tcp_listener(
             }
         },
     }
+    .map(|listener| listener.with_allowlist(allowlist))
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -118,6 +121,7 @@ where
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         max_connections: Option<u32>,
+        allowlist: Option<Vec<IpNet>>,
         source_name: &'static str,
         log_namespace: LogNamespace,
     ) -> crate::Result<crate::sources::Source> {
@@ -125,7 +129,7 @@ where
 
         Ok(Box::pin(async move {
             let listenfd = ListenFd::from_env();
-            let listener = try_bind_tcp_listener(addr, listenfd, &tls)
+            let listener = try_bind_tcp_listener(addr, listenfd, &tls, allowlist)
                 .await
                 .map_err(|error| {
                     emit!(SocketBindError {

@@ -168,6 +168,7 @@ impl SourceConfig for StatsdConfig {
                     cx,
                     false.into(),
                     config.connection_limit,
+                    None,
                     StatsdConfig::NAME,
                     LogNamespace::Legacy,
                 )
