@@ -31,7 +31,7 @@ use crate::{
 
 use super::{
     encode_test_event,
-    sync::{Configuring, Started, TaskCoordinator},
+    sync::{Configuring, TaskCoordinator},
     ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration, Validator,
 };
 
@@ -316,11 +316,19 @@ impl Runner {
                 self.configuration.component_type,
             );
 
+            // the number of events we expect to receive from the output.
+            let expected_output_events = test_case
+                .events
+                .iter()
+                .filter(|te| !te.should_fail())
+                .count();
+
             let output_driver = spawn_output_driver(
                 output_rx,
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
                 self.configuration.component_type,
+                expected_output_events,
             );
 
             // At this point, the component topology is running, and all input/output/telemetry
@@ -336,16 +344,23 @@ impl Runner {
                 .await
                 .expect("input driver task should not have panicked");
 
-            // Synchronize the shutdown of all tasks, and get the resulting output events
-            let output_events = self
-                .coordinate_shutdown(
-                    &mut input_task_coordinator,
-                    &mut telemetry_task_coordinator,
-                    &mut topology_task_coordinator,
-                    &mut output_task_coordinator,
-                    output_driver,
-                )
-                .await;
+            // Synchronize the shutdown of all tasks, and get the resulting output events.
+            // We drive the shutdown by ensuring that the output events have been
+            // processed by the external resource, which ensures that the input events have travelled
+            // all the way through the pipeline, and that the telemetry events have been processed
+            // before shutting down the telemetry and topology tasks.
+            input_task_coordinator.shutdown().await;
+
+            let output_events = output_driver
+                .await
+                .expect("output driver task should not have panicked");
+
+            // Now that all output events have been received, we can shutdown the controlled edge/sink
+            output_task_coordinator.shutdown().await;
+
+            // as well as the telemetry and topology
+            telemetry_task_coordinator.shutdown().await;
+            topology_task_coordinator.shutdown().await;
 
             info!("Collected runner metrics: {:?}", runner_metrics);
             let final_runner_metrics = runner_metrics.lock().await;
@@ -387,53 +402,6 @@ impl Runner {
         }
 
         Ok(test_case_results)
-    }
-
-    // TODO I think a nice refactoring of the TaskCoordinator / it's usage in the Runner could be helpful
-    // , to organize all of the task coordinators into a single struct and have methods like `new()` and
-    // `shutdown()`.
-    async fn coordinate_shutdown(
-        &self,
-        input_task_coordinator: &mut TaskCoordinator<Started>,
-        telemetry_task_coordinator: &mut TaskCoordinator<Started>,
-        topology_task_coordinator: &mut TaskCoordinator<Started>,
-        output_task_coordinator: &mut TaskCoordinator<Started>,
-        output_driver: JoinHandle<Vec<Event>>,
-    ) -> Vec<Event> {
-        // for sinks, we need drive the shutdown by ensuring that the output events have been
-        // processed by the external resource, which ensures that the input events have travelled
-        // all the way through the pipeline, and that the telemetry events have been processed
-        // before shutting down the telemetry and topology tasks.
-        if self.configuration.component_type == ComponentType::Sink {
-            input_task_coordinator.shutdown().await;
-
-            output_task_coordinator.shutdown().await;
-
-            let output_events = output_driver
-                .await
-                .expect("output driver task should not have panicked");
-
-            telemetry_task_coordinator.shutdown().await;
-
-            topology_task_coordinator.shutdown().await;
-
-            output_events
-
-        // for sources, and transforms the output events are collected from the controlled edge (vector sink),
-        // and as such the coordination of shutdown of the tasks is more straight forward.
-        } else {
-            input_task_coordinator.shutdown().await;
-
-            telemetry_task_coordinator.shutdown().await;
-
-            topology_task_coordinator.shutdown().await;
-
-            output_task_coordinator.shutdown().await;
-
-            output_driver
-                .await
-                .expect("output driver task should not have panicked")
-        }
     }
 }
 
@@ -649,35 +617,60 @@ fn spawn_output_driver(
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     maybe_encoder: Option<Encoder<encoding::Framer>>,
     component_type: ComponentType,
+    expected_events: usize,
 ) -> JoinHandle<Vec<Event>> {
     let output_runner_metrics = Arc::clone(runner_metrics);
 
     tokio::spawn(async move {
+        let timeout = tokio::time::sleep(Duration::from_secs(5));
+        tokio::pin!(timeout);
+
         let mut output_events = Vec::new();
-        while let Some(events) = output_rx.recv().await {
-            info!("Output driver received {} events.", events.len());
-            output_events.extend(events.clone());
 
-            // Update the runner metrics for the received event. This will later
-            // be used in the Validators, as the "expected" case.
-            let mut output_runner_metrics = output_runner_metrics.lock().await;
+        loop {
+            tokio::select! {
+                _ = &mut timeout => {
+                    error!("Output driver timed out waiting for all events.");
+                    break
+                },
+                events = output_rx.recv() => {
+                    if let Some(events) = events {
+                        info!("Output driver received {} events.", events.len());
+                        output_events.extend(events.clone());
 
-            for output_event in events {
-                if component_type != ComponentType::Sink {
-                    // The event is wrapped in a Vec to match the actual event storage in
-                    // the real topology
-                    output_runner_metrics.received_event_bytes_total +=
-                        vec![&output_event].estimated_json_encoded_size_of().get() as u64;
+                        // Update the runner metrics for the received event. This will later
+                        // be used in the Validators, as the "expected" case.
+                        let mut output_runner_metrics = output_runner_metrics.lock().await;
 
-                    if let Some(encoder) = maybe_encoder.as_ref() {
-                        let mut buffer = BytesMut::new();
-                        encoder
-                            .clone()
-                            .encode(output_event, &mut buffer)
-                            .expect("should not fail to encode output event");
+                        if component_type != ComponentType::Sink {
+                            for output_event in events {
+                                // The event is wrapped in a Vec to match the actual event storage in
+                                // the real topology
+                                output_runner_metrics.received_event_bytes_total +=
+                                    vec![&output_event].estimated_json_encoded_size_of().get() as u64;
 
-                        output_runner_metrics.received_events_total += 1;
-                        output_runner_metrics.received_bytes_total += buffer.len() as u64;
+                                if let Some(encoder) = maybe_encoder.as_ref() {
+                                    let mut buffer = BytesMut::new();
+                                    encoder
+                                        .clone()
+                                        .encode(output_event, &mut buffer)
+                                        .expect("should not fail to encode output event");
+
+                                    output_runner_metrics.received_events_total += 1;
+                                    output_runner_metrics.received_bytes_total += buffer.len() as u64;
+                                }
+                            }
+                        }
+                        if output_events.len() >= expected_events {
+                            info!("Output driver has received all expected events.");
+                            break
+                        }
+                    } else {
+                        // The channel closed on us.
+                        // This shouldn't happen because in the runner we should not shutdown the external
+                        // resource until this output driver task is complete.
+                        error!("Output driver channel with external resource closed.");
+                        break
                     }
                 }
             }

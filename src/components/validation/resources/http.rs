@@ -267,16 +267,7 @@ fn spawn_output_http_server(
     // First, we'll build and spawn our HTTP server.
     let decoder = codec.into_decoder()?;
 
-    // the number of events we expect to receive from the sink.
-    // any happy path events + any events that are flagged as external resource should reject.
-    let expected_output_events = input_events
-        .iter()
-        .filter(|te| !te.should_fail() || te.should_reject())
-        .count();
-
     let should_reject = input_events.iter().filter(|te| te.should_reject()).count() > 0;
-
-    let (server_sent_all_tx, mut server_sent_all_rx) = mpsc::channel(1);
 
     let (_, http_server_shutdown_tx) = spawn_http_server(
         task_coordinator,
@@ -285,8 +276,6 @@ fn spawn_output_http_server(
         move |request, output_runner_metrics| {
             let output_tx = output_tx.clone();
             let mut decoder = decoder.clone();
-            let mut decoded_events = 0;
-            let server_sent_all_tx = server_sent_all_tx.clone();
 
             async move {
                 match hyper::body::to_bytes(request.into_body()).await {
@@ -321,13 +310,8 @@ fn spawn_output_http_server(
                                             .await
                                             .expect("should not fail to send output event");
                                     }
-                                    decoded_events += events.len();
                                 }
                                 Ok(None) => {
-                                    if decoded_events == expected_output_events {
-                                        // Signal the outer thread that all expected events have been processed
-                                        let _ = server_sent_all_tx.send(1).await;
-                                    }
                                     if should_reject {
                                         // This status code is not retried and should result in the component under test
                                         // emitting error events
@@ -357,11 +341,6 @@ fn spawn_output_http_server(
 
         // Wait for the runner to tell us to shutdown
         resource_shutdown_rx.wait().await;
-
-        // ensure we've processed all events we expect to receive from the sink, if any.
-        if expected_output_events > 0 {
-            server_sent_all_rx.recv().await;
-        }
 
         // signal the server to shutdown
         let _ = http_server_shutdown_tx.send(());
