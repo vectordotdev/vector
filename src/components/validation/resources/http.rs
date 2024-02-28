@@ -291,15 +291,6 @@ fn spawn_output_http_server(
     // First, we'll build and spawn our HTTP server.
     let decoder = codec.into_decoder()?;
 
-    // the number of events we expect to receive from the sink.
-    // any happy path events + any events that are flagged as external resource should reject.
-    let expected_output_events = input_events
-        .iter()
-        .filter(|te| !te.should_fail() || te.should_reject())
-        .count();
-
-    info!("HTTP server expects {} events.", expected_output_events);
-
     // Note that we currently don't differentiate which events should and shouldn't be rejected-
     // we reject all events in this server if any are marked for rejection.
     // In the future it might be useful to be able to select which to reject. That will involve
@@ -308,10 +299,7 @@ fn spawn_output_http_server(
     // rejected.
     let should_reject = input_events.iter().filter(|te| te.should_reject()).count() > 0;
 
-    let (server_sent_all_tx, mut server_sent_all_rx) = mpsc::channel(1);
-
     let response_body = config.response_body.clone();
-    let decoded_events = Arc::new(Mutex::new(0));
 
     let (_, http_server_shutdown_tx) = spawn_http_server(
         task_coordinator,
@@ -320,9 +308,7 @@ fn spawn_output_http_server(
         move |request, output_runner_metrics| {
             let output_tx = output_tx.clone();
             let mut decoder = decoder.clone();
-            let server_sent_all_tx = server_sent_all_tx.clone();
             let response_body = response_body.clone();
-            let decoded_events = decoded_events.clone();
 
             async move {
                 match hyper::body::to_bytes(request.into_body()).await {
@@ -358,20 +344,8 @@ fn spawn_output_http_server(
                                             .await
                                             .expect("should not fail to send output event");
                                     }
-                                    let mut decoded_events = decoded_events.lock().await;
-                                    *decoded_events += events.len();
-                                    info!(
-                                        "HTTP server external output resource decoded_events {}",
-                                        decoded_events
-                                    );
                                 }
                                 Ok(None) => {
-                                    let decoded_events = decoded_events.lock().await;
-                                    if *decoded_events == expected_output_events {
-                                        info!("HTTP server external output resource server sent all events");
-                                        // Signal the outer thread that all expected events have been processed
-                                        let _ = server_sent_all_tx.send(1).await;
-                                    }
                                     if should_reject {
                                         // This status code is not retried and should result in the component under test
                                         // emitting error events
@@ -405,12 +379,6 @@ fn spawn_output_http_server(
 
         // Wait for the runner to tell us to shutdown
         resource_shutdown_rx.wait().await;
-
-        // ensure we've processed all events we expect to receive from the sink, if any.
-        if expected_output_events > 0 {
-            info!("HTTP server external output resource waiting for all events to be sent.");
-            server_sent_all_rx.recv().await;
-        }
 
         // signal the server to shutdown
         let _ = http_server_shutdown_tx.send(());
