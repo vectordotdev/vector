@@ -95,6 +95,10 @@ components: sources: dnstap: {
 			relevant_when: "mode = \"tcp\""
 		}
 
+		permit_origin: {
+			relevant_when: "mode = \"tcp\""
+		}
+
 		tls: {
 			relevant_when: "mode = \"tcp\""
 		}
