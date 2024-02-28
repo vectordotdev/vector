@@ -243,16 +243,19 @@ impl TaskCoordinator<Configuring> {
 impl TaskCoordinator<Started> {
     /// Triggers all coordinated tasks to shutdown, and waits for them to mark themselves as completed.
     pub async fn shutdown(&mut self) {
-        info!("Triggering {} task to shutdown.", self.name);
+        info!("{}: triggering task to shutdown.", self.name);
 
         // Trigger all registered shutdown handles.
         for trigger in self.state.shutdown_triggers.drain(..) {
             trigger.trigger();
-            debug!("Shutdown triggered for coordinated tasks.");
+            debug!("{}: shutdown triggered for coordinated tasks.", self.name);
         }
 
         // Now simply wait for all of them to mark themselves as completed.
-        debug!("Waiting for coordinated tasks to complete...");
+        debug!(
+            "{}: waiting for coordinated tasks to complete...",
+            self.name
+        );
         let tasks_completed = self
             .state
             .tasks_completed
@@ -260,6 +263,6 @@ impl TaskCoordinator<Started> {
             .expect("tasks completed wait group already consumed");
         tasks_completed.wait_for_children().await;
 
-        info!("{} task has been shutdown.", self.name);
+        info!("{}: task has been shutdown.", self.name);
     }
 }
