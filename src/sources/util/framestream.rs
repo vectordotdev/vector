@@ -858,6 +858,7 @@ mod test {
         sink::{Sink, SinkExt},
         stream::{self, StreamExt},
     };
+    use ipnet::IpNet;
     use tokio::{
         self,
         net::UnixStream,
@@ -921,6 +922,7 @@ mod test {
         receive_buffer_bytes: Option<usize>,
         max_connection_duration_secs: Option<u64>,
         max_connections: Option<u32>,
+        permit_origin: Vec<IpNet>,
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockTcpFrameHandler<F> {
@@ -929,6 +931,7 @@ mod test {
             content_type: String,
             multithreaded: bool,
             extra_routine: F,
+            permit_origin: Vec<IpNet>,
         ) -> Self {
             Self {
                 frame_handler: MockFrameHandler::new(content_type, multithreaded, extra_routine),
@@ -940,6 +943,7 @@ mod test {
                 receive_buffer_bytes: None,
                 max_connection_duration_secs: None,
                 max_connections: None,
+                permit_origin,
             }
         }
     }
@@ -1143,8 +1147,8 @@ mod test {
 
         fn insert_tls_client_metadata(&mut self, _: Option<CertificateMetadata>) {}
 
-        fn allowed_origins(&self) -> &[String] {
-            todo!()
+        fn allowed_origins(&self) -> &[IpNet] {
+            &self.permit_origin
         }
     }
 
@@ -1270,8 +1274,15 @@ mod test {
     fn create_tcp_frame_handler(
         addr: SocketAddr,
         multithreaded: bool,
+        permit_origin: Vec<IpNet>,
     ) -> impl TcpFrameHandler + Send + Sync + Clone {
-        MockTcpFrameHandler::new(addr, "test_content".to_string(), multithreaded, move || {})
+        MockTcpFrameHandler::new(
+            addr,
+            "test_content".to_string(),
+            multithreaded,
+            move || {},
+            permit_origin,
+        )
     }
 
     async fn signal_shutdown(source_name: &str, shutdown: &mut SourceShutdownCoordinator) {
@@ -1369,6 +1380,31 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[should_panic]
+    async fn blocked_framestream_tcp() {
+        let source_name = "test_source";
+        let (tx, rx) = SourceSender::new_test();
+        let addr = next_addr();
+        let (source_handle, shutdown) = init_framestream_tcp(
+            source_name,
+            &addr,
+            create_tcp_frame_handler(addr, false, vec![]),
+            tx,
+        );
+        let (sock_sink, sock_stream) = make_tcp_stream(addr).await.split();
+
+        test_normal_framestream(
+            source_name,
+            sock_sink,
+            sock_stream,
+            rx,
+            shutdown,
+            source_handle,
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn normal_framestream_singlethreaded_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
@@ -1376,7 +1412,7 @@ mod test {
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
-            create_tcp_frame_handler(addr, false),
+            create_tcp_frame_handler(addr, false, vec![IpNet::default()]),
             tx,
         );
         let (sock_sink, sock_stream) = make_tcp_stream(addr).await.split();
@@ -1416,8 +1452,12 @@ mod test {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
         let addr = next_addr();
-        let (source_handle, shutdown) =
-            init_framestream_tcp(source_name, &addr, create_tcp_frame_handler(addr, true), tx);
+        let (source_handle, shutdown) = init_framestream_tcp(
+            source_name,
+            &addr,
+            create_tcp_frame_handler(addr, true, vec![IpNet::default()]),
+            tx,
+        );
         let (sock_sink, sock_stream) = make_tcp_stream(addr).await.split();
 
         test_normal_framestream(
@@ -1458,7 +1498,7 @@ mod test {
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
-            create_tcp_frame_handler(addr, false),
+            create_tcp_frame_handler(addr, false, vec![IpNet::default()]),
             tx,
         );
         let (sock_sink, sock_stream) = make_tcp_stream(addr).await.split();
