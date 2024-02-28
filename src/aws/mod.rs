@@ -122,10 +122,32 @@ pub trait ClientBuilder {
     fn build(config: &SdkConfig) -> Self::Client;
 }
 
-async fn resolve_region(region: Option<Region>) -> crate::Result<Region> {
+fn region_provider(
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
+) -> crate::Result<impl ProvideRegion> {
+    let config = aws_config::provider_config::ProviderConfig::default()
+        .with_http_client(connector(proxy, tls_options)?);
+
+    Ok(aws_config::meta::region::RegionProviderChain::first_try(
+        aws_config::environment::EnvironmentVariableRegionProvider::new(),
+    )
+    .or_else(aws_config::profile::ProfileFileRegionProvider::builder().build())
+    .or_else(
+        aws_config::imds::region::ImdsRegionProvider::builder()
+            .configure(&config)
+            .build(),
+    ))
+}
+
+async fn resolve_region(
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
+    region: Option<Region>,
+) -> crate::Result<Region> {
     match region {
         Some(region) => Ok(region),
-        None => aws_config::default_provider::region::default_provider()
+        None => region_provider(proxy, tls_options)?
             .region()
             .await
             .ok_or_else(|| {
@@ -159,7 +181,7 @@ pub async fn create_client_and_region<T: ClientBuilder>(
 
     // The default credentials chains will look for a region if not given but we'd like to
     // error up front if later SDK calls will fail due to lack of region configuration
-    let region = resolve_region(region).await?;
+    let region = resolve_region(proxy, tls_options, region).await?;
 
     let provider_config =
         aws_config::provider_config::ProviderConfig::empty().with_region(Some(region.clone()));
