@@ -622,7 +622,7 @@ fn spawn_output_driver(
     let output_runner_metrics = Arc::clone(runner_metrics);
 
     tokio::spawn(async move {
-        let timeout = tokio::time::sleep(Duration::from_secs(5));
+        let timeout = tokio::time::sleep(Duration::from_secs(8));
         tokio::pin!(timeout);
 
         let mut output_events = Vec::new();
