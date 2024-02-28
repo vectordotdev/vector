@@ -238,11 +238,12 @@ impl SourceConfig for HttpClientConfig {
 
 impl ValidatableComponent for HttpClientConfig {
     fn validation_configuration() -> ValidationConfiguration {
-        let uri = Uri::from_static("http://127.0.0.1:9898/logs");
+        let uri = Uri::from_static("http://127.0.0.1:9898");
 
         let config = Self {
             endpoint: uri.to_string(),
             interval: Duration::from_secs(1),
+            timeout: Duration::from_secs(1),
             decoding: DeserializerConfig::Json(Default::default()),
             ..Default::default()
         };

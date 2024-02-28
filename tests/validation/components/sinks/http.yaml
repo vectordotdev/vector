@@ -5,10 +5,6 @@
     - simple message 2
     - simple message 3
 - name: sad path
-  config_name: encoding_error
   expectation: failure
   events:
-    - event: simple message with the invalid data type for encoder
-      name: level
-      value: "1"
-      fail: true
+    - external_resource_rejects: simple message downstream rejects
