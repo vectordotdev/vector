@@ -300,6 +300,12 @@ fn spawn_output_http_server(
 
     info!("HTTP server expects {} events.", expected_output_events);
 
+    // Note that we currently don't differentiate which events should and shouldn't be rejected-
+    // we reject all events in this server if any are marked for rejection.
+    // In the future it might be useful to be able to select which to reject. That will involve
+    // adding logic to the test case which is passed down here, and to the event itself. Since
+    // we can't guarantee the order of events, we'd need a way to flag which ones need to be
+    // rejected.
     let should_reject = input_events.iter().filter(|te| te.should_reject()).count() > 0;
 
     let (server_sent_all_tx, mut server_sent_all_rx) = mpsc::channel(1);
