@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use vector_lib::{
-    codecs::TextSerializerConfig,
+    codecs::{JsonSerializerConfig, MetricTagValues, TextSerializerConfig},
     lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath},
     sensitive_string::SensitiveString,
 };
@@ -295,11 +295,10 @@ impl ValidatableComponent for HecLogsSinkConfig {
             index: None,
             sourcetype: None,
             source: None,
-            encoding: TextSerializerConfig::default().into(),
-            // encoding: EncodingConfig::new(
-            //     JsonSerializerConfig::new(MetricTagValues::Full).into(),
-            //     Transformer::default(),
-            // ),
+            encoding: EncodingConfig::new(
+                JsonSerializerConfig::new(MetricTagValues::Full).into(),
+                Transformer::default(),
+            ),
             compression: Compression::default(),
             batch,
             request: TowerRequestConfig {
@@ -318,18 +317,7 @@ impl ValidatableComponent for HecLogsSinkConfig {
             endpoint_target: EndpointTarget::Raw,
         };
 
-        // let encoding = EncodingConfigWithFraming::new(
-        //     None,
-        //     JsonSerializerConfig::new(MetricTagValues::Full).into(),
-        //     config.encoding.clone(),
-        // );
-
         let endpoint = format!("{endpoint}/services/collector/raw");
-
-        // let mut bytes: Vec<u8> = Vec::new();
-        // let response = serde_json::json!({"ack_id": 0});
-        // serde_json::to_writer(&mut bytes, &response).unwrap();
-        // let response: Bytes = bytes.into();
 
         let external_resource = ExternalResource::new(
             ResourceDirection::Push,
@@ -337,8 +325,6 @@ impl ValidatableComponent for HecLogsSinkConfig {
                 http::Uri::try_from(&endpoint).expect("should not fail to parse URI"),
                 None,
             ),
-            // TODO :::::::::::::::: fix meeeeeeeeeee
-            // .with_response_body(response),
             config.encoding.clone(),
         );
 

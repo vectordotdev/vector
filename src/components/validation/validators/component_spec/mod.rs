@@ -290,12 +290,7 @@ fn compare_actual_to_expected(
         // check here if it matches what the array scenario would be, which is to add the size of
         // the brackets, for each event.
         (metric_type != &ComponentMetricType::EventsReceivedBytes
-            || (actual != (expected + (expect_received_events * 2)))) &&
-
-        // TODO if we go this route, need to pass down the component type, and make sure it is a sink,
-        // AND have flagged in the configuration that this sink does enrichment.
-        (metric_type != &ComponentMetricType::SentEventBytesTotal
-            || actual < expected)
+            || (actual != (expected + (expect_received_events * 2))))
     {
         errs.push(format!(
             "{}: expected {}, but received {}",

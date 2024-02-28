@@ -71,12 +71,10 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
         let encoded_input: Vec<u8> = input
             .into_iter()
             .filter_map(|processed_event| {
-                info!("hec encoding event before: {:?}", processed_event.event);
                 let mut event = Event::from(processed_event.event);
                 let metadata = processed_event.metadata;
                 self.transformer.transform(&mut event);
 
-                info!("hec encoding event after transform: {:?}", event);
                 byte_size.add_event(&event, event.estimated_json_encoded_size_of());
 
                 let mut bytes = BytesMut::new();
