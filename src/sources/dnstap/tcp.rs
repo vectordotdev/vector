@@ -29,7 +29,7 @@ use vector_lib::lookup::lookup_v2::OptionalValuePath;
 /// TCP configuration for the `dnstap` source.
 #[serde_as]
 #[configurable_component]
-#[cfg_attr(not(unix), serde(tag = "mode", rename_all = "snake_case"))]
+#[cfg_attr(unix, serde(tag = "mode", rename_all = "snake_case"))]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
     /// Maximum DNSTAP frame length that the source accepts.
