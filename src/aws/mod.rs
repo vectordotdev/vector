@@ -21,6 +21,7 @@ use aws_smithy_runtime_api::client::{
     runtime_components::RuntimeComponents,
 };
 use aws_smithy_types::body::SdkBody;
+use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::HeaderMap;
@@ -94,6 +95,24 @@ fn check_response(res: &HttpResponse) -> bool {
         || (status.is_client_error() && re.is_match(response_body.as_ref()))
 }
 
+/// Creates the http connector that has been configured to use the given proxy and TLS settings.
+/// All AWS requests should use this connector as the aws crates by default use RustTLS which we
+/// have turned off as we want to consistently use openssl.
+fn connector(
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
+) -> crate::Result<SharedHttpClient> {
+    let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
+
+    if proxy.enabled {
+        let proxy = build_proxy_connector(tls_settings, proxy)?;
+        Ok(HyperClientBuilder::new().build(proxy))
+    } else {
+        let tls_connector = build_tls_connector(tls_settings)?;
+        Ok(HyperClientBuilder::new().build(tls_connector))
+    }
+}
+
 /// Implement for each AWS service to create the appropriate AWS sdk client.
 pub trait ClientBuilder {
     /// The type of the client in the SDK.
@@ -145,15 +164,7 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     let provider_config =
         aws_config::provider_config::ProviderConfig::empty().with_region(Some(region.clone()));
 
-    let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
-
-    let connector = if proxy.enabled {
-        let proxy = build_proxy_connector(tls_settings, proxy)?;
-        HyperClientBuilder::new().build(proxy)
-    } else {
-        let tls_connector = build_tls_connector(tls_settings)?;
-        HyperClientBuilder::new().build(tls_connector)
-    };
+    let connector = connector(proxy, tls_options)?;
 
     // Create a custom http connector that will emit the required metrics for us.
     let connector = AwsHttpClient {
