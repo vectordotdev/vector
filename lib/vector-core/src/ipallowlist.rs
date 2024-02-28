@@ -1,11 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use vector_config::schema::generate_string_schema;
 use vector_config::GenerateError;
 
 use ipnet::IpNet;
-use vector_config::{configurable_component, Configurable, ToValue};
-use vector_config_common::schema::{SchemaGenerator, SchemaObject};
+use vector_config::{configurable_component, Configurable, Metadata, ToValue};
+use vector_config_common::schema::{InstanceType, SchemaGenerator, SchemaObject};
 
 /// IP network allowlist settings for network components
 #[configurable_component]
@@ -14,6 +13,7 @@ use vector_config_common::schema::{SchemaGenerator, SchemaObject};
 #[configurable(metadata(docs::human_name = "Allowed IP network origins"))]
 pub struct IpAllowlistConfig(pub Vec<IpNetConfig>);
 
+/// IP network
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, transparent)]
 pub struct IpNetConfig(pub IpNet);
@@ -28,6 +28,13 @@ impl Configurable for IpNetConfig {
     fn generate_schema(
         _: &RefCell<SchemaGenerator>,
     ) -> std::result::Result<SchemaObject, GenerateError> {
-        Ok(generate_string_schema())
+        Ok(SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            ..Default::default()
+        })
+    }
+
+    fn metadata() -> Metadata {
+        Metadata::with_description("IP network")
     }
 }

@@ -69,6 +69,15 @@ base: components: sources: dnstap: configuration: {
 		required:    false
 		type: bool: {}
 	}
+	permit_origin: {
+		description: """
+			List of allowed origin IP networks
+
+			By default, no origin is allowed
+			"""
+		required: true
+		type: array: items: type: string: {}
+	}
 	port_key: {
 		description: """
 			Overrides the name of the log field used to add the peer host's port to each event.
