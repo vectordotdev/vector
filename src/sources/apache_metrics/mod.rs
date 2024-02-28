@@ -58,8 +58,8 @@ pub fn default_namespace() -> String {
 }
 
 impl GenerateConfig for ApacheMetricsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             endpoints: vec!["http://localhost:8080/server-status/?auto".to_owned()],
             scrape_interval_secs: default_scrape_interval_secs(),
             namespace: default_namespace(),

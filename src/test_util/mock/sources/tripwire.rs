@@ -22,11 +22,11 @@ pub struct TripwireSourceConfig {
 }
 
 impl GenerateConfig for TripwireSourceConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         let config = Self {
             tripwire: Arc::new(Mutex::new(None)),
         };
-        toml::Value::try_from(&config).unwrap()
+        serde_json::to_value(&config).unwrap()
     }
 }
 

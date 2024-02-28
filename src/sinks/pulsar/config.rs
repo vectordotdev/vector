@@ -275,8 +275,8 @@ impl PulsarSinkConfig {
 }
 
 impl GenerateConfig for PulsarSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self::default()).unwrap()
     }
 }
 

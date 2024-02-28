@@ -136,8 +136,8 @@ pub struct DatadogAgentConfig {
 }
 
 impl GenerateConfig for DatadogAgentConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             store_api_key: true,

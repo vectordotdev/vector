@@ -36,7 +36,7 @@ pub(super) struct SqsSinkConfig {
 }
 
 impl GenerateConfig for SqsSinkConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"queue_url = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
             region = "us-east-2"

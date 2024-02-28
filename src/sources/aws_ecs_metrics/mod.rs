@@ -135,8 +135,8 @@ impl AwsEcsMetricsSourceConfig {
 }
 
 impl GenerateConfig for AwsEcsMetricsSourceConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             endpoint: default_endpoint(),
             version: default_version(),
             scrape_interval_secs: default_scrape_interval_secs(),

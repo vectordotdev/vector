@@ -173,8 +173,8 @@ pub struct LogToMetric {
 }
 
 impl GenerateConfig for LogToMetricConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             metrics: vec![MetricConfig {
                 field: "field_name".try_into().expect("Fixed template"),
                 name: None,

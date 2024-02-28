@@ -138,8 +138,8 @@ pub struct Dedupe {
 }
 
 impl GenerateConfig for DedupeConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             fields: None,
             cache: default_cache_config(),
         })

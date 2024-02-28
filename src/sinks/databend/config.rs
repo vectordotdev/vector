@@ -79,7 +79,7 @@ pub struct DatabendConfig {
 }
 
 impl GenerateConfig for DatabendConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"endpoint = "http://localhost:8000"
             table = "default"

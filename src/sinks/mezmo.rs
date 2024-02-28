@@ -34,7 +34,7 @@ const PATH: &str = "/logs/ingest";
 pub struct LogdnaConfig(MezmoConfig);
 
 impl GenerateConfig for LogdnaConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         <MezmoConfig as GenerateConfig>::generate_config()
     }
 }
@@ -144,7 +144,7 @@ fn default_env() -> String {
 }
 
 impl GenerateConfig for MezmoConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"hostname = "hostname"
             api_key = "${LOGDNA_API_KEY}""#,

@@ -163,8 +163,8 @@ impl Default for VectorConfig {
 }
 
 impl GenerateConfig for VectorConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(VectorConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(VectorConfig::default()).unwrap()
     }
 }
 

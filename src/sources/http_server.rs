@@ -45,7 +45,7 @@ use crate::{
 pub struct HttpConfig(SimpleHttpConfig);
 
 impl GenerateConfig for HttpConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         <SimpleHttpConfig as GenerateConfig>::generate_config()
     }
 }

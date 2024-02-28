@@ -185,8 +185,8 @@ const fn default_suppress_timestamp() -> bool {
 }
 
 impl GenerateConfig for PrometheusExporterConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self::default()).unwrap()
     }
 }
 

@@ -145,8 +145,8 @@ pub fn timestamp_nanos_key() -> Option<String> {
 }
 
 impl GenerateConfig for HumioLogsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             token: "${HUMIO_TOKEN}".to_owned().into(),
             endpoint: default_endpoint(),
             source: None,

@@ -261,8 +261,8 @@ const fn default_read_from() -> ReadFromConfig {
 }
 
 impl GenerateConfig for Config {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             self_node_name: default_self_node_name_env_template(),
             auto_partial_merge: true,
             ..Default::default()

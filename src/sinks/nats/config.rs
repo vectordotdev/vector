@@ -83,8 +83,8 @@ fn default_name() -> String {
 }
 
 impl GenerateConfig for NatsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             acknowledgements: Default::default(),
             auth: None,
             connection_name: "vector".into(),

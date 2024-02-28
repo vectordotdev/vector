@@ -71,8 +71,8 @@ pub struct FluentConfig {
 }
 
 impl GenerateConfig for FluentConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
             keepalive: None,
             tls: None,

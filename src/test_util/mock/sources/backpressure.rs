@@ -28,11 +28,11 @@ pub struct BackpressureSourceConfig {
 }
 
 impl GenerateConfig for BackpressureSourceConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         let config = Self {
             counter: Arc::new(AtomicUsize::new(0)),
         };
-        toml::Value::try_from(&config).unwrap()
+        serde_json::to_value(&config).unwrap()
     }
 }
 

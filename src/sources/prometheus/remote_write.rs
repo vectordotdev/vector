@@ -66,8 +66,8 @@ impl PrometheusRemoteWriteConfig {
 }
 
 impl GenerateConfig for PrometheusRemoteWriteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             address: "127.0.0.1:9090".parse().unwrap(),
             tls: None,
             auth: None,

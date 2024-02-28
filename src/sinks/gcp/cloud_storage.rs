@@ -205,7 +205,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
 }
 
 impl GenerateConfig for GcsSinkConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(indoc! {r#"
             bucket = "my-bucket"
             credentials_path = "/path/to/credentials.json"

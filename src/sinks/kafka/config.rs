@@ -237,8 +237,8 @@ impl KafkaSinkConfig {
 }
 
 impl GenerateConfig for KafkaSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: Template::try_from("topic-1234".to_owned()).unwrap(),
             key_field: Some(ConfigTargetPath::try_from("user_id".to_owned()).unwrap()),

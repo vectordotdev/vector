@@ -248,8 +248,8 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 }
 
 impl GenerateConfig for AwsKinesisFirehoseConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             address: "0.0.0.0:443".parse().unwrap(),
             access_key: None,
             access_keys: None,

@@ -118,8 +118,8 @@ fn example_http_config() -> HttpConfig {
 }
 
 impl GenerateConfig for OpentelemetryConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             grpc: example_grpc_config(),
             http: example_http_config(),
             acknowledgements: Default::default(),

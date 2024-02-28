@@ -66,8 +66,8 @@ pub struct WebSocketSinkConfig {
 }
 
 impl GenerateConfig for WebSocketSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             uri: "ws://127.0.0.1:9000/endpoint".into(),
             tls: None,
             encoding: JsonSerializerConfig::default().into(),

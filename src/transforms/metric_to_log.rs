@@ -75,8 +75,8 @@ impl MetricToLogConfig {
 }
 
 impl GenerateConfig for MetricToLogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             host_tag: Some("host-tag".to_string()),
             timezone: None,
             log_namespace: None,

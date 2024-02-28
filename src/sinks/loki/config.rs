@@ -159,7 +159,7 @@ pub enum OutOfOrderAction {
 }
 
 impl GenerateConfig for LokiConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"endpoint = "http://localhost:3100"
             encoding.codec = "json"

@@ -104,10 +104,10 @@ const fn default_address() -> SocketAddr {
 }
 
 impl GenerateConfig for StatsdSinkConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         let address = default_address();
 
-        toml::Value::try_from(Self {
+        serde_json::to_value(Self {
             default_namespace: None,
             mode: Mode::Udp(UdpConnectorConfig::from_address(
                 address.ip().to_string(),

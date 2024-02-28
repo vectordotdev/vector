@@ -9,7 +9,7 @@ use clap::Parser;
 use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
-use toml::{map::Map, Value};
+use serde_json::Value;
 use vector_lib::configurable::component::{
     ExampleError, SinkDescription, SourceDescription, TransformDescription,
 };
@@ -164,12 +164,12 @@ pub(crate) fn generate_example(
                             source_type, err
                         ));
                     }
-                    Value::Table(Map::new())
+                    Value::Object(Default::default())
                 }
             };
             example
-                .as_table_mut()
-                .expect("examples are always tables")
+                .as_object_mut()
+                .expect("examples are always objects")
                 .insert("type".into(), source_type.to_owned().into());
 
             sources.insert(name, example);
@@ -227,12 +227,12 @@ pub(crate) fn generate_example(
                             transform_type, err
                         ));
                     }
-                    Value::Table(Map::new())
+                    Value::Object(Default::default())
                 }
             };
             example
-                .as_table_mut()
-                .expect("examples are always tables")
+                .as_object_mut()
+                .expect("examples are always objects")
                 .insert("type".into(), transform_type.to_owned().into());
 
             transforms.insert(
@@ -276,12 +276,12 @@ pub(crate) fn generate_example(
                     if err != ExampleError::MissingExample {
                         errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
                     }
-                    Value::Table(Map::new())
+                    Value::Object(Default::default())
                 }
             };
             example
-                .as_table_mut()
-                .expect("examples are always tables")
+                .as_object_mut()
+                .expect("examples are always objects")
                 .insert("type".into(), sink_type.to_owned().into());
 
             sinks.insert(

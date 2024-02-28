@@ -90,8 +90,8 @@ pub(crate) const fn default_cache_size() -> usize {
 }
 
 impl GenerateConfig for TagCardinalityLimitConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             mode: Mode::Exact,
             value_limit: default_value_limit(),
             limit_exceeded_action: default_limit_exceeded_action(),

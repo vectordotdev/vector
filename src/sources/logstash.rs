@@ -127,8 +127,8 @@ impl Default for LogstashConfig {
 }
 
 impl GenerateConfig for LogstashConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(LogstashConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(LogstashConfig::default()).unwrap()
     }
 }
 

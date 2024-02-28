@@ -24,8 +24,8 @@ pub struct NoopTransformConfig {
 }
 
 impl GenerateConfig for NoopTransformConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(&Self {
             transform_type: TransformType::Function,
         })
         .unwrap()

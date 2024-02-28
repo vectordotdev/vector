@@ -122,8 +122,8 @@ pub struct HecMetricsSinkConfig {
 }
 
 impl GenerateConfig for HecMetricsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             default_namespace: None,
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "http://localhost:8088".to_owned(),

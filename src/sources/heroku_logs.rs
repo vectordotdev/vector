@@ -157,8 +157,8 @@ impl Default for LogplexConfig {
 }
 
 impl GenerateConfig for LogplexConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(LogplexConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(LogplexConfig::default()).unwrap()
     }
 }
 

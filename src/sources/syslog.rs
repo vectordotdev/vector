@@ -153,8 +153,8 @@ impl Default for SyslogConfig {
 }
 
 impl GenerateConfig for SyslogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(SyslogConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(SyslogConfig::default()).unwrap()
     }
 }
 

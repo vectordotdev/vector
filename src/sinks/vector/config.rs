@@ -88,8 +88,8 @@ impl VectorConfig {
 }
 
 impl GenerateConfig for VectorConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(default_config("127.0.0.1:6000")).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(default_config("127.0.0.1:6000")).unwrap()
     }
 }
 

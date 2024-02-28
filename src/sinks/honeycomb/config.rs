@@ -78,7 +78,7 @@ impl SinkBatchSettings for HoneycombDefaultBatchSettings {
 }
 
 impl GenerateConfig for HoneycombConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"api_key = "${HONEYCOMB_API_KEY}"
             dataset = "my-honeycomb-dataset""#,

@@ -55,7 +55,7 @@ fn default_process() -> Template {
 }
 
 impl GenerateConfig for PapertrailConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"endpoint = "logs.papertrailapp.com:12345"
             encoding.codec = "json""#,

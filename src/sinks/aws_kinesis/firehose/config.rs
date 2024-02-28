@@ -155,7 +155,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 }
 
 impl GenerateConfig for KinesisFirehoseSinkConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"stream_name = "my-stream"
             encoding.codec = "json""#,

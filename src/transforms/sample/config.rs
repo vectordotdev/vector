@@ -49,8 +49,8 @@ pub struct SampleConfig {
 }
 
 impl GenerateConfig for SampleConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             rate: 10,
             key_field: None,
             exclude: None::<AnyCondition>,

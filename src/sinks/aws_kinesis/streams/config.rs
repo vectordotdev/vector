@@ -157,7 +157,7 @@ impl SinkConfig for KinesisStreamsSinkConfig {
 }
 
 impl GenerateConfig for KinesisStreamsSinkConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"partition_key_field = "foo"
             stream_name = "my-stream"

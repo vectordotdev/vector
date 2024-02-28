@@ -155,8 +155,8 @@ pub fn default_blob_prefix() -> Template {
 }
 
 impl GenerateConfig for AzureBlobSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
             storage_account: Some(String::from("some-account-name")),
             container_name: String::from("logs"),

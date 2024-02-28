@@ -117,7 +117,7 @@ pub struct RedisSinkConfig {
 }
 
 impl GenerateConfig for RedisSinkConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"
             url = "redis://127.0.0.1:6379/0"

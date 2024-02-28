@@ -65,7 +65,7 @@ pub struct AxiomConfig {
 }
 
 impl GenerateConfig for AxiomConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(
             r#"token = "${AXIOM_TOKEN}"
             dataset = "${AXIOM_DATASET}"

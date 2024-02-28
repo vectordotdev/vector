@@ -143,7 +143,7 @@ struct InfluxDbLogsSink {
 }
 
 impl GenerateConfig for InfluxDbLogsConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         toml::from_str(indoc! {r#"
             endpoint = "http://localhost:8086/"
             namespace = "my-namespace"

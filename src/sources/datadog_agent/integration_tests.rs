@@ -80,7 +80,8 @@ async fn wait_for_message() {
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
-        let config: DatadogAgentConfig = DatadogAgentConfig::generate_config().try_into().unwrap();
+        let config: DatadogAgentConfig =
+            serde_json::from_value(DatadogAgentConfig::generate_config()).unwrap();
         config.build(context).await.unwrap().await.unwrap()
     });
     let events = spawn_collect_n(
