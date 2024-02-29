@@ -81,6 +81,10 @@ jobs:
         env:
           CARGO_BUILD_JOBS: 5
 
+      # Validates components for adherence to the Component Specification
+      - name: Check Component Spec
+        run: make test-component-validation
+
       - name: Upload test results
         run: scripts/upload-test-results.sh
         if: always()
