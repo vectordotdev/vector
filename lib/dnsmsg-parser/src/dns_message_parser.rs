@@ -674,8 +674,20 @@ fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8
         }
         RData::OPT(opt) => {
             let parsed = parse_edns_options(opt)?;
+            let ede_data = parsed.0.iter().map(|entry| EdnsOptionEntry {
+                opt_code: 15u16,
+                opt_name: "EDE".to_string(),
+                opt_data: format!(
+                    "EDE={}({}){}",
+                    entry.info_code(),
+                    entry.purpose().unwrap_or(""),
+                    entry.extra_text().unwrap_or("".to_string())
+                ),
+            });
             let opt_data = parsed
-                .iter()
+                .1
+                .into_iter()
+                .chain(ede_data)
                 .map(|entry| format!("{}={}", entry.opt_name, entry.opt_data))
                 .collect::<Vec<String>>()
                 .join(",");
@@ -909,7 +921,8 @@ fn parse_edns(dns_message: &TrustDnsMessage) -> Option<DnsParserResult<OptPseudo
 }
 
 fn parse_edns_options(edns: &OPT) -> DnsParserResult<(Vec<EDE>, Vec<EdnsOptionEntry>)> {
-    edns.as_ref()
+    let ede_opts: Vec<EDE> = edns
+        .as_ref()
         .iter()
         .filter_map(|(_, option)| {
             if let EdnsOption::Unknown(EDE_OPTION_CODE, option) = option {
@@ -924,7 +937,6 @@ fn parse_edns_options(edns: &OPT) -> DnsParserResult<(Vec<EDE>, Vec<EdnsOptionEn
         .collect::<Result<Vec<EDE>, DnsMessageParserError>>()?;
 
     let rest: Vec<EdnsOptionEntry> = edns
-        .options()
         .as_ref()
         .iter()
         .filter(|(&code, _)| u16::from(code) != EDE_OPTION_CODE)
