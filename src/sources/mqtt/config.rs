@@ -41,7 +41,7 @@ pub struct MqttSourceConfig {
 
     /// TCP port of the MQTT server to connect to.
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(default = "default_port")]
     #[derivative(Default(value = "default_port()"))]
     pub port: u16,
 
