@@ -65,25 +65,30 @@ impl MqttSource {
         })
     }
 
-    pub async fn run(self, mut out: SourceSender, _shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let (_client, mut connection) = self.connector.connect().await.map_err(|_| ())?;
 
         loop {
-            // If an error is returned here there is currently no way to tie this back
-            // to the event that was posted which means we can't accurately provide
-            // delivery guarantees.
-            // We need this issue resolved first:
-            // https://github.com/bytebeamio/rumqtt/issues/349
-            match connection.poll().await {
-                Ok(MqttEvent::Incoming(Incoming::Publish(publish))) => {
-                    self.process_message(publish, &mut out).await;
+            tokio::select! {
+                _ = shutdown.clone() => return Ok(()),
+                mqtt_event = connection.poll() => {
+                    // If an error is returned here there is currently no way to tie this back
+                    // to the event that was posted which means we can't accurately provide
+                    // delivery guarantees.
+                    // We need this issue resolved first:
+                    // https://github.com/bytebeamio/rumqtt/issues/349
+                    match mqtt_event {
+                        Ok(MqttEvent::Incoming(Incoming::Publish(publish))) => {
+                            self.process_message(publish, &mut out).await;
+                        }
+                        Ok(MqttEvent::Incoming(
+                            Incoming::PubAck(_) | Incoming::PubRec(_) | Incoming::PubComp(_),
+                        )) => {
+                            // TODO Handle acknowledgement
+                        }
+                        _ => {}
+                    }
                 }
-                Ok(MqttEvent::Incoming(
-                    Incoming::PubAck(_) | Incoming::PubRec(_) | Incoming::PubComp(_),
-                )) => {
-                    // TODO Handle acknowledgement
-                }
-                _ => {}
             }
         }
     }
