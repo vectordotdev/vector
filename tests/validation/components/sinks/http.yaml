@@ -4,3 +4,7 @@
     - simple message 1
     - simple message 2
     - simple message 3
+- name: sad path
+  expectation: failure
+  events:
+    - external_resource_rejects: simple message downstream rejects

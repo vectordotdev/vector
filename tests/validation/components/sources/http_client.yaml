@@ -9,5 +9,4 @@
   events:
     - simple message 1
     - simple message 2
-    - modified: true
-      event: simple message with the wrong encoding
+    - fail_encoding_of: simple message with the wrong encoding

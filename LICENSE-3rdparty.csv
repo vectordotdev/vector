@@ -472,7 +472,9 @@ rustc_version_runtime,https://github.com/seppo0010/rustc-version-runtime-rs,MIT,
 rustix,https://github.com/bytecodealliance/rustix,Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT,"Dan Gohman <dev@sunfishcode.online>, Jakub Konka <kubkon@jakubkonka.com>"
 rustls,https://github.com/rustls/rustls,Apache-2.0 OR ISC OR MIT,The rustls Authors
 rustls-native-certs,https://github.com/ctz/rustls-native-certs,Apache-2.0 OR ISC OR MIT,The rustls-native-certs Authors
+rustls-native-certs,https://github.com/rustls/rustls-native-certs,Apache-2.0 OR ISC OR MIT,The rustls-native-certs Authors
 rustls-pemfile,https://github.com/rustls/pemfile,Apache-2.0 OR ISC OR MIT,The rustls-pemfile Authors
+rustls-pki-types,https://github.com/rustls/pki-types,MIT OR Apache-2.0,The rustls-pki-types Authors
 rustls-webpki,https://github.com/rustls/webpki,ISC,The rustls-webpki Authors
 rustversion,https://github.com/dtolnay/rustversion,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 rusty-fork,https://github.com/altsysrq/rusty-fork,MIT OR Apache-2.0,Jason Lingle
@@ -539,6 +541,7 @@ stringprep,https://github.com/sfackler/rust-stringprep,MIT OR Apache-2.0,Steven 
 strip-ansi-escapes,https://github.com/luser/strip-ansi-escapes,Apache-2.0 OR MIT,Ted Mielczarek <ted@mielczarek.org>
 strsim,https://github.com/dguo/strsim-rs,MIT,Danny Guo <danny@dannyguo.com>
 strsim,https://github.com/dguo/strsim-rs,MIT,Danny Guo <dannyguo91@gmail.com>
+strsim,https://github.com/rapidfuzz/strsim-rs,MIT,"Danny Guo <danny@dannyguo.com>, maxbachmann <oss@maxbachmann.de>"
 structopt,https://github.com/TeXitoi/structopt,Apache-2.0 OR MIT,"Guillaume Pinot <texitoi@texitoi.eu>, others"
 structopt-derive,https://github.com/TeXitoi/structopt,Apache-2.0 OR MIT,Guillaume Pinot <texitoi@texitoi.eu>
 strum,https://github.com/Peternator7/strum,MIT,Peter Glotfelty <peter.glotfelty@microsoft.com>

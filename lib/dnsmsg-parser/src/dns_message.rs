@@ -1,5 +1,7 @@
 use hickory_proto::op::ResponseCode;
 
+use crate::ede::EDE;
+
 pub(super) const RTYPE_MB: u16 = 7;
 pub(super) const RTYPE_MG: u16 = 8;
 pub(super) const RTYPE_MR: u16 = 9;
@@ -80,6 +82,7 @@ pub struct OptPseudoSection {
     pub version: u8,
     pub dnssec_ok: bool,
     pub udp_max_payload_size: u16,
+    pub ede: Vec<EDE>,
     pub options: Vec<EdnsOptionEntry>,
 }
 
