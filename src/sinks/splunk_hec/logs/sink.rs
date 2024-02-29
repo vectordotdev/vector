@@ -233,30 +233,34 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
 
     let host = data.host_key.as_ref().and_then(|key| log.get(key)).cloned();
 
-    let timestamp = if data.endpoint_target == EndpointTarget::Event {
-        data.timestamp_key.as_ref().and_then(|timestamp_key| {
-            match log.remove(timestamp_key) {
-                Some(Value::Timestamp(ts)) => {
-                    // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
-                    if let Some(key) = data.timestamp_nanos_key {
-                        log.try_insert(event_path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
+    let timestamp = match data.endpoint_target {
+        EndpointTarget::Event => {
+            data.timestamp_key.as_ref().and_then(|timestamp_key| {
+                match log.remove(timestamp_key) {
+                    Some(Value::Timestamp(ts)) => {
+                        // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
+                        if let Some(key) = data.timestamp_nanos_key {
+                            log.try_insert(
+                                event_path!(key),
+                                ts.timestamp_subsec_nanos() % 1_000_000,
+                            );
+                        }
+                        Some((ts.timestamp_millis() as f64) / 1000f64)
                     }
-                    Some((ts.timestamp_millis() as f64) / 1000f64)
+                    Some(value) => {
+                        emit!(SplunkEventTimestampInvalidType {
+                            r#type: value.kind_str()
+                        });
+                        None
+                    }
+                    None => {
+                        emit!(SplunkEventTimestampMissing {});
+                        None
+                    }
                 }
-                Some(value) => {
-                    emit!(SplunkEventTimestampInvalidType {
-                        r#type: value.kind_str()
-                    });
-                    None
-                }
-                None => {
-                    emit!(SplunkEventTimestampMissing {});
-                    None
-                }
-            }
-        })
-    } else {
-        None
+            })
+        }
+        EndpointTarget::Raw => None,
     };
 
     let fields = data
