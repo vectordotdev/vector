@@ -69,6 +69,8 @@ pub mod kafka;
 pub mod loki;
 #[cfg(feature = "sinks-mezmo")]
 pub mod mezmo;
+#[cfg(feature = "sinks-mqtt")]
+pub mod mqtt;
 #[cfg(feature = "sinks-nats")]
 pub mod nats;
 #[cfg(feature = "sinks-new_relic")]
@@ -115,6 +117,8 @@ pub enum BuildError {
     SocketAddressError { source: std::io::Error },
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
+    #[snafu(display("HTTP request build error: {}", source))]
+    HTTPRequestBuilderError { source: ::http::Error },
 }
 
 /// Common healthcheck errors

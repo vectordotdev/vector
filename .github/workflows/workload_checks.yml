@@ -30,6 +30,7 @@ jobs:
   compute-metadata:
     name: Compute metadata
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       replicas: ${{ steps.experimental-meta.outputs.REPLICAS }}
       warmup-seconds: ${{ steps.experimental-meta.outputs.WARMUP_SECONDS }}
@@ -81,6 +82,7 @@ jobs:
   submit-job:
     name: Submit workload checks job
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     needs:
       - compute-metadata
     steps:

@@ -98,7 +98,6 @@ bson,https://github.com/mongodb/bson-rust,MIT,"Y. T. Chung <zonyitoo@gmail.com>,
 bstr,https://github.com/BurntSushi/bstr,MIT OR Apache-2.0,Andrew Gallant <jamslam@gmail.com>
 bumpalo,https://github.com/fitzgen/bumpalo,MIT OR Apache-2.0,Nick Fitzgerald <fitzgen@gmail.com>
 bytecheck,https://github.com/djkoloski/bytecheck,MIT,David Koloski <djkoloski@gmail.com>
-bytemuck,https://github.com/Lokathor/bytemuck,Zlib OR Apache-2.0 OR MIT,Lokathor <zefria@gmail.com>
 byteorder,https://github.com/BurntSushi/byteorder,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
 bytes,https://github.com/carllerche/bytes,MIT,Carl Lerche <me@carllerche.com>
 bytes,https://github.com/tokio-rs/bytes,MIT,"Carl Lerche <me@carllerche.com>, Sean McArthur <sean@seanmonstar.com>"
@@ -454,7 +453,6 @@ regex-syntax,https://github.com/rust-lang/regex/tree/master/regex-syntax,MIT OR 
 rend,https://github.com/djkoloski/rend,MIT,David Koloski <djkoloski@gmail.com>
 reqwest,https://github.com/seanmonstar/reqwest,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
 resolv-conf,http://github.com/tailhook/resolv-conf,MIT OR Apache-2.0,paul@colomiets.name
-retain_mut,https://github.com/upsuper/retain_mut,MIT,Xidorn Quan <me@upsuper.org>
 rfc6979,https://github.com/RustCrypto/signatures/tree/master/rfc6979,Apache-2.0 OR MIT,RustCrypto Developers
 ring,https://github.com/briansmith/ring,ISC AND Custom,Brian Smith <brian@briansmith.org>
 rkyv,https://github.com/rkyv/rkyv,MIT,David Koloski <djkoloski@gmail.com>
@@ -465,6 +463,7 @@ rmpv,https://github.com/3Hren/msgpack-rust,MIT,Evgeny Safronov <division494@gmai
 roaring,https://github.com/RoaringBitmap/roaring-rs,MIT OR Apache-2.0,"Wim Looman <wim@nemo157.com>, Kerollmops <kero@meilisearch.com>"
 roxmltree,https://github.com/RazrFalcon/roxmltree,MIT OR Apache-2.0,Yevhenii Reizner <razrfalcon@gmail.com>
 rsa,https://github.com/RustCrypto/RSA,MIT OR Apache-2.0,"RustCrypto Developers, dignifiedquire <dignifiedquire@gmail.com>"
+rumqttc,https://github.com/bytebeamio/rumqtt,Apache-2.0,tekjar <raviteja@bytebeam.io>
 rust_decimal,https://github.com/paupino/rust-decimal,MIT,Paul Mason <paul@form1.co.nz>
 rustc-demangle,https://github.com/alexcrichton/rustc-demangle,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
 rustc-hash,https://github.com/rust-lang-nursery/rustc-hash,Apache-2.0 OR MIT,The Rust Project Developers
@@ -473,7 +472,9 @@ rustc_version_runtime,https://github.com/seppo0010/rustc-version-runtime-rs,MIT,
 rustix,https://github.com/bytecodealliance/rustix,Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT,"Dan Gohman <dev@sunfishcode.online>, Jakub Konka <kubkon@jakubkonka.com>"
 rustls,https://github.com/rustls/rustls,Apache-2.0 OR ISC OR MIT,The rustls Authors
 rustls-native-certs,https://github.com/ctz/rustls-native-certs,Apache-2.0 OR ISC OR MIT,The rustls-native-certs Authors
+rustls-native-certs,https://github.com/rustls/rustls-native-certs,Apache-2.0 OR ISC OR MIT,The rustls-native-certs Authors
 rustls-pemfile,https://github.com/rustls/pemfile,Apache-2.0 OR ISC OR MIT,The rustls-pemfile Authors
+rustls-pki-types,https://github.com/rustls/pki-types,MIT OR Apache-2.0,The rustls-pki-types Authors
 rustls-webpki,https://github.com/rustls/webpki,ISC,The rustls-webpki Authors
 rustversion,https://github.com/dtolnay/rustversion,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 rusty-fork,https://github.com/altsysrq/rusty-fork,MIT OR Apache-2.0,Jason Lingle
@@ -540,6 +541,7 @@ stringprep,https://github.com/sfackler/rust-stringprep,MIT OR Apache-2.0,Steven 
 strip-ansi-escapes,https://github.com/luser/strip-ansi-escapes,Apache-2.0 OR MIT,Ted Mielczarek <ted@mielczarek.org>
 strsim,https://github.com/dguo/strsim-rs,MIT,Danny Guo <danny@dannyguo.com>
 strsim,https://github.com/dguo/strsim-rs,MIT,Danny Guo <dannyguo91@gmail.com>
+strsim,https://github.com/rapidfuzz/strsim-rs,MIT,"Danny Guo <danny@dannyguo.com>, maxbachmann <oss@maxbachmann.de>"
 structopt,https://github.com/TeXitoi/structopt,Apache-2.0 OR MIT,"Guillaume Pinot <texitoi@texitoi.eu>, others"
 structopt-derive,https://github.com/TeXitoi/structopt,Apache-2.0 OR MIT,Guillaume Pinot <texitoi@texitoi.eu>
 strum,https://github.com/Peternator7/strum,MIT,Peter Glotfelty <peter.glotfelty@microsoft.com>

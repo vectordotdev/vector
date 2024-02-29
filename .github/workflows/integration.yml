@@ -321,6 +321,14 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  mongodb
 
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.mqtt == 'true' }}
+        name: mqtt
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-int-e2e-test.sh int  mqtt
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.nats == 'true' }}
         name: nats
         uses: nick-fields/retry@v3
@@ -406,6 +414,7 @@ jobs:
   integration-test-suite:
     name: Integration Test Suite
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: always()
     needs:
       - changes

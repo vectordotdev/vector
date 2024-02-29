@@ -864,8 +864,47 @@ components: sources: dnstap: {
 										]
 										"udpPayloadSize": 4096
 									},
+									{
+										"do":            false
+										"ednsVersion":   0
+										"extendedRcode": 0
+										"options": [
+											{
+												"optCode":  10
+												"optName":  "Cookie"
+												"optValue": "hbbDFmHUM9wBAAAAX1q1McL4KhalWTS3"
+											},
+										]
+										"ede": [
+											{
+												"infoCode":  9
+												"purpose":   "DNSKEY Missing"
+												"extraText": "Additional description"
+											},
+										]
+										"udpPayloadSize": 4096
+									},
 								]
-								options: {}
+								options: {
+									ede: {
+										required:    false
+										description: """
+										Extended DNS errors. Provides additional information about
+										the DNS failure. See [RFC 8914](\(urls.rfc_8914)) for
+										detailed information.
+										"""
+										type: array: items: type: object: {
+											examples: [
+												{
+													"infoCode":  9
+													"purpose":   "DNSKEY Missing"
+													"extraText": "Additional description"
+												},
+											]
+											options: {}
+										}
+									}
+								}
 							}
 						}
 						zone: {

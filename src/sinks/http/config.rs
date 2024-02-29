@@ -10,6 +10,7 @@ use vector_lib::codecs::{
 
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
+    components::validation::ComponentTestCaseConfig,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
@@ -311,7 +312,7 @@ impl ValidatableComponent for HttpSinkConfig {
         use std::str::FromStr;
         use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
 
-        let config = Self {
+        let config = HttpSinkConfig {
             uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
                 .expect("should never fail to parse"),
             method: HttpMethod::Post,
@@ -337,7 +338,14 @@ impl ValidatableComponent for HttpSinkConfig {
             config.encoding.clone(),
         );
 
-        ValidationConfiguration::from_sink(Self::NAME, config, Some(external_resource))
+        ValidationConfiguration::from_sink(
+            Self::NAME,
+            vec![ComponentTestCaseConfig::from_sink(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
     }
 }
 

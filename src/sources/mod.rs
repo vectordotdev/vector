@@ -72,6 +72,8 @@ pub mod postgresql_metrics;
     feature = "sources-prometheus-pushgateway"
 ))]
 pub mod prometheus;
+#[cfg(feature = "sources-pulsar")]
+pub mod pulsar;
 #[cfg(feature = "sources-redis")]
 pub mod redis;
 #[cfg(feature = "sources-socket")]

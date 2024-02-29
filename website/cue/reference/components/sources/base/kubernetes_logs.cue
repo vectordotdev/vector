@@ -133,6 +133,16 @@ base: components: sources: kubernetes_logs: configuration: {
 			unit: "seconds"
 		}
 	}
+	include_paths_glob_patterns: {
+		description: "A list of glob patterns to include while reading the files."
+		required:    false
+		type: array: {
+			default: [
+				"**/*",
+			]
+			items: type: string: examples: ["**/include/**"]
+		}
+	}
 	ingestion_timestamp_field: {
 		description: """
 			Overrides the name of the log field used to add the ingestion timestamp to each event.
@@ -403,6 +413,17 @@ base: components: sources: kubernetes_logs: configuration: {
 				beginning: "Read from the beginning of the file."
 				end:       "Start reading from the current end of the file."
 			}
+		}
+	}
+	rotate_wait_secs: {
+		description: """
+			How long to keep an open handle to a rotated log file.
+			The default value represents "no limit"
+			"""
+		required: false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "seconds"
 		}
 	}
 	self_node_name: {
