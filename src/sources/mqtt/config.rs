@@ -3,15 +3,17 @@ use std::time::Duration;
 use rand::Rng;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use snafu::{ResultExt, Snafu};
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::owned_value_path;
-use vector_lib::tls::{MaybeTlsSettings, TlsEnableableConfig};
+use vector_lib::{
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::owned_value_path,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
+};
 use vrl::value::Kind;
 
-use crate::codecs::DecodingConfig;
 use crate::{
+    codecs::DecodingConfig,
     config::{SourceConfig, SourceContext, SourceOutput},
     serde::{default_decoding, default_framing_message_based},
 };
