@@ -1,10 +1,22 @@
 use std::path::PathBuf;
 
-use vector_lib::lookup::owned_value_path;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
+use vector_lib::event::{Event, LogEvent};
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered,
+};
+use vector_lib::lookup::{owned_value_path, path};
 use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
+use vrl::path::{OwnedValuePath, PathPrefix};
 use vrl::value::{kind::Collection, Kind};
 
-use super::util::framestream::{build_framestream_tcp_source, build_framestream_unix_source};
+use self::parser::DnstapParser;
+
+use super::util::framestream::{
+    build_framestream_tcp_source, build_framestream_unix_source, FrameHandler,
+};
+use crate::internal_events::DnstapParseError;
+use crate::sources::dnstap::schema::DNSTAP_VALUE_PATHS;
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
     Result,
@@ -17,7 +29,8 @@ pub mod tcp;
 pub mod unix;
 use dnsmsg_parser::{dns_message, dns_message_parser};
 pub use schema::DnstapEventSchema;
-use vector_lib::config::LogNamespace;
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 
 /// Configuration for the `dnstap` source.
 #[configurable_component(source("dnstap", "Collect DNS logs from a dnstap-compatible server."))]
@@ -25,6 +38,43 @@ use vector_lib::config::LogNamespace;
 pub struct DnstapConfig {
     #[serde(flatten)]
     pub mode: Mode,
+
+    /// Maximum DNSTAP frame length that the source accepts.
+    ///
+    /// If any frame is longer than this, it is discarded.
+    #[serde(default = "default_max_frame_length")]
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    pub max_frame_length: usize,
+
+    /// Overrides the name of the log field used to add the source path to each event.
+    ///
+    /// The value is the socket path itself.
+    ///
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    ///
+    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+    pub host_key: Option<OptionalValuePath>,
+
+    /// Whether or not to skip parsing or decoding of DNSTAP frames.
+    ///
+    /// If set to `true`, frames are not parsed or decoded. The raw frame data is set as a field on the event
+    /// (called `rawData`) and encoded as a base64 string.
+    pub raw_data_only: Option<bool>,
+
+    /// Whether or not to concurrently process DNSTAP frames.
+    pub multithreaded: Option<bool>,
+
+    /// Maximum number of frames that can be processed concurrently.
+    pub max_frame_handling_tasks: Option<u32>,
+
+    /// The namespace to use for logs. This overrides the global settings.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
+}
+
+fn default_max_frame_length() -> usize {
+    bytesize::kib(100u64) as usize
 }
 
 /// Listening mode for the `dnstap` source.
@@ -46,23 +96,16 @@ impl DnstapConfig {
     pub fn new(socket_path: PathBuf) -> Self {
         Self {
             mode: Mode::Unix(unix::UnixConfig::new(socket_path)),
+            ..Default::default()
         }
     }
 
     fn log_namespace(&self) -> LogNamespace {
-        match &self.mode {
-            Mode::Tcp(config) => config.log_namespace.unwrap_or(false).into(),
-            #[cfg(unix)]
-            Mode::Unix(config) => config.log_namespace.unwrap_or(false).into(),
-        }
+        self.log_namespace.unwrap_or(false).into()
     }
 
     fn raw_data_only(&self) -> bool {
-        match &self.mode {
-            Mode::Tcp(config) => config.raw_data_only.unwrap_or(false),
-            #[cfg(unix)]
-            Mode::Unix(config) => config.raw_data_only.unwrap_or(false),
-        }
+        self.raw_data_only.unwrap_or(false)
     }
 
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> vector_lib::schema::Definition {
@@ -114,48 +157,42 @@ impl Default for DnstapConfig {
                 std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
                 9000,
             ))),
+            max_frame_length: default_max_frame_length(),
+            host_key: None,
+            raw_data_only: None,
+            multithreaded: None,
+            max_frame_handling_tasks: None,
+            log_namespace: None,
         }
     }
 }
 
 impl_generate_config_from_default!(DnstapConfig);
 
-impl From<tcp::TcpConfig> for DnstapConfig {
-    fn from(config: tcp::TcpConfig) -> Self {
-        DnstapConfig {
-            mode: Mode::Tcp(config),
-        }
-    }
-}
-
-#[cfg(unix)]
-impl From<unix::UnixConfig> for DnstapConfig {
-    fn from(config: unix::UnixConfig) -> Self {
-        DnstapConfig {
-            mode: Mode::Unix(config),
-        }
-    }
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "dnstap")]
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        let common_frame_handler = CommonFrameHandler::new(self, log_namespace);
         match &self.mode {
             Mode::Tcp(config) => {
-                let log_namespace = cx.log_namespace(config.log_namespace);
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
 
                 let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
-                let frame_handler =
-                    tcp::DnstapFrameHandler::new(config.clone(), tls, log_namespace);
+                let frame_handler = tcp::DnstapFrameHandler::new(
+                    config.clone(),
+                    tls,
+                    common_frame_handler,
+                    log_namespace,
+                );
 
                 build_framestream_tcp_source(frame_handler, cx.shutdown, cx.out)
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
-                let log_namespace = cx.log_namespace(config.log_namespace);
-                let frame_handler = unix::DnstapFrameHandler::new(config.clone(), log_namespace);
+                let frame_handler =
+                    unix::DnstapFrameHandler::new(config.clone(), common_frame_handler);
                 build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
             }
         }
@@ -171,6 +208,126 @@ impl SourceConfig for DnstapConfig {
 
     fn can_acknowledge(&self) -> bool {
         false
+    }
+}
+
+#[derive(Clone)]
+struct CommonFrameHandler {
+    max_frame_length: usize,
+    content_type: String,
+    raw_data_only: bool,
+    multithreaded: bool,
+    max_frame_handling_tasks: u32,
+    host_key: Option<OwnedValuePath>,
+    timestamp_key: Option<OwnedValuePath>,
+    source_type_key: Option<OwnedValuePath>,
+    bytes_received: Registered<BytesReceived>,
+    log_namespace: LogNamespace,
+}
+
+impl CommonFrameHandler {
+    pub fn new(config: &DnstapConfig, log_namespace: LogNamespace) -> Self {
+        let source_type_key = log_schema().source_type_key();
+        let timestamp_key = log_schema().timestamp_key();
+
+        let host_key = config
+            .host_key
+            .clone()
+            .map_or(log_schema().host_key().cloned(), |k| k.path);
+
+        Self {
+            max_frame_length: config.max_frame_length,
+            content_type: "protobuf:dnstap.Dnstap".to_string(),
+            raw_data_only: config.raw_data_only.unwrap_or(false),
+            multithreaded: config.multithreaded.unwrap_or(false),
+            max_frame_handling_tasks: config.max_frame_handling_tasks.unwrap_or(1000),
+            host_key,
+            timestamp_key: timestamp_key.cloned(),
+            source_type_key: source_type_key.cloned(),
+            bytes_received: register!(BytesReceived::from(Protocol::from("protobuf"))),
+            log_namespace,
+        }
+    }
+}
+
+impl FrameHandler for CommonFrameHandler {
+    fn content_type(&self) -> String {
+        self.content_type.clone()
+    }
+
+    fn max_frame_length(&self) -> usize {
+        self.max_frame_length
+    }
+
+    fn handle_event(
+        &self,
+        received_from: Option<vrl::prelude::Bytes>,
+        frame: vrl::prelude::Bytes,
+    ) -> Option<vector_lib::event::Event> {
+        self.bytes_received.emit(ByteSize(frame.len()));
+
+        let mut log_event = LogEvent::default();
+
+        if let Some(host) = received_from {
+            self.log_namespace.insert_source_metadata(
+                DnstapConfig::NAME,
+                &mut log_event,
+                self.host_key.as_ref().map(LegacyKey::Overwrite),
+                path!("host"),
+                host,
+            );
+        }
+
+        if self.raw_data_only {
+            log_event.insert(
+                (PathPrefix::Event, &DNSTAP_VALUE_PATHS.raw_data),
+                BASE64_STANDARD.encode(&frame),
+            );
+        } else if let Err(err) = DnstapParser::parse(&mut log_event, frame) {
+            emit!(DnstapParseError {
+                error: format!("Dnstap protobuf decode error {:?}.", err)
+            });
+            return None;
+        }
+
+        if self.log_namespace == LogNamespace::Vector {
+            // The timestamp is inserted by the parser which caters for the Legacy namespace.
+            self.log_namespace.insert_vector_metadata(
+                &mut log_event,
+                self.timestamp_key(),
+                path!("ingest_timestamp"),
+                chrono::Utc::now(),
+            );
+        }
+
+        self.log_namespace.insert_vector_metadata(
+            &mut log_event,
+            self.source_type_key(),
+            path!("source_type"),
+            DnstapConfig::NAME,
+        );
+
+        Some(Event::from(log_event))
+    }
+
+    fn multithreaded(&self) -> bool {
+        self.multithreaded
+    }
+
+    fn max_frame_handling_tasks(&self) -> u32 {
+        self.max_frame_handling_tasks
+    }
+
+    fn host_key(&self) -> &Option<vrl::path::OwnedValuePath> {
+        &self.host_key
+    }
+
+    fn timestamp_key(&self) -> Option<&vrl::path::OwnedValuePath> {
+        self.timestamp_key.as_ref()
+    }
+
+    fn source_type_key(&self) -> Option<&vrl::path::OwnedValuePath> {
+        self.source_type_key.as_ref()
     }
 }
 
