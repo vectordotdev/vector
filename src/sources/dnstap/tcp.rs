@@ -49,8 +49,8 @@ pub struct TcpConfig {
 
     /// List of allowed origin IP networks
     ///
-    /// By default, no origin is allowed
-    permit_origin: IpAllowlistConfig,
+    /// By default, all origins are allowed
+    permit_origin: Option<IpAllowlistConfig>,
 
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
@@ -85,7 +85,7 @@ impl TcpConfig {
             keepalive: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             port_key: default_port_key(),
-            permit_origin: IpAllowlistConfig(Vec::new()),
+            permit_origin: None,
             tls: None,
             receive_buffer_bytes: None,
             max_connection_duration_secs: None,
@@ -134,7 +134,7 @@ pub struct DnstapFrameHandler<T: FrameHandler + Clone> {
     receive_buffer_bytes: Option<usize>,
     max_connection_duration_secs: Option<u64>,
     max_connections: Option<u32>,
-    allowlist: Vec<IpNet>,
+    allowlist: Option<Vec<IpNet>>,
     log_namespace: LogNamespace,
 }
 
@@ -162,7 +162,9 @@ impl<T: FrameHandler + Clone> DnstapFrameHandler<T> {
             receive_buffer_bytes: config.receive_buffer_bytes,
             max_connection_duration_secs: config.max_connection_duration_secs,
             max_connections: config.connection_limit,
-            allowlist: config.permit_origin.0.iter().map(|net| net.0).collect(),
+            allowlist: config
+                .permit_origin
+                .map(|p| p.0.iter().map(|net| net.0).collect()),
             log_namespace,
         }
     }
@@ -272,7 +274,7 @@ impl<T: FrameHandler + Clone> TcpFrameHandler for DnstapFrameHandler<T> {
         });
     }
 
-    fn allowed_origins(&self) -> &[IpNet] {
-        &self.allowlist
+    fn allowed_origins(&self) -> Option<&[IpNet]> {
+        self.allowlist.as_deref()
     }
 }

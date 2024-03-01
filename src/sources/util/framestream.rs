@@ -391,7 +391,7 @@ pub trait TcpFrameHandler: FrameHandler {
     fn receive_buffer_bytes(&self) -> Option<usize>;
     fn max_connection_duration_secs(&self) -> Option<u64>;
     fn max_connections(&self) -> Option<u32>;
-    fn allowed_origins(&self) -> &[IpNet];
+    fn allowed_origins(&self) -> Option<&[IpNet]>;
     fn insert_tls_client_metadata(&mut self, metadata: Option<CertificateMetadata>);
 }
 
@@ -415,13 +415,9 @@ pub fn build_framestream_tcp_source(
             addr,
             listenfd,
             &tls,
-            Some(
-                frame_handler
-                    .allowed_origins()
-                    .iter()
-                    .map(|net| net.clone())
-                    .collect(),
-            ),
+            frame_handler
+                .allowed_origins()
+                .map(|origins| origins.iter().map(|net| net.clone()).collect()),
         )
         .await
         .map_err(|error| {
@@ -922,7 +918,7 @@ mod test {
         receive_buffer_bytes: Option<usize>,
         max_connection_duration_secs: Option<u64>,
         max_connections: Option<u32>,
-        permit_origin: Vec<IpNet>,
+        permit_origin: Option<Vec<IpNet>>,
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockTcpFrameHandler<F> {
@@ -931,7 +927,7 @@ mod test {
             content_type: String,
             multithreaded: bool,
             extra_routine: F,
-            permit_origin: Vec<IpNet>,
+            permit_origin: Option<Vec<IpNet>>,
         ) -> Self {
             Self {
                 frame_handler: MockFrameHandler::new(content_type, multithreaded, extra_routine),
@@ -1147,8 +1143,8 @@ mod test {
 
         fn insert_tls_client_metadata(&mut self, _: Option<CertificateMetadata>) {}
 
-        fn allowed_origins(&self) -> &[IpNet] {
-            &self.permit_origin
+        fn allowed_origins(&self) -> Option<&[IpNet]> {
+            self.permit_origin.as_deref()
         }
     }
 
@@ -1274,7 +1270,7 @@ mod test {
     fn create_tcp_frame_handler(
         addr: SocketAddr,
         multithreaded: bool,
-        permit_origin: Vec<IpNet>,
+        permit_origin: Option<Vec<IpNet>>,
     ) -> impl TcpFrameHandler + Send + Sync + Clone {
         MockTcpFrameHandler::new(
             addr,
@@ -1388,7 +1384,7 @@ mod test {
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
-            create_tcp_frame_handler(addr, false, vec![]),
+            create_tcp_frame_handler(addr, false, Some(vec![])),
             tx,
         );
         let (sock_sink, sock_stream) = make_tcp_stream(addr).await.split();
@@ -1412,7 +1408,7 @@ mod test {
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
-            create_tcp_frame_handler(addr, false, vec![IpNet::default()]),
+            create_tcp_frame_handler(addr, false, None),
             tx,
         );
         let (sock_sink, sock_stream) = make_tcp_stream(addr).await.split();
@@ -1455,7 +1451,7 @@ mod test {
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
-            create_tcp_frame_handler(addr, true, vec![IpNet::default()]),
+            create_tcp_frame_handler(addr, true, None),
             tx,
         );
         let (sock_sink, sock_stream) = make_tcp_stream(addr).await.split();
@@ -1498,7 +1494,7 @@ mod test {
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
-            create_tcp_frame_handler(addr, false, vec![IpNet::default()]),
+            create_tcp_frame_handler(addr, false, None),
             tx,
         );
         let (sock_sink, sock_stream) = make_tcp_stream(addr).await.split();
