@@ -58,7 +58,6 @@ components: sources: dnstap: {
 					System-wide setting of maximum socket send buffer size (i.e. value of '/proc/sys/net/core/wmem_max' on Linux) may need adjustment accordingly.
 					""",
 			]
-			relevant_when: "mode = \"unix\""
 		}
 
 		socket_send_buffer_size: {
@@ -67,52 +66,10 @@ components: sources: dnstap: {
 					System-wide setting of maximum socket send buffer size (i.e. value of '/proc/sys/net/core/wmem_max' on Linux) may need adjustment accordingly.
 					""",
 			]
-			relevant_when: "mode = \"unix\""
 		}
 
 		socket_file_mode: {
 			type: uint: examples: [0o777, 0o754, 0o777]
-			relevant_when: "mode = \"unix\""
-		}
-
-		address: {
-			relevant_when: "mode = \"tcp\""
-		}
-
-		keepalive: {
-			relevant_when: "mode = \"tcp\""
-		}
-
-		max_connection_duration_secs: {
-			relevant_when: "mode = \"tcp\""
-		}
-
-		receive_buffer_bytes: {
-			relevant_when: "mode = \"tcp\""
-		}
-
-		shutdown_timeout_secs: {
-			relevant_when: "mode = \"tcp\""
-		}
-
-		permit_origin: {
-			relevant_when: "mode = \"tcp\""
-		}
-
-		tls: {
-			relevant_when: "mode = \"tcp\""
-		}
-
-		mode: {
-			description: "The type of socket to use."
-			required:    false
-			type: string: {
-				default: "unix"
-				enum: {
-					tcp:  "Listen on TCP."
-					unix: "Listen on Unix domain socket (UDS)"
-				}
-			}
 		}
 	}
 

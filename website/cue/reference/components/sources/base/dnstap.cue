@@ -8,12 +8,14 @@ base: components: sources: dnstap: configuration: {
 
 			If a socket address is used, it _must_ include a port.
 			"""
-		required: true
+		relevant_when: "mode = \"tcp\""
+		required:      true
 		type: string: examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
 	}
 	connection_limit: {
-		description: "The maximum number of TCP connections that are allowed at any given time."
-		required:    false
+		description:   "The maximum number of TCP connections that are allowed at any given time."
+		relevant_when: "mode = \"tcp\""
+		required:      false
 		type: uint: unit: "connections"
 	}
 	host_key: {
@@ -30,8 +32,9 @@ base: components: sources: dnstap: configuration: {
 		type: string: {}
 	}
 	keepalive: {
-		description: "TCP keepalive settings for socket-based components."
-		required:    false
+		description:   "TCP keepalive settings for socket-based components."
+		relevant_when: "mode = \"tcp\""
+		required:      false
 		type: object: options: time_secs: {
 			description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
 			required:    false
@@ -44,7 +47,8 @@ base: components: sources: dnstap: configuration: {
 
 			This is helpful for load balancing long-lived connections.
 			"""
-		required: false
+		relevant_when: "mode = \"tcp\""
+		required:      false
 		type: uint: unit: "seconds"
 	}
 	max_frame_handling_tasks: {
@@ -64,6 +68,14 @@ base: components: sources: dnstap: configuration: {
 			unit:    "bytes"
 		}
 	}
+	mode: {
+		description: "The type of dnstap socket to use."
+		required:    true
+		type: string: enum: {
+			tcp:  "Listen on TCP."
+			unix: "Listen on a Unix domain socket"
+		}
+	}
 	multithreaded: {
 		description: "Whether or not to concurrently process DNSTAP frames."
 		required:    false
@@ -75,7 +87,8 @@ base: components: sources: dnstap: configuration: {
 
 			By default, all origins are allowed
 			"""
-		required: false
+		relevant_when: "mode = \"tcp\""
+		required:      false
 		type: array: items: type: string: {}
 	}
 	port_key: {
@@ -88,7 +101,8 @@ base: components: sources: dnstap: configuration: {
 
 			Set to `""` to suppress this key.
 			"""
-		required: false
+		relevant_when: "mode = \"tcp\""
+		required:      false
 		type: string: default: "port"
 	}
 	raw_data_only: {
@@ -102,13 +116,15 @@ base: components: sources: dnstap: configuration: {
 		type: bool: {}
 	}
 	receive_buffer_bytes: {
-		description: "The size of the receive buffer used for each connection."
-		required:    false
+		description:   "The size of the receive buffer used for each connection."
+		relevant_when: "mode = \"tcp\""
+		required:      false
 		type: uint: unit: "bytes"
 	}
 	shutdown_timeout_secs: {
-		description: "The timeout before a connection is forcefully closed during shutdown."
-		required:    false
+		description:   "The timeout before a connection is forcefully closed during shutdown."
+		relevant_when: "mode = \"tcp\""
+		required:      false
 		type: uint: {
 			default: 30
 			unit:    "seconds"
@@ -121,7 +137,8 @@ base: components: sources: dnstap: configuration: {
 			Note: The file mode value can be specified in any numeric format supported by your configuration
 			language, but it is most intuitive to use an octal number.
 			"""
-		required: false
+		relevant_when: "mode = \"unix\""
+		required:      false
 		type: uint: {}
 	}
 	socket_path: {
@@ -131,7 +148,8 @@ base: components: sources: dnstap: configuration: {
 			The DNS server must be configured to send its DNSTAP data to this socket file. The socket file is created
 			if it doesn't already exist when the source first starts.
 			"""
-		required: true
+		relevant_when: "mode = \"unix\""
+		required:      true
 		type: string: {}
 	}
 	socket_receive_buffer_size: {
@@ -140,7 +158,8 @@ base: components: sources: dnstap: configuration: {
 
 			This should not typically needed to be changed.
 			"""
-		required: false
+		relevant_when: "mode = \"unix\""
+		required:      false
 		type: uint: unit: "bytes"
 	}
 	socket_send_buffer_size: {
@@ -149,12 +168,14 @@ base: components: sources: dnstap: configuration: {
 
 			This should not typically needed to be changed.
 			"""
-		required: false
+		relevant_when: "mode = \"unix\""
+		required:      false
 		type: uint: unit: "bytes"
 	}
 	tls: {
-		description: "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
-		required:    false
+		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
+		relevant_when: "mode = \"tcp\""
+		required:      false
 		type: object: options: {
 			alpn_protocols: {
 				description: """
