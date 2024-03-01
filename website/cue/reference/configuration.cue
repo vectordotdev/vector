@@ -473,9 +473,9 @@ configuration: {
 			common: false
 			description: """
 				Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
-				in Vector config. Currently, only the exec backend is supported. Multiple backends can be configured. To signify
-				Vector that it should look for a secret to retrieve use the `SECRET[<backend_name>.<secret_key>]`. This placeholder
-				will then be replaced by the secret retrieved from the relevant backend.
+				in Vector config. Multiple backends can be configured. To signify Vector that it should look for a secret to
+				retrieve use the `SECRET[<backend_name>.<secret_key>]`. This placeholder will then be replaced by the secret
+				retrieved from the relevant backend.
 				"""
 			required: false
 			type: object: options: {
@@ -524,6 +524,36 @@ configuration: {
 							type: uint: {
 								default: 5
 								unit:    "seconds"
+							}
+						}
+					}
+				}
+				aws_secrets_manager: {
+					required: true
+					description: """
+						Retrieve secrets from AWS Secrets Manager.
+
+						The secret is expected to be a JSON text string with key/value pairs, e.g.:
+						```json
+						{
+                          "username": "test",
+                          "password": "example-password"
+                        }
+						```
+
+						Vector will log and exit if an error occurred retrieving the secrets.
+
+						Secrets will be loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						secret_id: {
+							description: """
+								The id of the secret to be retrieved.
+								"""
+							required: true
+							type: string: {
+								examples: ["/secret/foo-bar"]
 							}
 						}
 					}
