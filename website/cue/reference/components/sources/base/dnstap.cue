@@ -73,9 +73,9 @@ base: components: sources: dnstap: configuration: {
 		description: """
 			List of allowed origin IP networks
 
-			By default, no origin is allowed
+			By default, all origins are allowed
 			"""
-		required: true
+		required: false
 		type: array: items: type: string: {}
 	}
 	port_key: {
