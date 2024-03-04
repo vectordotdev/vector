@@ -251,8 +251,8 @@ mod tests {
     }
 
     #[test]
-    fn ddtags_parse_mutli() {
-        let raw = Bytes::from(String::from("filename:driver.log,gandalf:the_grey"));
+    fn ddtags_parse_multi() {
+        let raw = Bytes::from(String::from("filename:driver.log,Gandalf:the_grey"));
         let obj = parse_ddtags(&raw);
 
         assert!(
@@ -262,7 +262,7 @@ mod tests {
                     "driver.log".to_string().into()
                 ),
                 (
-                    KeyString::from("gandalf".to_string()),
+                    KeyString::from("Gandalf".to_string()),
                     "the_grey".to_string().into()
                 ),
             ])

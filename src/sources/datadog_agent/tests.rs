@@ -136,7 +136,7 @@ fn test_decode_log_body_parse_ddtags() {
         hostname: Bytes::from(String::from("host")),
         service: Bytes::from(String::from("service")),
         ddsource: Bytes::from(String::from("ddsource")),
-        ddtags: Bytes::from(String::from("gandalf:the_grey")),
+        ddtags: Bytes::from(String::from("Gandalf:the_grey")),
     }];
 
     let body = Bytes::from(serde_json::to_string(&log_msgs).unwrap());
@@ -173,7 +173,7 @@ fn test_decode_log_body_parse_ddtags() {
     assert_eq!(
         log["ddtags"],
         ObjectMap::from([(
-            KeyString::from("gandalf".to_string()),
+            KeyString::from("Gandalf".to_string()),
             "the_grey".to_string().into()
         )])
         .into()
