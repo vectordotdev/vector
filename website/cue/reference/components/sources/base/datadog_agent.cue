@@ -401,6 +401,14 @@ base: components: sources: datadog_agent: configuration: {
 		required: false
 		type: bool: default: false
 	}
+	parse_ddtags: {
+		description: """
+			If this is set to `true`, when log events contain the field `ddtags`, the string value that
+			containins a list of key:value pairs set by the Agent is parsed and expanded into an object.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	store_api_key: {
 		description: """
 			If this is set to `true`, when incoming events contain a Datadog API key, it is
