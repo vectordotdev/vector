@@ -63,7 +63,7 @@ build() {
     local BUILDABLE_PLATFORMS=$(evaluate_supported_platforms_for_base $BASE)
 
     docker buildx build \
-      --platform="$PLATFORM" \
+      --platform="$BUILDABLE_PLATFORMS" \
       --tag "$TAG" \
       target/artifacts \
       -f "$DOCKERFILE" \
