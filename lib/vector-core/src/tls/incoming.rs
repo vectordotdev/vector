@@ -169,6 +169,7 @@ impl MaybeTlsListener {
         self.listener.local_addr()
     }
 
+    #[must_use]
     pub fn with_allowlist(mut self, allowlist: Option<Vec<IpNet>>) -> Self {
         self.origin_filter = allowlist;
         self
