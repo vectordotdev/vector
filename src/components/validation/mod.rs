@@ -8,6 +8,17 @@ mod validators;
 
 use crate::config::{BoxedSink, BoxedSource, BoxedTransform};
 
+/// For components implementing `ValidatableComponent`
+pub mod prelude {
+    pub use super::ComponentTestCaseConfig;
+    pub use super::ExternalResource;
+    pub use super::HttpResourceConfig;
+    pub use super::ResourceDirection;
+    pub use super::ValidatableComponent;
+    pub use super::ValidationConfiguration;
+    pub use crate::register_validatable_component;
+}
+
 pub use self::resources::*;
 #[cfg(feature = "component-validation-runner")]
 pub use self::runner::*;
@@ -268,6 +279,7 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
         .enable_all()
         .build()
         .unwrap();
+
     rt.block_on(async {
         let mut runner = Runner::from_configuration(
             configuration,

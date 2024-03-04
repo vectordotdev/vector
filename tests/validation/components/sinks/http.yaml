@@ -1,10 +1,11 @@
 - name: happy path
   expectation: success
   events:
-    - simple message 1
-    - simple message 2
-    - simple message 3
+    - log: simple message 1
+    - log: simple message 2
+    - log: simple message 3
 - name: sad path
   expectation: failure
   events:
-    - external_resource_rejects: simple message downstream rejects
+    - external_resource_rejects:
+        log: simple message downstream rejects

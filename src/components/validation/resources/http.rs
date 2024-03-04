@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     future::Future,
     net::{IpAddr, SocketAddr},
     str::FromStr,
@@ -33,11 +33,21 @@ use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 pub struct HttpResourceConfig {
     uri: Uri,
     method: Option<Method>,
+    headers: Option<HashMap<String, String>>,
 }
 
 impl HttpResourceConfig {
     pub const fn from_parts(uri: Uri, method: Option<Method>) -> Self {
-        Self { uri, method }
+        Self {
+            uri,
+            method,
+            headers: None,
+        }
+    }
+
+    pub fn with_headers(mut self, headers: HashMap<String, String>) -> Self {
+        self.headers = Some(headers);
+        self
     }
 
     pub fn spawn_as_input(
@@ -219,6 +229,7 @@ fn spawn_input_http_client(
         let client = Client::builder().build_http::<Body>();
         let request_uri = config.uri;
         let request_method = config.method.unwrap_or(Method::POST);
+        let headers = config.headers.unwrap_or_default();
 
         while let Some(event) = input_rx.recv().await {
             debug!("Got event to send from runner.");
@@ -226,9 +237,15 @@ fn spawn_input_http_client(
             let mut buffer = BytesMut::new();
             encode_test_event(&mut encoder, &mut buffer, event);
 
-            let request = Request::builder()
+            let mut request_builder = Request::builder()
                 .uri(request_uri.clone())
-                .method(request_method.clone())
+                .method(request_method.clone());
+
+            for (key, value) in &headers {
+                request_builder = request_builder.header(key, value);
+            }
+
+            let request = request_builder
                 .body(buffer.freeze().into())
                 .expect("should not fail to build request");
 
