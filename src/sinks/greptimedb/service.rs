@@ -12,7 +12,7 @@ use crate::sinks::prelude::*;
 
 use super::batch::GreptimeDBBatchSizer;
 use super::request_builder::metric_to_insert_request;
-use super::{GreptimeDBConfig, GreptimeDBConfigError};
+use super::GreptimeDBConfig;
 
 #[derive(Clone, Default)]
 pub(super) struct GreptimeDBRetryLogic;
@@ -107,7 +107,7 @@ impl GreptimeDBService {
     pub fn try_new(config: &GreptimeDBConfig) -> crate::Result<Self> {
         let grpc_client = if let Some(tls_config) = &config.tls {
             let channel_config = ChannelConfig {
-                client_tls: Self::try_from_tls_config(tls_config)?,
+                client_tls: Some(Self::try_from_tls_config(tls_config)?),
                 ..Default::default()
             };
             Client::with_manager_and_urls(
@@ -132,35 +132,22 @@ impl GreptimeDBService {
         })
     }
 
-    fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<Option<ClientTlsOption>> {
-        if let Some(ca_path) = tls_config.ca_file.as_ref() {
-            let cert_path = tls_config
-                .crt_file
-                .as_ref()
-                .ok_or(GreptimeDBConfigError::TlsMissingCert)?;
-            let key_path = tls_config
-                .key_file
-                .as_ref()
-                .ok_or(GreptimeDBConfigError::TlsMissingKey)?;
-
-            if tls_config.key_pass.is_some()
-                || tls_config.alpn_protocols.is_some()
-                || tls_config.verify_certificate.is_some()
-                || tls_config.verify_hostname.is_some()
-            {
-                warn!(
+    fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption> {
+        if tls_config.key_pass.is_some()
+            || tls_config.alpn_protocols.is_some()
+            || tls_config.verify_certificate.is_some()
+            || tls_config.verify_hostname.is_some()
+        {
+            warn!(
                     message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
                 );
-            }
-
-            Ok(Some(ClientTlsOption {
-                server_ca_cert_path: ca_path.clone(),
-                client_key_path: key_path.clone(),
-                client_cert_path: cert_path.clone(),
-            }))
-        } else {
-            Ok(None)
         }
+
+        Ok(ClientTlsOption {
+            server_ca_cert_path: tls_config.ca_file.clone(),
+            client_cert_path: tls_config.crt_file.clone(),
+            client_key_path: tls_config.key_file.clone(),
+        })
     }
 }
 
