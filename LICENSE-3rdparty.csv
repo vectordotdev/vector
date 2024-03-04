@@ -257,12 +257,14 @@ http-types,https://github.com/http-rs/http-types,MIT OR Apache-2.0,Yoshua Wuyts 
 httparse,https://github.com/seanmonstar/httparse,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
 httpdate,https://github.com/pyfisch/httpdate,MIT OR Apache-2.0,Pyfisch <pyfisch@posteo.org>
 hyper,https://github.com/hyperium/hyper,MIT,Sean McArthur <sean@seanmonstar.com>
+hyper-named-pipe,https://github.com/fussybeaver/hyper-named-pipe,Apache-2.0,The hyper-named-pipe Authors
 hyper-openssl,https://github.com/sfackler/hyper-openssl,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 hyper-proxy,https://github.com/tafia/hyper-proxy,MIT,Johann Tuffe <tafia973@gmail.com>
 hyper-rustls,https://github.com/rustls/hyper-rustls,Apache-2.0 OR ISC OR MIT,The hyper-rustls Authors
 hyper-timeout,https://github.com/hjr3/hyper-timeout,MIT OR Apache-2.0,Herman J. Radtke III <herman@hermanradtke.com>
 hyper-tls,https://github.com/hyperium/hyper-tls,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
-hyperlocal,https://github.com/softprops/hyperlocal,MIT,softprops <d.tangren@gmail.com>
+hyper-util,https://github.com/hyperium/hyper-util,MIT,Sean McArthur <sean@seanmonstar.com>
+hyperlocal-next,https://github.com/softprops/hyperlocal,MIT,softprops <d.tangren@gmail.com>
 iana-time-zone,https://github.com/strawlab/iana-time-zone,MIT OR Apache-2.0,"Andrew Straw <strawman@astraw.com>, René Kijewski <rene.kijewski@fu-berlin.de>, Ryan Lopopolo <rjl@hyperbo.la>"
 iana-time-zone-haiku,https://github.com/strawlab/iana-time-zone,MIT OR Apache-2.0,René Kijewski <crates.io@k6i.de>
 ident_case,https://github.com/TedDriggs/ident_case,MIT OR Apache-2.0,Ted Driggs <ted.driggs@outlook.com>
