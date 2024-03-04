@@ -27,8 +27,8 @@ use vector_lib::{
     event::{metric::TagValue, MetricTags},
     metric_tags,
 };
-use vrl::compiler::value::Collection;
 use vrl::value::{Kind, ObjectMap};
+use vrl::{compiler::value::Collection, value::KeyString};
 
 use crate::schema::Definition;
 use crate::{
@@ -97,6 +97,7 @@ fn test_decode_log_body() {
             "http",
             Some(test_logs_schema_definition()),
             LogNamespace::Legacy,
+            false,
         );
 
         let events = decode_log_body(body, api_key, &source).unwrap();
@@ -124,6 +125,62 @@ fn test_decode_log_body() {
 }
 
 #[test]
+fn test_decode_log_body_parse_ddtags() {
+    let log_msgs = [LogMsg {
+        message: Bytes::from(String::from("message")),
+        status: Bytes::from(String::from("status")),
+        timestamp: Utc
+            .timestamp_millis_opt(1234)
+            .single()
+            .expect("invalid timestamp"),
+        hostname: Bytes::from(String::from("host")),
+        service: Bytes::from(String::from("service")),
+        ddsource: Bytes::from(String::from("ddsource")),
+        ddtags: Bytes::from(String::from("gandalf:the_grey")),
+    }];
+
+    let body = Bytes::from(serde_json::to_string(&log_msgs).unwrap());
+    let api_key = None;
+    let decoder = crate::codecs::Decoder::new(
+        Framer::Bytes(BytesDecoder::new()),
+        Deserializer::Bytes(BytesDeserializer),
+    );
+
+    let source = DatadogAgentSource::new(
+        true,
+        decoder,
+        "http",
+        Some(test_logs_schema_definition()),
+        LogNamespace::Legacy,
+        true,
+    );
+
+    let events = decode_log_body(body, api_key, &source).unwrap();
+
+    assert_eq!(events.len(), 1);
+
+    let event = events.first().unwrap();
+    let log = event.as_log();
+    let log_msg = log_msgs[0].clone();
+
+    assert_eq!(log["message"], log_msg.message.into());
+    assert_eq!(log["status"], log_msg.status.into());
+    assert_eq!(log["timestamp"], log_msg.timestamp.into());
+    assert_eq!(log["hostname"], log_msg.hostname.into());
+    assert_eq!(log["service"], log_msg.service.into());
+    assert_eq!(log["ddsource"], log_msg.ddsource.into());
+
+    assert_eq!(
+        log["ddtags"],
+        ObjectMap::from([(
+            KeyString::from("gandalf".to_string()),
+            "the_grey".to_string().into()
+        )])
+        .into()
+    );
+}
+
+#[test]
 fn test_decode_log_body_empty_object() {
     let body = Bytes::from("{}");
     let api_key = None;
@@ -138,6 +195,7 @@ fn test_decode_log_body_empty_object() {
         "http",
         Some(test_logs_schema_definition()),
         LogNamespace::Legacy,
+        false,
     );
 
     let events = decode_log_body(body, api_key, &source).unwrap();
@@ -1519,6 +1577,7 @@ fn test_config_outputs_with_disabled_data_types() {
             disable_logs,
             disable_metrics,
             disable_traces,
+            parse_ddtags: false,
             log_namespace: Some(false),
             keepalive: Default::default(),
         };
@@ -1960,6 +2019,7 @@ fn test_config_outputs() {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            parse_ddtags: false,
             log_namespace: Some(false),
             keepalive: Default::default(),
         };

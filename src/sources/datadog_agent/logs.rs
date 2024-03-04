@@ -8,6 +8,8 @@ use vector_lib::codecs::StreamDecodingError;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::lookup::path;
 use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vrl::core::Value;
+use vrl::value::{KeyString, ObjectMap};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{
@@ -143,12 +145,19 @@ pub(crate) fn decode_log_body(
                                 path!("ddsource"),
                                 ddsource.clone(),
                             );
+
+                            let ddtags: Value = if source.parse_ddtags {
+                                parse_ddtags(&ddtags).into()
+                            } else {
+                                ddtags.clone().into()
+                            };
+
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
                                 Some(LegacyKey::InsertIfEmpty(path!("ddtags"))),
                                 path!("ddtags"),
-                                ddtags.clone(),
+                                ddtags,
                             );
 
                             namespace.insert_standard_vector_source_metadata(
@@ -191,4 +200,72 @@ pub(crate) fn decode_log_body(
     ));
 
     Ok(decoded)
+}
+
+// ddtags input is a string containing a list of key-value pairs.
+// the tag-value list members are separated by `,` and the
+// tag-value pairs are separated by `:`.
+//
+// The output is an Object constructed with the tag-value pairs.
+fn parse_ddtags(ddtags_raw: &Bytes) -> ObjectMap {
+    let ddtags_str = String::from_utf8_lossy(ddtags_raw);
+
+    let mut ddtags_object = ObjectMap::new();
+
+    ddtags_str.split(',').for_each(|kv| {
+        if let Some((k, v)) = kv.split_once(':') {
+            ddtags_object.insert(KeyString::from(k), Value::Bytes(Bytes::from(v.to_string())));
+        }
+    });
+
+    if ddtags_object.is_empty() && !ddtags_str.is_empty() {
+        warn!(message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed.")
+    }
+
+    ddtags_object
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ddtags_parse_none() {
+        let raw = Bytes::from(String::from(""));
+        let obj = parse_ddtags(&raw);
+
+        assert!(obj.is_empty());
+    }
+
+    #[test]
+    fn ddtags_parse_one() {
+        let raw = Bytes::from(String::from("filename:driver.log"));
+        let obj = parse_ddtags(&raw);
+
+        assert!(
+            obj == ObjectMap::from([(
+                KeyString::from("filename".to_string()),
+                "driver.log".to_string().into()
+            )])
+        )
+    }
+
+    #[test]
+    fn ddtags_parse_mutli() {
+        let raw = Bytes::from(String::from("filename:driver.log,gandalf:the_grey"));
+        let obj = parse_ddtags(&raw);
+
+        assert!(
+            obj == ObjectMap::from([
+                (
+                    KeyString::from("filename".to_string()),
+                    "driver.log".to_string().into()
+                ),
+                (
+                    KeyString::from("gandalf".to_string()),
+                    "the_grey".to_string().into()
+                ),
+            ])
+        )
+    }
 }
