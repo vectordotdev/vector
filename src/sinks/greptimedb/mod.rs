@@ -19,7 +19,6 @@
 //! - Distribution, Histogram and Summary, Sketch: Statistical attributes like
 //! `sum`, `count`, "max", "min", quantiles and buckets are stored as columns.
 //!
-use greptimedb_client::Client;
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::prelude::*;
@@ -138,8 +137,7 @@ impl SinkConfig for GreptimeDBConfig {
 }
 
 fn healthcheck(config: &GreptimeDBConfig) -> crate::Result<super::Healthcheck> {
-    // FIXME: TLS support
-    let client = Client::with_urls(vec![&config.endpoint]);
+    let client = service::new_client_from_config(config)?;
 
     Ok(async move { client.health_check().await.map_err(|error| error.into()) }.boxed())
 }

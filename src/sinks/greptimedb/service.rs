@@ -103,20 +103,42 @@ pub struct GreptimeDBService {
     client: Arc<Database>,
 }
 
+pub(crate) fn new_client_from_config(config: &GreptimeDBConfig) -> crate::Result<Client> {
+    if let Some(tls_config) = &config.tls {
+        let channel_config = ChannelConfig {
+            client_tls: Some(try_from_tls_config(tls_config)?),
+            ..Default::default()
+        };
+        Ok(Client::with_manager_and_urls(
+            ChannelManager::with_tls_config(channel_config).map_err(Box::new)?,
+            vec![&config.endpoint],
+        ))
+    } else {
+        Ok(Client::with_urls(vec![&config.endpoint]))
+    }
+}
+
+fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption> {
+    if tls_config.key_pass.is_some()
+        || tls_config.alpn_protocols.is_some()
+        || tls_config.verify_certificate.is_some()
+        || tls_config.verify_hostname.is_some()
+    {
+        warn!(
+                    message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
+                );
+    }
+
+    Ok(ClientTlsOption {
+        server_ca_cert_path: tls_config.ca_file.clone(),
+        client_cert_path: tls_config.crt_file.clone(),
+        client_key_path: tls_config.key_file.clone(),
+    })
+}
+
 impl GreptimeDBService {
     pub fn try_new(config: &GreptimeDBConfig) -> crate::Result<Self> {
-        let grpc_client = if let Some(tls_config) = &config.tls {
-            let channel_config = ChannelConfig {
-                client_tls: Some(Self::try_from_tls_config(tls_config)?),
-                ..Default::default()
-            };
-            Client::with_manager_and_urls(
-                ChannelManager::with_tls_config(channel_config).map_err(Box::new)?,
-                vec![&config.endpoint],
-            )
-        } else {
-            Client::with_urls(vec![&config.endpoint])
-        };
+        let grpc_client = new_client_from_config(config)?;
 
         let mut client = Database::new_with_dbname(&config.dbname, grpc_client);
 
@@ -129,24 +151,6 @@ impl GreptimeDBService {
 
         Ok(GreptimeDBService {
             client: Arc::new(client),
-        })
-    }
-
-    fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption> {
-        if tls_config.key_pass.is_some()
-            || tls_config.alpn_protocols.is_some()
-            || tls_config.verify_certificate.is_some()
-            || tls_config.verify_hostname.is_some()
-        {
-            warn!(
-                    message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
-                );
-        }
-
-        Ok(ClientTlsOption {
-            server_ca_cert_path: tls_config.ca_file.clone(),
-            client_cert_path: tls_config.crt_file.clone(),
-            client_key_path: tls_config.key_file.clone(),
         })
     }
 }
