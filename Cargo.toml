@@ -616,7 +616,7 @@ transforms-metrics = [
 
 transforms-aggregate = []
 transforms-aws_ec2_metadata = ["dep:arc-swap"]
-transforms-dedupe = ["dep:lru"]
+transforms-dedupe = ["transforms-impl-dedupe"]
 transforms-filter = []
 transforms-log_to_metric = []
 transforms-lua = ["dep:mlua", "vector-lib/lua"]
@@ -631,6 +631,7 @@ transforms-throttle = ["dep:governor"]
 
 # Implementations of transforms
 transforms-impl-sample = []
+transforms-impl-dedupe = ["dep:lru"]
 
 # Sinks
 sinks = ["sinks-logs", "sinks-metrics"]
