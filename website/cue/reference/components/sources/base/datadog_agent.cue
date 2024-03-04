@@ -404,7 +404,7 @@ base: components: sources: datadog_agent: configuration: {
 	parse_ddtags: {
 		description: """
 			If this is set to `true`, when log events contain the field `ddtags`, the string value that
-			containins a list of key:value pairs set by the Agent is parsed and expanded into an object.
+			contains a list of key:value pairs set by the Agent is parsed and expanded into an object.
 			"""
 		required: false
 		type: bool: default: false
