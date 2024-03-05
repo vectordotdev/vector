@@ -3,7 +3,7 @@ package metadata
 remap: functions: sieve: {
 	category: "String"
 	description: """
-		Keeps only mathces of `pattern` in `value`.
+		Keeps only matches of `pattern` in `value`.
 
 		This can be used to list out characters (or patterns) that are allowed in the string and
 		remove everything else.
