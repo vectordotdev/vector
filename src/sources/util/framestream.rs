@@ -417,7 +417,7 @@ pub fn build_framestream_tcp_source(
             &tls,
             frame_handler
                 .allowed_origins()
-                .map(|origins| origins.iter().map(|net| net.clone()).collect()),
+                .map(|origins| origins.iter().copied().collect()),
         )
         .await
         .map_err(|error| {

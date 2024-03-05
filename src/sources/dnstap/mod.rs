@@ -430,17 +430,17 @@ mod integration_tests {
 
                 DnstapConfig {
                     mode: Mode::Unix(UnixConfig {
-                        max_frame_length: 102400,
-                        host_key: Some(OptionalValuePath::from(owned_value_path!("key"))),
                         socket_path: socket,
-                        raw_data_only: Some(raw_data),
-                        multithreaded: Some(false),
-                        max_frame_handling_tasks: Some(100000),
                         socket_file_mode: Some(511),
                         socket_receive_buffer_size: Some(10485760),
                         socket_send_buffer_size: Some(10485760),
-                        log_namespace: None,
                     }),
+                    max_frame_length: 102400,
+                    host_key: Some(OptionalValuePath::from(owned_value_path!("key"))),
+                    raw_data_only: Some(raw_data),
+                    multithreaded: Some(false),
+                    max_frame_handling_tasks: Some(100000),
+                    log_namespace: None,
                 }
                 .build(SourceContext::new_test(sender, None))
                 .await
