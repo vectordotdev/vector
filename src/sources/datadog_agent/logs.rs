@@ -147,7 +147,7 @@ pub(crate) fn decode_log_body(
                             );
 
                             let ddtags: Value = if source.parse_ddtags {
-                                parse_ddtags(&ddtags).into()
+                                parse_ddtags(&ddtags)
                             } else {
                                 ddtags.clone().into()
                             };
@@ -205,24 +205,34 @@ pub(crate) fn decode_log_body(
 // ddtags input is a string containing a list of key-value pairs.
 // the tag-value list members are separated by `,` and the
 // tag-value pairs are separated by `:`.
-//
 // The output is an Object constructed with the tag-value pairs.
-fn parse_ddtags(ddtags_raw: &Bytes) -> ObjectMap {
+//
+// Technically, the Datadog logs intake accepts input where this
+// field is a bare tag (no `:`), so we're supporting that here,
+// in which case the raw input is not expanded into an object.
+fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
     let ddtags_str = String::from_utf8_lossy(ddtags_raw);
 
-    let mut ddtags_object = ObjectMap::new();
+    // The value is either an empty string or a bare tag
+    if !ddtags_str.contains(',') && !ddtags_str.contains(':') {
+        return Value::Bytes(ddtags_raw.clone());
+    }
 
-    ddtags_str.split(',').for_each(|kv| {
-        if let Some((k, v)) = kv.split_once(':') {
-            ddtags_object.insert(KeyString::from(k), Value::Bytes(Bytes::from(v.to_string())));
-        }
-    });
+    // There is at least one key-value pair
+    let ddtags_object: ObjectMap = ddtags_str
+        .split(',')
+        .filter(|kv| !kv.is_empty())
+        .map(|kv| match kv.split_once(':') {
+            Some((k, v)) => (KeyString::from(k), Value::Bytes(Bytes::from(v.to_string()))),
+            None => (KeyString::from(kv), Value::Null),
+        })
+        .collect();
 
     if ddtags_object.is_empty() && !ddtags_str.is_empty() {
         warn!(message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed.")
     }
 
-    ddtags_object
+    ddtags_object.into()
 }
 
 #[cfg(test)]
@@ -230,33 +240,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ddtags_parse_none() {
+    fn ddtags_parse_empty() {
         let raw = Bytes::from(String::from(""));
-        let obj = parse_ddtags(&raw);
+        let val = parse_ddtags(&raw);
 
-        assert!(obj.is_empty());
+        assert!(val == Value::Bytes(Bytes::from("")));
     }
 
     #[test]
-    fn ddtags_parse_one() {
+    fn ddtags_parse_bare() {
+        let raw = Bytes::from(String::from("bare"));
+        let val = parse_ddtags(&raw);
+
+        assert!(val == Value::Bytes(Bytes::from("bare")));
+    }
+
+    #[test]
+    fn ddtags_parse_kv_one() {
         let raw = Bytes::from(String::from("filename:driver.log"));
-        let obj = parse_ddtags(&raw);
+        let val = parse_ddtags(&raw);
 
         assert!(
-            obj == ObjectMap::from([(
+            val == Value::Object(ObjectMap::from([(
                 KeyString::from("filename".to_string()),
                 "driver.log".to_string().into()
-            )])
+            )]))
         )
     }
 
     #[test]
-    fn ddtags_parse_multi() {
+    fn ddtags_parse_kv_multi() {
         let raw = Bytes::from(String::from("filename:driver.log,wizard:the_grey"));
-        let obj = parse_ddtags(&raw);
+        let val = parse_ddtags(&raw);
 
         assert!(
-            obj == ObjectMap::from([
+            val == Value::Object(ObjectMap::from([
                 (
                     KeyString::from("filename".to_string()),
                     "driver.log".to_string().into()
@@ -265,7 +283,7 @@ mod tests {
                     KeyString::from("wizard".to_string()),
                     "the_grey".to_string().into()
                 ),
-            ])
+            ]))
         )
     }
 }
