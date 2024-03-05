@@ -13,14 +13,12 @@ use aws_config::{
     sts::AssumeRoleProviderBuilder,
 };
 use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
-use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
+use aws_smithy_async::time::SystemTimeSource;
 use aws_smithy_runtime_api::client::identity::SharedIdentityCache;
-use aws_types::region::Region;
+use aws_types::{region::Region, SdkConfig};
 use serde_with::serde_as;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{config::proxy::ProxyConfig, sensitive_string::SensitiveString, tls::TlsConfig};
-use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
-
-use crate::http::{build_proxy_connector, build_tls_connector};
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
@@ -266,8 +264,16 @@ impl AwsAuthentication {
                 ..
             } => {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                let mut builder =
-                    AssumeRoleProviderBuilder::new(assume_role).region(auth_region.clone());
+                let connector = super::connector(proxy, tls_options)?;
+                let config = SdkConfig::builder()
+                    .http_client(connector)
+                    .region(auth_region.clone())
+                    .time_source(SystemTimeSource::new())
+                    .build();
+
+                let mut builder = AssumeRoleProviderBuilder::new(assume_role)
+                    .region(auth_region.clone())
+                    .configure(&config);
 
                 if let Some(external_id) = external_id {
                     builder = builder.external_id(external_id)
@@ -313,14 +319,7 @@ async fn default_credentials_provider(
     tls_options: &Option<TlsConfig>,
     imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
-    let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
-    let connector = if proxy.enabled {
-        let proxy = build_proxy_connector(tls_settings, proxy)?;
-        HyperClientBuilder::new().build(proxy)
-    } else {
-        let tls_connector = build_tls_connector(tls_settings)?;
-        HyperClientBuilder::new().build(tls_connector)
-    };
+    let connector = super::connector(proxy, tls_options)?;
 
     let provider_config = ProviderConfig::empty()
         .with_region(Some(region.clone()))

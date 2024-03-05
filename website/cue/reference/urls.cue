@@ -444,6 +444,7 @@ urls: {
 	rfc_4180:                                   "https://tools.ietf.org/html/rfc4180"
 	rfc_6587_3_4_1:                             "https://tools.ietf.org/html/rfc6587#section-3.4.1"
 	rfc_6891:                                   "https://tools.ietf.org/html/rfc6891"
+	rfc_8914:                                   "https://tools.ietf.org/html/rfc8914"
 	rhel:                                       "https://www.redhat.com/en/technologies/linux-platforms/enterprise-linux"
 	rpm:                                        "https://rpm.org/"
 	rust:                                       "https://www.rust-lang.org/"
