@@ -241,8 +241,8 @@ fn spawn_input_http_client(
                 .uri(request_uri.clone())
                 .method(request_method.clone());
 
-            for header in &headers {
-                request_builder = request_builder.header(header.0, header.1);
+            for (key, value) in &headers {
+                request_builder = request_builder.header(key, value);
             }
 
             let request = request_builder
