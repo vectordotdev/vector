@@ -52,6 +52,7 @@ impl From<StandardValidators> for Box<dyn Validator> {
     }
 }
 
+#[derive(PartialEq)]
 pub enum ComponentMetricType {
     EventsReceived,
     EventsReceivedBytes,

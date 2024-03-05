@@ -4,14 +4,13 @@ use std::collections::HashSet;
 
 use snafu::Snafu;
 
+pub mod dedupe;
 pub mod sample;
 
 #[cfg(feature = "transforms-aggregate")]
 pub mod aggregate;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub mod aws_ec2_metadata;
-#[cfg(feature = "transforms-dedupe")]
-pub mod dedupe;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
 #[cfg(feature = "transforms-log_to_metric")]

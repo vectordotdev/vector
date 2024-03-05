@@ -213,7 +213,14 @@ impl ValidatableComponent for DatadogLogsConfig {
             encoding,
         );
 
-        ValidationConfiguration::from_sink(Self::NAME, config, Some(external_resource))
+        ValidationConfiguration::from_sink(
+            Self::NAME,
+            vec![ComponentTestCaseConfig::from_sink(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
     }
 }
 

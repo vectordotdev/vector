@@ -117,6 +117,8 @@ pub enum BuildError {
     SocketAddressError { source: std::io::Error },
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
+    #[snafu(display("HTTP request build error: {}", source))]
+    HTTPRequestBuilderError { source: ::http::Error },
 }
 
 /// Common healthcheck errors

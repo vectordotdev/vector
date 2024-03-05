@@ -14,6 +14,7 @@ env:
 jobs:
   publish-new-environment:
     runs-on: ubuntu-20.04
+    timeout-minutes: 15
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
@@ -22,7 +23,7 @@ jobs:
 
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@v2.0.0
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -42,7 +43,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.0.0
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.0.0
+        uses: docker/setup-buildx-action@v3.1.0
       - name: Login to DockerHub
         uses: docker/login-action@v3
         if: github.ref == 'refs/heads/master'
@@ -72,7 +73,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: (PR comment) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@v2.0.0
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         if: always() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
