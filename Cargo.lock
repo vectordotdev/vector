@@ -571,25 +571,24 @@ dependencies = [
 
 [[package]]
 name = "async-nats"
-version = "0.33.0"
+version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbc1f1a75fd07f0f517322d103211f12d757658e91676def9a2e688774656c60"
+checksum = "eea7b126ebfa4db78e9e788b2a792b6329f35b4f2fdd56dbc646dedc2beec7a5"
 dependencies = [
- "base64 0.21.7",
+ "base64 0.22.0",
  "bytes 1.5.0",
  "futures 0.3.30",
- "http 0.2.9",
  "memchr",
- "nkeys 0.3.2",
+ "nkeys",
  "nuid",
  "once_cell",
+ "portable-atomic",
  "rand 0.8.5",
  "regex",
  "ring",
- "rustls 0.21.8",
- "rustls-native-certs 0.6.3",
- "rustls-pemfile 1.0.3",
- "rustls-webpki 0.101.7",
+ "rustls-native-certs 0.7.0",
+ "rustls-pemfile 2.1.0",
+ "rustls-webpki 0.102.2",
  "serde",
  "serde_json",
  "serde_nanos",
@@ -597,9 +596,9 @@ dependencies = [
  "thiserror",
  "time",
  "tokio",
- "tokio-retry",
- "tokio-rustls 0.24.1",
+ "tokio-rustls 0.25.0",
  "tracing 0.1.40",
+ "tryhard",
  "url",
 ]
 
@@ -1416,6 +1415,12 @@ name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
+
+[[package]]
+name = "base64"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9475866fec1451be56a3c2400fd081ff546538961565ccb5b7142cbd22bc7a51"
 
 [[package]]
 name = "base64-simd"
@@ -5575,22 +5580,6 @@ dependencies = [
 
 [[package]]
 name = "nkeys"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aad178aad32087b19042ee36dfd450b73f5f934fbfb058b59b198684dfec4c47"
-dependencies = [
- "byteorder",
- "data-encoding",
- "ed25519",
- "ed25519-dalek",
- "getrandom 0.2.12",
- "log",
- "rand 0.8.5",
- "signatory",
-]
-
-[[package]]
-name = "nkeys"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6eafe79aeb8066a6f1f84dc44c03ae97403013e946bf0b13626468e0d5e26c6f"
@@ -9676,6 +9665,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3528ecfd12c466c6f163363caf2d02a71161dd5e1cc6ae7b34207ea2d42d81ed"
 
 [[package]]
+name = "tryhard"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c9f0a709784e86923586cff0d872dba54cd2d2e116b3bc57587d15737cfce9d"
+dependencies = [
+ "futures 0.3.30",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "tungstenite"
 version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10097,7 +10097,7 @@ dependencies = [
  "mlua",
  "mongodb",
  "nix 0.26.2",
- "nkeys 0.4.0",
+ "nkeys",
  "nom",
  "notify",
  "num-format",
