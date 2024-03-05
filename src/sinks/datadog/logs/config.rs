@@ -190,7 +190,7 @@ impl ValidatableComponent for DatadogLogsConfig {
         let config = Self {
             local_dd_common: LocalDatadogCommonConfig {
                 endpoint: Some(endpoint.clone()),
-                default_api_key: Some("DEADBEEF".to_string().into()),
+                default_api_key: Some("unused".to_string().into()),
                 ..Default::default()
             },
             ..Default::default()
