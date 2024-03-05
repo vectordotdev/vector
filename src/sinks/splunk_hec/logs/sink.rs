@@ -1,7 +1,5 @@
 use std::{fmt, sync::Arc};
 
-use serde::Serialize;
-
 use super::request_builder::HecLogsRequestBuilder;
 use crate::{
     internal_events::SplunkEventTimestampInvalidType,
@@ -195,9 +193,8 @@ impl Partitioner for EventPartitioner {
     }
 }
 
-#[derive(PartialEq, Default, Clone, Debug, Serialize)]
+#[derive(PartialEq, Default, Clone, Debug)]
 pub struct HecLogsProcessedEventMetadata {
-    pub event_byte_size: usize,
     pub sourcetype: Option<String>,
     pub source: Option<String>,
     pub index: Option<String>,
@@ -220,7 +217,6 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
 pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
 pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
-    let event_byte_size = event.size_of();
     let mut log = event.into_log();
 
     let sourcetype = data
@@ -237,27 +233,35 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
 
     let host = data.host_key.as_ref().and_then(|key| log.get(key)).cloned();
 
-    let timestamp = data.timestamp_key.as_ref().and_then(|timestamp_key| {
-        match log.remove(timestamp_key) {
-            Some(Value::Timestamp(ts)) => {
-                // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
-                if let Some(key) = data.timestamp_nanos_key {
-                    log.try_insert(event_path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
+    let timestamp = match data.endpoint_target {
+        EndpointTarget::Event => {
+            data.timestamp_key.as_ref().and_then(|timestamp_key| {
+                match log.remove(timestamp_key) {
+                    Some(Value::Timestamp(ts)) => {
+                        // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
+                        if let Some(key) = data.timestamp_nanos_key {
+                            log.try_insert(
+                                event_path!(key),
+                                ts.timestamp_subsec_nanos() % 1_000_000,
+                            );
+                        }
+                        Some((ts.timestamp_millis() as f64) / 1000f64)
+                    }
+                    Some(value) => {
+                        emit!(SplunkEventTimestampInvalidType {
+                            r#type: value.kind_str()
+                        });
+                        None
+                    }
+                    None => {
+                        emit!(SplunkEventTimestampMissing {});
+                        None
+                    }
                 }
-                Some((ts.timestamp_millis() as f64) / 1000f64)
-            }
-            Some(value) => {
-                emit!(SplunkEventTimestampInvalidType {
-                    r#type: value.kind_str()
-                });
-                None
-            }
-            None => {
-                emit!(SplunkEventTimestampMissing {});
-                None
-            }
+            })
         }
-    });
+        EndpointTarget::Raw => None,
+    };
 
     let fields = data
         .indexed_fields
@@ -269,7 +273,6 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
         .collect::<LogEvent>();
 
     let metadata = HecLogsProcessedEventMetadata {
-        event_byte_size,
         sourcetype,
         source,
         index,
