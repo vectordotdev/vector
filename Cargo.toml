@@ -588,7 +588,7 @@ sources-utils-net-unix = []
 sources-vector = ["dep:tonic", "protobuf-build"]
 
 # Transforms
-transforms = ["transforms-logs", "transforms-metrics", "dep:ipnet"]
+transforms = ["transforms-logs", "transforms-metrics"]
 transforms-logs = [
   "transforms-aws_ec2_metadata",
   "transforms-dedupe",
