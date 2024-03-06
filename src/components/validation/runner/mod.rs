@@ -521,6 +521,10 @@ fn spawn_component_topology(
     let mut config = config_builder
         .build()
         .expect("config should not have any errors");
+
+    // It's possible we could extend the framework to allow specifying logic to
+    // handle that, but I don't see much value currently since the healthcheck is
+    // not enforced for components, and it doesn't impact the internal telemetry.
     config.healthchecks.enabled = false;
 
     _ = std::thread::spawn(move || {

@@ -14,7 +14,6 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     http::Auth,
-    register_validatable_component,
     serde::{default_decoding, default_framing_message_based},
     sources,
     sources::util::{
@@ -27,7 +26,7 @@ use crate::{
     tls::{TlsConfig, TlsSettings},
     Result,
 };
-use crate::{components::validation::*, sources::util::http_client};
+use crate::{components::validation::prelude::*, sources::util::http_client};
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,

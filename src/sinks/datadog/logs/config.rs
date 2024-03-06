@@ -2,27 +2,29 @@ use std::{convert::TryFrom, sync::Arc};
 
 use indoc::indoc;
 use tower::ServiceBuilder;
-use vector_lib::configurable::configurable_component;
-use vector_lib::{config::proxy::ProxyConfig, schema::meaning};
+
+use vector_lib::{
+    codecs::{JsonSerializerConfig, MetricTagValues},
+    config::proxy::ProxyConfig,
+    configurable::configurable_component,
+    schema::meaning,
+};
 use vrl::value::Kind;
 
-use super::{service::LogApiRetry, sink::LogSinkBuilder};
-use crate::common::datadog;
 use crate::{
-    codecs::Transformer,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    codecs::EncodingConfigWithFraming,
+    common::datadog,
     http::HttpClient,
     schema,
     sinks::{
         datadog::{logs::service::LogApiService, DatadogCommonConfig, LocalDatadogCommonConfig},
-        util::{
-            http::RequestConfig, service::ServiceBuilderExt, BatchConfig, Compression,
-            SinkBatchSettings,
-        },
-        Healthcheck, VectorSink,
+        prelude::*,
+        util::http::RequestConfig,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
+
+use super::{service::LogApiRetry, sink::LogSinkBuilder};
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
 // threshold the API will toss results. We previously serialized Events as they
@@ -181,6 +183,48 @@ impl SinkConfig for DatadogLogsConfig {
         &self.local_dd_common.acknowledgements
     }
 }
+
+impl ValidatableComponent for DatadogLogsConfig {
+    fn validation_configuration() -> ValidationConfiguration {
+        let endpoint = "http://127.0.0.1:9005".to_string();
+        let config = Self {
+            local_dd_common: LocalDatadogCommonConfig {
+                endpoint: Some(endpoint.clone()),
+                default_api_key: Some("unused".to_string().into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let encoding = EncodingConfigWithFraming::new(
+            None,
+            JsonSerializerConfig::new(MetricTagValues::Full).into(),
+            config.encoding.clone(),
+        );
+
+        let logs_endpoint = format!("{endpoint}/api/v2/logs");
+
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(
+                http::Uri::try_from(&logs_endpoint).expect("should not fail to parse URI"),
+                None,
+            ),
+            encoding,
+        );
+
+        ValidationConfiguration::from_sink(
+            Self::NAME,
+            vec![ComponentTestCaseConfig::from_sink(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
+    }
+}
+
+register_validatable_component!(DatadogLogsConfig);
 
 #[cfg(test)]
 mod test {
