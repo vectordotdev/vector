@@ -290,7 +290,7 @@ indexmap.workspace = true
 infer = { version = "0.15.0", default-features = false, optional = true}
 indoc = { version = "2.0.4", default-features = false }
 inventory = { version = "0.3.15", default-features = false }
-ipnet = { version = "2", default-features = false, optional = true, features = ["serde"] }
+ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
 itertools = { version = "0.12.1", default-features = false, optional = false, features = ["use_alloc"] }
 k8s-openapi = { version = "0.18.0", default-features = false, features = ["api", "v1_26"], optional = true }
 kube = { version = "0.82.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
@@ -588,7 +588,7 @@ sources-utils-net-unix = []
 sources-vector = ["dep:tonic", "protobuf-build"]
 
 # Transforms
-transforms = ["transforms-logs", "transforms-metrics"]
+transforms = ["transforms-logs", "transforms-metrics", "dep:ipnet"]
 transforms-logs = [
   "transforms-aws_ec2_metadata",
   "transforms-dedupe",
