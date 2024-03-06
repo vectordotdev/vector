@@ -186,7 +186,7 @@ impl SinkConfig for DatadogLogsConfig {
 
 impl ValidatableComponent for DatadogLogsConfig {
     fn validation_configuration() -> ValidationConfiguration {
-        let endpoint = "http://127.0.0.1:9001".to_string();
+        let endpoint = "http://127.0.0.1:9005".to_string();
         let config = Self {
             local_dd_common: LocalDatadogCommonConfig {
                 endpoint: Some(endpoint.clone()),

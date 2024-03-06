@@ -911,6 +911,7 @@ component-validation-tests = [
   "sources-http_client",
   "sources-http_server",
   "sinks-http",
+  "sinks-splunk_hec",
   "sinks-datadog_logs"
 ]
 
