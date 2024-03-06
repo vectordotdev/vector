@@ -25,7 +25,6 @@ pub use vector_lib::{
 
 pub use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    components::validation::prelude::*,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     event::{Event, LogEvent},
     internal_events::{SinkRequestBuildError, TemplateRenderingError},
