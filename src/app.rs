@@ -7,7 +7,7 @@ use futures::StreamExt;
 use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::runtime::{self, Runtime};
-use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::{broadcast::error::RecvError, MutexGuard};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
@@ -22,7 +22,7 @@ use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
-    internal_events::{VectorQuit, VectorStarted, VectorStopped},
+    internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
@@ -340,12 +340,8 @@ async fn handle_signal(
 ) -> Option<SignalTo> {
     match signal {
         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
-            let mut topology_controller = topology_controller.lock().await;
-            let new_config = config_builder.build().map_err(handle_config_errors).ok();
-            match topology_controller.reload(new_config).await {
-                ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
-                _ => None,
-            }
+            let topology_controller = topology_controller.lock().await;
+            reload_config_from_result(topology_controller, config_builder.build()).await
         }
         Ok(SignalTo::ReloadFromDisk) => {
             let mut topology_controller = topology_controller.lock().await;
@@ -361,14 +357,9 @@ async fn handle_signal(
                 signal_handler,
                 allow_empty_config,
             )
-            .await
-            .map_err(handle_config_errors)
-            .ok();
+            .await;
 
-            match topology_controller.reload(new_config).await {
-                ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
-                _ => None,
-            }
+            reload_config_from_result(topology_controller, new_config).await
         }
         Err(RecvError::Lagged(amt)) => {
             warn!("Overflow, dropped {} signals.", amt);
@@ -376,6 +367,23 @@ async fn handle_signal(
         }
         Err(RecvError::Closed) => Some(SignalTo::Shutdown(None)),
         Ok(signal) => Some(signal),
+    }
+}
+
+async fn reload_config_from_result(
+    mut topology_controller: MutexGuard<'_, TopologyController>,
+    config: Result<Config, Vec<String>>,
+) -> Option<SignalTo> {
+    match config {
+        Ok(new_config) => match topology_controller.reload(new_config).await {
+            ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
+            _ => None,
+        },
+        Err(errors) => {
+            handle_config_errors(errors);
+            emit!(VectorConfigLoadError);
+            None
+        }
     }
 }
 
