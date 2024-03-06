@@ -11,7 +11,7 @@ use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
-use http::{StatusCode, Uri};
+use http::StatusCode;
 use hyper::{service::make_service_fn, Server};
 use serde::Serialize;
 use serde_json::{
@@ -22,16 +22,10 @@ use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::{self, event_path, owned_value_path};
 use vector_lib::sensitive_string::SensitiveString;
-use vector_lib::{
-    codecs::decoding::DeserializerConfig,
-    lookup::{self, event_path, owned_value_path},
-};
-use vector_lib::{
-    codecs::BytesDecoderConfig,
-    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
-};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
@@ -50,8 +44,6 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
-    codecs::DecodingConfig,
-    components::validation::prelude::*,
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent, Value},
     http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
@@ -1249,41 +1241,6 @@ fn response_json(code: StatusCode, body: impl Serialize) -> Response {
     warp::reply::with_status(warp::reply::json(&body), code).into_response()
 }
 
-impl ValidatableComponent for SplunkConfig {
-    fn validation_configuration() -> ValidationConfiguration {
-        let config = Self {
-            address: default_socket_address(),
-            ..Default::default()
-        };
-
-        let listen_addr_http = format!("http://{}/services/collector/event", config.address);
-        let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
-
-        let framing = BytesDecoderConfig::new().into();
-        let decoding = DeserializerConfig::Json(Default::default());
-
-        let external_resource = ExternalResource::new(
-            ResourceDirection::Push,
-            HttpResourceConfig::from_parts(uri, None).with_headers(HashMap::from([(
-                X_SPLUNK_REQUEST_CHANNEL.to_string(),
-                "channel".to_string(),
-            )])),
-            DecodingConfig::new(framing, decoding, false.into()),
-        );
-
-        ValidationConfiguration::from_source(
-            Self::NAME,
-            vec![ComponentTestCaseConfig::from_source(
-                config,
-                None,
-                Some(external_resource),
-            )],
-        )
-    }
-}
-
-register_validatable_component!(SplunkConfig);
-
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
@@ -1291,9 +1248,13 @@ mod tests {
 
     use chrono::{TimeZone, Utc};
     use futures_util::Stream;
+    use http::Uri;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
-    use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
+    use vector_lib::codecs::{
+        decoding::DeserializerConfig, BytesDecoderConfig, JsonSerializerConfig,
+        TextSerializerConfig,
+    };
     use vector_lib::sensitive_string::SensitiveString;
     use vector_lib::{event::EventStatus, schema::Definition};
     use vrl::path::PathPrefix;
@@ -1303,7 +1264,8 @@ mod tests {
         config_host_key_target_path, config_timestamp_key_target_path,
     };
     use crate::{
-        codecs::EncodingConfig,
+        codecs::{DecodingConfig, EncodingConfig},
+        components::validation::prelude::*,
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::{Event, LogEvent},
         sinks::{
@@ -2650,4 +2612,39 @@ mod tests {
 
         assert_eq!(definitions, Some(expected_definition));
     }
+
+    impl ValidatableComponent for SplunkConfig {
+        fn validation_configuration() -> ValidationConfiguration {
+            let config = Self {
+                address: default_socket_address(),
+                ..Default::default()
+            };
+
+            let listen_addr_http = format!("http://{}/services/collector/event", config.address);
+            let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
+
+            let framing = BytesDecoderConfig::new().into();
+            let decoding = DeserializerConfig::Json(Default::default());
+
+            let external_resource = ExternalResource::new(
+                ResourceDirection::Push,
+                HttpResourceConfig::from_parts(uri, None).with_headers(HashMap::from([(
+                    X_SPLUNK_REQUEST_CHANNEL.to_string(),
+                    "channel".to_string(),
+                )])),
+                DecodingConfig::new(framing, decoding, false.into()),
+            );
+
+            ValidationConfiguration::from_source(
+                Self::NAME,
+                vec![ComponentTestCaseConfig::from_source(
+                    config,
+                    None,
+                    Some(external_resource),
+                )],
+            )
+        }
+    }
+
+    register_validatable_component!(SplunkConfig);
 }

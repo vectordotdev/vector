@@ -4,15 +4,11 @@ use indoc::indoc;
 use tower::ServiceBuilder;
 
 use vector_lib::{
-    codecs::{JsonSerializerConfig, MetricTagValues},
-    config::proxy::ProxyConfig,
-    configurable::configurable_component,
-    schema::meaning,
+    config::proxy::ProxyConfig, configurable::configurable_component, schema::meaning,
 };
 use vrl::value::Kind;
 
 use crate::{
-    codecs::EncodingConfigWithFraming,
     common::datadog,
     http::HttpClient,
     schema,
@@ -184,54 +180,57 @@ impl SinkConfig for DatadogLogsConfig {
     }
 }
 
-impl ValidatableComponent for DatadogLogsConfig {
-    fn validation_configuration() -> ValidationConfiguration {
-        let endpoint = "http://127.0.0.1:9005".to_string();
-        let config = Self {
-            local_dd_common: LocalDatadogCommonConfig {
-                endpoint: Some(endpoint.clone()),
-                default_api_key: Some("unused".to_string().into()),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        let encoding = EncodingConfigWithFraming::new(
-            None,
-            JsonSerializerConfig::new(MetricTagValues::Full).into(),
-            config.encoding.clone(),
-        );
-
-        let logs_endpoint = format!("{endpoint}/api/v2/logs");
-
-        let external_resource = ExternalResource::new(
-            ResourceDirection::Push,
-            HttpResourceConfig::from_parts(
-                http::Uri::try_from(&logs_endpoint).expect("should not fail to parse URI"),
-                None,
-            ),
-            encoding,
-        );
-
-        ValidationConfiguration::from_sink(
-            Self::NAME,
-            vec![ComponentTestCaseConfig::from_sink(
-                config,
-                None,
-                Some(external_resource),
-            )],
-        )
-    }
-}
-
-register_validatable_component!(DatadogLogsConfig);
-
 #[cfg(test)]
 mod test {
-    use super::super::config::DatadogLogsConfig;
+    use super::*;
+    use crate::codecs::EncodingConfigWithFraming;
+    use crate::components::validation::prelude::*;
+    use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
     }
+
+    impl ValidatableComponent for DatadogLogsConfig {
+        fn validation_configuration() -> ValidationConfiguration {
+            let endpoint = "http://127.0.0.1:9005".to_string();
+            let config = Self {
+                local_dd_common: LocalDatadogCommonConfig {
+                    endpoint: Some(endpoint.clone()),
+                    default_api_key: Some("unused".to_string().into()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+
+            let encoding = EncodingConfigWithFraming::new(
+                None,
+                JsonSerializerConfig::new(MetricTagValues::Full).into(),
+                config.encoding.clone(),
+            );
+
+            let logs_endpoint = format!("{endpoint}/api/v2/logs");
+
+            let external_resource = ExternalResource::new(
+                ResourceDirection::Push,
+                HttpResourceConfig::from_parts(
+                    http::Uri::try_from(&logs_endpoint).expect("should not fail to parse URI"),
+                    None,
+                ),
+                encoding,
+            );
+
+            ValidationConfiguration::from_sink(
+                Self::NAME,
+                vec![ComponentTestCaseConfig::from_sink(
+                    config,
+                    None,
+                    Some(external_resource),
+                )],
+            )
+        }
+    }
+
+    register_validatable_component!(DatadogLogsConfig);
 }
