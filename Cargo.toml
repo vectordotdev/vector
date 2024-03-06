@@ -135,7 +135,7 @@ proptest-derive = "0.4.0"
 serde_json = { version = "1.0.114", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.197", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.10", default-features = false, features = ["display", "parse"] }
-vrl = { version = "0.11.0", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { git = "https://github.com/vectordotdev/vrl", branch = "jszwedko/relax-flate", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
 pin-project.workspace = true
@@ -270,7 +270,7 @@ dyn-clone = { version = "1.0.17", default-features = false }
 encoding_rs = { version = "0.8.33", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.12", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.0.28", default-features = false, features = ["default"] }
+flate2 = { version = "1.0.27", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.6.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
