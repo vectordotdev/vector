@@ -318,7 +318,7 @@ jobs:
             vector:${{ needs.compute-metadata.outputs.baseline-tag }}
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: baseline-image
           path: "${{ runner.temp }}/baseline-image.tar"
@@ -356,7 +356,7 @@ jobs:
             vector:${{ needs.compute-metadata.outputs.comparison-tag }}
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: comparison-image
           path: "${{ runner.temp }}/comparison-image.tar"
@@ -393,7 +393,7 @@ jobs:
       - build-baseline
     steps:
       - name: 'Download baseline image'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: baseline-image
 
@@ -432,7 +432,7 @@ jobs:
       - build-comparison
     steps:
       - name: 'Download comparison image'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: comparison-image
 
@@ -525,7 +525,7 @@ jobs:
             --target-name vector \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/submission-metadata
@@ -620,7 +620,7 @@ jobs:
           aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
       - name: Download submission metadata
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/
@@ -712,7 +712,7 @@ jobs:
           aws s3 cp s3://smp-cli-releases/v${{ needs.compute-metadata.outputs.smp-version }}/x86_64-unknown-linux-gnu/smp ${{ runner.temp }}/bin/smp
 
       - name: Download submission metadata
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/
@@ -741,7 +741,7 @@ jobs:
           body: ${{ steps.read-analysis.outputs.content }}
 
       - name: Upload regression report to artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: capture-artifacts
           path: ${{ runner.temp }}/outputs/*
