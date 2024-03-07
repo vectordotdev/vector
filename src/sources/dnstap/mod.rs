@@ -1,39 +1,44 @@
 use std::path::PathBuf;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
-use bytes::Bytes;
-use vector_lib::configurable::configurable_component;
+use vector_lib::event::{Event, LogEvent};
 use vector_lib::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+    ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered,
 };
-use vector_lib::lookup::{owned_value_path, path, OwnedValuePath};
-use vrl::path::PathPrefix;
+use vector_lib::lookup::{owned_value_path, path};
+use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
+use vrl::path::{OwnedValuePath, PathPrefix};
 use vrl::value::{kind::Collection, Kind};
 
-use super::util::framestream::{build_framestream_unix_source, FrameHandler};
+use self::parser::DnstapParser;
+
+use super::util::framestream::{
+    build_framestream_tcp_source, build_framestream_unix_source, FrameHandler,
+};
+use crate::internal_events::DnstapParseError;
+use crate::sources::dnstap::schema::DNSTAP_VALUE_PATHS;
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
-    event::{Event, LogEvent},
-    internal_events::{DnstapParseError, SocketEventsReceived, SocketMode},
     Result,
 };
 
 pub mod parser;
 pub mod schema;
-use crate::sources::dnstap::parser::DnstapParser;
-use crate::sources::dnstap::schema::DNSTAP_VALUE_PATHS;
+pub mod tcp;
+#[cfg(unix)]
+pub mod unix;
 use dnsmsg_parser::{dns_message, dns_message_parser};
 pub use schema::DnstapEventSchema;
+use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::{
-    config::{LegacyKey, LogNamespace},
-    EstimatedJsonEncodedSizeOf,
-};
 
 /// Configuration for the `dnstap` source.
 #[configurable_component(source("dnstap", "Collect DNS logs from a dnstap-compatible server."))]
 #[derive(Clone, Debug)]
 pub struct DnstapConfig {
+    #[serde(flatten)]
+    pub mode: Mode,
+
     /// Maximum DNSTAP frame length that the source accepts.
     ///
     /// If any frame is longer than this, it is discarded.
@@ -50,17 +55,11 @@ pub struct DnstapConfig {
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<OptionalValuePath>,
 
-    /// Absolute path to the socket file to read DNSTAP data from.
-    ///
-    /// The DNS server must be configured to send its DNSTAP data to this socket file. The socket file is created
-    /// if it doesn't already exist when the source first starts.
-    pub socket_path: PathBuf,
-
     /// Whether or not to skip parsing or decoding of DNSTAP frames.
     ///
     /// If set to `true`, frames are not parsed or decoded. The raw frame data is set as a field on the event
     /// (called `rawData`) and encoded as a base64 string.
-    raw_data_only: Option<bool>,
+    pub raw_data_only: Option<bool>,
 
     /// Whether or not to concurrently process DNSTAP frames.
     pub multithreaded: Option<bool>,
@@ -68,55 +67,55 @@ pub struct DnstapConfig {
     /// Maximum number of frames that can be processed concurrently.
     pub max_frame_handling_tasks: Option<u32>,
 
-    /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
-    ///
-    /// Note: The file mode value can be specified in any numeric format supported by your configuration
-    /// language, but it is most intuitive to use an octal number.
-    pub socket_file_mode: Option<u32>,
-
-    /// The size, in bytes, of the receive buffer used for the socket.
-    ///
-    /// This should not typically needed to be changed.
-    #[configurable(metadata(docs::type_unit = "bytes"))]
-    pub socket_receive_buffer_size: Option<usize>,
-
-    /// The size, in bytes, of the send buffer used for the socket.
-    ///
-    /// This should not typically needed to be changed.
-    #[configurable(metadata(docs::type_unit = "bytes"))]
-    pub socket_send_buffer_size: Option<usize>,
-
     /// The namespace to use for logs. This overrides the global settings.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
-    log_namespace: Option<bool>,
+    pub log_namespace: Option<bool>,
 }
 
 fn default_max_frame_length() -> usize {
     bytesize::kib(100u64) as usize
 }
 
+/// Listening mode for the `dnstap` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of dnstap socket to use."))]
+#[allow(clippy::large_enum_variant)] // just used for configuration
+pub enum Mode {
+    /// Listen on TCP.
+    Tcp(tcp::TcpConfig),
+
+    /// Listen on a Unix domain socket
+    #[cfg(unix)]
+    Unix(unix::UnixConfig),
+}
+
 impl DnstapConfig {
     pub fn new(socket_path: PathBuf) -> Self {
         Self {
-            host_key: None,
-            socket_path,
-            ..Self::default()
+            mode: Mode::Unix(unix::UnixConfig::new(socket_path)),
+            ..Default::default()
         }
     }
 
-    fn content_type(&self) -> String {
-        "protobuf:dnstap.Dnstap".to_string() //content-type for framestream
+    fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace.unwrap_or(false).into()
+    }
+
+    fn raw_data_only(&self) -> bool {
+        self.raw_data_only.unwrap_or(false)
     }
 
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> vector_lib::schema::Definition {
         let event_schema = DnstapEventSchema;
 
-        match log_namespace {
+        match self.log_namespace() {
             LogNamespace::Legacy => {
                 let schema = vector_lib::schema::Definition::empty_legacy_namespace();
 
-                if self.raw_data_only.unwrap_or(false) {
+                if self.raw_data_only() {
                     if let Some(message_key) = log_schema().message_key() {
                         return schema.with_event_field(
                             message_key,
@@ -134,7 +133,7 @@ impl DnstapConfig {
                 )
                 .with_standard_vector_source_metadata();
 
-                if self.raw_data_only.unwrap_or(false) {
+                if self.raw_data_only() {
                     schema.with_event_field(
                         &owned_value_path!("message"),
                         Kind::bytes(),
@@ -151,15 +150,18 @@ impl DnstapConfig {
 impl Default for DnstapConfig {
     fn default() -> Self {
         Self {
-            host_key: None,
+            #[cfg(unix)]
+            mode: Mode::Unix(unix::UnixConfig::default()),
+            #[cfg(not(unix))]
+            mode: Mode::Tcp(tcp::TcpConfig::from_address(std::net::SocketAddr::new(
+                std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
+                9000,
+            ))),
             max_frame_length: default_max_frame_length(),
-            socket_path: PathBuf::from("/run/bind/dnstap.sock"),
+            host_key: None,
             raw_data_only: None,
             multithreaded: None,
             max_frame_handling_tasks: None,
-            socket_file_mode: None,
-            socket_receive_buffer_size: None,
-            socket_send_buffer_size: None,
             log_namespace: None,
         }
     }
@@ -172,12 +174,32 @@ impl_generate_config_from_default!(DnstapConfig);
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let frame_handler = DnstapFrameHandler::new(self, log_namespace);
-        build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
+        let common_frame_handler = CommonFrameHandler::new(self, log_namespace);
+        match &self.mode {
+            Mode::Tcp(config) => {
+                let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
+
+                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
+                let frame_handler = tcp::DnstapFrameHandler::new(
+                    config.clone(),
+                    tls,
+                    common_frame_handler,
+                    log_namespace,
+                );
+
+                build_framestream_tcp_source(frame_handler, cx.shutdown, cx.out)
+            }
+            #[cfg(unix)]
+            Mode::Unix(config) => {
+                let frame_handler =
+                    unix::DnstapFrameHandler::new(config.clone(), common_frame_handler);
+                build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
+            }
+        }
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
         let schema_definition = self
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
@@ -190,16 +212,12 @@ impl SourceConfig for DnstapConfig {
 }
 
 #[derive(Clone)]
-pub struct DnstapFrameHandler {
+struct CommonFrameHandler {
     max_frame_length: usize,
-    socket_path: PathBuf,
     content_type: String,
     raw_data_only: bool,
     multithreaded: bool,
     max_frame_handling_tasks: u32,
-    socket_file_mode: Option<u32>,
-    socket_receive_buffer_size: Option<usize>,
-    socket_send_buffer_size: Option<usize>,
     host_key: Option<OwnedValuePath>,
     timestamp_key: Option<OwnedValuePath>,
     source_type_key: Option<OwnedValuePath>,
@@ -207,7 +225,7 @@ pub struct DnstapFrameHandler {
     log_namespace: LogNamespace,
 }
 
-impl DnstapFrameHandler {
+impl CommonFrameHandler {
     pub fn new(config: &DnstapConfig, log_namespace: LogNamespace) -> Self {
         let source_type_key = log_schema().source_type_key();
         let timestamp_key = log_schema().timestamp_key();
@@ -219,14 +237,10 @@ impl DnstapFrameHandler {
 
         Self {
             max_frame_length: config.max_frame_length,
-            socket_path: config.socket_path.clone(),
-            content_type: config.content_type(),
+            content_type: "protobuf:dnstap.Dnstap".to_string(),
             raw_data_only: config.raw_data_only.unwrap_or(false),
             multithreaded: config.multithreaded.unwrap_or(false),
             max_frame_handling_tasks: config.max_frame_handling_tasks.unwrap_or(1000),
-            socket_file_mode: config.socket_file_mode,
-            socket_receive_buffer_size: config.socket_receive_buffer_size,
-            socket_send_buffer_size: config.socket_send_buffer_size,
             host_key,
             timestamp_key: timestamp_key.cloned(),
             source_type_key: source_type_key.cloned(),
@@ -236,7 +250,7 @@ impl DnstapFrameHandler {
     }
 }
 
-impl FrameHandler for DnstapFrameHandler {
+impl FrameHandler for CommonFrameHandler {
     fn content_type(&self) -> String {
         self.content_type.clone()
     }
@@ -245,11 +259,11 @@ impl FrameHandler for DnstapFrameHandler {
         self.max_frame_length
     }
 
-    /**
-     * Function to pass into util::framestream::build_framestream_unix_source
-     * Takes a data frame from the unix socket and turns it into a Vector Event.
-     **/
-    fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
+    fn handle_event(
+        &self,
+        received_from: Option<vrl::prelude::Bytes>,
+        frame: vrl::prelude::Bytes,
+    ) -> Option<vector_lib::event::Event> {
         self.bytes_received.emit(ByteSize(frame.len()));
 
         let mut log_event = LogEvent::default();
@@ -276,12 +290,6 @@ impl FrameHandler for DnstapFrameHandler {
             return None;
         }
 
-        emit!(SocketEventsReceived {
-            mode: SocketMode::Unix,
-            byte_size: log_event.estimated_json_encoded_size_of(),
-            count: 1
-        });
-
         if self.log_namespace == LogNamespace::Vector {
             // The timestamp is inserted by the parser which caters for the Legacy namespace.
             self.log_namespace.insert_vector_metadata(
@@ -302,10 +310,6 @@ impl FrameHandler for DnstapFrameHandler {
         Some(Event::from(log_event))
     }
 
-    fn socket_path(&self) -> PathBuf {
-        self.socket_path.clone()
-    }
-
     fn multithreaded(&self) -> bool {
         self.multithreaded
     }
@@ -314,33 +318,23 @@ impl FrameHandler for DnstapFrameHandler {
         self.max_frame_handling_tasks
     }
 
-    fn socket_file_mode(&self) -> Option<u32> {
-        self.socket_file_mode
-    }
-
-    fn socket_receive_buffer_size(&self) -> Option<usize> {
-        self.socket_receive_buffer_size
-    }
-
-    fn socket_send_buffer_size(&self) -> Option<usize> {
-        self.socket_send_buffer_size
-    }
-
-    fn host_key(&self) -> &Option<OwnedValuePath> {
+    fn host_key(&self) -> &Option<vrl::path::OwnedValuePath> {
         &self.host_key
     }
 
-    fn source_type_key(&self) -> Option<&OwnedValuePath> {
-        self.source_type_key.as_ref()
+    fn timestamp_key(&self) -> Option<&vrl::path::OwnedValuePath> {
+        self.timestamp_key.as_ref()
     }
 
-    fn timestamp_key(&self) -> Option<&OwnedValuePath> {
-        self.timestamp_key.as_ref()
+    fn source_type_key(&self) -> Option<&vrl::path::OwnedValuePath> {
+        self.source_type_key.as_ref()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use vector_lib::event::{Event, LogEvent};
+
     use super::*;
 
     #[test]
@@ -412,6 +406,10 @@ mod integration_tests {
     use futures::StreamExt;
     use serde_json::json;
     use tokio::time;
+    use vector_lib::event::Event;
+    use vector_lib::lookup::lookup_v2::OptionalValuePath;
+
+    use self::unix::UnixConfig;
 
     use super::*;
     use crate::{
@@ -431,15 +429,17 @@ mod integration_tests {
                 let socket = get_socket(raw_data, query_type);
 
                 DnstapConfig {
+                    mode: Mode::Unix(UnixConfig {
+                        socket_path: socket,
+                        socket_file_mode: Some(511),
+                        socket_receive_buffer_size: Some(10485760),
+                        socket_send_buffer_size: Some(10485760),
+                    }),
                     max_frame_length: 102400,
                     host_key: Some(OptionalValuePath::from(owned_value_path!("key"))),
-                    socket_path: socket,
                     raw_data_only: Some(raw_data),
                     multithreaded: Some(false),
                     max_frame_handling_tasks: Some(100000),
-                    socket_file_mode: Some(511),
-                    socket_receive_buffer_size: Some(10485760),
-                    socket_send_buffer_size: Some(10485760),
                     log_namespace: None,
                 }
                 .build(SourceContext::new_test(sender, None))

@@ -4566,6 +4566,9 @@ name = "ipnet"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "ipnetwork"
@@ -10081,6 +10084,7 @@ dependencies = [
  "indoc",
  "infer 0.15.0",
  "inventory",
+ "ipnet",
  "itertools 0.12.1",
  "k8s-openapi 0.18.0",
  "kube",
@@ -10364,6 +10368,7 @@ dependencies = [
  "http 0.2.9",
  "hyper-proxy",
  "indexmap 2.2.5",
+ "ipnet",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",

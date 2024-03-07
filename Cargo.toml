@@ -290,6 +290,7 @@ indexmap.workspace = true
 infer = { version = "0.15.0", default-features = false, optional = true}
 indoc = { version = "2.0.4", default-features = false }
 inventory = { version = "0.3.15", default-features = false }
+ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
 itertools = { version = "0.12.1", default-features = false, optional = false, features = ["use_alloc"] }
 k8s-openapi = { version = "0.18.0", default-features = false, features = ["api", "v1_26"], optional = true }
 kube = { version = "0.82.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
@@ -538,7 +539,7 @@ sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver",
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-http-error", "protobuf-build"]
 sources-demo_logs = ["dep:fakedata"]
-sources-dnstap = ["dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "protobuf-build"]
+sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
@@ -580,7 +581,7 @@ sources-utils-http-prelude = ["sources-utils-http", "sources-utils-http-auth", "
 sources-utils-http-query = []
 sources-utils-http-client = ["sources-utils-http", "sources-http_server"]
 sources-utils-net = ["sources-utils-net-tcp", "sources-utils-net-udp", "sources-utils-net-unix"]
-sources-utils-net-tcp = ["listenfd"]
+sources-utils-net-tcp = ["listenfd", "dep:ipnet"]
 sources-utils-net-udp = ["listenfd"]
 sources-utils-net-unix = []
 
