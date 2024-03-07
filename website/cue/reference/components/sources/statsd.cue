@@ -66,7 +66,7 @@ components: sources: statsd: {
 
 	how_it_works: {
 		timings: {
-			title: "Statsd timings"
+			title: "StatsD timings"
 			body: """
 				Incoming timings are emitted as distributions. Timings in milliseconds (`ms`) are
 				converted to seconds (`s`).
