@@ -202,23 +202,26 @@ pub(crate) fn decode_log_body(
     Ok(decoded)
 }
 
-// ddtags input is a string containing a list of key-value pairs.
-// the tag-value list members are separated by `,` and the
+// ddtags input is a string containing a list of tags which
+// can include both bare tags and key-value pairs.
+// the tag list members are separated by `,` and the
 // tag-value pairs are separated by `:`.
-// The output is an Object constructed with the tag-value pairs.
 //
-// Technically, the Datadog logs intake accepts input where this
-// field is a bare tag (no `:`), so we're supporting that here,
-// in which case the raw input is not expanded into an object.
+// The output is an Object regardless of the input string.
+// Bare tags are constructed as a k-v pair with a null value.
 fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
-    let ddtags_str = String::from_utf8_lossy(ddtags_raw);
-
-    // The value is either an empty string or a bare tag
-    if !ddtags_str.contains(',') && !ddtags_str.contains(':') {
-        return Value::Bytes(ddtags_raw.clone());
+    if ddtags_raw.is_empty() {
+        return ObjectMap::new().into();
     }
 
-    // There is at least one key-value pair
+    let ddtags_str = String::from_utf8_lossy(ddtags_raw);
+
+    // The value is a single bare tag
+    if !ddtags_str.contains(',') && !ddtags_str.contains(':') {
+        return ObjectMap::from([(KeyString::from(ddtags_str), Value::Null)]).into();
+    }
+
+    // There are multiple tags, which could be either bare or pairs
     let ddtags_object: ObjectMap = ddtags_str
         .split(',')
         .filter(|kv| !kv.is_empty())
@@ -238,13 +241,15 @@ fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
+    use vrl::value;
 
     #[test]
     fn ddtags_parse_empty() {
         let raw = Bytes::from(String::from(""));
         let val = parse_ddtags(&raw);
 
-        assert!(val == Value::Bytes(Bytes::from("")));
+        assert_eq!(val, value!({}));
     }
 
     #[test]
@@ -252,7 +257,7 @@ mod tests {
         let raw = Bytes::from(String::from("bare"));
         let val = parse_ddtags(&raw);
 
-        assert!(val == Value::Bytes(Bytes::from("bare")));
+        assert_eq!(val, value!({"bare": null}));
     }
 
     #[test]
@@ -260,12 +265,7 @@ mod tests {
         let raw = Bytes::from(String::from("filename:driver.log"));
         let val = parse_ddtags(&raw);
 
-        assert!(
-            val == Value::Object(ObjectMap::from([(
-                KeyString::from("filename".to_string()),
-                "driver.log".to_string().into()
-            )]))
-        )
+        assert_eq!(val, value!({"filename": "driver.log"}));
     }
 
     #[test]
@@ -273,17 +273,20 @@ mod tests {
         let raw = Bytes::from(String::from("filename:driver.log,wizard:the_grey"));
         let val = parse_ddtags(&raw);
 
-        assert!(
-            val == Value::Object(ObjectMap::from([
-                (
-                    KeyString::from("filename".to_string()),
-                    "driver.log".to_string().into()
-                ),
-                (
-                    KeyString::from("wizard".to_string()),
-                    "the_grey".to_string().into()
-                ),
-            ]))
-        )
+        assert_eq!(
+            val,
+            value!({"filename": "driver.log", "wizard": "the_grey"})
+        );
+    }
+
+    #[test]
+    fn ddtags_parse_kv_bare_combo() {
+        let raw = Bytes::from(String::from("filename:driver.log,debug,wizard:the_grey"));
+        let val = parse_ddtags(&raw);
+
+        assert_eq!(
+            val,
+            value!({"filename": "driver.log", "wizard": "the_grey", "debug": null})
+        );
     }
 }

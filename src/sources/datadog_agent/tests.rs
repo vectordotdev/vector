@@ -27,8 +27,9 @@ use vector_lib::{
     event::{metric::TagValue, MetricTags},
     metric_tags,
 };
+use vrl::compiler::value::Collection;
+use vrl::value;
 use vrl::value::{Kind, ObjectMap};
-use vrl::{compiler::value::Collection, value::KeyString};
 
 use crate::schema::Definition;
 use crate::{
@@ -172,17 +173,7 @@ fn test_decode_log_body_parse_ddtags() {
 
     assert_eq!(
         log["ddtags"],
-        ObjectMap::from([
-            (
-                KeyString::from("wizard".to_string()),
-                "the_grey".to_string().into()
-            ),
-            (
-                KeyString::from("env".to_string()),
-                "staging".to_string().into()
-            )
-        ])
-        .into()
+        value!({"env": "staging", "wizard": "the_grey"})
     );
 }
 
