@@ -6,7 +6,6 @@ pub(super) const RTYPE_MB: u16 = 7;
 pub(super) const RTYPE_MG: u16 = 8;
 pub(super) const RTYPE_MR: u16 = 9;
 pub(super) const RTYPE_WKS: u16 = 11;
-pub(super) const RTYPE_HINFO: u16 = 13;
 pub(super) const RTYPE_MINFO: u16 = 14;
 pub(super) const RTYPE_RP: u16 = 17;
 pub(super) const RTYPE_AFSDB: u16 = 18;

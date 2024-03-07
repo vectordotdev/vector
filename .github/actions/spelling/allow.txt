@@ -254,6 +254,7 @@ buildname
 buildroot
 bytestream
 callsites
+cdnskey
 cncf
 codepath
 codepaths
@@ -262,6 +263,7 @@ compiletime
 coredns
 corejs
 coreutils
+csync
 curta
 daemonset
 dalek
