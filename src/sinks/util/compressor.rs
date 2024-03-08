@@ -73,12 +73,14 @@ impl From<Compression> for Writer {
             Compression::None => Writer::Plain(writer),
             // Buffering writes to the underlying Encoder writer
             // to avoid Vec-trashing and expensive memset syscalls.
+            // https://github.com/rust-lang/flate2-rs/issues/395#issuecomment-1975088152
             Compression::Gzip(level) => Writer::Gzip(BufWriter::with_capacity(
                 GZIP_INPUT_BUFFER_CAPACITY,
                 GzEncoder::new(writer, level.as_flate2()),
             )),
             // Buffering writes to the underlying Encoder writer
             // to avoid Vec-trashing and expensive memset syscalls.
+            // https://github.com/rust-lang/flate2-rs/issues/395#issuecomment-1975088152
             Compression::Zlib(level) => Writer::Zlib(BufWriter::with_capacity(
                 ZLIB_INPUT_BUFFER_CAPACITY,
                 ZlibEncoder::new(writer, level.as_flate2()),
