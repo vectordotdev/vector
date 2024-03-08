@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
+use dnsmsg_parser::dns_message_parser::DnsParserOptions;
 use vector_lib::event::{Event, LogEvent};
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered,
@@ -66,6 +67,10 @@ pub struct DnstapConfig {
 
     /// Maximum number of frames that can be processed concurrently.
     pub max_frame_handling_tasks: Option<u32>,
+
+    /// Whether to downcase all DNSTAP hostnames received for consistency
+    #[serde(default = "crate::serde::default_false")]
+    pub lowercase_hostnames: bool,
 
     /// The namespace to use for logs. This overrides the global settings.
     #[configurable(metadata(docs::hidden))]
@@ -162,6 +167,7 @@ impl Default for DnstapConfig {
             raw_data_only: None,
             multithreaded: None,
             max_frame_handling_tasks: None,
+            lowercase_hostnames: false,
             log_namespace: None,
         }
     }
@@ -222,6 +228,7 @@ struct CommonFrameHandler {
     timestamp_key: Option<OwnedValuePath>,
     source_type_key: Option<OwnedValuePath>,
     bytes_received: Registered<BytesReceived>,
+    lowercase_hostnames: bool,
     log_namespace: LogNamespace,
 }
 
@@ -245,6 +252,7 @@ impl CommonFrameHandler {
             timestamp_key: timestamp_key.cloned(),
             source_type_key: source_type_key.cloned(),
             bytes_received: register!(BytesReceived::from(Protocol::from("protobuf"))),
+            lowercase_hostnames: config.lowercase_hostnames,
             log_namespace,
         }
     }
@@ -283,7 +291,13 @@ impl FrameHandler for CommonFrameHandler {
                 (PathPrefix::Event, &DNSTAP_VALUE_PATHS.raw_data),
                 BASE64_STANDARD.encode(&frame),
             );
-        } else if let Err(err) = DnstapParser::parse(&mut log_event, frame) {
+        } else if let Err(err) = DnstapParser::parse(
+            &mut log_event,
+            frame,
+            DnsParserOptions {
+                lowercase_hostnames: self.lowercase_hostnames,
+            },
+        ) {
             emit!(DnstapParseError {
                 error: format!("Dnstap protobuf decode error {:?}.", err)
             });
@@ -440,6 +454,7 @@ mod integration_tests {
                     raw_data_only: Some(raw_data),
                     multithreaded: Some(false),
                     max_frame_handling_tasks: Some(100000),
+                    lowercase_hostnames: false,
                     log_namespace: None,
                 }
                 .build(SourceContext::new_test(sender, None))
