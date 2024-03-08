@@ -866,7 +866,7 @@ fn format_svcb_record(svcb: &SVCB, options: &DnsParserOptions) -> String {
     format!(
         "{} {} {}",
         svcb.svc_priority(),
-        svcb.target_name().to_string_with_options(&options),
+        svcb.target_name().to_string_with_options(options),
         svcb.svc_params()
             .iter()
             .map(|(key, value)| format!(r#"{}="{}""#, key, value.to_string().trim_end_matches(',')))

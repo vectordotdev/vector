@@ -453,6 +453,7 @@ mod integration_tests {
                     raw_data_only: Some(raw_data),
                     multithreaded: Some(false),
                     max_frame_handling_tasks: Some(100000),
+                    lowercase_hostnames: None,
                     log_namespace: None,
                 }
                 .build(SourceContext::new_test(sender, None))
