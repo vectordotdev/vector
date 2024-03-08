@@ -41,6 +41,11 @@ base: components: sources: dnstap: configuration: {
 			type: uint: unit: "seconds"
 		}
 	}
+	lowercase_hostnames: {
+		description: "Whether to downcase all DNSTAP hostnames received for consistency"
+		required:    false
+		type: bool: {}
+	}
 	max_connection_duration_secs: {
 		description: """
 			Maximum duration to keep each connection open. Connections open for longer than this duration are closed.

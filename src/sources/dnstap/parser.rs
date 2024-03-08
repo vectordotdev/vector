@@ -8,7 +8,7 @@ use std::{
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use dnsmsg_parser::ede::EDE;
+use dnsmsg_parser::{dns_message_parser::DnsParserOptions, ede::EDE};
 use hickory_proto::{
     rr::domain::Name,
     serialize::binary::{BinDecodable, BinDecoder},
@@ -95,7 +95,11 @@ impl DnstapParser {
         event.insert((PathPrefix::Event, prefix.concat(path)), value)
     }
 
-    pub fn parse(event: &mut LogEvent, frame: Bytes) -> Result<()> {
+    pub fn parse(
+        event: &mut LogEvent,
+        frame: Bytes,
+        parsing_options: DnsParserOptions,
+    ) -> Result<()> {
         //parse frame with dnstap protobuf
         let proto_msg = Dnstap::decode(frame.clone())?;
         let root = owned_value_path!();
@@ -145,7 +149,9 @@ impl DnstapParser {
 
             if dnstap_data_type == "Message" {
                 if let Some(message) = proto_msg.message {
-                    if let Err(err) = DnstapParser::parse_dnstap_message(event, &root, message) {
+                    if let Err(err) =
+                        DnstapParser::parse_dnstap_message(event, &root, message, parsing_options)
+                    {
                         emit!(DnstapParseWarning { error: &err });
                         need_raw_data = true;
                         DnstapParser::insert(
@@ -180,6 +186,7 @@ impl DnstapParser {
         event: &mut LogEvent,
         prefix: impl ValuePath<'a>,
         dnstap_message: DnstapMessage,
+        parsing_options: DnsParserOptions,
     ) -> Result<()> {
         if let Some(socket_family) = dnstap_message.socket_family {
             DnstapParser::parse_dnstap_message_socket_family(
@@ -249,6 +256,7 @@ impl DnstapParser {
             prefix.clone(),
             dnstap_message_type_id,
             dnstap_message,
+            parsing_options,
         )?;
 
         Ok(())
@@ -259,11 +267,13 @@ impl DnstapParser {
         prefix: impl ValuePath<'a>,
         dnstap_message_type_id: i32,
         dnstap_message: DnstapMessage,
+        parsing_options: DnsParserOptions,
     ) -> Result<()> {
         match dnstap_message_type_id {
             1..=12 => {
                 if let Some(query_message) = dnstap_message.query_message {
-                    let mut query_message_parser = DnsMessageParser::new(query_message);
+                    let mut query_message_parser =
+                        DnsMessageParser::with_options(query_message, parsing_options.clone());
                     if let Err(error) = DnstapParser::parse_dns_query_message(
                         event,
                         prefix.concat(&DNSTAP_VALUE_PATHS.request_message),
@@ -280,7 +290,8 @@ impl DnstapParser {
                 }
 
                 if let Some(response_message) = dnstap_message.response_message {
-                    let mut response_message_parser = DnsMessageParser::new(response_message);
+                    let mut response_message_parser =
+                        DnsMessageParser::with_options(response_message, parsing_options);
                     if let Err(error) = DnstapParser::parse_dns_query_message(
                         event,
                         prefix.concat(&DNSTAP_VALUE_PATHS.response_message),
@@ -298,8 +309,10 @@ impl DnstapParser {
             }
             13 | 14 => {
                 if let Some(update_request_message) = dnstap_message.query_message {
-                    let mut update_request_message_parser =
-                        DnsMessageParser::new(update_request_message);
+                    let mut update_request_message_parser = DnsMessageParser::with_options(
+                        update_request_message,
+                        parsing_options.clone(),
+                    );
                     if let Err(error) = DnstapParser::parse_dns_update_message(
                         event,
                         &DNSTAP_VALUE_PATHS.request_message,
@@ -317,7 +330,7 @@ impl DnstapParser {
 
                 if let Some(update_response_message) = dnstap_message.response_message {
                     let mut update_response_message_parser =
-                        DnsMessageParser::new(update_response_message);
+                        DnsMessageParser::with_options(update_response_message, parsing_options);
                     if let Err(error) = DnstapParser::parse_dns_update_message(
                         event,
                         &DNSTAP_VALUE_PATHS.response_message,
@@ -1004,6 +1017,7 @@ mod tests {
     use super::*;
     use crate::event::Value;
     use chrono::DateTime;
+    use dnsmsg_parser::dns_message_parser::DnsParserOptions;
     use std::collections::BTreeMap;
 
     #[test]
@@ -1015,7 +1029,11 @@ mod tests {
         let dnstap_data = BASE64_STANDARD
             .decode(raw_dnstap_data)
             .expect("Invalid base64 encoded data.");
-        let parse_result = DnstapParser::parse(&mut log_event, Bytes::from(dnstap_data));
+        let parse_result = DnstapParser::parse(
+            &mut log_event,
+            Bytes::from(dnstap_data),
+            DnsParserOptions::default(),
+        );
         assert!(parse_result.is_ok());
 
         let expected_map: BTreeMap<&str, Value> = BTreeMap::from([
@@ -1105,13 +1123,76 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_dnstap_data_lowercase_hostnames() {
+        let mut log_event = LogEvent::default();
+        let mut lowercase_log_event = LogEvent::default();
+        let raw_dnstap_data = "Cgw2NzNiNWZiZWI5MmESMkJJTkQgOS4xOC4yMS0xK3VidW50dTIyLjA0LjErZGViLnN1cnkub3JnKzEtVWJ1bnR1cqkBCAYQARgBIgQKWQUeKgQKWQUqMMitAjg1YLXQp68GbZ9tBw9ygwGInoGAAAEABAAAAAEGVmVjdG9yA0RldgAAAQABwAwAAQABAAAAPAAEEvVWOMAMAAEAAQAAADwABBL1VnnADAABAAEAAAA8AAQS9VYSwAwAAQABAAAAPAAEEvVWWQAAKQTQAAAAAAAcAAoAGERDbSN8uKngAQAAAGXp6DXs0fbpv0n9F3gB";
+        let dnstap_data = BASE64_STANDARD
+            .decode(raw_dnstap_data)
+            .expect("Invalid base64 encoded data.");
+        let parse_result = DnstapParser::parse(
+            &mut lowercase_log_event,
+            Bytes::from(dnstap_data.clone()),
+            DnsParserOptions {
+                lowercase_hostnames: true,
+            },
+        );
+        let no_lowercase_result = DnstapParser::parse(
+            &mut log_event,
+            Bytes::from(dnstap_data),
+            DnsParserOptions::default(),
+        );
+        assert!(parse_result.is_ok());
+        assert!(no_lowercase_result.is_ok());
+
+        let no_lowercase_expected: BTreeMap<&str, Value> = BTreeMap::from([
+            ("dataType", Value::Bytes(Bytes::from("Message"))),
+            ("dataTypeId", Value::Integer(1)),
+            (
+                "responseData.answers[0].domainName",
+                Value::Bytes(Bytes::from("Vector.Dev.")),
+            ),
+            (
+                "responseData.question[0].domainName",
+                Value::Bytes(Bytes::from("Vector.Dev.")),
+            ),
+        ]);
+        let expected_map: BTreeMap<&str, Value> = BTreeMap::from([
+            ("dataType", Value::Bytes(Bytes::from("Message"))),
+            ("dataTypeId", Value::Integer(1)),
+            (
+                "responseData.answers[0].domainName",
+                Value::Bytes(Bytes::from("vector.dev.")),
+            ),
+            (
+                "responseData.question[0].domainName",
+                Value::Bytes(Bytes::from("vector.dev.")),
+            ),
+        ]);
+
+        // The maps need to contain identical keys and values.
+        for (exp_key, exp_value) in no_lowercase_expected {
+            let value = log_event.get(exp_key).unwrap();
+            assert_eq!(*value, exp_value);
+        }
+        for (exp_key, exp_value) in expected_map {
+            let value = lowercase_log_event.get(exp_key).unwrap();
+            assert_eq!(*value, exp_value);
+        }
+    }
+
+    #[test]
     fn test_parse_dnstap_data_with_ede_options() {
         let mut log_event = LogEvent::default();
         let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zGgBy5wEIAxACGAEiEAAAAAAAAAAAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAGAAbQAAAAByZLM4AAAAAQAAAAAAAQJoNQdleGFtcGxlA2NvbQAABgABAAApBNABAUAAADkADwA1AAlubyBTRVAgbWF0Y2hpbmcgdGhlIERTIGZvdW5kIGZvciBkbnNzZWMtZmFpbGVkLm9yZy54AQ==";
         let dnstap_data = BASE64_STANDARD
             .decode(raw_dnstap_data)
             .expect("Invalid base64 encoded data.");
-        let parse_result = DnstapParser::parse(&mut log_event, Bytes::from(dnstap_data));
+        let parse_result = DnstapParser::parse(
+            &mut log_event,
+            Bytes::from(dnstap_data),
+            DnsParserOptions::default(),
+        );
         assert!(parse_result.is_ok());
 
         let expected_map: BTreeMap<&str, Value> = BTreeMap::from([
@@ -1144,7 +1225,11 @@ mod tests {
         let dnstap_data = BASE64_STANDARD
             .decode(raw_dnstap_data)
             .expect("Invalid base64 encoded data.");
-        let parse_result = DnstapParser::parse(&mut log_event, Bytes::from(dnstap_data));
+        let parse_result = DnstapParser::parse(
+            &mut log_event,
+            Bytes::from(dnstap_data),
+            DnsParserOptions::default(),
+        );
         assert!(parse_result.is_ok());
 
         let expected_map: BTreeMap<&str, Value> = BTreeMap::from([
@@ -1227,8 +1312,12 @@ mod tests {
     #[test]
     fn test_parse_dnstap_data_with_invalid_data() {
         let mut log_event = LogEvent::default();
-        let e = DnstapParser::parse(&mut log_event, Bytes::from(vec![1, 2, 3]))
-            .expect_err("Expected TrustDnsError.");
+        let e = DnstapParser::parse(
+            &mut log_event,
+            Bytes::from(vec![1, 2, 3]),
+            DnsParserOptions::default(),
+        )
+        .expect_err("Expected TrustDnsError.");
         assert!(e.to_string().contains("Protobuf message"));
     }
 
