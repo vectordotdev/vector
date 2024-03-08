@@ -11,7 +11,7 @@
         ddtags: tag1:value,bare,tag2:value
     - log_builder:
         message: simple message 2
-        status: meh
+        status: ok
         timestamp: 1709923304472
         hostname: the_best_host
         service: could_be_better_tho
@@ -30,7 +30,7 @@
         ddtags: tag1:value,bare,tag2:value
     - log_builder:
         message: simple message 2
-        status: meh
+        status: ok
         timestamp: 1709923304472
         hostname: the_best_host
         service: could_be_better_tho
