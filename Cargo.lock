@@ -10043,7 +10043,7 @@ dependencies = [
  "azure_identity",
  "azure_storage",
  "azure_storage_blobs",
- "base64 0.21.7",
+ "base64 0.22.0",
  "bloomy",
  "bollard",
  "bytes 1.5.0",
@@ -10356,7 +10356,7 @@ version = "0.1.0"
 dependencies = [
  "async-graphql",
  "async-trait",
- "base64 0.21.7",
+ "base64 0.22.0",
  "bitmask-enum",
  "bytes 1.5.0",
  "chrono",
