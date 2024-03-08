@@ -44,7 +44,7 @@ base: components: sources: dnstap: configuration: {
 	lowercase_hostnames: {
 		description: "Whether to downcase all DNSTAP hostnames received for consistency"
 		required:    false
-		type: bool: {}
+		type: bool: default: false
 	}
 	max_connection_duration_secs: {
 		description: """

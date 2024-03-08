@@ -69,7 +69,8 @@ pub struct DnstapConfig {
     pub max_frame_handling_tasks: Option<u32>,
 
     /// Whether to downcase all DNSTAP hostnames received for consistency
-    pub lowercase_hostnames: Option<bool>,
+    #[serde(default = "crate::serde::default_false")]
+    pub lowercase_hostnames: bool,
 
     /// The namespace to use for logs. This overrides the global settings.
     #[configurable(metadata(docs::hidden))]
@@ -166,7 +167,7 @@ impl Default for DnstapConfig {
             raw_data_only: None,
             multithreaded: None,
             max_frame_handling_tasks: None,
-            lowercase_hostnames: None,
+            lowercase_hostnames: false,
             log_namespace: None,
         }
     }
@@ -251,7 +252,7 @@ impl CommonFrameHandler {
             timestamp_key: timestamp_key.cloned(),
             source_type_key: source_type_key.cloned(),
             bytes_received: register!(BytesReceived::from(Protocol::from("protobuf"))),
-            lowercase_hostnames: config.lowercase_hostnames.unwrap_or(false),
+            lowercase_hostnames: config.lowercase_hostnames,
             log_namespace,
         }
     }
