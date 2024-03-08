@@ -5,7 +5,7 @@ remap: functions: sieve: {
 	description: """
 		Keeps only matches of `pattern` in `value`.
 
-		This can be used to list out characters (or patterns) that are allowed in the string and
+		This can be used to define patterns that are allowed in the string and
 		remove everything else.
 		"""
 
@@ -19,13 +19,13 @@ remap: functions: sieve: {
 		{
 			name:        "pattern"
 			description: """
-				Keep all matches of this pattern. Can be a static string or a regular expression. Static string is used as a list of allowed characters.
+				Keep all matches of this pattern.
 				"""
 			required:    true
-			type: ["regex", "string"]
+			type: ["regex"]
 		},
 		{
-			name:        "replace_sinle"
+			name:        "replace_single"
 			description: """
 				The string to use to replace single rejected characters.
 				"""
@@ -53,13 +53,6 @@ remap: functions: sieve: {
 				sieve("test123%456.فوائد.net.", r'[a-z]')
 				"""#
 			return: "test123456..net."
-		},
-		{
-			title: "Sieve with string"
-			source: #"""
-				sieve("vector.dev", "eov")
-				"""#
-			return: "veoev"
 		},
 		{
 			title: "Custom replacements"
