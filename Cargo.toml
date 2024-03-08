@@ -915,6 +915,7 @@ component-validation-tests = [
   "sinks-splunk_hec",
   "sources-splunk_hec",
   "sinks-datadog_logs",
+  "sources-datadog_agent",
 ]
 
 # Grouping together features for benchmarks. We exclude the API client due to it causing the build process to run out
