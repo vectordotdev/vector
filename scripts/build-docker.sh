@@ -31,12 +31,12 @@ declare -A SUPPORTED_PLATFORMS=(
 
 evaluate_supported_platforms_for_base() {
   local BASE="$1"
-  IFS=, read -ra SUPPORTED_PLATFORMS_FOR_BASE <<< ${SUPPORTED_PLATFORMS["$BASE"]}
+  IFS=, read -ra SUPPORTED_PLATFORMS_FOR_BASE <<< "${SUPPORTED_PLATFORMS["$BASE"]}"
 
   local BUILDABLE_PLATFORMS=""
   for platform in "${REQUESTED_PLATFORMS[@]}"
   do
-    if [[ ${SUPPORTED_PLATFORMS_FOR_BASE[@]} =~ $platform ]]
+    if [[ ${SUPPORTED_PLATFORMS_FOR_BASE[*]} =~ $platform ]]
     then
       BUILDABLE_PLATFORMS+="$platform,"
     else
@@ -60,7 +60,8 @@ build() {
       ARGS+=(--push)
     fi
 
-    local BUILDABLE_PLATFORMS=$(evaluate_supported_platforms_for_base $BASE)
+    local BUILDABLE_PLATFORMS
+    BUILDABLE_PLATFORMS=$(evaluate_supported_platforms_for_base "$BASE")
 
     docker buildx build \
       --platform="$BUILDABLE_PLATFORMS" \
