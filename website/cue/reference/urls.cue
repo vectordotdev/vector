@@ -527,6 +527,7 @@ urls: {
 	unix_timestamp:                             "\(wikipedia)/wiki/Unix_time"
 	utf8:                                       "\(wikipedia)/wiki/UTF-8"
 	uuidv4:                                     "\(wikipedia)/wiki/Universally_unique_identifier#Version_4_(random)"
+	uuidv7:                                     "https://datatracker.ietf.org/doc/html/draft-peabody-dispatch-new-uuid-format-04#name-uuid-version-7"
 	url:                                        "\(wikipedia)/wiki/URL"
 	us_social_security_number:                  "https://www.ssa.gov/history/ssn/geocard.html"
 	user_agent:                                 "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/User-Agent"
