@@ -17,7 +17,7 @@ pub mod aws_sqs;
 pub mod datadog_agent;
 #[cfg(feature = "sources-demo_logs")]
 pub mod demo_logs;
-#[cfg(all(unix, feature = "sources-dnstap"))]
+#[cfg(feature = "sources-dnstap")]
 pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 pub mod docker_logs;

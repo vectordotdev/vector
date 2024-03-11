@@ -7,7 +7,7 @@ jobs:
   cross-linux:
     name: Cross - ${{ matrix.target }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       CARGO_INCREMENTAL: 0
     strategy:

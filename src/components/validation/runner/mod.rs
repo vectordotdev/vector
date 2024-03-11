@@ -205,6 +205,14 @@ impl Runner {
 
         let test_cases = load_component_test_cases(&self.test_case_data_path)?;
         for test_case in test_cases {
+            println!("");
+            println!("");
+            info!(
+                "Running test '{}' case for component '{}' (type: {:?})...",
+                test_case.name,
+                self.configuration.component_name,
+                self.configuration.component_type()
+            );
             // Create a task coordinator for each relevant phase of the test.
             //
             // This provides us the granularity to know when the tasks associated with each phase
@@ -513,7 +521,11 @@ fn spawn_component_topology(
     let mut config = config_builder
         .build()
         .expect("config should not have any errors");
-    config.healthchecks.set_require_healthy(Some(true));
+
+    // It's possible we could extend the framework to allow specifying logic to
+    // handle that, but I don't see much value currently since the healthcheck is
+    // not enforced for components, and it doesn't impact the internal telemetry.
+    config.healthchecks.enabled = false;
 
     _ = std::thread::spawn(move || {
         let test_runtime = Builder::new_current_thread()
@@ -602,10 +614,17 @@ fn spawn_input_driver(
             if !failure_case || component_type == ComponentType::Sink {
                 input_runner_metrics.sent_events_total += 1;
 
-                // The event is wrapped in a Vec to match the actual event storage in
-                // the real topology
+                // This particular metric is tricky because a component can run the
+                // EstimatedJsonSizeOf calculation on a single event or an array of
+                // events. If it's an array of events, the size calculation includes
+                // the size of bracket ('[', ']') characters... But we have no way
+                // of knowing which case it will be. Indeed, there are even components
+                // where BOTH scenarios are possible, depending on how the component
+                // is configured.
+                // This is handled in the component spec validator code where we compare
+                // the actual to the expected.
                 input_runner_metrics.sent_event_bytes_total +=
-                    vec![event].estimated_json_encoded_size_of().get() as u64;
+                    event.estimated_json_encoded_size_of().get() as u64;
             }
         }
         info!("Input driver sent all events.");

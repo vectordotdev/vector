@@ -8,6 +8,17 @@ mod validators;
 
 use crate::config::{BoxedSink, BoxedSource, BoxedTransform};
 
+/// For components implementing `ValidatableComponent`
+pub mod prelude {
+    pub use super::ComponentTestCaseConfig;
+    pub use super::ExternalResource;
+    pub use super::HttpResourceConfig;
+    pub use super::ResourceDirection;
+    pub use super::ValidatableComponent;
+    pub use super::ValidationConfiguration;
+    pub use crate::register_validatable_component;
+}
+
 pub use self::resources::*;
 #[cfg(feature = "component-validation-runner")]
 pub use self::runner::*;
@@ -268,6 +279,7 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
         .enable_all()
         .build()
         .unwrap();
+
     rt.block_on(async {
         let mut runner = Runner::from_configuration(
             configuration,
@@ -409,8 +421,7 @@ fn get_validation_configuration_from_test_case_path(
 }
 
 #[cfg(feature = "component-validation-runner")]
-pub fn validate_component(test_case_data_path: &str) {
-    let test_case_data_path = std::path::PathBuf::from(test_case_data_path.to_string());
+pub fn validate_component(test_case_data_path: std::path::PathBuf) {
     if !test_case_data_path.exists() {
         panic!("Component validation test invoked with path to test case data that could not be found: {}", test_case_data_path.to_string_lossy());
     }
@@ -426,6 +437,9 @@ mod tests {
     #[test_generator::test_resources("tests/validation/components/**/*.yaml")]
     pub fn validate_component(test_case_data_path: &str) {
         crate::test_util::trace_init();
+
+        let test_case_data_path = std::path::PathBuf::from(test_case_data_path.to_string());
+
         super::validate_component(test_case_data_path);
     }
 }
