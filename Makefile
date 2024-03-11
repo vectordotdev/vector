@@ -264,7 +264,7 @@ cross-%: export CFLAGS += -g0 -O3
 cross-%: cargo-install-cross
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross ${COMMAND} \
-		$(if $(findstring release,$(PROFILE)),--release,) \
+		--profile $(PROFILE) \
 		--target ${TRIPLE} \
 		--no-default-features \
 		--features target-${TRIPLE}
@@ -276,7 +276,7 @@ target/%/vector: export CFLAGS += -g0 -O3
 target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
-		$(if $(findstring release,$(PROFILE)),--release,) \
+		--profile $(PROFILE) \
 		--target ${TRIPLE} \
 		--no-default-features \
 		--features target-${TRIPLE}
@@ -502,8 +502,8 @@ build-rustdoc: ## Build Vector's Rustdocs
 
 # archives
 target/artifacts/vector-${VERSION}-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-${VERSION}-%.tar.gz=%)
-target/artifacts/vector-${VERSION}-%.tar.gz: override PROFILE =release
-target/artifacts/vector-${VERSION}-%.tar.gz: target/%/release/vector.tar.gz
+target/artifacts/vector-${VERSION}-%.tar.gz: export PROFILE ?= release
+target/artifacts/vector-${VERSION}-%.tar.gz: target/%/${PROFILE}/vector.tar.gz
 	@echo "Built to ${<}, relocating to ${@}"
 	@mkdir -p target/artifacts/
 	@cp -v \
