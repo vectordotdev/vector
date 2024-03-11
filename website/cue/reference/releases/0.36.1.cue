@@ -7,10 +7,10 @@ releases: "0.36.1": {
 	whats_next: []
 
 	description: """
-			This patch release contains fixes for regressions in 0.36.0.
+		This patch release contains fixes for regressions in 0.36.0.
 
-			**Note:** Please see the release notes for [`v0.36.0`](/releases/0.36.0/) for additional changes if upgrading from
-			`v0.35.X`. In particular, see the upgrade guide for breaking changes.
+		**Note:** Please see the release notes for [`v0.36.0`](/releases/0.36.0/) for additional changes if upgrading from
+		`v0.35.X`. In particular, see the upgrade guide for breaking changes.
 		"""
 
 	changelog: [
