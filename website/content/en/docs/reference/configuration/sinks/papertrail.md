@@ -1,7 +1,7 @@
 ---
 title: Papertrail
 description: Deliver log events to [Papertrail](https://www.solarwinds.com/papertrail) from SolarWinds
-kind: sink
+component_kind: sink
 layout: component
 tags: ["papertrail", "solarwinds", "component", "sink", "logs"]
 ---

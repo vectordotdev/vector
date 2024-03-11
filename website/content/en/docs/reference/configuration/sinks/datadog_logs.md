@@ -1,7 +1,7 @@
 ---
 title: Datadog logs
 description: Publish log events to [Datadog](https://docs.datadoghq.com)
-kind: sink
+component_kind: sink
 layout: component
 tags: ["datadog", "component", "sink", "logs"]
 ---
