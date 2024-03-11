@@ -1,0 +1,2 @@
+Adds CompressionLayer to allow for Accept-Encoding header to be respected by prometheus exporter endpoint.
+Makes a number of functions more generic as a result. Includes new unit test to verify encoding behavior.

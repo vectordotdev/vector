@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
+    body::HttpBody,
     header::HeaderValue,
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
@@ -20,6 +21,7 @@ use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tower::ServiceBuilder;
+use tower_http::compression::CompressionLayer;
 use tracing::{Instrument, Span};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
@@ -353,7 +355,7 @@ impl MetricNormalize for PrometheusExporterMetricNormalizer {
     }
 }
 
-fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
+fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
     if let Some(auth) = auth {
         let headers = req.headers();
         if let Some(auth_header) = headers.get(hyper::header::AUTHORIZATION) {
@@ -394,9 +396,9 @@ struct Handler {
 }
 
 impl Handler {
-    fn handle(
+    fn handle<T: HttpBody>(
         &self,
-        req: Request<Body>,
+        req: Request<T>,
         metrics: &RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>,
     ) -> Response<Body> {
         let mut response = Response::new(Body::empty());
@@ -494,6 +496,7 @@ impl PrometheusExporter {
 
             let service = ServiceBuilder::new()
                 .layer(build_http_trace_layer(span.clone()))
+                .layer(CompressionLayer::new())
                 .service(inner);
 
             async move { Ok::<_, Infallible>(service) }
@@ -604,15 +607,15 @@ impl StreamSink<Event> for PrometheusExporter {
 mod tests {
     use chrono::{Duration, Utc};
     use futures::stream;
+    use flate2::read::GzDecoder;
     use indoc::indoc;
     use similar_asserts::assert_eq;
+    use std::io::Read;
     use tokio::{sync::oneshot::error::TryRecvError, time};
     use vector_lib::{
         event::{MetricTags, StatisticKind},
-        metric_tags, samples,
-    };
-    use vector_lib::{
         finalization::{BatchNotifier, BatchStatus},
+        metric_tags, samples,
         sensitive_string::SensitiveString,
     };
 
@@ -794,6 +797,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn encoding_gzip() {
+        let (name1, event1) = create_metric_gauge(None, 123.4);
+        let events = vec![event1];
+
+        let body_raw = export_and_fetch_raw(None, events, false, Some(String::from("gzip"))).await;
+        let expected = format!(
+            indoc! {r#"
+                # HELP {name} {name}
+                # TYPE {name} gauge
+                {name}{{some_tag="some_value"}} 123.4
+            "#},
+            name = name1,
+        );
+
+        let mut gz = GzDecoder::new(&body_raw[..]);
+        let mut body_decoded = String::new();
+        let _ = gz.read_to_string(&mut body_decoded);
+
+        assert!(body_raw.len() < expected.len());
+        assert_eq!(body_decoded, expected);
+    }
+
+    #[tokio::test]
     async fn updates_timestamps() {
         let timestamp1 = Utc::now();
         let (name, event1) = create_metric_gauge(None, 123.4);
@@ -869,11 +895,12 @@ mod tests {
         )));
     }
 
-    async fn export_and_fetch(
+    async fn export_and_fetch_raw(
         tls_config: Option<TlsEnableableConfig>,
         mut events: Vec<Event>,
         suppress_timestamp: bool,
-    ) -> String {
+        encoding: Option<String>,
+    ) -> hyper::body::Bytes {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
@@ -908,9 +935,17 @@ mod tests {
         // Events are marked as delivered as soon as they are aggregated.
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let request = Request::get(format!("{}://{}/metrics", proto, address))
+        let mut request = Request::get(format!("{}://{}/metrics", proto, address))
             .body(Body::empty())
             .expect("Error creating request.");
+
+        if let Some(ref encoding) = encoding {
+            request.headers_mut().insert(
+                http::header::ACCEPT_ENCODING,
+                HeaderValue::from_str(encoding.as_str()).unwrap(),
+            );
+        }
+
         let proxy = ProxyConfig::default();
         let result = HttpClient::new(client_settings, &proxy)
             .unwrap()
@@ -920,14 +955,29 @@ mod tests {
 
         assert!(result.status().is_success());
 
+        if encoding.is_some() {
+            assert!(result
+                .headers()
+                .contains_key(http::header::CONTENT_ENCODING));
+        }
+
         let body = result.into_body();
         let bytes = hyper::body::to_bytes(body)
             .await
             .expect("Reading body failed");
-        let result = String::from_utf8(bytes.to_vec()).unwrap();
 
         sink_handle.await.unwrap();
 
+        bytes
+    }
+
+    async fn export_and_fetch(
+        tls_config: Option<TlsEnableableConfig>,
+        events: Vec<Event>,
+        suppress_timestamp: bool,
+    ) -> String {
+        let bytes = export_and_fetch_raw(tls_config, events, suppress_timestamp, None);
+        let result = String::from_utf8(bytes.await.to_vec()).unwrap();
         result
     }
 
