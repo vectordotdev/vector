@@ -1,9 +1,12 @@
 //! Shared functionality for the AWS components.
 pub mod auth;
 pub mod region;
+pub mod timeout;
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
-use aws_config::{meta::region::ProvideRegion, retry::RetryConfig, Region, SdkConfig};
+use aws_config::{
+    meta::region::ProvideRegion, retry::RetryConfig, timeout::TimeoutConfig, Region, SdkConfig,
+};
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::{
     http_request::{SignableBody, SignableRequest, SigningSettings},
@@ -40,6 +43,7 @@ use std::{
     },
     task::{Context, Poll},
 };
+pub use timeout::AwsTimeout;
 
 use crate::config::ProxyConfig;
 use crate::http::{build_proxy_connector, build_tls_connector, status};
@@ -163,8 +167,9 @@ pub async fn create_client<T: ClientBuilder>(
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
+    timeout: &Option<AwsTimeout>,
 ) -> crate::Result<T::Client> {
-    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options)
+    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options, timeout)
         .await
         .map(|(client, _)| client)
 }
@@ -176,6 +181,7 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
+    timeout: &Option<AwsTimeout>,
 ) -> crate::Result<(T::Client, Region)> {
     let retry_config = RetryConfig::disabled();
 
@@ -214,6 +220,16 @@ pub async fn create_client_and_region<T: ClientBuilder>(
         aws_config::default_provider::use_fips::use_fips_provider(&provider_config).await
     {
         config_builder = config_builder.use_fips(use_fips);
+    }
+
+    if let Some(timeout) = timeout {
+        config_builder = config_builder.timeout_config(
+            TimeoutConfig::builder()
+                .connect_timeout(timeout.connect_timeout())
+                .operation_timeout(timeout.operation_timeout())
+                .read_timeout(timeout.read_timeout())
+                .build(),
+        );
     }
 
     let config = config_builder.build();

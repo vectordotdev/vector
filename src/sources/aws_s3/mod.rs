@@ -17,7 +17,10 @@ use vrl::value::{kind::Collection, Kind};
 use super::util::MultilineConfig;
 use crate::codecs::DecodingConfig;
 use crate::{
-    aws::{auth::AwsAuthentication, create_client, create_client_and_region, RegionOrEndpoint},
+    aws::{
+        auth::AwsAuthentication, create_client, create_client_and_region, AwsTimeout,
+        RegionOrEndpoint,
+    },
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
     config::{
         ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
@@ -130,6 +133,11 @@ pub struct AwsS3Config {
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
+
+    // Client timeout configuration for S3 operations.
+    #[configurable(derived)]
+    #[serde(default)]
+    timeout: Option<AwsTimeout>,
 }
 
 const fn default_framing() -> FramingConfig {
@@ -237,6 +245,7 @@ impl AwsS3Config {
             endpoint.clone(),
             proxy,
             &self.tls_options,
+            &self.timeout,
         )
         .await?;
 
@@ -252,6 +261,7 @@ impl AwsS3Config {
                     endpoint,
                     proxy,
                     &sqs.tls_options,
+                    &sqs.timeout,
                 )
                 .await?;
 
