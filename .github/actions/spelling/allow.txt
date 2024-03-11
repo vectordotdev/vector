@@ -442,6 +442,7 @@ solarwinds
 splunk
 ssh
 staticuser
+statsd
 symbian
 tanushri
 timeframe
