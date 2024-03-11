@@ -77,6 +77,16 @@ base: components: sources: syslog: configuration: {
 		required:      true
 		type: string: examples: ["/path/to/socket"]
 	}
+	permit_origin: {
+		description: """
+			List of allowed origin IP networks
+
+			By default, all origins are allowed
+			"""
+		relevant_when: "mode = \"tcp\""
+		required:      false
+		type: array: items: type: string: {}
+	}
 	receive_buffer_bytes: {
 		description: """
 			The size of the receive buffer used for each connection.

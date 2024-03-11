@@ -2,6 +2,7 @@ use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     time::Duration,
 };
+use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use bytes::Bytes;
 use futures::{StreamExt, TryFutureExt};
@@ -92,6 +93,11 @@ pub struct TcpConfig {
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
+    /// List of allowed origin IP networks
+    ///
+    /// By default, all origins are allowed
+    pub permit_origin: Option<IpAllowlistConfig>,
+
     #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsSourceConfig>,
@@ -117,6 +123,7 @@ impl TcpConfig {
         Self {
             address,
             keepalive: None,
+            permit_origin: None,
             tls: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             receive_buffer_bytes: None,
@@ -168,7 +175,10 @@ impl SourceConfig for StatsdConfig {
                     cx,
                     false.into(),
                     config.connection_limit,
-                    None,
+                    config
+                        .permit_origin
+                        .clone()
+                        .map(|p| p.0.iter().map(|net| net.0).collect()),
                     StatsdConfig::NAME,
                     LogNamespace::Legacy,
                 )

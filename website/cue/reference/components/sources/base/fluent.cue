@@ -46,6 +46,15 @@ base: components: sources: fluent: configuration: {
 			type: uint: unit: "seconds"
 		}
 	}
+	permit_origin: {
+		description: """
+			List of allowed origin IP networks
+
+			By default, all origins are allowed
+			"""
+		required: false
+		type: array: items: type: string: {}
+	}
 	receive_buffer_bytes: {
 		description: """
 			The size of the receive buffer used for each connection.

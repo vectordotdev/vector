@@ -5,6 +5,7 @@ use std::{
     convert::TryFrom,
     io::{self, Read},
 };
+use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::ZlibDecoder;
@@ -44,6 +45,11 @@ pub struct LogstashConfig {
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    /// List of allowed origin IP networks
+    ///
+    /// By default, all origins are allowed
+    pub permit_origin: Option<IpAllowlistConfig>,
 
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
@@ -117,6 +123,7 @@ impl Default for LogstashConfig {
         Self {
             address: SocketListenAddr::SocketAddr("0.0.0.0:5044".parse().unwrap()),
             keepalive: None,
+            permit_origin: None,
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
@@ -162,7 +169,9 @@ impl SourceConfig for LogstashConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
-            None,
+            self.permit_origin
+                .clone()
+                .map(|p| p.0.iter().map(|net| net.0).collect()),
             LogstashConfig::NAME,
             log_namespace,
         )
@@ -717,6 +726,7 @@ mod test {
             let source = LogstashConfig {
                 address: address.into(),
                 tls: None,
+                permit_origin: None,
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: true.into(),
@@ -960,6 +970,7 @@ mod integration_tests {
                 address: address.into(),
                 tls: Some(tls_config),
                 keepalive: None,
+                permit_origin: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
