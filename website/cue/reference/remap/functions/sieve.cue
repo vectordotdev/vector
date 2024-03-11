@@ -17,29 +17,29 @@ remap: functions: sieve: {
 			type: ["string"]
 		},
 		{
-			name:        "pattern"
+			name: "pattern"
 			description: """
 				Keep all matches of this pattern.
 				"""
-			required:    true
+			required: true
 			type: ["regex"]
 		},
 		{
-			name:        "replace_single"
+			name: "replace_single"
 			description: """
 				The string to use to replace single rejected characters.
 				"""
-			required:    false
-			default:	 ""
+			required: false
+			default:  ""
 			type: ["string"]
 		},
 		{
-			name:        "replace_repeated"
+			name: "replace_repeated"
 			description: """
 				The string to use to replace multiple sequential instances of rejected characters.
 				"""
-			required:    false
-			default:	 ""
+			required: false
+			default:  ""
 			type: ["string"]
 		},
 	]
