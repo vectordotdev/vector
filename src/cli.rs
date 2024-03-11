@@ -213,11 +213,12 @@ pub struct RootOpts {
     #[arg(long, env = "VECTOR_ALLOW_EMPTY_CONFIG", default_value = "false")]
     pub allow_empty_config: bool,
 
-    /// Turn on strict mode for environment variable interpolation. When set, interpolation of a
-    /// missing environment variable in configuration files will cause an error instead of a
-    /// warning, which will result in a failure to load any such configuration file. This defaults
-    /// to false, but that default is deprecated and will be changed to strict in future versions.
-    #[arg(long, env = "VECTOR_STRICT_ENV_VARS", default_value = "false")]
+    /// Turn on strict mode for environment variable interpolation. When set, interpolation of
+    /// a missing environment variable in configuration files will cause an error instead of
+    /// a warning, which will result in a failure to load any such configuration file. This option
+    /// is deprecated and will be removed in a future version to remove the ability to downgrade
+    /// missing environment variables to warnings.
+    #[arg(long, env = "VECTOR_STRICT_ENV_VARS", default_value = "true")]
     pub strict_env_vars: bool,
 }
 
