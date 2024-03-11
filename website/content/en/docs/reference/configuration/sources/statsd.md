@@ -1,7 +1,7 @@
 ---
 title: StatsD
 description: Collect metrics emitted via [StatsD](https://github.com/statsd/statsd) protocol
-kind: source
+component_kind: source
 layout: component
 tags: ["statsd", "component", "source", "metrics"]
 ---

@@ -1,7 +1,7 @@
 ---
 title: NATS
 description: Read observability data from subjects on the [NATS](https://nats.io) messaging system
-kind: source
+component_kind: source
 layout: component
 tags: ["nats", "component", "source"]
 ---

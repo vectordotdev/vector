@@ -1,7 +1,7 @@
 ---
 title: GreptimeDB
 description: Writes metric data to [GreptimeDB](https://github.com/greptimeteam/greptimedb)
-kind: sink
+component_kind: sink
 layout: component
 tags: ["greptimedb", "component", "sink", "storage", "time-series", "metrics"]
 ---

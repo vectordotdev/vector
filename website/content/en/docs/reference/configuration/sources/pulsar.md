@@ -1,7 +1,7 @@
 ---
 title: Pulsar
 description: Collect observability events from [Apache Pulsar](https://pulsar.apache.org) topics
-kind: source
+component_kind: source
 layout: component
 tags: ["pulsar", "apache", "component", "source"]
 ---
