@@ -98,7 +98,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
   else
     # Package a .deb file to build a docker container, unless skipped.
     if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
-      make package-deb-x86_64-unknown-linux-gnu
+      make package-deb-x86_64-unknown-linux-gnu PROFILE=dev
     fi
 
     # Prepare test image parameters.

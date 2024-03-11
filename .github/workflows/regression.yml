@@ -288,7 +288,7 @@ jobs:
   build-baseline:
     name: Build baseline Vector container
     runs-on: [linux, ubuntu-20.04-4core]
-    timeout-minutes: 30
+    timeout-minutes: 60
     needs:
       - compute-metadata
     steps:
@@ -326,7 +326,7 @@ jobs:
   build-comparison:
     name: Build comparison Vector container
     runs-on: [linux, ubuntu-20.04-4core]
-    timeout-minutes: 30
+    timeout-minutes: 60
     needs:
       - compute-metadata
     steps:
