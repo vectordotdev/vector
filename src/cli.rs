@@ -218,7 +218,15 @@ pub struct RootOpts {
     /// a warning, which will result in a failure to load any such configuration file. This option
     /// is deprecated and will be removed in a future version to remove the ability to downgrade
     /// missing environment variables to warnings.
-    #[arg(long, env = "VECTOR_STRICT_ENV_VARS", default_value = "true")]
+    #[arg(
+        long,
+        env = "VECTOR_STRICT_ENV_VARS",
+        default_value = "true",
+        default_missing_value = "true",
+        num_args = 0..=1,
+        require_equals = true,
+        action = ArgAction::Set
+    )]
     pub strict_env_vars: bool,
 }
 
