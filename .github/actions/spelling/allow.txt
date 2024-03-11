@@ -164,6 +164,7 @@ pront
 Proscan
 Qmobilevn
 RPZ
+RRSIGs
 Rackspace
 Rathi
 Regza
@@ -253,6 +254,7 @@ buildname
 buildroot
 bytestream
 callsites
+cdnskey
 cncf
 codepath
 codepaths
@@ -261,6 +263,7 @@ compiletime
 coredns
 corejs
 coreutils
+csync
 curta
 daemonset
 dalek
@@ -282,6 +285,7 @@ dnsutils
 dockercmd
 downsides
 downwardapi
+ede
 emoji
 esbuild
 etld
@@ -342,6 +346,7 @@ ifneq
 imobile
 influxd
 ionik
+ipallowlist
 ipod
 ircd
 jemalloc

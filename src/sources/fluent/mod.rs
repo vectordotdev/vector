@@ -110,6 +110,7 @@ impl SourceConfig for FluentConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            None,
             FluentConfig::NAME,
             log_namespace,
         )

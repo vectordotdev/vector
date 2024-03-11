@@ -34,7 +34,7 @@ mod conditions;
 mod datadog_metrics;
 #[cfg(feature = "sinks-datadog_traces")]
 mod datadog_traces;
-#[cfg(feature = "transforms-dedupe")]
+#[cfg(feature = "transforms-impl-dedupe")]
 mod dedupe;
 #[cfg(feature = "sources-demo_logs")]
 mod demo_logs;
@@ -102,7 +102,7 @@ mod process;
     feature = "sinks-prometheus"
 ))]
 mod prometheus;
-#[cfg(feature = "sinks-pulsar")]
+#[cfg(any(feature = "sinks-pulsar", feature = "sources-pulsar"))]
 mod pulsar;
 #[cfg(feature = "sources-redis")]
 mod redis;
@@ -169,7 +169,7 @@ pub(crate) use self::codecs::*;
 pub(crate) use self::datadog_metrics::*;
 #[cfg(feature = "sinks-datadog_traces")]
 pub(crate) use self::datadog_traces::*;
-#[cfg(feature = "transforms-dedupe")]
+#[cfg(feature = "transforms-impl-dedupe")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-demo_logs")]
 pub(crate) use self::demo_logs::*;
@@ -237,7 +237,7 @@ pub(crate) use self::postgresql_metrics::*;
     feature = "sinks-prometheus"
 ))]
 pub(crate) use self::prometheus::*;
-#[cfg(feature = "sinks-pulsar")]
+#[cfg(any(feature = "sinks-pulsar", feature = "sources-pulsar"))]
 pub(crate) use self::pulsar::*;
 #[cfg(feature = "sources-redis")]
 pub(crate) use self::redis::*;

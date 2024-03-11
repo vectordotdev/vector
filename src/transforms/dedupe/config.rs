@@ -1,74 +1,21 @@
-use std::{future::ready, num::NonZeroUsize, pin::Pin};
-
-use bytes::Bytes;
-use futures::{Stream, StreamExt};
-use lru::LruCache;
-use vector_lib::config::{clone_input_definitions, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::ConfigTargetPath;
-use vrl::path::OwnedTargetPath;
+use vector_lib::{
+    config::{clone_input_definitions, LogNamespace},
+    configurable::configurable_component,
+};
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
         TransformOutput,
     },
-    event::{Event, Value},
-    internal_events::DedupeEventsDropped,
     schema,
-    transforms::{TaskTransform, Transform},
+    transforms::Transform,
 };
 
-/// Options to control what fields to match against.
-///
-/// When no field matching configuration is specified, events are matched using the `timestamp`,
-/// `host`, and `message` fields from an event. The specific field names used are those set in
-/// the global [`log schema`][global_log_schema] configuration.
-///
-/// [global_log_schema]: https://vector.dev/docs/reference/configuration/global-options/#log_schema
-// TODO: This enum renders correctly in terms of providing equivalent Cue output when using the
-// machine-generated stuff vs the previously-hand-written Cue... but what it _doesn't_ have in the
-// machine-generated output is any sort of blurb that these "fields" (`match` and `ignore`) are
-// actually mutually exclusive.
-//
-// We know that to be the case when we're generating the output from the configuration schema, so we
-// need to emit something in that output to indicate as much, and further, actually use it on the
-// Cue side to add some sort of boilerplate about them being mutually exclusive, etc.
-#[configurable_component]
-#[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
-pub enum FieldMatchConfig {
-    /// Matches events using only the specified fields.
-    #[serde(rename = "match")]
-    MatchFields(
-        #[configurable(metadata(
-            docs::examples = "field1",
-            docs::examples = "parent.child_field"
-        ))]
-        Vec<ConfigTargetPath>,
-    ),
-
-    /// Matches events using all fields except for the ignored ones.
-    #[serde(rename = "ignore")]
-    IgnoreFields(
-        #[configurable(metadata(
-            docs::examples = "field1",
-            docs::examples = "parent.child_field",
-            docs::examples = "host",
-            docs::examples = "hostname"
-        ))]
-        Vec<ConfigTargetPath>,
-    ),
-}
-
-/// Caching configuration for deduplication.
-#[configurable_component]
-#[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct CacheConfig {
-    /// Number of events to cache and use for comparing incoming events to previously seen events.
-    pub num_events: NonZeroUsize,
-}
+use super::{
+    common::{default_cache_config, fill_default_fields_match, CacheConfig, FieldMatchConfig},
+    transform::Dedupe,
+};
 
 /// Configuration for the `dedupe` transform.
 #[configurable_component(transform("dedupe", "Deduplicate logs passing through a topology."))]
@@ -82,59 +29,6 @@ pub struct DedupeConfig {
     #[configurable(derived)]
     #[serde(default = "default_cache_config")]
     pub cache: CacheConfig,
-}
-
-fn default_cache_config() -> CacheConfig {
-    CacheConfig {
-        num_events: NonZeroUsize::new(5000).expect("static non-zero number"),
-    }
-}
-
-// TODO: Add support to the `configurable(metadata(..))` helper attribute for passing an expression
-// that will provide the value for the metadata attribute's value, as well as letting all metadata
-// attributes have whatever value they want, so long as it can be serialized by `serde_json`.
-//
-// Once we have that, we could curry these default values (and others) via a metadata attribute
-// instead of via `serde(default = "...")` to allow for displaying default values in the
-// configuration schema _without_ actually changing how a field is populated during deserialization.
-//
-// See the comment in `fill_default_fields_match` for more information on why this is required.
-//
-// TODO: These values are used even for events with the new "Vector" log namespace.
-//   These aren't great defaults in that case, but hard-coding isn't much better since the
-//   structure can vary significantly. This should probably either become a required field
-//   in the future, or maybe the "semantic meaning" can be utilized here.
-fn default_match_fields() -> Vec<ConfigTargetPath> {
-    let mut fields = Vec::new();
-    if let Some(message_key) = log_schema().message_key_target_path() {
-        fields.push(ConfigTargetPath(message_key.clone()));
-    }
-    if let Some(host_key) = log_schema().host_key_target_path() {
-        fields.push(ConfigTargetPath(host_key.clone()));
-    }
-    if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
-        fields.push(ConfigTargetPath(timestamp_key.clone()));
-    }
-    fields
-}
-
-impl DedupeConfig {
-    pub fn fill_default_fields_match(&self) -> FieldMatchConfig {
-        // We provide a default value on `fields`, based on `default_match_fields`, in order to
-        // drive the configuration schema and documentation. Since we're getting the values from the
-        // configured log schema, though, the default field values shown in the configuration
-        // schema/documentation may not be the same as an actual user's Vector configuration.
-        match &self.fields {
-            Some(FieldMatchConfig::MatchFields(x)) => FieldMatchConfig::MatchFields(x.clone()),
-            Some(FieldMatchConfig::IgnoreFields(y)) => FieldMatchConfig::IgnoreFields(y.clone()),
-            None => FieldMatchConfig::MatchFields(default_match_fields()),
-        }
-    }
-}
-
-pub struct Dedupe {
-    fields: FieldMatchConfig,
-    cache: LruCache<CacheEntry, bool>,
 }
 
 impl GenerateConfig for DedupeConfig {
@@ -151,7 +45,10 @@ impl GenerateConfig for DedupeConfig {
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::event_task(Dedupe::new(self.clone())))
+        Ok(Transform::event_task(Dedupe::new(
+            self.cache.num_events,
+            fill_default_fields_match(self.fields.as_ref()),
+        )))
     }
 
     fn input(&self) -> Input {
@@ -171,126 +68,6 @@ impl TransformConfig for DedupeConfig {
     }
 }
 
-type TypeId = u8;
-
-/// A CacheEntry comes in two forms, depending on the FieldMatchConfig in use.
-///
-/// When matching fields, a CacheEntry contains a vector of optional 2-tuples.
-/// Each element in the vector represents one field in the corresponding
-/// LogEvent. Elements in the vector will correspond 1:1 (and in order) to the
-/// fields specified in "fields.match". The tuples each store the TypeId for
-/// this field and the data as Bytes for the field. There is no need to store
-/// the field name because the elements of the vector correspond 1:1 to
-/// "fields.match", so there is never any ambiguity about what field is being
-/// referred to. If a field from "fields.match" does not show up in an incoming
-/// Event, the CacheEntry will have None in the correspond location in the
-/// vector.
-///
-/// When ignoring fields, a CacheEntry contains a vector of 3-tuples. Each
-/// element in the vector represents one field in the corresponding LogEvent.
-/// The tuples will each contain the field name, TypeId, and data as Bytes for
-/// the corresponding field (in that order). Since the set of fields that might
-/// go into CacheEntries is not known at startup, we must store the field names
-/// as part of CacheEntries. Since Event objects store their field in alphabetic
-/// order (as they are backed by a BTreeMap), and we build CacheEntries by
-/// iterating over the fields of the incoming Events, we know that the
-/// CacheEntries for 2 equivalent events will always contain the fields in the
-/// same order.
-#[derive(PartialEq, Eq, Hash)]
-enum CacheEntry {
-    Match(Vec<Option<(TypeId, Bytes)>>),
-    Ignore(Vec<(OwnedTargetPath, TypeId, Bytes)>),
-}
-
-/// Assigns a unique number to each of the types supported by Event::Value.
-const fn type_id_for_value(val: &Value) -> TypeId {
-    match val {
-        Value::Bytes(_) => 0,
-        Value::Timestamp(_) => 1,
-        Value::Integer(_) => 2,
-        Value::Float(_) => 3,
-        Value::Boolean(_) => 4,
-        Value::Object(_) => 5,
-        Value::Array(_) => 6,
-        Value::Null => 7,
-        Value::Regex(_) => 8,
-    }
-}
-
-impl Dedupe {
-    pub fn new(config: DedupeConfig) -> Self {
-        let num_entries = config.cache.num_events;
-        let fields = config.fill_default_fields_match();
-        Self {
-            fields,
-            cache: LruCache::new(num_entries),
-        }
-    }
-
-    fn transform_one(&mut self, event: Event) -> Option<Event> {
-        let cache_entry = build_cache_entry(&event, &self.fields);
-        if self.cache.put(cache_entry, true).is_some() {
-            emit!(DedupeEventsDropped { count: 1 });
-            None
-        } else {
-            Some(event)
-        }
-    }
-}
-
-/// Takes in an Event and returns a CacheEntry to place into the LRU cache
-/// containing all relevant information for the fields that need matching
-/// against according to the specified FieldMatchConfig.
-fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
-    match &fields {
-        FieldMatchConfig::MatchFields(fields) => {
-            let mut entry = Vec::new();
-            for field_name in fields.iter() {
-                if let Some(value) = event.as_log().get(field_name) {
-                    entry.push(Some((type_id_for_value(value), value.coerce_to_bytes())));
-                } else {
-                    entry.push(None);
-                }
-            }
-            CacheEntry::Match(entry)
-        }
-        FieldMatchConfig::IgnoreFields(fields) => {
-            let mut entry = Vec::new();
-
-            if let Some(event_fields) = event.as_log().all_event_fields() {
-                if let Some(metadata_fields) = event.as_log().all_metadata_fields() {
-                    for (field_name, value) in event_fields.chain(metadata_fields) {
-                        if let Ok(path) = ConfigTargetPath::try_from(field_name) {
-                            if !fields.contains(&path) {
-                                entry.push((
-                                    path.0,
-                                    type_id_for_value(value),
-                                    value.coerce_to_bytes(),
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
-
-            CacheEntry::Ignore(entry)
-        }
-    }
-}
-
-impl TaskTransform<Event> for Dedupe {
-    fn transform(
-        self: Box<Self>,
-        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
-    where
-        Self: 'static,
-    {
-        let mut inner = self;
-        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -306,7 +83,7 @@ mod tests {
         event::{Event, LogEvent, ObjectMap, Value},
         test_util::components::assert_transform_compliance,
         transforms::{
-            dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig},
+            dedupe::config::{CacheConfig, DedupeConfig, FieldMatchConfig},
             test::create_topology,
         },
     };

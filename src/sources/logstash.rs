@@ -162,6 +162,7 @@ impl SourceConfig for LogstashConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            None,
             LogstashConfig::NAME,
             log_namespace,
         )

@@ -30,6 +30,11 @@ impl Validator for ComponentSpecValidator {
         telemetry_events: &[Event],
         runner_metrics: &RunnerMetrics,
     ) -> Result<Vec<String>, Vec<String>> {
+        let expect_received_events = inputs
+            .iter()
+            .filter(|te| !te.should_fail() || te.should_reject())
+            .count() as u64;
+
         for input in inputs {
             info!("Validator observed input event: {:?}", input);
         }
@@ -79,7 +84,12 @@ impl Validator for ComponentSpecValidator {
             format!("received {} telemetry events", telemetry_events.len()),
         ];
 
-        let out = validate_telemetry(component_type, telemetry_events, runner_metrics)?;
+        let out = validate_telemetry(
+            component_type,
+            telemetry_events,
+            runner_metrics,
+            expect_received_events,
+        )?;
         run_out.extend(out);
 
         Ok(run_out)
@@ -90,6 +100,7 @@ fn validate_telemetry(
     component_type: ComponentType,
     telemetry_events: &[Event],
     runner_metrics: &RunnerMetrics,
+    expect_received_events: u64,
 ) -> Result<Vec<String>, Vec<String>> {
     let mut out: Vec<String> = Vec::new();
     let mut errs: Vec<String> = Vec::new();
@@ -111,6 +122,7 @@ fn validate_telemetry(
             runner_metrics,
             metric_type,
             component_type,
+            expect_received_events,
         ) {
             Err(e) => errs.extend(e),
             Ok(m) => out.extend(m),
@@ -129,6 +141,7 @@ fn validate_metric(
     runner_metrics: &RunnerMetrics,
     metric_type: &ComponentMetricType,
     component_type: ComponentType,
+    expect_received_events: u64,
 ) -> Result<Vec<String>, Vec<String>> {
     let component_id = match component_type {
         ComponentType::Source => TEST_SOURCE_NAME,
@@ -179,7 +192,13 @@ fn validate_metric(
         ComponentMetricType::DiscardedEventsTotal => runner_metrics.discarded_events_total,
     };
 
-    compare_actual_to_expected(telemetry_events, metric_type, component_id, expected)
+    compare_actual_to_expected(
+        telemetry_events,
+        metric_type,
+        component_id,
+        expected,
+        expect_received_events,
+    )
 }
 
 fn filter_events_by_metric_and_component<'a>(
@@ -204,6 +223,7 @@ fn filter_events_by_metric_and_component<'a>(
         })
         .filter(|&m| {
             if m.name() == metric.to_string() {
+                debug!("{}", m);
                 if let Some(tags) = m.tags() {
                     if tags.get("component_id").unwrap_or("") == component_id {
                         return true;
@@ -252,6 +272,7 @@ fn compare_actual_to_expected(
     metric_type: &ComponentMetricType,
     component_id: &str,
     expected: u64,
+    expect_received_events: u64,
 ) -> Result<Vec<String>, Vec<String>> {
     let mut errs: Vec<String> = Vec::new();
 
@@ -262,7 +283,15 @@ fn compare_actual_to_expected(
 
     info!("{}: expected {}, actual {}.", metric_type, expected, actual,);
 
-    if actual != expected {
+    if actual != expected &&
+        // This is a bit messy. The issue is that EstimatedJsonSizeOf can be called by a component
+        // on an event array, or on a single event. And we have no way of knowing which that is.
+        // By default the input driver for the framework is not assuming it is an array, so we
+        // check here if it matches what the array scenario would be, which is to add the size of
+        // the brackets, for each event.
+        (metric_type != &ComponentMetricType::EventsReceivedBytes
+            || (actual != (expected + (expect_received_events * 2))))
+    {
         errs.push(format!(
             "{}: expected {}, but received {}",
             metric_type, expected, actual

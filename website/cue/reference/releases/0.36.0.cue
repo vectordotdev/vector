@@ -22,6 +22,21 @@ releases: "0.36.0": {
 		instructions on how to migrate.
 		"""
 
+	known_issues: [
+		"""
+			AWS components don't support use of `credentials_process` in AWS configs. Fixed in v0.36.1.
+			""",
+		"""
+			AWS components don't support auto-detection of region . Fixed in v0.36.1.
+			""",
+		"""
+			AWS components don't support use of `assume_role`. Fixed in v0.36.1.
+			""",
+		"""
+			The `kafka` sink occasionally panics during rebalance events. Fixed in v0.36.1.
+			""",
+	]
+
 	changelog: [
 		{
 			type: "feat"

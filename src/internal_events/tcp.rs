@@ -45,6 +45,30 @@ impl InternalEvent for TcpSocketConnectionShutdown {
 }
 
 #[derive(Debug)]
+pub struct TcpSocketError<'a, E> {
+    pub(crate) error: &'a E,
+    pub peer_addr: SocketAddr,
+}
+
+impl<E: std::fmt::Display> InternalEvent for TcpSocketError<'_, E> {
+    fn emit(self) {
+        error!(
+            message = "TCP socket error.",
+            error = %self.error,
+            peer_addr = ?self.peer_addr,
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct TcpSocketTlsConnectionError {
     pub error: TlsError,
 }
