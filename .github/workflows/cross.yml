@@ -10,6 +10,7 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_INCREMENTAL: 0
+      PROFILE: dev
     strategy:
       matrix:
         target:
