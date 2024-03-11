@@ -5,6 +5,7 @@
 //! [maxmind]: https://dev.maxmind.com/geoip/geoip2/downloadable
 //! [geolite]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
+use vector_lib::event::KeyString;
 
 use maxminddb::{
     geoip2::{City, ConnectionType, Isp},
@@ -18,8 +19,8 @@ use vrl::value::{ObjectMap, Value};
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
 
 // MaxMind GeoIP database files have a type field we can use to recognize specific
-// products. If we encounter one of these two types, we look for ASN/ISP information;
-// otherwise we expect to be working with a City database.
+// products. If it is an unknown type, it will be treated as a Custom kind and will
+// directly read data from the database.
 #[derive(Copy, Clone, Debug)]
 #[allow(missing_docs)]
 pub enum DatabaseKind {
@@ -27,6 +28,7 @@ pub enum DatabaseKind {
     Isp,
     ConnectionType,
     City,
+    Custom,
 }
 
 impl From<&str> for DatabaseKind {
@@ -35,7 +37,8 @@ impl From<&str> for DatabaseKind {
             "GeoLite2-ASN" => Self::Asn,
             "GeoIP2-ISP" => Self::Isp,
             "GeoIP2-Connection-Type" => Self::ConnectionType,
-            _ => Self::City,
+            "GeoIP2-City" => Self::City,
+            _ => Self::Custom,
         }
     }
 }
@@ -120,6 +123,7 @@ impl Geoip {
             DatabaseKind::Asn | DatabaseKind::Isp => dbreader.lookup::<Isp>(ip).map(|_| ()),
             DatabaseKind::ConnectionType => dbreader.lookup::<ConnectionType>(ip).map(|_| ()),
             DatabaseKind::City => dbreader.lookup::<City>(ip).map(|_| ()),
+            DatabaseKind::Custom => dbreader.lookup::<ObjectMap>(ip).map(|_| ()),
         };
 
         match result {
@@ -216,6 +220,17 @@ impl Geoip {
                 let data = self.dbreader.lookup::<ConnectionType>(ip).ok()?;
 
                 add_field!("connection_type", data.connection_type);
+            }
+            DatabaseKind::Custom => {
+                let mut data = self.dbreader.lookup::<ObjectMap>(ip).ok()?;
+
+                if let Some(fields) = select {
+                    for field in fields {
+                        data.remove(&KeyString::from(field.as_str()));
+                    }
+                }
+
+                map = data;
             }
         }
 
@@ -442,6 +457,24 @@ mod tests {
         let values = find("10.1.12.1", "tests/data/GeoIP2-Connection-Type-Test.mmdb");
 
         assert!(values.is_none());
+    }
+
+    #[test]
+    fn custom_mmdb_type() {
+        let values = find("208.192.1.2", "tests/data/custom-type.mmdb").unwrap();
+
+        let mut expected = ObjectMap::new();
+        expected.insert("hostname".into(), "vectortest".into());
+        expected.insert(
+            "nested".into(),
+            ObjectMap::from([
+                ("hostname".into(), "vectortest".into()),
+                ("original_cidr".into(), "208.192.1.2/24".into()),
+            ])
+            .into(),
+        );
+
+        assert_eq!(values, expected);
     }
 
     fn find(ip: &str, database: &str) -> Option<ObjectMap> {
