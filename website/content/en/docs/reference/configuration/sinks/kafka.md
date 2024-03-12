@@ -1,7 +1,7 @@
 ---
 title: Kafka
 description: Publish observability data to [Apache Kafka](https://kafka.apache.org) topics
-kind: sink
+component_kind: sink
 layout: component
 tags: ["kafka", "apache", "component", "sink"]
 ---

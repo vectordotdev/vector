@@ -1,7 +1,7 @@
 ---
 title: Lua
 description: Modify event data using the [Lua](https://lua.org) programming language
-kind: transform
+component_kind: transform
 layout: component
 tags: ["lua", "runtime", "component", "transform"]
 ---

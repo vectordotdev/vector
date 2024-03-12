@@ -1,7 +1,7 @@
 ---
 title: dnstap
 description: Collect DNS logs from a [dnstap](https://dnstap.info)-compatible server
-kind: source
+component_kind: source
 layout: component
 tags: ["dnstap", "dns", "component", "source", "logs"]
 ---

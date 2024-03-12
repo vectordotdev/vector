@@ -1,7 +1,7 @@
 ---
 title: StatsD
 description: Deliver metric data to a [StatsD](https://github.com/statsd/statsd) aggregator
-kind: sink
+component_kind: sink
 layout: component
 tags: ["statsd", "component", "sink", "metrics"]
 ---
