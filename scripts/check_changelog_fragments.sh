@@ -61,8 +61,11 @@ while IFS= read -r fname; do
   # used for external contributor PRs.
   if [[ $1 == "--authors" ]]; then
     last=$( tail -n 1 "${CHANGELOG_DIR}/${fname}" )
-    if [[ "${last}" =~ ^(authors: @.*)$ ]]; then
+    if [[ "${last}" == "authors: "*@* ]]; then
       echo "invalid fragment contents: author should not be prefixed with @"
+      exit 1
+    elif [[ "${last}" == "authors: "*,* ]]; then
+      echo "invalid fragment contents: authors should be space delimited, not comma delimited."
       exit 1
     elif ! [[ "${last}" =~ ^(authors: .*)$ ]]; then
       echo "invalid fragment contents: author option was specified but fragment ${fname} contains no authors."
