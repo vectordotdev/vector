@@ -292,11 +292,12 @@ target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
 target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
 target/%/vector.tar.gz: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
+target/%/vector.tar.gz: export TARGET_SUBDIR ?=$(if $(filter-out release,$(PROFILE)),debug,release)
 target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 	rm -rf target/scratch/vector-${TRIPLE} || true
 	mkdir -p target/scratch/vector-${TRIPLE}/bin target/scratch/vector-${TRIPLE}/etc
 	cp -R -f -v \
-		target/${TRIPLE}/${PROFILE}/vector \
+		target/${TRIPLE}/${TARGET_SUBDIR}/vector \
 		target/scratch/vector-${TRIPLE}/bin/vector
 	cp -R -f -v \
 		README.md \
@@ -312,7 +313,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 	tar --create \
 		--gzip \
 		--verbose \
-		--file target/${TRIPLE}/${PROFILE}/vector.tar.gz \
+		--file target/${TRIPLE}/${TARGET_SUBDIR}/vector.tar.gz \
 		--directory target/scratch/ \
 		./vector-${TRIPLE}
 	rm -rf target/scratch/
@@ -511,7 +512,8 @@ build-rustdoc: ## Build Vector's Rustdocs
 # archives
 target/artifacts/vector-${VERSION}-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-${VERSION}-%.tar.gz=%)
 target/artifacts/vector-${VERSION}-%.tar.gz: export PROFILE ?= release
-target/artifacts/vector-${VERSION}-%.tar.gz: target/%/$(if $(filter-out release,$(PROFILE)),dev,release)/vector.tar.gz
+target/artifacts/vector-${VERSION}-%.tar.gz: export TARGET_SUBDIR ?=$(if $(filter-out release,$(PROFILE)),debug,release)
+target/artifacts/vector-${VERSION}-%.tar.gz: target/%/$(TARGET_SUBDIR)/vector.tar.gz
 	@echo "Built to ${<}, relocating to ${@}"
 	@mkdir -p target/artifacts/
 	@cp -v \
