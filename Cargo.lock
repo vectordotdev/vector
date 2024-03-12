@@ -10547,8 +10547,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8bfe806485288b36a6024f820b9874176130497673ab5a1935cb09ea0af88c6"
+source = "git+https://github.com/vectordotdev/vrl?rev=b85d349ff13cfe7fc7b9a539746cc195872c86b4#b85d349ff13cfe7fc7b9a539746cc195872c86b4"
 dependencies = [
  "aes",
  "ansi_term",
@@ -10601,6 +10600,8 @@ dependencies = [
  "pest_derive",
  "prettydiff",
  "prettytable-rs",
+ "prost 0.12.3",
+ "prost-reflect",
  "psl",
  "quickcheck",
  "quoted_printable",
