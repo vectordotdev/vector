@@ -2,7 +2,7 @@ use crate::common::protobuf::get_message_descriptor;
 use crate::encoding::BuildError;
 use bytes::BytesMut;
 use prost::Message;
-use prost_reflect::{MessageDescriptor};
+use prost_reflect::MessageDescriptor;
 use std::path::PathBuf;
 use tokio_util::codec::Encoder;
 use vector_core::{
@@ -79,7 +79,9 @@ impl Encoder<Event> for ProtobufSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let message = match event {
-            Event::Log(log) => vrl::protobuf::encode_message(&self.message_descriptor, log.into_parts().0),
+            Event::Log(log) => {
+                vrl::protobuf::encode_message(&self.message_descriptor, log.into_parts().0)
+            }
             Event::Metric(_) => unimplemented!(),
             Event::Trace(trace) => vrl::protobuf::encode_message(
                 &self.message_descriptor,

@@ -97,7 +97,8 @@ impl Deserializer for ProtobufDeserializer {
         let dynamic_message = DynamicMessage::decode(self.message_descriptor.clone(), bytes)
             .map_err(|error| format!("Error parsing protobuf: {:?}", error))?;
 
-        let proto_vrl = vrl::protobuf::proto_to_value(&prost_reflect::Value::Message(dynamic_message), None)?;
+        let proto_vrl =
+            vrl::protobuf::proto_to_value(&prost_reflect::Value::Message(dynamic_message), None)?;
         let mut event = Event::Log(LogEvent::from(proto_vrl));
         let event = match log_namespace {
             LogNamespace::Vector => event,
