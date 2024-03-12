@@ -26,7 +26,7 @@ env:
   TEST_LOG: vector=debug
   VERBOSE: true
   CI: true
-  PROFILE: debug
+  PROFILE: dev
 
 jobs:
   test-integration:

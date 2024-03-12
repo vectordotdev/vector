@@ -29,7 +29,7 @@ jobs:
       # We're not actually doing a debug build, we're just turning off the logic
       # in release-flags.sh so that we don't override the Cargo "release" profile
       # with full LTO / single codegen unit.
-      PROFILE: debug
+      PROFILE: dev
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3

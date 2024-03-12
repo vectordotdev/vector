@@ -45,7 +45,7 @@ env:
   VERBOSE: true
   DISABLE_MOLD: true
   CI: true
-  PROFILE: debug
+  PROFILE: dev
 
 jobs:
   changes:
