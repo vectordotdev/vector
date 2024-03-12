@@ -173,10 +173,7 @@ impl SourceConfig for StatsdConfig {
                     cx,
                     false.into(),
                     config.connection_limit,
-                    config
-                        .permit_origin
-                        .clone()
-                        .map(|p| p.0.iter().map(|net| net.0).collect()),
+                    config.permit_origin.clone().map(Into::into),
                     StatsdConfig::NAME,
                     LogNamespace::Legacy,
                 )

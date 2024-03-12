@@ -207,7 +207,7 @@ impl SourceConfig for SyslogConfig {
                     cx,
                     false.into(),
                     connection_limit,
-                    permit_origin.map(|p| p.0.iter().map(|net| net.0).collect()),
+                    permit_origin.map(Into::into),
                     SyslogConfig::NAME,
                     log_namespace,
                 )

@@ -38,3 +38,9 @@ impl Configurable for IpNetConfig {
         Metadata::with_description("IP network")
     }
 }
+
+impl From<IpAllowlistConfig> for Vec<IpNet> {
+    fn from(value: IpAllowlistConfig) -> Self {
+        value.0.iter().map(|net| net.0).collect()
+    }
+}

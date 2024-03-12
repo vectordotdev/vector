@@ -167,9 +167,7 @@ impl SourceConfig for LogstashConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
-            self.permit_origin
-                .clone()
-                .map(|p| p.0.iter().map(|net| net.0).collect()),
+            self.permit_origin.clone().map(Into::into),
             LogstashConfig::NAME,
             log_namespace,
         )

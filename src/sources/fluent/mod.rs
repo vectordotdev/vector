@@ -115,9 +115,7 @@ impl SourceConfig for FluentConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
-            self.permit_origin
-                .clone()
-                .map(|p| p.0.iter().map(|net| net.0).collect()),
+            self.permit_origin.clone().map(Into::into),
             FluentConfig::NAME,
             log_namespace,
         )
