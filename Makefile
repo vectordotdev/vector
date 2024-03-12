@@ -511,7 +511,7 @@ build-rustdoc: ## Build Vector's Rustdocs
 # archives
 target/artifacts/vector-${VERSION}-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-${VERSION}-%.tar.gz=%)
 target/artifacts/vector-${VERSION}-%.tar.gz: export PROFILE ?= release
-target/artifacts/vector-${VERSION}-%.tar.gz: target/%/${PROFILE}/vector.tar.gz
+target/artifacts/vector-${VERSION}-%.tar.gz: target/%/$(if $(filter-out release,$(PROFILE)),dev,release)/vector.tar.gz
 	@echo "Built to ${<}, relocating to ${@}"
 	@mkdir -p target/artifacts/
 	@cp -v \
