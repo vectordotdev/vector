@@ -87,11 +87,7 @@ base: components: sources: dnstap: configuration: {
 		type: bool: {}
 	}
 	permit_origin: {
-		description: """
-			List of allowed origin IP networks
-
-			By default, all origins are allowed
-			"""
+		description:   "List of allowed origin IP networks."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: array: items: type: string: {}
