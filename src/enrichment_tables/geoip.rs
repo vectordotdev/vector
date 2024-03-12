@@ -464,11 +464,11 @@ mod tests {
         let values = find("208.192.1.2", "tests/data/custom-type.mmdb").unwrap();
 
         let mut expected = ObjectMap::new();
-        expected.insert("hostname".into(), "vectortest".into());
+        expected.insert("hostname".into(), "custom".into());
         expected.insert(
             "nested".into(),
             ObjectMap::from([
-                ("hostname".into(), "vectortest".into()),
+                ("hostname".into(), "custom".into()),
                 ("original_cidr".into(), "208.192.1.2/24".into()),
             ])
             .into(),
