@@ -6,12 +6,22 @@ use ipnet::IpNet;
 use vector_config::{configurable_component, Configurable, Metadata, ToValue};
 use vector_config_common::schema::{InstanceType, SchemaGenerator, SchemaObject};
 
-/// List of allowed origin IP networks.
+/// List of allowed origin IP networks. IP addresses must be in CIDR notation.
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, transparent)]
 #[configurable(metadata(docs::human_name = "Allowed IP network origins"))]
+#[configurable(metadata(docs::examples = "ip_allow_list_example()"))]
 pub struct IpAllowlistConfig(pub Vec<IpNetConfig>);
+
+const fn ip_allow_list_example() -> [&'static str; 4] {
+    [
+        "192.168.0.0/16",
+        "127.0.0.1/32",
+        "::1/128",
+        "9876:9ca3:99ab::23/128",
+    ]
+}
 
 /// IP network
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

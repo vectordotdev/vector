@@ -78,10 +78,10 @@ base: components: sources: syslog: configuration: {
 		type: string: examples: ["/path/to/socket"]
 	}
 	permit_origin: {
-		description:   "List of allowed origin IP networks."
+		description:   "List of allowed origin IP networks. IP addresses must be in CIDR notation."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["192.168.0.0/16", "127.0.0.1/32", "::1/128", "9876:9ca3:99ab::23/128"]
 	}
 	receive_buffer_bytes: {
 		description: """
