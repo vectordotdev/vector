@@ -78,11 +78,7 @@ base: components: sources: syslog: configuration: {
 		type: string: examples: ["/path/to/socket"]
 	}
 	permit_origin: {
-		description: """
-			List of allowed origin IP networks
-
-			By default, all origins are allowed
-			"""
+		description:   "List of allowed origin IP networks."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: array: items: type: string: {}

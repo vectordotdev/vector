@@ -81,9 +81,7 @@ pub enum Mode {
         #[configurable(derived)]
         keepalive: Option<TcpKeepaliveConfig>,
 
-        /// List of allowed origin IP networks
-        ///
-        /// By default, all origins are allowed
+        #[configurable(derived)]
         permit_origin: Option<IpAllowlistConfig>,
 
         #[configurable(derived)]

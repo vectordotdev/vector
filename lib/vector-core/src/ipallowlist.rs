@@ -6,7 +6,7 @@ use ipnet::IpNet;
 use vector_config::{configurable_component, Configurable, Metadata, ToValue};
 use vector_config_common::schema::{InstanceType, SchemaGenerator, SchemaObject};
 
-/// IP network allowlist settings for network components
+/// List of allowed origin IP networks.
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, transparent)]

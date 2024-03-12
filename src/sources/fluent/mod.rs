@@ -51,9 +51,7 @@ pub struct FluentConfig {
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    /// List of allowed origin IP networks
-    ///
-    /// By default, all origins are allowed
+    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
     /// The size of the receive buffer used for each connection.

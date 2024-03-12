@@ -47,12 +47,8 @@ base: components: sources: fluent: configuration: {
 		}
 	}
 	permit_origin: {
-		description: """
-			List of allowed origin IP networks
-
-			By default, all origins are allowed
-			"""
-		required: false
+		description: "List of allowed origin IP networks."
+		required:    false
 		type: array: items: type: string: {}
 	}
 	receive_buffer_bytes: {
