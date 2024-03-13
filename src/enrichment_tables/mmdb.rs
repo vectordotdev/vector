@@ -72,9 +72,12 @@ impl Mmdb {
             let mut filtered = Value::from(ObjectMap::new());
             let mut data_value = Value::from(data);
             for field in fields {
-                if let Some(value) = data_value.remove(field.as_str(), false) {
-                    filtered.insert(field.as_str(), value);
-                }
+                filtered.insert(
+                    field.as_str(),
+                    data_value
+                        .remove(field.as_str(), false)
+                        .unwrap_or(Value::Null),
+                );
             }
             filtered.into_object()
         } else {
@@ -84,6 +87,7 @@ impl Mmdb {
 }
 
 // TODO: Common table impl for Mmdb and Geoip - since it is exactly the same
+// TODO: Handle case sensitivity
 impl Table for Mmdb {
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).

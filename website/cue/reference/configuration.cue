@@ -116,7 +116,8 @@ configuration: {
 					type: string: {
 						enum: {
 							"file":  "Enrich data from a CSV file."
-							"geoip": "Enrich data from a [MaxMind](\(urls.maxmind)) database."
+							"geoip": "Enrich data from a [GeoIp](\(urls.maxmind_geoip2)) [MaxMind](\(urls.maxmind)) database."
+							"mmdb":  "Enrich data from any [MaxMind](\(urls.maxmind)) database."
 						}
 					}
 				}
@@ -220,9 +221,6 @@ configuration: {
 						* [GeoIP2-ISP.mmdb](\(urls.maxmind_geoip2_isp)) (paid) — Determine the Internet
 							Service Provider (ISP), organization name, and autonomous system organization
 							and number associated with an IP address.
-						* Custom - any other database in MaxMind DB file format, which does not
-							match the above mentioned types. Fields are returned as they are stored in
-							the database with no additional mapping.
 
 						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
 
@@ -248,6 +246,29 @@ configuration: {
 							type: string: {
 								default: "en"
 								examples: ["de", "en", "es", "fr", "ja", "pt-BR", "ru", "zh-CN"]
+							}
+						}
+					}
+				}
+			}
+			type: object: options: {
+				mmdb: {
+					required:    true
+					description: """
+						Configuration options for generic [MaxMind](\(urls.maxmind)) databases.
+
+						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
+
+						This enrichment table only supports lookup with IP address.
+						"""
+					type: object: options: {
+						path: {
+							description: """
+								Path to the database file.
+								"""
+							required: true
+							type: string: {
+								examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
 							}
 						}
 					}
