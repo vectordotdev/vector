@@ -46,6 +46,11 @@ base: components: sources: logstash: configuration: {
 			type: uint: unit: "seconds"
 		}
 	}
+	permit_origin: {
+		description: "List of allowed origin IP networks. IP addresses must be in CIDR notation."
+		required:    false
+		type: array: items: type: string: examples: ["192.168.0.0/16", "127.0.0.1/32", "::1/128", "9876:9ca3:99ab::23/128"]
+	}
 	receive_buffer_bytes: {
 		description: "The size of the receive buffer used for each connection."
 		required:    false
