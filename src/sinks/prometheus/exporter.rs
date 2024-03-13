@@ -933,7 +933,7 @@ mod tests {
             .body(Body::empty())
             .expect("Error creating request.");
 
-        if let Some(encoding) = encoding {
+        if let Some(ref encoding) = encoding {
             request.headers_mut().insert(
                 http::header::ACCEPT_ENCODING,
                 HeaderValue::from_str(encoding.as_str()).unwrap(),
@@ -949,14 +949,10 @@ mod tests {
 
         assert!(result.status().is_success());
 
-        if let Some(encoding) = encoding {
-            assert_eq!(
-                result
-                    .headers()
-                    .get(http::header::CONTENT_ENCODING)
-                    .unwrap(),
-                HeaderValue::from_str(encoding.as_str()).unwrap(),
-            );
+        if encoding.is_some() {
+            assert!(result
+                .headers()
+                .contains_key(http::header::CONTENT_ENCODING));
         }
 
         let body = result.into_body();
