@@ -88,27 +88,27 @@ pub struct LogSink<S> {
     protocol: String,
 }
 
+// The Datadog logs intake does not require the fields that are set in this
+// function. But if they are present in the event, we normalize the paths
+// (and value in the case of timestamp) to something that intake understands.
 fn normalize_event(event: &mut Event) {
     let log = event.as_mut_log();
-    let message_path = log
-        .message_path()
-        .expect("message is required (make sure the \"message\" semantic meaning is set)")
-        .clone();
-    log.rename_key(&message_path, event_path!("message"));
+
+    if let Some(message_path) = log.message_path().cloned().as_ref() {
+        log.rename_key(message_path, event_path!("message"));
+    }
 
     if let Some(host_path) = log.host_path().cloned().as_ref() {
         log.rename_key(host_path, event_path!("hostname"));
     }
 
-    let timestamp_path = log
-        .timestamp_path()
-        .expect("timestamp is required (make sure the \"timestamp\" semantic meaning is set)")
-        .clone();
-    if let Some(Value::Timestamp(ts)) = log.remove(&timestamp_path) {
-        log.insert(
-            event_path!("timestamp"),
-            Value::Integer(ts.timestamp_millis()),
-        );
+    if let Some(timestamp_path) = log.timestamp_path().cloned().as_ref() {
+        if let Some(Value::Timestamp(ts)) = log.remove(timestamp_path) {
+            log.insert(
+                event_path!("timestamp"),
+                Value::Integer(ts.timestamp_millis()),
+            );
+        }
     }
 }
 
