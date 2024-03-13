@@ -20,7 +20,6 @@ use super::{ElasticsearchCommon, ElasticsearchConfig};
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     http::HttpClient,
-    internal_events::BadElasticsearchResponse,
     sinks::util::{
         auth::Auth,
         http::{HttpBatchService, RequestConfig},
@@ -207,30 +206,34 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
     }
 }
 
+// This event is not part of the event framework but is kept because some users were depending on it
+// to identify the number of errors returned by Elasticsearch. It can be dropped when we have better
+// telemetry. Ref: #15886
+fn emit_bad_response_error(response: &Response<Bytes>) {
+    let error_code = format!("http_response_{}", response.status().as_u16());
+
+    error!(
+        message =  "Response contained errors.",
+        error_code = error_code,
+        response = ?response,
+    );
+}
+
 fn get_event_status(response: &Response<Bytes>) -> EventStatus {
     let status = response.status();
     if status.is_success() {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
-            emit!(BadElasticsearchResponse::new(
-                "Response contained errors.",
-                response
-            ));
+            emit_bad_response_error(response);
             EventStatus::Rejected
         } else {
             EventStatus::Delivered
         }
     } else if status.is_server_error() {
-        emit!(BadElasticsearchResponse::new(
-            "Response contained errors.",
-            response
-        ));
+        emit_bad_response_error(response);
         EventStatus::Errored
     } else {
-        emit!(BadElasticsearchResponse::new(
-            "Response contained errors.",
-            response
-        ));
+        emit_bad_response_error(response);
         EventStatus::Rejected
     }
 }
