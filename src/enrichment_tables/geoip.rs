@@ -18,8 +18,7 @@ use vrl::value::{ObjectMap, Value};
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
 
 // MaxMind GeoIP database files have a type field we can use to recognize specific
-// products. If it is an unknown type, it will be treated as a Custom kind and will
-// directly read data from the database.
+// products. If it is an unknown type, an error will be returned.
 #[derive(Copy, Clone, Debug)]
 #[allow(missing_docs)]
 pub enum DatabaseKind {
