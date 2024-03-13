@@ -5,7 +5,6 @@
 //! [maxmind]: https://dev.maxmind.com/geoip/geoip2/downloadable
 //! [geolite]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
-use vector_lib::event::KeyString;
 
 use maxminddb::{
     geoip2::{City, ConnectionType, Isp},
@@ -28,17 +27,18 @@ pub enum DatabaseKind {
     Isp,
     ConnectionType,
     City,
-    Custom,
 }
 
-impl From<&str> for DatabaseKind {
-    fn from(v: &str) -> Self {
-        match v {
-            "GeoLite2-ASN" => Self::Asn,
-            "GeoIP2-ISP" => Self::Isp,
-            "GeoIP2-Connection-Type" => Self::ConnectionType,
-            "GeoIP2-City" => Self::City,
-            _ => Self::Custom,
+impl TryFrom<&str> for DatabaseKind {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "GeoLite2-ASN" => Ok(Self::Asn),
+            "GeoIP2-ISP" => Ok(Self::Isp),
+            "GeoIP2-Connection-Type" => Ok(Self::ConnectionType),
+            "GeoIP2-City" => Ok(Self::City),
+            _ => Err(()),
         }
     }
 }
@@ -51,6 +51,7 @@ pub struct GeoipConfig {
     /// (**GeoLite2-City.mmdb**).
     ///
     /// Other databases, such as the country database, are not supported.
+    /// `mmdb` enrichment table can be used for other databases.
     ///
     /// [geoip2]: https://dev.maxmind.com/geoip/geoip2/downloadable
     /// [geolite2]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
@@ -115,7 +116,13 @@ impl Geoip {
     /// Creates a new GeoIP struct from the provided config.
     pub fn new(config: GeoipConfig) -> crate::Result<Self> {
         let dbreader = Arc::new(Reader::open_readfile(config.path.clone())?);
-        let dbkind = DatabaseKind::from(dbreader.metadata.database_type.as_str());
+        let dbkind =
+            DatabaseKind::try_from(dbreader.metadata.database_type.as_str()).map_err(|_| {
+                format!(
+                    "Unsupported MMDB database type ({}). Use `mmdb` enrichment table instead.",
+                    dbreader.metadata.database_type
+                )
+            })?;
 
         // Check if we can read database with dummy Ip.
         let ip = IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
@@ -123,7 +130,6 @@ impl Geoip {
             DatabaseKind::Asn | DatabaseKind::Isp => dbreader.lookup::<Isp>(ip).map(|_| ()),
             DatabaseKind::ConnectionType => dbreader.lookup::<ConnectionType>(ip).map(|_| ()),
             DatabaseKind::City => dbreader.lookup::<City>(ip).map(|_| ()),
-            DatabaseKind::Custom => dbreader.lookup::<ObjectMap>(ip).map(|_| ()),
         };
 
         match result {
@@ -220,17 +226,6 @@ impl Geoip {
                 let data = self.dbreader.lookup::<ConnectionType>(ip).ok()?;
 
                 add_field!("connection_type", data.connection_type);
-            }
-            DatabaseKind::Custom => {
-                let mut data = self.dbreader.lookup::<ObjectMap>(ip).ok()?;
-
-                if let Some(fields) = select {
-                    for field in fields {
-                        data.remove(&KeyString::from(field.as_str()));
-                    }
-                }
-
-                map = data;
             }
         }
 
@@ -460,21 +455,13 @@ mod tests {
     }
 
     #[test]
-    fn custom_mmdb_type() {
-        let values = find("208.192.1.2", "tests/data/custom-type.mmdb").unwrap();
+    fn custom_mmdb_type_error() {
+        let result = Geoip::new(GeoipConfig {
+            path: "tests/data/custom-type.mmdb".to_string(),
+            locale: default_locale(),
+        });
 
-        let mut expected = ObjectMap::new();
-        expected.insert("hostname".into(), "custom".into());
-        expected.insert(
-            "nested".into(),
-            ObjectMap::from([
-                ("hostname".into(), "custom".into()),
-                ("original_cidr".into(), "208.192.1.2/24".into()),
-            ])
-            .into(),
-        );
-
-        assert_eq!(values, expected);
+        assert!(result.is_err());
     }
 
     fn find(ip: &str, database: &str) -> Option<ObjectMap> {
