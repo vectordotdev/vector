@@ -565,6 +565,7 @@ jmxrmi
 jmxtrans
 Jolokia
 jsn
+JSONAs
 jsonify
 jsonlines
 jstype

@@ -8,6 +8,8 @@ use vector_lib::codecs::StreamDecodingError;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::lookup::path;
 use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vrl::core::Value;
+use vrl::value::{KeyString, ObjectMap};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{
@@ -143,12 +145,19 @@ pub(crate) fn decode_log_body(
                                 path!("ddsource"),
                                 ddsource.clone(),
                             );
+
+                            let ddtags: Value = if source.parse_ddtags {
+                                parse_ddtags(&ddtags)
+                            } else {
+                                ddtags.clone().into()
+                            };
+
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
                                 Some(LegacyKey::InsertIfEmpty(path!("ddtags"))),
                                 path!("ddtags"),
-                                ddtags.clone(),
+                                ddtags,
                             );
 
                             namespace.insert_standard_vector_source_metadata(
@@ -191,4 +200,93 @@ pub(crate) fn decode_log_body(
     ));
 
     Ok(decoded)
+}
+
+// ddtags input is a string containing a list of tags which
+// can include both bare tags and key-value pairs.
+// the tag list members are separated by `,` and the
+// tag-value pairs are separated by `:`.
+//
+// The output is an Object regardless of the input string.
+// Bare tags are constructed as a k-v pair with a null value.
+fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
+    if ddtags_raw.is_empty() {
+        return ObjectMap::new().into();
+    }
+
+    let ddtags_str = String::from_utf8_lossy(ddtags_raw);
+
+    // The value is a single bare tag
+    if !ddtags_str.contains(',') && !ddtags_str.contains(':') {
+        return ObjectMap::from([(KeyString::from(ddtags_str), Value::Null)]).into();
+    }
+
+    // There are multiple tags, which could be either bare or pairs
+    let ddtags_object: ObjectMap = ddtags_str
+        .split(',')
+        .filter(|kv| !kv.is_empty())
+        .map(|kv| match kv.split_once(':') {
+            Some((k, v)) => (KeyString::from(k), Value::Bytes(Bytes::from(v.to_string()))),
+            None => (KeyString::from(kv), Value::Null),
+        })
+        .collect();
+
+    if ddtags_object.is_empty() && !ddtags_str.is_empty() {
+        warn!(message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed.")
+    }
+
+    ddtags_object.into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use similar_asserts::assert_eq;
+    use vrl::value;
+
+    #[test]
+    fn ddtags_parse_empty() {
+        let raw = Bytes::from(String::from(""));
+        let val = parse_ddtags(&raw);
+
+        assert_eq!(val, value!({}));
+    }
+
+    #[test]
+    fn ddtags_parse_bare() {
+        let raw = Bytes::from(String::from("bare"));
+        let val = parse_ddtags(&raw);
+
+        assert_eq!(val, value!({"bare": null}));
+    }
+
+    #[test]
+    fn ddtags_parse_kv_one() {
+        let raw = Bytes::from(String::from("filename:driver.log"));
+        let val = parse_ddtags(&raw);
+
+        assert_eq!(val, value!({"filename": "driver.log"}));
+    }
+
+    #[test]
+    fn ddtags_parse_kv_multi() {
+        let raw = Bytes::from(String::from("filename:driver.log,wizard:the_grey"));
+        let val = parse_ddtags(&raw);
+
+        assert_eq!(
+            val,
+            value!({"filename": "driver.log", "wizard": "the_grey"})
+        );
+    }
+
+    #[test]
+    fn ddtags_parse_kv_bare_combo() {
+        let raw = Bytes::from(String::from("filename:driver.log,debug,wizard:the_grey"));
+        let val = parse_ddtags(&raw);
+
+        assert_eq!(
+            val,
+            value!({"filename": "driver.log", "wizard": "the_grey", "debug": null})
+        );
+    }
 }

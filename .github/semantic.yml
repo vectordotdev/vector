@@ -158,6 +158,7 @@ scopes:
   - postgresql_metrics source # Anything `postgresql_metrics` source related
   - prometheus_remote_write source # Anything `prometheus_remote_write` source related
   - prometheus_scrape source # Anything `prometheus_scrape` source related
+  - pulsar source # Anything `pulsar` source related
   - redis source # Anything `redis` source related
   - socket source # Anything `socket` source related
   - splunk_hec source # Anything `splunk_hec` source related
