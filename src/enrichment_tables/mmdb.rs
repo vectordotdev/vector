@@ -86,8 +86,6 @@ impl Mmdb {
     }
 }
 
-// TODO: Common table impl for Mmdb and Geoip - since it is exactly the same
-// TODO: Handle case sensitivity
 impl Table for Mmdb {
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).
