@@ -221,7 +221,7 @@ configuration: {
 							Service Provider (ISP), organization name, and autonomous system organization
 							and number associated with an IP address.
 						* Custom - any other database in MaxMind DB file format, which does not
-							match above mentioned types. Fields are returned as they are stored in
+							match the above mentioned types. Fields are returned as they are stored in
 							the database with no additional mapping.
 
 						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
