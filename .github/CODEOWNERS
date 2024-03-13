@@ -4,15 +4,15 @@ lib/file-source/ @vectordotdev/vector
 lib/k8s-e2e-tests/ @vectordotdev/vector
 lib/k8s-test-framework/ @vectordotdev/vector
 lib/opentelemetry-proto/ @vectordotdev/vector
-lib/vector-common/ @vectordotdev/core-team
-lib/vector-config/ @vectordotdev/core-team
-lib/vector-config-common/ @vectordotdev/core-team
-lib/vector-config-macros/ @vectordotdev/core-team
-lib/vector-core/ @vectordotdev/core-team
-lib/vector-vrl-functions/ @vectordotdev/processing-team
-lib/vrl/ @vectordotdev/processing-team
-src/config/ @vectordotdev/core-team
-src/internal_telemetry/ @vectordotdev/core-team
+lib/vector-common/ @vectordotdev/vector
+lib/vector-config/ @vectordotdev/vector
+lib/vector-config-common/ @vectordotdev/vector
+lib/vector-config-macros/ @vectordotdev/vector
+lib/vector-core/ @vectordotdev/vector
+lib/vector-vrl-functions/ @vectordotdev/vector
+lib/vrl/ @vectordotdev/vector
+src/config/ @vectordotdev/vector
+src/internal_telemetry/ @vectordotdev/vector
 src/sinks/ @vectordotdev/vector
 src/sinks/amqp/ @vectordotdev/vector
 src/sinks/appsignal/ @vectordotdev/vector
@@ -54,7 +54,7 @@ src/sinks/splunk_hec/ @vectordotdev/vector # sink_splunk_hec_logs,sink_splunk_he
 src/sinks/statsd.rs @vectordotdev/vector
 src/sinks/vector/ @vectordotdev/vector
 src/sinks/websocket/ @vectordotdev/vector
-src/source_sender/ @vectordotdev/core-team
+src/source_sender/ @vectordotdev/vector
 src/sources/ @vectordotdev/vector
 src/sources/amqp.rs @vectordotdev/vector
 src/sources/apache_metrics/ @vectordotdev/vector
@@ -94,7 +94,7 @@ src/sources/splunk_hec/ @vectordotdev/vector
 src/sources/statsd/ @vectordotdev/vector
 src/sources/syslog.rs @vectordotdev/vector
 src/sources/vector/ @vectordotdev/vector
-src/test_util/ @vectordotdev/core-team
-src/topology/ @vectordotdev/core-team
-src/transforms/ @vectordotdev/processing-team
+src/test_util/ @vectordotdev/vector
+src/topology/ @vectordotdev/vector
+src/transforms/ @vectordotdev/vector
 website/ @vectordotdev/ux-team @vectordotdev/documentation
