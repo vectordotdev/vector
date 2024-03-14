@@ -8,7 +8,7 @@ use crate::{
     sinks::{
         elasticsearch::{
             sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
-            ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
+            ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode, VersionType,
         },
         util::encoding::Encoder,
     },
@@ -30,6 +30,8 @@ async fn sets_create_action_when_configured() {
         bulk: BulkConfig {
             action: parse_template("{{ action }}te"),
             index: parse_template("vector"),
+            version: Some(parse_template("4{{ my_version }}2")),
+            version_type: VersionType::External.as_str().to_string(),
         },
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
@@ -45,6 +47,52 @@ async fn sets_create_action_when_configured() {
             .expect("invalid timestamp"),
     );
     log.insert("action", "crea");
+    log.insert("my_version", "1337");
+
+    let mut encoded = vec![];
+    let (encoded_size, _json_size) = es
+        .request_builder
+        .encoder
+        .encode_input(
+            vec![process_log(log, &es.mode, None, &config.encoding).unwrap()],
+            &mut encoded,
+        )
+        .unwrap();
+
+    let expected = r#"{"create":{"_index":"vector","_type":"_doc","version_type":"external","version":413372}}
+{"action":"crea","message":"hello there","my_version":"1337","timestamp":"2020-12-01T01:02:03Z"}
+"#;
+    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_eq!(encoded.len(), encoded_size);
+}
+
+#[tokio::test]
+async fn encoding_with_external_versioning_without_version_set_does_not_include_version() {
+    use crate::config::log_schema;
+    use chrono::{TimeZone, Utc};
+
+    let config = ElasticsearchConfig {
+        bulk: BulkConfig {
+            action: parse_template("{{ action }}te"),
+            index: parse_template("vector"),
+            version: None,
+            version_type: VersionType::External.as_str().to_string(),
+        },
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
+        ..Default::default()
+    };
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
+
+    let mut log = LogEvent::from("hello there");
+    log.insert(
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+        Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
+            .single()
+            .expect("invalid timestamp"),
+    );
+    log.insert("action", "crea");
+    log.insert("my_version", 1337);
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -57,7 +105,97 @@ async fn sets_create_action_when_configured() {
         .unwrap();
 
     let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
-{"action":"crea","message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
+{"action":"crea","message":"hello there","my_version":1337,"timestamp":"2020-12-01T01:02:03Z"}
+"#;
+    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_eq!(encoded.len(), encoded_size);
+}
+
+#[tokio::test]
+async fn encoding_with_external_versioning_with_version_set_includes_version() {
+    use crate::config::log_schema;
+    use chrono::{TimeZone, Utc};
+
+    let config = ElasticsearchConfig {
+        bulk: BulkConfig {
+            action: parse_template("{{ action }}te"),
+            index: parse_template("vector"),
+            version: Some(parse_template("{{ my_version }}")),
+            version_type: VersionType::External.as_str().to_string(),
+        },
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
+        ..Default::default()
+    };
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
+
+    let mut log = LogEvent::from("hello there");
+    log.insert(
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+        Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
+            .single()
+            .expect("invalid timestamp"),
+    );
+    log.insert("action", "crea");
+    log.insert("my_version", 1337);
+
+    let mut encoded = vec![];
+    let (encoded_size, _json_size) = es
+        .request_builder
+        .encoder
+        .encode_input(
+            vec![process_log(log, &es.mode, None, &config.encoding).unwrap()],
+            &mut encoded,
+        )
+        .unwrap();
+
+    let expected = r#"{"create":{"_index":"vector","_type":"_doc","version_type":"external","version":1337}}
+{"action":"crea","message":"hello there","my_version":1337,"timestamp":"2020-12-01T01:02:03Z"}
+"#;
+    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_eq!(encoded.len(), encoded_size);
+}
+
+#[tokio::test]
+async fn encoding_with_external_gte_versioning_with_version_set_includes_version() {
+    use crate::config::log_schema;
+    use chrono::{TimeZone, Utc};
+
+    let config = ElasticsearchConfig {
+        bulk: BulkConfig {
+            action: parse_template("{{ action }}te"),
+            index: parse_template("vector"),
+            version: Some(parse_template("{{ my_version }}")),
+            version_type: VersionType::ExternalGte.as_str().to_string(),
+        },
+        endpoints: vec![String::from("https://example.com")],
+        api_version: ElasticsearchApiVersion::V6,
+        ..Default::default()
+    };
+    let es = ElasticsearchCommon::parse_single(&config).await.unwrap();
+
+    let mut log = LogEvent::from("hello there");
+    log.insert(
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+        Utc.with_ymd_and_hms(2020, 12, 1, 1, 2, 3)
+            .single()
+            .expect("invalid timestamp"),
+    );
+    log.insert("action", "crea");
+    log.insert("my_version", 1337);
+
+    let mut encoded = vec![];
+    let (encoded_size, _json_size) = es
+        .request_builder
+        .encoder
+        .encode_input(
+            vec![process_log(log, &es.mode, None, &config.encoding).unwrap()],
+            &mut encoded,
+        )
+        .unwrap();
+
+    let expected = r#"{"create":{"_index":"vector","_type":"_doc","version_type":"external_gte","version":1337}}
+{"action":"crea","message":"hello there","my_version":1337,"timestamp":"2020-12-01T01:02:03Z"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     assert_eq!(encoded.len(), encoded_size);
@@ -197,6 +335,7 @@ async fn handle_metrics() {
         bulk: BulkConfig {
             action: parse_template("create"),
             index: parse_template("vector"),
+            ..Default::default()
         },
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
@@ -239,6 +378,7 @@ async fn decode_bulk_action_error() {
         bulk: BulkConfig {
             action: parse_template("{{ action }}"),
             index: parse_template("vector"),
+            ..Default::default()
         },
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V7,
@@ -271,6 +411,7 @@ async fn decode_bulk_action() {
         bulk: BulkConfig {
             action: parse_template("create"),
             index: parse_template("vector"),
+            ..Default::default()
         },
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V7,
