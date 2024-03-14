@@ -14,7 +14,7 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
-use super::{ElasticsearchCommon, ElasticsearchConfig};
+use super::{ElasticsearchCommon, ElasticsearchConfig, VersionType};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
@@ -123,6 +123,11 @@ pub(super) fn process_log(
     } else {
         None
     };
+    let (version_type, version): (VersionType, Option<u64>) =
+        match (mode.version_type(), mode.version(&log)) {
+            (None, None) | (None, Some(_)) | (Some(_), None) => (VersionType::Internal, None),
+            (Some(vt), Some(v)) => (vt, Some(v)),
+        };
     let log = {
         let mut event = Event::from(log);
         transformer.transform(&mut event);
@@ -133,6 +138,8 @@ pub(super) fn process_log(
         bulk_action,
         log,
         id,
+        version,
+        version_type,
     })
 }
 

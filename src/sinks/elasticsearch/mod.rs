@@ -116,11 +116,55 @@ impl TryFrom<&str> for BulkAction {
     }
 }
 
+/// Elasticsearch version types.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum VersionType {
+    /// The `internal` type.
+    Internal,
+
+    /// The `external` or `external_gt` type.
+    External,
+
+    /// The `external_gte` type.
+    ExternalGte,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+impl VersionType {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            VersionType::Internal => "internal",
+            VersionType::External => "external",
+            VersionType::ExternalGte => "external_gte",
+        }
+    }
+}
+
+impl TryFrom<&str> for VersionType {
+    type Error = String;
+
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        match input {
+            "internal" => Ok(VersionType::Internal),
+            "external" | "external_gt" => Ok(VersionType::External),
+            "external_gte" => Ok(VersionType::ExternalGte),
+            _ => Err(format!("Invalid versioning mode: {}", input)),
+        }
+    }
+}
+
 impl_generate_config_from_default!(ElasticsearchConfig);
 
 #[derive(Debug, Clone)]
 pub enum ElasticsearchCommonMode {
-    Bulk { index: Template, action: Template },
+    Bulk {
+        index: Template,
+        action: Template,
+        version: Option<Template>,
+        version_type: String,
+    },
     DataStream(DataStreamConfig),
 }
 
@@ -159,6 +203,35 @@ impl ElasticsearchCommonMode {
                 .and_then(|value| BulkAction::try_from(value.as_str()).ok()),
             // avoid the interpolation
             ElasticsearchCommonMode::DataStream(_) => Some(BulkAction::Create),
+        }
+    }
+
+    fn version<'a>(&self, event: impl Into<EventRef<'a>>) -> Option<u64> {
+        match self {
+            ElasticsearchCommonMode::Bulk {
+                version: Some(version_template),
+                ..
+            } => version_template
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("version"),
+                        drop_event: true,
+                    });
+                })
+                .ok()
+                .and_then(|value| value.parse().ok()),
+            _ => None,
+        }
+    }
+
+    fn version_type(&self) -> Option<VersionType> {
+        match self {
+            ElasticsearchCommonMode::Bulk { version_type, .. } => {
+                VersionType::try_from(version_type.as_str()).ok()
+            }
+            _ => Some(VersionType::Internal),
         }
     }
 

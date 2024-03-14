@@ -13,7 +13,7 @@ use crate::{
     codecs::Transformer,
     event::{EventFinalizers, Finalizable, LogEvent},
     sinks::{
-        elasticsearch::BulkAction,
+        elasticsearch::{BulkAction, VersionType},
         util::encoding::{as_tracked_write, Encoder},
     },
 };
@@ -24,6 +24,8 @@ pub struct ProcessedEvent {
     pub bulk_action: BulkAction,
     pub log: LogEvent,
     pub id: Option<String>,
+    pub version: Option<u64>,
+    pub version_type: VersionType,
 }
 
 impl Finalizable for ProcessedEvent {
@@ -87,6 +89,8 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
                 &self.doc_type,
                 self.suppress_type_name,
                 &event.id,
+                &event.version,
+                &event.version_type,
             )?;
             written_bytes +=
                 as_tracked_write::<_, _, io::Error>(writer, &log, |mut writer, log| {
@@ -108,33 +112,90 @@ fn write_bulk_action(
     doc_type: &str,
     suppress_type: bool,
     id: &Option<String>,
+    version: &Option<u64>,
+    version_type: &VersionType,
 ) -> std::io::Result<usize> {
     as_tracked_write(
         writer,
-        (bulk_action, index, doc_type, id, suppress_type),
-        |writer, (bulk_action, index, doc_type, id, suppress_type)| match (id, suppress_type) {
-            (Some(id), true) => {
+        (
+            bulk_action,
+            index,
+            doc_type,
+            id,
+            suppress_type,
+            version,
+            version_type,
+        ),
+        |writer, (bulk_action, index, doc_type, id, suppress_type, version, version_type)| match (
+            id,
+            suppress_type,
+            (version_type, version),
+        ) {
+            (_, _, (VersionType::External, None) | (VersionType::ExternalGte, None)) => {
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Tried to use external versioning without specifying the version itself",
+                ))
+            }
+            (None, _, (VersionType::External, Some(_)) | (VersionType::ExternalGte, Some(_))) => {
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Cannot use external versioning without specifying a document ID",
+                ))
+            }
+            (Some(id), true, (VersionType::Internal, _)) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_id":"{}"}}}}"#,
                     bulk_action, index, id
                 )
             }
-            (Some(id), false) => {
+            (Some(id), false, (VersionType::Internal, _)) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#,
                     bulk_action, index, doc_type, id
                 )
             }
-            (None, true) => {
+            (None, true, (VersionType::Internal, _)) => {
                 write!(writer, r#"{{"{}":{{"_index":"{}"}}}}"#, bulk_action, index)
             }
-            (None, false) => {
+            (None, false, (VersionType::Internal, _)) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#,
                     bulk_action, index, doc_type
+                )
+            }
+            (
+                Some(id),
+                true,
+                (VersionType::External, Some(version)) | (VersionType::ExternalGte, Some(version)),
+            ) => {
+                write!(
+                    writer,
+                    r#"{{"{}":{{"_index":"{}","_id":"{}","version_type":"{}","version":{}}}}}"#,
+                    bulk_action,
+                    index,
+                    id,
+                    version_type.as_str(),
+                    version
+                )
+            }
+            (
+                Some(id),
+                false,
+                (VersionType::External, Some(version)) | (VersionType::ExternalGte, Some(version)),
+            ) => {
+                write!(
+                    writer,
+                    r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}","version_type":"{}","version":{}}}}}"#,
+                    bulk_action,
+                    index,
+                    doc_type,
+                    id,
+                    version_type.as_str(),
+                    version
                 )
             }
         },
@@ -156,6 +217,8 @@ mod tests {
             "TYPE",
             true,
             &Some("ID".to_string()),
+            &None,
+            &VersionType::Internal,
         );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
@@ -177,7 +240,16 @@ mod tests {
     fn suppress_type_without_id() {
         let mut writer = Vec::new();
 
-        _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", true, &None);
+        _ = write_bulk_action(
+            &mut writer,
+            "ACTION",
+            "INDEX",
+            "TYPE",
+            true,
+            &None,
+            &None,
+            &VersionType::Internal,
+        );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -204,6 +276,8 @@ mod tests {
             "TYPE",
             false,
             &Some("ID".to_string()),
+            &None,
+            &VersionType::Internal,
         );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
@@ -226,7 +300,16 @@ mod tests {
     fn type_without_id() {
         let mut writer = Vec::new();
 
-        _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", false, &None);
+        _ = write_bulk_action(
+            &mut writer,
+            "ACTION",
+            "INDEX",
+            "TYPE",
+            false,
+            &None,
+            &None,
+            &VersionType::Internal,
+        );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
