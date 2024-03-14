@@ -1,4 +1,4 @@
-The `datadog_logs` source now does not require a semantic meaning input definition for `message` and `timestamp` fields.
+The `datadog_logs` sink now does not require a semantic meaning input definition for `message` and `timestamp` fields.
 
 While the Datadog logs intake does handle these fields if they are present, they aren't required.
 
