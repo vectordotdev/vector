@@ -1,5 +1,5 @@
 //! Handles enrichment tables for `type = mmdb`.
-//! Enrichment data is loaded from any database in MaxMind format.
+//! Enrichment data is loaded from any database in [MaxMind][maxmind] format.
 //!
 //! [maxmind]: https://maxmind.com
 use std::{fs, net::IpAddr, sync::Arc, time::SystemTime};
@@ -16,6 +16,8 @@ use crate::config::{EnrichmentTableConfig, GenerateConfig};
 #[configurable_component(enrichment_table("mmdb"))]
 pub struct MmdbConfig {
     /// Path to the [MaxMind][maxmind] database
+    ///
+    /// [maxmind]: https://maxmind.com
     pub path: String,
 }
 
