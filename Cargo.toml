@@ -938,7 +938,7 @@ remap-benches = ["transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
-enrichment-tables-benches = ["enrichment-tables-geoip"]
+enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb"]
 
 [[bench]]
 name = "default"
