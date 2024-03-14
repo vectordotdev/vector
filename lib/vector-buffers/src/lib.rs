@@ -74,7 +74,7 @@ pub enum WhenFull {
 impl Arbitrary for WhenFull {
     fn arbitrary(g: &mut Gen) -> Self {
         // TODO: We explicitly avoid generating "overflow" as a possible value because nothing yet
-        // supports handling it, and will be defaulted to to using "block" if they encounter
+        // supports handling it, and will be defaulted to using "block" if they encounter
         // "overflow".  Thus, there's no reason to emit it here... yet.
         if bool::arbitrary(g) {
             WhenFull::Block
