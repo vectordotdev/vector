@@ -383,7 +383,7 @@ rstest = {version = "0.18.2"}
 tempfile = "3.10.1"
 test-generator = "0.3.1"
 tokio = { version = "1.36.0", features = ["test-util"] }
-tokio-test = "0.4.3"
+tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
 vrl.workspace = true
