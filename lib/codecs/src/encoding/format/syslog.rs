@@ -32,13 +32,8 @@ pub struct SyslogSerializerConfig {
 
     /// Payload key
     payload_key: String,
-    /// Add log source
-    add_log_source: bool,
 
-    // NOTE: The `tag` field was removed, it is better represented by the equivalents in RFC 5424.
     // Q: The majority of the fields above pragmatically only make sense as config for keys to query?
-    // Q: What was `trim_prefix` for? It is not used in file, nor in Vector source tree.
-    // Q: `add_log_source` doesn't belong here? Better handled by the `remap` transform with structured data?
 }
 
 impl SyslogSerializerConfig {
@@ -145,8 +140,6 @@ impl ConfigDecanter {
             )
     }
 
-    // NOTE: Originally named in PR as: `get_field()`
-    // Now returns a `None` directly instead of converting to either `"-"` or `""`
     fn value_by_key(&self, field_key: &str) -> Option<String> {
         self.log.get(field_key).and_then(|field_value| {
             let bytes = field_value.coerce_to_bytes();
@@ -185,10 +178,6 @@ impl ConfigDecanter {
     fn get_message(&self, config: &SyslogSerializerConfig) -> String {
         let mut message = String::new();
 
-        if config.add_log_source {
-            message.push_str(self.add_log_source().as_str());
-        }
-
         // `payload_key` configures where to source the value for the syslog `message`:
         // - Field key (Valid)   => Get value by lookup (value_by_key)
         // - Field key (Invalid) => Empty string (unwrap_or_default)
@@ -204,19 +193,6 @@ impl ConfigDecanter {
 
         message.push_str(&payload.unwrap_or_default());
         message
-    }
-
-    // NOTE: This is a third-party addition from the original PR author (it is not relevant to the syslog spec):
-    // TODO: Remove, as this type of additional data is better supported via VRL remap + `StructuredData`?
-    fn add_log_source(&self) -> String {
-        let get_value = |s| self.value_by_key(s).unwrap_or_default();
-
-        [
-            "namespace_name=", get_value("kubernetes.namespace_name").as_str(),
-            ", container_name=", get_value("kubernetes.container_name").as_str(),
-            ", pod_name=", get_value("kubernetes.pod_name").as_str(),
-            ", message="
-        ].concat()
     }
 }
 
@@ -319,7 +295,6 @@ struct Tag {
     msg_id: Option<String>
 }
 
-// NOTE: `.as_deref()` usage below avoids requiring `self.clone()`
 impl Tag {
     // Roughly equivalent - RFC 5424 fields can compose the start of
     // an RFC 3164 MSG part (TAG + CONTENT fields):
@@ -356,12 +331,6 @@ struct StructuredData {
 }
 
 // Used by `SyslogMessage::encode()`
-/*
-  Adapted `format_structured_data_rfc5424` method from:
-  https://github.com/vectordotdev/vector/blob/fafe8c50a4721fa3ddbea34e0641d3c145f14388/src/sources/syslog.rs#L1548-L1563
-
-  No notable change in logic, uses `NIL_VALUE` constant, and adapts method to struct instead of free-standing.
-*/
 impl StructuredData {
     fn encode(&self) -> String {
         if self.elements.is_empty() {
@@ -383,12 +352,6 @@ impl StructuredData {
 }
 
 // Used by `ConfigDecanter::decant_config()`
-/*
-  Adapted `structured_data_from_fields()` method from:
-  https://github.com/vectordotdev/vector/blob/fafe8c50a4721fa3ddbea34e0641d3c145f14388/src/sources/syslog.rs#L1439-L1454
-
-  Refactored to `impl From` that uses `flat_map()` instead to collect K/V tuples into a `HashMap`.
-*/
 impl From<ObjectMap> for StructuredData {
     fn from(fields: ObjectMap) -> Self {
         let elements = fields.into_iter().flat_map(|(sd_id, value)| {
@@ -406,14 +369,6 @@ impl From<ObjectMap> for StructuredData {
 }
 
 // Only used as helper to support `StructuredData::from()`
-/*
-  Adapted `value_to_string()` method from:
-  https://github.com/vectordotdev/vector/blob/fafe8c50a4721fa3ddbea34e0641d3c145f14388/src/sources/syslog.rs#L1569-L1579
-  https://github.com/vectordotdev/vrl/blob/main/src/value/value/convert.rs
-  https://github.com/vectordotdev/vrl/blob/main/src/value/value/display.rs
-
-  Simplified via `match` expression which seems better suited for this logic.
-*/
 fn value_to_string(v: Value) -> String {
     match v {
         Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).to_string(),
@@ -434,9 +389,6 @@ struct Pri {
 
 impl Pri {
     fn from_str_variants(facility_variant: &str, severity_variant: &str) -> Self {
-        // The original PR had `deserialize_*()` methods parsed a value to a `u8` or stored a field key as a `String`
-        // Later the equivalent `get_num_*()` method would retrieve the `u8` value or lookup the field key for the actual value,
-        // otherwise it'd fallback to the default Facility/Severity value.
         // This approach instead parses a string of the name or ordinal representation,
         // any reference via field key lookup should have already happened by this point.
         let facility = Facility::into_variant(&facility_variant).unwrap_or(Facility::User);
@@ -505,7 +457,8 @@ enum Severity {
 }
 
 // Additionally support variants from string-based integers:
-// Parse a string name, with fallback for parsing a string ordinal number.
+// Attempts to parse a string for ordinal mapping first, otherwise try the variant name.
+// NOTE: No error handling in place, invalid config will fallback to default during `decant_config()`.
 impl Facility {
     fn into_variant(variant_name: &str) -> Option<Self> {
         let s = variant_name.to_ascii_lowercase();
@@ -518,7 +471,7 @@ impl Facility {
 }
 
 // NOTE: The `strum` crate does not provide traits,
-// requiring copy/paste of the prior impl instead.
+// requiring copy/paste to repeat the previous impl for this enum too.
 impl Severity {
     fn into_variant(variant_name: &str) -> Option<Self> {
         let s = variant_name.to_ascii_lowercase();
