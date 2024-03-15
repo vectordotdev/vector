@@ -426,16 +426,16 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "7.0.1"
+version = "7.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b16926f97f683ff3b47b035cc79622f3d6a374730b07a5d9051e81e88b5f1904"
+checksum = "0ba89a35adbed833e0d21db467093a087c3a07b497626009eae02cb36f060567"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
  "async-graphql-value",
  "async-stream",
  "async-trait",
- "base64 0.13.1",
+ "base64 0.21.7",
  "bytes 1.5.0",
  "chrono",
  "fnv",
@@ -457,9 +457,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "7.0.1"
+version = "7.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6a7349168b79030e3172a620f4f0e0062268a954604e41475eff082380fe505"
+checksum = "9547f7f22688f022ea8001bdd57a1fce8996045dcb959b1730a79bafd366a9d9"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -474,9 +474,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "7.0.1"
+version = "7.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58fdc0adf9f53c2b65bb0ff5170cba1912299f248d0e48266f444b6f005deb1d"
+checksum = "6a8e3d4cc5074c46adfee619b5b6cf817943332f772ed5930ed78871f7dbbac6"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -486,9 +486,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "7.0.1"
+version = "7.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cf4d4e86208f4f9b81a503943c07e6e7f29ad3505e6c9ce6431fe64dc241681"
+checksum = "53ff1287a1283ea772b4099dd556ba4577d35f069ea4a93f337a525beefcfacf"
 dependencies = [
  "bytes 1.5.0",
  "indexmap 2.2.5",
@@ -498,9 +498,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "7.0.1"
+version = "7.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d906b817c1499c0a814ea62b2a9cc03726e50d694d7e8cad3fcc1b24e8b62883"
+checksum = "9fbd05ff161d6abed02f8e994763a9356ae939177f4056d464e767c9b14e86fd"
 dependencies = [
  "async-graphql",
  "futures-util",
