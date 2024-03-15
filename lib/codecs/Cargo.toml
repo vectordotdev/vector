@@ -27,6 +27,7 @@ serde.workspace = true
 serde_json.workspace = true
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
+strum = { version = "0.26", features = ["derive"], optional = true }
 syslog_loose = { version = "0.21", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tracing = { version = "0.1", default-features = false }
@@ -48,4 +49,4 @@ rstest = "0.18.2"
 vrl.workspace = true
 
 [features]
-syslog = ["dep:syslog_loose"]
+syslog = ["dep:syslog_loose", "dep:strum"]

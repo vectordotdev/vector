@@ -1,223 +1,106 @@
-/// Syslog facility
-#[configurable_component]
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum Facility {
-    /// Syslog facility ordinal number
-    Fixed(u8),
+use std::str::FromStr;
+use strum::{FromRepr, EnumString};
 
-    /// Syslog facility name
-    Field(String)
+#[derive(Default, Debug)]
+struct Pri {
+    facility: Facility,
+    severity: Severity,
 }
 
-impl Default for Facility {
-    fn default() -> Self {
-        Facility::Fixed(1)
+impl Pri {
+    fn from_str_variants(facility_variant: &str, severity_variant: &str) -> Self {
+        // The original PR had `deserialize_*()` methods parsed a value to a `u8` or stored a field key as a `String`
+        // Later the equivalent `get_num_*()` method would retrieve the `u8` value or lookup the field key for the actual value,
+        // otherwise it'd fallback to the default Facility/Severity value.
+        // This approach instead parses a string of the name or ordinal representation,
+        // any reference via field key lookup should have already happened by this point.
+        let facility = Facility::into_variant(&facility_variant).unwrap_or(Facility::User);
+        let severity = Severity::into_variant(&severity_variant).unwrap_or(Severity::Informational);
+
+        Self {
+            facility,
+            severity,
+        }
     }
+
+    // The last paragraph describes how to compose the enums into `PRIVAL`:
+    // https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1
+    fn encode(&self) -> String {
+        let prival = (self.facility as u8 * 8) + self.severity as u8;
+        ["<", &prival.to_string(), ">"].concat()
+    }
+}
+
+// Facility + Severity mapping from Name => Ordinal number:
+
+/// Syslog facility
+#[derive(Default, Debug, EnumString, FromRepr, Copy, Clone)]
+#[strum(serialize_all = "kebab-case")]
+enum Facility {
+    Kern = 0,
+    #[default]
+    User = 1,
+    Mail = 2,
+    Daemon = 3,
+    Auth = 4,
+    Syslog = 5,
+    LPR = 6,
+    News = 7,
+    UUCP = 8,
+    Cron = 9,
+    AuthPriv = 10,
+    FTP = 11,
+    NTP = 12,
+    Security = 13,
+    Console = 14,
+    SolarisCron = 15,
+    Local0 = 16,
+    Local1 = 17,
+    Local2 = 18,
+    Local3 = 19,
+    Local4 = 20,
+    Local5 = 21,
+    Local6 = 22,
+    Local7 = 23,
 }
 
 /// Syslog severity
-#[configurable_component]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Default, Debug, EnumString, FromRepr, Copy, Clone)]
+#[strum(serialize_all = "kebab-case")]
 enum Severity {
-    /// Syslog severity ordinal number
-    Fixed(u8),
-
-    /// Syslog severity name
-    Field(String)
+    Emergency = 0,
+    Alert = 1,
+    Critical = 2,
+    Error = 3,
+    Warning = 4,
+    Notice = 5,
+    #[default]
+    Informational = 6,
+    Debug = 7,
 }
 
-impl Default for Severity {
-    fn default() -> Self {
-        Severity::Fixed(6)
+// Additionally support variants from string-based integers:
+// Parse a string name, with fallback for parsing a string ordinal number.
+impl Facility {
+    fn into_variant(variant_name: &str) -> Option<Self> {
+        let s = variant_name.to_ascii_lowercase();
+
+        s.parse::<usize>().map_or_else(
+            |_| Self::from_str(&s).ok(),
+            |num| Self::from_repr(num),
+        )
     }
 }
 
-fn deserialize_facility<'de, D>(d: D) -> Result<Facility, D::Error>
-    where D: de::Deserializer<'de>
-{
-    let value: String = String::deserialize(d)?;
-    let num_value = value.parse::<u8>();
-    match num_value {
-        Ok(num) => {
-            if num > 23 {
-                return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"facility number too large"));
-            } else {
-                return Ok(Facility::Fixed(num));
-            }
-        }
-        Err(_) => {
-            if let Some(field_name) = value.strip_prefix("$.message.") {
-                return Ok(Facility::Field(field_name.to_string()));
-            } else {
-                let num = match value.to_uppercase().as_str() {
-                    "KERN" => 0,
-                    "USER" => 1,
-                    "MAIL" => 2,
-                    "DAEMON" => 3,
-                    "AUTH" => 4,
-                    "SYSLOG" => 5,
-                    "LPR" => 6,
-                    "NEWS" => 7,
-                    "UUCP" => 8,
-                    "CRON" => 9,
-                    "AUTHPRIV" => 10,
-                    "FTP" => 11,
-                    "NTP" => 12,
-                    "SECURITY" => 13,
-                    "CONSOLE" => 14,
-                    "SOLARIS-CRON" => 15,
-                    "LOCAL0" => 16,
-                    "LOCAL1" => 17,
-                    "LOCAL2" => 18,
-                    "LOCAL3" => 19,
-                    "LOCAL4" => 20,
-                    "LOCAL5" => 21,
-                    "LOCAL6" => 22,
-                    "LOCAL7" => 23,
-                    _ => 24,
-                };
-                if num > 23 {
-                    return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"unknown facility"));
-                } else {
-                    return Ok(Facility::Fixed(num))
-                }
-            }
-        }
-    }
-}
+// NOTE: The `strum` crate does not provide traits,
+// requiring copy/paste of the prior impl instead.
+impl Severity {
+    fn into_variant(variant_name: &str) -> Option<Self> {
+        let s = variant_name.to_ascii_lowercase();
 
-fn deserialize_severity<'de, D>(d: D) -> Result<Severity, D::Error>
-    where D: de::Deserializer<'de>
-{
-    let value: String = String::deserialize(d)?;
-    let num_value = value.parse::<u8>();
-    match num_value {
-        Ok(num) => {
-            if num > 7 {
-                return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"severity number too large"))
-            } else {
-                return Ok(Severity::Fixed(num))
-            }
-        }
-        Err(_) => {
-            if let Some(field_name) = value.strip_prefix("$.message.") {
-                return Ok(Severity::Field(field_name.to_string()));
-            } else {
-                let num = match value.to_uppercase().as_str() {
-                    "EMERGENCY" => 0,
-                    "ALERT" => 1,
-                    "CRITICAL" => 2,
-                    "ERROR" => 3,
-                    "WARNING" => 4,
-                    "NOTICE" => 5,
-                    "INFORMATIONAL" => 6,
-                    "DEBUG" => 7,
-                    _ => 8,
-                };
-                if num > 7 {
-                    return Err(de::Error::invalid_value(de::Unexpected::Unsigned(num as u64), &"unknown severity"))
-                } else {
-                    return Ok(Severity::Fixed(num))
-                }
-            }
-        }
-    }
-}
-
-fn get_num_facility(config_facility: &Facility, log: &LogEvent) -> u8 {
-    match config_facility {
-        Facility::Fixed(num) => return *num,
-        Facility::Field(field_name) => {
-            if let Some(field_value) = log.get(field_name.as_str()) {
-                let field_value_string = String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
-                let num_value = field_value_string.parse::<u8>();
-                match num_value {
-                    Ok(num) => {
-                        if num > 23 {
-                            return 1 // USER
-                        } else {
-                            return num
-                        }
-                    }
-                    Err(_) => {
-                            let num = match field_value_string.to_uppercase().as_str() {
-                                "KERN" => 0,
-                                "USER" => 1,
-                                "MAIL" => 2,
-                                "DAEMON" => 3,
-                                "AUTH" => 4,
-                                "SYSLOG" => 5,
-                                "LPR" => 6,
-                                "NEWS" => 7,
-                                "UUCP" => 8,
-                                "CRON" => 9,
-                                "AUTHPRIV" => 10,
-                                "FTP" => 11,
-                                "NTP" => 12,
-                                "SECURITY" => 13,
-                                "CONSOLE" => 14,
-                                "SOLARIS-CRON" => 15,
-                                "LOCAL0" => 16,
-                                "LOCAL1" => 17,
-                                "LOCAL2" => 18,
-                                "LOCAL3" => 19,
-                                "LOCAL4" => 20,
-                                "LOCAL5" => 21,
-                                "LOCAL6" => 22,
-                                "LOCAL7" => 23,
-                                _ => 24,
-                            };
-                            if num > 23 {
-                                return 1 // USER
-                            } else {
-                                return num
-                            }
-                        }
-                    }
-            } else {
-                return 1 // USER
-            }
-        }
-    }
-}
-
-fn get_num_severity(config_severity: &Severity, log: &LogEvent) -> u8 {
-    match config_severity {
-        Severity::Fixed(num) => return *num,
-        Severity::Field(field_name) => {
-            if let Some(field_value) = log.get(field_name.as_str()) {
-                let field_value_string = String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
-                let num_value = field_value_string.parse::<u8>();
-                match num_value {
-                    Ok(num) => {
-                        if num > 7 {
-                            return 6 // INFORMATIONAL
-                        } else {
-                            return num
-                        }
-                    }
-                    Err(_) => {
-                            let num = match field_value_string.to_uppercase().as_str() {
-                                "EMERGENCY" => 0,
-                                "ALERT" => 1,
-                                "CRITICAL" => 2,
-                                "ERROR" => 3,
-                                "WARNING" => 4,
-                                "NOTICE" => 5,
-                                "INFORMATIONAL" => 6,
-                                "DEBUG" => 7,
-                                _ => 8,
-                            };
-                            if num > 7 {
-                                return 6 // INFORMATIONAL
-                            } else {
-                                return num
-                            }
-                        }
-                    }
-            } else {
-                return 6 // INFORMATIONAL
-            }
-        }
+        s.parse::<usize>().map_or_else(
+            |_| Self::from_str(&s).ok(),
+            |num| Self::from_repr(num),
+        )
     }
 }
