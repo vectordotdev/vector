@@ -2,9 +2,10 @@ use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
 use vector_core::{config::DataType, event::{Event, LogEvent}, schema};
 use chrono::{DateTime, SecondsFormat, Local};
-use vrl::value::Value;
+use vrl::value::{ObjectMap, Value};
 use vector_config::configurable_component;
 
+use std::collections::HashMap;
 use std::str::FromStr;
 use strum::{FromRepr, EnumString};
 
@@ -121,7 +122,7 @@ impl ConfigDecanter {
                 proc_id,
                 msg_id,
             },
-            structured_data: None,
+            structured_data: self.get_structured_data(),
             message: self.get_message(&config),
         }
     }
@@ -151,6 +152,12 @@ impl ConfigDecanter {
             let bytes = field_value.coerce_to_bytes();
             String::from_utf8(bytes.to_vec()).ok()
         })
+    }
+
+    fn get_structured_data(&self) -> Option<StructuredData> {
+        self.log.get("structured_data")
+          .and_then(|v| v.clone().into_object())
+          .map(StructuredData::from)
     }
 
     fn get_timestamp(&self) -> DateTime::<Local> {
@@ -281,8 +288,6 @@ impl SyslogMessage {
                 let version = SYSLOG_V1;
                 let timestamp = self.timestamp.to_rfc3339_opts(SecondsFormat::Millis, true);
                 let tag = self.tag.encode_rfc_5424();
-                // Structured Data:
-                // https://datatracker.ietf.org/doc/html/rfc5424#section-6.3
                 let sd = structured_data.as_deref().unwrap_or(NIL_VALUE);
 
                 [
@@ -341,12 +346,79 @@ impl Tag {
     }
 }
 
-#[derive(Debug)]
-struct StructuredData {}
+// Structured Data:
+// https://datatracker.ietf.org/doc/html/rfc5424#section-6.3
+// An SD-ELEMENT consists of a name (SD-ID) + parameter key-value pairs (SD-PARAM)
+type StructuredDataMap = HashMap<String, HashMap<String, String>>;
+#[derive(Debug, Default)]
+struct StructuredData {
+    elements: StructuredDataMap
+}
 
+// Used by `SyslogMessage::encode()`
+/*
+  Adapted `format_structured_data_rfc5424` method from:
+  https://github.com/vectordotdev/vector/blob/fafe8c50a4721fa3ddbea34e0641d3c145f14388/src/sources/syslog.rs#L1548-L1563
+
+  No notable change in logic, uses `NIL_VALUE` constant, and adapts method to struct instead of free-standing.
+*/
 impl StructuredData {
     fn encode(&self) -> String {
-        todo!()
+        if self.elements.is_empty() {
+            NIL_VALUE.to_string()
+        } else {
+            let mut s = String::new();
+
+            for (sd_id, sd_params) in &self.elements {
+                s = s + "[" + sd_id;
+                for (key, value) in sd_params {
+                    s = s + " " + key + "=\"" + value + "\"";
+                }
+                s += "]";
+            }
+
+            s
+        }
+    }
+}
+
+// Used by `ConfigDecanter::decant_config()`
+/*
+  Adapted `structured_data_from_fields()` method from:
+  https://github.com/vectordotdev/vector/blob/fafe8c50a4721fa3ddbea34e0641d3c145f14388/src/sources/syslog.rs#L1439-L1454
+
+  Refactored to `impl From` that uses `flat_map()` instead to collect K/V tuples into a `HashMap`.
+*/
+impl From<ObjectMap> for StructuredData {
+    fn from(fields: ObjectMap) -> Self {
+        let elements = fields.into_iter().flat_map(|(sd_id, value)| {
+            let sd_params = value
+                .into_object()?
+                .into_iter()
+                .map(|(k, v)| (k.into(), value_to_string(v)))
+                .collect();
+
+            Some((sd_id.into(), sd_params))
+        }).collect::<StructuredDataMap>();
+
+        Self { elements }
+    }
+}
+
+// Only used as helper to support `StructuredData::from()`
+/*
+  Adapted `value_to_string()` method from:
+  https://github.com/vectordotdev/vector/blob/fafe8c50a4721fa3ddbea34e0641d3c145f14388/src/sources/syslog.rs#L1569-L1579
+  https://github.com/vectordotdev/vrl/blob/main/src/value/value/convert.rs
+  https://github.com/vectordotdev/vrl/blob/main/src/value/value/display.rs
+
+  Simplified via `match` expression which seems better suited for this logic.
+*/
+fn value_to_string(v: Value) -> String {
+    match v {
+        Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).to_string(),
+        Value::Timestamp(timestamp) => timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true),
+        _ => v.to_string()
     }
 }
 
