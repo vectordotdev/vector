@@ -319,3 +319,62 @@ where
         self.run_inner(input).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use chrono::Utc;
+    use vector_lib::{
+        config::LegacyKey,
+        event::{Event, LogEvent},
+    };
+    use vrl::{event_path, owned_value_path, path};
+
+    use super::normalize_event;
+
+    #[test]
+    fn normalize_event_doesnt_require() {
+        let mut log = LogEvent::default();
+        log.insert(event_path!("foo"), "bar");
+
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+
+        let log = event.as_log();
+
+        assert!(!log.contains(event_path!("message")));
+        assert!(!log.contains(event_path!("timestamp")));
+        assert!(!log.contains(event_path!("hostname")));
+    }
+
+    #[test]
+    fn normalize_event_normalizes() {
+        let mut log = LogEvent::from("hello");
+        let namespace = log.namespace();
+
+        namespace.insert_standard_vector_source_metadata(&mut log, "this_source", Utc::now());
+
+        let legacy_key = Some(owned_value_path!("host"));
+        let legacy_key = legacy_key.as_ref().map(LegacyKey::Overwrite);
+        namespace.insert_source_metadata(
+            "this_source",
+            &mut log,
+            legacy_key,
+            path!("host"),
+            "the_host",
+        );
+
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+
+        let log = event.as_log();
+
+        assert!(log.contains(event_path!("message")));
+        assert!(log.contains(event_path!("timestamp")));
+        assert!(log
+            .get_timestamp()
+            .expect("should have timestamp")
+            .is_integer());
+        assert!(log.contains(event_path!("hostname")));
+    }
+}
