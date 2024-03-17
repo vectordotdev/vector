@@ -596,6 +596,50 @@ base: components: sources: aws_s3: configuration: {
 				required:    true
 				type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
 			}
+			timeout: {
+				description: "Client timeout configuration for AWS operations."
+				required:    false
+				type: object: options: {
+					connect_timeout_seconds: {
+						description: """
+																The connection timeout for AWS requests
+
+																Limits the ammount of time allowed to initiate a socket connection.
+																"""
+						required: false
+						type: uint: {
+							default: 20
+							unit:    "seconds"
+						}
+					}
+					operation_timeout_seconds: {
+						description: """
+																The operation timeout for AWS requests
+
+																Limits the amount of time allowd for an operation to be fully serviced; an operation
+																represents the full request/response lifecycle of a call to a service.
+																"""
+						required: false
+						type: uint: {
+							default: 30
+							unit:    "seconds"
+						}
+					}
+					read_timeout_seconds: {
+						description: """
+																The read timeout for AWS requests
+
+																Limits the amount of time allowed to read the first byte of a response from the time the
+																request is initiated.
+																"""
+						required: false
+						type: uint: {
+							default: 20
+							unit:    "seconds"
+						}
+					}
+				}
+			}
 			tls_options: {
 				description: "TLS configuration."
 				required:    false
@@ -693,6 +737,50 @@ base: components: sources: aws_s3: configuration: {
 				required: false
 				type: uint: {
 					default: 300
+					unit:    "seconds"
+				}
+			}
+		}
+	}
+	timeout: {
+		description: "Client timeout configuration for AWS operations."
+		required:    false
+		type: object: options: {
+			connect_timeout_seconds: {
+				description: """
+					The connection timeout for AWS requests
+
+					Limits the ammount of time allowed to initiate a socket connection.
+					"""
+				required: false
+				type: uint: {
+					default: 20
+					unit:    "seconds"
+				}
+			}
+			operation_timeout_seconds: {
+				description: """
+					The operation timeout for AWS requests
+
+					Limits the amount of time allowd for an operation to be fully serviced; an operation
+					represents the full request/response lifecycle of a call to a service.
+					"""
+				required: false
+				type: uint: {
+					default: 30
+					unit:    "seconds"
+				}
+			}
+			read_timeout_seconds: {
+				description: """
+					The read timeout for AWS requests
+
+					Limits the amount of time allowed to read the first byte of a response from the time the
+					request is initiated.
+					"""
+				required: false
+				type: uint: {
+					default: 20
 					unit:    "seconds"
 				}
 			}
