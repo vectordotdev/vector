@@ -623,21 +623,14 @@ fn spawn_input_driver(
                 if component_type == ComponentType::Source {
                     if let Event::Log(ref mut log) = event {
                         if let Some(ts) = log.remove_timestamp() {
-                            match ts.as_integer() {
-                                Some(ts) => {
-                                    log.parse_path_and_insert(
-                                        "timestamp",
-                                        chrono::DateTime::from_timestamp_millis(ts).expect(
-                                            &format!("invalid timestamp in input test event {ts}"),
-                                        ),
-                                    )
-                                    .expect("failed to insert timestamp");
-                                }
-                                None => {
-                                    log.parse_path_and_insert("timestamp", ts)
-                                        .expect("failed to insert timestamp");
-                                }
-                            }
+                            let ts = match ts.as_integer() {
+                                Some(ts) => chrono::DateTime::from_timestamp_millis(ts)
+                                    .expect(&format!("invalid timestamp in input test event {ts}"))
+                                    .into(),
+                                None => ts,
+                            };
+                            log.parse_path_and_insert("timestamp", ts)
+                                .expect("failed to insert timestamp");
                         }
                     }
                 }
