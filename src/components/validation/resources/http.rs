@@ -240,21 +240,20 @@ fn spawn_input_http_client(
             debug!("Got event to send from runner.");
 
             let mut buffer = BytesMut::new();
-            if let (
-                Json(_),
-                Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
-            ) = (encoder.serializer(), encoder.framer())
-            {
+
+            let is_json = matches!(encoder.serializer(), Json(_))
+                && matches!(
+                    encoder.framer(),
+                    Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })
+                );
+
+            if is_json {
                 buffer.put_u8(b'[');
             }
 
             encode_test_event(&mut encoder, &mut buffer, event);
 
-            if let (
-                Json(_),
-                Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
-            ) = (encoder.serializer(), encoder.framer())
-            {
+            if is_json {
                 if !buffer.is_empty() {
                     // remove trailing comma from last record
                     buffer.truncate(buffer.len() - 1);
