@@ -10,6 +10,7 @@ name = "generate-avro-fixtures"
 path = "tests/bin/generate-avro-fixtures.rs"
 
 [dependencies]
+akin = { version = "0.4", optional = true }
 apache-avro = { version = "0.16.0", default-features = false }
 bytes = { version = "1", default-features = false }
 chrono.workspace = true
@@ -49,4 +50,4 @@ rstest = "0.18.2"
 vrl.workspace = true
 
 [features]
-syslog = ["dep:syslog_loose", "dep:strum"]
+syslog = ["dep:syslog_loose", "dep:strum", "dep:akin"]

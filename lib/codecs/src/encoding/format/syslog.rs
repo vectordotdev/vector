@@ -8,6 +8,7 @@ use vector_config::configurable_component;
 use std::collections::HashMap;
 use std::str::FromStr;
 use strum::{FromRepr, EnumString};
+use akin::akin;
 
 /// Config used to build a `SyslogSerializer`.
 #[configurable_component]
@@ -459,26 +460,17 @@ enum Severity {
 // Additionally support variants from string-based integers:
 // Attempts to parse a string for ordinal mapping first, otherwise try the variant name.
 // NOTE: No error handling in place, invalid config will fallback to default during `decant_config()`.
-impl Facility {
-    fn into_variant(variant_name: &str) -> Option<Self> {
-        let s = variant_name.to_ascii_lowercase();
+akin! {
+    let &enums = [Facility, Severity];
 
-        s.parse::<usize>().map_or_else(
-            |_| Self::from_str(&s).ok(),
-            |num| Self::from_repr(num),
-        )
-    }
-}
+    impl *enums {
+        fn into_variant(variant_name: &str) -> Option<Self> {
+            let s = variant_name.to_ascii_lowercase();
 
-// NOTE: The `strum` crate does not provide traits,
-// requiring copy/paste to repeat the previous impl for this enum too.
-impl Severity {
-    fn into_variant(variant_name: &str) -> Option<Self> {
-        let s = variant_name.to_ascii_lowercase();
-
-        s.parse::<usize>().map_or_else(
-            |_| Self::from_str(&s).ok(),
-            |num| Self::from_repr(num),
-        )
+            s.parse::<usize>().map_or_else(
+                |_| Self::from_str(&s).ok(),
+                |num| Self::from_repr(num),
+            )
+        }
     }
 }
