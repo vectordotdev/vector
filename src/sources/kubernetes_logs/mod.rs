@@ -844,6 +844,7 @@ impl Source {
                 pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
                     name: info.pod_name.to_owned(),
                     namespace: info.pod_namespace.to_owned(),
+                    container_name: info.container_name.to_owned()
                 }),
             });
 

@@ -18,6 +18,7 @@ pub struct KubernetesLogsEventsReceived<'a> {
 pub struct KubernetesLogsPodInfo {
     pub name: String,
     pub namespace: String,
+    pub container_name: String
 }
 
 impl InternalEvent for KubernetesLogsEventsReceived<'_> {
@@ -32,9 +33,10 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
             Some(pod_info) => {
                 let pod_name = pod_info.name;
                 let pod_namespace = pod_info.namespace;
+                let container_name: String = pod_info.container_name;
 
-                counter!("component_received_events_total", 1, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone());
-                counter!("component_received_event_bytes_total", self.byte_size.get() as u64, "pod_name" => pod_name, "pod_namespace" => pod_namespace);
+                counter!("component_received_events_total", 1, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone(), "container_name" => container_name.clone());
+                counter!("component_received_event_bytes_total", self.byte_size.get() as u64, "pod_name" => pod_name, "pod_namespace" => pod_namespace, "container_name" => container_name);
             }
             None => {
                 counter!("component_received_events_total", 1);
