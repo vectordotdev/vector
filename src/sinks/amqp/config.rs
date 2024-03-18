@@ -18,6 +18,11 @@ pub struct AmqpPropertiesConfig {
     /// Content-Encoding for the AMQP messages.
     #[configurable(derived)]
     pub(crate) content_encoding: Option<String>,
+
+    /// Persistent delivery mode for the AMQP messages.
+    #[serde(default = "crate::serde::default_false")]
+    #[configurable(derived)]
+    pub(crate) persistent: bool,
 }
 
 impl AmqpPropertiesConfig {
@@ -28,6 +33,9 @@ impl AmqpPropertiesConfig {
         }
         if let Some(content_encoding) = &self.content_encoding {
             prop = prop.with_content_encoding(ShortString::from(content_encoding.clone()));
+        }
+        if self.persistent {
+            prop = prop.with_delivery_mode(2);
         }
         prop
     }
