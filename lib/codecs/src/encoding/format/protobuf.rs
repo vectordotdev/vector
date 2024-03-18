@@ -96,6 +96,8 @@ fn convert_value_raw(
         }
         (Value::Float(f), Kind::Double) => Ok(prost_reflect::Value::F64(f.into_inner())),
         (Value::Float(f), Kind::Float) => Ok(prost_reflect::Value::F32(f.into_inner() as f32)),
+        (Value::Integer(i), Kind::Double) => Ok(prost_reflect::Value::F64(i as f64)),
+        (Value::Integer(i), Kind::Float) => Ok(prost_reflect::Value::F32(i as f32)),
         (Value::Integer(i), Kind::Int32) => Ok(prost_reflect::Value::I32(i as i32)),
         (Value::Integer(i), Kind::Int64) => Ok(prost_reflect::Value::I64(i)),
         (Value::Integer(i), Kind::Sint32) => Ok(prost_reflect::Value::I32(i as i32)),
@@ -275,6 +277,7 @@ mod tests {
 
     #[test]
     fn test_encode_floats() {
+        // float version
         let message = encode_message(
             &test_message_descriptor("Floats"),
             Value::Object(BTreeMap::from([
@@ -285,6 +288,27 @@ mod tests {
         .unwrap();
         assert_eq!(Some(11.0), mfield!(message, "d").as_f64());
         assert_eq!(Some(2.0), mfield!(message, "f").as_f32());
+        // integer version
+        let message = encode_message(
+            &test_message_descriptor("Floats"),
+            Value::Object(BTreeMap::from([
+                ("d".into(), Value::Integer(9223372036854775807)),
+                ("f".into(), Value::Integer(9223372036854775807)),
+            ])),
+        )
+        .unwrap();
+        assert_eq!(Some(9.223372036854775807e18), mfield!(message, "d").as_f64());
+        assert_eq!(Some(9.223372036854775807e18), mfield!(message, "f").as_f32());
+        let message = encode_message(
+            &test_message_descriptor("Floats"),
+            Value::Object(BTreeMap::from([
+                ("d".into(), Value::Integer(-9223372036854775808)),
+                ("f".into(), Value::Integer(-9223372036854775808)),
+            ])),
+        )
+        .unwrap();
+        assert_eq!(Some(-9.223372036854775808e18), mfield!(message, "d").as_f64());
+        assert_eq!(Some(-9.223372036854775808e18), mfield!(message, "f").as_f32());
     }
 
     #[test]
