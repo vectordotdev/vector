@@ -1,7 +1,7 @@
 ---
 title: HTTP
 description: Deliver observability data to an [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) server
-kind: sink
+component_kind: sink
 layout: component
 tags: ["http", "client", "component", "sink", "logs", "metrics", "traces"]
 ---

@@ -1,7 +1,7 @@
 ---
 title: Prometheus Exporter
 description: Output metric events to a [Prometheus exporter](https://prometheus.io/docs/instrumenting/exporters) running on the host
-kind: sink
+component_kind: sink
 layout: component
 tags: ["prometheus", "exporter", "component", "sink", "metrics"]
 aliases: ["/docs/reference/sinks/prometheus"]

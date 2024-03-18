@@ -32,6 +32,10 @@ The `master` branch, on the other hand, often contains unreleased, "nightly" cha
 
 vector.dev is built using the [Hugo] static site generator. The site configuration is in [`config.toml`](./config.toml). The standard Hugo [directory structure] is obeyed.
 
+### Cargo data
+
+Some pages in the Vector documentation rely on dependency information such as version numbers found in the [`../Cargo.lock`](../Cargo.lock) file. Whenever you build the Vector site, the `../Cargo.lock` file is copied into `data/cargo-lock.toml` so it can be used in conjunction with Hugo's templating system to build HTML.
+
 ### Structured data
 
 The Vector documentation relies heavily on structured data supplied using the [CUE] configuration and data validation language. Uses of CUE data include the docs for Vector's many [components] and the docs for [Vector Remap Language][vrl].

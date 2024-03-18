@@ -1,7 +1,7 @@
 ---
 title: Vector
 description: Collect observability data from another Vector instance
-kind: source
+component_kind: source
 layout: component
 tags: ["vector", "instance", "component", "source"]
 ---

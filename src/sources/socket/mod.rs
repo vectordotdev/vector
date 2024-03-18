@@ -145,9 +145,7 @@ impl SourceConfig for SocketConfig {
                     cx,
                     false.into(),
                     config.connection_limit,
-                    config
-                        .permit_origin
-                        .map(|p| p.0.iter().map(|net| net.0).collect()),
+                    config.permit_origin.map(Into::into),
                     SocketConfig::NAME,
                     log_namespace,
                 )

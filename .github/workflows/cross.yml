@@ -19,6 +19,8 @@ jobs:
           - aarch64-unknown-linux-musl
           - armv7-unknown-linux-gnueabihf
           - armv7-unknown-linux-musleabihf
+          - arm-unknown-linux-gnueabi
+          - arm-unknown-linux-musleabi
     steps:
 
       - name: (PR comment) Get PR branch

@@ -1,7 +1,7 @@
 ---
 title: GCP Cloud Monitoring (formerly Stackdriver)
 description: Deliver metrics to GCP's [Cloud Monitoring](https://cloud.google.com/monitoring) system
-kind: sink
+component_kind: sink
 layout: component
 tags: ["gcp", "stackdriver", "operations", "component", "sink", "metrics"]
 ---

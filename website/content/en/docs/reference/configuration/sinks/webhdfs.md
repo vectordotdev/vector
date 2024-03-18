@@ -1,7 +1,7 @@
 ---
 title: WebHDFS
 description: Output observability events into WebHDFS
-kind: sink
+component_kind: sink
 layout: component
 tags: ["webhdfs", "component", "sink"]
 ---

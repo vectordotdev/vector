@@ -41,6 +41,11 @@ base: components: sources: dnstap: configuration: {
 			type: uint: unit: "seconds"
 		}
 	}
+	lowercase_hostnames: {
+		description: "Whether to downcase all DNSTAP hostnames received for consistency"
+		required:    false
+		type: bool: default: false
+	}
 	max_connection_duration_secs: {
 		description: """
 			Maximum duration to keep each connection open. Connections open for longer than this duration are closed.
@@ -82,14 +87,10 @@ base: components: sources: dnstap: configuration: {
 		type: bool: {}
 	}
 	permit_origin: {
-		description: """
-			List of allowed origin IP networks
-
-			By default, all origins are allowed
-			"""
+		description:   "List of allowed origin IP networks. IP addresses must be in CIDR notation."
 		relevant_when: "mode = \"tcp\""
 		required:      false
-		type: array: items: type: string: {}
+		type: array: items: type: string: examples: ["192.168.0.0/16", "127.0.0.1/32", "::1/128", "9876:9ca3:99ab::23/128"]
 	}
 	port_key: {
 		description: """
