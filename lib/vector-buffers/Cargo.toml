@@ -46,7 +46,7 @@ quickcheck = "1.0"
 rand = "0.8.5"
 serde_yaml = { version = "0.9", default-features = false }
 temp-dir = "0.1.12"
-tokio-test = "0.4.3"
+tokio-test = "0.4.4"
 tracing-fluent-assertions = { version = "0.3" }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
 

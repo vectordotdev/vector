@@ -131,6 +131,7 @@ Moto
 Mpman
 Multilaser
 Mumbai
+musleabi
 Mytab
 NLB
 Nabi
@@ -164,6 +165,7 @@ pront
 Proscan
 Qmobilevn
 RPZ
+RRSIGs
 Rackspace
 Rathi
 Regza
@@ -253,6 +255,7 @@ buildname
 buildroot
 bytestream
 callsites
+cdnskey
 cncf
 codepath
 codepaths
@@ -261,6 +264,7 @@ compiletime
 coredns
 corejs
 coreutils
+csync
 curta
 daemonset
 dalek
@@ -282,6 +286,7 @@ dnsutils
 dockercmd
 downsides
 downwardapi
+ede
 emoji
 esbuild
 etld
@@ -303,6 +308,7 @@ gcr
 gcs
 gdpr
 github
+gnueabi
 gnueabihf
 gnupg
 gnuplot
@@ -342,6 +348,7 @@ ifneq
 imobile
 influxd
 ionik
+ipallowlist
 ipod
 ircd
 jemalloc
@@ -437,6 +444,7 @@ solarwinds
 splunk
 ssh
 staticuser
+statsd
 symbian
 tanushri
 timeframe

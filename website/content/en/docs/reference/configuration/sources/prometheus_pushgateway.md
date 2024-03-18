@@ -1,7 +1,7 @@
 ---
 title: Prometheus Pushgateway
 description: Collect metrics from [Prometheus](https://prometheus.io)
-kind: source
+component_kind: source
 layout: component
 tags: ["prometheus", "pushgateway", "component", "source", "metrics"]
 ---

@@ -77,6 +77,9 @@ start = false
 # libc requirements are defined by `cross`
 # https://github.com/rust-embedded/cross#supported-targets
 # Though, it seems like aarch64 libc is actually 2.18 and not 2.19
+[package.metadata.deb.variants.arm-unknown-linux-gnueabi]
+depends = "libc6 (>= 2.15)"
+
 [package.metadata.deb.variants.armv7-unknown-linux-gnueabihf]
 depends = "libc6 (>= 2.15)"
 
@@ -127,15 +130,15 @@ members = [
 
 [workspace.dependencies]
 chrono = { version = "0.4.34", default-features = false, features = ["clock", "serde"] }
-clap = { version = "4.4.18", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
-indexmap = { version = "2.2.3", default-features = false, features = ["serde", "std"] }
-pin-project = { version = "1.1.4", default-features = false }
+clap = { version = "4.5.2", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+indexmap = { version = "2.2.5", default-features = false, features = ["serde", "std"] }
+pin-project = { version = "1.1.5", default-features = false }
 proptest = "1.4"
 proptest-derive = "0.4.0"
-serde_json = { version = "1.0.112", default-features = false, features = ["raw_value", "std"] }
-serde = { version = "1.0.196", default-features = false, features = ["alloc", "derive", "rc"] }
-toml = { version = "0.8.10", default-features = false, features = ["display", "parse"] }
-vrl = { version = "0.11.0", features = ["arbitrary", "cli", "test", "test_framework"] }
+serde_json = { version = "1.0.114", default-features = false, features = ["raw_value", "std"] }
+serde = { version = "1.0.197", default-features = false, features = ["alloc", "derive", "rc"] }
+toml = { version = "0.8.11", default-features = false, features = ["display", "parse"] }
+vrl = { version = "0.12.0", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
 pin-project.workspace = true
@@ -181,14 +184,18 @@ aws-sdk-cloudwatchlogs = { version = "1.3.0", default-features = false, features
 aws-sdk-elasticsearch = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-sdk-firehose = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-sdk-kinesis = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
-aws-types = { version = "1.1.5", default-features = false, optional = true }
-aws-sigv4 = { version = "1.1.5", default-features = false, features = ["sign-http"], optional = true }
-aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest"], optional = true }
-aws-credential-types = { version = "1.1.5", default-features = false, features = ["hardcoded-credentials"], optional = true }
+# The sts crate is needed despite not being referred to anywhere in the code because we need to set the
+# `behavior-version-latest` feature. Without this we get a runtime panic when `auth.assume_role` authentication
+# is configured.
+aws-sdk-sts = { version = "1.3.1", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-types = { version = "1.1.7", default-features = false, optional = true }
+aws-sigv4 = { version = "1.1.7", default-features = false, features = ["sign-http"], optional = true }
+aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest", "credentials-process"], optional = true }
+aws-credential-types = { version = "1.1.7", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-types = { version = "1.1.6", default-features = false, optional = true }
-aws-smithy-runtime-api = { version = "1.1.6", default-features = false, optional = true }
-aws-smithy-runtime = { version = "1.1.6", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
+aws-smithy-types = { version = "1.1.8", default-features = false, optional = true }
+aws-smithy-runtime-api = { version = "1.2.0", default-features = false, optional = true }
+aws-smithy-runtime = { version = "1.1.8", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
 aws-smithy-async = { version = "1.0.2", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
@@ -205,11 +212,11 @@ tower = { version = "0.4.13", default-features = false, features = ["buffer", "l
 tower-http = { version = "0.4.4", default-features = false, features = ["decompression-gzip", "trace"]}
 # Serde
 serde.workspace = true
-serde-toml-merge = { version = "0.3.4", default-features = false }
+serde-toml-merge = { version = "0.3.5", default-features = false }
 serde_bytes = { version = "0.11.14", default-features = false, features = ["std"], optional = true }
 serde_json.workspace = true
-serde_with = { version = "3.6.1", default-features = false, features = ["macros", "std"] }
-serde_yaml = { version = "0.9.31", default-features = false }
+serde_with = { version = "3.7.0", default-features = false, features = ["macros", "std"] }
+serde_yaml = { version = "0.9.32", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.2", default-features = false, optional = true }
@@ -243,16 +250,16 @@ hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.8", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-client = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust.git", rev = "4cb19ec47eeaf634c451d9ae438dac445a8a3dce", optional = true }
+greptimedb-client = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust.git", rev = "d21dbcff680139ed2065b62100bac3123da7c789", optional = true }
 
 # External libs
-arc-swap = { version = "1.6", default-features = false, optional = true }
+arc-swap = { version = "1.7", default-features = false, optional = true }
 async-compression = { version = "0.4.6", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
-base64 = { version = "0.21.7", default-features = false, optional = true }
+base64 = { version = "0.22.0", default-features = false, optional = true }
 bloomy  = { version = "1.2.0", default-features = false, optional = true }
-bollard = { version = "0.15.0", default-features = false, features = ["ssl", "chrono"], optional = true }
+bollard = { version = "0.16.0", default-features = false, features = ["ssl", "chrono"], optional = true }
 bytes = { version = "1.5.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.3.0", default-features = false }
 chrono.workspace = true
@@ -262,7 +269,7 @@ colored = { version = "2.1.0", default-features = false }
 csv = { version = "1.3", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
-dyn-clone = { version = "1.0.16", default-features = false }
+dyn-clone = { version = "1.0.17", default-features = false }
 encoding_rs = { version = "0.8.33", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.12", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
@@ -286,12 +293,13 @@ indexmap.workspace = true
 infer = { version = "0.15.0", default-features = false, optional = true}
 indoc = { version = "2.0.4", default-features = false }
 inventory = { version = "0.3.15", default-features = false }
+ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
 itertools = { version = "0.12.1", default-features = false, optional = false, features = ["use_alloc"] }
 k8s-openapi = { version = "0.18.0", default-features = false, features = ["api", "v1_26"], optional = true }
 kube = { version = "0.82.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.1", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
-lru = { version = "0.12.2", default-features = false, optional = true }
+lru = { version = "0.12.3", default-features = false, optional = true }
 maxminddb = { version = "0.24.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.8.1", default-features = false, features = ["tokio-runtime"], optional = true }
@@ -300,7 +308,7 @@ nkeys = { version = "0.4.0", default-features = false, optional = true }
 nom = { version = "7.1.3", default-features = false, optional = true }
 notify = { version = "6.1.1", default-features = false, features = ["macos_fsevent"] }
 once_cell = { version = "1.19", default-features = false }
-openssl = { version = "0.10.63", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.64", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "4.2.0", default-features = false }
 paste = "1.0.14"
@@ -313,13 +321,13 @@ rdkafka = { version = "0.35.0", default-features = false, features = ["tokio", "
 redis = { version = "0.24.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.10.3", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.3", default-features = false, optional = true }
-rumqttc = { version = "0.23.0", default-features = false, features = ["use-rustls"], optional = true }
+rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
-semver = { version = "1.0.21", default-features = false, features = ["serde", "std"], optional = true }
+semver = { version = "1.0.22", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
 snap = { version = "1.1.1", default-features = false }
-socket2 = { version = "0.5.5", default-features = false }
+socket2 = { version = "0.5.6", default-features = false }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.0", default-features = false }
 syslog = { version = "6.1.0", default-features = false, optional = true }
@@ -329,7 +337,7 @@ tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["
 toml.workspace = true
 tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 hickory-proto = { version = "0.24.0", default-features = false, features = ["dnssec"], optional = true }
-typetag = { version = "0.2.15", default-features = false }
+typetag = { version = "0.2.16", default-features = false }
 url = { version = "2.5.0", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.6", default-features = false }
@@ -341,7 +349,7 @@ arr_macro = { version = "0.2.1" }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.9.5", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
+mlua = { version = "0.9.6", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.6.0"
@@ -357,13 +365,13 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 
 [dev-dependencies]
 approx = "0.5.1"
-assert_cmd = { version = "2.0.13", default-features = false }
-aws-smithy-runtime = { version = "1.1.6", default-features = false, features = ["tls-rustls"] }
+assert_cmd = { version = "2.0.14", default-features = false }
+aws-smithy-runtime = { version = "1.1.8", default-features = false, features = ["tls-rustls"] }
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { version = "0.17", default-features = false }
-base64 = "0.21.7"
+base64 = "0.22.0"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.12.1", default-features = false, features = ["use_alloc"] }
 libc = "0.2.153"
@@ -372,10 +380,10 @@ proptest.workspace = true
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 rstest = {version = "0.18.2"}
-tempfile = "3.10.0"
+tempfile = "3.10.1"
 test-generator = "0.3.1"
 tokio = { version = "1.36.0", features = ["test-util"] }
-tokio-test = "0.4.3"
+tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
 vrl.workspace = true
@@ -419,6 +427,8 @@ target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "r
 target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "enterprise"]
+target-arm-unknown-linux-gnueabi = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+target-arm-unknown-linux-musleabi = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "enterprise"]
 target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
 target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
 # Does not currently build
@@ -464,6 +474,7 @@ aws-core = [
   "dep:aws-smithy-types",
   "dep:aws-smithy-runtime",
   "dep:aws-smithy-runtime-api",
+  "dep:aws-sdk-sts",
 ]
 
 # Anything that requires Protocol Buffers.
@@ -472,8 +483,9 @@ protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
 # Enrichment Tables
-enrichment-tables = ["enrichment-tables-geoip"]
+enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb"]
 enrichment-tables-geoip = ["dep:maxminddb"]
+enrichment-tables-mmdb = ["dep:maxminddb"]
 
 # Codecs
 codecs-syslog = ["vector-lib/syslog"]
@@ -502,6 +514,7 @@ sources-logs = [
   "sources-logstash",
   "sources-nats",
   "sources-opentelemetry",
+  "sources-pulsar",
   "sources-file-descriptor",
   "sources-redis",
   "sources-socket",
@@ -532,7 +545,7 @@ sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver",
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-http-error", "protobuf-build"]
 sources-demo_logs = ["dep:fakedata"]
-sources-dnstap = ["dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "protobuf-build"]
+sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
@@ -559,6 +572,7 @@ sources-prometheus = ["sources-prometheus-scrape", "sources-prometheus-remote-wr
 sources-prometheus-scrape = ["sinks-prometheus", "sources-utils-http-client", "vector-lib/prometheus"]
 sources-prometheus-remote-write = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
 sources-prometheus-pushgateway = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
+sources-pulsar = ["dep:apache-avro", "dep:pulsar"]
 sources-redis= ["dep:redis"]
 sources-socket = ["sources-utils-net", "tokio-util/net"]
 sources-splunk_hec = ["dep:roaring"]
@@ -573,7 +587,7 @@ sources-utils-http-prelude = ["sources-utils-http", "sources-utils-http-auth", "
 sources-utils-http-query = []
 sources-utils-http-client = ["sources-utils-http", "sources-http_server"]
 sources-utils-net = ["sources-utils-net-tcp", "sources-utils-net-udp", "sources-utils-net-unix"]
-sources-utils-net-tcp = ["listenfd"]
+sources-utils-net-tcp = ["listenfd", "dep:ipnet"]
 sources-utils-net-udp = ["listenfd"]
 sources-utils-net-unix = []
 
@@ -609,7 +623,7 @@ transforms-metrics = [
 
 transforms-aggregate = []
 transforms-aws_ec2_metadata = ["dep:arc-swap"]
-transforms-dedupe = ["dep:lru"]
+transforms-dedupe = ["transforms-impl-dedupe"]
 transforms-filter = []
 transforms-log_to_metric = []
 transforms-lua = ["dep:mlua", "vector-lib/lua"]
@@ -624,6 +638,7 @@ transforms-throttle = ["dep:governor"]
 
 # Implementations of transforms
 transforms-impl-sample = []
+transforms-impl-dedupe = ["dep:lru"]
 
 # Sinks
 sinks = ["sinks-logs", "sinks-metrics"]
@@ -852,7 +867,7 @@ nginx-integration-tests = ["sources-nginx_metrics"]
 opentelemetry-integration-tests = ["sources-opentelemetry"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "sinks-influxdb"]
-pulsar-integration-tests = ["sinks-pulsar"]
+pulsar-integration-tests = ["sinks-pulsar", "sources-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
@@ -896,7 +911,17 @@ enterprise-tests = [
 ]
 
 component-validation-runner = ["dep:tonic", "sources-internal_logs", "sources-internal_metrics", "sources-vector", "sinks-vector"]
-component-validation-tests = ["component-validation-runner", "sources", "transforms", "sinks"]
+# For now, only include components that implement ValidatableComponent.
+# In the future, this can change to simply reference the targets `sources`, `transforms`, `sinks`
+component-validation-tests = [
+  "component-validation-runner",
+  "sources-http_client",
+  "sources-http_server",
+  "sinks-http",
+  "sinks-splunk_hec",
+  "sources-splunk_hec",
+  "sinks-datadog_logs",
+]
 
 # Grouping together features for benchmarks. We exclude the API client due to it causing the build process to run out
 # of memory when those additional dependencies are built in CI.
@@ -918,7 +943,7 @@ remap-benches = ["transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
-enrichment-tables-benches = ["enrichment-tables-geoip"]
+enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb"]
 
 [[bench]]
 name = "default"

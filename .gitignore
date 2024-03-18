@@ -20,3 +20,6 @@ massif.*
 
 # tilt
 tilt_modules/
+
+# Jetbrains
+.idea/

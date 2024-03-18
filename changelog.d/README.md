@@ -74,7 +74,7 @@ the authors specified.
 
 The process for adding this is simply to have the last line of the file be in this format:
 
-    authors: <author1_gh_username>, <author2_gh_username>, <...>
+    authors: <author1_gh_username> <author2_gh_username> <...>
 
 Do not include a leading `@` when specifying your username.
 

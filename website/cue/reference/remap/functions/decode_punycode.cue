@@ -13,6 +13,13 @@ remap: functions: decode_punycode: {
 			required:    true
 			type: ["string"]
 		},
+		{
+			name:        "validate"
+			description: "If enabled, checks if the input string is a valid domain name."
+			required:    false
+			type: ["boolean"]
+			default: true
+		},
 	]
 	internal_failure_reasons: [
 		"`value` is not valid `punycode`",
@@ -33,6 +40,13 @@ remap: functions: decode_punycode: {
 				decode_punycode!("www.cafe.com")
 				"""
 			return: "www.cafe.com"
+		},
+		{
+			title: "Ignore validation"
+			source: """
+				decode_punycode!("xn--8hbb.xn--fiba.xn--8hbf.xn--eib.", validate: false)
+				"""
+			return: "١٠.٦٦.٣٠.٥."
 		},
 	]
 }

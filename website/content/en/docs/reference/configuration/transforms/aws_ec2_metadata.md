@@ -1,7 +1,7 @@
 ---
 title: AWS EC2 metadata
 description: Parse metadata emitted by [AWS EC2](https://aws.amazon.com/ec2) instances
-kind: transform
+component_kind: transform
 layout: component
 tags: ["aws", "ec2", "metadata", "component", "transform"]
 ---

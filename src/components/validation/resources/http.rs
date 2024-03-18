@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     future::Future,
     net::{IpAddr, SocketAddr},
     str::FromStr,
@@ -33,11 +33,21 @@ use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 pub struct HttpResourceConfig {
     uri: Uri,
     method: Option<Method>,
+    headers: Option<HashMap<String, String>>,
 }
 
 impl HttpResourceConfig {
     pub const fn from_parts(uri: Uri, method: Option<Method>) -> Self {
-        Self { uri, method }
+        Self {
+            uri,
+            method,
+            headers: None,
+        }
+    }
+
+    pub fn with_headers(mut self, headers: HashMap<String, String>) -> Self {
+        self.headers = Some(headers);
+        self
     }
 
     pub fn spawn_as_input(
@@ -66,6 +76,7 @@ impl HttpResourceConfig {
         codec: ResourceCodec,
         output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
+        input_events: Vec<TestEvent>,
         runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     ) -> vector_lib::Result<()> {
         match direction {
@@ -77,9 +88,14 @@ impl HttpResourceConfig {
                 task_coordinator,
             )),
             // The sink will push data to us.
-            ResourceDirection::Push => {
-                spawn_output_http_server(self, codec, output_tx, task_coordinator, runner_metrics)
-            }
+            ResourceDirection::Push => spawn_output_http_server(
+                self,
+                codec,
+                output_tx,
+                task_coordinator,
+                input_events,
+                runner_metrics,
+            ),
         }
     }
 }
@@ -132,10 +148,11 @@ fn spawn_input_http_server(
     // events and working with the HTTP server as they're consumed.
     let resource_started = task_coordinator.track_started();
     let resource_completed = task_coordinator.track_completed();
+    let mut resource_shutdown_rx = task_coordinator.register_for_shutdown();
 
     tokio::spawn(async move {
         resource_started.mark_as_done();
-        debug!("HTTP server external input resource started.");
+        info!("HTTP server external input resource started.");
 
         let mut input_finished = false;
 
@@ -152,7 +169,7 @@ fn spawn_input_http_server(
                         outstanding_events.push_back(event);
                     },
                     None => {
-                        trace!("HTTP server external input resource input is finished.");
+                        info!("HTTP server external input resource input is finished.");
                         input_finished = true;
                     },
                 },
@@ -175,16 +192,18 @@ fn spawn_input_http_server(
         }
         // Mark ourselves as completed now that we've sent all inputs to the source, and
         // additionally signal the HTTP server to also gracefully shutdown.
+        info!("HTTP server external input resource signalling ready for shutdown.");
+
+        // Wait for the runner to signal us to shutdown
+        resource_shutdown_rx.wait().await;
+
+        // Shutdown the server
         _ = http_server_shutdown_tx.send(());
 
-        // TODO - currently we are getting lucky in the testing of `http_client` source... if the source tries to query
-        // this server but we have already shut down the thread, then it will generate an error which can throw off our error
-        // validation.
-        // I think the solution involves adding synchronization to wait here for the runner to tell us to shutdown.
-
+        info!("HTTP server external input resource marking as done.");
         resource_completed.mark_as_done();
 
-        debug!("HTTP server external input resource completed.");
+        info!("HTTP server external input resource completed.");
     });
 }
 
@@ -205,11 +224,12 @@ fn spawn_input_http_client(
         // Mark ourselves as started. We don't actually do anything until we get our first input
         // message, though.
         started.mark_as_done();
-        debug!("HTTP client external input resource started.");
+        info!("HTTP client external input resource started.");
 
         let client = Client::builder().build_http::<Body>();
         let request_uri = config.uri;
         let request_method = config.method.unwrap_or(Method::POST);
+        let headers = config.headers.unwrap_or_default();
 
         while let Some(event) = input_rx.recv().await {
             debug!("Got event to send from runner.");
@@ -217,9 +237,15 @@ fn spawn_input_http_client(
             let mut buffer = BytesMut::new();
             encode_test_event(&mut encoder, &mut buffer, event);
 
-            let request = Request::builder()
+            let mut request_builder = Request::builder()
                 .uri(request_uri.clone())
-                .method(request_method.clone())
+                .method(request_method.clone());
+
+            for (key, value) in &headers {
+                request_builder = request_builder.header(key, value);
+            }
+
+            let request = request_builder
                 .body(buffer.freeze().into())
                 .expect("should not fail to build request");
 
@@ -238,7 +264,7 @@ fn spawn_input_http_client(
         // Mark ourselves as completed now that we've sent all inputs to the source.
         completed.mark_as_done();
 
-        debug!("HTTP client external input resource completed.");
+        info!("HTTP client external input resource completed.");
     });
 }
 
@@ -249,6 +275,7 @@ fn spawn_output_http_server(
     codec: ResourceCodec,
     output_tx: mpsc::Sender<Vec<Event>>,
     task_coordinator: &TaskCoordinator<Configuring>,
+    input_events: Vec<TestEvent>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
 ) -> vector_lib::Result<()> {
     // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
@@ -256,6 +283,14 @@ fn spawn_output_http_server(
 
     // First, we'll build and spawn our HTTP server.
     let decoder = codec.into_decoder()?;
+
+    // Note that we currently don't differentiate which events should and shouldn't be rejected-
+    // we reject all events in this server if any are marked for rejection.
+    // In the future it might be useful to be able to select which to reject. That will involve
+    // adding logic to the test case which is passed down here, and to the event itself. Since
+    // we can't guarantee the order of events, we'd need a way to flag which ones need to be
+    // rejected.
+    let should_reject = input_events.iter().filter(|te| te.should_reject()).count() > 0;
 
     let (_, http_server_shutdown_tx) = spawn_http_server(
         task_coordinator,
@@ -273,28 +308,41 @@ fn spawn_output_http_server(
                         loop {
                             match decoder.decode_eof(&mut body) {
                                 Ok(Some((events, byte_size))) => {
-                                    let mut output_runner_metrics =
-                                        output_runner_metrics.lock().await;
-                                    debug!("HTTP server external output resource decoded {byte_size} bytes.");
+                                    if should_reject {
+                                        info!("HTTP server external output resource decoded {byte_size} bytes but test case configured to reject.");
+                                    } else {
+                                        let mut output_runner_metrics =
+                                            output_runner_metrics.lock().await;
+                                        info!("HTTP server external output resource decoded {byte_size} bytes.");
 
-                                    // Update the runner metrics for the received events. This will later
-                                    // be used in the Validators, as the "expected" case.
-                                    output_runner_metrics.received_bytes_total += byte_size as u64;
+                                        // Update the runner metrics for the received events. This will later
+                                        // be used in the Validators, as the "expected" case.
+                                        output_runner_metrics.received_bytes_total +=
+                                            byte_size as u64;
 
-                                    output_runner_metrics.received_events_total +=
-                                        events.len() as u64;
+                                        output_runner_metrics.received_events_total +=
+                                            events.len() as u64;
 
-                                    events.iter().for_each(|event| {
-                                        output_runner_metrics.received_event_bytes_total +=
-                                            event.estimated_json_encoded_size_of().get() as u64;
-                                    });
+                                        events.iter().for_each(|event| {
+                                            output_runner_metrics.received_event_bytes_total +=
+                                                event.estimated_json_encoded_size_of().get() as u64;
+                                        });
 
-                                    output_tx
-                                        .send(events.to_vec())
-                                        .await
-                                        .expect("should not fail to send output event");
+                                        output_tx
+                                            .send(events.to_vec())
+                                            .await
+                                            .expect("should not fail to send output event");
+                                    }
                                 }
-                                Ok(None) => return StatusCode::OK.into_response(),
+                                Ok(None) => {
+                                    if should_reject {
+                                        // This status code is not retried and should result in the component under test
+                                        // emitting error events
+                                        return StatusCode::BAD_REQUEST.into_response();
+                                    } else {
+                                        return StatusCode::OK.into_response();
+                                    }
+                                }
                                 Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
                             }
                         }
@@ -312,14 +360,20 @@ fn spawn_output_http_server(
 
     tokio::spawn(async move {
         resource_started.mark_as_done();
-        debug!("HTTP server external output resource started.");
+        info!("HTTP server external output resource started.");
 
+        // Wait for the runner to tell us to shutdown
         resource_shutdown_rx.wait().await;
-        _ = http_server_shutdown_tx.send(());
+
+        // signal the server to shutdown
+        let _ = http_server_shutdown_tx.send(());
+
+        // mark ourselves as done
         resource_completed.mark_as_done();
 
-        debug!("HTTP server external output resource completed.");
+        info!("HTTP server external output resource completed.");
     });
+
     Ok(())
 }
 

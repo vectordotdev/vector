@@ -77,7 +77,7 @@ components: sinks: vector: {
 
 	configuration: base.components.sinks.vector.configuration
 
-	how_it_works: components.sources.vector.how_it_works
+	how_it_works: components.sinks.vector.how_it_works
 
 	telemetry: metrics: {
 		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total

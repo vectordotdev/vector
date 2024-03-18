@@ -1614,7 +1614,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
         expected_namespaces.insert(name);
     }
 
-    // Create a pod for our other pods to have an affinity to to ensure they are all deployed on
+    // Create a pod for our other pods to have an affinity to ensure they are all deployed on
     // the same node.
     let affinity_ns_name = format!("{}-affinity", pod_namespace);
     let affinity_ns = framework
