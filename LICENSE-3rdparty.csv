@@ -239,6 +239,7 @@ h2,https://github.com/hyperium/h2,MIT,"Carl Lerche <me@carllerche.com>, Sean McA
 hash_hasher,https://github.com/Fraser999/Hash-Hasher,Apache-2.0 OR MIT,Fraser Hutchison <fraser.hutchison@maidsafe.net>
 hashbrown,https://github.com/rust-lang/hashbrown,MIT OR Apache-2.0,Amanieu d'Antras <amanieu@gmail.com>
 headers,https://github.com/hyperium/headers,MIT,Sean McArthur <sean@seanmonstar.com>
+heck,https://github.com/withoutboats/heck,MIT OR Apache-2.0,The heck Authors
 heck,https://github.com/withoutboats/heck,MIT OR Apache-2.0,Without Boats <woboats@gmail.com>
 heim,https://github.com/heim-rs/heim,Apache-2.0 OR MIT,svartalf <self@svartalf.info>
 hermit-abi,https://github.com/hermitcore/hermit-rs,MIT OR Apache-2.0,Stefan Lankes
