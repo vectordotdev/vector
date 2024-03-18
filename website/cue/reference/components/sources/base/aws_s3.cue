@@ -604,7 +604,7 @@ base: components: sources: aws_s3: configuration: {
 						description: """
 																The connection timeout for AWS requests
 
-																Limits the ammount of time allowed to initiate a socket connection.
+																Limits the amount of time allowed to initiate a socket connection.
 																"""
 						required: false
 						type: uint: {
@@ -616,7 +616,7 @@ base: components: sources: aws_s3: configuration: {
 						description: """
 																The operation timeout for AWS requests
 
-																Limits the amount of time allowd for an operation to be fully serviced; an operation
+																Limits the amount of time allowed for an operation to be fully serviced; an operation
 																represents the full request/response lifecycle of a call to a service.
 																"""
 						required: false
@@ -750,7 +750,7 @@ base: components: sources: aws_s3: configuration: {
 				description: """
 					The connection timeout for AWS requests
 
-					Limits the ammount of time allowed to initiate a socket connection.
+					Limits the amount of time allowed to initiate a socket connection.
 					"""
 				required: false
 				type: uint: {
@@ -762,7 +762,7 @@ base: components: sources: aws_s3: configuration: {
 				description: """
 					The operation timeout for AWS requests
 
-					Limits the amount of time allowd for an operation to be fully serviced; an operation
+					Limits the amount of time allowed for an operation to be fully serviced; an operation
 					represents the full request/response lifecycle of a call to a service.
 					"""
 				required: false

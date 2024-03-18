@@ -13,7 +13,7 @@ use serde_with::serde_as;
 pub struct AwsTimeout {
     /// The connection timeout for AWS requests
     ///
-    /// Limits the ammount of time allowed to initiate a socket connection.
+    /// Limits the amount of time allowed to initiate a socket connection.
     #[serde(default = "default_timeout")]
     #[serde(rename = "connect_timeout_seconds")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
@@ -21,7 +21,7 @@ pub struct AwsTimeout {
 
     /// The operation timeout for AWS requests
     ///
-    /// Limits the amount of time allowd for an operation to be fully serviced; an operation
+    /// Limits the amount of time allowed for an operation to be fully serviced; an operation
     /// represents the full request/response lifecycle of a call to a service.
     #[serde(default = "default_operation_timeout")]
     #[serde(rename = "operation_timeout_seconds")]
