@@ -274,7 +274,7 @@ pub struct BulkConfig {
     #[serde(default = "default_version_type")]
     #[configurable(metadata(docs::examples = "internal"))]
     #[configurable(metadata(docs::examples = "external"))]
-    pub version_type: String,
+    pub version_type: VersionType,
 }
 
 fn default_bulk_action() -> Template {
@@ -285,8 +285,8 @@ fn default_index() -> Template {
     Template::try_from("vector-%Y.%m.%d").expect("unable to parse template")
 }
 
-fn default_version_type() -> String {
-    VersionType::Internal.as_str().to_string()
+fn default_version_type() -> VersionType {
+    VersionType::Internal
 }
 
 impl Default for BulkConfig {
