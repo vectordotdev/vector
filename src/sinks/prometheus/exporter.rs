@@ -20,7 +20,7 @@ use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tower::ServiceBuilder;
-use tower_http::compression::CompressionLayer;
+use tower_http::compression::Compression;
 use tracing::{Instrument, Span};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
@@ -495,10 +495,9 @@ impl PrometheusExporter {
 
             let service = ServiceBuilder::new()
                 .layer(build_http_trace_layer(span.clone()))
-                .layer(CompressionLayer::new())
                 .service(inner);
 
-            async move { Ok::<_, Infallible>(service) }
+            async move { Ok::<_, Infallible>(Compression::new(service)) }
         });
 
         let (trigger, tripwire) = Tripwire::new();
