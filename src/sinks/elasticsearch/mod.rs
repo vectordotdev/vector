@@ -163,7 +163,7 @@ pub enum ElasticsearchCommonMode {
         index: Template,
         action: Template,
         version: Option<Template>,
-        version_type: String,
+        version_type: VersionType,
     },
     DataStream(DataStreamConfig),
 }
