@@ -13,7 +13,7 @@ use async_graphql::{EmptyMutation, MergedObject, MergedSubscription, Schema, Sch
 pub struct Query(
     health::HealthQuery,
     components::ComponentsQuery,
-    metrics::MetricsQuery,
+    #[cfg(feature = "sources-host_metrics")] metrics::MetricsQuery,
     meta::MetaQuery,
 );
 
