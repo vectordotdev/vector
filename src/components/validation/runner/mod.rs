@@ -593,7 +593,7 @@ fn spawn_input_driver(
                 }
             }
 
-            let (failure_case, event) = input_event.clone().get();
+            let (failure_case, mut event) = input_event.clone().get();
 
             if let Some(encoder) = maybe_encoder.as_mut() {
                 let mut buffer = BytesMut::new();
@@ -613,6 +613,27 @@ fn spawn_input_driver(
 
             if !failure_case || component_type == ComponentType::Sink {
                 input_runner_metrics.sent_events_total += 1;
+
+                // Convert unix timestamp in input events to the Datetime string.
+                // This is necessary when a source expects the incoming event to have a
+                // unix timestamp but we convert it into a datetime string in the source.
+                // For example, the `datadog_agent` source. This only takes effect when
+                // the test case YAML file defining the event, constructs it with the log
+                // builder variant, and specifies an integer in milliseconds for the timestamp.
+                if component_type == ComponentType::Source {
+                    if let Event::Log(ref mut log) = event {
+                        if let Some(ts) = log.remove_timestamp() {
+                            let ts = match ts.as_integer() {
+                                Some(ts) => chrono::DateTime::from_timestamp_millis(ts)
+                                    .expect(&format!("invalid timestamp in input test event {ts}"))
+                                    .into(),
+                                None => ts,
+                            };
+                            log.parse_path_and_insert("timestamp", ts)
+                                .expect("failed to insert timestamp");
+                        }
+                    }
+                }
 
                 // This particular metric is tricky because a component can run the
                 // EstimatedJsonSizeOf calculation on a single event or an array of

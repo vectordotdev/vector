@@ -88,27 +88,27 @@ pub struct LogSink<S> {
     protocol: String,
 }
 
+// The Datadog logs intake does not require the fields that are set in this
+// function. But if they are present in the event, we normalize the paths
+// (and value in the case of timestamp) to something that intake understands.
 fn normalize_event(event: &mut Event) {
     let log = event.as_mut_log();
-    let message_path = log
-        .message_path()
-        .expect("message is required (make sure the \"message\" semantic meaning is set)")
-        .clone();
-    log.rename_key(&message_path, event_path!("message"));
+
+    if let Some(message_path) = log.message_path().cloned().as_ref() {
+        log.rename_key(message_path, event_path!("message"));
+    }
 
     if let Some(host_path) = log.host_path().cloned().as_ref() {
         log.rename_key(host_path, event_path!("hostname"));
     }
 
-    let timestamp_path = log
-        .timestamp_path()
-        .expect("timestamp is required (make sure the \"timestamp\" semantic meaning is set)")
-        .clone();
-    if let Some(Value::Timestamp(ts)) = log.remove(&timestamp_path) {
-        log.insert(
-            event_path!("timestamp"),
-            Value::Integer(ts.timestamp_millis()),
-        );
+    if let Some(timestamp_path) = log.timestamp_path().cloned().as_ref() {
+        if let Some(Value::Timestamp(ts)) = log.remove(timestamp_path) {
+            log.insert(
+                event_path!("timestamp"),
+                Value::Integer(ts.timestamp_millis()),
+            );
+        }
     }
 }
 
@@ -317,5 +317,64 @@ where
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use chrono::Utc;
+    use vector_lib::{
+        config::LegacyKey,
+        event::{Event, LogEvent},
+    };
+    use vrl::{event_path, owned_value_path, path};
+
+    use super::normalize_event;
+
+    #[test]
+    fn normalize_event_doesnt_require() {
+        let mut log = LogEvent::default();
+        log.insert(event_path!("foo"), "bar");
+
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+
+        let log = event.as_log();
+
+        assert!(!log.contains(event_path!("message")));
+        assert!(!log.contains(event_path!("timestamp")));
+        assert!(!log.contains(event_path!("hostname")));
+    }
+
+    #[test]
+    fn normalize_event_normalizes() {
+        let mut log = LogEvent::from("hello");
+        let namespace = log.namespace();
+
+        namespace.insert_standard_vector_source_metadata(&mut log, "this_source", Utc::now());
+
+        let legacy_key = Some(owned_value_path!("host"));
+        let legacy_key = legacy_key.as_ref().map(LegacyKey::Overwrite);
+        namespace.insert_source_metadata(
+            "this_source",
+            &mut log,
+            legacy_key,
+            path!("host"),
+            "the_host",
+        );
+
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+
+        let log = event.as_log();
+
+        assert!(log.contains(event_path!("message")));
+        assert!(log.contains(event_path!("timestamp")));
+        assert!(log
+            .get_timestamp()
+            .expect("should have timestamp")
+            .is_integer());
+        assert!(log.contains(event_path!("hostname")));
     }
 }

@@ -1,7 +1,7 @@
 ---
 title: Route
 description: Split a stream of events into multiple sub-streams based on user-supplied conditions
-kind: transform
+component_kind: transform
 layout: component
 tags: ["route", "swimlanes", "split", "component", "transform"]
 ---

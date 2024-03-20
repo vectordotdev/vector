@@ -16,7 +16,7 @@
 <a href="{{ .RelPermalink }}">
   <div class="component-card is-hoverable" x-data="{ tags: {{ $tags | jsonify }} }">
     <header class="component-card-header">
-      {{ .Title }} {{ .Params.kind }}
+      {{ .Title }} {{ .Params.component_kind }}
     </header>
 
     {{ with $desc }}

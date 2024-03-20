@@ -1,7 +1,7 @@
 ---
 title: File
 description: Collect logs from [files](https://en.wikipedia.org/wiki/File_system)
-kind: source
+component_kind: source
 layout: component
 tags: ["file", "component", "source"]
 ---

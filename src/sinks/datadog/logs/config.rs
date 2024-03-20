@@ -164,8 +164,8 @@ impl SinkConfig for DatadogLogsConfig {
 
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
-            .required_meaning(meaning::MESSAGE, Kind::bytes())
-            .required_meaning(meaning::TIMESTAMP, Kind::timestamp())
+            .optional_meaning(meaning::MESSAGE, Kind::bytes())
+            .optional_meaning(meaning::TIMESTAMP, Kind::timestamp())
             .optional_meaning(meaning::HOST, Kind::bytes())
             .optional_meaning(meaning::SOURCE, Kind::bytes())
             .optional_meaning(meaning::SEVERITY, Kind::bytes())

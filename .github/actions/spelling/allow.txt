@@ -131,6 +131,7 @@ Moto
 Mpman
 Multilaser
 Mumbai
+musleabi
 Mytab
 NLB
 Nabi
@@ -307,6 +308,7 @@ gcr
 gcs
 gdpr
 github
+gnueabi
 gnueabihf
 gnupg
 gnuplot
@@ -442,6 +444,7 @@ solarwinds
 splunk
 ssh
 staticuser
+statsd
 symbian
 tanushri
 timeframe

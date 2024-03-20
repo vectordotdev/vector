@@ -1,7 +1,7 @@
 ---
 title: Logstash
 description: Collect logs from a [Logstash](https://www.elastic.co/logstash) agent
-kind: source
+component_kind: source
 layout: component
 tags: ["logstash", "elastic", "component", "source", "logs"]
 ---
