@@ -1,7 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
 use vector_core::{config::DataType, event::{Event, LogEvent}, schema};
-use chrono::{DateTime, SecondsFormat, Local};
+use chrono::{DateTime, SecondsFormat, Local, SubsecRound};
 use vrl::value::{ObjectMap, Value};
 use vector_config::configurable_component;
 
@@ -177,23 +177,23 @@ impl ConfigDecanter {
     }
 
     fn get_message(&self, config: &SyslogSerializerConfig) -> String {
-        let mut message = String::new();
-
         // `payload_key` configures where to source the value for the syslog `message`:
+        // - Not configured      => Encodes the default log message.
         // - Field key (Valid)   => Get value by lookup (value_by_key)
         // - Field key (Invalid) => Empty string (unwrap_or_default)
-        // - Not configured      => JSON encoded `LogEvent` (fallback?)
-        //
-        // Q: Was the JSON fallback intended by the original PR author only for debugging?
-        //    Roughly equivalent to using `payload_key: .` (in YAML config)?
+
+        // Ref:
+        // `log.get_message()`:
+        // https://github.com/vectordotdev/vector/blob/ad6a48efc0f79b2c18a5c1394e5d8603fdfd1bab/lib/vector-core/src/event/log_event.rs#L532-L541
+        // `v.to_string_lossy()`:
+        // https://github.com/vectordotdev/vrl/blob/f2d71cd26cb8270230f531945d7dee4929235905/src/value/value/serde.rs#L34-L55
         let payload = if config.payload_key.is_empty() {
-            serde_json::to_string(&self.log).ok()
+            self.log.get_message().map(|v| v.to_string_lossy().to_string() )
         } else {
             self.value_by_key(&config.payload_key)
         };
 
-        message.push_str(&payload.unwrap_or_default());
-        message
+        payload.unwrap_or_default()
     }
 }
 
@@ -242,6 +242,7 @@ impl SyslogMessage {
             SyslogRFC::Rfc3164 => {
                 // TIMESTAMP field format:
                 // https://datatracker.ietf.org/doc/html/rfc3164#section-4.1.2
+                // https://docs.rs/chrono/latest/chrono/format/strftime/index.html
                 let timestamp = self.timestamp.format("%b %e %H:%M:%S").to_string();
                 // MSG part begins with TAG field + optional context:
                 // https://datatracker.ietf.org/doc/html/rfc3164#section-4.1.3
@@ -262,13 +263,14 @@ impl SyslogMessage {
             SyslogRFC::Rfc5424 => {
                 // HEADER part fields:
                 // https://datatracker.ietf.org/doc/html/rfc5424#section-6.2
-                let version = SYSLOG_V1;
-                let timestamp = self.timestamp.to_rfc3339_opts(SecondsFormat::Millis, true);
+                // TIME-FRAC max length is 6 digits (microseconds):
+                // https://datatracker.ietf.org/doc/html/rfc5424#section-6
+                let timestamp = self.timestamp.round_subsecs(6).to_rfc3339_opts(SecondsFormat::AutoSi, true);
                 let tag = self.tag.encode_rfc_5424();
                 let sd = structured_data.as_deref().unwrap_or(NIL_VALUE);
 
                 [
-                    version,
+                    SYSLOG_V1,
                     timestamp.as_str(),
                     hostname,
                     &tag,
