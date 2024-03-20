@@ -12,7 +12,7 @@ default-run = "vector"
 autobenches = false # our benchmarks are not runnable on their own either way
 # Minimum supported rust version
 # See docs/DEVELOPING.md for policy
-rust-version = "1.74"
+rust-version = "1.75"
 
 [[bin]]
 name = "vector"
@@ -130,7 +130,7 @@ members = [
 
 [workspace.dependencies]
 chrono = { version = "0.4.34", default-features = false, features = ["clock", "serde"] }
-clap = { version = "4.5.2", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.3", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 indexmap = { version = "2.2.5", default-features = false, features = ["serde", "std"] }
 pin-project = { version = "1.1.5", default-features = false }
 proptest = "1.4"
@@ -138,7 +138,7 @@ proptest-derive = "0.4.0"
 serde_json = { version = "1.0.114", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.197", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.11", default-features = false, features = ["display", "parse"] }
-vrl = { version = "0.12.0", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { version = "0.13.0", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
 pin-project.workspace = true
@@ -156,11 +156,11 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.5", default-features = false }
-async-trait = { version = "0.1.77", default-features = false }
+async-trait = { version = "0.1.78", default-features = false }
 futures = { version = "0.3.30", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.36.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.4", default-features = false }
-tokio-stream = { version = "0.1.14", default-features = false, features = ["net", "sync", "time"] }
+tokio-stream = { version = "0.1.15", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
 console-subscriber = { version = "0.2.0", default-features = false, optional = true }
 
@@ -191,7 +191,7 @@ aws-sdk-sts = { version = "1.3.1", default-features = false, features = ["behavi
 aws-types = { version = "1.1.7", default-features = false, optional = true }
 aws-sigv4 = { version = "1.1.7", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest", "credentials-process"], optional = true }
-aws-credential-types = { version = "1.1.7", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-credential-types = { version = "1.1.8", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream"], optional = true }
 aws-smithy-types = { version = "1.1.8", default-features = false, optional = true }
 aws-smithy-runtime-api = { version = "1.2.0", default-features = false, optional = true }
@@ -216,7 +216,7 @@ serde-toml-merge = { version = "0.3.5", default-features = false }
 serde_bytes = { version = "0.11.14", default-features = false, features = ["std"], optional = true }
 serde_json.workspace = true
 serde_with = { version = "3.7.0", default-features = false, features = ["macros", "std"] }
-serde_yaml = { version = "0.9.32", default-features = false }
+serde_yaml = { version = "0.9.33", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.2", default-features = false, optional = true }
@@ -235,8 +235,8 @@ smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 lapin = { version = "2.3.1", default-features = false, features = ["native-tls"], optional = true }
 
 # API
-async-graphql = { version = "7.0.1", default-features = false, optional = true, features = ["chrono", "playground"] }
-async-graphql-warp = { version = "7.0.1", default-features = false, optional = true }
+async-graphql = { version = "7.0.3", default-features = false, optional = true, features = ["chrono", "playground"] }
+async-graphql-warp = { version = "7.0.3", default-features = false, optional = true }
 
 # API client
 crossterm = { version = "0.27.0", default-features = false, features = ["event-stream", "windows"], optional = true }
@@ -302,7 +302,7 @@ logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.12.3", default-features = false, optional = true }
 maxminddb = { version = "0.24.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
-mongodb = { version = "2.8.1", default-features = false, features = ["tokio-runtime"], optional = true }
+mongodb = { version = "2.8.2", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.33.0", default-features = false, optional = true }
 nkeys = { version = "0.4.0", default-features = false, optional = true }
 nom = { version = "7.1.3", default-features = false, optional = true }
@@ -383,7 +383,7 @@ rstest = {version = "0.18.2"}
 tempfile = "3.10.1"
 test-generator = "0.3.1"
 tokio = { version = "1.36.0", features = ["test-util"] }
-tokio-test = "0.4.3"
+tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
 vrl.workspace = true
@@ -921,6 +921,7 @@ component-validation-tests = [
   "sinks-splunk_hec",
   "sources-splunk_hec",
   "sinks-datadog_logs",
+  "sources-datadog_agent",
 ]
 
 # Grouping together features for benchmarks. We exclude the API client due to it causing the build process to run out
