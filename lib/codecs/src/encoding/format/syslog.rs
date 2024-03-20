@@ -12,11 +12,37 @@ use akin::akin;
 
 /// Config used to build a `SyslogSerializer`.
 #[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(default)]
+pub struct SyslogSerializerConfig {
+    /// Options for the Syslog serializer.
+    pub syslog: SyslogSerializerOptions
+}
+
+impl SyslogSerializerConfig {
+    /// Build the `SyslogSerializer` from this configuration.
+    pub fn build(&self) -> SyslogSerializer {
+        SyslogSerializer::new(&self)
+    }
+
+    /// The data type of events that are accepted by `SyslogSerializer`.
+    pub fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+
+    /// The schema required by the serializer.
+    pub fn schema_requirement(&self) -> schema::Requirement {
+        schema::Requirement::empty()
+    }
+}
+
+/// Syslog serializer options.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 // Serde default makes all config keys optional.
 // Each field assigns either a fixed value, or field name (lookup field key to retrieve dynamic value per `LogEvent`).
 #[serde(default)]
-#[derive(Clone, Debug, Default)]
-pub struct SyslogSerializerConfig {
+pub struct SyslogSerializerOptions {
     /// RFC
     rfc: SyslogRFC,
     /// Facility
@@ -37,23 +63,6 @@ pub struct SyslogSerializerConfig {
     // Q: The majority of the fields above pragmatically only make sense as config for keys to query?
 }
 
-impl SyslogSerializerConfig {
-    /// Build the `SyslogSerializer` from this configuration.
-    pub fn build(&self) -> SyslogSerializer {
-        SyslogSerializer::new(&self)
-    }
-
-    /// The data type of events that are accepted by `SyslogSerializer`.
-    pub fn input_type(&self) -> DataType {
-        DataType::Log
-    }
-
-    /// The schema required by the serializer.
-    pub fn schema_requirement(&self) -> schema::Requirement {
-        schema::Requirement::empty()
-    }
-}
-
 /// Serializer that converts an `Event` to bytes using the Syslog format.
 #[derive(Debug, Clone)]
 pub struct SyslogSerializer {
@@ -72,10 +81,10 @@ impl Encoder<Event> for SyslogSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         if let Event::Log(log_event) = event {
-            let syslog_message = ConfigDecanter::new(log_event).decant_config(&self.config);
+            let syslog_message = ConfigDecanter::new(log_event).decant_config(&self.config.syslog);
 
             let vec = syslog_message
-                .encode(&self.config.rfc)
+                .encode(&self.config.syslog.rfc)
                 .as_bytes()
                 .to_vec();
             buffer.put_slice(&vec);
@@ -85,7 +94,7 @@ impl Encoder<Event> for SyslogSerializer {
     }
 }
 
-// Adapts a `LogEvent` into a `SyslogMessage` based on config from `SyslogSerializerConfig`:
+// Adapts a `LogEvent` into a `SyslogMessage` based on config from `SyslogSerializerOptions`:
 // - Splits off the responsibility of encoding logic to `SyslogMessage` (which is not dependent upon Vector types).
 // - Majority of methods are only needed to support the `decant_config()` operation.
 struct ConfigDecanter {
@@ -99,7 +108,7 @@ impl ConfigDecanter {
         }
     }
 
-    fn decant_config(&self, config: &SyslogSerializerConfig) -> SyslogMessage {
+    fn decant_config(&self, config: &SyslogSerializerOptions) -> SyslogMessage {
         let x = |v| self.replace_if_proxied(v).unwrap_or_default();
         let facility = x(&config.facility);
         let severity = x(&config.severity);
@@ -142,9 +151,8 @@ impl ConfigDecanter {
     }
 
     fn value_by_key(&self, field_key: &str) -> Option<String> {
-        self.log.get(field_key).and_then(|field_value| {
-            let bytes = field_value.coerce_to_bytes();
-            String::from_utf8(bytes.to_vec()).ok()
+        self.log.get(field_key).map(|field_value| {
+            field_value.to_string_lossy().to_string()
         })
     }
 
@@ -188,7 +196,7 @@ impl ConfigDecanter {
         }
     }
 
-    fn get_message(&self, config: &SyslogSerializerConfig) -> String {
+    fn get_message(&self, config: &SyslogSerializerOptions) -> String {
         // `payload_key` configures where to source the value for the syslog `message`:
         // - Not configured      => Encodes the default log message.
         // - Field key (Valid)   => Get value by lookup (value_by_key)
@@ -389,6 +397,12 @@ impl From<ObjectMap> for StructuredData {
 }
 
 // Only used as helper to support `StructuredData::from()`
+//
+// TODO:
+// This method could be replaced in favor of calling `v.to_string_lossy().to_string()`? (As was done elsewhere in this file):
+// https://github.com/vectordotdev/vrl/blob/f2d71cd26cb8270230f531945d7dee4929235905/src/value/value/serde.rs#L34-L55
+// Timestamp value is handled the same way via `timestamp_to_string()`:
+// https://github.com/vectordotdev/vrl/blob/f2d71cd26cb8270230f531945d7dee4929235905/src/value/value.rs#L175-L179
 fn value_to_string(v: Value) -> String {
     match v {
         Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).to_string(),
@@ -401,6 +415,10 @@ fn value_to_string(v: Value) -> String {
 // Facility + Severity support
 //
 
+// PRIVAL:
+// https://www.rfc-editor.org/rfc/rfc5424#section-6.2.1
+// > The number contained within these angle brackets is known as the Priority value (PRIVAL)
+//   and represents both the Facility and Severity.
 #[derive(Default, Debug)]
 struct Pri {
     facility: Facility,
@@ -409,10 +427,8 @@ struct Pri {
 
 impl Pri {
     fn from_str_variants(facility_variant: &str, severity_variant: &str) -> Self {
-        // This approach instead parses a string of the name or ordinal representation,
-        // any reference via field key lookup should have already happened by this point.
-        let facility = Facility::into_variant(&facility_variant).unwrap_or(Facility::User);
-        let severity = Severity::into_variant(&severity_variant).unwrap_or(Severity::Informational);
+        let facility = Facility::into_variant(&facility_variant).unwrap_or_default();
+        let severity = Severity::into_variant(&severity_variant).unwrap_or_default();
 
         Self {
             facility,
