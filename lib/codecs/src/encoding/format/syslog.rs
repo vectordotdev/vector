@@ -1,7 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
 use vector_core::{config::DataType, event::{Event, LogEvent}, schema};
-use chrono::{DateTime, SecondsFormat, Local, SubsecRound};
+use chrono::{DateTime, SecondsFormat, SubsecRound, Utc};
 use vrl::value::{ObjectMap, Value};
 use vector_config::configurable_component;
 
@@ -154,25 +154,37 @@ impl ConfigDecanter {
           .map(StructuredData::from)
     }
 
-    fn get_timestamp(&self) -> DateTime::<Local> {
-        // Q: Was this Timestamp key hard-coded to the needs of the original PR author?
+    fn get_timestamp(&self) -> DateTime::<Utc> {
+        // Q: Should the timestamp source be configurable? (eg: Select a field from the `remap` transform)
         //
-        // Key `@timestamp` depends on input:
-        // https://vector.dev/guides/level-up/managing-schemas/#example-custom-timestamp-field
-        // https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/#timestamps
-        // NOTE: Log schema key renaming is unavailable when Log namespacing is enabled:
-        // https://vector.dev/docs/reference/configuration/global-options/#log_schema
+        // Concerns:
+        // - A source with `log_namespace: true` seems to cause `get_timstamp()` to return `None`?
+        // Does not seem to retrieve `%vector.ingest_timestamp`?
+        // - A sink type `console` with `timestamp_format: unix_ms` converts a `Value::Timestamp` prior to the encoder logic
+        // to `Value::Integer(i64)` instead, which won't match this condition.
         //
-        // NOTE: Log namespacing has metadata `%vector.ingest_timestamp` from a source (file/demo_logs) instead of `timestamp`.
-        // As a `payload_key` it will not respect config `encoding.timestamp_format`, but does when
-        // using the parent object (`%vector`). Inputs without namespacing respect that config setting.
-        if let Some(Value::Timestamp(timestamp)) = self.log.get("@timestamp") {
-            // Q: Utc type returned is changed to Local?
-            // - Could otherwise return `*timestamp` as-is? Why is Local conversion necessary?
-            DateTime::<Local>::from(*timestamp)
+        // NOTE:
+        // Vector always manages `Value::Timestamp` as `DateTime<Utc>`, any prior TZ information context is always dropped.
+        // If restoring the TZ for a log is important, it could be handled via a remap transform?
+        //
+        // Ref:
+        // `log.get_timestamp()`:
+        // https://github.com/vectordotdev/vector/blob/ad6a48efc0f79b2c18a5c1394e5d8603fdfd1bab/lib/vector-core/src/event/log_event.rs#L543-L552
+        if let Some(Value::Timestamp(timestamp)) = self.log.get_timestamp() {
+            *timestamp
         } else {
-            // NOTE: Local time is encouraged by RFC 5424 when creating a fallback timestamp for RFC 3164
-            Local::now()
+            // NOTE:
+            // When timezone information is missing Vector handles conversion to UTC by assuming the local TZ:
+            // https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/#time-zones
+            // There is a global option for which TZ to assume (where the default is local TZ):
+            // https://vector.dev/docs/reference/configuration/global-options/#timezone
+            // https://github.com/vectordotdev/vector/blob/58a4a2ef52e606c0f9b9fa975cf114b661300584/lib/vector-core/src/config/global_options.rs#L233-L236
+            // https://github.com/vectordotdev/vrl/blob/c010300710a00191cd406e57cd0f3e001923d598/src/compiler/datetime.rs#L88-L95
+            // VRL remap can also override that:
+            // https://vector.dev/docs/reference/configuration/transforms/remap/#timezone
+            // Vector's `syslog` source type also uses `Utc::now()` internally as a fallback:
+            // https://github.com/vectordotdev/vector/blob/58a4a2ef52e606c0f9b9fa975cf114b661300584/src/sources/syslog.rs#L430-L438
+            Utc::now()
         }
     }
 
@@ -223,7 +235,7 @@ pub enum SyslogRFC {
 #[derive(Default, Debug)]
 struct SyslogMessage {
     pri: Pri,
-    timestamp: DateTime::<Local>,
+    timestamp: DateTime::<Utc>,
     hostname: Option<String>,
     tag: Tag,
     structured_data: Option<StructuredData>,
@@ -243,6 +255,10 @@ impl SyslogMessage {
                 // TIMESTAMP field format:
                 // https://datatracker.ietf.org/doc/html/rfc3164#section-4.1.2
                 // https://docs.rs/chrono/latest/chrono/format/strftime/index.html
+                //
+                // TODO: Should this remain as UTC or adjust to the local TZ of the environment (or Vector config)?
+                // RFC 5424 suggests (when adapting for RFC 3164) to present a timestamp with the local TZ of the log source:
+                // https://www.rfc-editor.org/rfc/rfc5424#appendix-A.1
                 let timestamp = self.timestamp.format("%b %e %H:%M:%S").to_string();
                 // MSG part begins with TAG field + optional context:
                 // https://datatracker.ietf.org/doc/html/rfc3164#section-4.1.3
@@ -265,6 +281,7 @@ impl SyslogMessage {
                 // https://datatracker.ietf.org/doc/html/rfc5424#section-6.2
                 // TIME-FRAC max length is 6 digits (microseconds):
                 // https://datatracker.ietf.org/doc/html/rfc5424#section-6
+                // TODO: Likewise for RFC 5424, as UTC the offset will always render as `Z` if not configurable.
                 let timestamp = self.timestamp.round_subsecs(6).to_rfc3339_opts(SecondsFormat::AutoSi, true);
                 let tag = self.tag.encode_rfc_5424();
                 let sd = structured_data.as_deref().unwrap_or(NIL_VALUE);
