@@ -992,7 +992,7 @@ impl Checkpointer {
             .read(true)
             .write(true)
             .create(true)
-            .truncate(true)
+            .truncate(false)
             .open(&filename)
             .await?;
         Ok(Checkpointer { file, filename })
