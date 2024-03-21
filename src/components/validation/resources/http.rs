@@ -75,36 +75,25 @@ impl HttpResourceConfig {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn spawn_as_output(
-        self,
-        direction: ResourceDirection,
-        codec: ResourceCodec,
-        output_tx: mpsc::Sender<Vec<Event>>,
-        task_coordinator: &TaskCoordinator<Configuring>,
-        input_events: Vec<TestEvent>,
-        runner_metrics: &Arc<Mutex<RunnerMetrics>>,
-        log_namespace: LogNamespace,
-    ) -> vector_lib::Result<()> {
-        match direction {
+    pub fn spawn_as_output(self, ctx: HttpResourceOutputContext) -> vector_lib::Result<()> {
+        match ctx.direction {
             // We'll pull data from the sink.
-            ResourceDirection::Pull => Ok(spawn_output_http_client(
-                self,
-                codec,
-                output_tx,
-                task_coordinator,
-            )),
+            ResourceDirection::Pull => Ok(spawn_output_http_client(self, ctx)),
             // The sink will push data to us.
-            ResourceDirection::Push => spawn_output_http_server(
-                self,
-                codec,
-                output_tx,
-                task_coordinator,
-                input_events,
-                runner_metrics,
-                log_namespace,
-            ),
+            ResourceDirection::Push => spawn_output_http_server(self, ctx),
         }
     }
+}
+
+/// Anything that the output side HTTP external resource needs
+pub struct HttpResourceOutputContext<'a> {
+    pub direction: ResourceDirection,
+    pub codec: ResourceCodec,
+    pub output_tx: mpsc::Sender<Vec<Event>>,
+    pub task_coordinator: &'a TaskCoordinator<Configuring>,
+    pub input_events: Vec<TestEvent>,
+    pub runner_metrics: &'a Arc<Mutex<RunnerMetrics>>,
+    pub log_namespace: LogNamespace,
 }
 
 /// Spawns an HTTP server that a source will make requests to in order to get events.
@@ -305,18 +294,13 @@ fn spawn_input_http_client(
 #[allow(clippy::missing_const_for_fn)]
 fn spawn_output_http_server(
     config: HttpResourceConfig,
-    codec: ResourceCodec,
-    output_tx: mpsc::Sender<Vec<Event>>,
-    task_coordinator: &TaskCoordinator<Configuring>,
-    input_events: Vec<TestEvent>,
-    runner_metrics: &Arc<Mutex<RunnerMetrics>>,
-    log_namespace: LogNamespace,
+    context: HttpResourceOutputContext,
 ) -> vector_lib::Result<()> {
     // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
     // via an output sender. We accept/collect events until we're told to shutdown.
 
     // First, we'll build and spawn our HTTP server.
-    let decoder = codec.into_decoder(log_namespace)?;
+    let decoder = context.codec.into_decoder(context.log_namespace)?;
 
     // Note that we currently don't differentiate which events should and shouldn't be rejected-
     // we reject all events in this server if any are marked for rejection.
@@ -324,14 +308,19 @@ fn spawn_output_http_server(
     // adding logic to the test case which is passed down here, and to the event itself. Since
     // we can't guarantee the order of events, we'd need a way to flag which ones need to be
     // rejected.
-    let should_reject = input_events.iter().filter(|te| te.should_reject()).count() > 0;
+    let should_reject = context
+        .input_events
+        .iter()
+        .filter(|te| te.should_reject())
+        .count()
+        > 0;
 
     let (_, http_server_shutdown_tx) = spawn_http_server(
-        task_coordinator,
+        context.task_coordinator,
         &config,
-        runner_metrics,
+        context.runner_metrics,
         move |request, output_runner_metrics| {
-            let output_tx = output_tx.clone();
+            let output_tx = context.output_tx.clone();
             let mut decoder = decoder.clone();
 
             async move {
@@ -394,9 +383,9 @@ fn spawn_output_http_server(
 
     // Now we'll create and spawn the resource's core logic loop which simply waits for the runner
     // to instruct us to shutdown, and when that happens, cascades to shutting down the HTTP server.
-    let resource_started = task_coordinator.track_started();
-    let resource_completed = task_coordinator.track_completed();
-    let mut resource_shutdown_rx = task_coordinator.register_for_shutdown();
+    let resource_started = context.task_coordinator.track_started();
+    let resource_completed = context.task_coordinator.track_completed();
+    let mut resource_shutdown_rx = context.task_coordinator.register_for_shutdown();
 
     tokio::spawn(async move {
         resource_started.mark_as_done();
@@ -419,12 +408,7 @@ fn spawn_output_http_server(
 
 /// Spawns an HTTP client that pulls events by making requests to an HTTP server driven by a sink.
 #[allow(clippy::missing_const_for_fn)]
-fn spawn_output_http_client(
-    _config: HttpResourceConfig,
-    _codec: ResourceCodec,
-    _output_tx: mpsc::Sender<Vec<Event>>,
-    _task_coordinator: &TaskCoordinator<Configuring>,
-) {
+fn spawn_output_http_client(_config: HttpResourceConfig, _ctx: HttpResourceOutputContext) {
     // TODO: The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be
     // scraped... but since we need special logic to aggregate/deduplicate scraped metrics, we can't
     // use this generically for that purpose.

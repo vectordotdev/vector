@@ -21,6 +21,7 @@ use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingCo
 
 pub use self::event::{encode_test_event, TestEvent};
 pub use self::http::HttpResourceConfig;
+use self::http::HttpResourceOutputContext;
 
 use super::{
     sync::{Configuring, TaskCoordinator},
@@ -349,15 +350,17 @@ impl ExternalResource {
         log_namespace: LogNamespace,
     ) -> vector_lib::Result<()> {
         match self.definition {
-            ResourceDefinition::Http(http_config) => http_config.spawn_as_output(
-                self.direction,
-                self.codec,
-                output_tx,
-                task_coordinator,
-                input_events,
-                runner_metrics,
-                log_namespace,
-            ),
+            ResourceDefinition::Http(http_config) => {
+                http_config.spawn_as_output(HttpResourceOutputContext {
+                    direction: self.direction,
+                    codec: self.codec,
+                    output_tx,
+                    task_coordinator,
+                    input_events,
+                    runner_metrics,
+                    log_namespace,
+                })
+            }
         }
     }
 }
