@@ -50,7 +50,7 @@ remap: functions: sieve: {
 		{
 			title: "Sieve with regex"
 			source: #"""
-				sieve("test123%456.فوائد.net.", r'[a-z]')
+				sieve("test123%456.فوائد.net.", r'[a-z0-9.]')
 				"""#
 			return: "test123456..net."
 		},
