@@ -7,8 +7,8 @@ remap: functions: parse_proto: {
 		"""
 	notices: [
 		"""
-			Only proto messages are parsed and returned.
-		""",
+				Only proto messages are parsed and returned.
+			""",
 	]
 
 	arguments: [
@@ -53,13 +53,13 @@ remap: functions: parse_proto: {
 				parse_proto!(decode_base64!("Cgdzb21lb25lIggKBjEyMzQ1Ng=="), "/etc/vector/protobuf_descriptor_set.desc", "package.Message")
 				"""#
 			return: {
-				    name: "someone",
-				    phones: [
+				name: "someone"
+				phones: [
 					{
-					    number: "123456",
-					}
-				    ],
-				}
+						number: "123456"
+					},
+				]
+			}
 		},
 	]
 }

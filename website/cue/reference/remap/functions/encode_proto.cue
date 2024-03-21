@@ -46,7 +46,7 @@ remap: functions: encode_proto: {
 			source: #"""
 				.payload = encode_base64(encode_proto!({"name": "someone", "phones: [{"number": "123456"}]}, "/etc/vector/protobuf_descriptor_set.desc", "package.Message"))
 				"""#
-			return: #"Cgdzb21lb25lIggKBjEyMzQ1Ng=="#,
+			return: #"Cgdzb21lb25lIggKBjEyMzQ1Ng=="#
 		},
 	]
 }
