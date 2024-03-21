@@ -37,8 +37,6 @@ impl TopologyBuilder {
                 config_name
             ))?;
 
-        let log_namespace = configuration.log_namespace == LogNamespace::Vector;
-
         Ok(match component_configuration {
             ComponentConfiguration::Source(source) => {
                 debug_assert_eq!(configuration.component_type(), ComponentType::Source);
@@ -46,11 +44,11 @@ impl TopologyBuilder {
             }
             ComponentConfiguration::Transform(transform) => {
                 debug_assert_eq!(configuration.component_type(), ComponentType::Transform);
-                Self::from_transform(transform, log_namespace)
+                Self::from_transform(transform, configuration.log_namespace)
             }
             ComponentConfiguration::Sink(sink) => {
                 debug_assert_eq!(configuration.component_type(), ComponentType::Sink);
-                Self::from_sink(sink, log_namespace)
+                Self::from_sink(sink, configuration.log_namespace)
             }
         })
     }
@@ -70,7 +68,7 @@ impl TopologyBuilder {
         }
     }
 
-    fn from_transform(transform: BoxedTransform, log_namespace: bool) -> Self {
+    fn from_transform(transform: BoxedTransform, log_namespace: LogNamespace) -> Self {
         let (input_edge, input_source) = build_input_edge(log_namespace);
         let (output_edge, output_sink) = build_output_edge();
 
@@ -86,7 +84,7 @@ impl TopologyBuilder {
         }
     }
 
-    fn from_sink(sink: BoxedSink, log_namespace: bool) -> Self {
+    fn from_sink(sink: BoxedSink, log_namespace: LogNamespace) -> Self {
         let (input_edge, input_source) = build_input_edge(log_namespace);
 
         let mut config_builder = ConfigBuilder::default();
@@ -128,13 +126,13 @@ impl TopologyBuilder {
     }
 }
 
-fn build_input_edge(log_namespace: bool) -> (InputEdge, impl Into<BoxedSource>) {
+fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedSource>) {
     let input_listen_addr = GrpcAddress::from(next_addr());
     debug!(listen_addr = %input_listen_addr, "Creating controlled input edge.");
 
     let mut input_source = VectorSourceConfig::from_address(input_listen_addr.as_socket_addr());
 
-    input_source.log_namespace = Some(log_namespace);
+    input_source.log_namespace = Some(log_namespace == LogNamespace::Vector);
 
     let input_edge = InputEdge::from_address(input_listen_addr);
 
