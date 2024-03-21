@@ -188,7 +188,7 @@ impl ValidationConfiguration {
         self.component_configurations.clone()
     }
 
-    /// Gets the LogNamespace the that the component is using.
+    /// Gets the LogNamespace that the component is using.
     pub const fn log_namespace(&self) -> LogNamespace {
         self.log_namespace
     }
