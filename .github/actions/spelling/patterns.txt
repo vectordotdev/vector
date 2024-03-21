@@ -226,7 +226,7 @@ user:P@ssw0rd
 /.+@base64/.+
 
 # Ignore base64 encoded values in VRL examples (requires padding to avoid false positives)
-\b.*[A-Za-z0-9+]*==\b
+\b[A-Za-z0-9]*==\b
 
 # Ignore punycode
 \bxn--[-0-9a-z]+
