@@ -14,10 +14,13 @@ use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
-use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+use vector_lib::{
+    codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig},
+    lookup::{owned_value_path, OwnedTargetPath},
+};
 use vector_lib::{
     codecs::{
-        decoding::{Deserializer, DeserializerConfig, Framer},
+        decoding::{BytesDeserializerConfig, Deserializer, DeserializerConfig, Framer},
         BytesDecoder, BytesDeserializer,
     },
     config::DataType,
@@ -34,6 +37,7 @@ use vrl::value::{Kind, ObjectMap};
 use crate::schema::Definition;
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
+    components::validation::prelude::*,
     config::{SourceConfig, SourceContext},
     event::{
         into_event_stream,
@@ -2501,3 +2505,62 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
 fn assert_tags(metric: &Metric, tags: MetricTags) {
     assert_eq!(metric.tags().expect("Missing tags"), &tags);
 }
+
+impl ValidatableComponent for DatadogAgentConfig {
+    fn validation_configuration() -> ValidationConfiguration {
+        use crate::codecs::DecodingConfig;
+
+        let config = DatadogAgentConfig {
+            address: "0.0.0.0:9007".parse().unwrap(),
+            tls: None,
+            store_api_key: false,
+            framing: CharacterDelimitedDecoderConfig {
+                character_delimited: CharacterDelimitedDecoderOptions {
+                    delimiter: b',',
+                    max_length: Some(usize::MAX),
+                },
+            }
+            .into(),
+            decoding: BytesDeserializerConfig::new().into(),
+            acknowledgements: Default::default(),
+            multiple_outputs: false,
+            disable_logs: false,
+            disable_metrics: false,
+            disable_traces: false,
+            parse_ddtags: false,
+            log_namespace: Some(false),
+            keepalive: Default::default(),
+        };
+
+        let log_namespace: LogNamespace = config.log_namespace.unwrap_or(false).into();
+
+        // TODO set up separate test cases for metrics and traces endpoints
+
+        let logs_addr = format!("http://{}/api/v2/logs", config.address);
+        let uri = http::Uri::try_from(&logs_addr).expect("should not fail to parse URI");
+
+        let decoder = DecodingConfig::new(
+            config.framing.clone(),
+            DeserializerConfig::Json(Default::default()),
+            false.into(),
+        );
+
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(uri, None),
+            decoder,
+        );
+
+        ValidationConfiguration::from_source(
+            Self::NAME,
+            log_namespace,
+            vec![ComponentTestCaseConfig::from_source(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
+    }
+}
+
+register_validatable_component!(DatadogAgentConfig);
