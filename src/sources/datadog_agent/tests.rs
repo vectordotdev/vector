@@ -2532,7 +2532,7 @@ impl ValidatableComponent for DatadogAgentConfig {
             keepalive: Default::default(),
         };
 
-        let log_namespace: LogNamespace = config.log_namespace.unwrap_or(false).into();
+        let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
 
         // TODO set up separate test cases for metrics and traces endpoints
 

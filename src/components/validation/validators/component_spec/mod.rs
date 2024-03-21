@@ -281,7 +281,7 @@ fn compare_actual_to_expected(
 
     let actual = sum_counters(metric_type, &metrics)?;
 
-    info!("{}: expected {}, actual {}.", metric_type, expected, actual,);
+    info!("{metric_type}: expected {expected}, actual {actual}.");
 
     if actual != expected &&
         // This is a bit messy. The issue is that EstimatedJsonSizeOf can be called by a component
@@ -293,8 +293,7 @@ fn compare_actual_to_expected(
             || (actual != (expected + (expect_received_events * 2))))
     {
         errs.push(format!(
-            "{}: expected {}, actual {}",
-            metric_type, expected, actual
+            "{metric_type}: expected {expected}, actual {actual}",
         ));
     }
 

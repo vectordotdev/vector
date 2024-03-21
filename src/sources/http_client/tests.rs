@@ -50,7 +50,7 @@ impl ValidatableComponent for HttpClientConfig {
             decoding: DeserializerConfig::Json(Default::default()),
             ..Default::default()
         };
-        let log_namespace: LogNamespace = config.log_namespace.unwrap_or(false).into();
+        let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
 
         let external_resource = ExternalResource::new(
             ResourceDirection::Pull,

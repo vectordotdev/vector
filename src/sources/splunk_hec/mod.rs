@@ -2623,7 +2623,7 @@ mod tests {
             let listen_addr_http = format!("http://{}/services/collector/event", config.address);
             let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
 
-            let log_namespace: LogNamespace = config.log_namespace.unwrap_or(false).into();
+            let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
             let framing = BytesDecoderConfig::new().into();
             let decoding = DeserializerConfig::Json(Default::default());
 
