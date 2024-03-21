@@ -24,7 +24,7 @@ use crate::components::validation::{
     sync::{Configuring, TaskCoordinator},
     RunnerMetrics,
 };
-use vector_lib::{event::Event, EstimatedJsonEncodedSizeOf};
+use vector_lib::{config::LogNamespace, event::Event, EstimatedJsonEncodedSizeOf};
 
 use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 
@@ -70,6 +70,7 @@ impl HttpResourceConfig {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn_as_output(
         self,
         direction: ResourceDirection,
@@ -78,6 +79,7 @@ impl HttpResourceConfig {
         task_coordinator: &TaskCoordinator<Configuring>,
         input_events: Vec<TestEvent>,
         runner_metrics: &Arc<Mutex<RunnerMetrics>>,
+        log_namespace: LogNamespace,
     ) -> vector_lib::Result<()> {
         match direction {
             // We'll pull data from the sink.
@@ -95,6 +97,7 @@ impl HttpResourceConfig {
                 task_coordinator,
                 input_events,
                 runner_metrics,
+                log_namespace,
             ),
         }
     }
@@ -277,12 +280,13 @@ fn spawn_output_http_server(
     task_coordinator: &TaskCoordinator<Configuring>,
     input_events: Vec<TestEvent>,
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
+    log_namespace: LogNamespace,
 ) -> vector_lib::Result<()> {
     // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
     // via an output sender. We accept/collect events until we're told to shutdown.
 
     // First, we'll build and spawn our HTTP server.
-    let decoder = codec.into_decoder()?;
+    let decoder = codec.into_decoder(log_namespace)?;
 
     // Note that we currently don't differentiate which events should and shouldn't be rejected-
     // we reject all events in this server if any are marked for rejection.
@@ -343,7 +347,13 @@ fn spawn_output_http_server(
                                         return StatusCode::OK.into_response();
                                     }
                                 }
-                                Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+                                Err(_) => {
+                                    error!(
+                                        "HTTP server failed to decode {:?}",
+                                        String::from_utf8_lossy(&body)
+                                    );
+                                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                                }
                             }
                         }
                     }
@@ -461,7 +471,12 @@ where
                 }
             });
 
-        let router = Router::new().route(&request_path, method_router);
+        let router = Router::new().route(&request_path, method_router).fallback(
+            |req: Request<Body>| async move {
+                error!(?req, "Component sent request the server could not route");
+                StatusCode::NOT_FOUND
+            },
+        );
 
         // Now actually run/drive the HTTP server and process requests until we're told to shutdown.
         http_server_started.mark_as_done();

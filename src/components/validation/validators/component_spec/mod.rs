@@ -293,7 +293,7 @@ fn compare_actual_to_expected(
             || (actual != (expected + (expect_received_events * 2))))
     {
         errs.push(format!(
-            "{}: expected {}, but received {}",
+            "{}: expected {}, actual {}",
             metric_type, expected, actual
         ));
     }
