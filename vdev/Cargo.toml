@@ -30,7 +30,7 @@ os_info = { version = "3.8.1", default-features = false }
 owo-colors = { version = "4.0.0", features = ["supports-colors"] }
 paste = "1.0.14"
 regex = { version = "1.10.3", default-features = false, features = ["std", "perf"] }
-reqwest = { version = "0.11", features = ["json", "blocking"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml = "0.9.33"
