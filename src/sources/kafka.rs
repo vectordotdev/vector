@@ -503,7 +503,6 @@ struct ConsumerStateInner<S> {
     consumer_state: S,
 }
 struct Consuming;
-struct Complete;
 struct Draining {
     /// The rendezvous channel sender from the revoke or shutdown callback. Sending on this channel
     /// indicates to the kafka client task that one or more partitions have been drained, while
@@ -527,7 +526,7 @@ type OptionDeadline = OptionFuture<Pin<Box<Sleep>>>;
 enum ConsumerState {
     Consuming(ConsumerStateInner<Consuming>),
     Draining(ConsumerStateInner<Draining>),
-    Complete(ConsumerStateInner<Complete>),
+    Complete,
 }
 impl Draining {
     fn new(signal: SyncSender<()>, shutdown: bool) -> Self {
@@ -545,16 +544,7 @@ impl Draining {
 
 impl<C> ConsumerStateInner<C> {
     fn complete(self, _deadline: OptionDeadline) -> (OptionDeadline, ConsumerState) {
-        (
-            None.into(),
-            ConsumerState::Complete(ConsumerStateInner {
-                config: self.config,
-                decoder: self.decoder,
-                out: self.out,
-                log_namespace: self.log_namespace,
-                consumer_state: Complete,
-            }),
-        )
+        (None.into(), ConsumerState::Complete)
     }
 }
 
@@ -765,7 +755,7 @@ async fn coordinate_kafka_callbacks(
                 abort_handles.remove(&finished_partition);
 
                 (drain_deadline, consumer_state) = match consumer_state {
-                    ConsumerState::Complete(_) => unreachable!("Partition consumer finished after completion."),
+                    ConsumerState::Complete => unreachable!("Partition consumer finished after completion."),
                     ConsumerState::Draining(mut state) => {
                         state.partition_drained(finished_partition);
 
@@ -798,7 +788,7 @@ async fn coordinate_kafka_callbacks(
             },
             Some(callback) = callbacks.recv() => match callback {
                 KafkaCallback::PartitionsAssigned(mut assigned_partitions, done) => match consumer_state {
-                    ConsumerState::Complete(_) => unreachable!("Partition assignment received after completion."),
+                    ConsumerState::Complete => unreachable!("Partition assignment received after completion."),
                     ConsumerState::Draining(_) => error!("Partition assignment received while draining revoked partitions, maybe an invalid assignment."),
                     ConsumerState::Consuming(ref consumer_state) => {
                         let acks = consumer.context().acknowledgements;
@@ -819,7 +809,7 @@ async fn coordinate_kafka_callbacks(
                     }
                 },
                 KafkaCallback::PartitionsRevoked(mut revoked_partitions, drain) => (drain_deadline, consumer_state) = match consumer_state {
-                    ConsumerState::Complete(_) => unreachable!("Partitions revoked after completion."),
+                    ConsumerState::Complete => unreachable!("Partitions revoked after completion."),
                     ConsumerState::Draining(d) => {
                         // NB: This would only happen if the task driving the kafka client (i.e. rebalance handlers)
                         // is not handling shutdown signals, and a revoke happens during a shutdown drain; otherwise
@@ -843,7 +833,7 @@ async fn coordinate_kafka_callbacks(
                     }
                 },
                 KafkaCallback::ShuttingDown(drain) => (drain_deadline, consumer_state) = match consumer_state {
-                    ConsumerState::Complete(_) => unreachable!("Shutdown received after completion."),
+                    ConsumerState::Complete => unreachable!("Shutdown received after completion."),
                     // Shutting down is just like a full assignment revoke, but we also close the
                     // callback channels, since we don't expect additional assignments or rebalances
                     ConsumerState::Draining(state) => {
@@ -882,7 +872,7 @@ async fn coordinate_kafka_callbacks(
             },
 
             Some(_) = &mut drain_deadline => (drain_deadline, consumer_state) = match consumer_state {
-                ConsumerState::Complete(_) => unreachable!("Drain deadline received after completion."),
+                ConsumerState::Complete => unreachable!("Drain deadline received after completion."),
                 ConsumerState::Consuming(state) => {
                     warn!("A drain deadline fired outside of draining mode.");
                     state.keep_consuming(None.into())
