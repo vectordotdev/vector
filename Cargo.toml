@@ -137,7 +137,7 @@ proptest = "1.4"
 proptest-derive = "0.4.0"
 serde_json = { version = "1.0.114", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.197", default-features = false, features = ["alloc", "derive", "rc"] }
-toml = { version = "0.8.11", default-features = false, features = ["display", "parse"] }
+toml = { version = "0.8.12", default-features = false, features = ["display", "parse"] }
 vrl = { version = "0.13.0", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
