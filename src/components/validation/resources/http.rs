@@ -503,7 +503,7 @@ where
 
         let router = Router::new().route(&request_path, method_router).fallback(
             |req: Request<Body>| async move {
-                error!(?req, "Component sent request the server could not route");
+                error!(?req, "Component sent request the server could not route.");
                 StatusCode::NOT_FOUND
             },
         );
