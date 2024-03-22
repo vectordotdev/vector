@@ -44,7 +44,7 @@ remap: functions: encode_proto: {
 		{
 			title: "Encode to proto"
 			source: #"""
-				.payload = encode_base64(encode_proto!({"name": "someone", "phones: [{"number": "123456"}]}, "/etc/vector/protobuf_descriptor_set.desc", "package.Message"))
+				.payload = encode_base64(encode_proto!({"name": "someone", "phones": [{"number": "123456"}]}, "resources/protobuf_descriptor_set.desc", "test_protobuf.Person"))
 				"""#
 			return: #"Cgdzb21lb25lIggKBjEyMzQ1Ng=="#
 		},

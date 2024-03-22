@@ -50,7 +50,7 @@ remap: functions: parse_proto: {
 		{
 			title: "Parse proto"
 			source: #"""
-				parse_proto!(decode_base64!("Cgdzb21lb25lIggKBjEyMzQ1Ng=="), "/etc/vector/protobuf_descriptor_set.desc", "package.Message")
+				parse_proto!(decode_base64!("Cgdzb21lb25lIggKBjEyMzQ1Ng=="), "resources/protobuf_descriptor_set.desc", "test_protobuf.Person")
 				"""#
 			return: {
 				name: "someone"
