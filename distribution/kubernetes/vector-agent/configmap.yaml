@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.36.0-distroless-libc"
+    app.kubernetes.io/version: "0.36.1-distroless-libc"
 data:
   agent.yaml: |
     data_dir: /vector-data-dir
@@ -25,7 +25,7 @@ data:
             excludes: [binfmt_misc]
           filesystems:
             excludes: [binfmt_misc]
-          mountPoints:
+          mountpoints:
             excludes: ["*/proc/sys/fs/binfmt_misc"]
         type: host_metrics
       internal_metrics:

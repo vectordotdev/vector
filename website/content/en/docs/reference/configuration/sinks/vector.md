@@ -1,7 +1,7 @@
 ---
 title: Vector
 description: Relay observability data to another Vector instance
-kind: sink
+component_kind: sink
 layout: component
 tags: ["vector", "instance", "component", "sink"]
 ---

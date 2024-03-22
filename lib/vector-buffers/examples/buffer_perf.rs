@@ -283,7 +283,7 @@ where
 
     variant
         .add_to_builder(&mut builder, Some(data_dir), id)
-        .expect("should not fail to to add variant to builder");
+        .expect("should not fail to add variant to builder");
 
     builder
         .build(String::from("buffer_perf"), Span::none())

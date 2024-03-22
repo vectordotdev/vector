@@ -1,7 +1,7 @@
 ---
 title: AWS Kinesis Streams logs
 description: Publish logs to [AWS Kinesis Streams](https://aws.amazon.com/kinesis/data-streams) topics
-kind: sink
+component_kind: sink
 layout: component
 tags: ["aws", "kinesis", "streams", "component", "sink", "logs"]
 ---

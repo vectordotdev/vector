@@ -1,7 +1,7 @@
 ---
 title: Honeycomb
 description: Deliver log events to [Honeycomb](https://www.honeycomb.io)
-kind: sink
+component_kind: sink
 layout: component
 tags: ["honeycomb", "component", "sink", "logs"]
 ---

@@ -184,7 +184,7 @@ impl DnsMessageParser {
             .collect::<Result<Vec<_>, _>>()
     }
 
-    fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
+    pub(crate) fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
         let record_data = match record.data() {
             Some(RData::Unknown { code, rdata }) => {
                 self.format_unknown_rdata((*code).into(), rdata)
@@ -1297,6 +1297,7 @@ mod tests {
             CAA, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
         },
     };
+    use hickory_proto::serialize::binary::Restrict;
 
     use super::*;
 
@@ -2200,11 +2201,22 @@ mod tests {
         let raw_rdata = BASE64
             .decode(raw_data.as_bytes())
             .expect("Invalid base64 encoded rdata.");
-        let record_rdata = NULL::with(raw_rdata);
-        let rdata_text =
-            DnsMessageParser::new(Vec::<u8>::new()).format_unknown_rdata(code, &record_rdata);
+        let mut decoder = BinDecoder::new(&raw_rdata);
+        let record = Record::from_rdata(
+            Name::new(),
+            1,
+            RData::read(
+                &mut decoder,
+                RecordType::from(code),
+                Restrict::new(raw_rdata.len() as u16),
+            )
+            .unwrap(),
+        );
+        let rdata_text = DnsMessageParser::new(Vec::<u8>::new())
+            .parse_dns_record(&record)
+            .map(|r| r.rdata);
         assert!(rdata_text.is_ok());
-        assert_eq!(expected_output, rdata_text.unwrap().0.unwrap());
+        assert_eq!(expected_output, rdata_text.unwrap().unwrap());
     }
 
     fn test_format_rdata_with_compressed_domain_names(

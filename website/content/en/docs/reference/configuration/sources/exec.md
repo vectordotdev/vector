@@ -1,7 +1,7 @@
 ---
 title: Exec
 description: Collect output from a process running on the host
-kind: source
+component_kind: source
 layout: component
 tags: ["exec", "process", "component", "source"]
 ---

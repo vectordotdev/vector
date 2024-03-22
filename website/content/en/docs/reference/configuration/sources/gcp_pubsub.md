@@ -1,7 +1,7 @@
 ---
 title: GCP PubSub
 description: Fetch observability events from GCP's [PubSub](https://cloud.google.com/pubsub) messaging system
-kind: source
+component_kind: source
 layout: component
 tags: ["gcp", "pubsub", "component", "source"]
 ---

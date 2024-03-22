@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-async-graphql = { version = "7.0.1", default-features = false, features = ["playground" ], optional = true }
+async-graphql = { version = "7.0.3", default-features = false, features = ["playground" ], optional = true }
 async-trait = { version = "0.1", default-features = false }
 bitmask-enum = { version = "2.2.3", default-features = false }
 bytes = { version = "1.5.0", default-features = false, features = ["serde"] }
@@ -43,7 +43,7 @@ regex = { version = "1.10.3", default-features = false, features = ["std", "perf
 ryu = { version = "1", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
-serde_with = { version = "3.6.1", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "3.7.0", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.5", default-features = false }
 socket2 = { version = "0.5.6", default-features = false }
@@ -75,7 +75,7 @@ schannel = "0.1.23"
 prost-build = "0.12"
 
 [dev-dependencies]
-base64 = "0.21.7"
+base64 = "0.22.0"
 chrono-tz = { version = "0.8.6", default-features = false }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 env-test-util = "1.0.1"
@@ -83,14 +83,14 @@ quickcheck = "1"
 quickcheck_macros = "1"
 proptest = "1.4"
 similar-asserts = "1.5.0"
-tokio-test = "0.4.3"
+tokio-test = "0.4.4"
 toml.workspace = true
 ndarray = "0.15.6"
 ndarray-stats = "0.5.1"
 noisy_float = "0.2.0"
 rand = "0.8.5"
 rand_distr = "0.4.3"
-serde_yaml = { version = "0.9.32", default-features = false }
+serde_yaml = { version = "0.9.33", default-features = false }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 

@@ -16,7 +16,7 @@ For example:
 
 ## To be migrated
 
-- v0.37.0 strict_env_vars Change the default for missing environment variable interpolation from
-  warning to erroring.
-
 ## To be removed
+
+- v0.38.0 strict_env_vars Remove option for configuring missing environment variable interpolation
+  to be a warning rather than an error
