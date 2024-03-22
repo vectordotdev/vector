@@ -321,6 +321,7 @@ pub enum FingerprintConfig {
         /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
         ///
         /// This can be helpful if all files share a common header that should be skipped.
+        #[serde(default = "default_ignored_header_bytes")]
         #[configurable(metadata(docs::type_unit = "bytes"))]
         ignored_header_bytes: usize,
 
@@ -349,6 +350,10 @@ impl Default for FingerprintConfig {
             lines: default_lines(),
         }
     }
+}
+
+const fn default_ignored_header_bytes() -> usize {
+    0
 }
 
 const fn default_lines() -> usize {

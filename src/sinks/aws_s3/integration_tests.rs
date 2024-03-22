@@ -388,7 +388,11 @@ async fn s3_healthchecks() {
         .create_service(&ProxyConfig::from_env())
         .await
         .unwrap();
-    config.build_healthcheck(service.client()).unwrap();
+    config
+        .build_healthcheck(service.client())
+        .unwrap()
+        .await
+        .unwrap();
 }
 
 #[tokio::test]

@@ -59,9 +59,7 @@ pub struct TcpConfig {
     #[serde(default = "default_port_key")]
     port_key: OptionalValuePath,
 
-    /// List of allowed origin IP networks
-    ///
-    /// By default, all origins are allowed
+    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
     #[configurable(derived)]

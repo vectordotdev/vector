@@ -18,8 +18,7 @@ use vrl::value::{ObjectMap, Value};
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
 
 // MaxMind GeoIP database files have a type field we can use to recognize specific
-// products. If we encounter one of these two types, we look for ASN/ISP information;
-// otherwise we expect to be working with a City database.
+// products. If it is an unknown type, an error will be returned.
 #[derive(Copy, Clone, Debug)]
 #[allow(missing_docs)]
 pub enum DatabaseKind {
@@ -29,13 +28,16 @@ pub enum DatabaseKind {
     City,
 }
 
-impl From<&str> for DatabaseKind {
-    fn from(v: &str) -> Self {
-        match v {
-            "GeoLite2-ASN" => Self::Asn,
-            "GeoIP2-ISP" => Self::Isp,
-            "GeoIP2-Connection-Type" => Self::ConnectionType,
-            _ => Self::City,
+impl TryFrom<&str> for DatabaseKind {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "GeoLite2-ASN" => Ok(Self::Asn),
+            "GeoIP2-ISP" => Ok(Self::Isp),
+            "GeoIP2-Connection-Type" => Ok(Self::ConnectionType),
+            "GeoIP2-City" => Ok(Self::City),
+            _ => Err(()),
         }
     }
 }
@@ -48,6 +50,7 @@ pub struct GeoipConfig {
     /// (**GeoLite2-City.mmdb**).
     ///
     /// Other databases, such as the country database, are not supported.
+    /// `mmdb` enrichment table can be used for other databases.
     ///
     /// [geoip2]: https://dev.maxmind.com/geoip/geoip2/downloadable
     /// [geolite2]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
@@ -112,7 +115,13 @@ impl Geoip {
     /// Creates a new GeoIP struct from the provided config.
     pub fn new(config: GeoipConfig) -> crate::Result<Self> {
         let dbreader = Arc::new(Reader::open_readfile(config.path.clone())?);
-        let dbkind = DatabaseKind::from(dbreader.metadata.database_type.as_str());
+        let dbkind =
+            DatabaseKind::try_from(dbreader.metadata.database_type.as_str()).map_err(|_| {
+                format!(
+                    "Unsupported MMDB database type ({}). Use `mmdb` enrichment table instead.",
+                    dbreader.metadata.database_type
+                )
+            })?;
 
         // Check if we can read database with dummy Ip.
         let ip = IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
@@ -442,6 +451,16 @@ mod tests {
         let values = find("10.1.12.1", "tests/data/GeoIP2-Connection-Type-Test.mmdb");
 
         assert!(values.is_none());
+    }
+
+    #[test]
+    fn custom_mmdb_type_error() {
+        let result = Geoip::new(GeoipConfig {
+            path: "tests/data/custom-type.mmdb".to_string(),
+            locale: default_locale(),
+        });
+
+        assert!(result.is_err());
     }
 
     fn find(ip: &str, database: &str) -> Option<ObjectMap> {

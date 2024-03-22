@@ -6,6 +6,7 @@ use http::StatusCode;
 use tokio_util::codec::Decoder;
 use vector_lib::codecs::StreamDecodingError;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::json_size::JsonSize;
 use vector_lib::lookup::path;
 use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use vrl::core::Value;
@@ -14,6 +15,7 @@ use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Respo
 
 use crate::{
     event::Event,
+    internal_events::DatadogAgentJsonParseError,
     sources::{
         datadog_agent::{
             handle_request, ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg,
@@ -80,6 +82,8 @@ pub(crate) fn decode_log_body(
     }
 
     let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
+        emit!(DatadogAgentJsonParseError { error: &error });
+
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
             format!("Error parsing JSON: {:?}", error),
@@ -88,6 +92,7 @@ pub(crate) fn decode_log_body(
 
     let now = Utc::now();
     let mut decoded = Vec::new();
+    let mut event_bytes_received = JsonSize::zero();
 
     for LogMsg {
         message,
@@ -102,6 +107,7 @@ pub(crate) fn decode_log_body(
         let mut decoder = source.decoder.clone();
         let mut buffer = BytesMut::new();
         buffer.put(message);
+
         loop {
             match decoder.decode_eof(&mut buffer) {
                 Ok(Some((events, _byte_size))) => {
@@ -160,6 +166,9 @@ pub(crate) fn decode_log_body(
                                 ddtags,
                             );
 
+                            // compute EstimatedJsonSizeOf before enrichment
+                            event_bytes_received += log.estimated_json_encoded_size_of();
+
                             namespace.insert_standard_vector_source_metadata(
                                 log,
                                 DatadogAgentConfig::NAME,
@@ -194,10 +203,9 @@ pub(crate) fn decode_log_body(
         }
     }
 
-    source.events_received.emit(CountByteSize(
-        decoded.len(),
-        decoded.estimated_json_encoded_size_of(),
-    ));
+    source
+        .events_received
+        .emit(CountByteSize(decoded.len(), event_bytes_received));
 
     Ok(decoded)
 }

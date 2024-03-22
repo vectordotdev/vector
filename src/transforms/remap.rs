@@ -18,7 +18,7 @@ use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::compiler::runtime::{Runtime, Terminate};
 use vrl::compiler::state::ExternalEnv;
 use vrl::compiler::{CompileConfig, ExpressionError, Function, Program, TypeState, VrlRuntime};
-use vrl::diagnostic::{DiagnosticList, DiagnosticMessage, Formatter, Note};
+use vrl::diagnostic::{DiagnosticMessage, Formatter, Note};
 use vrl::path;
 use vrl::path::ValuePath;
 use vrl::value::{Kind, Value};
@@ -135,25 +135,6 @@ pub struct RemapConfig {
     pub runtime: VrlRuntime,
 }
 
-/// The propagated errors should not contain file contents to prevent exposing sensitive data.
-fn redacted_diagnostics(source: &str, diagnostics: DiagnosticList) -> String {
-    let placeholder = '*';
-    // The formatter depends on whitespaces.
-    let redacted_source: String = source
-        .chars()
-        .map(|c| if c.is_whitespace() { c } else { placeholder })
-        .collect();
-    // Remove placeholder chars to hide the content length.
-    format!(
-        "{}{}",
-        "File contents were redacted.",
-        Formatter::new(&redacted_source, diagnostics)
-            .colored()
-            .to_string()
-            .replace(placeholder, " ")
-    )
-}
-
 impl RemapConfig {
     fn compile_vrl_program(
         &self,
@@ -192,12 +173,11 @@ impl RemapConfig {
         config.set_custom(MeaningList::default());
 
         compile_vrl(&source, &functions, &state, config)
-            .map_err(|diagnostics| match self.file {
-                None => Formatter::new(&source, diagnostics)
+            .map_err(|diagnostics| {
+                Formatter::new(&source, diagnostics)
                     .colored()
                     .to_string()
-                    .into(),
-                Some(_) => redacted_diagnostics(&source, diagnostics).into(),
+                    .into()
             })
             .map(|result| {
                 (
@@ -625,7 +605,6 @@ pub enum BuildError {
 #[cfg(test)]
 mod tests {
     use std::collections::{HashMap, HashSet};
-    use std::io::Write;
     use std::sync::Arc;
 
     use indoc::{formatdoc, indoc};
@@ -649,7 +628,6 @@ mod tests {
         transforms::OutputBuffer,
     };
     use chrono::DateTime;
-    use tempfile::NamedTempFile;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::enrichment::TableRegistry;
@@ -2020,21 +1998,5 @@ mod tests {
     #[test]
     fn do_not_emit_metrics_when_errored() {
         assert_no_metrics("parse_key_value!(.message)".to_string());
-    }
-
-    #[test]
-    fn redact_file_contents_from_diagnostics() {
-        let mut tmp_file = NamedTempFile::new().expect("Failed to create temporary file");
-        tmp_file
-            .write_all(b"password: top secret")
-            .expect("Failed to write to temporary file");
-
-        let config = RemapConfig {
-            file: Some(tmp_file.path().to_path_buf()),
-            ..Default::default()
-        };
-        let config_error = remap(config).unwrap_err().to_string();
-        assert!(config_error.contains("File contents were redacted."));
-        assert!(!config_error.contains("top secret"));
     }
 }

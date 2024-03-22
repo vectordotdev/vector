@@ -175,7 +175,7 @@ impl_generate_config_from_default!(HttpClientConfig);
 impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         // build the url
-        let endpoints = vec![self.endpoint.clone()];
+        let endpoints = [self.endpoint.clone()];
         let urls = endpoints
             .iter()
             .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))

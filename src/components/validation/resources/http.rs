@@ -11,7 +11,7 @@ use axum::{
     routing::{MethodFilter, MethodRouter},
     Router,
 };
-use bytes::BytesMut;
+use bytes::{BufMut as _, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
 use hyper::{Body, Client, Server};
 use tokio::{
@@ -24,7 +24,10 @@ use crate::components::validation::{
     sync::{Configuring, TaskCoordinator},
     RunnerMetrics,
 };
-use vector_lib::{event::Event, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    codecs::encoding::Framer, codecs::encoding::Serializer::Json,
+    codecs::CharacterDelimitedEncoder, event::Event, EstimatedJsonEncodedSizeOf,
+};
 
 use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 
@@ -65,7 +68,7 @@ impl HttpResourceConfig {
             }
             // We'll push data to the source.
             ResourceDirection::Push => {
-                spawn_input_http_client(self, codec, input_rx, task_coordinator)
+                spawn_input_http_client(self, codec, input_rx, task_coordinator, runner_metrics)
             }
         }
     }
@@ -213,12 +216,14 @@ fn spawn_input_http_client(
     codec: ResourceCodec,
     mut input_rx: mpsc::Receiver<TestEvent>,
     task_coordinator: &TaskCoordinator<Configuring>,
+    runner_metrics: &Arc<Mutex<RunnerMetrics>>,
 ) {
     // Spin up an HTTP client that will push the input data to the source on a
     // request-per-input-item basis. This runs serially and has no parallelism.
     let started = task_coordinator.track_started();
     let completed = task_coordinator.track_completed();
     let mut encoder = codec.into_encoder();
+    let runner_metrics = Arc::clone(runner_metrics);
 
     tokio::spawn(async move {
         // Mark ourselves as started. We don't actually do anything until we get our first input
@@ -235,7 +240,31 @@ fn spawn_input_http_client(
             debug!("Got event to send from runner.");
 
             let mut buffer = BytesMut::new();
+
+            let is_json = matches!(encoder.serializer(), Json(_))
+                && matches!(
+                    encoder.framer(),
+                    Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })
+                );
+
+            if is_json {
+                buffer.put_u8(b'[');
+            }
+
             encode_test_event(&mut encoder, &mut buffer, event);
+
+            if is_json {
+                if !buffer.is_empty() {
+                    // remove trailing comma from last record
+                    buffer.truncate(buffer.len() - 1);
+                }
+                buffer.put_u8(b']');
+
+                // in this edge case we have removed the trailing comma (one byte) and added
+                // opening and closing braces (2 bytes) for a net add of one byte.
+                let mut runner_metrics = runner_metrics.lock().await;
+                runner_metrics.sent_bytes_total += 1;
+            }
 
             let mut request_builder = Request::builder()
                 .uri(request_uri.clone())

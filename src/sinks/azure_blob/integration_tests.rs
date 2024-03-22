@@ -40,9 +40,10 @@ async fn azure_blob_healthcheck_passed() {
     )
     .expect("Failed to create client");
 
-    let response = azure_common::config::build_healthcheck(config.container_name, client);
-
-    response.expect("Failed to pass healthcheck");
+    azure_common::config::build_healthcheck(config.container_name, client)
+        .expect("Failed to build healthcheck")
+        .await
+        .expect("Failed to pass healthcheck");
 }
 
 #[tokio::test]
