@@ -279,7 +279,8 @@ cross-%: cargo-install-cross
 
 target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
 target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
-target/%/vector: export PROFILE ?=$(word 2,${PAIR})
+target/%/vector: export TARGET_SUBDIR?=$(word 2,${PAIR})
+target/%/vector: export PROFILE ?=$(if $(filter-out debug,$(TARGET_SUBDIR)),$(TARGET_SUBDIR),dev)
 target/%/vector: export CFLAGS += -g0 -O3
 target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
 	$(MAKE) -k cross-image-${TRIPLE}
