@@ -173,7 +173,7 @@ pub fn encode_test_event(
             // versa.
             let mut alt_encoder = if encoder.serializer().supports_json() {
                 Encoder::<encoding::Framer>::new(
-                    LengthDelimitedEncoder::new().into(),
+                    LengthDelimitedEncoder::default().into(),
                     LogfmtSerializer::new().into(),
                 )
             } else {
