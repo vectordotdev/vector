@@ -1,4 +1,4 @@
-# RFC <issue#> - 2024-03-22 - Establish an Internal Trace Model
+# RFC 20170 - 2024-03-22 - Establish an Internal Trace Model
 
 As of today there is an already existing Log and Metric event model, the purpose is to establish an
 internal model for describing a trace event.
@@ -6,7 +6,7 @@ internal model for describing a trace event.
 ## Context
 
 The [Ingest OpenTelemetry Traces RFC] was accepted, but there was a condition that an [internal trace model] MUST be
-estabilished. Meanwhile, there's also the [Accept Datadog Traces RFC] which was estabilished, but
+established. Meanwhile, there's also the [Accept Datadog Traces RFC] which was established, but
 that primarily only works well with the [`datadog_traces` sink]. There was also a previous RFC which
 was concerned with [validating schemas], but never came attempted to define an event schema.  This leaves this RFC
 to establish that data model.
