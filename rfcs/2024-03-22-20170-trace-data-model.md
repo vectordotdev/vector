@@ -62,8 +62,10 @@ Therefore the only necessary mapping will be how the Proto data model maps to th
 
 #### Mapping OpenTelemetry Tracing to Vector Data Model
 
+This section reflects similarly to how the current Log `source` for `opentelemetry` works.
+
 As OpenTelemetry is the primary model the this will only describe the data types. The top level
-`TraceEvent` will represent a top level proto `message ResourceSpans`. This will be a
+`TraceEvent` will represent a top level proto `message ResourceSpans`.
 `Value::Object`.  The remaining proto to mappings can be found:
 
 | Proto Type | Vector Type |
@@ -79,8 +81,8 @@ As OpenTelemetry is the primary model the this will only describe the data types
 | `bytes` | `Value::Bytes` |
 | `repeated` messages | `Value::Array` of `Value::Object` |
 
-The keys for `message` come the field names for `Value::Object`, and MUST follow a "Lower Camel Case" format.
-As an example: `traceId` and `droppedEventCount`, NOT `trace_id` and `dropped_event_count`.
+The keys for `message` come the field names for `Value::Object`, and MUST follow a "Snake Case" format.
+As an example, instead of `traceId` and `droppedEventCount`, use `trace_id` and `dropped_event_count`.
 
 ## Rationale
 
