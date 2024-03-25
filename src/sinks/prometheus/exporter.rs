@@ -958,7 +958,9 @@ mod tests {
         let bytes = hyper::body::to_bytes(body)
             .await
             .expect("Reading body failed");
-        let result = String::from_utf8(bytes.to_vec()).unwrap();
+        let result = unsafe {
+            String::from_utf8_unchecked(bytes.to_vec())
+        };
 
         sink_handle.await.unwrap();
 
