@@ -19,9 +19,9 @@ releases: "0.37.0": {
 		  repository. We are looking into publishing them there in the future. No RPM packages are
 		  built at this time. Kudos to [@wtaylor](https://github.com/wtaylor) for this contribution.
 		- A new `mqtt` sink to emit events from Vector using the MQTT protocol. A source is [in the
-		  works](https://github.com/vectordotdev/vector/pull/19931). Kudos to the many
-	      contributors that pushed this forward ([@astro](https://github.com/astro),
-		  [@zamazan4ik](https://github.com/zamazan4ik), [@mladedav](https://github.com/mladedav)).
+		  works](https://github.com/vectordotdev/vector/pull/19931). Kudos to the contributors that
+		  pushed this forward: [@astro](https://github.com/astro),
+		  [@zamazan4ik](https://github.com/zamazan4ik), and [@mladedav](https://github.com/mladedav).
 		- The `dnstap` source now supports reading events over TCP. Kudos to
 		  [@esensar](https://github.com/esensar) for this contribution.
 		- A new `mmdb` enrichment table type for loading arbitrary mmdb databases and not just GeoIP
