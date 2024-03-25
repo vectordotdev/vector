@@ -90,7 +90,7 @@ ndarray-stats = "0.5.1"
 noisy_float = "0.2.0"
 rand = "0.8.5"
 rand_distr = "0.4.3"
-serde_yaml = { version = "0.9.33", default-features = false }
+serde_yaml = { version = "0.9.34", default-features = false }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 
