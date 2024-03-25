@@ -230,3 +230,6 @@ user:P@ssw0rd
 
 # changelog.d fragment authors line
 ^authors: .*$
+
+# commit lines in release changelog
+sha: ".*",.*$

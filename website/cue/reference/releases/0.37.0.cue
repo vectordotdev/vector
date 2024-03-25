@@ -26,7 +26,9 @@ releases: "0.37.0": {
 		  [@esensar](https://github.com/esensar) for this contribution.
 		- A new `mmdb` enrichment table type for loading arbitrary mmdb databases and not just GeoIP
 		  ones. Kudos to [@esensar](https://github.com/esensar) for this contribution.
-		- A new `pulsar` source for receiving events from Pulsar. Kudos to [@zamazan4ik](https://github.com/zamazan4ik) and [@WarmSnowy](https://github.com/WarmSnowy) for this contribution.
+		- A new `pulsar` source for receiving events from Pulsar. Kudos to
+		  [@zamazan4ik](https://github.com/zamazan4ik) and [@WarmSnowy](https://github.com/WarmSnowy)
+		  for this contribution.
 		"""
 
 	changelog: [
