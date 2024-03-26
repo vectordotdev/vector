@@ -20,6 +20,7 @@ use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tower::ServiceBuilder;
+use tower_http::compression::Compression;
 use tracing::{Instrument, Span};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
@@ -29,6 +30,9 @@ use vector_lib::{
     },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
+
+use flate2::read::GzDecoder;
+use std::io::Read;
 
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
@@ -496,7 +500,7 @@ impl PrometheusExporter {
                 .layer(build_http_trace_layer(span.clone()))
                 .service(inner);
 
-            async move { Ok::<_, Infallible>(service) }
+            async move { Ok::<_, Infallible>(Compression::new(service)) }
         });
 
         let (trigger, tripwire) = Tripwire::new();
@@ -794,6 +798,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn encoding_gzip() {
+        let (name1, event1) = create_metric_gauge(None, 123.4);
+        let events = vec![event1];
+
+        let body_raw = export_and_fetch(None, events, false, Some(String::from("gzip"))).await;
+        let expected = format!(
+            indoc! {r#"
+                # HELP {name} {name}
+                # TYPE {name} gauge
+                {name}{{some_tag="some_value"}} 123.4
+            "#},
+            name = name1,
+        );
+
+        let mut gz = GzDecoder::new(&body_raw.as_bytes()[..]);
+        let mut body_decoded = String::new();
+        let _ = gz.read_to_string(&mut body_decoded);
+
+        assert!(body_raw.len() < expected.len());
+        assert_eq!(body_decoded, expected);
+    }
+
+    #[tokio::test]
     async fn updates_timestamps() {
         let timestamp1 = Utc::now();
         let (name, event1) = create_metric_gauge(None, 123.4);
@@ -803,7 +830,7 @@ mod tests {
         let event2 = Event::from(event2.into_metric().with_timestamp(Some(timestamp2)));
         let events = vec![event1, event2];
 
-        let body = export_and_fetch(None, events, false).await;
+        let body = export_and_fetch(None, events, false, None).await;
         let timestamp = timestamp2.timestamp_millis();
         assert_eq!(
             body,
@@ -826,7 +853,7 @@ mod tests {
         let event = Event::from(event.into_metric().with_timestamp(Some(timestamp)));
         let events = vec![event];
 
-        let body = export_and_fetch(None, events, true).await;
+        let body = export_and_fetch(None, events, true, None).await;
         assert_eq!(
             body,
             format!(
@@ -873,6 +900,7 @@ mod tests {
         tls_config: Option<TlsEnableableConfig>,
         mut events: Vec<Event>,
         suppress_timestamp: bool,
+        encoding: Option<String>,
     ) -> String {
         trace_init();
 
@@ -908,9 +936,17 @@ mod tests {
         // Events are marked as delivered as soon as they are aggregated.
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let request = Request::get(format!("{}://{}/metrics", proto, address))
+        let mut request = Request::get(format!("{}://{}/metrics", proto, address))
             .body(Body::empty())
             .expect("Error creating request.");
+
+        if let Some(ref encoding) = encoding {
+            request.headers_mut().insert(
+                http::header::ACCEPT_ENCODING,
+                HeaderValue::from_str(encoding.as_str()).unwrap(),
+            );
+        }
+
         let proxy = ProxyConfig::default();
         let result = HttpClient::new(client_settings, &proxy)
             .unwrap()
@@ -920,11 +956,17 @@ mod tests {
 
         assert!(result.status().is_success());
 
+        if encoding.is_some() {
+            assert!(result
+                .headers()
+                .contains_key(http::header::CONTENT_ENCODING));
+        }
+
         let body = result.into_body();
         let bytes = hyper::body::to_bytes(body)
             .await
             .expect("Reading body failed");
-        let result = String::from_utf8(bytes.to_vec()).unwrap();
+        let result = unsafe { String::from_utf8_unchecked(bytes.to_vec()) };
 
         sink_handle.await.unwrap();
 
@@ -1007,7 +1049,7 @@ mod tests {
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];
 
-        let body = export_and_fetch(tls_config, events, false).await;
+        let body = export_and_fetch(tls_config, events, false, None).await;
 
         assert!(body.contains(&format!(
             indoc! {r#"
