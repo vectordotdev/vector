@@ -24,7 +24,7 @@ impl InputHandler {
     ) -> crate::Result<Source> {
         let conn = self
             .client
-            .get_async_connection()
+            .get_multiplexed_async_connection()
             .await
             .context(ConnectionSnafu {})?;
 

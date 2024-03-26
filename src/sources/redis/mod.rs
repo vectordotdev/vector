@@ -487,7 +487,7 @@ mod integration_test {
         let client = redis::Client::open(REDIS_SERVER).unwrap();
 
         let mut async_conn = client
-            .get_async_connection()
+            .get_multiplexed_async_connection()
             .await
             .expect("Failed to get redis async connection.");
 

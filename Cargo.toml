@@ -318,7 +318,7 @@ pulsar = { version = "6.1.0", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.35.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.24.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.25.2", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.10.3", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.3", default-features = false, optional = true }
 rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
