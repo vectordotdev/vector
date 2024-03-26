@@ -31,6 +31,9 @@ use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
+use flate2::read::GzDecoder;
+use std::io::Read;
+
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext},
@@ -799,8 +802,8 @@ mod tests {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let events = vec![event1];
 
-        let body = export_and_fetch(None, events, false, Some(String::from("gzip"))).await;
-        let uncompressed = format!(
+        let body_raw = export_and_fetch(None, events, false, Some(String::from("gzip"))).await;
+        let expected = format!(
             indoc! {r#"
                 # HELP {name} {name}
                 # TYPE {name} gauge
@@ -809,7 +812,12 @@ mod tests {
             name = name1,
         );
 
-        assert!(body.len() < uncompressed.len());
+        let mut gz = GzDecoder::new(&body_raw.as_bytes()[..]);
+        let mut body_decoded = String::new();
+        let _ = gz.read_to_string(&mut body_decoded);
+
+        assert!(body_raw.len() < expected.len());
+        assert_eq!(body_decoded, expected);
     }
 
     #[tokio::test]
@@ -958,9 +966,7 @@ mod tests {
         let bytes = hyper::body::to_bytes(body)
             .await
             .expect("Reading body failed");
-        let result = unsafe {
-            String::from_utf8_unchecked(bytes.to_vec())
-        };
+        let result = unsafe { String::from_utf8_unchecked(bytes.to_vec()) };
 
         sink_handle.await.unwrap();
 
