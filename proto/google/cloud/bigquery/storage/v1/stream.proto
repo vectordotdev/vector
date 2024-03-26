@@ -1,0 +1,315 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package google.cloud.bigquery.storage.v1;
+
+import "google/api/field_behavior.proto";
+import "google/api/resource.proto";
+import "google/cloud/bigquery/storage/v1/arrow.proto";
+import "google/cloud/bigquery/storage/v1/avro.proto";
+import "google/cloud/bigquery/storage/v1/table.proto";
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "Google.Cloud.BigQuery.Storage.V1";
+option go_package = "cloud.google.com/go/bigquery/storage/apiv1/storagepb;storagepb";
+option java_multiple_files = true;
+option java_outer_classname = "StreamProto";
+option java_package = "com.google.cloud.bigquery.storage.v1";
+option php_namespace = "Google\\Cloud\\BigQuery\\Storage\\V1";
+
+// Data format for input or output data.
+enum DataFormat {
+  // Data format is unspecified.
+  DATA_FORMAT_UNSPECIFIED = 0;
+
+  // Avro is a standard open source row based file format.
+  // See https://avro.apache.org/ for more details.
+  AVRO = 1;
+
+  // Arrow is a standard open source column-based message format.
+  // See https://arrow.apache.org/ for more details.
+  ARROW = 2;
+}
+
+// Information about the ReadSession.
+message ReadSession {
+  option (google.api.resource) = {
+    type: "bigquerystorage.googleapis.com/ReadSession"
+    pattern: "projects/{project}/locations/{location}/sessions/{session}"
+  };
+
+  // Additional attributes when reading a table.
+  message TableModifiers {
+    // The snapshot time of the table. If not set, interpreted as now.
+    google.protobuf.Timestamp snapshot_time = 1;
+  }
+
+  // Options dictating how we read a table.
+  message TableReadOptions {
+    // Optional. The names of the fields in the table to be returned. If no
+    // field names are specified, then all fields in the table are returned.
+    //
+    // Nested fields -- the child elements of a STRUCT field -- can be selected
+    // individually using their fully-qualified names, and will be returned as
+    // record fields containing only the selected nested fields. If a STRUCT
+    // field is specified in the selected fields list, all of the child elements
+    // will be returned.
+    //
+    // As an example, consider a table with the following schema:
+    //
+    //   {
+    //       "name": "struct_field",
+    //       "type": "RECORD",
+    //       "mode": "NULLABLE",
+    //       "fields": [
+    //           {
+    //               "name": "string_field1",
+    //               "type": "STRING",
+    // .              "mode": "NULLABLE"
+    //           },
+    //           {
+    //               "name": "string_field2",
+    //               "type": "STRING",
+    //               "mode": "NULLABLE"
+    //           }
+    //       ]
+    //   }
+    //
+    // Specifying "struct_field" in the selected fields list will result in a
+    // read session schema with the following logical structure:
+    //
+    //   struct_field {
+    //       string_field1
+    //       string_field2
+    //   }
+    //
+    // Specifying "struct_field.string_field1" in the selected fields list will
+    // result in a read session schema with the following logical structure:
+    //
+    //   struct_field {
+    //       string_field1
+    //   }
+    //
+    // The order of the fields in the read session schema is derived from the
+    // table schema and does not correspond to the order in which the fields are
+    // specified in this list.
+    repeated string selected_fields = 1;
+
+    // SQL text filtering statement, similar to a WHERE clause in a query.
+    // Aggregates are not supported.
+    //
+    // Examples: "int_field > 5"
+    //           "date_field = CAST('2014-9-27' as DATE)"
+    //           "nullable_field is not NULL"
+    //           "st_equals(geo_field, st_geofromtext("POINT(2, 2)"))"
+    //           "numeric_field BETWEEN 1.0 AND 5.0"
+    //
+    // Restricted to a maximum length for 1 MB.
+    string row_restriction = 2;
+
+    oneof output_format_serialization_options {
+      // Optional. Options specific to the Apache Arrow output format.
+      ArrowSerializationOptions arrow_serialization_options = 3
+          [(google.api.field_behavior) = OPTIONAL];
+
+      // Optional. Options specific to the Apache Avro output format
+      AvroSerializationOptions avro_serialization_options = 4
+          [(google.api.field_behavior) = OPTIONAL];
+    }
+
+    // Optional. Specifies a table sampling percentage. Specifically, the query
+    // planner will use TABLESAMPLE SYSTEM (sample_percentage PERCENT). The
+    // sampling percentage is applied at the data block granularity. It will
+    // randomly choose for each data block whether to read the rows in that data
+    // block. For more details, see
+    // https://cloud.google.com/bigquery/docs/table-sampling)
+    optional double sample_percentage = 5
+        [(google.api.field_behavior) = OPTIONAL];
+  }
+
+  // Output only. Unique identifier for the session, in the form
+  // `projects/{project_id}/locations/{location}/sessions/{session_id}`.
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Time at which the session becomes invalid. After this time,
+  // subsequent requests to read this Session will return errors. The
+  // expire_time is automatically assigned and currently cannot be specified or
+  // updated.
+  google.protobuf.Timestamp expire_time = 2
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Immutable. Data format of the output data. DATA_FORMAT_UNSPECIFIED not
+  // supported.
+  DataFormat data_format = 3 [(google.api.field_behavior) = IMMUTABLE];
+
+  // The schema for the read. If read_options.selected_fields is set, the
+  // schema may be different from the table schema as it will only contain
+  // the selected fields.
+  oneof schema {
+    // Output only. Avro schema.
+    AvroSchema avro_schema = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+    // Output only. Arrow schema.
+    ArrowSchema arrow_schema = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  }
+
+  // Immutable. Table that this ReadSession is reading from, in the form
+  // `projects/{project_id}/datasets/{dataset_id}/tables/{table_id}`
+  string table = 6 [
+    (google.api.field_behavior) = IMMUTABLE,
+    (google.api.resource_reference) = { type: "bigquery.googleapis.com/Table" }
+  ];
+
+  // Optional. Any modifiers which are applied when reading from the specified
+  // table.
+  TableModifiers table_modifiers = 7 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Read options for this session (e.g. column selection, filters).
+  TableReadOptions read_options = 8 [(google.api.field_behavior) = OPTIONAL];
+
+  // Output only. A list of streams created with the session.
+  //
+  // At least one stream is created with the session. In the future, larger
+  // request_stream_count values *may* result in this list being unpopulated,
+  // in that case, the user will need to use a List method to get the streams
+  // instead, which is not yet available.
+  repeated ReadStream streams = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. An estimate on the number of bytes this session will scan when
+  // all streams are completely consumed. This estimate is based on
+  // metadata from the table which might be incomplete or stale.
+  int64 estimated_total_bytes_scanned = 12
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. A pre-projected estimate of the total physical size of files
+  // (in bytes) that this session will scan when all streams are consumed. This
+  // estimate is independent of the selected columns and can be based on
+  // incomplete or stale metadata from the table.  This field is only set for
+  // BigLake tables.
+  int64 estimated_total_physical_file_size = 15
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. An estimate on the number of rows present in this session's
+  // streams. This estimate is based on metadata from the table which might be
+  // incomplete or stale.
+  int64 estimated_row_count = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Optional. ID set by client to annotate a session identity.  This does not
+  // need to be strictly unique, but instead the same ID should be used to group
+  // logically connected sessions (e.g. All using the same ID for all sessions
+  // needed to complete a Spark SQL query is reasonable).
+  //
+  // Maximum length is 256 bytes.
+  string trace_id = 13 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Information about a single stream that gets data out of the storage system.
+// Most of the information about `ReadStream` instances is aggregated, making
+// `ReadStream` lightweight.
+message ReadStream {
+  option (google.api.resource) = {
+    type: "bigquerystorage.googleapis.com/ReadStream"
+    pattern: "projects/{project}/locations/{location}/sessions/{session}/streams/{stream}"
+  };
+
+  // Output only. Name of the stream, in the form
+  // `projects/{project_id}/locations/{location}/sessions/{session_id}/streams/{stream_id}`.
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// WriteStreamView is a view enum that controls what details about a write
+// stream should be returned.
+enum WriteStreamView {
+  // The default / unset value.
+  WRITE_STREAM_VIEW_UNSPECIFIED = 0;
+
+  // The BASIC projection returns basic metadata about a write stream.  The
+  // basic view does not include schema information.  This is the default view
+  // returned by GetWriteStream.
+  BASIC = 1;
+
+  // The FULL projection returns all available write stream metadata, including
+  // the schema.  CreateWriteStream returns the full projection of write stream
+  // metadata.
+  FULL = 2;
+}
+
+// Information about a single stream that gets data inside the storage system.
+message WriteStream {
+  option (google.api.resource) = {
+    type: "bigquerystorage.googleapis.com/WriteStream"
+    pattern: "projects/{project}/datasets/{dataset}/tables/{table}/streams/{stream}"
+  };
+
+  // Type enum of the stream.
+  enum Type {
+    // Unknown type.
+    TYPE_UNSPECIFIED = 0;
+
+    // Data will commit automatically and appear as soon as the write is
+    // acknowledged.
+    COMMITTED = 1;
+
+    // Data is invisible until the stream is committed.
+    PENDING = 2;
+
+    // Data is only visible up to the offset to which it was flushed.
+    BUFFERED = 3;
+  }
+
+  // Mode enum of the stream.
+  enum WriteMode {
+    // Unknown type.
+    WRITE_MODE_UNSPECIFIED = 0;
+
+    // Insert new records into the table.
+    // It is the default value if customers do not specify it.
+    INSERT = 1;
+  }
+
+  // Output only. Name of the stream, in the form
+  // `projects/{project}/datasets/{dataset}/tables/{table}/streams/{stream}`.
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Immutable. Type of the stream.
+  Type type = 2 [(google.api.field_behavior) = IMMUTABLE];
+
+  // Output only. Create time of the stream. For the _default stream, this is
+  // the creation_time of the table.
+  google.protobuf.Timestamp create_time = 3
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. Commit time of the stream.
+  // If a stream is of `COMMITTED` type, then it will have a commit_time same as
+  // `create_time`. If the stream is of `PENDING` type, empty commit_time
+  // means it is not committed.
+  google.protobuf.Timestamp commit_time = 4
+      [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Output only. The schema of the destination table. It is only returned in
+  // `CreateWriteStream` response. Caller should generate data that's
+  // compatible with this schema to send in initial `AppendRowsRequest`.
+  // The table schema could go out of date during the life time of the stream.
+  TableSchema table_schema = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Immutable. Mode of the stream.
+  WriteMode write_mode = 7 [(google.api.field_behavior) = IMMUTABLE];
+
+  // Immutable. The geographic location where the stream's dataset resides. See
+  // https://cloud.google.com/bigquery/docs/locations for supported
+  // locations.
+  string location = 8 [(google.api.field_behavior) = IMMUTABLE];
+}
