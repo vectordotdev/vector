@@ -36,7 +36,7 @@ impl TryFrom<&str> for DatabaseKind {
             "GeoLite2-ASN" => Ok(Self::Asn),
             "GeoIP2-ISP" => Ok(Self::Isp),
             "GeoIP2-Connection-Type" => Ok(Self::ConnectionType),
-            "GeoIP2-City" => Ok(Self::City),
+            "GeoIP2-City" | "GeoLite2-City" => Ok(Self::City),
             _ => Err(()),
         }
     }
