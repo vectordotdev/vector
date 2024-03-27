@@ -122,6 +122,19 @@ pub(super) struct Config {
     #[configurable(metadata(docs::examples = 5))]
     pub(super) client_concurrency: Option<NonZeroUsize>,
 
+    /// Maximum number of messages to poll from sqs in a batch
+    ///
+    /// Defaults to 10
+    ///
+    /// Should be set to smaller numbers when the files are larger to help prevent large ingestions
+    /// from causing other files to exceed the visibility_timeout. Valid values are 1 - 10
+    // NOTE: We restrict this to u32 for safe conversion to i32 later.
+    #[serde(default = "default_max_number_of_messages")]
+    #[derivative(Default(value = "default_max_number_of_messages()"))]
+    #[configurable(metadata(docs::human_name = "Max Messages"))]
+    #[configurable(metadata(docs::examples = 1))]
+    pub(super) max_number_of_messages: u32,
+
     #[configurable(derived)]
     #[serde(default)]
     #[derivative(Default)]
@@ -134,6 +147,10 @@ const fn default_poll_secs() -> u32 {
 
 const fn default_visibility_timeout_secs() -> u32 {
     300
+}
+
+const fn default_max_number_of_messages() -> u32 {
+    10
 }
 
 const fn default_true() -> bool {
@@ -207,6 +224,7 @@ pub struct State {
 
     queue_url: String,
     poll_secs: i32,
+    max_number_of_messages: i32,
     client_concurrency: usize,
     visibility_timeout_secs: i32,
     delete_message: bool,
@@ -239,6 +257,7 @@ impl Ingestor {
 
             queue_url: config.queue_url,
             poll_secs: config.poll_secs as i32,
+            max_number_of_messages: config.max_number_of_messages as i32,
             client_concurrency: config
                 .client_concurrency
                 .map(|n| n.get())
@@ -637,7 +656,7 @@ impl IngestorProcess {
             .sqs_client
             .receive_message()
             .queue_url(self.state.queue_url.clone())
-            .max_number_of_messages(10)
+            .max_number_of_messages(self.state.max_number_of_messages)
             .visibility_timeout(self.state.visibility_timeout_secs)
             .wait_time_seconds(self.state.poll_secs)
             .send()

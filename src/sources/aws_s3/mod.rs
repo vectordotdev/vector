@@ -800,6 +800,7 @@ mod integration_tests {
             sqs: Some(sqs::Config {
                 queue_url: queue_url.to_string(),
                 poll_secs: 1,
+                max_number_of_messages: 10,
                 visibility_timeout_secs: 0,
                 client_concurrency: None,
                 ..Default::default()
