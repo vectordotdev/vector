@@ -1330,6 +1330,75 @@ mod tests {
             .expect("histogram metric should exist");
         assert_eq!(actual_histogram.0.value(), expected_histogram.value());
     }
+
+    #[tokio::test]
+    async fn sink_gauge_incremental_absolute_mix() {
+        // Because Prometheus does not, itself, have the concept of an Incremental metric, the
+        // Exporter must apply a normalization function that converts all metrics to Absolute ones
+        // before handling them.
+
+        // This test ensures that this normalization works correctly when applied to a mix of both
+        // Incremental and Absolute inputs.
+        let config = PrometheusExporterConfig {
+            address: next_addr(), // Not actually bound, just needed to fill config
+            tls: None,
+            ..Default::default()
+        };
+
+        let sink = PrometheusExporter::new(config);
+
+        let base_absolute_gauge_metric = Metric::new(
+            "gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 100.0 },
+        );
+
+        let base_incremental_gauge_metric = Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: -10.0 },
+        );
+
+        let metrics = vec![
+            base_absolute_gauge_metric.clone(),
+            base_absolute_gauge_metric
+                .clone()
+                .with_value(MetricValue::Gauge { value: 333.0 }),
+            base_incremental_gauge_metric.clone(),
+            base_incremental_gauge_metric
+                .clone()
+                .with_value(MetricValue::Gauge { value: 4.0 }),
+        ];
+
+        // Now run the events through the sink and see what ends up in the internal metric map.
+        let metrics_handle = Arc::clone(&sink.metrics);
+
+        let events = metrics
+            .iter()
+            .cloned()
+            .map(Event::Metric)
+            .collect::<Vec<_>>();
+
+        let sink = VectorSink::from_event_streamsink(sink);
+        let input_events = stream::iter(events).map(Into::into);
+        sink.run(input_events).await.unwrap();
+
+        let metrics_after = metrics_handle.read().unwrap();
+
+        // The gauge metric should be present.
+        assert_eq!(metrics_after.len(), 1);
+
+        let expected_gauge = Metric::new(
+            "gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 327.0 },
+        );
+
+        let actual_gauge = metrics_after
+            .get(&MetricRef::from_metric(&expected_gauge))
+            .expect("gauge metric should exist");
+        assert_eq!(actual_gauge.0.value(), expected_gauge.value());
+    }
 }
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
