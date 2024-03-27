@@ -5,6 +5,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{Arc, RwLock},
     time::{Duration, Instant},
+    fs,
 };
 
 use async_trait::async_trait;
@@ -367,6 +368,10 @@ fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
                 ),
                 Auth::Bearer { token } => {
                     HeaderValue::from_str(format!("Bearer {}", token.inner()).as_str())
+                },
+                Auth::BearerFile { token_file } => match fs::read_to_string(token_file) {
+                    Ok(token) => HeaderValue::from_str(format!("Bearer {}", token).as_str()),
+                    Err(_error) => return false,
                 }
             };
 
