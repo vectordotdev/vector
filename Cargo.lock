@@ -1052,9 +1052,9 @@ dependencies = [
 
 [[package]]
 name = "aws-smithy-async"
-version = "1.1.8"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d26ea8fa03025b2face2b3038a63525a10891e3d8829901d502e5384a0d8cd46"
+checksum = "f7a41ccd6b74401a49ca828617049e5c23d83163d330a4f90a8081aadee0ac45"
 dependencies = [
  "futures-util",
  "pin-project-lite",
