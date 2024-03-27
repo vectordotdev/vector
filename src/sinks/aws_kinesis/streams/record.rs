@@ -51,7 +51,6 @@ pub struct KinesisStreamClient {
     pub client: KinesisClient,
 }
 
-#[async_trait::async_trait]
 impl SendRecord for KinesisStreamClient {
     type T = KinesisRecord;
     type E = KinesisError;
