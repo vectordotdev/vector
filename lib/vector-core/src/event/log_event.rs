@@ -329,7 +329,7 @@ impl LogEvent {
     }
 
     /// Retrieves the target path of a field based on the specified `meaning`.
-    fn find_key_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&OwnedTargetPath> {
+    pub fn find_key_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&OwnedTargetPath> {
         self.metadata()
             .schema_definition()
             .meaning_path(meaning.as_ref())
