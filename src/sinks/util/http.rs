@@ -41,14 +41,16 @@ pub trait HttpEventEncoder<Output> {
     fn encode_event(&mut self, event: Event) -> Option<Output>;
 }
 
-#[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
     type Input;
     type Output;
     type Encoder: HttpEventEncoder<Self::Input>;
 
     fn build_encoder(&self) -> Self::Encoder;
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>>;
+    fn build_request(
+        &self,
+        events: Self::Output,
+    ) -> impl Future<Output = crate::Result<http::Request<Bytes>>> + Send;
 }
 
 /// Provides a simple wrapper around internal tower and

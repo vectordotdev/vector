@@ -30,7 +30,6 @@ impl GenerateConfig for MmdbConfig {
     }
 }
 
-#[async_trait::async_trait]
 impl EnrichmentTableConfig for MmdbConfig {
     async fn build(
         &self,

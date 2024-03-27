@@ -295,7 +295,6 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
     }
 }
 
-#[async_trait::async_trait]
 impl HttpSink for MezmoConfig {
     type Input = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
     type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, PartitionKey>;
