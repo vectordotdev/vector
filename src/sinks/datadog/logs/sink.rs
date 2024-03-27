@@ -5,6 +5,7 @@ use vector_lib::{
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
+use vrl::path::parse_target_path;
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::sinks::{
@@ -100,6 +101,50 @@ fn normalize_event(event: &mut Event) {
 
     if let Some(host_path) = log.host_path().cloned().as_ref() {
         log.rename_key(host_path, event_path!("hostname"));
+    }
+
+    if let Some(ddtags_path) = log.find_key_by_meaning("tags") {
+        let ddtags_path = ddtags_path.clone();
+
+        // first, if the value is an array we need to reconstruct it to a comma delimitted string for DD logs intake.
+        if let Some(Value::Array(tags_arr)) = log.get(&ddtags_path) {
+            let n_tags = tags_arr.len();
+            if n_tags > 0 {
+                let mut all_tags = String::new();
+                tags_arr.iter().enumerate().for_each(|(idx, tag_kv)| {
+                    if tag_kv.is_bytes() {
+                        let tag_kv_str = String::from_utf8_lossy(
+                            tag_kv.as_bytes().expect("tag should be bytes."),
+                        );
+                        all_tags.push_str(&tag_kv_str);
+                        if idx + 1 < n_tags {
+                            all_tags.push(',');
+                        }
+                    }
+                });
+                log.insert(&ddtags_path, all_tags);
+            }
+        }
+
+        // now, the tags attribute must be at the event root so we will move it there if
+        // needed and move any conflicting field if any.
+        if ddtags_path != parse_target_path("tags").expect("should parse tags target path") {
+            let desired_path = event_path!("tags");
+            // if an existing attribute exists here already, move it so to not overwrite it.
+            // yes, technically the rename path could exist, but technically that could always be the case.
+            if log.contains(desired_path) {
+                let rename_attr = "_RESERVED_tags";
+                let rename_path = event_path!(rename_attr);
+                warn!(
+                    message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
+                    meaning = "tags",
+                    renamed = &rename_attr,
+                    internal_log_rate_limit = true,
+                );
+                log.rename_key(desired_path, rename_path);
+            }
+            log.rename_key(&ddtags_path, desired_path);
+        }
     }
 
     if let Some(timestamp_path) = log.timestamp_path().cloned().as_ref() {
@@ -323,14 +368,40 @@ where
 #[cfg(test)]
 mod tests {
 
+    use std::sync::Arc;
+
     use chrono::Utc;
     use vector_lib::{
-        config::LegacyKey,
-        event::{Event, LogEvent},
+        config::{LegacyKey, LogNamespace},
+        event::{Event, EventMetadata, LogEvent},
+        schema::Definition,
     };
-    use vrl::{event_path, owned_value_path, path};
+    use vrl::{
+        core::Value,
+        event_path, metadata_path, owned_value_path,
+        value::{kind::Collection, Kind},
+    };
 
     use super::normalize_event;
+
+    fn assert_normalized_log_has_expected_attrs(log: &LogEvent) {
+        assert!(log.contains(event_path!("message")));
+
+        assert!(log.contains(event_path!("timestamp")));
+
+        assert!(log
+            .get(event_path!("timestamp"))
+            .expect("should have timestamp")
+            .is_integer());
+
+        assert!(log.contains(event_path!("hostname")));
+
+        assert!(log.contains(event_path!("tags")));
+        assert_eq!(
+            log.get(event_path!("tags")).expect("should have tags"),
+            &Value::Bytes("key1:value1,key2:value2".into())
+        );
+    }
 
     #[test]
     fn normalize_event_doesnt_require() {
@@ -348,33 +419,108 @@ mod tests {
     }
 
     #[test]
-    fn normalize_event_normalizes() {
-        let mut log = LogEvent::from("hello");
+    fn normalize_event_normalizes_legacy_namespace() {
+        let metadata = EventMetadata::default().with_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(
+                Kind::object(Collection::empty()),
+                [LogNamespace::Legacy],
+            )
+            .with_source_metadata(
+                "datadog_agent",
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
+                &owned_value_path!("ddtags"),
+                Kind::bytes(),
+                Some("tags"),
+            )
+            .with_source_metadata(
+                "datadog_agent",
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
+                &owned_value_path!("hostname"),
+                Kind::bytes(),
+                Some("host"),
+            )
+            .with_source_metadata(
+                "datadog_agent",
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some("timestamp"),
+            ),
+        ));
+
+        let mut log = LogEvent::new_with_metadata(metadata);
+        log.insert(event_path!("message"), "the_message");
         let namespace = log.namespace();
 
-        namespace.insert_standard_vector_source_metadata(&mut log, "this_source", Utc::now());
+        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent", Utc::now());
 
-        let legacy_key = Some(owned_value_path!("host"));
-        let legacy_key = legacy_key.as_ref().map(LegacyKey::Overwrite);
-        namespace.insert_source_metadata(
-            "this_source",
-            &mut log,
-            legacy_key,
-            path!("host"),
-            "the_host",
-        );
+        log.insert(event_path!("hostname"), "the_host");
+
+        let tags = vec![
+            Value::Bytes("key1:value1".into()),
+            Value::Bytes("key2:value2".into()),
+        ];
+        log.insert(event_path!("ddtags"), tags);
+
+        assert!(log.namespace() == LogNamespace::Legacy);
 
         let mut event = Event::Log(log);
         normalize_event(&mut event);
 
-        let log = event.as_log();
+        assert_normalized_log_has_expected_attrs(event.as_log());
+    }
 
-        assert!(log.contains(event_path!("message")));
-        assert!(log.contains(event_path!("timestamp")));
-        assert!(log
-            .get_timestamp()
-            .expect("should have timestamp")
-            .is_integer());
-        assert!(log.contains(event_path!("hostname")));
+    #[test]
+    fn normalize_event_normalizes_vector_namespace() {
+        let metadata = EventMetadata::default().with_schema_definition(&Arc::new(
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_source_metadata(
+                    "datadog_agent",
+                    Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
+                    &owned_value_path!("ddtags"),
+                    Kind::bytes(),
+                    Some("tags"),
+                )
+                .with_source_metadata(
+                    "datadog_agent",
+                    Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
+                    &owned_value_path!("hostname"),
+                    Kind::bytes(),
+                    Some("host"),
+                )
+                .with_source_metadata(
+                    "datadog_agent",
+                    Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
+                    &owned_value_path!("timestamp"),
+                    Kind::timestamp(),
+                    Some("timestamp"),
+                ),
+        ));
+
+        let mut log = LogEvent::new_with_metadata(metadata);
+        log.insert(event_path!("message"), "the_message");
+
+        // insert an arbitrary metadata field such that the log becomes Vector namespaced
+        log.insert(metadata_path!("vector", "foo"), "bar");
+
+        let namespace = log.namespace();
+        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent", Utc::now());
+
+        let tags = vec![
+            Value::Bytes("key1:value1".into()),
+            Value::Bytes("key2:value2".into()),
+        ];
+        log.insert(metadata_path!("datadog_agent", "ddtags"), tags);
+
+        log.insert(metadata_path!("datadog_agent", "hostname"), "the_host");
+
+        log.insert(metadata_path!("datadog_agent", "timestamp"), Utc::now());
+
+        assert!(log.namespace() == LogNamespace::Vector);
+
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+
+        assert_normalized_log_has_expected_attrs(event.as_log());
     }
 }
