@@ -169,7 +169,6 @@ fn poll_http(
     }
 }
 
-#[async_trait::async_trait]
 impl ProviderConfig for HttpConfig {
     async fn build(&mut self, signal_handler: &mut signal::SignalHandler) -> BuildResult {
         let url = self

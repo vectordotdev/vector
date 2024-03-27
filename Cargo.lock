@@ -10210,7 +10210,6 @@ name = "vector-api-client"
 version = "0.1.2"
 dependencies = [
  "anyhow",
- "async-trait",
  "chrono",
  "clap 4.5.3",
  "futures 0.3.30",

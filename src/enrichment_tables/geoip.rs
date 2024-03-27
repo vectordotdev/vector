@@ -92,7 +92,6 @@ impl GenerateConfig for GeoipConfig {
     }
 }
 
-#[async_trait::async_trait]
 impl EnrichmentTableConfig for GeoipConfig {
     async fn build(
         &self,

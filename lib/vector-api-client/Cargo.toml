@@ -16,7 +16,6 @@ serde_json.workspace = true
 anyhow = { version = "1.0.81", default-features = false, features = ["std"] }
 
 # Tokio / Futures
-async-trait = { version = "0.1", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
 tokio = { version = "1.36.0", default-features = false, features = ["macros", "rt", "sync"] }
 tokio-stream = { version = "0.1.15", default-features = false, features = ["sync"] }

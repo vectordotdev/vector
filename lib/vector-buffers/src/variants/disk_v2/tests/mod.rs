@@ -4,7 +4,6 @@ use std::{
     sync::Arc,
 };
 
-use async_trait::async_trait;
 use tokio::{
     fs::OpenOptions,
     io::{AsyncWriteExt, DuplexStream},
@@ -32,7 +31,6 @@ mod model;
 mod record;
 mod size_limits;
 
-#[async_trait]
 impl AsyncFile for DuplexStream {
     async fn metadata(&self) -> io::Result<Metadata> {
         Ok(Metadata { len: 0 })
@@ -43,7 +41,6 @@ impl AsyncFile for DuplexStream {
     }
 }
 
-#[async_trait]
 impl AsyncFile for Cursor<Vec<u8>> {
     async fn metadata(&self) -> io::Result<Metadata> {
         Ok(Metadata { len: 0 })
