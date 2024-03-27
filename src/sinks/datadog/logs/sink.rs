@@ -106,7 +106,7 @@ fn normalize_event(event: &mut Event) {
     if let Some(ddtags_path) = log.find_key_by_meaning("tags") {
         let ddtags_path = ddtags_path.clone();
 
-        // first, if the value is an array we need to reconstruct it to a comma delimitted string for DD logs intake.
+        // first, if the value is an array we need to reconstruct it to a comma delimited string for DD logs intake.
         if let Some(Value::Array(tags_arr)) = log.get(&ddtags_path) {
             let n_tags = tags_arr.len();
             if n_tags > 0 {
