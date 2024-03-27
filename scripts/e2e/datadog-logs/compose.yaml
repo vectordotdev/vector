@@ -84,12 +84,14 @@ services:
   # Receives log data from the `datadog-agent` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-agent:
-    image: docker.io/datadog/fakeintake:latest
+    # TODO: temporarily pegging the image as latest results in failures
+    image: docker.io/datadog/fakeintake:v77a06f2b
 
   # Receives log data from the `datadog-agent-vector` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-vector:
-    image: docker.io/datadog/fakeintake:latest
+    # TODO: temporarily pegging the image as latest results in failures
+    image: docker.io/datadog/fakeintake:v77a06f2b
 
 networks:
   default:
