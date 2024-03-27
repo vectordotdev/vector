@@ -32,6 +32,7 @@ use vector_lib::internal_event::{
 use crate::codecs::Decoder;
 use crate::event::{Event, LogEvent};
 use crate::{
+    aws::AwsTimeout,
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
     internal_events::{
@@ -126,6 +127,13 @@ pub(super) struct Config {
     #[serde(default)]
     #[derivative(Default)]
     pub(super) tls_options: Option<TlsConfig>,
+
+    // Client timeout configuration for SQS operations. Take care when configuring these settings
+    // to allow enough time for the polling interval configured in `poll_secs`.
+    #[configurable(derived)]
+    #[serde(default)]
+    #[derivative(Default)]
+    pub(super) timeout: Option<AwsTimeout>,
 }
 
 const fn default_poll_secs() -> u32 {

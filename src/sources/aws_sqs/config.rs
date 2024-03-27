@@ -166,6 +166,7 @@ impl AwsSqsConfig {
             self.region.endpoint(),
             &cx.proxy,
             &self.tls,
+            &None,
         )
         .await
     }
