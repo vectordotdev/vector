@@ -434,7 +434,7 @@ base: components: sources: datadog_agent: configuration: {
 			contains a list of key:value pairs set by the Agent is parsed and expanded into an object.
 
 			Note: This setting introduced in 0.37.0 is incorrectly parsing into an object. This will be
-			fixed in 0.37.1 to parse into an array which aligns with the Datadog intake.
+			fixed in 0.37.1 to parse into an array, which aligns with the Datadog intake.
 			"""
 		required: false
 		type: bool: default: false

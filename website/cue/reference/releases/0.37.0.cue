@@ -33,7 +33,7 @@ releases: "0.37.0": {
 
 	known_issues: [
 		"""
-			The `parse_ddtags` setting added to the datadog_agent incorrectly parses the tags into an object instead of an array.
+			The `parse_ddtags` setting added to the `datadog_agent` Source incorrectly parses the tags into an object instead of an array.
 			""",
 	]
 
