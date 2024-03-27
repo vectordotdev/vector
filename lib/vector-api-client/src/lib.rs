@@ -11,6 +11,7 @@
 
 #![deny(warnings)]
 #![deny(missing_debug_implementations, missing_copy_implementations)]
+#![allow(async_fn_in_trait)]
 
 mod client;
 /// GraphQL queries
