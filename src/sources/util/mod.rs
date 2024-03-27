@@ -16,7 +16,11 @@ pub mod grpc;
 pub mod http;
 #[cfg(any(feature = "sources-http_client", feature = "sources-prometheus-scrape",))]
 pub mod http_client;
-#[cfg(any(feature = "sources-aws_sqs", feature = "sources-gcp_pubsub"))]
+#[cfg(any(
+    feature = "sources-aws_sqs",
+    feature = "sources-gcp_pubsub",
+    feature = "sources-mqtt"
+))]
 mod message_decoding;
 pub mod multiline_config;
 #[cfg(any(feature = "sources-utils-net-tcp", feature = "sources-utils-net-udp"))]
@@ -62,7 +66,11 @@ pub use self::http::ErrorMessage;
 pub use self::http::HttpSource;
 #[cfg(feature = "sources-utils-http-auth")]
 pub use self::http::HttpSourceAuthConfig;
-#[cfg(any(feature = "sources-aws_sqs", feature = "sources-gcp_pubsub"))]
+#[cfg(any(
+    feature = "sources-aws_sqs",
+    feature = "sources-gcp_pubsub",
+    feature = "sources-mqtt"
+))]
 pub use self::message_decoding::decode_message;
 
 /// Extract a tag and it's value from input string delimited by a colon character.
