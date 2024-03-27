@@ -315,6 +315,7 @@ mod tests {
         fn validation_configuration() -> ValidationConfiguration {
             use std::str::FromStr;
             use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
+            use vector_lib::config::LogNamespace;
 
             let config = HttpSinkConfig {
                 uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
@@ -344,6 +345,7 @@ mod tests {
 
             ValidationConfiguration::from_sink(
                 Self::NAME,
+                LogNamespace::Legacy,
                 vec![ComponentTestCaseConfig::from_sink(
                     config,
                     None,

@@ -1,6 +1,7 @@
 use http::Uri;
 use std::collections::HashMap;
 use tokio::time::Duration;
+use vector_lib::config::LogNamespace;
 use warp::{http::HeaderMap, Filter};
 
 use crate::components::validation::prelude::*;
@@ -49,6 +50,7 @@ impl ValidatableComponent for HttpClientConfig {
             decoding: DeserializerConfig::Json(Default::default()),
             ..Default::default()
         };
+        let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
 
         let external_resource = ExternalResource::new(
             ResourceDirection::Pull,
@@ -58,6 +60,7 @@ impl ValidatableComponent for HttpClientConfig {
 
         ValidationConfiguration::from_source(
             Self::NAME,
+            log_namespace,
             vec![ComponentTestCaseConfig::from_source(
                 config,
                 None,

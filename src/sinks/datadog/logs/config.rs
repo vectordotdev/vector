@@ -185,7 +185,10 @@ mod test {
     use super::*;
     use crate::codecs::EncodingConfigWithFraming;
     use crate::components::validation::prelude::*;
-    use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
+    use vector_lib::{
+        codecs::{JsonSerializerConfig, MetricTagValues},
+        config::LogNamespace,
+    };
 
     #[test]
     fn generate_config() {
@@ -223,6 +226,7 @@ mod test {
 
             ValidationConfiguration::from_sink(
                 Self::NAME,
+                LogNamespace::Legacy,
                 vec![ComponentTestCaseConfig::from_sink(
                     config,
                     None,

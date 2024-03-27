@@ -6,6 +6,8 @@ mod test_case;
 pub mod util;
 mod validators;
 
+use vector_lib::config::LogNamespace;
+
 use crate::config::{BoxedSink, BoxedSource, BoxedTransform};
 
 /// For components implementing `ValidatableComponent`
@@ -125,42 +127,49 @@ pub struct ValidationConfiguration {
     /// There may be only one `ComponentTestCaseConfig` necessary to execute all test cases, but some cases
     /// require more advanced configuration in order to hit the code path desired.
     component_configurations: Vec<ComponentTestCaseConfig>,
+    log_namespace: LogNamespace,
 }
 
 impl ValidationConfiguration {
     /// Creates a new `ValidationConfiguration` for a source.
     pub fn from_source(
         component_name: &'static str,
+        log_namespace: LogNamespace,
         component_configurations: Vec<ComponentTestCaseConfig>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Source,
             component_configurations,
+            log_namespace,
         }
     }
 
     /// Creates a new `ValidationConfiguration` for a transform.
     pub fn from_transform(
         component_name: &'static str,
+        log_namespace: LogNamespace,
         component_configurations: Vec<ComponentTestCaseConfig>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Transform,
             component_configurations,
+            log_namespace,
         }
     }
 
     /// Creates a new `ValidationConfiguration` for a sink.
     pub fn from_sink(
         component_name: &'static str,
+        log_namespace: LogNamespace,
         component_configurations: Vec<ComponentTestCaseConfig>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Sink,
             component_configurations,
+            log_namespace,
         }
     }
 
@@ -177,6 +186,11 @@ impl ValidationConfiguration {
     /// Gets the configuration of the component.
     pub fn component_configurations(&self) -> Vec<ComponentTestCaseConfig> {
         self.component_configurations.clone()
+    }
+
+    /// Gets the LogNamespace that the component is using.
+    pub const fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
     }
 
     fn get_comp_test_case(&self, test_case: Option<&String>) -> Option<ComponentTestCaseConfig> {
