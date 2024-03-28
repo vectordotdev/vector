@@ -13,6 +13,7 @@ use vrl::core::Value;
 use vrl::value::{KeyString, ObjectMap};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
+use crate::common::datadog::DDTAGS;
 use crate::{
     event::Event,
     internal_events::DatadogAgentJsonParseError,

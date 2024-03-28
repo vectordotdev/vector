@@ -6,7 +6,7 @@ use vector_lib::{
     lookup::event_path,
     schema::meaning,
 };
-use vrl::path::PathPrefix;
+use vrl::{owned_value_path, path::OwnedTargetPath};
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
@@ -129,8 +129,9 @@ fn normalize_event(event: &mut Event) {
 
         // now, the tags attribute must be at the event root so we will move it there if
         // needed and move any conflicting field if any.
-        if !(ddtags_path.prefix == PathPrefix::Event && ddtags_path.path.to_string() == "ddtags") {
+        if ddtags_path != OwnedTargetPath::event(owned_value_path!(DDTAGS)) {
             let desired_path = event_path!(DDTAGS);
+
             // if an existing attribute exists here already, move it so to not overwrite it.
             // yes, technically the rename path could exist, but technically that could always be the case.
             if log.contains(desired_path) {
@@ -144,6 +145,7 @@ fn normalize_event(event: &mut Event) {
                 );
                 log.rename_key(desired_path, rename_path);
             }
+
             log.rename_key(&ddtags_path, desired_path);
         }
     }
