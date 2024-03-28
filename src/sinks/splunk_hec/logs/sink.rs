@@ -29,9 +29,9 @@ pub struct HecLogsSink<S> {
     pub source: Option<Template>,
     pub index: Option<Template>,
     pub indexed_fields: Vec<OwnedValuePath>,
-    pub host_path: Option<String>,
+    pub host_key: Option<String>,
     pub timestamp_nanos_key: Option<String>,
-    pub timestamp_path: Option<String>,
+    pub timestamp_key: Option<String>,
     pub endpoint_target: EndpointTarget,
 }
 
@@ -40,9 +40,9 @@ pub struct HecLogData<'a> {
     pub source: Option<&'a Template>,
     pub index: Option<&'a Template>,
     pub indexed_fields: &'a [OwnedValuePath],
-    pub host_path: Option<&'a String>,
+    pub host_key: Option<&'a String>,
     pub timestamp_nanos_key: Option<&'a String>,
-    pub timestamp_path: Option<&'a String>,
+    pub timestamp_key: Option<&'a String>,
     pub endpoint_target: EndpointTarget,
 }
 
@@ -59,9 +59,9 @@ where
             source: self.source.as_ref(),
             index: self.index.as_ref(),
             indexed_fields: self.indexed_fields.as_slice(),
-            host_path: self.host_path.as_ref(),
+            host_key: self.host_key.as_ref(),
             timestamp_nanos_key: self.timestamp_nanos_key.as_ref(),
-            timestamp_path: self.timestamp_path.as_ref(),
+            timestamp_key: self.timestamp_key.as_ref(),
             endpoint_target: self.endpoint_target,
         };
         let batch_settings = self.batch_settings;
@@ -76,7 +76,7 @@ where
                         self.sourcetype.clone(),
                         self.source.clone(),
                         self.index.clone(),
-                        self.host_path.clone(),
+                        self.host_key.clone(),
                     )
                 } else {
                     EventPartitioner::new(None, None, None, None)
@@ -129,7 +129,7 @@ struct EventPartitioner {
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
-    pub host_path: Option<String>,
+    pub host_key: Option<String>,
 }
 
 impl EventPartitioner {
@@ -137,13 +137,13 @@ impl EventPartitioner {
         sourcetype: Option<Template>,
         source: Option<Template>,
         index: Option<Template>,
-        host_path: Option<String>,
+        host_key: Option<String>,
     ) -> Self {
         Self {
             sourcetype,
             source,
             index,
-            host_path,
+            host_key,
         }
     }
 }
@@ -182,7 +182,7 @@ impl Partitioner for EventPartitioner {
                 .ok()
         });
 
-        let host = user_or_namespaced_path(&item.event, self.host_path.as_ref(), meaning::HOST)
+        let host = user_or_namespaced_path(&item.event, self.host_key.as_ref(), meaning::HOST)
             .and_then(|path| item.event.get(&path))
             .and_then(|value| value.as_str().map(|s| s.to_string()));
 
@@ -221,12 +221,12 @@ pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetad
 
 fn user_or_namespaced_path(
     log: &LogEvent,
-    key: Option<&String>,
+    user_key: Option<&String>,
     semantic: &str,
 ) -> Option<OwnedTargetPath> {
     match log.namespace() {
         LogNamespace::Vector => {
-            if let Some(key) = key {
+            if let Some(key) = user_key {
                 if key == "" {
                     None
                 } else {
@@ -237,7 +237,7 @@ fn user_or_namespaced_path(
             }
         }
         LogNamespace::Legacy => {
-            if let Some(key) = key {
+            if let Some(key) = user_key {
                 if key == "" {
                     None
                 } else {
@@ -265,13 +265,13 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
         .index
         .and_then(|index| render_template_string(index, &log, INDEX_FIELD));
 
-    let host = user_or_namespaced_path(&log, data.host_path, meaning::HOST)
+    let host = user_or_namespaced_path(&log, data.host_key, meaning::HOST)
         .and_then(|path| log.get(&path))
         .cloned();
 
     let timestamp = match data.endpoint_target {
         EndpointTarget::Event => {
-            user_or_namespaced_path(&log, data.timestamp_path, meaning::TIMESTAMP).and_then(
+            user_or_namespaced_path(&log, data.timestamp_key, meaning::TIMESTAMP).and_then(
                 |timestamp_path| {
                     match log.remove(&timestamp_path) {
                         Some(Value::Timestamp(ts)) => {

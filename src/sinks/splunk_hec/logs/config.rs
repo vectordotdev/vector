@@ -49,13 +49,13 @@ pub struct HecLogsSinkConfig {
     #[configurable(validation(format = "uri"))]
     pub endpoint: String,
 
-    /// Overrides the path to the log field used to retrieve the hostname to send to Splunk HEC.
+    /// Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[configurable(metadata(docs::advanced))]
-    pub host_path: Option<String>,
+    pub host_key: Option<String>,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
@@ -118,7 +118,7 @@ pub struct HecLogsSinkConfig {
     #[serde(skip)]
     pub timestamp_nanos_key: Option<String>,
 
-    /// Overrides the path to the log field used to retrieve the timestamp to send to Splunk HEC.
+    /// Overrides the name of the log field used to retrieve the timestamp to send to Splunk HEC.
     /// When set to `“”`, a timestamp is not set in the events sent to Splunk HEC.
     ///
     /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
@@ -126,7 +126,7 @@ pub struct HecLogsSinkConfig {
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
-    pub timestamp_path: Option<String>,
+    pub timestamp_key: Option<String>,
 
     /// Passes the `auto_extract_timestamp` option to Splunk.
     ///
@@ -154,7 +154,7 @@ impl GenerateConfig for HecLogsSinkConfig {
         toml::Value::try_from(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
-            host_path: None,
+            host_key: None,
             indexed_fields: vec![],
             index: None,
             sourcetype: None,
@@ -166,7 +166,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
-            timestamp_path: None,
+            timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
         })
@@ -266,9 +266,9 @@ impl HecLogsSinkConfig {
                 .iter()
                 .map(|config_path| config_path.0.clone())
                 .collect(),
-            host_path: self.host_path.clone(),
+            host_key: self.host_key.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
-            timestamp_path: self.timestamp_path.clone(),
+            timestamp_key: self.timestamp_key.clone(),
             endpoint_target: self.endpoint_target,
         };
 
@@ -297,7 +297,7 @@ mod tests {
             let config = Self {
                 endpoint: endpoint.clone(),
                 default_token: "i_am_an_island".to_string().into(),
-                host_path: None,
+                host_key: None,
                 indexed_fields: vec![],
                 index: None,
                 sourcetype: None,
@@ -319,7 +319,7 @@ mod tests {
                     ..Default::default()
                 },
                 timestamp_nanos_key: None,
-                timestamp_path: None,
+                timestamp_key: None,
                 auto_extract_timestamp: None,
                 endpoint_target: EndpointTarget::Raw,
             };

@@ -50,7 +50,7 @@ struct HecEventText {
 
 fn get_processed_event_timestamp(
     timestamp: Option<Value>,
-    timestamp_path: Option<String>,
+    timestamp_key: Option<String>,
 ) -> HecProcessedEvent {
     let mut event = Event::Log(LogEvent::from("hello world"));
     event
@@ -64,16 +64,16 @@ fn get_processed_event_timestamp(
     event.as_mut_log().insert("key", "value");
     event.as_mut_log().insert("int_val", 123);
 
-    if let Some(timestamp_path) = &timestamp_path {
+    if let Some(timestamp_key) = &timestamp_key {
         if timestamp.is_some() {
             event.as_mut_log().insert(
-                &OwnedTargetPath::event(owned_value_path!(timestamp_path)),
+                &OwnedTargetPath::event(owned_value_path!(timestamp_key)),
                 timestamp,
             );
         } else {
             event
                 .as_mut_log()
-                .remove(&OwnedTargetPath::event(owned_value_path!(timestamp_path)));
+                .remove(&OwnedTargetPath::event(owned_value_path!(timestamp_key)));
         }
     }
 
@@ -92,10 +92,10 @@ fn get_processed_event_timestamp(
             sourcetype: sourcetype.as_ref(),
             source: source.as_ref(),
             index: index.as_ref(),
-            host_path: Some(&String::from("host_key")),
+            host_key: Some(&String::from("host_key")),
             indexed_fields: indexed_fields.as_slice(),
             timestamp_nanos_key: timestamp_nanos_key.as_ref(),
-            timestamp_path: timestamp_path.as_ref(),
+            timestamp_key: timestamp_key.as_ref(),
             endpoint_target: EndpointTarget::Event,
         },
     )
@@ -205,7 +205,7 @@ async fn splunk_passthrough_token() {
     let config = HecLogsSinkConfig {
         default_token: "token".to_string().into(),
         endpoint: format!("http://{}", addr),
-        host_path: None,
+        host_key: None,
         indexed_fields: Vec::new(),
         index: None,
         sourcetype: None,
@@ -217,7 +217,7 @@ async fn splunk_passthrough_token() {
         tls: None,
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
-        timestamp_path: None,
+        timestamp_key: None,
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
     };
