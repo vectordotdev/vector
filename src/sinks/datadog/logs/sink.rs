@@ -4,6 +4,7 @@ use snafu::Snafu;
 use vector_lib::{
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
+    schema::meaning,
 };
 use vrl::path::PathPrefix;
 
@@ -103,22 +104,22 @@ fn normalize_event(event: &mut Event) {
         log.rename_key(host_path, event_path!("hostname"));
     }
 
-    if let Some(ddtags_path) = log.find_key_by_meaning("tags") {
+    if let Some(ddtags_path) = log.find_key_by_meaning(meaning::TAGS) {
         let ddtags_path = ddtags_path.clone();
 
         // first, if the value is an array we need to reconstruct it to a comma delimited string for DD logs intake.
         if let Some(Value::Array(tags_arr)) = log.get(&ddtags_path) {
             if !tags_arr.is_empty() {
-                let mut all_tags = String::new();
-                tags_arr.iter().enumerate().for_each(|(idx, tag_kv)| {
-                    if let Some(bytes) = tag_kv.as_bytes() {
-                        if idx > 0 {
-                            all_tags.push(',');
-                        }
-                        let tag_kv_str = String::from_utf8_lossy(bytes);
-                        all_tags.push_str(&tag_kv_str);
-                    }
-                });
+                let all_tags: String = tags_arr
+                    .iter()
+                    .filter_map(|tag_kv| {
+                        tag_kv
+                            .as_bytes()
+                            .map(|bytes| String::from_utf8_lossy(bytes).to_string())
+                    })
+                    .collect::<Vec<String>>()
+                    .join(",");
+
                 log.insert(&ddtags_path, all_tags);
             }
         }
@@ -134,7 +135,7 @@ fn normalize_event(event: &mut Event) {
                 let rename_path = event_path!(rename_attr);
                 warn!(
                     message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
-                    meaning = "tags",
+                    meaning = meaning::TAGS,
                     renamed = &rename_attr,
                     internal_log_rate_limit = true,
                 );
@@ -371,7 +372,7 @@ mod tests {
     use vector_lib::{
         config::{LegacyKey, LogNamespace},
         event::{Event, EventMetadata, LogEvent},
-        schema::Definition,
+        schema::{meaning, Definition},
     };
     use vrl::{
         core::Value,
@@ -427,21 +428,21 @@ mod tests {
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
                 &owned_value_path!("ddtags"),
                 Kind::bytes(),
-                Some("tags"),
+                Some(meaning::TAGS),
             )
             .with_source_metadata(
                 "datadog_agent",
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
                 &owned_value_path!("hostname"),
                 Kind::bytes(),
-                Some("host"),
+                Some(meaning::HOST),
             )
             .with_source_metadata(
                 "datadog_agent",
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
-                Some("timestamp"),
+                Some(meaning::TIMESTAMP),
             ),
         ));
 
@@ -476,21 +477,21 @@ mod tests {
                     Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
                     &owned_value_path!("ddtags"),
                     Kind::bytes(),
-                    Some("tags"),
+                    Some(meaning::TAGS),
                 )
                 .with_source_metadata(
                     "datadog_agent",
                     Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
                     &owned_value_path!("hostname"),
                     Kind::bytes(),
-                    Some("host"),
+                    Some(meaning::HOST),
                 )
                 .with_source_metadata(
                     "datadog_agent",
                     Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
                     &owned_value_path!("timestamp"),
                     Kind::timestamp(),
-                    Some("timestamp"),
+                    Some(meaning::TIMESTAMP),
                 ),
         ));
 
