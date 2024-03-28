@@ -284,4 +284,13 @@ fn splunk_encode_log_event_json_timestamps() {
     // timestamp_key is provided but no timestamp in the event
     let hec_data = get_hec_data_for_timestamp_test(None, timestamp);
     assert_eq!(hec_data.time, None);
+
+    // timestamp_key is provided as an empty string
+    let hec_data = get_hec_data_for_timestamp_test(Some(Utc::now().into()), Some("".to_string()));
+    assert_eq!(hec_data.time, None);
+}
+
+#[test]
+fn splunk_encode_log_event_semantic_meanings() {
+    // TODO
 }
