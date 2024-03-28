@@ -222,23 +222,18 @@ fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
 
     let ddtags_str = String::from_utf8_lossy(ddtags_raw);
 
-    // The value is a single bare tag
-    if !ddtags_str.contains(',') && !ddtags_str.contains(':') {
-        return vec![Value::Bytes(ddtags_raw.clone())].into();
-    }
-
     // There are multiple tags, which could be either bare or pairs
-    let ddtags_object: Vec<Value> = ddtags_str
+    let ddtags: Vec<Value> = ddtags_str
         .split(',')
         .filter(|kv| !kv.is_empty())
         .map(|kv| Value::Bytes(Bytes::from(kv.trim().to_string())))
         .collect();
 
-    if ddtags_object.is_empty() && !ddtags_str.is_empty() {
+    if ddtags.is_empty() && !ddtags_str.is_empty() {
         warn!(message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed.")
     }
 
-    ddtags_object.into()
+    ddtags.into()
 }
 
 #[cfg(test)]
