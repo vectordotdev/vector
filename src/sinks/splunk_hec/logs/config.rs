@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use vector_lib::{
-    codecs::TextSerializerConfig,
-    lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath},
+    codecs::TextSerializerConfig, lookup::lookup_v2::ConfigValuePath,
     sensitive_string::SensitiveString,
 };
 
@@ -12,7 +11,7 @@ use crate::{
         prelude::*,
         splunk_hec::common::{
             acknowledgements::HecClientAcknowledgementsConfig,
-            build_healthcheck, build_http_batch_service, config_no_target_path, create_client,
+            build_healthcheck, build_http_batch_service, create_client,
             service::{HecService, HttpRequestBuilder},
             EndpointTarget, SplunkHecDefaultBatchSettings,
         },
@@ -50,14 +49,13 @@ pub struct HecLogsSinkConfig {
     #[configurable(validation(format = "uri"))]
     pub endpoint: String,
 
-    /// Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
+    /// Overrides the path to the log field used to retrieve the hostname to send to Splunk HEC.
     ///
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "config_no_target_path")]
-    pub host_key: OptionalTargetPath,
+    pub host_path: Option<String>,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
@@ -120,16 +118,15 @@ pub struct HecLogsSinkConfig {
     #[serde(skip)]
     pub timestamp_nanos_key: Option<String>,
 
-    /// Overrides the name of the log field used to retrieve the timestamp to send to Splunk HEC.
+    /// Overrides the path to the log field used to retrieve the timestamp to send to Splunk HEC.
     /// When set to `“”`, a timestamp is not set in the events sent to Splunk HEC.
     ///
     /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "config_no_target_path")]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
-    pub timestamp_key: OptionalTargetPath,
+    pub timestamp_path: Option<String>,
 
     /// Passes the `auto_extract_timestamp` option to Splunk.
     ///
@@ -157,7 +154,7 @@ impl GenerateConfig for HecLogsSinkConfig {
         toml::Value::try_from(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
-            host_key: config_no_target_path(),
+            host_path: None,
             indexed_fields: vec![],
             index: None,
             sourcetype: None,
@@ -169,7 +166,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
-            timestamp_key: config_no_target_path(),
+            timestamp_path: None,
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
         })
@@ -269,9 +266,9 @@ impl HecLogsSinkConfig {
                 .iter()
                 .map(|config_path| config_path.0.clone())
                 .collect(),
-            host_key: self.host_key.path.clone(),
+            host_path: self.host_path.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
-            timestamp_key: self.timestamp_key.path.clone(),
+            timestamp_path: self.timestamp_path.clone(),
             endpoint_target: self.endpoint_target,
         };
 
@@ -300,7 +297,7 @@ mod tests {
             let config = Self {
                 endpoint: endpoint.clone(),
                 default_token: "i_am_an_island".to_string().into(),
-                host_key: config_no_target_path(),
+                host_path: None,
                 indexed_fields: vec![],
                 index: None,
                 sourcetype: None,
@@ -322,7 +319,7 @@ mod tests {
                     ..Default::default()
                 },
                 timestamp_nanos_key: None,
-                timestamp_key: config_no_target_path(),
+                timestamp_path: None,
                 auto_extract_timestamp: None,
                 endpoint_target: EndpointTarget::Raw,
             };

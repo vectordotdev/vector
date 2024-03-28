@@ -15,8 +15,10 @@ use crate::{
 };
 use vector_lib::{
     config::LogNamespace,
-    lookup::{event_path, OwnedTargetPath, OwnedValuePath, PathPrefix},
+    lookup::{event_path, OwnedValuePath, PathPrefix},
+    schema::meaning,
 };
+use vrl::{owned_value_path, path::OwnedTargetPath};
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
@@ -27,9 +29,9 @@ pub struct HecLogsSink<S> {
     pub source: Option<Template>,
     pub index: Option<Template>,
     pub indexed_fields: Vec<OwnedValuePath>,
-    pub host_key: Option<OwnedTargetPath>,
+    pub host_path: Option<String>,
     pub timestamp_nanos_key: Option<String>,
-    pub timestamp_key: Option<OwnedTargetPath>,
+    pub timestamp_path: Option<String>,
     pub endpoint_target: EndpointTarget,
 }
 
@@ -38,9 +40,9 @@ pub struct HecLogData<'a> {
     pub source: Option<&'a Template>,
     pub index: Option<&'a Template>,
     pub indexed_fields: &'a [OwnedValuePath],
-    pub host_key: Option<OwnedTargetPath>,
+    pub host_path: Option<&'a String>,
     pub timestamp_nanos_key: Option<&'a String>,
-    pub timestamp_key: Option<OwnedTargetPath>,
+    pub timestamp_path: Option<&'a String>,
     pub endpoint_target: EndpointTarget,
 }
 
@@ -57,9 +59,9 @@ where
             source: self.source.as_ref(),
             index: self.index.as_ref(),
             indexed_fields: self.indexed_fields.as_slice(),
-            host_key: self.host_key.clone(),
+            host_path: self.host_path.as_ref(),
             timestamp_nanos_key: self.timestamp_nanos_key.as_ref(),
-            timestamp_key: self.timestamp_key.clone(),
+            timestamp_path: self.timestamp_path.as_ref(),
             endpoint_target: self.endpoint_target,
         };
         let batch_settings = self.batch_settings;
@@ -74,7 +76,7 @@ where
                         self.sourcetype.clone(),
                         self.source.clone(),
                         self.index.clone(),
-                        self.host_key.clone(),
+                        self.host_path.clone(),
                     )
                 } else {
                     EventPartitioner::new(None, None, None, None)
@@ -127,7 +129,7 @@ struct EventPartitioner {
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
-    pub host_key: Option<OwnedTargetPath>,
+    pub host_path: Option<String>,
 }
 
 impl EventPartitioner {
@@ -135,13 +137,13 @@ impl EventPartitioner {
         sourcetype: Option<Template>,
         source: Option<Template>,
         index: Option<Template>,
-        host_key: Option<OwnedTargetPath>,
+        host_path: Option<String>,
     ) -> Self {
         Self {
             sourcetype,
             source,
             index,
-            host_key,
+            host_path,
         }
     }
 }
@@ -180,10 +182,8 @@ impl Partitioner for EventPartitioner {
                 .ok()
         });
 
-        let host = self
-            .host_key
-            .as_ref()
-            .and_then(|host_key| item.event.get(host_key))
+        let host = user_or_namespaced_path(&item.event, self.host_path.as_ref(), meaning::HOST)
+            .and_then(|path| item.event.get(&path))
             .and_then(|value| value.as_str().map(|s| s.to_string()));
 
         Some(Partitioned {
@@ -219,6 +219,37 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
 
 pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
+fn user_or_namespaced_path(
+    log: &LogEvent,
+    key: Option<&String>,
+    semantic: &str,
+) -> Option<OwnedTargetPath> {
+    match log.namespace() {
+        LogNamespace::Vector => {
+            if let Some(key) = key {
+                if key == "" {
+                    None
+                } else {
+                    Some(OwnedTargetPath::event(owned_value_path!(key)))
+                }
+            } else {
+                log.find_key_by_meaning(semantic).cloned()
+            }
+        }
+        LogNamespace::Legacy => {
+            if let Some(key) = key {
+                if key == "" {
+                    None
+                } else {
+                    Some(OwnedTargetPath::event(owned_value_path!(key)))
+                }
+            } else {
+                crate::config::log_schema().host_key_target_path().cloned()
+            }
+        }
+    }
+}
+
 pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
     let mut log = event.into_log();
 
@@ -234,27 +265,15 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
         .index
         .and_then(|index| render_template_string(index, &log, INDEX_FIELD));
 
-    let host = data
-        .host_key
-        .as_ref()
-        .or_else(|| match log.namespace() {
-            LogNamespace::Vector => log.find_key_by_meaning("host"),
-            LogNamespace::Legacy => crate::config::log_schema().host_key_target_path(),
-        })
-        .and_then(|key| log.get(key))
+    let host = user_or_namespaced_path(&log, data.host_path, meaning::HOST)
+        .and_then(|path| log.get(&path))
         .cloned();
 
     let timestamp = match data.endpoint_target {
         EndpointTarget::Event => {
-            data.timestamp_key
-                .as_ref()
-                .or_else(|| match log.namespace() {
-                    LogNamespace::Vector => log.find_key_by_meaning("timestamp"),
-                    LogNamespace::Legacy => crate::config::log_schema().timestamp_key_target_path(),
-                })
-                .cloned()
-                .and_then(|timestamp_key| {
-                    match log.remove(&timestamp_key) {
+            user_or_namespaced_path(&log, data.timestamp_path, meaning::TIMESTAMP).and_then(
+                |timestamp_path| {
+                    match log.remove(&timestamp_path) {
                         Some(Value::Timestamp(ts)) => {
                             // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
                             if let Some(key) = data.timestamp_nanos_key {
@@ -276,7 +295,8 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
                             None
                         }
                     }
-                })
+                },
+            )
         }
         EndpointTarget::Raw => None,
     };
