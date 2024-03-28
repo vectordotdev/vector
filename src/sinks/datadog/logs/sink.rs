@@ -5,7 +5,6 @@ use vector_lib::{
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
-use vrl::path::parse_target_path;
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::sinks::{
@@ -108,18 +107,15 @@ fn normalize_event(event: &mut Event) {
 
         // first, if the value is an array we need to reconstruct it to a comma delimited string for DD logs intake.
         if let Some(Value::Array(tags_arr)) = log.get(&ddtags_path) {
-            let n_tags = tags_arr.len();
-            if n_tags > 0 {
+            if !tags_arr.is_empty() {
                 let mut all_tags = String::new();
                 tags_arr.iter().enumerate().for_each(|(idx, tag_kv)| {
-                    if tag_kv.is_bytes() {
-                        let tag_kv_str = String::from_utf8_lossy(
-                            tag_kv.as_bytes().expect("tag should be bytes."),
-                        );
-                        all_tags.push_str(&tag_kv_str);
-                        if idx + 1 < n_tags {
+                    if let Some(bytes) = tag_kv.as_bytes() {
+                        if idx > 0 {
                             all_tags.push(',');
                         }
+                        let tag_kv_str = String::from_utf8_lossy(bytes);
+                        all_tags.push_str(&tag_kv_str);
                     }
                 });
                 log.insert(&ddtags_path, all_tags);
@@ -128,7 +124,7 @@ fn normalize_event(event: &mut Event) {
 
         // now, the tags attribute must be at the event root so we will move it there if
         // needed and move any conflicting field if any.
-        if ddtags_path != parse_target_path("tags").expect("should parse tags target path") {
+        if ddtags_path.path.to_string() != "tags" {
             let desired_path = event_path!("tags");
             // if an existing attribute exists here already, move it so to not overwrite it.
             // yes, technically the rename path could exist, but technically that could always be the case.
