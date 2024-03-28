@@ -39,7 +39,6 @@ apt-get install --yes --no-install-recommends \
     llvm \
     locales \
     pkg-config \
-    python3-pip \
     rename \
     rpm \
     ruby-bundler \

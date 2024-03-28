@@ -29,8 +29,5 @@ fi
 sudo npm -g install markdownlint-cli@0.30
 sudo npm -g install @datadog/datadog-ci
 
-pip3 install jsonschema==3.2.0
-pip3 install remarshal==0.11.2
-
 # Make sure our release build settings are present.
 . scripts/environment/release-flags.sh
