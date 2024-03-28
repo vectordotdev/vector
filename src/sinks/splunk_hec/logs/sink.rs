@@ -226,7 +226,7 @@ fn user_or_namespaced_path(
 ) -> Option<OwnedTargetPath> {
     // When the user provides an empty string, we won't set this field in the outgoing event data
     if let Some(key) = user_key {
-        if key == "" {
+        if key.is_empty() {
             None
         } else {
             Some(OwnedTargetPath::event(owned_value_path!(key)))

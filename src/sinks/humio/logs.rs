@@ -188,7 +188,7 @@ impl HumioLogsConfig {
         HecLogsSinkConfig {
             default_token: self.token.clone(),
             endpoint: self.endpoint.clone(),
-            host_key: self.host_key.path.map(|p| p.to_string()),
+            host_key: self.host_key.path.as_ref().map(|p| p.to_string()),
             indexed_fields: self.indexed_fields.clone(),
             index: self.index.clone(),
             sourcetype: self.event_type.clone(),
