@@ -188,7 +188,7 @@ impl HumioLogsConfig {
         HecLogsSinkConfig {
             default_token: self.token.clone(),
             endpoint: self.endpoint.clone(),
-            host_key: self.host_key.clone(),
+            host_key: self.host_key.path.map(|p| p.to_string()),
             indexed_fields: self.indexed_fields.clone(),
             index: self.index.clone(),
             sourcetype: self.event_type.clone(),
@@ -203,7 +203,7 @@ impl HumioLogsConfig {
                 indexer_acknowledgements_enabled: false,
                 ..Default::default()
             },
-            timestamp_key: config_timestamp_key_target_path(),
+            timestamp_key: None,
             endpoint_target: EndpointTarget::Event,
             auto_extract_timestamp: None,
         }

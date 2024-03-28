@@ -224,28 +224,19 @@ fn user_or_namespaced_path(
     user_key: Option<&String>,
     semantic: &str,
 ) -> Option<OwnedTargetPath> {
-    match log.namespace() {
-        LogNamespace::Vector => {
-            if let Some(key) = user_key {
-                if key == "" {
-                    None
-                } else {
-                    Some(OwnedTargetPath::event(owned_value_path!(key)))
-                }
-            } else {
-                log.find_key_by_meaning(semantic).cloned()
-            }
+    // When the user provides an empty string, we won't set this field in the outgoing event data
+    if let Some(key) = user_key {
+        if key == "" {
+            None
+        } else {
+            Some(OwnedTargetPath::event(owned_value_path!(key)))
         }
-        LogNamespace::Legacy => {
-            if let Some(key) = user_key {
-                if key == "" {
-                    None
-                } else {
-                    Some(OwnedTargetPath::event(owned_value_path!(key)))
-                }
-            } else {
-                crate::config::log_schema().host_key_target_path().cloned()
-            }
+    // By default (user provided no key), we either use the Global log nanespace (Legacy),
+    // or attempt to use the semantic meaning.
+    } else {
+        match log.namespace() {
+            LogNamespace::Vector => log.find_key_by_meaning(semantic).cloned(),
+            LogNamespace::Legacy => crate::config::log_schema().host_key_target_path().cloned(),
         }
     }
 }
