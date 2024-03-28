@@ -5,6 +5,7 @@ use vector_lib::{
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
+use vrl::path::PathPrefix;
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::sinks::{
@@ -124,8 +125,8 @@ fn normalize_event(event: &mut Event) {
 
         // now, the tags attribute must be at the event root so we will move it there if
         // needed and move any conflicting field if any.
-        if ddtags_path.path.to_string() != "tags" {
-            let desired_path = event_path!("tags");
+        if !(ddtags_path.prefix == PathPrefix::Event && ddtags_path.path.to_string() == "ddtags") {
+            let desired_path = event_path!("ddtags");
             // if an existing attribute exists here already, move it so to not overwrite it.
             // yes, technically the rename path could exist, but technically that could always be the case.
             if log.contains(desired_path) {
@@ -392,9 +393,9 @@ mod tests {
 
         assert!(log.contains(event_path!("hostname")));
 
-        assert!(log.contains(event_path!("tags")));
+        assert!(log.contains(event_path!("ddtags")));
         assert_eq!(
-            log.get(event_path!("tags")).expect("should have tags"),
+            log.get(event_path!("ddtags")).expect("should have tags"),
             &Value::Bytes("key1:value1,key2:value2".into())
         );
     }
