@@ -1,5 +1,6 @@
 use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 
+use itertools::Itertools;
 use snafu::Snafu;
 use vector_lib::{
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
@@ -118,9 +119,8 @@ fn normalize_event(event: &mut Event) {
                     .filter_map(|tag_kv| {
                         tag_kv
                             .as_bytes()
-                            .map(|bytes| String::from_utf8_lossy(bytes).to_string())
+                            .map(|bytes| String::from_utf8_lossy(bytes))
                     })
-                    .collect::<Vec<String>>()
                     .join(",");
 
                 log.insert(&ddtags_path, all_tags);
