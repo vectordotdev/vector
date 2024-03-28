@@ -2529,6 +2529,8 @@ impl ValidatableComponent for DatadogAgentConfig {
             keepalive: Default::default(),
         };
 
+        let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
+
         // TODO set up separate test cases for metrics and traces endpoints
 
         let logs_addr = format!("http://{}/api/v2/logs", config.address);
@@ -2548,6 +2550,7 @@ impl ValidatableComponent for DatadogAgentConfig {
 
         ValidationConfiguration::from_source(
             Self::NAME,
+            log_namespace,
             vec![ComponentTestCaseConfig::from_source(
                 config,
                 None,

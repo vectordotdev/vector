@@ -322,6 +322,7 @@ impl Runner {
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
                 self.configuration.component_type,
+                self.configuration.log_namespace(),
             );
 
             // the number of events we expect to receive from the output.
@@ -498,6 +499,7 @@ fn build_external_resource(
                 output_task_coordinator,
                 test_case.events.clone(),
                 runner_metrics,
+                configuration.log_namespace(),
             )?;
 
             Ok((
@@ -567,10 +569,10 @@ fn spawn_input_driver(
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     mut maybe_encoder: Option<Encoder<encoding::Framer>>,
     component_type: ComponentType,
+    log_namespace: LogNamespace,
 ) -> JoinHandle<()> {
     let input_runner_metrics = Arc::clone(runner_metrics);
 
-    let log_namespace = LogNamespace::Legacy;
     let now = Utc::now();
 
     tokio::spawn(async move {
