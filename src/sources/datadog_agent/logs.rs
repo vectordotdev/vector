@@ -231,7 +231,7 @@ fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
     let ddtags_object: Vec<Value> = ddtags_str
         .split(',')
         .filter(|kv| !kv.is_empty())
-        .map(|kv| Value::Bytes(Bytes::from(kv.to_string())))
+        .map(|kv| Value::Bytes(Bytes::from(kv.trim().to_string())))
         .collect();
 
     if ddtags_object.is_empty() && !ddtags_str.is_empty() {
