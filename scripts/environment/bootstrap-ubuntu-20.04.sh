@@ -20,8 +20,6 @@ apt-get install --yes \
   apt-utils \
   apt-transport-https
 
-apt-get upgrade --yes
-
 # Deps
 apt-get install --yes --no-install-recommends \
     awscli \
