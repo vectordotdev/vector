@@ -47,6 +47,7 @@ use vrl::value::kind::Collection;
 use vrl::value::Kind;
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
+use crate::common::datadog::DDTAGS;
 use crate::http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -279,8 +280,8 @@ impl SourceConfig for DatadogAgentConfig {
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
-                &owned_value_path!("ddtags"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(DDTAGS))),
+                &owned_value_path!(DDTAGS),
                 if self.parse_ddtags {
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined()
                 } else {

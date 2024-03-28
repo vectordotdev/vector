@@ -161,8 +161,8 @@ pub(crate) fn decode_log_body(
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(path!("ddtags"))),
-                                path!("ddtags"),
+                                Some(LegacyKey::InsertIfEmpty(path!(DDTAGS))),
+                                path!(DDTAGS),
                                 ddtags,
                             );
 

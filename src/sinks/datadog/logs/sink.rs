@@ -9,9 +9,12 @@ use vector_lib::{
 use vrl::path::PathPrefix;
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
-use crate::sinks::{
-    prelude::*,
-    util::{http::HttpJsonBatchSizer, Compressor},
+use crate::{
+    common::datadog::DDTAGS,
+    sinks::{
+        prelude::*,
+        util::{http::HttpJsonBatchSizer, Compressor},
+    },
 };
 #[derive(Default)]
 struct EventPartitioner;
@@ -127,12 +130,12 @@ fn normalize_event(event: &mut Event) {
         // now, the tags attribute must be at the event root so we will move it there if
         // needed and move any conflicting field if any.
         if !(ddtags_path.prefix == PathPrefix::Event && ddtags_path.path.to_string() == "ddtags") {
-            let desired_path = event_path!("ddtags");
+            let desired_path = event_path!(DDTAGS);
             // if an existing attribute exists here already, move it so to not overwrite it.
             // yes, technically the rename path could exist, but technically that could always be the case.
             if log.contains(desired_path) {
-                let rename_attr = "_RESERVED_ddtags";
-                let rename_path = event_path!(rename_attr);
+                let rename_attr = format!("_RESERVED_{}", DDTAGS);
+                let rename_path = event_path!(rename_attr.as_str());
                 warn!(
                     message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
                     meaning = meaning::TAGS,
