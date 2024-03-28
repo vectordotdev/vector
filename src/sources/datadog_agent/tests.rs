@@ -1633,7 +1633,7 @@ fn test_config_outputs() {
                             .with_event_field(
                                 &owned_value_path!("status"),
                                 Kind::bytes(),
-                                Some("severity"),
+                                Some("status"),
                             )
                             .with_event_field(
                                 &owned_value_path!("timestamp"),
@@ -1686,7 +1686,7 @@ fn test_config_outputs() {
                             .with_event_field(
                                 &owned_value_path!("status"),
                                 Kind::bytes(),
-                                Some("severity"),
+                                Some("status"),
                             )
                             .with_event_field(
                                 &owned_value_path!("timestamp"),
@@ -1740,7 +1740,7 @@ fn test_config_outputs() {
                                 .with_event_field(
                                     &owned_value_path!("status"),
                                     Kind::bytes(),
-                                    Some("severity"),
+                                    Some("status"),
                                 )
                                 .with_event_field(
                                     &owned_value_path!("timestamp"),
@@ -2341,7 +2341,7 @@ fn test_output_schema_definition_json_vector_namespace() {
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "status"),
                     Kind::bytes(),
-                    Some("severity")
+                    Some("status")
                 )
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "timestamp"),
@@ -2400,7 +2400,7 @@ fn test_output_schema_definition_bytes_vector_namespace() {
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "status"),
                     Kind::bytes(),
-                    Some("severity")
+                    Some("status")
                 )
                 .with_metadata_field(
                     &owned_value_path!("datadog_agent", "timestamp"),
@@ -2488,11 +2488,7 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
                 Some("service")
             )
             .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-            .with_event_field(
-                &owned_value_path!("status"),
-                Kind::bytes(),
-                Some("severity")
-            )
+            .with_event_field(&owned_value_path!("status"), Kind::bytes(), Some("status"))
             .with_event_field(
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
