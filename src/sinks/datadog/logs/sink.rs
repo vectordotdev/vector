@@ -130,7 +130,7 @@ fn normalize_event(event: &mut Event) {
             // if an existing attribute exists here already, move it so to not overwrite it.
             // yes, technically the rename path could exist, but technically that could always be the case.
             if log.contains(desired_path) {
-                let rename_attr = "_RESERVED_tags";
+                let rename_attr = "_RESERVED_ddtags";
                 let rename_path = event_path!(rename_attr);
                 warn!(
                     message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
