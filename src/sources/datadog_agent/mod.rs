@@ -112,7 +112,7 @@ pub struct DatadogAgentConfig {
     multiple_outputs: bool,
 
     /// If this is set to `true`, when log events contain the field `ddtags`, the string value that
-    /// contains a list of key:value pairs set by the Agent is parsed and expanded into an array.
+    /// contains a list of key:value pairs set by the Agent is parsed and expanded into an object.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     parse_ddtags: bool,
@@ -278,7 +278,7 @@ impl SourceConfig for DatadogAgentConfig {
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
                 &owned_value_path!("ddtags"),
                 if self.parse_ddtags {
-                    Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined()
+                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined()
                 } else {
                     Kind::bytes()
                 },
