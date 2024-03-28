@@ -161,6 +161,10 @@ pub fn config_timestamp_key() -> OptionalValuePath {
     }
 }
 
+pub const fn config_no_target_path() -> OptionalTargetPath {
+    OptionalTargetPath { path: None }
+}
+
 pub fn render_template_string<'a>(
     template: &Template,
     event: impl Into<EventRef<'a>>,

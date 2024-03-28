@@ -13,7 +13,10 @@ use crate::{
         util::processed_event::ProcessedEvent,
     },
 };
-use vector_lib::lookup::{event_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
+use vector_lib::{
+    config::LogNamespace,
+    lookup::{event_path, OwnedTargetPath, OwnedValuePath, PathPrefix},
+};
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
@@ -231,34 +234,49 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
         .index
         .and_then(|index| render_template_string(index, &log, INDEX_FIELD));
 
-    let host = data.host_key.as_ref().and_then(|key| log.get(key)).cloned();
+    let host = data
+        .host_key
+        .as_ref()
+        .or_else(|| match log.namespace() {
+            LogNamespace::Vector => log.find_key_by_meaning("host"),
+            LogNamespace::Legacy => crate::config::log_schema().host_key_target_path(),
+        })
+        .and_then(|key| log.get(key))
+        .cloned();
 
     let timestamp = match data.endpoint_target {
         EndpointTarget::Event => {
-            data.timestamp_key.as_ref().and_then(|timestamp_key| {
-                match log.remove(timestamp_key) {
-                    Some(Value::Timestamp(ts)) => {
-                        // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
-                        if let Some(key) = data.timestamp_nanos_key {
-                            log.try_insert(
-                                event_path!(key),
-                                ts.timestamp_subsec_nanos() % 1_000_000,
-                            );
+            data.timestamp_key
+                .as_ref()
+                .or_else(|| match log.namespace() {
+                    LogNamespace::Vector => log.find_key_by_meaning("timestamp"),
+                    LogNamespace::Legacy => crate::config::log_schema().timestamp_key_target_path(),
+                })
+                .cloned()
+                .and_then(|timestamp_key| {
+                    match log.remove(&timestamp_key) {
+                        Some(Value::Timestamp(ts)) => {
+                            // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
+                            if let Some(key) = data.timestamp_nanos_key {
+                                log.try_insert(
+                                    event_path!(key),
+                                    ts.timestamp_subsec_nanos() % 1_000_000,
+                                );
+                            }
+                            Some((ts.timestamp_millis() as f64) / 1000f64)
                         }
-                        Some((ts.timestamp_millis() as f64) / 1000f64)
+                        Some(value) => {
+                            emit!(SplunkEventTimestampInvalidType {
+                                r#type: value.kind_str()
+                            });
+                            None
+                        }
+                        None => {
+                            emit!(SplunkEventTimestampMissing {});
+                            None
+                        }
                     }
-                    Some(value) => {
-                        emit!(SplunkEventTimestampInvalidType {
-                            r#type: value.kind_str()
-                        });
-                        None
-                    }
-                    None => {
-                        emit!(SplunkEventTimestampMissing {});
-                        None
-                    }
-                }
-            })
+                })
         }
         EndpointTarget::Raw => None,
     };

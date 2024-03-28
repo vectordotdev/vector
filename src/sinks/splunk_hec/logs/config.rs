@@ -12,8 +12,7 @@ use crate::{
         prelude::*,
         splunk_hec::common::{
             acknowledgements::HecClientAcknowledgementsConfig,
-            build_healthcheck, build_http_batch_service, config_host_key_target_path,
-            config_timestamp_key_target_path, create_client,
+            build_healthcheck, build_http_batch_service, config_no_target_path, create_client,
             service::{HecService, HttpRequestBuilder},
             EndpointTarget, SplunkHecDefaultBatchSettings,
         },
@@ -57,7 +56,7 @@ pub struct HecLogsSinkConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "config_host_key_target_path")]
+    #[serde(default = "config_no_target_path")]
     pub host_key: OptionalTargetPath,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
@@ -128,7 +127,7 @@ pub struct HecLogsSinkConfig {
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "crate::sinks::splunk_hec::common::config_timestamp_key_target_path")]
+    #[serde(default = "config_no_target_path")]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
     pub timestamp_key: OptionalTargetPath,
 
@@ -158,7 +157,7 @@ impl GenerateConfig for HecLogsSinkConfig {
         toml::Value::try_from(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
-            host_key: config_host_key_target_path(),
+            host_key: config_no_target_path(),
             indexed_fields: vec![],
             index: None,
             sourcetype: None,
@@ -170,7 +169,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
-            timestamp_key: config_timestamp_key_target_path(),
+            timestamp_key: config_no_target_path(),
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
         })
@@ -301,7 +300,7 @@ mod tests {
             let config = Self {
                 endpoint: endpoint.clone(),
                 default_token: "i_am_an_island".to_string().into(),
-                host_key: config_host_key_target_path(),
+                host_key: config_no_target_path(),
                 indexed_fields: vec![],
                 index: None,
                 sourcetype: None,
@@ -323,7 +322,7 @@ mod tests {
                     ..Default::default()
                 },
                 timestamp_nanos_key: None,
-                timestamp_key: config_timestamp_key_target_path(),
+                timestamp_key: config_no_target_path(),
                 auto_extract_timestamp: None,
                 endpoint_target: EndpointTarget::Raw,
             };
