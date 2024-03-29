@@ -297,7 +297,7 @@ fn splunk_encode_log_event_json_timestamps() {
         get_hec_data_for_timestamp_test(None, Some(timestamp_key.clone()), dont_auto_extract);
     assert_eq!(hec_data.time, None);
 
-    // timestamp_key is provided and timstamp is valid
+    // timestamp_key is provided and timestamp is valid
     hec_data = get_hec_data_for_timestamp_test(
         Some(Value::Timestamp(Utc::now())),
         Some(timestamp_key.clone()),
