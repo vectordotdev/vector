@@ -2,16 +2,21 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::{TimeZone, Utc};
 use futures_util::StreamExt;
-use serde::Deserialize;
+use serde::{de, Deserialize};
 use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::event::EventMetadata;
+use vector_lib::schema::{meaning, Definition};
 use vector_lib::{
     config::log_schema,
     event::{Event, LogEvent, Value},
 };
-use vrl::owned_value_path;
 use vrl::path::OwnedTargetPath;
+use vrl::value::Kind;
+use vrl::{event_path, metadata_path, owned_value_path};
 
-use super::sink::HecProcessedEvent;
+use super::sink::{HecLogsProcessedEventMetadata, HecProcessedEvent};
+use crate::sinks::util::processed_event::ProcessedEvent;
 use crate::{
     codecs::{Encoder, EncodingConfig},
     config::{SinkConfig, SinkContext},
@@ -46,6 +51,18 @@ struct HecEventText {
     sourcetype: Option<String>,
     index: Option<String>,
     host: Option<String>,
+}
+
+fn get_encoded_event<D: de::DeserializeOwned>(
+    encoding: EncodingConfig,
+    processed_event: ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>,
+) -> D {
+    let encoder = hec_encoder(encoding);
+    let mut bytes = Vec::new();
+    encoder
+        .encode_input(vec![processed_event], &mut bytes)
+        .unwrap();
+    serde_json::from_slice::<D>(&bytes).unwrap()
 }
 
 fn get_processed_event_timestamp(
@@ -143,12 +160,8 @@ fn hec_encoder(encoding: EncodingConfig) -> HecLogsEncoder {
 #[test]
 fn splunk_encode_log_event_json() {
     let processed_event = get_processed_event();
-    let encoder = hec_encoder(JsonSerializerConfig::default().into());
-    let mut bytes = Vec::new();
-    encoder
-        .encode_input(vec![processed_event], &mut bytes)
-        .unwrap();
-    let hec_data = serde_json::from_slice::<HecEventJson>(&bytes).unwrap();
+    let hec_data =
+        get_encoded_event::<HecEventJson>(JsonSerializerConfig::default().into(), processed_event);
     let event = hec_data.event;
 
     assert_eq!(event.get("key").unwrap(), &serde_json::Value::from("value"));
@@ -180,12 +193,8 @@ fn splunk_encode_log_event_json() {
 #[test]
 fn splunk_encode_log_event_text() {
     let processed_event = get_processed_event();
-    let encoder = hec_encoder(TextSerializerConfig::default().into());
-    let mut bytes = Vec::new();
-    encoder
-        .encode_input(vec![processed_event], &mut bytes)
-        .unwrap();
-    let hec_data = serde_json::from_slice::<HecEventText>(&bytes).unwrap();
+    let hec_data =
+        get_encoded_event::<HecEventText>(TextSerializerConfig::default().into(), processed_event);
 
     assert_eq!(hec_data.event.as_str(), "hello world");
 
@@ -262,12 +271,7 @@ fn splunk_encode_log_event_json_timestamps() {
         timestamp_path: Option<String>,
     ) -> HecEventJson {
         let processed_event = get_processed_event_timestamp(timestamp, timestamp_path);
-        let encoder = hec_encoder(JsonSerializerConfig::default().into());
-        let mut bytes = Vec::new();
-        encoder
-            .encode_input(vec![processed_event], &mut bytes)
-            .unwrap();
-        serde_json::from_slice::<HecEventJson>(&bytes).unwrap()
+        get_encoded_event::<HecEventJson>(JsonSerializerConfig::default().into(), processed_event)
     }
 
     let timestamp = Some("timestamp".to_string());
@@ -292,5 +296,63 @@ fn splunk_encode_log_event_json_timestamps() {
 
 #[test]
 fn splunk_encode_log_event_semantic_meanings() {
-    // TODO
+    let metadata = EventMetadata::default().with_schema_definition(&Arc::new(
+        Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+            .with_source_metadata(
+                "splunk_hec",
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
+                &owned_value_path!("hostname"),
+                Kind::bytes(),
+                Some(meaning::HOST),
+            )
+            .with_source_metadata(
+                "splunk_hec",
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
+                &owned_value_path!("timestamp"),
+                Kind::timestamp(),
+                Some(meaning::TIMESTAMP),
+            ),
+    ));
+
+    let mut log = LogEvent::new_with_metadata(metadata);
+    log.insert(event_path!("message"), "the_message");
+
+    // insert an arbitrary metadata field such that the log becomes Vector namespaced
+    log.insert(metadata_path!("vector", "foo"), "bar");
+
+    let og_time = Utc::now();
+
+    // determine the time we expect to get after encoding
+    let expected_time = (og_time.timestamp_millis() as f64) / 1000f64;
+
+    log.insert(metadata_path!("splunk_hec", "hostname"), "roast");
+    log.insert(
+        metadata_path!("splunk_hec", "timestamp"),
+        Value::Timestamp(og_time),
+    );
+
+    assert!(log.namespace() == LogNamespace::Vector);
+
+    let event = Event::Log(log);
+
+    let processed_event = process_log(
+        event,
+        &super::sink::HecLogData {
+            sourcetype: None,
+            source: None,
+            index: None,
+            host_key: None,
+            indexed_fields: &vec![],
+            timestamp_nanos_key: None,
+            timestamp_key: None,
+            endpoint_target: EndpointTarget::Event,
+        },
+    );
+
+    let hec_data =
+        get_encoded_event::<HecEventJson>(JsonSerializerConfig::default().into(), processed_event);
+
+    assert_eq!(hec_data.time, Some(expected_time));
+
+    assert_eq!(hec_data.host, Some("roast".to_string()));
 }
