@@ -119,8 +119,10 @@ impl Deserializer for ProtobufDeserializer {
 impl TryFrom<&ProtobufDeserializerConfig> for ProtobufDeserializer {
     type Error = vector_common::Error;
     fn try_from(config: &ProtobufDeserializerConfig) -> vector_common::Result<Self> {
-        let message_descriptor =
-            vrl::protobuf::get_message_descriptor(&config.protobuf.desc_file, &config.protobuf.message_type)?;
+        let message_descriptor = vrl::protobuf::get_message_descriptor(
+            &config.protobuf.desc_file,
+            &config.protobuf.message_type,
+        )?;
         Ok(Self::new(message_descriptor))
     }
 }
@@ -146,7 +148,8 @@ mod tests {
         validate_log: fn(&LogEvent),
     ) {
         let input = Bytes::from(protobuf_bin_message);
-        let message_descriptor = vrl::protobuf::get_message_descriptor(&protobuf_desc_path, message_type).unwrap();
+        let message_descriptor =
+            vrl::protobuf::get_message_descriptor(&protobuf_desc_path, message_type).unwrap();
         let deserializer = ProtobufDeserializer::new(message_descriptor);
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
@@ -224,7 +227,11 @@ mod tests {
         let protobuf_desc_path = test_data_dir().join("protos/test_protobuf.desc");
         let message_type = "test_protobuf.Person";
         let validate_log = |log: &LogEvent| {
-            assert_eq!(log["name"], "".into());
+            // No field will be set.
+            assert!(!log.contains("name"));
+            assert!(!log.contains("id"));
+            assert!(!log.contains("email"));
+            assert!(!log.contains("phones"));
         };
 
         parse_and_validate(
@@ -238,7 +245,7 @@ mod tests {
     #[test]
     fn deserialize_error_invalid_protobuf() {
         let input = Bytes::from("{ foo");
-        let message_descriptor = get_message_descriptor(
+        let message_descriptor = vrl::protobuf::get_message_descriptor(
             &test_data_dir().join("protos/test_protobuf.desc"),
             "test_protobuf.Person",
         )

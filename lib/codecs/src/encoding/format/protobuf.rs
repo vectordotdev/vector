@@ -21,8 +21,10 @@ pub struct ProtobufSerializerConfig {
 impl ProtobufSerializerConfig {
     /// Build the `ProtobufSerializer` from this configuration.
     pub fn build(&self) -> Result<ProtobufSerializer, BuildError> {
-        let message_descriptor =
-            vrl::protobuf::get_message_descriptor(&self.protobuf.desc_file, &self.protobuf.message_type)?;
+        let message_descriptor = vrl::protobuf::get_message_descriptor(
+            &self.protobuf.desc_file,
+            &self.protobuf.message_type,
+        )?;
         Ok(ProtobufSerializer { message_descriptor })
     }
 
