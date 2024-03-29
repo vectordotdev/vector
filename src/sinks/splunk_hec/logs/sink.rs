@@ -28,6 +28,7 @@ pub struct HecLogsSink<S> {
     pub timestamp_nanos_key: Option<String>,
     pub timestamp_key: Option<OwnedTargetPath>,
     pub endpoint_target: EndpointTarget,
+    pub auto_extract_timestamp: bool,
 }
 
 pub struct HecLogData<'a> {
@@ -39,6 +40,7 @@ pub struct HecLogData<'a> {
     pub timestamp_nanos_key: Option<&'a String>,
     pub timestamp_key: Option<OwnedTargetPath>,
     pub endpoint_target: EndpointTarget,
+    pub auto_extract_timestamp: bool,
 }
 
 impl<S> HecLogsSink<S>
@@ -58,6 +60,7 @@ where
             timestamp_nanos_key: self.timestamp_nanos_key.as_ref(),
             timestamp_key: self.timestamp_key.clone(),
             endpoint_target: self.endpoint_target,
+            auto_extract_timestamp: self.auto_extract_timestamp,
         };
         let batch_settings = self.batch_settings;
 
@@ -233,34 +236,34 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
 
     let host = data.host_key.as_ref().and_then(|key| log.get(key)).cloned();
 
-    let timestamp = match data.endpoint_target {
-        EndpointTarget::Event => {
-            data.timestamp_key.as_ref().and_then(|timestamp_key| {
-                match log.remove(timestamp_key) {
-                    Some(Value::Timestamp(ts)) => {
-                        // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
-                        if let Some(key) = data.timestamp_nanos_key {
-                            log.try_insert(
-                                event_path!(key),
-                                ts.timestamp_subsec_nanos() % 1_000_000,
-                            );
-                        }
-                        Some((ts.timestamp_millis() as f64) / 1000f64)
+    // only extract the timestamp if this is the Event endpoint, and if the setting
+    // `auto_extract_timestamp` is false (because that indicates that we should leave
+    // the timestamp in the event as-is, and let Splunk do the extraction).
+    let timestamp = if EndpointTarget::Event == data.endpoint_target && !data.auto_extract_timestamp
+    {
+        data.timestamp_key.as_ref().and_then(|timestamp_key| {
+            match log.remove(timestamp_key) {
+                Some(Value::Timestamp(ts)) => {
+                    // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
+                    if let Some(key) = data.timestamp_nanos_key {
+                        log.try_insert(event_path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
                     }
-                    Some(value) => {
-                        emit!(SplunkEventTimestampInvalidType {
-                            r#type: value.kind_str()
-                        });
-                        None
-                    }
-                    None => {
-                        emit!(SplunkEventTimestampMissing {});
-                        None
-                    }
+                    Some((ts.timestamp_millis() as f64) / 1000f64)
                 }
-            })
-        }
-        EndpointTarget::Raw => None,
+                Some(value) => {
+                    emit!(SplunkEventTimestampInvalidType {
+                        r#type: value.kind_str()
+                    });
+                    None
+                }
+                None => {
+                    emit!(SplunkEventTimestampMissing {});
+                    None
+                }
+            }
+        })
+    } else {
+        None
     };
 
     let fields = data
