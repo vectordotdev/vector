@@ -4,10 +4,12 @@ use futures_util::stream::BoxStream;
 use indoc::indoc;
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
+use vector_lib::lookup;
+use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath, OptionalValuePath};
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::sink::StreamSink;
 
+use super::config_host_key;
 use super::logs::{HumioLogsConfig, HOST};
 use crate::{
     config::{
@@ -83,8 +85,8 @@ pub struct HumioMetricsConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default)]
-    host_key: Option<OptionalTargetPath>,
+    #[serde(default = "config_host_key")]
+    host_key: OptionalValuePath,
 
     /// Event fields to be added to Humio’s extra fields.
     ///
@@ -161,7 +163,10 @@ impl SinkConfig for HumioMetricsConfig {
             source: self.source.clone(),
             encoding: JsonSerializerConfig::default().into(),
             event_type: self.event_type.clone(),
-            host_key: self.host_key.clone(),
+            host_key: OptionalTargetPath::from(
+                vrl::path::PathPrefix::Event,
+                self.host_key.path.clone(),
+            ),
             indexed_fields: self.indexed_fields.clone(),
             index: self.index.clone(),
             compression: self.compression,
@@ -171,7 +176,10 @@ impl SinkConfig for HumioMetricsConfig {
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
             // hard coded as humio expects this format so no sense in making it configurable
-            timestamp_key: None,
+            timestamp_key: OptionalTargetPath::from(
+                vrl::path::PathPrefix::Event,
+                Some(lookup::owned_value_path!("timestamp")),
+            ),
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
