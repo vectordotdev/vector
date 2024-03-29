@@ -15,10 +15,10 @@ use crate::{
 };
 use vector_lib::{
     config::LogNamespace,
-    lookup::{event_path, OwnedValuePath, PathPrefix},
+    lookup::{event_path, lookup_v2::OptionalTargetPath, OwnedValuePath, PathPrefix},
     schema::meaning,
 };
-use vrl::{owned_value_path, path::OwnedTargetPath};
+use vrl::path::OwnedTargetPath;
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
@@ -29,9 +29,9 @@ pub struct HecLogsSink<S> {
     pub source: Option<Template>,
     pub index: Option<Template>,
     pub indexed_fields: Vec<OwnedValuePath>,
-    pub host_key: Option<String>,
+    pub host_key: Option<OptionalTargetPath>,
     pub timestamp_nanos_key: Option<String>,
-    pub timestamp_key: Option<String>,
+    pub timestamp_key: Option<OptionalTargetPath>,
     pub endpoint_target: EndpointTarget,
 }
 
@@ -40,9 +40,9 @@ pub struct HecLogData<'a> {
     pub source: Option<&'a Template>,
     pub index: Option<&'a Template>,
     pub indexed_fields: &'a [OwnedValuePath],
-    pub host_key: Option<&'a String>,
+    pub host_key: Option<OptionalTargetPath>,
     pub timestamp_nanos_key: Option<&'a String>,
-    pub timestamp_key: Option<&'a String>,
+    pub timestamp_key: Option<OptionalTargetPath>,
     pub endpoint_target: EndpointTarget,
 }
 
@@ -59,9 +59,9 @@ where
             source: self.source.as_ref(),
             index: self.index.as_ref(),
             indexed_fields: self.indexed_fields.as_slice(),
-            host_key: self.host_key.as_ref(),
+            host_key: self.host_key.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.as_ref(),
-            timestamp_key: self.timestamp_key.as_ref(),
+            timestamp_key: self.timestamp_key.clone(),
             endpoint_target: self.endpoint_target,
         };
         let batch_settings = self.batch_settings;
@@ -129,7 +129,7 @@ struct EventPartitioner {
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
-    pub host_key: Option<String>,
+    pub host_key: Option<OptionalTargetPath>,
 }
 
 impl EventPartitioner {
@@ -137,7 +137,7 @@ impl EventPartitioner {
         sourcetype: Option<Template>,
         source: Option<Template>,
         index: Option<Template>,
-        host_key: Option<String>,
+        host_key: Option<OptionalTargetPath>,
     ) -> Self {
         Self {
             sourcetype,
@@ -221,23 +221,21 @@ pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetad
 
 fn user_or_namespaced_path(
     log: &LogEvent,
-    user_key: Option<&String>,
+    user_key: Option<&OptionalTargetPath>,
     semantic: &str,
 ) -> Option<OwnedTargetPath> {
-    // When the user provides an empty string, we won't set this field in the outgoing event data
-    if let Some(key) = user_key {
-        if key.is_empty() {
-            None
-        } else {
-            Some(OwnedTargetPath::event(owned_value_path!(key)))
+    match user_key {
+        Some(k) => {
+            if k.path.is_some() {
+                k.path.clone()
+            } else {
+                None
+            }
         }
-    // By default (user provided no key), we either use the Global log nanespace (Legacy),
-    // or attempt to use the semantic meaning.
-    } else {
-        match log.namespace() {
+        None => match log.namespace() {
             LogNamespace::Vector => log.find_key_by_meaning(semantic).cloned(),
             LogNamespace::Legacy => crate::config::log_schema().host_key_target_path().cloned(),
-        }
+        },
     }
 }
 
@@ -256,13 +254,13 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
         .index
         .and_then(|index| render_template_string(index, &log, INDEX_FIELD));
 
-    let host = user_or_namespaced_path(&log, data.host_key, meaning::HOST)
+    let host = user_or_namespaced_path(&log, data.host_key.as_ref(), meaning::HOST)
         .and_then(|path| log.get(&path))
         .cloned();
 
     let timestamp = match data.endpoint_target {
         EndpointTarget::Event => {
-            user_or_namespaced_path(&log, data.timestamp_key, meaning::TIMESTAMP).and_then(
+            user_or_namespaced_path(&log, data.timestamp_key.as_ref(), meaning::TIMESTAMP).and_then(
                 |timestamp_path| {
                     match log.remove(&timestamp_path) {
                         Some(Value::Timestamp(ts)) => {

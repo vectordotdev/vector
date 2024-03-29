@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use vector_lib::{
-    codecs::TextSerializerConfig, lookup::lookup_v2::ConfigValuePath,
+    codecs::TextSerializerConfig,
+    lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath},
     sensitive_string::SensitiveString,
 };
 
@@ -55,7 +56,7 @@ pub struct HecLogsSinkConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[configurable(metadata(docs::advanced))]
-    pub host_key: Option<String>,
+    pub host_key: Option<OptionalTargetPath>,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
@@ -126,7 +127,7 @@ pub struct HecLogsSinkConfig {
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
-    pub timestamp_key: Option<String>,
+    pub timestamp_key: Option<OptionalTargetPath>,
 
     /// Passes the `auto_extract_timestamp` option to Splunk.
     ///

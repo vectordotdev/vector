@@ -6,6 +6,7 @@ use serde::{de, Deserialize};
 use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::event::EventMetadata;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 use vector_lib::schema::{meaning, Definition};
 use vector_lib::{
     config::log_schema,
@@ -67,7 +68,7 @@ fn get_encoded_event<D: de::DeserializeOwned>(
 
 fn get_processed_event_timestamp(
     timestamp: Option<Value>,
-    timestamp_key: Option<String>,
+    timestamp_key: Option<OptionalTargetPath>,
 ) -> HecProcessedEvent {
     let mut event = Event::Log(LogEvent::from("hello world"));
     event
@@ -83,14 +84,17 @@ fn get_processed_event_timestamp(
 
     if let Some(timestamp_key) = &timestamp_key {
         if timestamp.is_some() {
-            event.as_mut_log().insert(
-                &OwnedTargetPath::event(owned_value_path!(timestamp_key)),
-                timestamp,
-            );
+            if let Some(ts_path) = &timestamp_key.path {
+                event
+                    .as_mut_log()
+                    .insert(&OwnedTargetPath::event(ts_path.path.clone()), timestamp);
+            }
         } else {
-            event
-                .as_mut_log()
-                .remove(&OwnedTargetPath::event(owned_value_path!(timestamp_key)));
+            if let Some(ts_path) = &timestamp_key.path {
+                event
+                    .as_mut_log()
+                    .remove(&OwnedTargetPath::event(ts_path.path.clone()));
+            }
         }
     }
 
@@ -109,10 +113,12 @@ fn get_processed_event_timestamp(
             sourcetype: sourcetype.as_ref(),
             source: source.as_ref(),
             index: index.as_ref(),
-            host_key: Some(&String::from("host_key")),
+            host_key: Some(OptionalTargetPath {
+                path: Some(OwnedTargetPath::event(owned_value_path!("host_key"))),
+            }),
             indexed_fields: indexed_fields.as_slice(),
             timestamp_nanos_key: timestamp_nanos_key.as_ref(),
-            timestamp_key: timestamp_key.as_ref(),
+            timestamp_key,
             endpoint_target: EndpointTarget::Event,
         },
     )
@@ -123,7 +129,9 @@ fn get_processed_event() -> HecProcessedEvent {
         Some(vrl::value::Value::Timestamp(
             Utc.timestamp_nanos(1638366107111456123),
         )),
-        Some("timestamp".to_string()),
+        Some(OptionalTargetPath {
+            path: Some(OwnedTargetPath::event(owned_value_path!("timestamp"))),
+        }),
     )
 }
 
@@ -268,13 +276,15 @@ fn splunk_encode_log_event_json_timestamps() {
 
     fn get_hec_data_for_timestamp_test(
         timestamp: Option<Value>,
-        timestamp_path: Option<String>,
+        timestamp_path: Option<OptionalTargetPath>,
     ) -> HecEventJson {
         let processed_event = get_processed_event_timestamp(timestamp, timestamp_path);
         get_encoded_event::<HecEventJson>(JsonSerializerConfig::default().into(), processed_event)
     }
 
-    let timestamp = Some("timestamp".to_string());
+    let timestamp = Some(OptionalTargetPath {
+        path: Some(OwnedTargetPath::event(owned_value_path!("timestamp"))),
+    });
 
     // no timestamp_key is provided
     let mut hec_data = get_hec_data_for_timestamp_test(None, None);
@@ -289,8 +299,10 @@ fn splunk_encode_log_event_json_timestamps() {
     let hec_data = get_hec_data_for_timestamp_test(None, timestamp);
     assert_eq!(hec_data.time, None);
 
+    let no_timestamp = Some(OptionalTargetPath::none());
+
     // timestamp_key is provided as an empty string
-    let hec_data = get_hec_data_for_timestamp_test(Some(Utc::now().into()), Some("".to_string()));
+    let hec_data = get_hec_data_for_timestamp_test(Some(Utc::now().into()), no_timestamp);
     assert_eq!(hec_data.time, None);
 }
 
