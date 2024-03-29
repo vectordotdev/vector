@@ -370,7 +370,8 @@ base: components: sinks: humio_logs: configuration: {
 		description: """
 			Overrides the name of the log field used to retrieve the hostname to send to Humio.
 
-			By default, the [global `log_schema.host_key` option][global_host_key] is used.
+			By default, the [global `log_schema.host_key` option][global_host_key] is used if log
+			events are Legacy namespaced, or the semantic meaning of "host" is used, if defined.
 
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
@@ -609,8 +610,10 @@ base: components: sinks: humio_logs: configuration: {
 	timestamp_key: {
 		description: """
 			Overrides the name of the log field used to retrieve the timestamp to send to Humio.
+			When set to `“”`, a timestamp is not set in the events sent to Humio.
 
-			By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
+			By default, either the [global `log_schema.timestamp_key` option][global_timestamp_key] is used
+			if log events are Legacy namespaced, or the semantic meaning of "timestamp" is used, if defined.
 
 			[global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
 			"""
