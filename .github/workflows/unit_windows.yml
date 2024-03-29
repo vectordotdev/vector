@@ -6,7 +6,7 @@ on:
 jobs:
 
   test-windows:
-    runs-on: [windows, windows-2019-8core]
+    runs-on: windows-2019-8core
     timeout-minutes: 60
     steps:
       - name: (PR comment) Get PR branch
