@@ -467,6 +467,9 @@ where
         // the actual encoded size and then check it against the limit.
         //
         // C'est la vie.
+        // Clone record here because encode will consume it and ack it to source.
+        // We have not yet archived the record, so we should avoid acknowledging the event.
+        let old_record = record.clone();
         let encode_result = {
             let mut encode_buf = (&mut self.encode_buf).limit(self.max_record_size);
             record.encode(&mut encode_buf)
@@ -532,15 +535,8 @@ where
                 "Archived record is too large to fit in remaining free space of current data file."
             );
 
-            // We have to decode the record back out to actually be able to give it back.  If we
-            // can't decode it for some reason, this is entirely an unrecoverable error, since an
-            // encoded record should always be decodable within the same process that encoded it.
-            let record = T::decode(T::get_metadata(), &self.encode_buf[..]).map_err(|_| {
-                WriterError::InconsistentState {
-                    reason: "failed to decode record immediately after encoding it".to_string(),
-                }
-            })?;
-
+            // assign old record rather that decoding again
+            let record = old_record;
             return Err(WriterError::DataFileFull {
                 record,
                 serialized_len,

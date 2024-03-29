@@ -3,7 +3,8 @@ use std::io::Cursor;
 use futures::{stream, StreamExt};
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 use tracing::Instrument;
-use vector_common::finalization::Finalizable;
+use vector_common::finalization::{AddBatchNotifier, BatchStatus, Finalizable};
+use vector_common::finalization::{BatchNotifier};
 
 use super::{create_default_buffer_v2, read_next, read_next_some};
 use crate::{
@@ -12,6 +13,72 @@ use crate::{
     variants::disk_v2::{tests::create_default_buffer_v2_with_usage, writer::RecordWriter},
     EventCount,
 };
+use crate::variants::disk_v2::WriterError;
+
+// Test to validate that the record is not acknowledged even when there is data file full error in write file to disk.
+#[tokio::test]
+async fn archive_record_not_acknowledge_when_data_file_full() {
+    let mut record_writer =
+        RecordWriter::new(Cursor::new(Vec::new()), 99, 16_384, 105, 55);
+    let mut record = SizedRecord::new(1);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    record.add_batch_notifier(batch);
+
+    match record_writer.archive_record(1, record) {
+        Ok(_) => {
+            assert!(false, "Was expecting WriterError::DataFileFull but got Ok")
+        },
+        Err(we) => {
+            match we {
+                WriterError::DataFileFull {
+                    record: _old_record,
+                    serialized_len: _,
+                } => {
+                    match receiver.try_recv() {
+                        Err(_) => {
+                            assert!(true, "Was expecting event to be not delivered");
+                        }
+                        // Do not expect try_recv to return Ok.
+                        _ => {
+                            assert!(false, "Was expecting receiver's try_recv to not complete");
+                        }
+                    }
+                },
+                _ => {
+                    assert!(false, "Was expecting WriterError::DataFileFull but got other Error");
+                }
+            }
+        }
+    }
+}
+
+// Test to validate that the record is acknowledged written to disk/archived.
+#[tokio::test]
+async fn archive_record_acknowledge_when_archived() {
+    let mut record_writer =
+        RecordWriter::new(Cursor::new(Vec::new()), 0, 16_384, 105, 55);
+    let mut record = SizedRecord::new(1);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    record.add_batch_notifier(batch);
+
+    match record_writer.archive_record(1, record) {
+        Ok(_) => {
+            assert!(true, "Was expecting Ok");
+            match receiver.try_recv() {
+                Err(_) => {
+                    assert!(false, "Was expecting event to be delivered");
+                }
+                // Do expect try_recv to return Ok.
+                Ok(status) => {
+                    assert!(status == BatchStatus::Delivered, "Was expecting receiver's try_recv to complete");
+                }
+            }
+        },
+        Err(_) => {
+            assert!(false, "Was expecting archive record to succeed");
+        }
+    }
+}
 
 #[tokio::test]
 async fn basic_read_write_loop() {
