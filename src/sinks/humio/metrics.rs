@@ -9,8 +9,10 @@ use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath, Optiona
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::sink::StreamSink;
 
-use super::config_host_key;
-use super::logs::{HumioLogsConfig, HOST};
+use super::{
+    config_host_key,
+    logs::{HumioLogsConfig, HOST},
+};
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, TransformContext,

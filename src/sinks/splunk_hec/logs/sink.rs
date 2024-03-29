@@ -224,19 +224,12 @@ fn user_or_namespaced_path(
     user_key: Option<&OptionalTargetPath>,
     semantic: &str,
 ) -> Option<OwnedTargetPath> {
-    match user_key {
-        Some(k) => {
-            if k.path.is_some() {
-                k.path.clone()
-            } else {
-                None
-            }
-        }
-        None => match log.namespace() {
+    user_key
+        .and_then(|key| key.path.clone())
+        .or_else(|| match log.namespace() {
             LogNamespace::Vector => log.find_key_by_meaning(semantic).cloned(),
             LogNamespace::Legacy => crate::config::log_schema().host_key_target_path().cloned(),
-        },
-    }
+        })
 }
 
 pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {

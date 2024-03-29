@@ -3,6 +3,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
 use vector_lib::sensitive_string::SensitiveString;
 
+use super::config_host_key_target_path;
 use crate::sinks::splunk_hec::common::config_timestamp_key_target_path;
 use crate::{
     codecs::EncodingConfig,
@@ -21,8 +22,6 @@ use crate::{
     template::Template,
     tls::TlsConfig,
 };
-
-use super::config_host_key_target_path;
 
 pub(super) const HOST: &str = "https://cloud.humio.com";
 
