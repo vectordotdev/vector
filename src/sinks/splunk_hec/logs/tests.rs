@@ -342,7 +342,7 @@ fn splunk_encode_log_event_semantic_meanings() {
             source: None,
             index: None,
             host_key: None,
-            indexed_fields: &vec![],
+            indexed_fields: &[],
             timestamp_nanos_key: None,
             timestamp_key: None,
             endpoint_target: EndpointTarget::Event,
