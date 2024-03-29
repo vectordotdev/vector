@@ -89,12 +89,10 @@ fn get_processed_event_timestamp(
                     .as_mut_log()
                     .insert(&OwnedTargetPath::event(ts_path.path.clone()), timestamp);
             }
-        } else {
-            if let Some(ts_path) = &timestamp_key.path {
-                event
-                    .as_mut_log()
-                    .remove(&OwnedTargetPath::event(ts_path.path.clone()));
-            }
+        } else if let Some(ts_path) = &timestamp_key.path {
+            event
+                .as_mut_log()
+                .remove(&OwnedTargetPath::event(ts_path.path.clone()));
         }
     }
 

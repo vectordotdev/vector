@@ -5,11 +5,13 @@ use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
 use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
-use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
 use vector_lib::{
     config::{init_telemetry, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    lookup,
 };
+use vrl::path::OwnedTargetPath;
 
 use crate::{
     codecs::EncodingConfig,
@@ -116,7 +118,7 @@ async fn config(
     HecLogsSinkConfig {
         default_token: get_token().await.into(),
         endpoint: splunk_hec_address(),
-        host_key: Some("host".to_string()),
+        host_key: Some(OptionalTargetPath::event("host")),
         indexed_fields,
         index: None,
         sourcetype: None,
@@ -407,7 +409,7 @@ async fn splunk_configure_hostname() {
     let cx = SinkContext::default();
 
     let config = HecLogsSinkConfig {
-        host_key: Some("roast".to_string()),
+        host_key: Some(OptionalTargetPath::event("roast")),
         ..config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await
     };
 
@@ -486,7 +488,11 @@ async fn splunk_auto_extracted_timestamp() {
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(true),
-            timestamp_key: Some("timestamp".to_string()),
+            timestamp_key: Some(OptionalTargetPath {
+                path: Some(OwnedTargetPath::event(lookup::owned_value_path!(
+                    "timestamp"
+                ))),
+            }),
             ..config(JsonSerializerConfig::default().into(), vec![]).await
         };
 
@@ -537,7 +543,11 @@ async fn splunk_non_auto_extracted_timestamp() {
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(false),
-            timestamp_key: Some("timestamp".to_string()),
+            timestamp_key: Some(OptionalTargetPath {
+                path: Some(OwnedTargetPath::event(lookup::owned_value_path!(
+                    "timestamp"
+                ))),
+            }),
             ..config(JsonSerializerConfig::default().into(), vec![]).await
         };
 
