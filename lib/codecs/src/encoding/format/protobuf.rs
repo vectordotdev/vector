@@ -1,4 +1,3 @@
-use crate::common::protobuf::get_message_descriptor;
 use crate::encoding::BuildError;
 use bytes::BytesMut;
 use prost::Message;
@@ -23,7 +22,7 @@ impl ProtobufSerializerConfig {
     /// Build the `ProtobufSerializer` from this configuration.
     pub fn build(&self) -> Result<ProtobufSerializer, BuildError> {
         let message_descriptor =
-            get_message_descriptor(&self.protobuf.desc_file, &self.protobuf.message_type)?;
+            vrl::protobuf::get_message_descriptor(&self.protobuf.desc_file, &self.protobuf.message_type)?;
         Ok(ProtobufSerializer { message_descriptor })
     }
 
