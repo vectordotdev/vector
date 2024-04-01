@@ -15,6 +15,7 @@ use akin::akin;
 // Custom deserialization with serde needed:
 use serde::{Deserialize, Deserializer, de::Error};
 use serde_aux::field_attributes::deserialize_number_from_string;
+use snafu::{Snafu, OptionExt};
 
 /// Config used to build a `SyslogSerializer`.
 #[configurable_component]
@@ -549,10 +550,10 @@ akin! {
               NumberOrString::String(s) => Self::from_str(&s.to_ascii_lowercase()).ok(),
             };
 
-            variant.ok_or_else(|| format!(
-                "Unknown variant `{value}`, expected one of `{variants}`",
-                variants=Self::VARIANTS.join("`, `")
-            )).map_err(D::Error::custom)
+            variant.with_context(|| InvalidVariantSnafu {
+                input: value.to_string(),
+                variants: Self::VARIANTS.join("`, `"),
+            }).map_err(D::Error::custom)
         }
     }
 }
@@ -567,4 +568,10 @@ enum NumberOrString {
         usize
     ),
     String(String)
+}
+
+#[derive(Debug, Snafu)]
+enum StrumDeserializeError {
+    #[snafu(display("Unknown variant `{}`, expected one of `{}`", input, variants))]
+    InvalidVariant { input: String, variants: String },
 }
