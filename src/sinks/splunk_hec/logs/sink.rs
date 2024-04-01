@@ -14,7 +14,7 @@ use crate::{
     },
 };
 use vector_lib::{
-    config::LogNamespace,
+    config::{log_schema, LogNamespace},
     lookup::{event_path, lookup_v2::OptionalTargetPath, OwnedValuePath, PathPrefix},
     schema::meaning,
 };
@@ -182,9 +182,14 @@ impl Partitioner for EventPartitioner {
                 .ok()
         });
 
-        let host = user_or_namespaced_path(&item.event, self.host_key.as_ref(), meaning::HOST)
-            .and_then(|path| item.event.get(&path))
-            .and_then(|value| value.as_str().map(|s| s.to_string()));
+        let host = user_or_namespaced_path(
+            &item.event,
+            self.host_key.as_ref(),
+            meaning::HOST,
+            log_schema().host_key_target_path(),
+        )
+        .and_then(|path| item.event.get(&path))
+        .and_then(|value| value.as_str().map(|s| s.to_string()));
 
         Some(Partitioned {
             token: item.event.metadata().splunk_hec_token(),
@@ -219,17 +224,25 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
 
 pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
+// determine the path for a field from one of the following use cases:
+// 1. user provided a path in the config settings
+//     a. If the path provided was an empty string, None is returned
+// 2. namespaced path ("default")
+//     a. if Legacy namespace, use the provided path from the global log schema
+//     b. if Vector namespace, use the semantically defined path
 fn user_or_namespaced_path(
     log: &LogEvent,
     user_key: Option<&OptionalTargetPath>,
     semantic: &str,
+    legacy_path: Option<&OwnedTargetPath>,
 ) -> Option<OwnedTargetPath> {
-    user_key
-        .and_then(|key| key.path.clone())
-        .or_else(|| match log.namespace() {
+    match user_key {
+        Some(maybe_key) => maybe_key.path.clone(),
+        None => match log.namespace() {
             LogNamespace::Vector => log.find_key_by_meaning(semantic).cloned(),
-            LogNamespace::Legacy => crate::config::log_schema().host_key_target_path().cloned(),
-        })
+            LogNamespace::Legacy => legacy_path.cloned(),
+        },
+    }
 }
 
 pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
@@ -247,38 +260,47 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
         .index
         .and_then(|index| render_template_string(index, &log, INDEX_FIELD));
 
-    let host = user_or_namespaced_path(&log, data.host_key.as_ref(), meaning::HOST)
-        .and_then(|path| log.get(&path))
-        .cloned();
+    let host = user_or_namespaced_path(
+        &log,
+        data.host_key.as_ref(),
+        meaning::HOST,
+        log_schema().host_key_target_path(),
+    )
+    .and_then(|path| log.get(&path))
+    .cloned();
 
     let timestamp = match data.endpoint_target {
         EndpointTarget::Event => {
-            user_or_namespaced_path(&log, data.timestamp_key.as_ref(), meaning::TIMESTAMP).and_then(
-                |timestamp_path| {
-                    match log.remove(&timestamp_path) {
-                        Some(Value::Timestamp(ts)) => {
-                            // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
-                            if let Some(key) = data.timestamp_nanos_key {
-                                log.try_insert(
-                                    event_path!(key),
-                                    ts.timestamp_subsec_nanos() % 1_000_000,
-                                );
-                            }
-                            Some((ts.timestamp_millis() as f64) / 1000f64)
-                        }
-                        Some(value) => {
-                            emit!(SplunkEventTimestampInvalidType {
-                                r#type: value.kind_str()
-                            });
-                            None
-                        }
-                        None => {
-                            emit!(SplunkEventTimestampMissing {});
-                            None
-                        }
-                    }
-                },
+            user_or_namespaced_path(
+                &log,
+                data.timestamp_key.as_ref(),
+                meaning::TIMESTAMP,
+                log_schema().timestamp_key_target_path(),
             )
+            .and_then(|timestamp_path| {
+                match log.remove(&timestamp_path) {
+                    Some(Value::Timestamp(ts)) => {
+                        // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
+                        if let Some(key) = data.timestamp_nanos_key {
+                            log.try_insert(
+                                event_path!(key),
+                                ts.timestamp_subsec_nanos() % 1_000_000,
+                            );
+                        }
+                        Some((ts.timestamp_millis() as f64) / 1000f64)
+                    }
+                    Some(value) => {
+                        emit!(SplunkEventTimestampInvalidType {
+                            r#type: value.kind_str()
+                        });
+                        None
+                    }
+                    None => {
+                        emit!(SplunkEventTimestampMissing {});
+                        None
+                    }
+                }
+            })
         }
         EndpointTarget::Raw => None,
     };

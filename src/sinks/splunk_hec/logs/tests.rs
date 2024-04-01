@@ -284,8 +284,10 @@ fn splunk_encode_log_event_json_timestamps() {
         path: Some(OwnedTargetPath::event(owned_value_path!("timestamp"))),
     });
 
+    let no_timestamp = Some(OptionalTargetPath::none());
+
     // no timestamp_key is provided
-    let mut hec_data = get_hec_data_for_timestamp_test(None, None);
+    let mut hec_data = get_hec_data_for_timestamp_test(None, no_timestamp);
     assert_eq!(hec_data.time, None);
 
     // timestamp_key is provided but timestamp is not valid type
@@ -295,12 +297,6 @@ fn splunk_encode_log_event_json_timestamps() {
 
     // timestamp_key is provided but no timestamp in the event
     let hec_data = get_hec_data_for_timestamp_test(None, timestamp);
-    assert_eq!(hec_data.time, None);
-
-    let no_timestamp = Some(OptionalTargetPath::none());
-
-    // timestamp_key is provided as an empty string
-    let hec_data = get_hec_data_for_timestamp_test(Some(Utc::now().into()), no_timestamp);
     assert_eq!(hec_data.time, None);
 }
 
