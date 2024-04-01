@@ -274,6 +274,7 @@ impl HecLogsSinkConfig {
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             timestamp_key: self.timestamp_key.path.clone(),
             endpoint_target: self.endpoint_target,
+            auto_extract_timestamp: self.auto_extract_timestamp.unwrap_or_default(),
         };
 
         Ok(VectorSink::from_event_streamsink(sink))
