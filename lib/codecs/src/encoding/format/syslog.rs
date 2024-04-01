@@ -443,6 +443,7 @@ impl Pri {
 
 // Facility + Severity mapping from Name => Ordinal number:
 // NOTE:
+// - Vector component enforces variant doc-comments, even though it's pointless for these enums?
 // - `configurable_component(no_deser)` is used to match the existing functionality to support deserializing config with ordinal mapping.
 // - `EnumString` with `strum(serialize_all = "kebab-case")` provides the `FromStr` support, while `FromRepr` handles ordinal support.
 // - `VariantNames` assists with generating the equivalent `de::Error::unknown_variant` serde error message.
@@ -452,30 +453,54 @@ impl Pri {
 #[strum(serialize_all = "kebab-case")]
 #[configurable_component(no_deser)]
 enum Facility {
+    /// Kern
     Kern = 0,
+    /// User
     #[default]
     User = 1,
+    /// Mail
     Mail = 2,
+    /// Daemon
     Daemon = 3,
+    /// Auth
     Auth = 4,
+    /// Syslog
     Syslog = 5,
+    /// LPR
     LPR = 6,
+    /// News
     News = 7,
+    /// UUCP
     UUCP = 8,
+    /// Cron
     Cron = 9,
+    /// AuthPriv
     AuthPriv = 10,
+    /// FTP
     FTP = 11,
+    /// NTP
     NTP = 12,
+    /// Security
     Security = 13,
+    /// Console
     Console = 14,
+    /// SolarisCron
     SolarisCron = 15,
+    /// Local0
     Local0 = 16,
+    /// Local1
     Local1 = 17,
+    /// Local2
     Local2 = 18,
+    /// Local3
     Local3 = 19,
+    /// Local4
     Local4 = 20,
+    /// Local5
     Local5 = 21,
+    /// Local6
     Local6 = 22,
+    /// Local7
     Local7 = 23,
 }
 
@@ -484,14 +509,22 @@ enum Facility {
 #[strum(serialize_all = "kebab-case")]
 #[configurable_component(no_deser)]
 enum Severity {
+    /// Emergency
     Emergency = 0,
+    /// Alert
     Alert = 1,
+    /// Critical
     Critical = 2,
+    /// Error
     Error = 3,
+    /// Warning
     Warning = 4,
+    /// Notice
     Notice = 5,
+    /// Informational
     #[default]
     Informational = 6,
+    /// Debug
     Debug = 7,
 }
 
