@@ -6,9 +6,14 @@ use vrl::value::{ObjectMap, Value};
 use vector_config::configurable_component;
 
 use std::collections::HashMap;
+
+// All of this block is to support the Facility + Severity enums with convenience of string or ordinal config value:
 use std::str::FromStr;
-use strum::{FromRepr, EnumString};
+use strum::{FromRepr, EnumString, VariantNames};
+// `akin` macro for DRY impl to share with both enums due to lack of a `FromRepr` trait:
 use akin::akin;
+// Custom deserialization with serde needed:
+use serde::{Deserializer, de::Error};
 
 /// Config used to build a `SyslogSerializer`.
 #[configurable_component]
@@ -46,9 +51,11 @@ pub struct SyslogSerializerOptions {
     /// RFC
     rfc: SyslogRFC,
     /// Facility
-    facility: String,
+    #[serde(deserialize_with = "Facility::deserialize")]
+    facility: Facility,
     /// Severity
-    severity: String,
+    #[serde(deserialize_with = "Severity::deserialize")]
+    severity: Severity,
 
     /// App Name
     app_name: Option<String>,
@@ -109,17 +116,16 @@ impl ConfigDecanter {
     }
 
     fn decant_config(&self, config: &SyslogSerializerOptions) -> SyslogMessage {
-        let x = |v| self.replace_if_proxied(v).unwrap_or_default();
-        let facility = x(&config.facility);
-        let severity = x(&config.severity);
-
         let y = |v| self.replace_if_proxied_opt(v);
         let app_name = y(&config.app_name).unwrap_or("vector".to_owned());
         let proc_id = y(&config.proc_id);
         let msg_id = y(&config.msg_id);
 
         SyslogMessage {
-            pri: Pri::from_str_variants(&facility, &severity),
+            pri: Pri {
+                facility: config.facility,
+                severity: config.severity,
+            },
             timestamp: self.get_timestamp(),
             hostname: self.value_by_key("hostname"),
             tag: Tag {
@@ -426,16 +432,6 @@ struct Pri {
 }
 
 impl Pri {
-    fn from_str_variants(facility_variant: &str, severity_variant: &str) -> Self {
-        let facility = Facility::into_variant(&facility_variant).unwrap_or_default();
-        let severity = Severity::into_variant(&severity_variant).unwrap_or_default();
-
-        Self {
-            facility,
-            severity,
-        }
-    }
-
     // The last paragraph describes how to compose the enums into `PRIVAL`:
     // https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1
     fn encode(&self) -> String {
@@ -445,10 +441,15 @@ impl Pri {
 }
 
 // Facility + Severity mapping from Name => Ordinal number:
+// NOTE:
+// - `configurable_component(no_deser)` is used to match the existing functionality to support deserializing config with ordinal mapping.
+// - `EnumString` with `strum(serialize_all = "kebab-case")` provides the `FromStr` support, while `FromRepr` handles ordinal support.
+// - `VariantNames` assists with generating the equivalent `de::Error::unknown_variant` serde error message.
 
 /// Syslog facility
-#[derive(Default, Debug, EnumString, FromRepr, Copy, Clone)]
+#[derive(Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone)]
 #[strum(serialize_all = "kebab-case")]
+#[configurable_component(no_deser)]
 enum Facility {
     Kern = 0,
     #[default]
@@ -478,8 +479,9 @@ enum Facility {
 }
 
 /// Syslog severity
-#[derive(Default, Debug, EnumString, FromRepr, Copy, Clone)]
+#[derive(Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone)]
 #[strum(serialize_all = "kebab-case")]
+#[configurable_component(no_deser)]
 enum Severity {
     Emergency = 0,
     Alert = 1,
@@ -494,18 +496,28 @@ enum Severity {
 
 // Additionally support variants from string-based integers:
 // Attempts to parse a string for ordinal mapping first, otherwise try the variant name.
-// NOTE: No error handling in place, invalid config will fallback to default during `decant_config()`.
+// NOTE:
+// - While `serde(rename_all = "kebab-case")` attribute would deserialize like `FromStr` + `EnumString`, config input must strictly match.
+// - To retain support for ordinal config input, a custom deserialize method is needed (as `derive(Deserialize)` is too basic):
+// - Error message should roughly match `de::Error::unknown_variant`
+
 akin! {
     let &enums = [Facility, Severity];
 
     impl *enums {
-        fn into_variant(variant_name: &str) -> Option<Self> {
-            let s = variant_name.to_ascii_lowercase();
+        fn deserialize<'de, D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let value = String::deserialize(deserializer)?;
 
-            s.parse::<usize>().map_or_else(
-                |_| Self::from_str(&s).ok(),
+            value.parse::<usize>().map_or_else(
+                |_| Self::from_str(&value.to_ascii_lowercase()).ok(),
                 |num| Self::from_repr(num),
-            )
+            ).ok_or(format!(
+                "Unknown variant `{value}`, expected one of `{variants}`",
+                variants=Self::VARIANTS.join("`, `")
+            )).map_err(D::Error::custom)
         }
     }
 }
