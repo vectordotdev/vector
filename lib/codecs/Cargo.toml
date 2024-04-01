@@ -16,6 +16,7 @@ bytes = { version = "1", default-features = false }
 chrono.workspace = true
 csv-core = { version = "0.1.10", default-features = false }
 derivative = { version = "2", default-features = false }
+derive_more = { version = "0.99", optional = true }
 dyn-clone = { version = "1", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
@@ -25,6 +26,7 @@ prost = { version = "0.12.3", default-features = false, features = ["std"] }
 prost-reflect = { version = "0.13", default-features = false, features = ["serde"] }
 regex = { version = "1.10.3", default-features = false, features = ["std", "perf"] }
 serde.workspace = true
+serde-aux = { version = "4.5", optional = true }
 serde_json.workspace = true
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
@@ -50,4 +52,4 @@ rstest = "0.18.2"
 vrl.workspace = true
 
 [features]
-syslog = ["dep:syslog_loose", "dep:strum", "dep:akin"]
+syslog = ["dep:syslog_loose", "dep:strum", "dep:akin", "dep:derive_more", "dep:serde-aux"]

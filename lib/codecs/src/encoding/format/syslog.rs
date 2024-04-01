@@ -13,7 +13,8 @@ use strum::{FromRepr, EnumString, VariantNames};
 // `akin` macro for DRY impl to share with both enums due to lack of a `FromRepr` trait:
 use akin::akin;
 // Custom deserialization with serde needed:
-use serde::{Deserializer, de::Error};
+use serde::{Deserialize, Deserializer, de::Error};
+use serde_aux::field_attributes::deserialize_number_from_string;
 
 /// Config used to build a `SyslogSerializer`.
 #[configurable_component]
@@ -509,15 +510,28 @@ akin! {
         where
             D: Deserializer<'de>,
         {
-            let value = String::deserialize(deserializer)?;
+            let value = NumberOrString::deserialize(deserializer)?;
+            let variant: Option<Self> = match &value {
+              NumberOrString::Number(num) => Self::from_repr(*num),
+              NumberOrString::String(s) => Self::from_str(&s.to_ascii_lowercase()).ok(),
+            };
 
-            value.parse::<usize>().map_or_else(
-                |_| Self::from_str(&value.to_ascii_lowercase()).ok(),
-                |num| Self::from_repr(num),
-            ).ok_or(format!(
+            variant.ok_or_else(|| format!(
                 "Unknown variant `{value}`, expected one of `{variants}`",
                 variants=Self::VARIANTS.join("`, `")
             )).map_err(D::Error::custom)
         }
     }
+}
+
+// An intermediary container to deserialize config value into.
+// Ensures that a string number is properly deserialized to the `usize` variant.
+#[derive(derive_more::Display, Deserialize)]
+#[serde(untagged)]
+enum NumberOrString {
+    Number(
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        usize
+    ),
+    String(String)
 }
