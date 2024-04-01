@@ -40,14 +40,12 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::event::{BatchNotifier, BatchStatus};
 use vector_lib::internal_event::{EventsReceived, Registered};
 use vector_lib::lookup::owned_value_path;
-use vector_lib::schema::meaning;
 use vector_lib::tls::MaybeTlsIncomingStream;
 use vrl::path::OwnedTargetPath;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
-use crate::common::datadog::DDTAGS;
 use crate::http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -248,46 +246,46 @@ impl SourceConfig for DatadogAgentConfig {
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("status"))),
                 &owned_value_path!("status"),
                 Kind::bytes(),
-                Some(meaning::STATUS),
+                Some("severity"),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
-                Some(meaning::TIMESTAMP),
+                Some("timestamp"),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
                 &owned_value_path!("hostname"),
                 Kind::bytes(),
-                Some(meaning::HOST),
+                Some("host"),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
                 &owned_value_path!("service"),
                 Kind::bytes(),
-                Some(meaning::SERVICE),
+                Some("service"),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddsource"))),
                 &owned_value_path!("ddsource"),
                 Kind::bytes(),
-                Some(meaning::SOURCE),
+                Some("source"),
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!(DDTAGS))),
-                &owned_value_path!(DDTAGS),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
+                &owned_value_path!("ddtags"),
                 if self.parse_ddtags {
                     Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined()
                 } else {
                     Kind::bytes()
                 },
-                Some(meaning::TAGS),
+                Some("tags"),
             )
             .with_standard_vector_source_metadata();
 
