@@ -7,7 +7,7 @@ use vector_lib::{
     lookup::event_path,
     schema::meaning,
 };
-use vrl::{owned_value_path, path::OwnedTargetPath};
+use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
@@ -129,7 +129,7 @@ fn normalize_event(event: &mut Event) {
 
         // now, the tags attribute must be at the event root so we will move it there if
         // needed and move any conflicting field if any.
-        if ddtags_path != OwnedTargetPath::event(owned_value_path!(DDTAGS)) {
+        if !path_is_field(&ddtags_path, DDTAGS) {
             let desired_path = event_path!(DDTAGS);
 
             // if an existing attribute exists here already, move it so to not overwrite it.
@@ -158,6 +158,16 @@ fn normalize_event(event: &mut Event) {
             );
         }
     }
+}
+
+// Test if the named path consists of the single named field. This is rather a hack and should
+// hypothetically be solvable in the `vrl` crate with an implementation of
+// `PartialEq<BorrowedTargetPath<'_>>`. The alternative is doing a comparison against another
+// `OwnedTargetPath`, but the naïve implementation of that requires multiple allocations and copies
+// just to test equality.
+fn path_is_field(path: &OwnedTargetPath, field: &str) -> bool {
+    path.prefix == PathPrefix::Event
+        && matches!(&path.path.segments[..], [OwnedSegment::Field(f)] if f.as_str() == field)
 }
 
 #[derive(Debug, Snafu)]
