@@ -40,11 +40,7 @@ use crate::{
     http::{build_http_trace_layer, Auth},
     internal_events::PrometheusNormalizationError,
     sinks::{
-        util::{
-            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet},
-            statistic::validate_quantiles,
-            StreamSink,
-        },
+        util::{statistic::validate_quantiles, StreamSink},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -264,7 +260,6 @@ impl MetricMetadata {
 #[derive(Clone, Debug)]
 struct MetricRef {
     series: MetricSeries,
-    kind: MetricKind,
     value: Discriminant<MetricValue>,
     bounds: Option<Vec<f64>>,
 }
@@ -285,7 +280,6 @@ impl MetricRef {
 
         Self {
             series: metric.series().clone(),
-            kind: metric.kind(),
             value: discriminant(metric.value()),
             bounds,
         }
@@ -294,10 +288,7 @@ impl MetricRef {
 
 impl PartialEq for MetricRef {
     fn eq(&self, other: &Self) -> bool {
-        self.series == other.series
-            && self.kind == other.kind
-            && self.value == other.value
-            && self.bounds == other.bounds
+        self.series == other.series && self.value == other.value && self.bounds == other.bounds
     }
 }
 
@@ -306,50 +297,12 @@ impl Eq for MetricRef {}
 impl Hash for MetricRef {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.series.hash(state);
-        self.kind.hash(state);
         self.value.hash(state);
         if let Some(bounds) = &self.bounds {
             for bound in bounds {
                 bound.to_bits().hash(state);
             }
         }
-    }
-}
-
-struct PrometheusExporterMetricNormalizer {
-    distributions_as_summaries: bool,
-    buckets: Vec<f64>,
-}
-
-impl MetricNormalize for PrometheusExporterMetricNormalizer {
-    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        let new_metric = match metric.value() {
-            MetricValue::Distribution { .. } => {
-                // Convert the distribution as-is, and then let the normalizer absolute-ify it.
-                let (series, data, metadata) = metric.into_parts();
-                let (time, kind, value) = data.into_parts();
-
-                let new_value = if self.distributions_as_summaries {
-                    // We use a sketch when in summary mode because they're actually able to be
-                    // merged and provide correct output, unlike the aggregated summaries that
-                    // we handle from _sources_ like Prometheus.  The collector code itself
-                    // will render sketches as aggregated summaries, so we have continuity there.
-                    value
-                        .distribution_to_sketch()
-                        .expect("value should be distribution already")
-                } else {
-                    value
-                        .distribution_to_agg_histogram(&self.buckets)
-                        .expect("value should be distribution already")
-                };
-
-                let data = MetricData::from_parts(time, kind, new_value);
-                Metric::from_parts(series, data, metadata)
-            }
-            _ => metric,
-        };
-
-        state.make_absolute(new_metric)
     }
 }
 
@@ -523,6 +476,55 @@ impl PrometheusExporter {
         self.server_shutdown_trigger = Some(trigger);
         Ok(())
     }
+
+    fn normalize(&mut self, metric: Metric) -> Option<Metric> {
+        let new_metric = match metric.value() {
+            MetricValue::Distribution { .. } => {
+                // Convert the distribution as-is, and then absolute-ify it.
+                let (series, data, metadata) = metric.into_parts();
+                let (time, kind, value) = data.into_parts();
+
+                let new_value = if self.config.distributions_as_summaries {
+                    // We use a sketch when in summary mode because they're actually able to be
+                    // merged and provide correct output, unlike the aggregated summaries that
+                    // we handle from _sources_ like Prometheus.  The collector code itself
+                    // will render sketches as aggregated summaries, so we have continuity there.
+                    value
+                        .distribution_to_sketch()
+                        .expect("value should be distribution already")
+                } else {
+                    value
+                        .distribution_to_agg_histogram(&self.config.buckets)
+                        .expect("value should be distribution already")
+                };
+
+                let data = MetricData::from_parts(time, kind, new_value);
+                Metric::from_parts(series, data, metadata)
+            }
+            _ => metric,
+        };
+
+        match new_metric.kind() {
+            MetricKind::Absolute => Some(new_metric),
+            MetricKind::Incremental => {
+                let metrics = self.metrics.read().expect(LOCK_FAILED);
+                let metric_ref = MetricRef::from_metric(&new_metric);
+
+                if let Some(existing) = metrics.get(&metric_ref) {
+                    let mut current = existing.0.value().clone();
+                    if current.add(new_metric.value()) {
+                        // If we were able to add to the existing value (i.e. they were compatible),
+                        // return the result as an absolute metric.
+                        return Some(new_metric.with_value(current).into_absolute());
+                    }
+                }
+
+                // Otherwise, if we didn't have an existing value or we did and it was not
+                // compatible with the new value, simply return the new value as absolute.
+                Some(new_metric.into_absolute())
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -534,10 +536,6 @@ impl StreamSink<Event> for PrometheusExporter {
 
         let mut last_flush = Instant::now();
         let flush_period = self.config.flush_period_secs;
-        let mut normalizer = MetricNormalizer::from(PrometheusExporterMetricNormalizer {
-            distributions_as_summaries: self.config.distributions_as_summaries,
-            buckets: self.config.buckets.clone(),
-        });
 
         while let Some(event) = input.next().await {
             // If we've exceed our flush interval, go through all of the metrics we're currently
@@ -553,22 +551,14 @@ impl StreamSink<Event> for PrometheusExporter {
 
                 let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
-                let normalizer_mut = normalizer.get_state_mut();
-                metrics.retain(|metric_ref, (_, metadata)| {
-                    if metadata.has_expired(last_flush) {
-                        normalizer_mut.remove(&metric_ref.series);
-                        false
-                    } else {
-                        true
-                    }
-                });
+                metrics.retain(|_metric_ref, (_, metadata)| !metadata.has_expired(last_flush));
             }
 
             // Now process the metric we got.
             let mut metric = event.into_metric();
             let finalizers = metric.take_finalizers();
 
-            if let Some(normalized) = normalizer.normalize(metric) {
+            if let Some(normalized) = self.normalize(metric) {
                 let normalized = if self.config.suppress_timestamp {
                     normalized.with_timestamp(None)
                 } else {
