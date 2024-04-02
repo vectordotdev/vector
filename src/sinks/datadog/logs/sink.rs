@@ -101,32 +101,13 @@ fn normalize_event(event: &mut Event) {
 
     // Upstream Sources may have semantically defined Datadog reserved attributes outside of their
     // expected location by DD logs intake (root of the event). Move them if needed.
-    DD_RESERVED_SEMANTIC_ATTRS.iter().for_each(|meaning| {
+    for (meaning, expected_field_name) in DD_RESERVED_SEMANTIC_ATTRS {
+        // check if there is a semantic meaning for the reserved attribute
         if let Some(current_path) = log.find_key_by_meaning(meaning).cloned() {
-            if let Some(desired_field_name) = current_path.path.segments.last().map(|s| s.to_string()) {
-                // the path that DD archives expects this reserved attribute to be in.
-                let desired_path = event_path!(&desired_field_name);
-
-                if !path_is_field(&current_path, &desired_field_name) {
-                    // if an existing attribute exists here already, move it so to not overwrite it.
-                    // yes, technically the rename path could exist, but technically that could always be the case.
-                    if log.contains(desired_path) {
-                        let rename_attr = format!("_RESERVED_{}", *meaning);
-                        let rename_path = event_path!(rename_attr.as_str());
-                        warn!(
-                            message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
-                            meaning = *meaning,
-                            renamed = &rename_attr,
-                            internal_log_rate_limit = true,
-                        );
-                        log.rename_key(desired_path, rename_path);
-                    }
-
-                    log.rename_key(&current_path, desired_path);
-                }
-            }
+            // move it to the desired location
+            position_reserved_attr_event_root(log, &current_path, expected_field_name, meaning);
         }
-    });
+    }
 
     // if the tags value is an array we need to reconstruct it to a comma delimited string for DD logs intake.
     // NOTE: we don't access by semantic meaning here because in the prior step
@@ -153,6 +134,37 @@ fn normalize_event(event: &mut Event) {
     let ts_path = event_path!("timestamp");
     if let Some(Value::Timestamp(ts)) = log.remove(ts_path) {
         log.insert(ts_path, Value::Integer(ts.timestamp_millis()));
+    }
+}
+
+// If an expected reserved attribute is not located in the event root, rename it and handle
+// any potential conflicts by preserving the conflicting one with a _RESERVED_ prefix.
+fn position_reserved_attr_event_root(
+    log: &mut LogEvent,
+    current_path: &OwnedTargetPath,
+    expected_field_name: &str,
+    meaning: &str,
+) {
+    // the path that DD archives expects this reserved attribute to be in.
+    let desired_path = event_path!(expected_field_name);
+
+    // if not already be at the expected location
+    if !path_is_field(current_path, expected_field_name) {
+        // if an existing attribute exists here already, move it so to not overwrite it.
+        // yes, technically the rename path could exist, but technically that could always be the case.
+        if log.contains(desired_path) {
+            let rename_attr = format!("_RESERVED_{}", meaning);
+            let rename_path = event_path!(rename_attr.as_str());
+            warn!(
+                message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
+                meaning = meaning,
+                renamed = &rename_attr,
+                internal_log_rate_limit = true,
+            );
+            log.rename_key(desired_path, rename_path);
+        }
+
+        log.rename_key(current_path, desired_path);
     }
 }
 
@@ -399,18 +411,16 @@ mod tests {
             .expect("should have timestamp")
             .is_integer());
 
-        [
+        for attr in [
             "message",
             "timestamp",
             "hostname",
             "ddtags",
             "service",
             "severity",
-        ]
-        .iter()
-        .for_each(|attr| {
-            assert!(log.contains(event_path!(*attr)));
-        });
+        ] {
+            assert!(log.contains(event_path!(attr)));
+        }
 
         assert_eq!(
             log.get(event_path!("ddtags")).expect("should have tags"),

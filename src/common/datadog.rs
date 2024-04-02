@@ -13,15 +13,16 @@ pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 
 pub(crate) const DDTAGS: &str = "ddtags";
 
-/// List of well known Datadog reserved attributes
+/// Mapping of the semantic meaning of well known Datadog reserved attributes
+/// to the field name that Datadog intake expects.
 // https://docs.datadoghq.com/logs/log_configuration/attributes_naming_convention/?s=severity#reserved-attributes
-pub(crate) const DD_RESERVED_SEMANTIC_ATTRS: [&str; 6] = [
-    meaning::SEVERITY, // Status is mapped to severity intentionally
-    meaning::TIMESTAMP,
-    meaning::HOST,
-    meaning::SERVICE,
-    meaning::SOURCE,
-    meaning::TAGS,
+pub(crate) const DD_RESERVED_SEMANTIC_ATTRS: [(&str, &str); 6] = [
+    (meaning::SEVERITY, "severity"),
+    (meaning::TIMESTAMP, "timestamp"),
+    (meaning::HOST, "hostname"),
+    (meaning::SERVICE, "service"),
+    (meaning::SOURCE, "source"),
+    (meaning::TAGS, DDTAGS),
 ];
 
 /// DatadogSeriesMetric
