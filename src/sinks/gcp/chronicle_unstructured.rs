@@ -8,6 +8,7 @@ use http::{header::HeaderValue, Request, StatusCode, Uri};
 use hyper::Body;
 use indoc::indoc;
 use serde_json::json;
+use serde::Serialize;
 use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
@@ -305,10 +306,19 @@ impl MetaDescriptive for ChronicleRequest {
     }
 }
 
+#[derive(Clone, Debug, Serialize)]
+struct ChronicleRequestBody{
+    customer_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    namespace: Option<String>,
+    log_type: String,
+    entries: Vec<serde_json::Value>,
+}
+
 #[derive(Clone, Debug)]
 struct ChronicleEncoder {
     customer_id: String,
-    namespace: String,
+    namespace: Option<String>,
     encoder: codecs::Encoder<()>,
     transformer: codecs::Transformer,
 }
@@ -353,11 +363,11 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
             })
             .collect::<Vec<_>>();
 
-        let json = json!({
-            "customer_id": self.customer_id,
-            "namespace": self.namespace,
-            "log_type": partition_key,
-            "entries": events,
+        let json = json!(ChronicleRequestBody{
+            customer_id: self.customer_id.clone(),
+            namespace: self.namespace.clone(),
+            log_type: partition_key,
+            entries: events,
         });
 
         let size = as_tracked_write::<_, _, io::Error>(writer, &json, |writer, json| {
