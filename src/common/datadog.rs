@@ -9,6 +9,8 @@ use vector_lib::{event::DatadogMetricOriginMetadata, sensitive_string::Sensitive
 pub(crate) const DD_US_SITE: &str = "datadoghq.com";
 pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 
+pub(crate) const DDTAGS: &str = "ddtags";
+
 /// DatadogSeriesMetric
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DatadogSeriesMetric {

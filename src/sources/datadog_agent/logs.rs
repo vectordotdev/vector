@@ -12,6 +12,7 @@ use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use vrl::core::Value;
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
+use crate::common::datadog::DDTAGS;
 use crate::{
     event::Event,
     internal_events::DatadogAgentJsonParseError,
@@ -160,8 +161,8 @@ pub(crate) fn decode_log_body(
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(path!("ddtags"))),
-                                path!("ddtags"),
+                                Some(LegacyKey::InsertIfEmpty(path!(DDTAGS))),
+                                path!(DDTAGS),
                                 ddtags,
                             );
 
