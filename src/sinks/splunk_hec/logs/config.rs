@@ -56,6 +56,9 @@ pub struct HecLogsSinkConfig {
     /// events are Legacy namespaced, or the semantic meaning of "host" is used, if defined.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+    // NOTE: The `OptionalTargetPath` is wrapped in an `Option` in order to distinguish between a true
+    //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
+    //       empty string to a `None` path internally.
     #[configurable(metadata(docs::advanced))]
     pub host_key: Option<OptionalTargetPath>,
 
@@ -129,6 +132,9 @@ pub struct HecLogsSinkConfig {
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
+    // NOTE: The `OptionalTargetPath` is wrapped in an `Option` in order to distinguish between a true
+    //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
+    //       empty string to a `None` path internally.
     pub timestamp_key: Option<OptionalTargetPath>,
 
     /// Passes the `auto_extract_timestamp` option to Splunk.

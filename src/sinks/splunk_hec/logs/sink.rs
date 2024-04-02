@@ -20,6 +20,9 @@ use vector_lib::{
 };
 use vrl::path::OwnedTargetPath;
 
+// NOTE: The `OptionalTargetPath`s are wrapped in an `Option` in order to distinguish between a true
+//       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
+//       empty string to a `None` path internally.
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
     pub service: S,

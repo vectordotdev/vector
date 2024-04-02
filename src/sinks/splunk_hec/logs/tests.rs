@@ -83,14 +83,15 @@ fn get_processed_event_timestamp(
     event.as_mut_log().insert("key", "value");
     event.as_mut_log().insert("int_val", 123);
 
-    if let Some(timestamp_key) = &timestamp_key {
+    if let Some(OptionalTargetPath {
+        path: Some(ts_path),
+    }) = &timestamp_key
+    {
         if timestamp.is_some() {
-            if let Some(ts_path) = &timestamp_key.path {
-                event
-                    .as_mut_log()
-                    .insert(&OwnedTargetPath::event(ts_path.path.clone()), timestamp);
-            }
-        } else if let Some(ts_path) = &timestamp_key.path {
+            event
+                .as_mut_log()
+                .insert(&OwnedTargetPath::event(ts_path.path.clone()), timestamp);
+        } else {
             event
                 .as_mut_log()
                 .remove(&OwnedTargetPath::event(ts_path.path.clone()));
