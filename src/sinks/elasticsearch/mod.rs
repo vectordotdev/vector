@@ -135,9 +135,9 @@ pub enum VersionType {
 impl VersionType {
     pub const fn as_str(&self) -> &'static str {
         match self {
-            VersionType::Internal => "internal",
-            VersionType::External => "external",
-            VersionType::ExternalGte => "external_gte",
+            Self::Internal => "internal",
+            Self::External => "external",
+            Self::ExternalGte => "external_gte",
         }
     }
 }
@@ -208,20 +208,20 @@ impl ElasticsearchCommonMode {
 
     fn version<'a>(&self, event: impl Into<EventRef<'a>>) -> Option<u64> {
         match self {
-            ElasticsearchCommonMode::Bulk {
-                version: Some(version_template),
-                ..
-            } => version_template
-                .render_string(event)
-                .map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("version"),
-                        drop_event: true,
-                    });
-                })
-                .ok()
-                .and_then(|value| value.parse().ok()),
+            ElasticsearchCommonMode::Bulk { version, .. } => match &version {
+                Some(value) => value
+                    .render_string(event)
+                    .map_err(|error| {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("version"),
+                            drop_event: true,
+                        });
+                    })
+                    .ok()
+                    .and_then(|value| value.parse().ok()),
+                None => None,
+            },
             _ => None,
         }
     }
@@ -292,4 +292,10 @@ pub enum ParseError {
         "`endpoint` and `endpoints` options are mutually exclusive. Please use `endpoints` option."
     ))]
     EndpointsExclusive,
+    #[snafu(display("Tried to use external versioning without specifying the version itself"))]
+    ExternalVersioningWithoutVersion,
+    #[snafu(display("Cannot use external versioning without specifying a document ID"))]
+    ExternalVersioningWithoutDocumentID,
+    #[snafu(display("Your version field will be ignored because you use internal versioning"))]
+    ExternalVersionIgnoredWithInternalVersioning,
 }

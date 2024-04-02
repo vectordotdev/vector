@@ -19,13 +19,39 @@ use crate::{
 };
 
 #[derive(Serialize)]
+pub enum ProcessedVersionType {
+    External,
+    ExternalGte,
+}
+
+impl ProcessedVersionType {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            ProcessedVersionType::External => VersionType::External.as_str(),
+            ProcessedVersionType::ExternalGte => VersionType::ExternalGte.as_str(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct ProcessedDocumentVersion {
+    pub kind: ProcessedVersionType,
+    pub value: u64,
+}
+
+#[derive(Serialize)]
+pub enum ProcessedDocument {
+    WithoutId,
+    Id(String),
+    IdAndVersion(String, ProcessedDocumentVersion),
+}
+
+#[derive(Serialize)]
 pub struct ProcessedEvent {
     pub index: String,
     pub bulk_action: BulkAction,
     pub log: LogEvent,
-    pub id: Option<String>,
-    pub version: Option<u64>,
-    pub version_type: VersionType,
+    pub processed_document: ProcessedDocument,
 }
 
 impl Finalizable for ProcessedEvent {
@@ -36,7 +62,14 @@ impl Finalizable for ProcessedEvent {
 
 impl ByteSizeOf for ProcessedEvent {
     fn allocated_bytes(&self) -> usize {
-        self.index.allocated_bytes() + self.log.allocated_bytes() + self.id.allocated_bytes()
+        match &self.processed_document {
+            ProcessedDocument::WithoutId => {
+                self.index.allocated_bytes() + self.log.allocated_bytes()
+            }
+            ProcessedDocument::Id(id) | ProcessedDocument::IdAndVersion(id, _) => {
+                self.index.allocated_bytes() + self.log.allocated_bytes() + id.allocated_bytes()
+            }
+        }
     }
 }
 
@@ -88,9 +121,7 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
                 &event.index,
                 &self.doc_type,
                 self.suppress_type_name,
-                &event.id,
-                &event.version,
-                &event.version_type,
+                &event.processed_document,
             )?;
             written_bytes +=
                 as_tracked_write::<_, _, io::Error>(writer, &log, |mut writer, log| {
@@ -111,82 +142,51 @@ fn write_bulk_action(
     index: &str,
     doc_type: &str,
     suppress_type: bool,
-    id: &Option<String>,
-    version: &Option<u64>,
-    version_type: &VersionType,
+    document: &ProcessedDocument,
 ) -> std::io::Result<usize> {
     as_tracked_write(
         writer,
-        (
-            bulk_action,
-            index,
-            doc_type,
-            id,
+        (bulk_action, index, doc_type, suppress_type, document),
+        |writer, (bulk_action, index, doc_type, suppress_type, document)| match (
             suppress_type,
-            version,
-            version_type,
-        ),
-        |writer, (bulk_action, index, doc_type, id, suppress_type, version, version_type)| match (
-            id,
-            suppress_type,
-            (version_type, version),
+            document,
         ) {
-            (_, _, (VersionType::External, None) | (VersionType::ExternalGte, None)) => {
-                Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Tried to use external versioning without specifying the version itself",
-                ))
-            }
-            (None, _, (VersionType::External, Some(_)) | (VersionType::ExternalGte, Some(_))) => {
-                Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Cannot use external versioning without specifying a document ID",
-                ))
-            }
-            (Some(id), true, (VersionType::Internal, _)) => {
+            (true, ProcessedDocument::Id(id)) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_id":"{}"}}}}"#,
                     bulk_action, index, id
                 )
             }
-            (Some(id), false, (VersionType::Internal, _)) => {
+            (false, ProcessedDocument::Id(id)) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#,
                     bulk_action, index, doc_type, id
                 )
             }
-            (None, true, (VersionType::Internal, _)) => {
+            (true, ProcessedDocument::WithoutId) => {
                 write!(writer, r#"{{"{}":{{"_index":"{}"}}}}"#, bulk_action, index)
             }
-            (None, false, (VersionType::Internal, _)) => {
+            (false, ProcessedDocument::WithoutId) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#,
                     bulk_action, index, doc_type
                 )
             }
-            (
-                Some(id),
-                true,
-                (VersionType::External, Some(version)) | (VersionType::ExternalGte, Some(version)),
-            ) => {
+            (true, ProcessedDocument::IdAndVersion(id, version)) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_id":"{}","version_type":"{}","version":{}}}}}"#,
                     bulk_action,
                     index,
                     id,
-                    version_type.as_str(),
-                    version
+                    version.kind.as_str(),
+                    version.value
                 )
             }
-            (
-                Some(id),
-                false,
-                (VersionType::External, Some(version)) | (VersionType::ExternalGte, Some(version)),
-            ) => {
+            (false, ProcessedDocument::IdAndVersion(id, version)) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}","version_type":"{}","version":{}}}}}"#,
@@ -194,8 +194,8 @@ fn write_bulk_action(
                     index,
                     doc_type,
                     id,
-                    version_type.as_str(),
-                    version
+                    version.kind.as_str(),
+                    version.value
                 )
             }
         },
@@ -216,9 +216,7 @@ mod tests {
             "INDEX",
             "TYPE",
             true,
-            &Some("ID".to_string()),
-            &None,
-            &VersionType::Internal,
+            &ProcessedDocument::Id("ID".to_string()),
         );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
@@ -246,9 +244,7 @@ mod tests {
             "INDEX",
             "TYPE",
             true,
-            &None,
-            &None,
-            &VersionType::Internal,
+            &ProcessedDocument::WithoutId,
         );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
@@ -275,9 +271,7 @@ mod tests {
             "INDEX",
             "TYPE",
             false,
-            &Some("ID".to_string()),
-            &None,
-            &VersionType::Internal,
+            &ProcessedDocument::Id("ID".to_string()),
         );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
@@ -306,9 +300,7 @@ mod tests {
             "INDEX",
             "TYPE",
             false,
-            &None,
-            &None,
-            &VersionType::Internal,
+            &ProcessedDocument::WithoutId,
         );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();

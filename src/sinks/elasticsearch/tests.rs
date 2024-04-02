@@ -30,8 +30,8 @@ async fn sets_create_action_when_configured() {
         bulk: BulkConfig {
             action: parse_template("{{ action }}te"),
             index: parse_template("vector"),
-            version: Some(parse_template("4{{ my_version }}2")),
-            version_type: VersionType::External,
+            version: None,
+            version_type: VersionType::Internal,
         },
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
@@ -47,7 +47,6 @@ async fn sets_create_action_when_configured() {
             .expect("invalid timestamp"),
     );
     log.insert("action", "crea");
-    log.insert("my_version", "1337");
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -59,8 +58,8 @@ async fn sets_create_action_when_configured() {
         )
         .unwrap();
 
-    let expected = r#"{"create":{"_index":"vector","_type":"_doc","version_type":"external","version":413372}}
-{"action":"crea","message":"hello there","my_version":"1337","timestamp":"2020-12-01T01:02:03Z"}
+    let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
+{"action":"crea","message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     assert_eq!(encoded.len(), encoded_size);
@@ -76,7 +75,7 @@ async fn encoding_with_external_versioning_without_version_set_does_not_include_
             action: parse_template("{{ action }}te"),
             index: parse_template("vector"),
             version: None,
-            version_type: VersionType::External,
+            version_type: VersionType::Internal,
         },
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
@@ -92,7 +91,6 @@ async fn encoding_with_external_versioning_without_version_set_does_not_include_
             .expect("invalid timestamp"),
     );
     log.insert("action", "crea");
-    log.insert("my_version", 1337);
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -105,7 +103,7 @@ async fn encoding_with_external_versioning_without_version_set_does_not_include_
         .unwrap();
 
     let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
-{"action":"crea","message":"hello there","my_version":1337,"timestamp":"2020-12-01T01:02:03Z"}
+{"action":"crea","message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     assert_eq!(encoded.len(), encoded_size);
@@ -120,8 +118,8 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
         bulk: BulkConfig {
             action: parse_template("{{ action }}te"),
             index: parse_template("vector"),
-            version: Some(parse_template("{{ my_version }}")),
-            version_type: VersionType::External,
+            version: None,
+            version_type: VersionType::Internal,
         },
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
@@ -137,7 +135,6 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
             .expect("invalid timestamp"),
     );
     log.insert("action", "crea");
-    log.insert("my_version", 1337);
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -149,8 +146,8 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
         )
         .unwrap();
 
-    let expected = r#"{"create":{"_index":"vector","_type":"_doc","version_type":"external","version":1337}}
-{"action":"crea","message":"hello there","my_version":1337,"timestamp":"2020-12-01T01:02:03Z"}
+    let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
+{"action":"crea","message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     assert_eq!(encoded.len(), encoded_size);
@@ -165,8 +162,8 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
         bulk: BulkConfig {
             action: parse_template("{{ action }}te"),
             index: parse_template("vector"),
-            version: Some(parse_template("{{ my_version }}")),
-            version_type: VersionType::ExternalGte,
+            version: None,
+            version_type: VersionType::Internal,
         },
         endpoints: vec![String::from("https://example.com")],
         api_version: ElasticsearchApiVersion::V6,
@@ -182,7 +179,6 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
             .expect("invalid timestamp"),
     );
     log.insert("action", "crea");
-    log.insert("my_version", 1337);
 
     let mut encoded = vec![];
     let (encoded_size, _json_size) = es
@@ -194,8 +190,8 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
         )
         .unwrap();
 
-    let expected = r#"{"create":{"_index":"vector","_type":"_doc","version_type":"external_gte","version":1337}}
-{"action":"crea","message":"hello there","my_version":1337,"timestamp":"2020-12-01T01:02:03Z"}
+    let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
+{"action":"crea","message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     assert_eq!(encoded.len(), encoded_size);

@@ -14,7 +14,10 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
-use super::{ElasticsearchCommon, ElasticsearchConfig, VersionType};
+use super::{
+    encoder::{ProcessedDocument, ProcessedDocumentVersion, ProcessedVersionType},
+    ElasticsearchCommon, ElasticsearchConfig,
+};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
@@ -123,11 +126,29 @@ pub(super) fn process_log(
     } else {
         None
     };
-    let (version_type, version): (VersionType, Option<u64>) =
-        match (mode.version_type(), mode.version(&log)) {
-            (None, None) | (None, Some(_)) | (Some(_), None) => (VersionType::Internal, None),
-            (Some(vt), Some(v)) => (vt, Some(v)),
-        };
+    let processed_document = match (id, mode.version_type(), mode.version(&log)) {
+        (None, _, _) => ProcessedDocument::WithoutId,
+        (Some(id), None, None) | (Some(id), None, Some(_)) | (Some(id), Some(_), None) => {
+            ProcessedDocument::Id(id)
+        }
+        (Some(id), Some(version_type), Some(version)) => match version_type {
+            super::VersionType::Internal => ProcessedDocument::Id(id),
+            super::VersionType::External => ProcessedDocument::IdAndVersion(
+                id,
+                ProcessedDocumentVersion {
+                    kind: ProcessedVersionType::External,
+                    value: version,
+                },
+            ),
+            super::VersionType::ExternalGte => ProcessedDocument::IdAndVersion(
+                id,
+                ProcessedDocumentVersion {
+                    kind: ProcessedVersionType::ExternalGte,
+                    value: version,
+                },
+            ),
+        },
+    };
     let log = {
         let mut event = Event::from(log);
         transformer.transform(&mut event);
@@ -137,9 +158,7 @@ pub(super) fn process_log(
         index,
         bulk_action,
         log,
-        id,
-        version,
-        version_type,
+        processed_document,
     })
 }
 

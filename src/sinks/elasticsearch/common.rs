@@ -10,7 +10,7 @@ use vector_lib::config::LogNamespace;
 
 use super::{
     request_builder::ElasticsearchRequestBuilder, ElasticsearchApiVersion, ElasticsearchEncoder,
-    InvalidHostSnafu, Request,
+    InvalidHostSnafu, Request, VersionType,
 };
 use crate::{
     http::{HttpClient, MaybeAuth},
@@ -92,6 +92,23 @@ impl ElasticsearchCommon {
         let mode = config.common_mode()?;
 
         let tower_request = config.request.tower.into_settings();
+
+        match (
+            (&config.bulk.version, &config.bulk.version_type),
+            &config.id_key,
+        ) {
+            ((Some(_), VersionType::Internal), _) => {
+                return Err(ParseError::ExternalVersionIgnoredWithInternalVersioning.into());
+            }
+            ((Some(_), VersionType::External), None)
+            | ((Some(_), VersionType::ExternalGte), None) => {
+                return Err(ParseError::ExternalVersioningWithoutDocumentID.into());
+            }
+            ((None, VersionType::External), _) | ((None, VersionType::ExternalGte), _) => {
+                return Err(ParseError::ExternalVersioningWithoutVersion.into());
+            }
+            (_, _) => (),
+        }
 
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert(

@@ -231,7 +231,7 @@ impl ElasticsearchConfig {
                 index: self.bulk.index.clone(),
                 action: self.bulk.action.clone(),
                 version: self.bulk.version.clone(),
-                version_type: self.bulk.version_type.clone(),
+                version_type: self.bulk.version_type,
             }),
             ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
@@ -285,7 +285,7 @@ fn default_index() -> Template {
     Template::try_from("vector-%Y.%m.%d").expect("unable to parse template")
 }
 
-fn default_version_type() -> VersionType {
+const fn default_version_type() -> VersionType {
     VersionType::Internal
 }
 
