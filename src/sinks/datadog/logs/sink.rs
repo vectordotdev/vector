@@ -417,9 +417,9 @@ mod tests {
             "hostname",
             "ddtags",
             "service",
-            "severity",
+            "status",
         ] {
-            assert!(log.contains(event_path!(attr)));
+            assert_eq!(log.contains(event_path!(attr)), true, "missing {}", attr);
         }
 
         assert_eq!(
