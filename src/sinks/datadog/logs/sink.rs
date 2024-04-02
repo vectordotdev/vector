@@ -419,7 +419,7 @@ mod tests {
             "service",
             "status",
         ] {
-            assert_eq!(log.contains(event_path!(attr)), true, "missing {}", attr);
+            assert!(log.contains(event_path!(attr)), "missing {}", attr);
         }
 
         assert_eq!(
