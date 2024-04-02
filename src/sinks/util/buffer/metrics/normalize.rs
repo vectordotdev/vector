@@ -120,17 +120,7 @@ impl MetricSet {
     /// to absolute if incremental.
     pub fn make_absolute(&mut self, metric: Metric) -> Option<Metric> {
         match metric.kind() {
-            MetricKind::Absolute => {
-                // Even if passing through as-is, track the absolute value so that we are able to
-                // correctly calculate any later incremental values that come through for the same
-                // series.
-                self.0.insert(
-                    metric.series().clone(),
-                    (metric.data().clone(), EventMetadata::default()),
-                );
-
-                Some(metric)
-            }
+            MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => Some(self.incremental_to_absolute(metric)),
         }
     }
