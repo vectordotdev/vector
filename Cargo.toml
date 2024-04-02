@@ -129,13 +129,13 @@ members = [
 ]
 
 [workspace.dependencies]
-chrono = { version = "0.4.34", default-features = false, features = ["clock", "serde"] }
-clap = { version = "4.5.3", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
-indexmap = { version = "2.2.5", default-features = false, features = ["serde", "std"] }
+chrono = { version = "0.4.37", default-features = false, features = ["clock", "serde"] }
+clap = { version = "4.5.4", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+indexmap = { version = "2.2.6", default-features = false, features = ["serde", "std"] }
 pin-project = { version = "1.1.5", default-features = false }
 proptest = "1.4"
 proptest-derive = "0.4.0"
-serde_json = { version = "1.0.114", default-features = false, features = ["raw_value", "std"] }
+serde_json = { version = "1.0.115", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.197", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.12", default-features = false, features = ["display", "parse"] }
 vrl = { version = "0.13.0", features = ["arbitrary", "cli", "test", "test_framework"] }
@@ -156,9 +156,9 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.5", default-features = false }
-async-trait = { version = "0.1.78", default-features = false }
+async-trait = { version = "0.1.79", default-features = false }
 futures = { version = "0.3.30", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.36.0", default-features = false, features = ["full"] }
+tokio = { version = "1.37.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.4", default-features = false }
 tokio-stream = { version = "0.1.15", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -196,7 +196,7 @@ aws-smithy-http = { version = "0.60", default-features = false, features = ["eve
 aws-smithy-types = { version = "1.1.8", default-features = false, optional = true }
 aws-smithy-runtime-api = { version = "1.2.0", default-features = false, optional = true }
 aws-smithy-runtime = { version = "1.1.8", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
-aws-smithy-async = { version = "1.0.2", default-features = false, features = ["rt-tokio"], optional = true }
+aws-smithy-async = { version = "1.2.0", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -216,7 +216,7 @@ serde-toml-merge = { version = "0.3.6", default-features = false }
 serde_bytes = { version = "0.11.14", default-features = false, features = ["std"], optional = true }
 serde_json.workspace = true
 serde_with = { version = "3.7.0", default-features = false, features = ["macros", "std"] }
-serde_yaml = { version = "0.9.33", default-features = false }
+serde_yaml = { version = "0.9.34", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.2", default-features = false, optional = true }
@@ -259,8 +259,8 @@ apache-avro = { version = "0.16.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.22.0", default-features = false, optional = true }
 bloomy  = { version = "1.2.0", default-features = false, optional = true }
-bollard = { version = "0.16.0", default-features = false, features = ["ssl", "chrono"], optional = true }
-bytes = { version = "1.5.0", default-features = false, features = ["serde"] }
+bollard = { version = "0.16.1", default-features = false, features = ["ssl", "chrono"], optional = true }
+bytes = { version = "1.6.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.3.0", default-features = false }
 chrono.workspace = true
 chrono-tz = { version = "0.8.6", default-features = false }
@@ -271,7 +271,7 @@ derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.17", default-features = false }
 encoding_rs = { version = "0.8.33", default-features = false, features = ["serde"] }
-enum_dispatch = { version = "0.3.12", default-features = false }
+enum_dispatch = { version = "0.3.13", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.28", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.29", default-features = false }
@@ -291,7 +291,7 @@ hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap.workspace = true
 infer = { version = "0.15.0", default-features = false, optional = true}
-indoc = { version = "2.0.4", default-features = false }
+indoc = { version = "2.0.5", default-features = false }
 inventory = { version = "0.3.15", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
 itertools = { version = "0.12.1", default-features = false, optional = false, features = ["use_alloc"] }
@@ -319,7 +319,7 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.35.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.24.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
-regex = { version = "1.10.3", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.10.4", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.3", default-features = false, optional = true }
 rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
@@ -341,7 +341,7 @@ typetag = { version = "0.2.16", default-features = false }
 url = { version = "2.5.0", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.6", default-features = false }
-zstd = { version = "0.13.0", default-features = false }
+zstd = { version = "0.13.1", default-features = false }
 arr_macro = { version = "0.2.1" }
 
 # depending on fork for bumped nix dependency
@@ -382,14 +382,14 @@ reqwest = { version = "0.11", features = ["json"] }
 rstest = {version = "0.18.2"}
 tempfile = "3.10.1"
 test-generator = "0.3.1"
-tokio = { version = "1.36.0", features = ["test-util"] }
+tokio = { version = "1.37.0", features = ["test-util"] }
 tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
 vrl.workspace = true
 
 wiremock = "0.5.22"
-zstd = { version = "0.13.0", default-features = false }
+zstd = { version = "0.13.1", default-features = false }
 
 [patch.crates-io]
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.

@@ -223,7 +223,7 @@ impl Encoder<Event> for ProtobufSerializer {
 mod tests {
     use super::*;
     use bytes::Bytes;
-    use chrono::{DateTime, NaiveDateTime, Utc};
+    use chrono::DateTime;
     use ordered_float::NotNan;
     use prost_reflect::MapKey;
     use std::collections::{BTreeMap, HashMap};
@@ -381,10 +381,7 @@ mod tests {
             &test_message_descriptor("Timestamp"),
             Value::Object(BTreeMap::from([(
                 "morning".into(),
-                Value::Timestamp(DateTime::from_naive_utc_and_offset(
-                    NaiveDateTime::from_timestamp_opt(8675, 309).unwrap(),
-                    Utc,
-                )),
+                Value::Timestamp(DateTime::from_timestamp(8675, 309).unwrap()),
             )])),
         )
         .unwrap();

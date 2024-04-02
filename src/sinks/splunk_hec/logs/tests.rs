@@ -69,6 +69,7 @@ fn get_encoded_event<D: de::DeserializeOwned>(
 fn get_processed_event_timestamp(
     timestamp: Option<Value>,
     timestamp_key: Option<OptionalTargetPath>,
+    auto_extract_timestamp: bool,
 ) -> HecProcessedEvent {
     let mut event = Event::Log(LogEvent::from("hello world"));
     event
@@ -118,6 +119,7 @@ fn get_processed_event_timestamp(
             timestamp_nanos_key: timestamp_nanos_key.as_ref(),
             timestamp_key,
             endpoint_target: EndpointTarget::Event,
+            auto_extract_timestamp,
         },
     )
 }
@@ -130,6 +132,7 @@ fn get_processed_event() -> HecProcessedEvent {
         Some(OptionalTargetPath {
             path: Some(OwnedTargetPath::event(owned_value_path!("timestamp"))),
         }),
+        false,
     )
 }
 
@@ -275,28 +278,51 @@ fn splunk_encode_log_event_json_timestamps() {
     fn get_hec_data_for_timestamp_test(
         timestamp: Option<Value>,
         timestamp_path: Option<OptionalTargetPath>,
+        auto_extract_timestamp: bool,
     ) -> HecEventJson {
-        let processed_event = get_processed_event_timestamp(timestamp, timestamp_path);
+        let processed_event =
+            get_processed_event_timestamp(timestamp, timestamp_path, auto_extract_timestamp);
         get_encoded_event::<HecEventJson>(JsonSerializerConfig::default().into(), processed_event)
     }
 
-    let timestamp = Some(OptionalTargetPath {
+    let timestamp_key = Some(OptionalTargetPath {
         path: Some(OwnedTargetPath::event(owned_value_path!("timestamp"))),
     });
 
     let no_timestamp = Some(OptionalTargetPath::none());
+    let dont_auto_extract = false;
+    let do_auto_extract = true;
 
     // no timestamp_key is provided
-    let mut hec_data = get_hec_data_for_timestamp_test(None, no_timestamp);
+    let mut hec_data = get_hec_data_for_timestamp_test(None, no_timestamp, dont_auto_extract);
     assert_eq!(hec_data.time, None);
 
     // timestamp_key is provided but timestamp is not valid type
-    hec_data =
-        get_hec_data_for_timestamp_test(Some(vrl::value::Value::Integer(0)), timestamp.clone());
+    hec_data = get_hec_data_for_timestamp_test(
+        Some(vrl::value::Value::Integer(0)),
+        timestamp_key.clone(),
+        dont_auto_extract,
+    );
     assert_eq!(hec_data.time, None);
 
     // timestamp_key is provided but no timestamp in the event
-    let hec_data = get_hec_data_for_timestamp_test(None, timestamp);
+    hec_data = get_hec_data_for_timestamp_test(None, timestamp_key.clone(), dont_auto_extract);
+    assert_eq!(hec_data.time, None);
+
+    // timestamp_key is provided and timestamp is valid
+    hec_data = get_hec_data_for_timestamp_test(
+        Some(Value::Timestamp(Utc::now())),
+        timestamp_key.clone(),
+        dont_auto_extract,
+    );
+    assert!(hec_data.time.is_some());
+
+    // timestamp_key is provided and timestamp is valid, but auto_extract_timestamp is set
+    hec_data = get_hec_data_for_timestamp_test(
+        Some(Value::Timestamp(Utc::now())),
+        timestamp_key.clone(),
+        do_auto_extract,
+    );
     assert_eq!(hec_data.time, None);
 }
 
@@ -352,6 +378,7 @@ fn splunk_encode_log_event_semantic_meanings() {
             timestamp_nanos_key: None,
             timestamp_key: None,
             endpoint_target: EndpointTarget::Event,
+            auto_extract_timestamp: false,
         },
     );
 

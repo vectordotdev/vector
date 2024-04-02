@@ -273,6 +273,7 @@ impl HecLogsSinkConfig {
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             timestamp_key: self.timestamp_key.clone(),
             endpoint_target: self.endpoint_target,
+            auto_extract_timestamp: self.auto_extract_timestamp.unwrap_or_default(),
         };
 
         Ok(VectorSink::from_event_streamsink(sink))
@@ -283,7 +284,10 @@ impl HecLogsSinkConfig {
 mod tests {
     use super::*;
     use crate::components::validation::prelude::*;
-    use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
+    use vector_lib::{
+        codecs::{JsonSerializerConfig, MetricTagValues},
+        config::LogNamespace,
+    };
 
     #[test]
     fn generate_config() {
@@ -340,6 +344,7 @@ mod tests {
 
             ValidationConfiguration::from_sink(
                 Self::NAME,
+                LogNamespace::Legacy,
                 vec![ComponentTestCaseConfig::from_sink(
                     config,
                     None,

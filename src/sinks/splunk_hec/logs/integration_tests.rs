@@ -519,8 +519,16 @@ async fn splunk_auto_extracted_timestamp() {
 
         let entry = find_entry(&message).await;
 
+        // we should not have removed the timestamp from the event in this case, because that only
+        // happens when we set the `_time` field in the HEC metadata, which we do by extracting the
+        // timestamp from the event data in vector. Instead, when auto_extract_timestamp is true,
+        // Splunk will determine the timestamp from the *message* field in the event.
+        // Thus, we expect the `timestamp` field to still be present.
         assert_eq!(
-            format!("{{\"message\":\"{}\"}}", message),
+            format!(
+                "{{\"message\":\"{}\",\"timestamp\":\"2020-03-05T00:00:00Z\"}}",
+                message
+            ),
             entry["_raw"].as_str().unwrap()
         );
         assert_eq!(

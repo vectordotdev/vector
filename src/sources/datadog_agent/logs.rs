@@ -10,7 +10,6 @@ use vector_lib::json_size::JsonSize;
 use vector_lib::lookup::path;
 use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
 use vrl::core::Value;
-use vrl::value::{KeyString, ObjectMap};
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{
@@ -215,35 +214,26 @@ pub(crate) fn decode_log_body(
 // the tag list members are separated by `,` and the
 // tag-value pairs are separated by `:`.
 //
-// The output is an Object regardless of the input string.
-// Bare tags are constructed as a k-v pair with a null value.
+// The output is an Array regardless of the input string.
 fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
     if ddtags_raw.is_empty() {
-        return ObjectMap::new().into();
+        return Vec::<Value>::new().into();
     }
 
     let ddtags_str = String::from_utf8_lossy(ddtags_raw);
 
-    // The value is a single bare tag
-    if !ddtags_str.contains(',') && !ddtags_str.contains(':') {
-        return ObjectMap::from([(KeyString::from(ddtags_str), Value::Null)]).into();
-    }
-
     // There are multiple tags, which could be either bare or pairs
-    let ddtags_object: ObjectMap = ddtags_str
+    let ddtags: Vec<Value> = ddtags_str
         .split(',')
         .filter(|kv| !kv.is_empty())
-        .map(|kv| match kv.split_once(':') {
-            Some((k, v)) => (KeyString::from(k), Value::Bytes(Bytes::from(v.to_string()))),
-            None => (KeyString::from(kv), Value::Null),
-        })
+        .map(|kv| Value::Bytes(Bytes::from(kv.trim().to_string())))
         .collect();
 
-    if ddtags_object.is_empty() && !ddtags_str.is_empty() {
+    if ddtags.is_empty() && !ddtags_str.is_empty() {
         warn!(message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed.")
     }
 
-    ddtags_object.into()
+    ddtags.into()
 }
 
 #[cfg(test)]
@@ -257,7 +247,7 @@ mod tests {
         let raw = Bytes::from(String::from(""));
         let val = parse_ddtags(&raw);
 
-        assert_eq!(val, value!({}));
+        assert_eq!(val, value!([]));
     }
 
     #[test]
@@ -265,7 +255,7 @@ mod tests {
         let raw = Bytes::from(String::from("bare"));
         let val = parse_ddtags(&raw);
 
-        assert_eq!(val, value!({"bare": null}));
+        assert_eq!(val, value!(["bare"]));
     }
 
     #[test]
@@ -273,7 +263,7 @@ mod tests {
         let raw = Bytes::from(String::from("filename:driver.log"));
         let val = parse_ddtags(&raw);
 
-        assert_eq!(val, value!({"filename": "driver.log"}));
+        assert_eq!(val, value!(["filename:driver.log"]));
     }
 
     #[test]
@@ -281,10 +271,7 @@ mod tests {
         let raw = Bytes::from(String::from("filename:driver.log,wizard:the_grey"));
         let val = parse_ddtags(&raw);
 
-        assert_eq!(
-            val,
-            value!({"filename": "driver.log", "wizard": "the_grey"})
-        );
+        assert_eq!(val, value!(["filename:driver.log", "wizard:the_grey"]));
     }
 
     #[test]
@@ -294,7 +281,7 @@ mod tests {
 
         assert_eq!(
             val,
-            value!({"filename": "driver.log", "wizard": "the_grey", "debug": null})
+            value!(["filename:driver.log", "debug", "wizard:the_grey"])
         );
     }
 }
