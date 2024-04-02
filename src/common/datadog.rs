@@ -16,10 +16,10 @@ pub(crate) const DDTAGS: &str = "ddtags";
 /// List of well known Datadog reserved attributes
 // https://docs.datadoghq.com/logs/log_configuration/attributes_naming_convention/?s=severity#reserved-attributes
 pub(crate) const DD_RESERVED_SEMANTIC_ATTRS: [&str; 6] = [
-    meaning::SEVERITY,
+    meaning::SEVERITY, // Status is mapped to severity intentionally
     meaning::TIMESTAMP,
     meaning::HOST,
-    meaning::SERVICE, // Status is mapped to service intentionally
+    meaning::SERVICE,
     meaning::SOURCE,
     meaning::TAGS,
 ];
