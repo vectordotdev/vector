@@ -493,6 +493,33 @@ fn get_gauge_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     })
 }
 
+fn get_set_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
+    let set_values = log
+        .get(event_path!("set", "values"))
+        .ok_or_else(|| TransformError::PathNotFound {
+            path: "set.values".to_string(),
+        })?
+        .as_array()
+        .ok_or_else(|| TransformError::ParseError {
+            path: "set.values".to_string(),
+            kind: TransformParseErrorKind::ArrayError,
+        })?;
+
+    let mut values: Vec<String> = Vec::new();
+    for e_value in set_values {
+        let value = e_value
+            .as_bytes()
+            .ok_or_else(|| TransformError::ParseError {
+                path: "set.values".to_string(),
+                kind: TransformParseErrorKind::ArrayError,
+            })?;
+        values.push(String::from_utf8_lossy(value).to_string());
+    }
+
+    Ok(MetricValue::Set { values })
+}
+
+
 fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_samples = log
         .get(event_path!("distribution", "samples"))
@@ -755,6 +782,7 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
                 "histogram" => Some(get_histogram_value(log)?),
                 "summary" => Some(get_summary_value(log)?),
                 "counter" => Some(get_counter_value(log)?),
+                "set" => Some(get_set_value(log)?),
                 _ => None,
             };
 
