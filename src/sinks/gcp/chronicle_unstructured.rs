@@ -7,8 +7,8 @@ use goauth::scopes::Scope;
 use http::{header::HeaderValue, Request, StatusCode, Uri};
 use hyper::Body;
 use indoc::indoc;
-use serde_json::json;
 use serde::Serialize;
+use serde_json::json;
 use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
@@ -307,7 +307,7 @@ impl MetaDescriptive for ChronicleRequest {
 }
 
 #[derive(Clone, Debug, Serialize)]
-struct ChronicleRequestBody{
+struct ChronicleRequestBody {
     customer_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     namespace: Option<String>,
@@ -363,7 +363,7 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
             })
             .collect::<Vec<_>>();
 
-        let json = json!(ChronicleRequestBody{
+        let json = json!(ChronicleRequestBody {
             customer_id: self.customer_id.clone(),
             namespace: self.namespace.clone(),
             log_type: partition_key,
