@@ -473,8 +473,7 @@ configuration: {
 			common: false
 			description: """
 				Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
-				in Vector config. Multiple backends can be configured. To signify Vector that it should look for a secret to
-				retrieve use the `SECRET[<backend_name>.<secret_key>]`. This placeholder will then be replaced by the secret
+				in Vector config. Multiple backends can be configured. Use `SECRET[<backend_name>.<secret_key>]` to tell Vector to retrieve the secret. This placeholder is replaced by the secret
 				retrieved from the relevant backend.
 				"""
 			required: false
@@ -503,7 +502,7 @@ configuration: {
 						If an `error` is returned for any secrets, or if the command exits with a non-zero status code,
 						Vector will log the errors and exit.
 
-						Secrets will be loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
 						configuration reload process.
 						"""
 					type: object: options: {
@@ -533,7 +532,7 @@ configuration: {
 					description: """
 						Retrieve secrets from AWS Secrets Manager.
 
-						The secret is expected to be a JSON text string with key/value pairs, e.g.:
+						The secret must be a JSON text string with key/value pairs. For example:
 						```json
 						{
                           "username": "test",
@@ -541,15 +540,15 @@ configuration: {
                         }
 						```
 
-						Vector will log and exit if an error occurred retrieving the secrets.
+						If an error occurred retrieving the secrets, Vector logs the error and exits.
 
-						Secrets will be loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
 						configuration reload process.
 						"""
 					type: object: options: {
 						secret_id: {
 							description: """
-								The id of the secret to be retrieved.
+								The ID of the secret to be retrieved.
 								"""
 							required: true
 							type: string: {
