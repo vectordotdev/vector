@@ -516,9 +516,10 @@ fn get_set_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         values.push(String::from_utf8_lossy(value).to_string());
     }
 
-    Ok(MetricValue::Set { values })
+    Ok(MetricValue::Set {
+        values: values.into_iter().collect(),
+    })
 }
-
 
 fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_samples = log
