@@ -40,6 +40,9 @@ impl InternalEvent for SocketBytesReceived {
             "component_received_bytes_total", self.byte_size as u64,
             "protocol" => protocol,
         );
+        histogram!(
+            "component_received_bytes", self.byte_size as f64
+        );
     }
 }
 
