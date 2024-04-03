@@ -362,6 +362,11 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 			syntax: "template"
 		}
 	}
+	namespace: {
+		description: "User-configured environment namespace to identify the data domain the logs originated from."
+		required:    false
+		type: string: examples: ["production"]
+	}
 	region: {
 		description: "The GCP region to use."
 		required:    false
