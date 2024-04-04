@@ -84,7 +84,8 @@ pub struct HumioMetricsConfig {
 
     /// Overrides the name of the log field used to retrieve the hostname to send to Humio.
     ///
-    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used if log
+    /// events are Legacy namespaced, or the semantic meaning of "host" is used, if defined.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "config_host_key")]
