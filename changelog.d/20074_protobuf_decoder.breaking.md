@@ -1,0 +1,1 @@
+The `protobuf` decoder will no longer set fields on the decoded event that are not set in the incoming byte stream. Previously it would set the default value for the field even if it wasn't in the event. This change ensures that the encoder will return the exact same bytes for the same given event.
