@@ -57,32 +57,31 @@ impl SecretBackend for AwsSecretsManagerBackend {
         secret_keys: HashSet<String>,
         _: &mut signal::SignalRx,
     ) -> crate::Result<HashMap<String, String>> {
-        let client: Client = executor::block_on(async {
-            return create_client::<SecretsManagerClientBuilder>(
+        let client = executor::block_on(async {
+            create_client::<SecretsManagerClientBuilder>(
                 &self.auth,
                 self.region.region(),
                 self.region.endpoint(),
                 &ProxyConfig::default(),
                 &self.tls,
             )
-            .await;
+            .await
         })?;
 
         let get_secret_value_response = executor::block_on(async {
-            return client
+            client
                 .get_secret_value()
                 .secret_id(&self.secret_id)
                 .send()
-                .await;
+                .await
         })?;
 
-        let secret_string = get_secret_value_response.secret_string.ok_or::<String>(
-            format!(
+        let secret_string = get_secret_value_response
+            .secret_string
+            .ok_or::<String>(format!(
                 "secret for secret-id '{}' could not be retrieved",
                 &self.secret_id
-            )
-            .into(),
-        )?;
+            ))?;
 
         let output = serde_json::from_str::<HashMap<String, String>>(secret_string.as_str())?;
 
@@ -105,6 +104,6 @@ impl SecretBackend for AwsSecretsManagerBackend {
                 .into());
             }
         }
-        return Ok(secrets);
+        Ok(secrets)
     }
 }
