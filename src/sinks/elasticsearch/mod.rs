@@ -226,11 +226,9 @@ impl ElasticsearchCommonMode {
         }
     }
 
-    fn version_type(&self) -> Option<VersionType> {
+    const fn version_type(&self) -> Option<VersionType> {
         match self {
-            ElasticsearchCommonMode::Bulk { version_type, .. } => {
-                VersionType::try_from(version_type.as_str()).ok()
-            }
+            ElasticsearchCommonMode::Bulk { version_type, .. } => Some(*version_type),
             _ => Some(VersionType::Internal),
         }
     }

@@ -93,21 +93,21 @@ impl ElasticsearchCommon {
 
         let tower_request = config.request.tower.into_settings();
 
-        match (
-            (&config.bulk.version, &config.bulk.version_type),
-            &config.id_key,
-        ) {
-            ((Some(_), VersionType::Internal), _) => {
-                return Err(ParseError::ExternalVersionIgnoredWithInternalVersioning.into());
-            }
-            ((Some(_), VersionType::External), None)
-            | ((Some(_), VersionType::ExternalGte), None) => {
-                return Err(ParseError::ExternalVersioningWithoutDocumentID.into());
-            }
-            ((None, VersionType::External), _) | ((None, VersionType::ExternalGte), _) => {
-                return Err(ParseError::ExternalVersioningWithoutVersion.into());
-            }
-            (_, _) => (),
+        if config.bulk.version.is_some() && config.bulk.version_type == VersionType::Internal {
+            return Err(ParseError::ExternalVersionIgnoredWithInternalVersioning.into());
+        }
+        if config.bulk.version.is_some()
+            && (config.bulk.version_type == VersionType::External
+                || config.bulk.version_type == VersionType::ExternalGte)
+            && config.id_key.is_none()
+        {
+            return Err(ParseError::ExternalVersioningWithoutDocumentID.into());
+        }
+        if config.bulk.version.is_none()
+            && (config.bulk.version_type == VersionType::External
+                || config.bulk.version_type == VersionType::ExternalGte)
+        {
+            return Err(ParseError::ExternalVersioningWithoutVersion.into());
         }
 
         let mut query_params = config.query.clone().unwrap_or_default();

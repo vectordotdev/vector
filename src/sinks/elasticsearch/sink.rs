@@ -15,7 +15,7 @@ use crate::{
 };
 
 use super::{
-    encoder::{ProcessedDocument, ProcessedDocumentVersion, ProcessedVersionType},
+    encoder::{DocumentMetadata, DocumentVersion, DocumentVersionType},
     ElasticsearchCommon, ElasticsearchConfig,
 };
 
@@ -126,24 +126,24 @@ pub(super) fn process_log(
     } else {
         None
     };
-    let processed_document = match (id, mode.version_type(), mode.version(&log)) {
-        (None, _, _) => ProcessedDocument::WithoutId,
+    let document_metadata = match (id, mode.version_type(), mode.version(&log)) {
+        (None, _, _) => DocumentMetadata::WithoutId,
         (Some(id), None, None) | (Some(id), None, Some(_)) | (Some(id), Some(_), None) => {
-            ProcessedDocument::Id(id)
+            DocumentMetadata::Id(id)
         }
         (Some(id), Some(version_type), Some(version)) => match version_type {
-            super::VersionType::Internal => ProcessedDocument::Id(id),
-            super::VersionType::External => ProcessedDocument::IdAndVersion(
+            super::VersionType::Internal => DocumentMetadata::Id(id),
+            super::VersionType::External => DocumentMetadata::IdAndVersion(
                 id,
-                ProcessedDocumentVersion {
-                    kind: ProcessedVersionType::External,
+                DocumentVersion {
+                    kind: DocumentVersionType::External,
                     value: version,
                 },
             ),
-            super::VersionType::ExternalGte => ProcessedDocument::IdAndVersion(
+            super::VersionType::ExternalGte => DocumentMetadata::IdAndVersion(
                 id,
-                ProcessedDocumentVersion {
-                    kind: ProcessedVersionType::ExternalGte,
+                DocumentVersion {
+                    kind: DocumentVersionType::ExternalGte,
                     value: version,
                 },
             ),
@@ -158,7 +158,7 @@ pub(super) fn process_log(
         index,
         bulk_action,
         log,
-        processed_document,
+        document_metadata,
     })
 }
 

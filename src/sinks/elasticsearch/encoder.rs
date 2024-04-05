@@ -19,31 +19,31 @@ use crate::{
 };
 
 #[derive(Serialize)]
-pub enum ProcessedVersionType {
+pub enum DocumentVersionType {
     External,
     ExternalGte,
 }
 
-impl ProcessedVersionType {
+impl DocumentVersionType {
     pub const fn as_str(&self) -> &'static str {
         match self {
-            ProcessedVersionType::External => VersionType::External.as_str(),
-            ProcessedVersionType::ExternalGte => VersionType::ExternalGte.as_str(),
+            DocumentVersionType::External => VersionType::External.as_str(),
+            DocumentVersionType::ExternalGte => VersionType::ExternalGte.as_str(),
         }
     }
 }
 
 #[derive(Serialize)]
-pub struct ProcessedDocumentVersion {
-    pub kind: ProcessedVersionType,
+pub struct DocumentVersion {
+    pub kind: DocumentVersionType,
     pub value: u64,
 }
 
 #[derive(Serialize)]
-pub enum ProcessedDocument {
+pub enum DocumentMetadata {
     WithoutId,
     Id(String),
-    IdAndVersion(String, ProcessedDocumentVersion),
+    IdAndVersion(String, DocumentVersion),
 }
 
 #[derive(Serialize)]
@@ -51,7 +51,7 @@ pub struct ProcessedEvent {
     pub index: String,
     pub bulk_action: BulkAction,
     pub log: LogEvent,
-    pub processed_document: ProcessedDocument,
+    pub document_metadata: DocumentMetadata,
 }
 
 impl Finalizable for ProcessedEvent {
@@ -62,11 +62,11 @@ impl Finalizable for ProcessedEvent {
 
 impl ByteSizeOf for ProcessedEvent {
     fn allocated_bytes(&self) -> usize {
-        match &self.processed_document {
-            ProcessedDocument::WithoutId => {
+        match &self.document_metadata {
+            DocumentMetadata::WithoutId => {
                 self.index.allocated_bytes() + self.log.allocated_bytes()
             }
-            ProcessedDocument::Id(id) | ProcessedDocument::IdAndVersion(id, _) => {
+            DocumentMetadata::Id(id) | DocumentMetadata::IdAndVersion(id, _) => {
                 self.index.allocated_bytes() + self.log.allocated_bytes() + id.allocated_bytes()
             }
         }
@@ -121,7 +121,7 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
                 &event.index,
                 &self.doc_type,
                 self.suppress_type_name,
-                &event.processed_document,
+                &event.document_metadata,
             )?;
             written_bytes +=
                 as_tracked_write::<_, _, io::Error>(writer, &log, |mut writer, log| {
@@ -142,7 +142,7 @@ fn write_bulk_action(
     index: &str,
     doc_type: &str,
     suppress_type: bool,
-    document: &ProcessedDocument,
+    document: &DocumentMetadata,
 ) -> std::io::Result<usize> {
     as_tracked_write(
         writer,
@@ -151,31 +151,31 @@ fn write_bulk_action(
             suppress_type,
             document,
         ) {
-            (true, ProcessedDocument::Id(id)) => {
+            (true, DocumentMetadata::Id(id)) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_id":"{}"}}}}"#,
                     bulk_action, index, id
                 )
             }
-            (false, ProcessedDocument::Id(id)) => {
+            (false, DocumentMetadata::Id(id)) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#,
                     bulk_action, index, doc_type, id
                 )
             }
-            (true, ProcessedDocument::WithoutId) => {
+            (true, DocumentMetadata::WithoutId) => {
                 write!(writer, r#"{{"{}":{{"_index":"{}"}}}}"#, bulk_action, index)
             }
-            (false, ProcessedDocument::WithoutId) => {
+            (false, DocumentMetadata::WithoutId) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#,
                     bulk_action, index, doc_type
                 )
             }
-            (true, ProcessedDocument::IdAndVersion(id, version)) => {
+            (true, DocumentMetadata::IdAndVersion(id, version)) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_id":"{}","version_type":"{}","version":{}}}}}"#,
@@ -186,7 +186,7 @@ fn write_bulk_action(
                     version.value
                 )
             }
-            (false, ProcessedDocument::IdAndVersion(id, version)) => {
+            (false, DocumentMetadata::IdAndVersion(id, version)) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}","version_type":"{}","version":{}}}}}"#,
@@ -216,7 +216,7 @@ mod tests {
             "INDEX",
             "TYPE",
             true,
-            &ProcessedDocument::Id("ID".to_string()),
+            &DocumentMetadata::Id("ID".to_string()),
         );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
@@ -244,7 +244,7 @@ mod tests {
             "INDEX",
             "TYPE",
             true,
-            &ProcessedDocument::WithoutId,
+            &DocumentMetadata::WithoutId,
         );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
@@ -271,7 +271,7 @@ mod tests {
             "INDEX",
             "TYPE",
             false,
-            &ProcessedDocument::Id("ID".to_string()),
+            &DocumentMetadata::Id("ID".to_string()),
         );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
@@ -300,7 +300,7 @@ mod tests {
             "INDEX",
             "TYPE",
             false,
-            &ProcessedDocument::WithoutId,
+            &DocumentMetadata::WithoutId,
         );
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
