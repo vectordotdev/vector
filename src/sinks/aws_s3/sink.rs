@@ -64,6 +64,7 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         let metadata = S3Metadata {
             partition_key,
             s3_key: s3_key_prefix,
+            count: events.len(),
             finalizers,
         };
 
@@ -103,8 +104,18 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
 
         s3metadata.s3_key = format_s3_key(&s3metadata.s3_key, &filename, &extension);
 
+        let body = payload.into_payload();
+
+        info!(
+            message = "Sending events.",
+            bytes = ?body.len(),
+            events_len = ?s3metadata.count,
+            blob = ?s3metadata.s3_key,
+            container = ?self.bucket,
+        );
+
         S3Request {
-            body: payload.into_payload(),
+            body: body,
             bucket: self.bucket.clone(),
             metadata: s3metadata,
             request_metadata,
