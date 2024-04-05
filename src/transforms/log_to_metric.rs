@@ -1962,4 +1962,43 @@ mod tests {
             .with_timestamp(Some(ts()))
         );
     }
+
+    #[tokio::test]
+    async fn transform_set() {
+        let config = parse_yaml_config(
+            r#"
+            metrics: []
+            all_metrics: true
+            "#,
+        );
+
+        let json_str = r#"{
+          "set": {
+            "values": ["990.0", "1234"]
+          },
+          "kind": "incremental",
+          "name": "test.transform.set",
+          "tags": {
+            "env": "test_env",
+            "host": "localhost"
+          }
+        }"#;
+        let log = create_log_event(json_str);
+        let metric = do_transform(config, log.clone()).await.unwrap();
+        assert_eq!(
+            *metric.as_metric(),
+            Metric::new_with_metadata(
+                "test.transform.set",
+                MetricKind::Incremental,
+                MetricValue::Set { values: vec!["990.0".into(), "1234".into()].into_iter().collect() },
+                metric.metadata().clone(),
+            )
+            .with_namespace(Some("test_namespace"))
+            .with_tags(Some(metric_tags!(
+                "env" => "test_env",
+                "host" => "localhost",
+            )))
+            .with_timestamp(Some(ts()))
+        );
+    }
 }
