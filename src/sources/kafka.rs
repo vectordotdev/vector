@@ -36,7 +36,7 @@ use tokio::{
     time::Sleep,
 };
 use tokio_util::codec::FramedRead;
-use tracing::Span;
+use tracing::{Instrument, Span};
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
@@ -452,13 +452,13 @@ async fn kafka_source(
         let consumer_state =
             ConsumerStateInner::<Consuming>::new(config, decoder, out, log_namespace);
         tokio::spawn(async move {
-            let _enter = span.enter();
             coordinate_kafka_callbacks(
                 consumer,
                 callback_rx,
                 consumer_state,
                 drain_timeout_ms,
                 eof_tx,
+                span,
             )
             .await;
         })
@@ -575,6 +575,7 @@ impl ConsumerStateInner<Consuming> {
         p: StreamPartitionQueue<KafkaSourceContext>,
         acknowledgements: bool,
         exit_eof: bool,
+        span: Span,
     ) -> (oneshot::Sender<()>, tokio::task::AbortHandle) {
         let keys = self.config.keys();
         let decoder = self.decoder.clone();
@@ -611,13 +612,15 @@ impl ConsumerStateInner<Consuming> {
                             _ => emit!(KafkaReadError { error }),
                         },
                         Some(Ok(msg)) => {
+                            let e = span.enter();
                             emit!(KafkaBytesReceived {
                                 byte_size: msg.payload_len(),
                                 protocol: "tcp",
                                 topic: msg.topic(),
                                 partition: msg.partition(),
                             });
-                            parse_message(msg, decoder.clone(), &keys, &mut out, acknowledgements, &finalizer, log_namespace).await;
+                            drop(e);
+                            parse_message(msg, decoder.clone(), &keys, &mut out, acknowledgements, &finalizer, log_namespace).instrument(span.clone()).await;
                         }
                     },
 
@@ -726,6 +729,7 @@ async fn coordinate_kafka_callbacks(
     consumer_state: ConsumerStateInner<Consuming>,
     max_drain_ms: Duration,
     mut eof: Option<oneshot::Sender<()>>,
+    span: Span,
 ) {
     let mut drain_deadline: OptionFuture<_> = None.into();
     let mut consumer_state = ConsumerState::Consuming(consumer_state);
@@ -797,7 +801,7 @@ async fn coordinate_kafka_callbacks(
                             let partition = tp.1;
                             if let Some(pq) = consumer.split_partition_queue(topic, partition) {
                                 debug!("Consuming partition {}:{}.", &tp.0, tp.1);
-                                let (end_tx, handle) = consumer_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof);
+                                let (end_tx, handle) = consumer_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof, span.clone());
                                 abort_handles.insert(tp.clone(), handle);
                                 end_signals.insert(tp, end_tx);
                             } else {
