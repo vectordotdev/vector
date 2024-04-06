@@ -612,15 +612,13 @@ impl ConsumerStateInner<Consuming> {
                             _ => emit!(KafkaReadError { error }),
                         },
                         Some(Ok(msg)) => {
-                            let e = span.enter();
                             emit!(KafkaBytesReceived {
                                 byte_size: msg.payload_len(),
                                 protocol: "tcp",
                                 topic: msg.topic(),
                                 partition: msg.partition(),
                             });
-                            drop(e);
-                            parse_message(msg, decoder.clone(), &keys, &mut out, acknowledgements, &finalizer, log_namespace).instrument(span.clone()).await;
+                            parse_message(msg, decoder.clone(), &keys, &mut out, acknowledgements, &finalizer, log_namespace).await;
                         }
                     },
 
@@ -643,7 +641,7 @@ impl ConsumerStateInner<Consuming> {
                 )
             }
             (tp, status)
-        });
+        }.instrument(span));
         (end_tx, handle)
     }
 
