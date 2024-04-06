@@ -450,7 +450,7 @@ async fn kafka_source(
             .drain_timeout_ms
             .map_or(config.session_timeout_ms / 2, Duration::from_millis);
         let consumer_state =
-            ConsumerStateInner::<Consuming>::new(config, decoder, out, log_namespace);
+            ConsumerStateInner::<Consuming>::new(config, decoder, out, log_namespace, span);
         tokio::spawn(async move {
             coordinate_kafka_callbacks(
                 consumer,
@@ -458,7 +458,6 @@ async fn kafka_source(
                 consumer_state,
                 drain_timeout_ms,
                 eof_tx,
-                span,
             )
             .await;
         })
@@ -502,7 +501,10 @@ struct ConsumerStateInner<S> {
     log_namespace: LogNamespace,
     consumer_state: S,
 }
-struct Consuming;
+struct Consuming {
+    /// The source's tracing Span used to instrument metrics emitted by consumer tasks
+    span: Span,
+}
 struct Draining {
     /// The rendezvous channel sender from the revoke or shutdown callback. Sending on this channel
     /// indicates to the kafka client task that one or more partitions have been drained, while
@@ -521,6 +523,9 @@ struct Draining {
     /// the `finish_drain` method will return a Complete state, otherwise
     /// a Consuming state.
     shutdown: bool,
+
+    /// The source's tracing Span used to instrument metrics emitted by consumer tasks
+    span: Span,
 }
 type OptionDeadline = OptionFuture<Pin<Box<Sleep>>>;
 enum ConsumerState {
@@ -529,11 +534,12 @@ enum ConsumerState {
     Complete,
 }
 impl Draining {
-    fn new(signal: SyncSender<()>, shutdown: bool) -> Self {
+    fn new(signal: SyncSender<()>, shutdown: bool, span: Span) -> Self {
         Self {
             signal,
             shutdown,
             expect_drain: HashSet::new(),
+            span,
         }
     }
 
@@ -554,13 +560,14 @@ impl ConsumerStateInner<Consuming> {
         decoder: Decoder,
         out: SourceSender,
         log_namespace: LogNamespace,
+        span: Span,
     ) -> Self {
         Self {
             config,
             decoder,
             out,
             log_namespace,
-            consumer_state: Consuming,
+            consumer_state: Consuming { span },
         }
     }
 
@@ -575,7 +582,6 @@ impl ConsumerStateInner<Consuming> {
         p: StreamPartitionQueue<KafkaSourceContext>,
         acknowledgements: bool,
         exit_eof: bool,
-        span: Span,
     ) -> (oneshot::Sender<()>, tokio::task::AbortHandle) {
         let keys = self.config.keys();
         let decoder = self.decoder.clone();
@@ -641,7 +647,7 @@ impl ConsumerStateInner<Consuming> {
                 )
             }
             (tp, status)
-        }.instrument(span));
+        }.instrument(self.consumer_state.span.clone()));
         (end_tx, handle)
     }
 
@@ -660,7 +666,7 @@ impl ConsumerStateInner<Consuming> {
             decoder: self.decoder,
             out: self.out,
             log_namespace: self.log_namespace,
-            consumer_state: Draining::new(sig, shutdown),
+            consumer_state: Draining::new(sig, shutdown, self.consumer_state.span),
         };
 
         (Some(deadline).into(), draining)
@@ -710,7 +716,7 @@ impl ConsumerStateInner<Draining> {
                     decoder: self.decoder,
                     out: self.out,
                     log_namespace: self.log_namespace,
-                    consumer_state: Consuming,
+                    consumer_state: Consuming { span: self.consumer_state.span },
                 }),
             )
         }
@@ -727,7 +733,6 @@ async fn coordinate_kafka_callbacks(
     consumer_state: ConsumerStateInner<Consuming>,
     max_drain_ms: Duration,
     mut eof: Option<oneshot::Sender<()>>,
-    span: Span,
 ) {
     let mut drain_deadline: OptionFuture<_> = None.into();
     let mut consumer_state = ConsumerState::Consuming(consumer_state);
@@ -799,7 +804,7 @@ async fn coordinate_kafka_callbacks(
                             let partition = tp.1;
                             if let Some(pq) = consumer.split_partition_queue(topic, partition) {
                                 debug!("Consuming partition {}:{}.", &tp.0, tp.1);
-                                let (end_tx, handle) = consumer_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof, span.clone());
+                                let (end_tx, handle) = consumer_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof);
                                 abort_handles.insert(tp.clone(), handle);
                                 end_signals.insert(tp, end_tx);
                             } else {
