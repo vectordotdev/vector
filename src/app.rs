@@ -222,7 +222,7 @@ impl Application {
         let config = runtime.block_on(ApplicationConfig::from_opts(
             &opts.root,
             &mut signals.handler,
-            extra_context.clone(),
+            extra_context,
         ))?;
 
         Ok((
