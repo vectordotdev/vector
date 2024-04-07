@@ -156,7 +156,6 @@ mod tests {
         metric_tags!(
             "normal_tag" => "value1",
             ".workaround" => "value2",
-            "empty_tag" => "",
         )
     }
 
@@ -192,7 +191,6 @@ mod tests {
 
     #[test]
     fn kafka_get_key_from_metric_from_normal_tag() {
-        // Test to confirm the current work-around for parition keys does not break
         let event = Event::Metric(metric());
         let key_field = OwnedTargetPath::try_from(".tags.normal_tag".to_string()).unwrap();
         let key_value = get_key(&event, Some(&key_field));
@@ -201,18 +199,17 @@ mod tests {
     }
 
     #[test]
-    fn kafka_get_key_from_metric_from_empty_tag() {
-        // Test to confirm the current work-around for parition keys does not break
+    fn kafka_get_key_from_metric_from_missing_tag() {
         let event = Event::Metric(metric());
-        let key_field = OwnedTargetPath::try_from(".tags.empty_tag".to_string()).unwrap();
+        let key_field = OwnedTargetPath::try_from(".tags.missing_tag".to_string()).unwrap();
         let key_value = get_key(&event, Some(&key_field));
 
-        assert_eq!(key_value.unwrap().as_ref(), "".as_bytes());
+        assert_eq!(key_value, None);
     }
 
     #[test]
     fn kafka_get_key_from_metric_from_workaround_tag() {
-        // Test to confirm the current work-around for parition keys does not break
+        // Also test that explicitly referencing a workaround tag works as expected
         let event = Event::Metric(metric());
         let key_field = OwnedTargetPath::try_from(".tags.\".workaround\"".to_string()).unwrap();
         let key_value = get_key(&event, Some(&key_field));
