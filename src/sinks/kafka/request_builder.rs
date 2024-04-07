@@ -122,8 +122,11 @@ mod tests {
     use bytes::Bytes;
     use rdkafka::message::Headers;
 
+    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
+    use similar_asserts::assert_eq;
+
     use super::*;
-    use crate::event::{LogEvent, ObjectMap};
+    use crate::event::{LogEvent, Metric, MetricKind, MetricTags, MetricValue, ObjectMap};
 
     #[test]
     fn kafka_get_headers() {
@@ -140,5 +143,80 @@ mod tests {
         assert_eq!(headers.get(0).value.unwrap(), "a-value".as_bytes());
         assert_eq!(headers.get(1).key, "b-key");
         assert_eq!(headers.get(1).value.unwrap(), "b-value".as_bytes());
+    }
+
+    fn ts() -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+            .single()
+            .and_then(|t| t.with_nanosecond(11))
+            .expect("invalid timestamp")
+    }
+
+    fn tags() -> MetricTags {
+        metric_tags!(
+            "normal_tag" => "value1",
+            ".workaround" => "value2",
+            "empty_tag" => "",
+        )
+    }
+
+    fn metric() -> Metric {
+        Metric::new(
+            "test_name",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 2.0 },
+        )
+        .with_namespace(Some("test_namespace"))
+        .with_tags(Some(tags()))
+        .with_timestamp(Some(ts()))
+    }
+
+    #[test]
+    fn kafka_get_key_from_metric_with_workaround() {
+        // Test to confirm the current work-around for parition keys does not break
+        let event = Event::Metric(metric());
+        let key_field = OwnedTargetPath::try_from(".workaround".to_string()).unwrap();
+        let key_value = get_key(&event, Some(&key_field));
+
+        assert_eq!(key_value.unwrap().as_ref(), "value2".as_bytes());
+    }
+
+    #[test]
+    fn kafka_get_key_from_metric_from_name() {
+        let event = Event::Metric(metric());
+        let key_field = OwnedTargetPath::try_from(".name".to_string()).unwrap();
+        let key_value = get_key(&event, Some(&key_field));
+
+        assert_eq!(key_value.unwrap().as_ref(), "test_name".as_bytes());
+    }
+
+    #[test]
+    fn kafka_get_key_from_metric_from_normal_tag() {
+        // Test to confirm the current work-around for parition keys does not break
+        let event = Event::Metric(metric());
+        let key_field = OwnedTargetPath::try_from(".tags.normal_tag".to_string()).unwrap();
+        let key_value = get_key(&event, Some(&key_field));
+
+        assert_eq!(key_value.unwrap().as_ref(), "value1".as_bytes());
+    }
+
+    #[test]
+    fn kafka_get_key_from_metric_from_empty_tag() {
+        // Test to confirm the current work-around for parition keys does not break
+        let event = Event::Metric(metric());
+        let key_field = OwnedTargetPath::try_from(".tags.empty_tag".to_string()).unwrap();
+        let key_value = get_key(&event, Some(&key_field));
+
+        assert_eq!(key_value.unwrap().as_ref(), "".as_bytes());
+    }
+
+    #[test]
+    fn kafka_get_key_from_metric_from_workaround_tag() {
+        // Test to confirm the current work-around for parition keys does not break
+        let event = Event::Metric(metric());
+        let key_field = OwnedTargetPath::try_from(".tags.\".workaround\"".to_string()).unwrap();
+        let key_value = get_key(&event, Some(&key_field));
+
+        assert_eq!(key_value.unwrap().as_ref(), "value2".as_bytes());
     }
 }
