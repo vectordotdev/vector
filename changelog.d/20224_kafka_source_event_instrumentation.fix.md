@@ -1,3 +1,3 @@
-The Kafka source emits reveived bytes and event counts corerctly.
+The Kafka source emits received bytes and event counts corerctly.
 
 authors: jches
