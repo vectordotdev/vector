@@ -14,15 +14,15 @@ mod tests;
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests;
 
-use std::convert::TryFrom;
+use std::{convert::TryFrom, fmt};
 
 pub use common::*;
 pub use config::*;
 pub use encoder::ElasticsearchEncoder;
 use http::{uri::InvalidUri, Request};
 use snafu::Snafu;
-use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, internal_event};
 
 use crate::{
     event::{EventRef, LogEvent},
@@ -168,6 +168,22 @@ pub enum ElasticsearchCommonMode {
     DataStream(DataStreamConfig),
 }
 
+struct VersionValueParseError<'a> {
+    value: &'a str,
+}
+
+impl internal_event::InternalEvent for VersionValueParseError<'_> {
+    fn emit(self) {
+        warn!("{self}")
+    }
+}
+
+impl fmt::Display for VersionValueParseError<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Cannot parse version \"{}\" as integer", self.value)
+    }
+}
+
 impl ElasticsearchCommonMode {
     fn index(&self, log: &LogEvent) -> Option<String> {
         match self {
@@ -219,7 +235,13 @@ impl ElasticsearchCommonMode {
                         });
                     })
                     .ok()
-                    .and_then(|value| value.parse().ok()),
+                    .as_ref()
+                    .and_then(|value| {
+                        value
+                            .parse()
+                            .map_err(|_| emit!(VersionValueParseError { value }))
+                            .ok()
+                    }),
                 None => None,
             },
             _ => None,
