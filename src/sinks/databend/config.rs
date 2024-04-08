@@ -46,11 +46,11 @@ pub struct DatabendConfig {
     )]
     pub tls: Option<TlsConfig>,
 
-    /// The database that contains the table that data is inserted into. will override the database in DSN.
+    /// The database that contains the table that data is inserted into. Overrides the database in DSN.
     #[configurable(metadata(docs::examples = "mydatabase"))]
     pub database: Option<String>,
 
-    /// The username&password to authenticate with, will override the username&password in DSN.
+    /// The username and password to authenticate with. Overrides the username and password in DSN.
     #[configurable(derived)]
     pub auth: Option<Auth>,
 

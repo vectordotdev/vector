@@ -28,7 +28,7 @@ base: components: sinks: databend: configuration: {
 		}
 	}
 	auth: {
-		description: "The username&password to authenticate with, will override the username&password in DSN."
+		description: "The username and password to authenticate with. Overrides the username and password in DSN."
 		required:    false
 		type: object: options: {
 			password: {
@@ -117,7 +117,7 @@ base: components: sinks: databend: configuration: {
 		}
 	}
 	database: {
-		description: "The database that contains the table that data is inserted into. will override the database in DSN."
+		description: "The database that contains the table that data is inserted into. Overrides the database in DSN."
 		required:    false
 		type: string: examples: ["mydatabase"]
 	}
