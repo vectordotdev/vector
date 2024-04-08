@@ -33,7 +33,12 @@ releases: "0.37.0": {
 
 	known_issues: [
 		"""
-			The `parse_ddtags` setting added to the `datadog_agent` Source incorrectly parses the tags into an object instead of an array.
+			The `geoip2` enrichment table type stopped handling `GeoLite2-City` mmdb types. This is fixed in v0.37.1.
+			""",
+		"""
+			The `parse_ddtags` setting added to the `datadog_agent` source incorrectly parses the
+			tags into an object instead of an array. The `datadog_logs` sink also failed to
+			reconstruct the parsed tags. This will be fixed in v0.38.0.
 			""",
 	]
 
