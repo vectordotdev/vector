@@ -36,5 +36,7 @@ releases: "0.37.1": {
 		{sha: "1cb0b96459ba23aa821fee2725680a42146944c6", date: "2024-03-30 05:14:41 UTC", description: "Only use one label for selecting GHA runner", pr_number:                              20210, scopes: ["ci"], type:                         "chore", breaking_change: false, author: "Jesse Szwedko", files_count:            11, insertions_count: 26, deletions_count:  26},
 		{sha: "8c99fd31e51934647b1e7e4e341992b4edee4070", date: "2024-03-29 05:32:26 UTC", description: "align `ddtags` parsing with DD logs intake", pr_number:                               20184, scopes: ["datadog_agent"], type:              "fix", breaking_change:   true, author:  "neuronull", files_count:                5, insertions_count:  16, deletions_count:  37},
 		{sha: "e3831a86e77057acfb4ecccb1625d7a5c381fd8c", date: "2024-04-02 21:45:46 UTC", description: "reconstruct `ddtags` if not already in format expected by DD logs intake", pr_number: 20198, scopes: ["datadog_logs sink"], type:          "fix", breaking_change:   false, author: "neuronull", files_count:                5, insertions_count:  195, deletions_count: 28},
+		{sha: "7f0dc8fc63ec982a16682a462fc10584f21cdbba", date: "2024-04-05 21:31:59 UTC", description: "Update h2", pr_number:                                                                20236, scopes: ["deps"], type:                       "chore", breaking_change: false, author: "Jesse Szwedko", files_count:            1, insertions_count:  10, deletions_count:  10},
+
 	]
 }
