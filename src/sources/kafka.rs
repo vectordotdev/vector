@@ -716,7 +716,9 @@ impl ConsumerStateInner<Draining> {
                     decoder: self.decoder,
                     out: self.out,
                     log_namespace: self.log_namespace,
-                    consumer_state: Consuming { span: self.consumer_state.span },
+                    consumer_state: Consuming {
+                        span: self.consumer_state.span,
+                    },
                 }),
             )
         }
