@@ -37,7 +37,7 @@ releases: "0.37.0": {
 			""",
 		"""
 			The `parse_ddtags` setting added to the `datadog_agent` source incorrectly parses the
-			tags into an object instead of an array. The `datadog_logs` sink also failed to
+			tags into an object instead of an array. The `datadog_logs` sink also fails to
 			reconstruct the parsed tags. This will be fixed in v0.38.0.
 			""",
 	]
