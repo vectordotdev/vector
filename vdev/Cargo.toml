@@ -9,7 +9,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.81"
-cached = "0.49.2"
+cached = "0.49.3"
 chrono.workspace = true
 clap.workspace = true
 clap-verbosity-flag = "2.2.0"
