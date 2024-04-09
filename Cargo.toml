@@ -267,6 +267,7 @@ chrono-tz = { version = "0.8.6", default-features = false }
 cidr-utils = { version = "0.6.1", default-features = false }
 colored = { version = "2.1.0", default-features = false }
 csv = { version = "1.3", default-features = false }
+databend-client ={ version = "0.16.1", default-features = false, features = ["rustls"], optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.17", default-features = false }
@@ -719,7 +720,7 @@ sinks-blackhole = []
 sinks-chronicle = []
 sinks-clickhouse = []
 sinks-console = []
-sinks-databend = []
+sinks-databend = ["dep:databend-client"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost-reflect"]

@@ -97,7 +97,7 @@ components: sinks: databend: {
 				    The `stage_path` generated from: `vector/{database}/{table}/{timestamp}-{random_suffix}`
 				2. Format data into ndjson, and upload directly into object storage with the presigned url.
 				3. Insert with the uploaded file with stage attachment in previous step.
-				    ref: https://databend.rs/doc/sql-commands/dml/dml-insert#insert-with-stage-attachment
+				    ref: https://docs.databend.com/developer/apis/http#stage-attachment
 				"""
 		}
 	}
