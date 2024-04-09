@@ -16,7 +16,7 @@ use crate::{
 
 use super::{
     encoder::{DocumentMetadata, DocumentVersion, DocumentVersionType},
-    ElasticsearchCommon, ElasticsearchConfig,
+    ElasticsearchCommon, ElasticsearchConfig, VersionType,
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -126,21 +126,21 @@ pub(super) fn process_log(
     } else {
         None
     };
-    let document_metadata = match (id, mode.version_type(), mode.version(&log)) {
+    let document_metadata = match (id.clone(), mode.version_type(), mode.version(&log)) {
         (None, _, _) => DocumentMetadata::WithoutId,
         (Some(id), None, None) | (Some(id), None, Some(_)) | (Some(id), Some(_), None) => {
             DocumentMetadata::Id(id)
         }
         (Some(id), Some(version_type), Some(version)) => match version_type {
-            super::VersionType::Internal => DocumentMetadata::Id(id),
-            super::VersionType::External => DocumentMetadata::IdAndVersion(
+            VersionType::Internal => DocumentMetadata::Id(id),
+            VersionType::External => DocumentMetadata::IdAndVersion(
                 id,
                 DocumentVersion {
                     kind: DocumentVersionType::External,
                     value: version,
                 },
             ),
-            super::VersionType::ExternalGte => DocumentMetadata::IdAndVersion(
+            VersionType::ExternalGte => DocumentMetadata::IdAndVersion(
                 id,
                 DocumentVersion {
                     kind: DocumentVersionType::ExternalGte,
