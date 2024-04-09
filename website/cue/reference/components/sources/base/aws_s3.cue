@@ -607,12 +607,12 @@ base: components: sources: aws_s3: configuration: {
 			}
 			max_number_of_messages: {
 				description: """
-					Maximum number of messages to poll from sqs in a batch
+					Maximum number of messages to poll from SQS in a batch
 
 					Defaults to 10
 
-					Should be set to smaller numbers when the files are larger to help prevent large ingestions
-					from causing other files to exceed the visibility_timeout. Valid values are 1 - 10
+					Should be set to a smaller value when the files are large to help prevent the ingestion of
+					one file from causing the other files to exceed the visibility_timeout. Valid values are 1 - 10
 					"""
 				required: false
 				type: uint: {

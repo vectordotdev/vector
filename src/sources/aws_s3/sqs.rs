@@ -122,12 +122,12 @@ pub(super) struct Config {
     #[configurable(metadata(docs::examples = 5))]
     pub(super) client_concurrency: Option<NonZeroUsize>,
 
-    /// Maximum number of messages to poll from sqs in a batch
+    /// Maximum number of messages to poll from SQS in a batch
     ///
     /// Defaults to 10
     ///
-    /// Should be set to smaller numbers when the files are larger to help prevent large ingestions
-    /// from causing other files to exceed the visibility_timeout. Valid values are 1 - 10
+    /// Should be set to a smaller value when the files are large to help prevent the ingestion of
+    /// one file from causing the other files to exceed the visibility_timeout. Valid values are 1 - 10
     // NOTE: We restrict this to u32 for safe conversion to i32 later.
     #[serde(default = "default_max_number_of_messages")]
     #[derivative(Default(value = "default_max_number_of_messages()"))]
@@ -163,6 +163,10 @@ pub(super) enum IngestorNewError {
     InvalidVisibilityTimeout {
         source: std::num::TryFromIntError,
         timeout: u64,
+    },
+    #[snafu(display("Invalid value for max_number_of_messages {}", messages))]
+    InvalidNumberOfMessages {
+        messages: u32,
     },
 }
 
@@ -246,6 +250,11 @@ impl Ingestor {
         multiline: Option<line_agg::Config>,
         decoder: Decoder,
     ) -> Result<Ingestor, IngestorNewError> {
+        if config.max_number_of_messages < 1 || config.max_number_of_messages > 10 {
+            return Err(IngestorNewError::InvalidNumberOfMessages {
+                messages: config.max_number_of_messages
+            });
+        }
         let state = Arc::new(State {
             region,
 
