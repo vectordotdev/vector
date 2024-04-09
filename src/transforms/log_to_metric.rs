@@ -1990,7 +1990,9 @@ mod tests {
             Metric::new_with_metadata(
                 "test.transform.set",
                 MetricKind::Incremental,
-                MetricValue::Set { values: vec!["990.0".into(), "1234".into()].into_iter().collect() },
+                MetricValue::Set {
+                    values: vec!["990.0".into(), "1234".into()].into_iter().collect()
+                },
                 metric.metadata().clone(),
             )
             .with_namespace(Some("test_namespace"))
