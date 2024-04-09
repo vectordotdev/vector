@@ -85,6 +85,6 @@ components: sources: statsd: {
 		}
 	}
 	telemetry: metrics: {
-		component_received_bytes:     components.sources.internal_metrics.output.metrics.component_received_bytes
+		component_received_bytes: components.sources.internal_metrics.output.metrics.component_received_bytes
 	}
 }
