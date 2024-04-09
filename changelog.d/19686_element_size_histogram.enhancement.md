@@ -4,4 +4,4 @@ Added a new histogram metric, `component_received_bytes`, that measures the byte
 - `statsd`
 - `syslog`
 
-authors: Pablo E.
+authors: pabloem
