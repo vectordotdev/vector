@@ -196,7 +196,7 @@ aws-smithy-http = { version = "0.60", default-features = false, features = ["eve
 aws-smithy-types = { version = "1.1.8", default-features = false, optional = true }
 aws-smithy-runtime-api = { version = "1.2.0", default-features = false, optional = true }
 aws-smithy-runtime = { version = "1.1.8", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
-aws-smithy-async = { version = "1.2.0", default-features = false, features = ["rt-tokio"], optional = true }
+aws-smithy-async = { version = "1.2.1", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
