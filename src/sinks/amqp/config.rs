@@ -21,7 +21,7 @@ pub struct AmqpPropertiesConfig {
 
     /// Expiration for AMQP messages (in milliseconds)
     #[configurable(derived)]
-    pub(crate) expiration: Option<String>,
+    pub(crate) expiration: Option<u64>,
 }
 
 impl AmqpPropertiesConfig {
