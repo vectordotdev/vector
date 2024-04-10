@@ -312,6 +312,11 @@ base: components: sinks: amqp: configuration: {
 				required:    false
 				type: string: {}
 			}
+			expiration_ms: {
+				description: "Expiration for AMQP messages (in milliseconds)"
+				required:    false
+				type: uint: {}
+			}
 		}
 	}
 	routing_key: {

@@ -12,16 +12,13 @@ use super::sink::AmqpSink;
 #[derive(Clone, Debug, Default)]
 pub struct AmqpPropertiesConfig {
     /// Content-Type for the AMQP messages.
-    #[configurable(derived)]
     pub(crate) content_type: Option<String>,
 
     /// Content-Encoding for the AMQP messages.
-    #[configurable(derived)]
     pub(crate) content_encoding: Option<String>,
 
     /// Expiration for AMQP messages (in milliseconds)
-    #[configurable(derived)]
-    pub(crate) expiration: Option<u64>,
+    pub(crate) expiration_ms: Option<u64>,
 }
 
 impl AmqpPropertiesConfig {
@@ -33,8 +30,8 @@ impl AmqpPropertiesConfig {
         if let Some(content_encoding) = &self.content_encoding {
             prop = prop.with_content_encoding(ShortString::from(content_encoding.clone()));
         }
-        if let Some(expiration) = &self.expiration {
-            prop = prop.with_expiration(ShortString::from(expiration.clone()));
+        if let Some(expiration_ms) = &self.expiration_ms {
+            prop = prop.with_expiration(ShortString::from(expiration_ms.to_string()));
         }
         prop
     }
