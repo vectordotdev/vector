@@ -698,6 +698,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
+          path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-gnueabi)
         uses: actions/download-artifact@v3
         with:
