@@ -206,6 +206,33 @@ impl AwsAuthentication {
         }
     }
 
+    /// Create the AssumeRoleProviderBuilder, ensuring we create the HTTP client with
+    /// the correct proxy and TLS options.
+    fn assume_role_provider_builder(
+        proxy: &ProxyConfig,
+        tls_options: &Option<TlsConfig>,
+        region: &Region,
+        assume_role: &str,
+        external_id: Option<&str>,
+    ) -> crate::Result<AssumeRoleProviderBuilder> {
+        let connector = super::connector(proxy, tls_options)?;
+        let config = SdkConfig::builder()
+            .http_client(connector)
+            .region(region.clone())
+            .time_source(SystemTimeSource::new())
+            .build();
+
+        let mut builder = AssumeRoleProviderBuilder::new(assume_role)
+            .region(region.clone())
+            .configure(&config);
+
+        if let Some(external_id) = external_id {
+            builder = builder.external_id(external_id)
+        }
+
+        Ok(builder)
+    }
+
     /// Returns the provider for the credentials based on the authentication mechanism chosen.
     pub async fn credentials_provider(
         &self,
@@ -228,12 +255,13 @@ impl AwsAuthentication {
                 ));
                 if let Some(assume_role) = assume_role {
                     let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                    let mut builder =
-                        AssumeRoleProviderBuilder::new(assume_role).region(auth_region);
-
-                    if let Some(external_id) = external_id {
-                        builder = builder.external_id(external_id)
-                    }
+                    let builder = Self::assume_role_provider_builder(
+                        proxy,
+                        tls_options,
+                        &auth_region,
+                        assume_role,
+                        external_id.as_deref(),
+                    )?;
 
                     let provider = builder.build_from_provider(provider).await;
 
@@ -264,20 +292,13 @@ impl AwsAuthentication {
                 ..
             } => {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                let connector = super::connector(proxy, tls_options)?;
-                let config = SdkConfig::builder()
-                    .http_client(connector)
-                    .region(auth_region.clone())
-                    .time_source(SystemTimeSource::new())
-                    .build();
-
-                let mut builder = AssumeRoleProviderBuilder::new(assume_role)
-                    .region(auth_region.clone())
-                    .configure(&config);
-
-                if let Some(external_id) = external_id {
-                    builder = builder.external_id(external_id)
-                }
+                let builder = Self::assume_role_provider_builder(
+                    proxy,
+                    tls_options,
+                    &auth_region,
+                    assume_role,
+                    external_id.as_deref(),
+                )?;
 
                 let provider = builder
                     .build_from_provider(
