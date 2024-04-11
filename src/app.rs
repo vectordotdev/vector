@@ -257,12 +257,29 @@ impl Application {
             require_healthy: root_opts.require_healthy,
             #[cfg(feature = "enterprise")]
             enterprise_reporter: config.enterprise,
-            extra_context: config.extra_context,
+            extra_context: config.extra_context.clone(),
         });
+
+        let internal_topologies: Vec<_> = config
+            .internal_topologies
+            .into_iter()
+            .map(|topology| {
+                SharedTopologyController::new(TopologyController {
+                    #[cfg(feature = "api")]
+                    api_server: None,
+                    topology,
+                    config_paths: Vec::new(),
+                    require_healthy: root_opts.require_healthy,
+                    #[cfg(feature = "enterprise")]
+                    enterprise_reporter: None,
+                    extra_context: config.extra_context.clone(),
+                })
+            })
+            .collect();
 
         Ok(StartedApplication {
             config_paths: config.config_paths,
-            internal_topologies: config.internal_topologies,
+            internal_topologies,
             graceful_crash_receiver: config.graceful_crash_receiver,
             signals,
             topology_controller,
@@ -273,7 +290,7 @@ impl Application {
 
 pub struct StartedApplication {
     pub config_paths: Vec<ConfigPath>,
-    pub internal_topologies: Vec<RunningTopology>,
+    pub internal_topologies: Vec<SharedTopologyController>,
     pub graceful_crash_receiver: ShutdownErrorReceiver,
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
@@ -391,7 +408,7 @@ pub struct FinishedApplication {
     pub signal: SignalTo,
     pub signal_rx: SignalRx,
     pub topology_controller: SharedTopologyController,
-    pub internal_topologies: Vec<RunningTopology>,
+    pub internal_topologies: Vec<SharedTopologyController>,
 }
 
 impl FinishedApplication {
@@ -403,11 +420,11 @@ impl FinishedApplication {
             internal_topologies,
         } = self;
 
-        // At this point, we'll have the only reference to the shared topology controller and can
-        // safely remove it from the wrapper to shut down the topology.
+        // At this point, we should have the only reference to the shared topology controllers and
+        // can safely remove it from the wrapper to shut down the topology.
         let topology_controller = topology_controller
             .try_into_inner()
-            .expect("fail to unwrap topology controller")
+            .expect("Topology controller is still shared, cannot stop")
             .into_inner();
 
         let status = match signal {
@@ -417,7 +434,11 @@ impl FinishedApplication {
         };
 
         for topology in internal_topologies {
-            topology.stop().await;
+            let Ok(topology) = topology.try_into_inner() else {
+                warn!("Internal topology controller is still shared, cannot stop.");
+                continue;
+            };
+            topology.into_inner().stop().await;
         }
 
         status
