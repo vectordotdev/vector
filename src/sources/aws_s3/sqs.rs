@@ -165,9 +165,7 @@ pub(super) enum IngestorNewError {
         timeout: u64,
     },
     #[snafu(display("Invalid value for max_number_of_messages {}", messages))]
-    InvalidNumberOfMessages {
-        messages: u32,
-    },
+    InvalidNumberOfMessages { messages: u32 },
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -252,7 +250,7 @@ impl Ingestor {
     ) -> Result<Ingestor, IngestorNewError> {
         if config.max_number_of_messages < 1 || config.max_number_of_messages > 10 {
             return Err(IngestorNewError::InvalidNumberOfMessages {
-                messages: config.max_number_of_messages
+                messages: config.max_number_of_messages,
             });
         }
         let state = Arc::new(State {
