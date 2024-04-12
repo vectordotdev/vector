@@ -273,14 +273,21 @@ impl AwsAuthentication {
                 credentials_file,
                 profile,
             } => {
+                let connector = super::connector(proxy, tls_options)?;
+
                 // The SDK uses the default profile out of the box, but doesn't provide an optional
                 // type in the builder. We can just hardcode it so that everything works.
                 let profile_files = ProfileFiles::builder()
                     .with_file(ProfileFileKind::Credentials, credentials_file)
                     .build();
+
+                let provider_config = ProviderConfig::empty()
+                    .with_http_client(connector);
+
                 let profile_provider = ProfileFileCredentialsProvider::builder()
                     .profile_files(profile_files)
                     .profile_name(profile)
+                    .configure(&provider_config)
                     .build();
                 Ok(SharedCredentialsProvider::new(profile_provider))
             }
