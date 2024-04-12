@@ -10,6 +10,7 @@ use vector_core::{compile_vrl, schema};
 use vrl::compiler::state::ExternalEnv;
 use vrl::compiler::{runtime::Runtime, CompileConfig, Program, TimeZone, TypeState};
 use vrl::diagnostic::Formatter;
+use vrl::path::OwnedTargetPath;
 use vrl::value::Kind;
 
 /// Config used to build a `VrlDeserializer`.
@@ -82,6 +83,7 @@ impl VrlDeserializerConfig {
             }
             LogNamespace::Vector => {
                 schema::Definition::new_with_default_metadata(Kind::any(), [log_namespace])
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
             }
         }
     }
@@ -138,6 +140,7 @@ mod tests {
     use super::*;
     use chrono::{DateTime, Utc};
     use indoc::indoc;
+    use vector_core::schema::Definition;
     use vrl::btreemap;
     use vrl::path::OwnedTargetPath;
     use vrl::value::Value;
@@ -316,5 +319,23 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("aborted"));
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let legacy_definition =
+            VrlDeserializerConfig::default().schema_definition(LogNamespace::Legacy);
+        let expected_definition = Definition::empty_legacy_namespace().unknown_fields(Kind::any());
+        assert_eq!(legacy_definition, expected_definition);
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let vector_definition =
+            VrlDeserializerConfig::default().schema_definition(LogNamespace::Vector);
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::any(), [LogNamespace::Vector])
+                .with_meaning(OwnedTargetPath::event_root(), "message");
+        assert_eq!(vector_definition, expected_definition);
     }
 }
