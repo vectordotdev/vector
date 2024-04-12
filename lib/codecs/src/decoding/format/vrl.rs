@@ -4,8 +4,9 @@ use bytes::Bytes;
 use derivative::Derivative;
 use smallvec::{smallvec, SmallVec};
 use vector_config_macros::configurable_component;
-use vector_core::config::{DataType, LogNamespace};
+use vector_core::config::{log_schema, DataType, LogNamespace};
 use vector_core::event::{Event, TargetEvents, VrlTarget};
+use vector_core::schema::meaning;
 use vector_core::{compile_vrl, schema};
 use vrl::compiler::state::ExternalEnv;
 use vrl::compiler::{runtime::Runtime, CompileConfig, Program, TimeZone, TypeState};
@@ -79,7 +80,17 @@ impl VrlDeserializerConfig {
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => {
-                schema::Definition::empty_legacy_namespace().unknown_fields(Kind::any())
+                let definition =
+                    schema::Definition::empty_legacy_namespace().unknown_fields(Kind::any());
+                if let Some(message_key) = log_schema().message_key() {
+                    definition.with_event_field(
+                        message_key,
+                        Kind::bytes().or_undefined(),
+                        Some(meaning::MESSAGE),
+                    )
+                } else {
+                    definition
+                }
             }
             LogNamespace::Vector => {
                 schema::Definition::new_with_default_metadata(Kind::any(), [log_namespace])
@@ -141,9 +152,9 @@ mod tests {
     use chrono::{DateTime, Utc};
     use indoc::indoc;
     use vector_core::schema::Definition;
-    use vrl::btreemap;
     use vrl::path::OwnedTargetPath;
     use vrl::value::Value;
+    use vrl::{btreemap, owned_value_path};
 
     fn make_decoder(source: &str) -> VrlDeserializer {
         VrlDeserializerConfig {
@@ -325,7 +336,13 @@ mod tests {
     fn output_schema_definition_legacy_namespace() {
         let legacy_definition =
             VrlDeserializerConfig::default().schema_definition(LogNamespace::Legacy);
-        let expected_definition = Definition::empty_legacy_namespace().unknown_fields(Kind::any());
+        let expected_definition = Definition::empty_legacy_namespace()
+            .unknown_fields(Kind::any())
+            .with_event_field(
+                &owned_value_path!("message"),
+                Kind::bytes().or_undefined(),
+                Some(meaning::MESSAGE),
+            );
         assert_eq!(legacy_definition, expected_definition);
     }
 
