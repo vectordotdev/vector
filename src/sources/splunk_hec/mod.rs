@@ -2534,6 +2534,7 @@ mod tests {
             Kind::object(Collection::empty()).or_bytes(),
             [LogNamespace::Vector],
         )
+        .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE)
         .with_metadata_field(
             &owned_value_path!("vector", "source_type"),
             Kind::bytes(),
