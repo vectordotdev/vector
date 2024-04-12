@@ -281,8 +281,7 @@ impl AwsAuthentication {
                     .with_file(ProfileFileKind::Credentials, credentials_file)
                     .build();
 
-                let provider_config = ProviderConfig::empty()
-                    .with_http_client(connector);
+                let provider_config = ProviderConfig::empty().with_http_client(connector);
 
                 let profile_provider = ProfileFileCredentialsProvider::builder()
                     .profile_files(profile_files)
