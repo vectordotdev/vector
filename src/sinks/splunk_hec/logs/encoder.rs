@@ -22,6 +22,7 @@ pub enum HecEvent<'a> {
     Text(Cow<'a, str>),
 }
 
+/// See https://docs.splunk.com/Documentation/Splunk/9.2.1/Data/FormateventsforHTTPEventCollector#Event_data.
 #[derive(Serialize, Debug)]
 pub struct HecData<'a> {
     #[serde(flatten)]
@@ -86,16 +87,21 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                     }
                     EndpointTarget::Event => {
                         let serializer = encoder.serializer();
-                        let hec_event = if serializer.supports_json() {
-                            HecEvent::Json(
-                                serializer
-                                    .to_json_value(event)
-                                    .map_err(|error| emit!(SplunkEventEncodeError { error }))
-                                    .ok()?,
-                            )
+                        let hec_event = if let Some(message) = event.as_log().get_message() {
+                            if serializer.supports_json() {
+                                let message_event = Event::from(LogEvent::from(message.clone()));
+                                HecEvent::Json(
+                                    serializer
+                                        .to_json_value(message_event)
+                                        .map_err(|error| emit!(SplunkEventEncodeError { error }))
+                                        .ok()?,
+                                )
+                            } else {
+                                encoder.encode(event, &mut bytes).ok()?;
+                                HecEvent::Text(String::from_utf8_lossy(&bytes))
+                            }
                         } else {
-                            encoder.encode(event, &mut bytes).ok()?;
-                            HecEvent::Text(String::from_utf8_lossy(&bytes))
+                            HecEvent::Text("".into())
                         };
 
                         let mut hec_data = HecData::new(
