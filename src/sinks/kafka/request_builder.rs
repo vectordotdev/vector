@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn kafka_get_key_from_metric_with_workaround() {
-        // Test to confirm the current work-around for parition keys does not break
+        // Confirm direct reference to dot-prefixed tag names does not break
         let event = Event::Metric(metric());
         let key_field = OwnedTargetPath::try_from(".workaround".to_string()).unwrap();
         let key_value = get_key(&event, Some(&key_field));
