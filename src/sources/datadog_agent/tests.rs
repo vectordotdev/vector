@@ -2485,11 +2485,7 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
                 Some("service")
             )
             .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-            .with_event_field(
-                &owned_value_path!("status"),
-                Kind::bytes(),
-                Some("status")
-            )
+            .with_event_field(&owned_value_path!("status"), Kind::bytes(), Some("status"))
             .with_event_field(
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
