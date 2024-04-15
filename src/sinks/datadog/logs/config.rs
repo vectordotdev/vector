@@ -168,7 +168,7 @@ impl SinkConfig for DatadogLogsConfig {
             .optional_meaning(meaning::TIMESTAMP, Kind::timestamp())
             .optional_meaning(meaning::HOST, Kind::bytes())
             .optional_meaning(meaning::SOURCE, Kind::bytes())
-            .optional_meaning(meaning::SEVERITY, Kind::bytes())
+            .optional_meaning(meaning::STATUS, Kind::bytes())
             .optional_meaning(meaning::SERVICE, Kind::bytes())
             .optional_meaning(meaning::TRACE_ID, Kind::bytes());
 

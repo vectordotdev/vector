@@ -247,7 +247,7 @@ impl SourceConfig for DatadogAgentConfig {
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("status"))),
                 &owned_value_path!("status"),
                 Kind::bytes(),
-                Some(meaning::SEVERITY),
+                Some(meaning::STATUS),
             )
             .with_source_metadata(
                 Self::NAME,

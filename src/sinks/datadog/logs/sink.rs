@@ -476,7 +476,7 @@ mod tests {
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("severity"))),
                 &owned_value_path!("severity"),
                 Kind::bytes(),
-                Some(meaning::SEVERITY),
+                Some(meaning::STATUS),
             )
             .with_source_metadata(
                 "datadog_agent",
@@ -549,7 +549,7 @@ mod tests {
                     Some(LegacyKey::InsertIfEmpty(owned_value_path!("severity"))),
                     &owned_value_path!("severity"),
                     Kind::bytes(),
-                    Some(meaning::SEVERITY),
+                    Some(meaning::STATUS),
                 )
                 .with_source_metadata(
                     "datadog_agent",

@@ -16,5 +16,6 @@ pub const HOST: &str = "host";
 pub const TAGS: &str = "tags";
 
 pub const SOURCE: &str = "source";
-pub const SEVERITY: &str = "severity";
+pub const STATUS: &str = "status";
 pub const TRACE_ID: &str = "trace_id";
+pub const SPAN_ID: &str = "span_id";
