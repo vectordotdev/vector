@@ -220,15 +220,15 @@ fn splunk_encode_log_event_text() {
 
     assert_eq!(
         hec_data.event.as_str(),
-        "{\"event_field1\":\"test_value1\",
-        \"event_field2\":\"test_value2\",
-        \"event_index\":\"test_index\",
-        \"event_source\":\"test_source\",
-        \"event_sourcetype\":\"test_sourcetype\",
-        \"host_key\":\"test_host\",
-        \"int_val\":123,
-        \"key\":\"value\",
-        \"msg\":\"hello world\",
+        "{\"event_field1\":\"test_value1\",\
+        \"event_field2\":\"test_value2\",\
+        \"event_index\":\"test_index\",\
+        \"event_source\":\"test_source\",\
+        \"event_sourcetype\":\"test_sourcetype\",\
+        \"host_key\":\"test_host\",\
+        \"int_val\":123,\
+        \"key\":\"value\",\
+        \"msg\":\"hello world\",\
         \"ts_nanos_key\":456123}"
     );
 
