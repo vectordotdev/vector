@@ -18,7 +18,7 @@ pub const DDTAGS: &str = "ddtags";
 /// to the field name that Datadog intake expects.
 // https://docs.datadoghq.com/logs/log_configuration/attributes_naming_convention/?s=severity#reserved-attributes
 pub const DD_RESERVED_SEMANTIC_ATTRS: [(&str, &str); 6] = [
-    (meaning::STATUS, "status"), // status is intentionally semantically defined as severity
+    (meaning::STATUS, "status"),
     (meaning::TIMESTAMP, "timestamp"),
     (meaning::HOST, "hostname"),
     (meaning::SERVICE, "service"),
