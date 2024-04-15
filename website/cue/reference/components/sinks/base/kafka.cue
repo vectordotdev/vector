@@ -339,13 +339,13 @@ base: components: sinks: kafka: configuration: {
 	}
 	key_field: {
 		description: """
-			The log field name or tag key to use for the topic key.
+			A path expression to a field of the event to use for the topic key.
 
-			If the field does not exist in the log or in the tags, a blank value is used. If
-			unspecified, the key is not sent.
-
+			If unspecified, or if the field does not exist in the log or metric, the key is not sent.
 			Kafka uses a hash of the key to choose the partition or uses round-robin if the record has
 			no key.
+
+			Metrics currently only support access to `name` and `tags`.
 			"""
 		required: false
 		type: string: examples: ["user_id", ".my_topic", "%my_topic"]
