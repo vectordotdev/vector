@@ -535,7 +535,7 @@ mod test {
                 .with_metadata_field(
                     &owned_value_path!("syslog", "severity"),
                     Kind::bytes().or_undefined(),
-                    Some("severity"),
+                    Some("status"),
                 )
                 .with_metadata_field(
                     &owned_value_path!("syslog", "facility"),
@@ -614,7 +614,7 @@ mod test {
         .with_event_field(
             &owned_value_path!("severity"),
             Kind::bytes().or_undefined(),
-            Some("severity"),
+            Some("status"),
         )
         .with_event_field(
             &owned_value_path!("facility"),

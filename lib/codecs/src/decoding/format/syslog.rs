@@ -85,7 +85,7 @@ impl SyslogDeserializerConfig {
                     .optional_field(
                         &owned_value_path!("severity"),
                         Kind::bytes(),
-                        Some("severity"),
+                        Some("status"),
                     )
                     .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
                     .optional_field(&owned_value_path!("version"), Kind::integer(), None)
@@ -130,7 +130,7 @@ impl SyslogDeserializerConfig {
                 .optional_field(
                     &owned_value_path!("severity"),
                     Kind::bytes(),
-                    Some("severity"),
+                    Some("status"),
                 )
                 .optional_field(&owned_value_path!("facility"), Kind::bytes(), None)
                 .optional_field(&owned_value_path!("version"), Kind::integer(), None)
@@ -177,7 +177,7 @@ impl SyslogDeserializerConfig {
                         None,
                         &owned_value_path!("severity"),
                         Kind::bytes().or_undefined(),
-                        Some("severity"),
+                        Some("status"),
                     )
                     .with_source_metadata(
                         source,

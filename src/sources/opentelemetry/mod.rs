@@ -217,7 +217,7 @@ impl SourceConfig for OpentelemetryConfig {
                 Some(LegacyKey::Overwrite(owned_value_path!(SEVERITY_TEXT_KEY))),
                 &owned_value_path!(SEVERITY_TEXT_KEY),
                 Kind::bytes().or_undefined(),
-                Some("severity"),
+                Some("status"),
             )
             .with_source_metadata(
                 Self::NAME,
