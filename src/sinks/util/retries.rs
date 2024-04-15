@@ -193,12 +193,14 @@ where
                     );
                     Some(self.build_retry())
                 } else {
+                    // For now, retry request in all cases
                     error!(
-                        message = "Unexpected error type; dropping the request.",
+                        // message = "Unexpected error type; dropping the request.",
+                        message = "Unexpected error type encountered.",
                         %error,
                         internal_log_rate_limit = true
                     );
-                    None
+                    Some(self.build_retry())
                 }
             }
         }

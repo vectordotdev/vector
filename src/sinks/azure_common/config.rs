@@ -59,9 +59,12 @@ impl RetryLogic for AzureBlobRetryLogic {
     type Error = HttpError;
     type Response = AzureBlobResponse;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.status().is_server_error()
-            || StatusCode::TOO_MANY_REQUESTS.as_u16() == Into::<u16>::into(error.status())
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        // For now, retry request in all cases
+
+        // error.status().is_server_error()
+        //     || StatusCode::TOO_MANY_REQUESTS.as_u16() == Into::<u16>::into(error.status())
+        true
     }
 }
 

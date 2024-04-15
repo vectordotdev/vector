@@ -15,7 +15,7 @@ use vector_lib::configurable::configurable_component;
 
 use super::service::{S3Response, S3Service};
 use crate::{
-    aws::{create_client, is_retriable_error, AwsAuthentication, RegionOrEndpoint},
+    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
     common::s3::S3ClientBuilder,
     config::ProxyConfig,
     http::status,
@@ -311,8 +311,11 @@ impl RetryLogic for S3RetryLogic {
     type Error = SdkError<PutObjectError, HttpResponse>;
     type Response = S3Response;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        is_retriable_error(error)
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        // For now, retry request in all cases
+
+        // is_retriable_error(error)
+        true
     }
 }
 
