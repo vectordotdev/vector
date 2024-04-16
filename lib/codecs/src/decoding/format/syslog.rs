@@ -7,13 +7,13 @@ use std::borrow::Cow;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol, Variant};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
+use vector_core::schema::meaning;
 use vector_core::{
     config::{log_schema, DataType},
     event::{Event, LogEvent, ObjectMap, Value},
     schema,
 };
 use vrl::value::{kind::Collection, Kind};
-use vector_core::schema::meaning;
 
 use super::{default_lossy, Deserializer};
 
