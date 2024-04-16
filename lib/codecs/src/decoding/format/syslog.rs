@@ -13,6 +13,7 @@ use vector_core::{
     schema,
 };
 use vrl::value::{kind::Collection, Kind};
+use vector_core::schema::meaning;
 
 use super::{default_lossy, Deserializer};
 
