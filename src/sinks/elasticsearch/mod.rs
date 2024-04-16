@@ -224,26 +224,26 @@ impl ElasticsearchCommonMode {
 
     fn version<'a>(&self, event: impl Into<EventRef<'a>>) -> Option<u64> {
         match self {
-            ElasticsearchCommonMode::Bulk { version, .. } => match &version {
-                Some(value) => value
-                    .render_string(event)
-                    .map_err(|error| {
-                        emit!(TemplateRenderingError {
-                            error,
-                            field: Some("version"),
-                            drop_event: true,
-                        });
-                    })
-                    .ok()
-                    .as_ref()
-                    .and_then(|value| {
-                        value
-                            .parse()
-                            .map_err(|_| emit!(VersionValueParseError { value }))
-                            .ok()
-                    }),
-                None => None,
-            },
+            ElasticsearchCommonMode::Bulk {
+                version: Some(version),
+                ..
+            } => version
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("version"),
+                        drop_event: true,
+                    });
+                })
+                .ok()
+                .as_ref()
+                .and_then(|value| {
+                    value
+                        .parse()
+                        .map_err(|_| emit!(VersionValueParseError { value }))
+                        .ok()
+                }),
             _ => None,
         }
     }
