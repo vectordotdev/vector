@@ -1,4 +1,13 @@
-#[cfg(all(test, feature = "vector-unit-test-tests"))]
+// should match vector-unit-test-tests feature
+#[cfg(all(
+    test,
+    feature = "sources-demo_logs",
+    feature = "transforms-remap",
+    feature = "transforms-route",
+    feature = "transforms-filter",
+    feature = "transforms-reduce",
+    feature = "sinks-console"
+))]
 mod tests;
 mod unit_test_components;
 
