@@ -261,6 +261,33 @@ base: components: sinks: elasticsearch: configuration: {
 					syntax: "template"
 				}
 			}
+			version: {
+				description: "Version field value."
+				required:    false
+				type: string: {
+					examples: ["{{ obj_version }}-%Y-%m-%d", "123"]
+					syntax: "template"
+				}
+			}
+			version_type: {
+				description: """
+					Version type.
+
+					Possible values are `internal`, `external` or `external_gt` and `external_gte`.
+
+					[es_index_versioning]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html#index-versioning
+					"""
+				required: false
+				type: string: {
+					default: "internal"
+					enum: {
+						external:     "The `external` or `external_gt` type."
+						external_gte: "The `external_gte` type."
+						internal:     "The `internal` type."
+					}
+					examples: ["internal", "external"]
+				}
+			}
 		}
 	}
 	compression: {
