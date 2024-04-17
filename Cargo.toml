@@ -220,7 +220,7 @@ serde_yaml = { version = "0.9.34", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "1.1.2", default-features = false, optional = true }
-rmpv = { version = "1.0.1", default-features = false, features = ["with-serde"], optional = true }
+rmpv = { version = "1.0.2", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost / Protocol Buffers
 prost = { version = "0.12", default-features = false, features = ["std"] }
