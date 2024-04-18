@@ -353,7 +353,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 mlua = { version = "0.9.7", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-service = "0.6.0"
+windows-service = "0.7.0"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.26.2", default-features = false, features = ["socket", "signal"] }
