@@ -11,6 +11,7 @@ mod exec;
 mod test;
 
 /// Configurable secret backends in Vector.
+#[allow(clippy::large_enum_variant)]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[enum_dispatch(SecretBackend)]
