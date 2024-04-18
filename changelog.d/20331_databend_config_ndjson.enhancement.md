@@ -1,3 +1,3 @@
-Added new config field `missing_field_as` to the `databend` sink as file format option for NDJSON encoding, default value is `NULL`.
+Added a new config field `missing_field_as` to the `databend` sink to specify the behavior when fields are missing. Previously the behavior was the same as setting this new configuration option to `ERROR`. The new default value is `NULL`.
 
 authors: everpcpc
