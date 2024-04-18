@@ -276,6 +276,22 @@ base: components: sinks: databend: configuration: {
 		required:    true
 		type: string: examples: ["databend://localhost:8000/default?sslmode=disable"]
 	}
+	missing_field_as: {
+		description: """
+			Defines how missing fields are handled for NDJson.
+			Refer to https://docs.databend.com/sql/sql-reference/file-format-options#null_field_as
+			"""
+		required: false
+		type: string: {
+			default: "NULL"
+			enum: {
+				ERROR:         "Generates an error if a missing field is encountered."
+				FIELD_DEFAULT: "Uses the default value of the field for missing fields."
+				NULL:          "Interprets missing fields as NULL values. An error will be generated for non-nullable fields."
+				TYPE_DEFAULT:  "Uses the default value of the field's data type for missing fields."
+			}
+		}
+	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.
