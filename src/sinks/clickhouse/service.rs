@@ -65,6 +65,7 @@ pub(super) struct ClickhouseServiceRequestBuilder {
     pub(super) endpoint: Uri,
     pub(super) skip_unknown_fields: bool,
     pub(super) date_time_best_effort: bool,
+    pub(super) insert_random_shard: bool,
     pub(super) compression: Compression,
 }
 
@@ -82,6 +83,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             metadata.format,
             self.skip_unknown_fields,
             self.date_time_best_effort,
+            self.insert_random_shard,
         )?;
 
         let auth: Option<Auth> = self.auth.clone();
@@ -112,6 +114,7 @@ fn set_uri_query(
     format: Format,
     skip_unknown: bool,
     date_time_best_effort: bool,
+    insert_random_shard: bool,
 ) -> crate::Result<Uri> {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
@@ -137,6 +140,9 @@ fn set_uri_query(
     }
     if date_time_best_effort {
         uri.push_str("date_time_input_format=best_effort&")
+    }
+    if insert_random_shard {
+        uri.push_str("insert_distributed_one_random_shard=1&")
     }
     uri.push_str(query.as_str());
 
