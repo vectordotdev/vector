@@ -23,7 +23,7 @@ use crate::{
 
 use super::{
     compression::DatabendCompression,
-    encoding::{DatabendEncodingConfig, DatabendSerializerConfig},
+    encoding::{DatabendEncodingConfig, DatabendMissingFieldAS, DatabendSerializerConfig},
     request_builder::DatabendRequestBuilder,
     service::{DatabendRetryLogic, DatabendService},
     sink::DatabendSink,
@@ -57,6 +57,10 @@ pub struct DatabendConfig {
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
     pub table: String,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub missing_field_as: DatabendMissingFieldAS,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -153,6 +157,7 @@ impl SinkConfig for DatabendConfig {
         let serializer = match self.encoding.config() {
             DatabendSerializerConfig::Json(_) => {
                 file_format_options.insert("type", "NDJSON");
+                file_format_options.insert("missing_field_as", self.missing_field_as.as_str());
                 encoding.build()?
             }
             DatabendSerializerConfig::Csv(_) => {
