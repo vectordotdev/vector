@@ -105,7 +105,7 @@ impl EncodingConfigWithFraming {
                 SinkType::MessageBased => CharacterDelimitedEncoder::new(b',').into(),
             },
             (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::new().into()
+                LengthDelimitedEncoder::default().into()
             }
             (None, Serializer::Gelf(_)) => {
                 // Graylog/GELF always uses null byte delimiter on TCP, see
@@ -115,7 +115,7 @@ impl EncodingConfigWithFraming {
             (None, Serializer::Protobuf(_)) => {
                 // Protobuf uses length-delimited messages, see:
                 // https://developers.google.com/protocol-buffers/docs/techniques#streaming
-                LengthDelimitedEncoder::new().into()
+                LengthDelimitedEncoder::default().into()
             }
             (
                 None,

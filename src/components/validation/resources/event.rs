@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use bytes::BytesMut;
 use serde::Deserialize;
+use serde_json::Value;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 
@@ -43,7 +44,7 @@ pub enum EventData {
     /// A simple log event.
     Log(String),
     /// A log event built from key-value pairs
-    LogBuilder(HashMap<String, String>),
+    LogBuilder(HashMap<String, Value>),
 }
 
 impl EventData {
@@ -172,7 +173,7 @@ pub fn encode_test_event(
             // versa.
             let mut alt_encoder = if encoder.serializer().supports_json() {
                 Encoder::<encoding::Framer>::new(
-                    LengthDelimitedEncoder::new().into(),
+                    LengthDelimitedEncoder::default().into(),
                     LogfmtSerializer::new().into(),
                 )
             } else {

@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use chrono::NaiveDateTime;
+use chrono::DateTime;
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
@@ -675,9 +675,7 @@ impl PubsubSource {
             "gcp_pubsub",
             &message.data,
             message.publish_time.map(|dt| {
-                NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
-                    .expect("invalid timestamp")
-                    .and_utc()
+                DateTime::from_timestamp(dt.seconds, dt.nanos as u32).expect("invalid timestamp")
             }),
             batch,
             log_namespace,
@@ -1004,9 +1002,7 @@ mod integration_tests {
     fn now_trunc() -> DateTime<Utc> {
         let start = Utc::now().timestamp();
         // Truncate the milliseconds portion, the hard way.
-        NaiveDateTime::from_timestamp_opt(start, 0)
-            .expect("invalid timestamp")
-            .and_utc()
+        DateTime::from_timestamp(start, 0).expect("invalid timestamp")
     }
 
     struct Tester {

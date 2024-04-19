@@ -287,7 +287,7 @@ jobs:
 
   build-baseline:
     name: Build baseline Vector container
-    runs-on: [linux, ubuntu-20.04-4core]
+    runs-on: ubuntu-20.04-4core
     timeout-minutes: 30
     needs:
       - compute-metadata
@@ -303,10 +303,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.1.0
+        uses: docker/setup-buildx-action@v3.3.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v5.2.0
+        uses: docker/build-push-action@v5.3.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -325,7 +325,7 @@ jobs:
 
   build-comparison:
     name: Build comparison Vector container
-    runs-on: [linux, ubuntu-20.04-4core]
+    runs-on: ubuntu-20.04-4core
     timeout-minutes: 30
     needs:
       - compute-metadata
@@ -341,10 +341,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.1.0
+        uses: docker/setup-buildx-action@v3.3.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v5.2.0
+        uses: docker/build-push-action@v5.3.0
         with:
           context: comparison-vector/
           cache-from: type=gha

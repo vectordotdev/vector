@@ -45,7 +45,7 @@ pub(crate) trait ComposeTestT {
         let environment = environment.into();
         let (test_dir, config) = ComposeTestConfig::load(Self::DIRECTORY, &test_name)?;
         let envs_dir = EnvsDir::new(&test_name);
-        let Some(mut env_config) = config.environments().get(&environment).map(Clone::clone) else {
+        let Some(mut env_config) = config.environments().get(&environment).cloned() else {
             bail!("Could not find environment named {environment:?}");
         };
 

@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use chrono::{NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
@@ -133,12 +133,12 @@ impl GelfDeserializer {
 
         if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
             if let Some(timestamp) = parsed.timestamp {
-                let naive = NaiveDateTime::from_timestamp_opt(
+                let dt = DateTime::from_timestamp(
                     f64::trunc(timestamp) as i64,
                     f64::fract(timestamp) as u32,
                 )
                 .expect("invalid timestamp");
-                log.insert(timestamp_key, naive.and_utc());
+                log.insert(timestamp_key, dt);
                 // per GELF spec- add timestamp if not provided
             } else {
                 log.insert(timestamp_key, Utc::now());
@@ -239,7 +239,6 @@ impl Deserializer for GelfDeserializer {
 mod tests {
     use super::*;
     use bytes::Bytes;
-    use chrono::NaiveDateTime;
     use lookup::event_path;
     use serde_json::json;
     use similar_asserts::assert_eq;
@@ -303,8 +302,8 @@ mod tests {
             )))
         );
         // Vector does not use the nanos
-        let naive = NaiveDateTime::from_timestamp_opt(1385053862, 0).expect("invalid timestamp");
-        assert_eq!(log.get(TIMESTAMP), Some(&Value::Timestamp(naive.and_utc())));
+        let dt = DateTime::from_timestamp(1385053862, 0).expect("invalid timestamp");
+        assert_eq!(log.get(TIMESTAMP), Some(&Value::Timestamp(dt)));
         assert_eq!(log.get(LEVEL), Some(&Value::Integer(1)));
         assert_eq!(
             log.get(FACILITY),

@@ -12,8 +12,7 @@ use crate::{
         prelude::*,
         splunk_hec::common::{
             acknowledgements::HecClientAcknowledgementsConfig,
-            build_healthcheck, build_http_batch_service, config_host_key_target_path,
-            config_timestamp_key_target_path, create_client,
+            build_healthcheck, build_http_batch_service, create_client,
             service::{HecService, HttpRequestBuilder},
             EndpointTarget, SplunkHecDefaultBatchSettings,
         },
@@ -53,12 +52,15 @@ pub struct HecLogsSinkConfig {
 
     /// Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
     ///
-    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used if log
+    /// events are Legacy namespaced, or the semantic meaning of "host" is used, if defined.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
+    // NOTE: The `OptionalTargetPath` is wrapped in an `Option` in order to distinguish between a true
+    //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
+    //       empty string to a `None` path internally.
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "config_host_key_target_path")]
-    pub host_key: OptionalTargetPath,
+    pub host_key: Option<OptionalTargetPath>,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
@@ -124,13 +126,16 @@ pub struct HecLogsSinkConfig {
     /// Overrides the name of the log field used to retrieve the timestamp to send to Splunk HEC.
     /// When set to `“”`, a timestamp is not set in the events sent to Splunk HEC.
     ///
-    /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
+    /// By default, either the [global `log_schema.timestamp_key` option][global_timestamp_key] is used
+    /// if log events are Legacy namespaced, or the semantic meaning of "timestamp" is used, if defined.
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[configurable(metadata(docs::advanced))]
-    #[serde(default = "crate::sinks::splunk_hec::common::config_timestamp_key_target_path")]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
-    pub timestamp_key: OptionalTargetPath,
+    // NOTE: The `OptionalTargetPath` is wrapped in an `Option` in order to distinguish between a true
+    //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
+    //       empty string to a `None` path internally.
+    pub timestamp_key: Option<OptionalTargetPath>,
 
     /// Passes the `auto_extract_timestamp` option to Splunk.
     ///
@@ -158,7 +163,7 @@ impl GenerateConfig for HecLogsSinkConfig {
         toml::Value::try_from(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
             endpoint: "endpoint".to_owned(),
-            host_key: config_host_key_target_path(),
+            host_key: None,
             indexed_fields: vec![],
             index: None,
             sourcetype: None,
@@ -170,7 +175,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
-            timestamp_key: config_timestamp_key_target_path(),
+            timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
         })
@@ -270,10 +275,11 @@ impl HecLogsSinkConfig {
                 .iter()
                 .map(|config_path| config_path.0.clone())
                 .collect(),
-            host_key: self.host_key.path.clone(),
+            host_key: self.host_key.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
-            timestamp_key: self.timestamp_key.path.clone(),
+            timestamp_key: self.timestamp_key.clone(),
             endpoint_target: self.endpoint_target,
+            auto_extract_timestamp: self.auto_extract_timestamp.unwrap_or_default(),
         };
 
         Ok(VectorSink::from_event_streamsink(sink))
@@ -284,7 +290,10 @@ impl HecLogsSinkConfig {
 mod tests {
     use super::*;
     use crate::components::validation::prelude::*;
-    use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
+    use vector_lib::{
+        codecs::{JsonSerializerConfig, MetricTagValues},
+        config::LogNamespace,
+    };
 
     #[test]
     fn generate_config() {
@@ -301,7 +310,7 @@ mod tests {
             let config = Self {
                 endpoint: endpoint.clone(),
                 default_token: "i_am_an_island".to_string().into(),
-                host_key: config_host_key_target_path(),
+                host_key: None,
                 indexed_fields: vec![],
                 index: None,
                 sourcetype: None,
@@ -323,7 +332,7 @@ mod tests {
                     ..Default::default()
                 },
                 timestamp_nanos_key: None,
-                timestamp_key: config_timestamp_key_target_path(),
+                timestamp_key: None,
                 auto_extract_timestamp: None,
                 endpoint_target: EndpointTarget::Raw,
             };
@@ -341,6 +350,7 @@ mod tests {
 
             ValidationConfiguration::from_sink(
                 Self::NAME,
+                LogNamespace::Legacy,
                 vec![ComponentTestCaseConfig::from_sink(
                     config,
                     None,
