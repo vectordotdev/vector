@@ -115,18 +115,25 @@ fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
     )
 }
 
+fn to_hex(d: &[u8]) -> String {
+    if d.is_empty() {
+        return "".to_string();
+    }
+    hex::encode(d)
+}
+
 // Unlike log events(log body + metadata), trace spans are just metadata, so we don't handle log_namespace here,
 // insert all attributes into log root, just like what datadog_agent/traces does.
 impl ResourceSpan {
     fn into_event(self, now: DateTime<Utc>) -> Event {
         let mut trace = TraceEvent::default();
         let span = self.span;
-        trace.insert(event_path!("trace_id"), Value::from(span.trace_id));
-        trace.insert(event_path!("span_id"), Value::from(span.span_id));
+        trace.insert(event_path!(TRACE_ID_KEY), Value::from(to_hex(&span.trace_id)));
+        trace.insert(event_path!(SPAN_ID_KEY), Value::from(to_hex(&span.span_id)));
         trace.insert(event_path!("trace_state"), span.trace_state);
         trace.insert(
             event_path!("parent_span_id"),
-            Value::from(span.parent_span_id),
+            Value::from(to_hex(&span.parent_span_id)),
         );
         trace.insert(event_path!("name"), span.name);
         trace.insert(event_path!("kind"), span.kind);
@@ -140,12 +147,12 @@ impl ResourceSpan {
         );
         if !span.attributes.is_empty() {
             trace.insert(
-                event_path!("attributes"),
+                event_path!(ATTRIBUTES_KEY),
                 kv_list_into_value(span.attributes),
             );
         }
         trace.insert(
-            event_path!("dropped_attributes_count"),
+            event_path!(DROPPED_ATTRIBUTES_COUNT_KEY),
             Value::from(span.dropped_attributes_count),
         );
         if !span.events.is_empty() {
@@ -229,7 +236,7 @@ impl ResourceLog {
                 &mut log,
                 Some(LegacyKey::Overwrite(path!(TRACE_ID_KEY))),
                 path!(TRACE_ID_KEY),
-                Bytes::from(hex::encode(self.log_record.trace_id)),
+                Bytes::from(to_hex(&self.log_record.trace_id)),
             );
         }
         if !self.log_record.span_id.is_empty() {
@@ -238,7 +245,7 @@ impl ResourceLog {
                 &mut log,
                 Some(LegacyKey::Overwrite(path!(SPAN_ID_KEY))),
                 path!(SPAN_ID_KEY),
-                Bytes::from(hex::encode(self.log_record.span_id)),
+                Bytes::from(to_hex(&self.log_record.span_id)),
             );
         }
         if !self.log_record.severity_text.is_empty() {
@@ -344,8 +351,8 @@ impl From<SpanEvent> for Value {
 impl From<Link> for Value {
     fn from(link: Link) -> Self {
         let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
-        obj.insert("trace_id".into(), Value::from(link.trace_id));
-        obj.insert("span_id".into(), Value::from(link.span_id));
+        obj.insert("trace_id".into(), Value::from(to_hex(&link.trace_id)));
+        obj.insert("span_id".into(), Value::from(to_hex(&link.span_id)));
         obj.insert("trace_state".into(), link.trace_state.into());
         obj.insert("attributes".into(), kv_list_into_value(link.attributes));
         obj.insert(
