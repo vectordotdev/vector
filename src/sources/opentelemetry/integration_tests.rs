@@ -3,6 +3,7 @@ use std::time::Duration;
 use itertools::Itertools;
 use serde_json::json;
 
+use super::{LOGS, TRACES};
 use crate::{
     config::{log_schema, SourceConfig, SourceContext},
     event::EventStatus,
@@ -56,7 +57,7 @@ async fn receive_logs_legacy_namespace() {
             log_namespace: Default::default(),
         };
 
-        let (sender, logs_output, _) = new_source(EventStatus::Delivered);
+        let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
         let server = config
             .build(SourceContext::new_test(sender, None))
             .await
@@ -113,8 +114,8 @@ async fn receive_trace() {
             scope_spans: vec![ScopeSpans {
                 scope: None,
                 spans: vec![Span {
-                    trace_id: (1..17).collect_vec(), //trace_id [u8;16]
-                    span_id: (1..9).collect_vec(), // span_id [u8;8]
+                    trace_id: (1..17).collect_vec(),      //trace_id [u8;16]
+                    span_id: (1..9).collect_vec(),        // span_id [u8;8]
                     parent_span_id: (1..9).collect_vec(), // parent_span_id [u8;8]
                     name: "span".to_string(),
                     kind: 1,
@@ -153,7 +154,7 @@ async fn receive_trace() {
             log_namespace: Default::default(),
         };
 
-        let (sender, trace_output, _) = new_source(EventStatus::Delivered);
+        let (sender, trace_output, _) = new_source(EventStatus::Delivered, TRACES.to_string());
         let server = config
             .build(SourceContext::new_test(sender, None))
             .await

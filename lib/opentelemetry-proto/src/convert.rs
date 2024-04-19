@@ -128,7 +128,10 @@ impl ResourceSpan {
     fn into_event(self, now: DateTime<Utc>) -> Event {
         let mut trace = TraceEvent::default();
         let span = self.span;
-        trace.insert(event_path!(TRACE_ID_KEY), Value::from(to_hex(&span.trace_id)));
+        trace.insert(
+            event_path!(TRACE_ID_KEY),
+            Value::from(to_hex(&span.trace_id)),
+        );
         trace.insert(event_path!(SPAN_ID_KEY), Value::from(to_hex(&span.span_id)));
         trace.insert(event_path!("trace_state"), span.trace_state);
         trace.insert(
