@@ -1,0 +1,1 @@
+Added new config field "insert_random_shard" to support "insert_distributed_one_random_shard" on Clickhouse sink for Distributed Table Engine. More on here https://clickhouse.com/docs/en/engines/table-engines/special/distributed
