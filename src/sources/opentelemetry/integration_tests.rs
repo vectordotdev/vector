@@ -16,7 +16,7 @@ use prost::Message;
 
 use vector_lib::opentelemetry::proto::{
     collector::trace::v1::ExportTraceServiceRequest,
-    trace::v1::{ScopeSpans, ResourceSpans, Span}
+    trace::v1::{ResourceSpans, ScopeSpans, Span},
 };
 
 use super::{tests::new_source, GrpcConfig, HttpConfig, OpentelemetryConfig};
@@ -107,19 +107,19 @@ async fn receive_logs_legacy_namespace() {
 #[tokio::test]
 async fn receive_trace() {
     // generate a trace request
-    let req = ExportTraceServiceRequest{
-        resource_spans: vec![ResourceSpans{
+    let req = ExportTraceServiceRequest {
+        resource_spans: vec![ResourceSpans {
             resource: None,
-            scope_spans: vec![ScopeSpans{
+            scope_spans: vec![ScopeSpans {
                 scope: None,
-                spans: vec![Span{
-                    trace_id: (1..17).collect_vec(),
-                    span_id: (1..9).collect_vec(),
-                    parent_span_id: (1..9).collect_vec(),
+                spans: vec![Span {
+                    trace_id: (1..17).collect_vec(), //trace_id [u8;16]
+                    span_id: (1..9).collect_vec(), // span_id [u8;8]
+                    parent_span_id: (1..9).collect_vec(), // parent_span_id [u8;8]
                     name: "span".to_string(),
                     kind: 1,
-                    start_time_unix_nano: 123456789,
-                    end_time_unix_nano: 987654321,
+                    start_time_unix_nano: 1713525203000000000,
+                    end_time_unix_nano: 1713525205000000000,
                     attributes: vec![],
                     dropped_attributes_count: 0,
                     events: vec![],
@@ -129,9 +129,9 @@ async fn receive_trace() {
                     status: None,
                     trace_state: "".to_string(),
                 }],
-                schema_url: "world".to_string(),
+                schema_url: "".to_string(),
             }],
-            schema_url: "hello".to_string(),
+            schema_url: "".to_string(),
         }],
     };
     let body = req.encode_to_vec();

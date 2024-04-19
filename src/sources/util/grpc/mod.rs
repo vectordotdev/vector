@@ -7,6 +7,7 @@ use futures::FutureExt;
 use http::{Request, Response};
 use hyper::Body;
 use std::{convert::Infallible, net::SocketAddr, time::Duration};
+use tonic::transport::server::Routes;
 use tonic::{
     body::BoxBody,
     transport::server::{NamedService, Server},
@@ -17,7 +18,6 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::Span;
-use tonic::transport::server::Routes;
 
 mod decompression;
 pub use self::decompression::{DecompressionAndMetrics, DecompressionAndMetricsLayer};
@@ -71,8 +71,7 @@ pub async fn run_grpc_server_with_routes(
     tls_settings: MaybeTlsSettings,
     routes: Routes,
     shutdown: ShutdownSignal,
-) -> crate::Result<()>
-{
+) -> crate::Result<()> {
     let span = Span::current();
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
     let listener = tls_settings.bind(&address).await?;
