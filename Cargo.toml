@@ -337,7 +337,7 @@ tokio-postgres = { version = "0.7.10", default-features = false, features = ["ru
 tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["connect"], optional = true}
 toml.workspace = true
 tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
-hickory-proto = { version = "0.24.0", default-features = false, features = ["dnssec"], optional = true }
+hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.16", default-features = false }
 url = { version = "2.5.0", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
