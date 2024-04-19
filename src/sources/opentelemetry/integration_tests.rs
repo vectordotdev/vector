@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use itertools::Itertools;
 use serde_json::json;
 
 use crate::{
@@ -10,6 +11,12 @@ use crate::{
         components::{assert_source_compliance, SOURCE_TAGS},
         retry_until, wait_for_tcp,
     },
+};
+use prost::Message;
+
+use vector_lib::opentelemetry::proto::{
+    collector::trace::v1::ExportTraceServiceRequest,
+    trace::v1::{ScopeSpans, ResourceSpans, Span}
 };
 
 use super::{tests::new_source, GrpcConfig, HttpConfig, OpentelemetryConfig};
@@ -93,6 +100,81 @@ async fn receive_logs_legacy_namespace() {
             events[0].as_log()[log_schema().message_key().unwrap().to_string()],
             events[1].as_log()[log_schema().message_key().unwrap().to_string()]
         );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn receive_trace() {
+    // generate a trace request
+    let req = ExportTraceServiceRequest{
+        resource_spans: vec![ResourceSpans{
+            resource: None,
+            scope_spans: vec![ScopeSpans{
+                scope: None,
+                spans: vec![Span{
+                    trace_id: (1..17).collect_vec(),
+                    span_id: (1..9).collect_vec(),
+                    parent_span_id: (1..9).collect_vec(),
+                    name: "span".to_string(),
+                    kind: 1,
+                    start_time_unix_nano: 123456789,
+                    end_time_unix_nano: 987654321,
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                    events: vec![],
+                    dropped_events_count: 0,
+                    links: vec![],
+                    dropped_links_count: 0,
+                    status: None,
+                    trace_state: "".to_string(),
+                }],
+                schema_url: "world".to_string(),
+            }],
+            schema_url: "hello".to_string(),
+        }],
+    };
+    let body = req.encode_to_vec();
+
+    assert_source_compliance(&SOURCE_TAGS, async {
+        wait_ready(otel_health_url()).await;
+
+        let config = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: source_grpc_address().parse().unwrap(),
+                tls: Default::default(),
+            },
+            http: HttpConfig {
+                address: source_http_address().parse().unwrap(),
+                tls: Default::default(),
+                keepalive: Default::default(),
+            },
+            acknowledgements: Default::default(),
+            log_namespace: Default::default(),
+        };
+
+        let (sender, trace_output, _) = new_source(EventStatus::Delivered);
+        let server = config
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        wait_for_tcp(source_grpc_address()).await;
+        wait_for_tcp(source_http_address()).await;
+
+        let client = reqwest::Client::new();
+        let _res = client
+            .post(format!("{}/v1/traces", otel_otlp_url()))
+            .header(reqwest::header::CONTENT_TYPE, "application/x-protobuf")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to send traces to Opentelemetry Collector.");
+
+        // The Opentelemetry Collector is configured to send to both the gRPC and HTTP endpoints
+        // so we should expect to collect two events from the single log sent.
+        let events = collect_n(trace_output, 2).await;
+        assert_eq!(events.len(), 2);
     })
     .await;
 }
