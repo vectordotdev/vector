@@ -29,6 +29,7 @@ use vector_lib::{
     schema::Definition,
 };
 use vrl::value::{kind::Collection, Kind};
+use tonic::transport::server::RoutesBuilder;
 
 use self::{
     grpc::Service,
@@ -41,7 +42,7 @@ use crate::{
     },
     http::KeepaliveConfig,
     serde::bool_or_struct,
-    sources::{util::grpc::run_grpc_tuple_server, Source},
+    sources::{util::grpc::run_grpc_server_with_routes, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -162,10 +163,12 @@ impl SourceConfig for OpentelemetryConfig {
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
-        let grpc_source = run_grpc_tuple_server(
+        let mut builder = RoutesBuilder::default();
+        builder.add_service(log_service).add_service(trace_service);
+        let grpc_source = run_grpc_server_with_routes(
             self.grpc.address,
             grpc_tls_settings,
-            (log_service, trace_service),
+            builder.routes(),
             cx.shutdown.clone(),
         )
         .map_err(|error| {

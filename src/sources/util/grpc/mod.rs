@@ -17,6 +17,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::Span;
+use tonic::transport::server::Routes;
 
 mod decompression;
 pub use self::decompression::{DecompressionAndMetrics, DecompressionAndMetricsLayer};
@@ -65,25 +66,12 @@ where
 
 // This is a bit of a ugly hack to allow us to run two services on the same port.
 // I just don't know how to convert the generic type with associated types into a Vec<Box<trait object>>.
-pub async fn run_grpc_tuple_server<S, T>(
+pub async fn run_grpc_server_with_routes(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
-    services: (S, T),
+    routes: Routes,
     shutdown: ShutdownSignal,
 ) -> crate::Result<()>
-where
-    S: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
-        + NamedService
-        + Clone
-        + Send
-        + 'static,
-    S::Future: Send + 'static,
-    T: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
-        + NamedService
-        + Clone
-        + Send
-        + 'static,
-    T::Future: Send + 'static,
 {
     let span = Span::current();
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
@@ -95,8 +83,7 @@ where
     Server::builder()
         .layer(build_grpc_trace_layer(span.clone()))
         .layer(DecompressionAndMetricsLayer)
-        .add_service(services.0)
-        .add_service(services.1)
+        .add_routes(routes)
         .serve_with_incoming_shutdown(stream, shutdown.map(|token| tx.send(token).unwrap()))
         .await?;
 
