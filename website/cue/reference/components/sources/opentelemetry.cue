@@ -41,7 +41,7 @@ components: sources: opentelemetry: {
 		requirements: []
 		warnings: [
 			"""
-				The `opentelemetry` source only supports log events at this time.
+				The `opentelemetry` source only supports log and trace events at this time.
 				""",
 		]
 		notices: []
@@ -58,6 +58,12 @@ components: sources: opentelemetry: {
 			name: "logs"
 			description: """
 				Received log events will go to this output stream. Use `<component_id>.logs` as an input to downstream transforms and sinks.
+				"""
+		},
+		{
+			name: "traces"
+			description: """
+				Received trace events will go to this output stream. Use `<component_id>.traces` as an input to downstream transforms and sinks.
 				"""
 		},
 	]
@@ -203,6 +209,13 @@ components: sources: opentelemetry: {
 				[OpenSSL configuration file](\(urls.openssl_conf)). The file location defaults to
 				`/usr/local/ssl/openssl.cnf` or can be specified with the `OPENSSL_CONF` environment variable.
 				"""
+		},
+		traces: {
+			title: "Ingest OTLP traces"
+			body: """
+				Vector now support ingest opentelemetry trace in proto format(JSON is not supported). The trace
+				data is then converted as log, and you can use vrl to remap it to whatever you want.
+			"""
 		}
 	}
 
