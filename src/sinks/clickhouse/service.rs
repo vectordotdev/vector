@@ -164,6 +164,7 @@ mod tests {
             Format::JsonEachRow,
             false,
             true,
+            false,
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
@@ -176,6 +177,7 @@ mod tests {
             "my_database",
             "my_\"table\"",
             Format::JsonEachRow,
+            false,
             false,
             false,
         )
@@ -191,6 +193,7 @@ mod tests {
             Format::JsonAsObject,
             true,
             true,
+            false,
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
@@ -207,6 +210,7 @@ mod tests {
             "my_database",
             "my_table",
             Format::JsonEachRow,
+            false,
             false,
             false,
         )
