@@ -63,7 +63,7 @@ docker run \
   -d \
   -v $PWD/vector.yaml:/etc/vector/vector.yaml:ro \
   -p 8686:8686 \
-  --name vector
+  --name vector \
   timberio/vector:{{< version >}}-debian
 ```
 
