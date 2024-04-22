@@ -16,7 +16,7 @@ remap: functions: uuid_from_friendly_id: {
 	]
 	internal_failure_reasons: [
 		"`value` is not a string.",
-		"`value` is a string but the text use characters outside of class [0-9A-Za-z].",
+		"`value` is a string but the text uses characters outside of class [0-9A-Za-z].",
 		"`value` is a base62 encoding of an integer, but the integer is greater than or equal to 2^128.",
         ]
 	return: types: ["string"]
