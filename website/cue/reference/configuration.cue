@@ -535,9 +535,9 @@ configuration: {
 						The secret must be a JSON text string with key/value pairs. For example:
 						```json
 						{
-                          "username": "test",
-                          "password": "example-password"
-                        }
+							"username": "test",
+							"password": "example-password"
+						}
 						```
 
 						If an error occurred retrieving the secrets, Vector logs the error and exits.
