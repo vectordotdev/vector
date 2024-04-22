@@ -228,6 +228,9 @@ user:P@ssw0rd
 # Ignore base64 encoded values in VRL examples (requires padding to avoid false positives)
 "[A-Za-z0-9]*=="
 
+# ignore uuid_from_friendly_id argument
+uuid_from_friendly_id\(".*"\)
+
 # Ignore punycode
 \bxn--[-0-9a-z]+
 
