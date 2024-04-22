@@ -7,6 +7,7 @@ use goauth::scopes::Scope;
 use http::{header::HeaderValue, Request, StatusCode, Uri};
 use hyper::Body;
 use indoc::indoc;
+use itertools::Itertools;
 use serde::Serialize;
 use serde_json::json;
 use snafu::Snafu;
@@ -330,7 +331,7 @@ struct ChronicleRequestBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     namespace: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    labels: Option<HashMap<String, String>>,
+    labels: Option<Vec<(String, String)>>,
     log_type: String,
     entries: Vec<serde_json::Value>,
 }
@@ -339,7 +340,7 @@ struct ChronicleRequestBody {
 struct ChronicleEncoder {
     customer_id: String,
     namespace: Option<String>,
-    labels: Option<HashMap<String, String>>,
+    labels: Option<Vec<(String, String)>>,
     encoder: codecs::Encoder<()>,
     transformer: codecs::Transformer,
 }
@@ -474,7 +475,10 @@ impl ChronicleRequestBuilder {
         let encoder = ChronicleEncoder {
             customer_id: config.customer_id.clone(),
             namespace: config.namespace.clone(),
-            labels: config.labels.clone(),
+            labels: config
+                .labels
+                .clone()
+                .map(|labels| labels.into_iter().collect_vec()),
             encoder,
             transformer,
         };
