@@ -179,7 +179,7 @@ fn chronicle_labels_examples() -> HashMap<String, String> {
     let mut examples = HashMap::new();
     examples.insert("source".to_string(), "vector".to_string());
     examples.insert(
-        "\"tenant\"".to_string(),
+        "tenant".to_string(),
         "marketing".to_string(),
     );
     examples
