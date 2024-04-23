@@ -11,8 +11,8 @@ use itertools::Itertools;
 use serde::Serialize;
 use serde_json::json;
 use snafu::Snafu;
-use std::io;
 use std::collections::HashMap;
+use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
 use vector_lib::configurable::configurable_component;
@@ -179,10 +179,7 @@ pub struct ChronicleUnstructuredConfig {
 fn chronicle_labels_examples() -> HashMap<String, String> {
     let mut examples = HashMap::new();
     examples.insert("source".to_string(), "vector".to_string());
-    examples.insert(
-        "tenant".to_string(),
-        "marketing".to_string(),
-    );
+    examples.insert("tenant".to_string(), "marketing".to_string());
     examples
 }
 
@@ -467,11 +464,81 @@ impl RequestBuilder<(String, Vec<Event>)> for ChronicleRequestBuilder {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use std::convert::TryInto;
+
+    use super::valid_label_name;
+
+    #[test]
+    fn valid_label_names() {
+        assert!(valid_label_name(&"name".try_into().unwrap()));
+        assert!(valid_label_name(&"bee-bop".try_into().unwrap()));
+        assert!(valid_label_name(&"a09b".try_into().unwrap()));
+        assert!(valid_label_name(&"09ba".try_into().unwrap()));
+        assert!(valid_label_name(&"abc--".try_into().unwrap()));
+        assert!(valid_label_name(
+            &"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .try_into()
+                .unwrap()
+        ));
+
+        assert!(!valid_label_name(
+            &"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .try_into()
+                .unwrap()
+        ));
+        assert!(!valid_label_name(&" name ".try_into().unwrap()));
+        assert!(!valid_label_name(&"bee_bop".try_into().unwrap()));
+        assert!(!valid_label_name(&"".try_into().unwrap()));
+        assert!(!valid_label_name(&" ".try_into().unwrap()));
+        assert!(!valid_label_name(&"_*".try_into().unwrap()));
+        assert!(!valid_label_name(&"-a".try_into().unwrap()));
+        assert!(!valid_label_name(&"-".try_into().unwrap()));
+        assert!(!valid_label_name(&"_".try_into().unwrap()));
+        assert!(!valid_label_name(&"*".try_into().unwrap()));
+        assert!(!valid_label_name(&"{{field}}".try_into().unwrap()));
+    }
+}
+
+// valid chars: [a-z0-9][a-z0-9-] upto 63 chars
+// See https://cloud.google.com/chronicle/docs/preview/cloud-integration/create-custom-labels#label_requirements
+fn valid_label_name(label: &String) -> bool {
+    if label.chars().count() > 63 {
+        return false;
+    }
+    let mut chs = label.chars();
+    let Some(ch) = chs.next() else { return false };
+    if !(ch.is_ascii_lowercase() || ch.is_ascii_digit()) {
+        return false;
+    }
+    for c in chs.by_ref() {
+        if !(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+            return false;
+        }
+    }
+    return true;
+}
+
 impl ChronicleRequestBuilder {
     fn new(config: &ChronicleUnstructuredConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.config().build()?;
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
+
+        if let Some(labels) = &config.labels {
+            labels
+                .iter()
+                .map(|(k, _v)| {
+                    if !valid_label_name(k) {
+                        return Err("Invalid label.");
+                    }
+
+                    Ok(())
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+        }
+
         let encoder = ChronicleEncoder {
             customer_id: config.customer_id.clone(),
             namespace: config.namespace.clone(),
