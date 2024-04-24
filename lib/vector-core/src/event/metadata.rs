@@ -209,11 +209,6 @@ impl EventMetadata {
         self.dropped_fields.get(meaning.as_ref())
     }
 
-    /// Fetches the mutable dropped field by meaning.
-    pub fn dropped_field_mut(&mut self, meaning: impl AsRef<str>) -> Option<&mut Value> {
-        self.dropped_fields.get_mut(meaning.as_ref())
-    }
-
     /// Returns a reference to the `DatadogMetricOriginMetadata`.
     pub fn datadog_origin_metadata(&self) -> Option<&DatadogMetricOriginMetadata> {
         self.datadog_origin_metadata.as_ref()
