@@ -21,6 +21,8 @@ if ! dd-rust-license-tool --help >& /dev/null ; then
   rustup run stable cargo install dd-rust-license-tool --version 1.0.2 --force --locked
 fi
 
+./scripts/ensure-wasm-pack-installed.sh
+
 # Currently fixing this to version 0.30 since version 0.31 has introduced
 # a change that means it only works with versions of node > 10.
 # https://github.com/igorshubovych/markdownlint-cli/issues/258
