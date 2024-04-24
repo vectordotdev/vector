@@ -351,7 +351,7 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 		description: """
 			A set of labels that are attached to each batch of events.
 
-			Both keys and values are not templateable.
+			Both keys and values cannot be used in a template.
 			"""
 		required: false
 		type: object: {

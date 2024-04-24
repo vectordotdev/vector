@@ -136,7 +136,7 @@ pub struct ChronicleUnstructuredConfig {
 
     /// A set of labels that are attached to each batch of events.
     ///
-    /// Both keys and values are not templateable.
+    /// Both keys and values cannot be used in a template.
     #[configurable(metadata(docs::examples = "chronicle_labels_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "A Chronicle label."))]
     pub labels: Option<HashMap<String, String>>,
