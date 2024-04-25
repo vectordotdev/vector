@@ -517,7 +517,7 @@ fn valid_label_name(label: &String) -> bool {
             return false;
         }
     }
-    return true;
+    true
 }
 
 impl ChronicleRequestBuilder {
