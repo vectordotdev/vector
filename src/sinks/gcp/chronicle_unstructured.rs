@@ -498,7 +498,7 @@ mod tests {
 // valid chars: [a-z0-9-] 1 to 63 chars
 // See https://cloud.google.com/chronicle/docs/preview/cloud-integration/create-custom-labels#label_requirements
 fn valid_label_name(label: &str) -> bool {
-    if label.len() > 63 || label.len() < 1 {
+    if label.len() > 63 || label.is_empty() {
         return false;
     }
     label.
