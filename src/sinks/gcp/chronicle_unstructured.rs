@@ -498,20 +498,12 @@ mod tests {
 // valid chars: [a-z0-9][a-z0-9-] upto 63 chars
 // See https://cloud.google.com/chronicle/docs/preview/cloud-integration/create-custom-labels#label_requirements
 fn valid_label_name(label: &str) -> bool {
-    if label.chars().count() > 63 {
+    if !label.starts_with(|c: char| (c.is_ascii_lowercase() || c.is_ascii_digit())) || label.chars().count() > 63 {
         return false;
     }
-    let mut chs = label.chars();
-    let Some(ch) = chs.next() else { return false };
-    if !(ch.is_ascii_lowercase() || ch.is_ascii_digit()) {
-        return false;
-    }
-    for c in chs.by_ref() {
-        if !(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
-            return false;
-        }
-    }
-    true
+    label.
+        chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 impl ChronicleRequestBuilder {
