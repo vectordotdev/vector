@@ -470,28 +470,28 @@ mod tests {
 
     #[test]
     fn valid_label_names() {
-        assert!(valid_label_name(&"name"));
-        assert!(valid_label_name(&"bee-bop"));
-        assert!(valid_label_name(&"a09b"));
-        assert!(valid_label_name(&"09ba"));
-        assert!(valid_label_name(&"abc--"));
+        assert!(valid_label_name("name"));
+        assert!(valid_label_name("bee-bop"));
+        assert!(valid_label_name("a09b"));
+        assert!(valid_label_name("09ba"));
+        assert!(valid_label_name("abc--"));
         assert!(valid_label_name(
-            &"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         ));
 
         assert!(!valid_label_name(
-            &"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         ));
-        assert!(!valid_label_name(&" name "));
-        assert!(!valid_label_name(&"bee_bop"));
-        assert!(!valid_label_name(&""));
-        assert!(!valid_label_name(&" "));
-        assert!(!valid_label_name(&"_*"));
-        assert!(!valid_label_name(&"-a"));
-        assert!(!valid_label_name(&"-"));
-        assert!(!valid_label_name(&"_"));
-        assert!(!valid_label_name(&"*"));
-        assert!(!valid_label_name(&"{{field}}"));
+        assert!(!valid_label_name(" name "));
+        assert!(!valid_label_name("bee_bop"));
+        assert!(!valid_label_name(""));
+        assert!(!valid_label_name(" "));
+        assert!(!valid_label_name("_*"));
+        assert!(!valid_label_name("-a"));
+        assert!(!valid_label_name("-"));
+        assert!(!valid_label_name("_"));
+        assert!(!valid_label_name("*"));
+        assert!(!valid_label_name("{{field}}"));
     }
 }
 
