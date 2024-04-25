@@ -466,44 +466,38 @@ impl RequestBuilder<(String, Vec<Event>)> for ChronicleRequestBuilder {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryInto;
-
     use super::valid_label_name;
 
     #[test]
     fn valid_label_names() {
-        assert!(valid_label_name(&"name".try_into().unwrap()));
-        assert!(valid_label_name(&"bee-bop".try_into().unwrap()));
-        assert!(valid_label_name(&"a09b".try_into().unwrap()));
-        assert!(valid_label_name(&"09ba".try_into().unwrap()));
-        assert!(valid_label_name(&"abc--".try_into().unwrap()));
+        assert!(valid_label_name(&"name"));
+        assert!(valid_label_name(&"bee-bop"));
+        assert!(valid_label_name(&"a09b"));
+        assert!(valid_label_name(&"09ba"));
+        assert!(valid_label_name(&"abc--"));
         assert!(valid_label_name(
             &"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                .try_into()
-                .unwrap()
         ));
 
         assert!(!valid_label_name(
             &"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                .try_into()
-                .unwrap()
         ));
-        assert!(!valid_label_name(&" name ".try_into().unwrap()));
-        assert!(!valid_label_name(&"bee_bop".try_into().unwrap()));
-        assert!(!valid_label_name(&"".try_into().unwrap()));
-        assert!(!valid_label_name(&" ".try_into().unwrap()));
-        assert!(!valid_label_name(&"_*".try_into().unwrap()));
-        assert!(!valid_label_name(&"-a".try_into().unwrap()));
-        assert!(!valid_label_name(&"-".try_into().unwrap()));
-        assert!(!valid_label_name(&"_".try_into().unwrap()));
-        assert!(!valid_label_name(&"*".try_into().unwrap()));
-        assert!(!valid_label_name(&"{{field}}".try_into().unwrap()));
+        assert!(!valid_label_name(&" name "));
+        assert!(!valid_label_name(&"bee_bop"));
+        assert!(!valid_label_name(&""));
+        assert!(!valid_label_name(&" "));
+        assert!(!valid_label_name(&"_*"));
+        assert!(!valid_label_name(&"-a"));
+        assert!(!valid_label_name(&"-"));
+        assert!(!valid_label_name(&"_"));
+        assert!(!valid_label_name(&"*"));
+        assert!(!valid_label_name(&"{{field}}"));
     }
 }
 
 // valid chars: [a-z0-9][a-z0-9-] upto 63 chars
 // See https://cloud.google.com/chronicle/docs/preview/cloud-integration/create-custom-labels#label_requirements
-fn valid_label_name(label: &String) -> bool {
+fn valid_label_name(label: &str) -> bool {
     if label.chars().count() > 63 {
         return false;
     }
