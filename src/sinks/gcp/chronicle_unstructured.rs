@@ -226,6 +226,18 @@ pub enum ChronicleError {
 #[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        if let Some(labels) = self.labels.clone() {
+            labels
+                .keys()
+                .map(|k| {
+                    if !valid_label_name(k) {
+                        return Err("Invalid label.");
+                    }
+
+                    Ok(())
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+        }
         let creds = self.auth.build(Scope::MalachiteIngestion).await?;
 
         let tls = TlsSettings::from_options(&self.tls)?;
@@ -511,20 +523,6 @@ impl ChronicleRequestBuilder {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.config().build()?;
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
-
-        if let Some(labels) = &config.labels {
-            labels
-                .iter()
-                .map(|(k, _v)| {
-                    if !valid_label_name(k) {
-                        return Err("Invalid label.");
-                    }
-
-                    Ok(())
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-        }
-
         let encoder = ChronicleEncoder {
             customer_id: config.customer_id.clone(),
             namespace: config.namespace.clone(),
