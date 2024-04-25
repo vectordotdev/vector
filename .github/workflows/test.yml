@@ -36,7 +36,7 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-20.04-8core
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
