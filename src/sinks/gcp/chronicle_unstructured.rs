@@ -478,6 +478,8 @@ mod tests {
         assert!(valid_label_name(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         ));
+        assert!(valid_label_name("-"));
+        assert!(valid_label_name("-a"));
 
         assert!(!valid_label_name(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -487,18 +489,16 @@ mod tests {
         assert!(!valid_label_name(""));
         assert!(!valid_label_name(" "));
         assert!(!valid_label_name("_*"));
-        assert!(!valid_label_name("-a"));
-        assert!(!valid_label_name("-"));
         assert!(!valid_label_name("_"));
         assert!(!valid_label_name("*"));
         assert!(!valid_label_name("{{field}}"));
     }
 }
 
-// valid chars: [a-z0-9][a-z0-9-] upto 63 chars
+// valid chars: [a-z0-9-] 1 to 63 chars
 // See https://cloud.google.com/chronicle/docs/preview/cloud-integration/create-custom-labels#label_requirements
 fn valid_label_name(label: &str) -> bool {
-    if !label.starts_with(|c: char| (c.is_ascii_lowercase() || c.is_ascii_digit())) || label.chars().count() > 63 {
+    if label.len() > 63 || label.len() < 1 {
         return false;
     }
     label.
