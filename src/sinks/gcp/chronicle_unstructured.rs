@@ -501,8 +501,8 @@ fn valid_label_name(label: &str) -> bool {
     if label.len() > 63 || label.is_empty() {
         return false;
     }
-    label.
-        chars()
+    label
+        .chars()
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
