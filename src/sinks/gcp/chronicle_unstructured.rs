@@ -231,7 +231,7 @@ impl SinkConfig for ChronicleUnstructuredConfig {
                 .keys()
                 .map(|k| {
                     if !valid_label_name(k) {
-                        return Err("Invalid label.");
+                        return Err(format!("Invalid label {k}"));
                     }
 
                     Ok(())
