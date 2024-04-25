@@ -337,6 +337,16 @@ base: components: sinks: kafka: configuration: {
 		required: false
 		type: string: examples: ["headers"]
 	}
+	healthcheck_topic: {
+		description: """
+			The topic name to use for healthcheck. If omitted, `topic` is used.
+			This option helps prevent healthcheck warnings when `topic` is templated.
+
+			It is ignored when healthcheck is disabled.
+			"""
+		required: false
+		type: string: {}
+	}
 	key_field: {
 		description: """
 			The log field name or tag key to use for the topic key.
