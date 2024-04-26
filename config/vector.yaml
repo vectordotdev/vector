@@ -37,7 +37,7 @@ sinks:
     type: "console"
     inputs: ["parse_logs"]
     encoding:
-      codec: "json"
+      codec: "pretty_json"
 
 # Vector's GraphQL API (disabled by default)
 # Uncomment to try it out with the `vector top` command or
