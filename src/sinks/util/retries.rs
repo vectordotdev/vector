@@ -384,6 +384,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn service_error_retry_even_with_diff_error() {
+        trace_init();
+
+        time::pause();
+
+        let policy = FibonacciRetryPolicy::new(
+            5,
+            Duration::from_secs(1),
+            Duration::from_secs(10),
+            SvcRetryLogic,
+            JitterMode::None,
+        );
+
+        let (mut svc, mut handle) = mock::spawn_layer(RetryLayer::new(policy));
+
+        assert_ready_ok!(svc.poll_ready());
+
+        let fut = svc.call("hello");
+        let mut fut = task::spawn(fut);
+
+        // Even if you can't re-cast, you should still retry
+        assert_request_eq!(handle, "hello").send_error(BadError);
+
+        assert_pending!(fut.poll());
+
+        time::advance(Duration::from_secs(2)).await;
+        assert_pending!(fut.poll());
+
+        assert_request_eq!(handle, "hello").send_response("world");
+        assert_eq!(fut.await.unwrap(), "world");
+    }
+
+    #[tokio::test]
     async fn timeout_error() {
         trace_init();
 
@@ -510,4 +543,16 @@ mod tests {
     }
 
     impl std::error::Error for Error {}
+
+    // Dummy base error that isn't of expected type
+    #[derive(Debug)]
+    struct BadError;
+
+    impl fmt::Display for BadError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "error")
+        }
+    }
+
+    impl std::error::Error for BadError {}
 }

@@ -376,6 +376,13 @@ mod tests {
     use super::S3StorageClass;
     use crate::serde::json::to_string;
 
+    use super::*;
+    use aws_sdk_s3::operation::put_object::PutObjectError;
+    use aws_smithy_runtime_api::client::{result::SdkError, orchestrator::HttpResponse};
+    use aws_smithy_types::body::SdkBody;
+
+    use std::fmt;
+
     #[test]
     fn storage_class_names() {
         for &(name, storage_class) in &[
@@ -395,4 +402,29 @@ mod tests {
             assert_eq!(result, storage_class);
         }
     }
+
+    #[test]
+    fn test_retriable() {
+        // Handle unhandled + 400 status code case (from expired token code)
+        assert!(
+            S3RetryLogic.is_retriable_error(
+                &SdkError::<PutObjectError, HttpResponse>::service_error(
+                    PutObjectError::unhandled(BadError),
+                    HttpResponse::new(http::StatusCode::from_u16(400).unwrap().into(), SdkBody::empty())
+                )
+            )
+        );
+    }
+
+
+    #[derive(Debug)]
+    struct BadError;
+
+    impl fmt::Display for BadError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "error")
+        }
+    }
+
+    impl std::error::Error for BadError {}
 }
