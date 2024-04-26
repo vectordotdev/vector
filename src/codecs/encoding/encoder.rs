@@ -106,11 +106,15 @@ impl Encoder<Framer> {
     /// Get the HTTP content type.
     pub const fn content_type(&self) -> &'static str {
         match (&self.serializer, &self.framer) {
-            (Serializer::Json(_) | Serializer::PrettyJson(_) | Serializer::NativeJson(_), Framer::NewlineDelimited(_)) => {
-                "application/x-ndjson"
-            }
             (
-                Serializer::Gelf(_) | Serializer::Json(_) | Serializer::PrettyJson(_) | Serializer::NativeJson(_),
+                Serializer::Json(_) | Serializer::PrettyJson(_) | Serializer::NativeJson(_),
+                Framer::NewlineDelimited(_),
+            ) => "application/x-ndjson",
+            (
+                Serializer::Gelf(_)
+                | Serializer::Json(_)
+                | Serializer::PrettyJson(_)
+                | Serializer::NativeJson(_),
                 Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
             ) => "application/json",
             (Serializer::Native(_), _) | (Serializer::Protobuf(_), _) => "application/octet-stream",

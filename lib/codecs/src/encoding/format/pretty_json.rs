@@ -4,7 +4,7 @@ use vector_core::{config::DataType, event::Event, schema};
 
 use crate::MetricTagValues;
 
-/// Config used to build a `JsonSerializer`.
+/// Config used to build a `PrettyJsonSerializer`.
 #[crate::configurable_component]
 #[derive(Debug, Clone, Default)]
 pub struct PrettyJsonSerializerConfig {
@@ -17,17 +17,17 @@ pub struct PrettyJsonSerializerConfig {
 }
 
 impl PrettyJsonSerializerConfig {
-    /// Creates a new `JsonSerializerConfig`.
+    /// Creates a new `PrettyJsonSerializerConfig`.
     pub const fn new(metric_tag_values: MetricTagValues) -> Self {
         Self { metric_tag_values }
     }
 
-    /// Build the `JsonSerializer` from this configuration.
+    /// Build the `PrettyJsonSerializer` from this configuration.
     pub const fn build(&self) -> PrettyJsonSerializer {
         PrettyJsonSerializer::new(self.metric_tag_values)
     }
 
-    /// The data type of events that are accepted by `JsonSerializer`.
+    /// The data type of events that are accepted by `PrettyJsonSerializer`.
     pub fn input_type(&self) -> DataType {
         DataType::all()
     }
@@ -47,7 +47,7 @@ pub struct PrettyJsonSerializer {
 }
 
 impl PrettyJsonSerializer {
-    /// Creates a new `JsonSerializer`.
+    /// Creates a new `PrettyJsonSerializer`.
     pub const fn new(metric_tag_values: MetricTagValues) -> Self {
         Self { metric_tag_values }
     }
@@ -99,7 +99,7 @@ mod tests {
             "z" => Value::from(25),
             "a" => Value::from("0"),
         }));
-        let bytes = serialize(JsonSerializerConfig::default(), event);
+        let bytes = serialize(PrettyJsonSerializerConfig::default(), event);
 
         assert_eq!(bytes, r#"{"a":"0","x":"23","z":25}"#);
     }
@@ -126,7 +126,7 @@ mod tests {
             )),
         );
 
-        let bytes = serialize(JsonSerializerConfig::default(), event);
+        let bytes = serialize(PrettyJsonSerializerConfig::default(), event);
 
         assert_eq!(
             bytes,
@@ -144,7 +144,7 @@ mod tests {
             },
         ));
 
-        let bytes = serialize(JsonSerializerConfig::default(), event);
+        let bytes = serialize(PrettyJsonSerializerConfig::default(), event);
 
         assert_eq!(
             bytes,
@@ -163,7 +163,7 @@ mod tests {
             },
         ));
 
-        let bytes = serialize(JsonSerializerConfig::default(), event);
+        let bytes = serialize(PrettyJsonSerializerConfig::default(), event);
 
         assert_eq!(
             bytes,

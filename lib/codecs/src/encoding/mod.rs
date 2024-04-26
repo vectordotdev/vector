@@ -450,7 +450,10 @@ impl Serializer {
     /// Check if the serializer supports encoding an event to JSON via `Serializer::to_json_value`.
     pub fn supports_json(&self) -> bool {
         match self {
-            Serializer::Json(_) | Self::PrettyJson(_) |  Serializer::NativeJson(_) | Serializer::Gelf(_) => true,
+            Serializer::Json(_)
+            | Self::PrettyJson(_)
+            | Serializer::NativeJson(_)
+            | Serializer::Gelf(_) => true,
             Serializer::Avro(_)
             | Serializer::Csv(_)
             | Serializer::Logfmt(_)
