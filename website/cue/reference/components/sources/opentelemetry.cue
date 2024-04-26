@@ -213,8 +213,7 @@ components: sources: opentelemetry: {
 		traces: {
 			title: "Ingest OTLP traces"
 			body: """
-				Vector now support ingest opentelemetry trace in proto format(JSON is not supported). The trace
-				data is then converted as log, and you can use vrl to remap it to whatever you want.
+				Trace support is experimental and subject to change as Vector has no strongly-typed structure for traces internally. Instead traces are stored as a key/value map similar to logs. This may change in the future to be a structured format.
 			"""
 		}
 	}
