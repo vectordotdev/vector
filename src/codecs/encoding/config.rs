@@ -100,7 +100,7 @@ impl EncodingConfigWithFraming {
 
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
-            (None, Serializer::Json(_)) => match sink_type {
+            (None, Serializer::Json(_) | Serializer::PrettyJson(_)) => match sink_type {
                 SinkType::StreamBased => NewlineDelimitedEncoder::new().into(),
                 SinkType::MessageBased => CharacterDelimitedEncoder::new(b',').into(),
             },

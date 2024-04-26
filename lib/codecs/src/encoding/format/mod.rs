@@ -14,6 +14,7 @@ mod native_json;
 mod protobuf;
 mod raw_message;
 mod text;
+mod pretty_json;
 
 use std::fmt::Debug;
 
@@ -22,6 +23,7 @@ pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 use dyn_clone::DynClone;
 pub use gelf::{GelfSerializer, GelfSerializerConfig};
 pub use json::{JsonSerializer, JsonSerializerConfig};
+pub use pretty_json::{PrettyJsonSerializer, PrettyJsonSerializerConfig};
 pub use logfmt::{LogfmtSerializer, LogfmtSerializerConfig};
 pub use native::{NativeSerializer, NativeSerializerConfig};
 pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};

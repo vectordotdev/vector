@@ -23,6 +23,8 @@ pub use framing::{
 use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
+use self::format::{PrettyJsonSerializer, PrettyJsonSerializerConfig};
+
 /// An error that occurred while building an encoder.
 pub type BuildError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -213,6 +215,11 @@ pub enum SerializerConfig {
     /// [json]: https://www.json.org/
     Json(JsonSerializerConfig),
 
+    /// Encodes an event as [JSON][json] in pretty format.
+    ///
+    /// [json]: https://www.json.org/
+    PrettyJson(PrettyJsonSerializerConfig),
+
     /// Encodes an event as a [logfmt][logfmt] message.
     ///
     /// [logfmt]: https://brandur.org/logfmt
@@ -329,6 +336,7 @@ impl SerializerConfig {
             SerializerConfig::Csv(config) => Ok(Serializer::Csv(config.build()?)),
             SerializerConfig::Gelf => Ok(Serializer::Gelf(GelfSerializerConfig::new().build())),
             SerializerConfig::Json(config) => Ok(Serializer::Json(config.build())),
+            SerializerConfig::PrettyJson(config) => Ok(Serializer::PrettyJson(config.build())),
             SerializerConfig::Logfmt => Ok(Serializer::Logfmt(LogfmtSerializerConfig.build())),
             SerializerConfig::Native => Ok(Serializer::Native(NativeSerializerConfig.build())),
             SerializerConfig::NativeJson => {
@@ -364,6 +372,7 @@ impl SerializerConfig {
             SerializerConfig::Csv(_)
             | SerializerConfig::Gelf
             | SerializerConfig::Json(_)
+            | SerializerConfig::PrettyJson(_)
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
@@ -380,6 +389,7 @@ impl SerializerConfig {
             SerializerConfig::Csv(config) => config.input_type(),
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::input_type(),
             SerializerConfig::Json(config) => config.input_type(),
+            SerializerConfig::PrettyJson(config) => config.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
@@ -398,6 +408,7 @@ impl SerializerConfig {
             SerializerConfig::Csv(config) => config.schema_requirement(),
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::schema_requirement(),
             SerializerConfig::Json(config) => config.schema_requirement(),
+            SerializerConfig::PrettyJson(config) => config.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
@@ -419,6 +430,8 @@ pub enum Serializer {
     Gelf(GelfSerializer),
     /// Uses a `JsonSerializer` for serialization.
     Json(JsonSerializer),
+    /// Uses a `JsonSerializer` for serialization.
+    PrettyJson(PrettyJsonSerializer),
     /// Uses a `LogfmtSerializer` for serialization.
     Logfmt(LogfmtSerializer),
     /// Uses a `NativeSerializer` for serialization.
@@ -437,7 +450,7 @@ impl Serializer {
     /// Check if the serializer supports encoding an event to JSON via `Serializer::to_json_value`.
     pub fn supports_json(&self) -> bool {
         match self {
-            Serializer::Json(_) | Serializer::NativeJson(_) | Serializer::Gelf(_) => true,
+            Serializer::Json(_) | Self::PrettyJson(_) |  Serializer::NativeJson(_) | Serializer::Gelf(_) => true,
             Serializer::Avro(_)
             | Serializer::Csv(_)
             | Serializer::Logfmt(_)
@@ -458,6 +471,7 @@ impl Serializer {
         match self {
             Serializer::Gelf(serializer) => serializer.to_json_value(event),
             Serializer::Json(serializer) => serializer.to_json_value(event),
+            Serializer::PrettyJson(serializer) => serializer.to_json_value(event),
             Serializer::NativeJson(serializer) => serializer.to_json_value(event),
             Serializer::Avro(_)
             | Serializer::Csv(_)
@@ -541,6 +555,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             Serializer::Csv(serializer) => serializer.encode(event, buffer),
             Serializer::Gelf(serializer) => serializer.encode(event, buffer),
             Serializer::Json(serializer) => serializer.encode(event, buffer),
+            Serializer::PrettyJson(serializer) => serializer.encode(event, buffer),
             Serializer::Logfmt(serializer) => serializer.encode(event, buffer),
             Serializer::Native(serializer) => serializer.encode(event, buffer),
             Serializer::NativeJson(serializer) => serializer.encode(event, buffer),
