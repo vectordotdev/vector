@@ -7,7 +7,6 @@ use goauth::scopes::Scope;
 use http::{header::HeaderValue, Request, StatusCode, Uri};
 use hyper::Body;
 use indoc::indoc;
-use itertools::Itertools;
 use serde::Serialize;
 use serde_json::json;
 use snafu::Snafu;
@@ -326,7 +325,7 @@ struct ChronicleRequestBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     namespace: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    labels: Option<Vec<(String, String)>>,
+    labels: Option<Vec<Label>>,
     log_type: String,
     entries: Vec<serde_json::Value>,
 }
@@ -335,7 +334,7 @@ struct ChronicleRequestBody {
 struct ChronicleEncoder {
     customer_id: String,
     namespace: Option<String>,
-    labels: Option<Vec<(String, String)>>,
+    labels: Option<Vec<Label>>,
     encoder: codecs::Encoder<()>,
     transformer: codecs::Transformer,
 }
@@ -462,6 +461,12 @@ impl RequestBuilder<(String, Vec<Event>)> for ChronicleRequestBuilder {
     }
 }
 
+#[derive(Clone, Debug, Serialize)]
+struct Label {
+    key: String,
+    value: String,
+}
+
 impl ChronicleRequestBuilder {
     fn new(config: &ChronicleUnstructuredConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
@@ -470,10 +475,14 @@ impl ChronicleRequestBuilder {
         let encoder = ChronicleEncoder {
             customer_id: config.customer_id.clone(),
             namespace: config.namespace.clone(),
-            labels: config
-                .labels
-                .clone()
-                .map(|labels| labels.into_iter().collect_vec()),
+            labels: config.labels.as_ref().map(|labs| {
+                labs.iter()
+                    .map(|(k, v)| Label {
+                        key: k.to_string(),
+                        value: v.to_string(),
+                    })
+                    .collect::<Vec<_>>()
+            }),
             encoder,
             transformer,
         };
