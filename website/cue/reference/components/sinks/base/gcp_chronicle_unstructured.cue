@@ -348,12 +348,8 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 		type: string: examples: ["127.0.0.1:8080", "example.com:12345"]
 	}
 	labels: {
-		description: """
-			A set of labels that are attached to each batch of events.
-
-			Both keys and values cannot be used in a template.
-			"""
-		required: false
+		description: "A set of labels that are attached to each batch of events."
+		required:    false
 		type: object: {
 			examples: [{
 				source: "vector"
