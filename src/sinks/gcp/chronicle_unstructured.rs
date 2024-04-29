@@ -224,18 +224,6 @@ pub enum ChronicleError {
 #[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        if let Some(labels) = self.labels.clone() {
-            labels
-                .keys()
-                .map(|k| {
-                    if !valid_label_name(k) {
-                        return Err(format!("Invalid label {k}"));
-                    }
-
-                    Ok(())
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-        }
         let creds = self.auth.build(Scope::MalachiteIngestion).await?;
 
         let tls = TlsSettings::from_options(&self.tls)?;
@@ -472,48 +460,6 @@ impl RequestBuilder<(String, Vec<Event>)> for ChronicleRequestBuilder {
             metadata,
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::valid_label_name;
-
-    #[test]
-    fn valid_label_names() {
-        assert!(valid_label_name("name"));
-        assert!(valid_label_name("bee-bop"));
-        assert!(valid_label_name("a09b"));
-        assert!(valid_label_name("09ba"));
-        assert!(valid_label_name("abc--"));
-        assert!(valid_label_name(
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        ));
-        assert!(valid_label_name("-"));
-        assert!(valid_label_name("-a"));
-
-        assert!(!valid_label_name(
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        ));
-        assert!(!valid_label_name(" name "));
-        assert!(!valid_label_name("bee_bop"));
-        assert!(!valid_label_name(""));
-        assert!(!valid_label_name(" "));
-        assert!(!valid_label_name("_*"));
-        assert!(!valid_label_name("_"));
-        assert!(!valid_label_name("*"));
-        assert!(!valid_label_name("{{field}}"));
-    }
-}
-
-// valid chars: [a-z0-9-] 1 to 63 chars
-// See https://cloud.google.com/chronicle/docs/preview/cloud-integration/create-custom-labels#label_requirements
-fn valid_label_name(label: &str) -> bool {
-    if label.len() > 63 || label.is_empty() {
-        return false;
-    }
-    label
-        .chars()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 impl ChronicleRequestBuilder {
