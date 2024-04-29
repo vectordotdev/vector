@@ -43,7 +43,7 @@ regex = { version = "1.10.4", default-features = false, features = ["std", "perf
 ryu = { version = "1", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
-serde_with = { version = "3.7.0", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "3.8.1", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.5", default-features = false }
 socket2 = { version = "0.5.6", default-features = false }
