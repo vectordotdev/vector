@@ -241,7 +241,7 @@ impl DatadogApiError {
         match self {
             // This retry logic will be expanded further, but specifically retrying unauthorized
             // requests and lower level HttpErrors for now.
-            // I verified using `curl` that `403` is the respose code for this.
+            // I verified using `curl` that `403` is the response code for this.
             //
             // https://github.com/vectordotdev/vector/issues/10870
             // https://github.com/vectordotdev/vector/issues/12220
