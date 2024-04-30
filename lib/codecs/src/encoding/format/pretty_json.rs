@@ -101,7 +101,14 @@ mod tests {
         }));
         let bytes = serialize(PrettyJsonSerializerConfig::default(), event);
 
-        assert_eq!(bytes, r#"{"a":"0","x":"23","z":25}"#);
+        assert_eq!(
+            bytes,
+            r#"{
+  "a": "0",
+  "x": "23",
+  "z": 25
+}"#
+        );
     }
 
     #[test]
@@ -130,7 +137,20 @@ mod tests {
 
         assert_eq!(
             bytes,
-            r#"{"name":"foos","namespace":"vector","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"timestamp":"2018-11-14T08:09:10.000000011Z","kind":"incremental","counter":{"value":100.0}}"#
+            r#"{
+  "name": "foos",
+  "namespace": "vector",
+  "tags": {
+    "Key3": "Value3",
+    "key1": "value1",
+    "key2": "value2"
+  },
+  "timestamp": "2018-11-14T08:09:10.000000011Z",
+  "kind": "incremental",
+  "counter": {
+    "value": 100.0
+  }
+}"#
         );
     }
 
@@ -148,7 +168,15 @@ mod tests {
 
         assert_eq!(
             bytes,
-            r#"{"name":"users","kind":"incremental","set":{"values":["bob"]}}"#
+            r#"{
+  "name": "users",
+  "kind": "incremental",
+  "set": {
+    "values": [
+      "bob"
+    ]
+  }
+}"#
         );
     }
 
@@ -167,7 +195,19 @@ mod tests {
 
         assert_eq!(
             bytes,
-            r#"{"name":"glork","kind":"incremental","distribution":{"samples":[{"value":10.0,"rate":1}],"statistic":"histogram"}}"#
+            r#"{
+  "name": "glork",
+  "kind": "incremental",
+  "distribution": {
+    "samples": [
+      {
+        "value": 10.0,
+        "rate": 1
+      }
+    ],
+    "statistic": "histogram"
+  }
+}"#
         );
     }
 
@@ -197,7 +237,20 @@ mod tests {
 
         assert_eq!(
             bytes,
-            r#"{"name":"counter","tags":{"a":["first",null,"second"]},"kind":"incremental","counter":{"value":1.0}}"#
+            r#"{
+  "name": "counter",
+  "tags": {
+    "a": [
+      "first",
+      null,
+      "second"
+    ]
+  },
+  "kind": "incremental",
+  "counter": {
+    "value": 1.0
+  }
+}"#
         );
     }
 
@@ -212,7 +265,16 @@ mod tests {
 
         assert_eq!(
             bytes,
-            r#"{"name":"counter","tags":{"a":"second"},"kind":"incremental","counter":{"value":1.0}}"#
+            r#"{
+  "name": "counter",
+  "tags": {
+    "a": "second"
+  },
+  "kind": "incremental",
+  "counter": {
+    "value": 1.0
+  }
+}"#
         );
     }
 
