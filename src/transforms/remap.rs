@@ -1238,9 +1238,8 @@ mod tests {
                     MetricValue::Counter { value: 1.0 },
                     // The schema definition is set in the topology, which isn't used in this test. Setting the definition
                     // to the actual value to skip the assertion here
-                    EventMetadata::default().with_schema_definition(&Arc::new(
-                        output.metadata().schema_definition().clone()
-                    )),
+                    EventMetadata::default()
+                        .with_schema_definition(output.metadata().schema_definition()),
                 )
                 .with_tags(Some(metric_tags! {
                     "hello" => "world",
@@ -1259,9 +1258,8 @@ mod tests {
                     MetricValue::Counter { value: 1.0 },
                     // The schema definition is set in the topology, which isn't used in this test. Setting the definition
                     // to the actual value to skip the assertion here
-                    EventMetadata::default().with_schema_definition(&Arc::new(
-                        output.metadata().schema_definition().clone()
-                    )),
+                    EventMetadata::default()
+                        .with_schema_definition(output.metadata().schema_definition()),
                 )
                 .with_tags(Some(metric_tags! {
                     "hello" => "goodbye",
@@ -1283,9 +1281,8 @@ mod tests {
                     MetricValue::Counter { value: 1.0 },
                     // The schema definition is set in the topology, which isn't used in this test. Setting the definition
                     // to the actual value to skip the assertion here
-                    EventMetadata::default().with_schema_definition(&Arc::new(
-                        output.metadata().schema_definition().clone()
-                    )),
+                    EventMetadata::default()
+                        .with_schema_definition(output.metadata().schema_definition()),
                 )
                 .with_tags(Some(metric_tags! {
                     "not_hello" => "oops",

@@ -237,7 +237,7 @@ impl DatadogMetricsEncoder {
         // for `SketchPayload` with a single sketch looks just like as if we literally wrote out a
         // single value for the given field.
         //
-        // Similary, `MetricPayload` has a single repeated `series` field.
+        // Similarly, `MetricPayload` has a single repeated `series` field.
 
         match self.endpoint {
             // V1 Series metrics are encoded via JSON, in an incremental fashion.
