@@ -75,7 +75,7 @@ schannel = "0.1.23"
 prost-build = "0.12"
 
 [dev-dependencies]
-base64 = "0.22.0"
+base64 = "0.22.1"
 chrono-tz = { version = "0.9.0", default-features = false }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 env-test-util = "1.0.1"
