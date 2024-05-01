@@ -664,7 +664,8 @@ impl<'a> Builder<'a> {
                     info!("Healthcheck disabled.");
                     Ok(TaskOutput::Healthcheck)
                 }
-            };
+            }
+            .instrument(span.clone());
 
             let healthcheck_task = Task::new(key.clone(), typetag, healthcheck_task);
 
