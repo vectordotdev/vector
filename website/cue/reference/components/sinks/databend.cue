@@ -69,7 +69,7 @@ components: sinks: databend: {
 	support: {
 		requirements: [
 			"""
-				[Databend](\(urls.databend)) version `>= 0.9.0` is required.
+				[Databend](\(urls.databend)) version `>= 1.2.216` is required.
 				""",
 		]
 		warnings: []

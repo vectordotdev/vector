@@ -8,12 +8,12 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-anyhow = "1.0.81"
-cached = "0.49.3"
+anyhow = "1.0.82"
+cached = "0.50.0"
 chrono.workspace = true
 clap.workspace = true
 clap-verbosity-flag = "2.2.0"
-clap_complete = "4.5.1"
+clap_complete = "4.5.2"
 confy = "0.6.1"
 directories = "5.0.1"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html

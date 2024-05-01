@@ -36,7 +36,7 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-20.04-8core
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -122,6 +122,12 @@ jobs:
       - name: VRL - Linux
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
         run: cargo vdev test-vrl
+
+      - name: Build VRL Playground
+        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
+        run: |
+          cd lib/vector-vrl/web-playground/
+          wasm-pack build --target web --out-dir public/pkg
 
   # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   all-checks:
