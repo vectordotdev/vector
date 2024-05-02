@@ -249,7 +249,7 @@ mod tests {
         "#,
             env_var, env_var_in_arr
         );
-        let (interpolated_config_source, _) = vars::interpolate(
+        let interpolated_config_source = vars::interpolate(
             config_source.as_ref(),
             &HashMap::from([
                 (env_var.to_string(), "syslog".to_string()),

@@ -280,7 +280,7 @@ fn load_from_inputs(
     }
 }
 
-pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<String>), Vec<String>> {
+pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<String, Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
@@ -299,9 +299,9 @@ pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<(T, Vec<Str
 where
     T: serde::de::DeserializeOwned,
 {
-    let (with_vars, warnings) = prepare_input(input)?;
+    let with_vars = prepare_input(input)?;
 
-    format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
+    format::deserialize(&with_vars, format)
 }
 
 #[cfg(not(windows))]

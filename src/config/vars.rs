@@ -20,15 +20,9 @@ pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: Lazy<Regex> = Lazy::new(|| 
     .unwrap()
 });
 
-/// (result, warnings)
-pub fn interpolate(
-    input: &str,
-    vars: &HashMap<String, String>,
-) -> Result<(String, Vec<String>), Vec<String>> {
+/// Result<intepolated config, errors>
+pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::new();
-
-    // unused but kept around since we are likely to need it again
-    let warnings = Vec::new();
 
     let interpolated = ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX
         .replace_all(input, |caps: &Captures<'_>| {
@@ -74,7 +68,7 @@ pub fn interpolate(
         .into_owned();
 
     if errors.is_empty() {
-        Ok((interpolated, warnings))
+        Ok(interpolated)
     } else {
         Err(errors)
     }
@@ -95,32 +89,32 @@ mod test {
         .into_iter()
         .collect();
 
-        assert_eq!("dogs", interpolate("$FOO", &vars).unwrap().0);
-        assert_eq!("dogs", interpolate("${FOO}", &vars).unwrap().0);
-        assert_eq!("cats", interpolate("${FOOBAR}", &vars).unwrap().0);
-        assert_eq!("xcatsy", interpolate("x${FOOBAR}y", &vars).unwrap().0);
+        assert_eq!("dogs", interpolate("$FOO", &vars).unwrap());
+        assert_eq!("dogs", interpolate("${FOO}", &vars).unwrap());
+        assert_eq!("cats", interpolate("${FOOBAR}", &vars).unwrap());
+        assert_eq!("xcatsy", interpolate("x${FOOBAR}y", &vars).unwrap());
         assert!(interpolate("x$FOOBARy", &vars).is_err());
-        assert_eq!("$ x", interpolate("$ x", &vars).unwrap().0);
-        assert_eq!("$FOO", interpolate("$$FOO", &vars).unwrap().0);
-        assert_eq!("dogs=bar", interpolate("$FOO=bar", &vars).unwrap().0);
+        assert_eq!("$ x", interpolate("$ x", &vars).unwrap());
+        assert_eq!("$FOO", interpolate("$$FOO", &vars).unwrap());
+        assert_eq!("dogs=bar", interpolate("$FOO=bar", &vars).unwrap());
         assert!(interpolate("$NOT_FOO", &vars).is_err());
         assert!(interpolate("$NOT-FOO", &vars).is_err());
-        assert_eq!("turtles", interpolate("$FOO.BAR", &vars).unwrap().0);
-        assert_eq!("${FOO x", interpolate("${FOO x", &vars).unwrap().0);
-        assert_eq!("${}", interpolate("${}", &vars).unwrap().0);
-        assert_eq!("dogs", interpolate("${FOO:-cats}", &vars).unwrap().0);
-        assert_eq!("dogcats", interpolate("${NOT:-dogcats}", &vars).unwrap().0);
+        assert_eq!("turtles", interpolate("$FOO.BAR", &vars).unwrap());
+        assert_eq!("${FOO x", interpolate("${FOO x", &vars).unwrap());
+        assert_eq!("${}", interpolate("${}", &vars).unwrap());
+        assert_eq!("dogs", interpolate("${FOO:-cats}", &vars).unwrap());
+        assert_eq!("dogcats", interpolate("${NOT:-dogcats}", &vars).unwrap());
         assert_eq!(
             "dogs and cats",
-            interpolate("${NOT:-dogs and cats}", &vars).unwrap().0
+            interpolate("${NOT:-dogs and cats}", &vars).unwrap()
         );
-        assert_eq!("${:-cats}", interpolate("${:-cats}", &vars).unwrap().0);
-        assert_eq!("", interpolate("${NOT:-}", &vars).unwrap().0);
-        assert_eq!("cats", interpolate("${NOT-cats}", &vars).unwrap().0);
-        assert_eq!("", interpolate("${EMPTY-cats}", &vars).unwrap().0);
-        assert_eq!("dogs", interpolate("${FOO:?error cats}", &vars).unwrap().0);
-        assert_eq!("dogs", interpolate("${FOO?error cats}", &vars).unwrap().0);
-        assert_eq!("", interpolate("${EMPTY?error cats}", &vars).unwrap().0);
+        assert_eq!("${:-cats}", interpolate("${:-cats}", &vars).unwrap());
+        assert_eq!("", interpolate("${NOT:-}", &vars).unwrap());
+        assert_eq!("cats", interpolate("${NOT-cats}", &vars).unwrap());
+        assert_eq!("", interpolate("${EMPTY-cats}", &vars).unwrap());
+        assert_eq!("dogs", interpolate("${FOO:?error cats}", &vars).unwrap());
+        assert_eq!("dogs", interpolate("${FOO?error cats}", &vars).unwrap());
+        assert_eq!("", interpolate("${EMPTY?error cats}", &vars).unwrap());
         assert!(interpolate("${NOT:?error cats}", &vars).is_err());
         assert!(interpolate("${NOT?error cats}", &vars).is_err());
         assert!(interpolate("${EMPTY:?error cats}", &vars).is_err());
