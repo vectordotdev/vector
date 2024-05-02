@@ -4221,7 +4221,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.4.10",
+ "socket2 0.5.7",
  "tokio",
  "tower-service",
  "tracing 0.1.40",
@@ -10590,9 +10590,9 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vrl"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c257b8f629e4717d866924d78d38e34cf983c977851b0b377344165f60554a5"
+checksum = "82cfcc99d9936dc2a8645f049122a5c5d137b066d0ffc48f01203ab2f102ed62"
 dependencies = [
  "aes",
  "ansi_term",
