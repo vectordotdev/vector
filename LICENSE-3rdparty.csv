@@ -228,7 +228,7 @@ getrandom,https://github.com/rust-random/getrandom,MIT OR Apache-2.0,The Rand Pr
 gimli,https://github.com/gimli-rs/gimli,MIT OR Apache-2.0,The gimli Authors
 glob,https://github.com/rust-lang/glob,MIT OR Apache-2.0,The Rust Project Developers
 goauth,https://github.com/durch/rust-goauth,MIT,Drazen Urch <github@drazenur.ch>
-governor,https://github.com/antifuchs/governor,MIT,Andreas Fuchs <asf@boinkor.net>
+governor,https://github.com/boinkor-net/governor,MIT,Andreas Fuchs <asf@boinkor.net>
 graphql-introspection-query,https://github.com/graphql-rust/graphql-client,Apache-2.0 OR MIT,Tom Houlé <tom@tomhoule.com>
 graphql-parser,https://github.com/graphql-rust/graphql-parser,MIT OR Apache-2.0,Paul Colomiets <paul@colomiets.name>
 graphql_client,https://github.com/graphql-rust/graphql-client,Apache-2.0 OR MIT,Tom Houlé <tom@tomhoule.com>
@@ -538,6 +538,7 @@ snap,https://github.com/BurntSushi/rust-snappy,BSD-3-Clause,Andrew Gallant <jams
 socket2,https://github.com/rust-lang/socket2,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Thomas de Zeeuw <thomasdezeeuw@gmail.com>"
 spin,https://github.com/mvdnes/spin-rs,MIT,"Mathijs van de Nes <git@mathijs.vd-nes.nl>, John Ericson <git@JohnEricson.me>"
 spin,https://github.com/mvdnes/spin-rs,MIT,"Mathijs van de Nes <git@mathijs.vd-nes.nl>, John Ericson <git@JohnEricson.me>, Joshua Barretto <joshua.s.barretto@gmail.com>"
+spinning_top,https://github.com/rust-osdev/spinning_top,MIT OR Apache-2.0,Philipp Oppermann <dev@phil-opp.com>
 spki,https://github.com/RustCrypto/formats/tree/master/spki,Apache-2.0 OR MIT,RustCrypto Developers
 stability,https://github.com/sagebind/stability,MIT,Stephen M. Coakley <me@stephencoakley.com>
 static_assertions,https://github.com/nvzqz/static-assertions-rs,MIT OR Apache-2.0,Nikolai Vazquez
