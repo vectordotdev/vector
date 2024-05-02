@@ -9,6 +9,7 @@ use aws_smithy_runtime_api::{
     client::{orchestrator::HttpResponse, result::SdkError},
     http::StatusCode,
 };
+use aws_smithy_types::error::metadata::ProvideErrorMetadata;
 use futures::FutureExt;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
@@ -19,6 +20,7 @@ use crate::{
     common::s3::S3ClientBuilder,
     config::ProxyConfig,
     http::status,
+    internal_events::{CheckRetryEvent},
     sinks::{util::retries::RetryLogic, Healthcheck},
     tls::TlsConfig,
 };
@@ -312,7 +314,12 @@ impl RetryLogic for S3RetryLogic {
     type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        is_retriable_error(error)
+        let retry = is_retriable_error(error);
+        emit!(CheckRetryEvent {
+            status_code: error.code().unwrap_or(""),
+            retry: retry,
+        });
+        retry
     }
 }
 

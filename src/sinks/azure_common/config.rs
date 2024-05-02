@@ -16,6 +16,7 @@ use vector_lib::{
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
+    internal_events::{CheckRetryEvent},
     sinks::{util::retries::RetryLogic, Healthcheck},
 };
 
@@ -59,11 +60,15 @@ impl RetryLogic for AzureBlobRetryLogic {
     type Error = HttpError;
     type Response = AzureBlobResponse;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
         // For now, retry request in all cases
 
         // error.status().is_server_error()
         //     || StatusCode::TOO_MANY_REQUESTS.as_u16() == Into::<u16>::into(error.status())
+        emit!(CheckRetryEvent {
+            status_code: error.error_code().unwrap_or(""),
+            retry: true,
+        });
         true
     }
 }
