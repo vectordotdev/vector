@@ -27,7 +27,7 @@ pub fn interpolate(
 ) -> Result<(String, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
-    // unusued but kept around since we are likely to need it again
+    // unused but kept around since we are likely to need it again
     let warnings = Vec::new();
 
     let interpolated = ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX
