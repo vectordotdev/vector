@@ -15,7 +15,7 @@ use vector_lib::configurable::configurable_component;
 
 use super::service::{S3Response, S3Service};
 use crate::{
-    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+    aws::{create_client, is_retriable_error, AwsAuthentication, RegionOrEndpoint},
     common::s3::S3ClientBuilder,
     config::ProxyConfig,
     http::status,
@@ -311,11 +311,8 @@ impl RetryLogic for S3RetryLogic {
     type Error = SdkError<PutObjectError, HttpResponse>;
     type Response = S3Response;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        // For now, retry request in all cases
-
-        // is_retriable_error(error)
-        true
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        is_retriable_error(error)
     }
 }
 
@@ -406,11 +403,16 @@ mod tests {
     #[test]
     fn test_retriable() {
         // Handle unhandled + 400 status code case (from expired token code)
+        // Example response with token/host data removed
+        let response = "Once(Some(b\"<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\"?>\\n<Error><Code>ExpiredToken</Code><Message>The provided token has expired.</Message></Error>\"))";
         assert!(
             S3RetryLogic.is_retriable_error(
                 &SdkError::<PutObjectError, HttpResponse>::service_error(
                     PutObjectError::unhandled(BadError),
-                    HttpResponse::new(http::StatusCode::from_u16(400).unwrap().into(), SdkBody::empty())
+                    HttpResponse::new(
+                        http::StatusCode::from_u16(400).unwrap().into(),
+                        SdkBody::from(response)
+                    )
                 )
             )
         );
