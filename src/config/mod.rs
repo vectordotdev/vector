@@ -53,7 +53,7 @@ pub use id::{ComponentKey, Inputs};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
     load_from_str, load_source_from_paths, merge_path_lists, process_paths, COLLECTOR,
-    CONFIG_PATHS, STRICT_ENV_VARS,
+    CONFIG_PATHS,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
