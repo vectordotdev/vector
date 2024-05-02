@@ -17,6 +17,3 @@ For example:
 ## To be migrated
 
 ## To be removed
-
-- v0.38.0 strict_env_vars Remove option for configuring missing environment variable interpolation
-  to be a warning rather than an error

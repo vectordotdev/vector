@@ -131,14 +131,7 @@ async fn http_request_to_config_builder(
         .await
         .map_err(|e| vec![e.to_owned()])?;
 
-    let (config_builder, warnings) =
-        config::load(config_str.chunk(), crate::config::format::Format::Toml)?;
-
-    for warning in warnings.into_iter() {
-        warn!("{}", warning);
-    }
-
-    Ok(config_builder)
+    config::load(config_str.chunk(), crate::config::format::Format::Toml)?
 }
 
 /// Polls the HTTP endpoint after/every `poll_interval_secs`, returning a stream of `ConfigBuilder`.
