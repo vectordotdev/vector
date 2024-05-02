@@ -20,7 +20,7 @@ pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: Lazy<Regex> = Lazy::new(|| 
     .unwrap()
 });
 
-/// Result<intepolated config, errors>
+/// Result<interpolated config, errors>
 pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::new();
 
