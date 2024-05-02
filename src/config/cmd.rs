@@ -168,7 +168,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     // builder fields which we'll use to error out if required.
     let (paths, builder) = match process_paths(&paths) {
         Some(paths) => match load_builder_from_paths(&paths) {
-            Ok((builder, _)) => (paths, builder),
+            Ok(builder) => (paths, builder),
             Err(errs) => return handle_config_errors(errs),
         },
         None => return exitcode::CONFIG,
@@ -176,7 +176,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     // Load source TOML.
     let source = match load_source_from_paths(&paths) {
-        Ok((map, _)) => map,
+        Ok(map) => map,
         Err(errs) => return handle_config_errors(errs),
     };
 
