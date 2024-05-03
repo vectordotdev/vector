@@ -315,6 +315,12 @@ impl RetryLogic for S3RetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         let retry = is_retriable_error(error);
+        info!(
+            message = "Considered retry on error.",
+            error = %error,
+            retry = retry,
+        );
+
         emit!(CheckRetryEvent {
             status_code: error.code().unwrap_or(""),
             retry: retry,

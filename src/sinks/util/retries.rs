@@ -173,7 +173,9 @@ where
                     error!(message = "Retries exhausted; dropping the request.", %error, internal_log_rate_limit = true);
                     return None;
                 }
-
+                // First attempt to cast the error into something of type L::Error
+                // L::Error is the error specified in the definition of the RetryLogic (HTTPError for AzureRetryLogic for ex.)
+                // So it's looking for an error that is compatible with the retry logic type
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
                         warn!(message = "Retrying after error.", error = %expected, internal_log_rate_limit = true);
@@ -186,6 +188,7 @@ where
                         );
                         None
                     }
+                // Next attempt to cast the error into a timeout error
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     warn!(
                         message = "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased.",
@@ -193,10 +196,14 @@ where
                     );
                     Some(self.build_retry())
                 } else {
-                    // For now, retry request in all cases
+                    // If we can't cast to either of the above cases, then give up
+                    // However, for Azure, we may end up in this case for transient issues
+                    // For example, a connection reset error that occasionally pops up registers with status code 104
+                    // This is not a status code defined for the HTTPError and the downcast fails even though we can retry in this case
+                    // As such, we currently retry with all unexpected errors like this (TODO: refine down to more specific issues)
                     error!(
                         // message = "Unexpected error type; dropping the request.",
-                        message = "Unexpected error type encountered.",
+                        message = "Unexpected error type encountered... Retrying",
                         %error,
                         internal_log_rate_limit = true
                     );

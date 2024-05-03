@@ -65,11 +65,18 @@ impl RetryLogic for AzureBlobRetryLogic {
 
         // error.status().is_server_error()
         //     || StatusCode::TOO_MANY_REQUESTS.as_u16() == Into::<u16>::into(error.status())
+        let retry = true;
+        info!(
+            message = "Considered retry on error.",
+            error = %error,
+            retry = retry,
+        );
+
         emit!(CheckRetryEvent {
             status_code: error.error_code().unwrap_or(""),
-            retry: true,
+            retry: retry,
         });
-        true
+        retry
     }
 }
 
