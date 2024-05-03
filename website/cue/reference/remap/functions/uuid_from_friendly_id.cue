@@ -24,7 +24,7 @@ remap: functions: uuid_from_friendly_id: {
 		{
 			title: "Convert a Friendly ID to a UUID"
 			source: #"""
-				uuid_from_friendly_id("3s87yEvnmkiPBMHsj8bwwc")
+				uuid_from_friendly_id!("3s87yEvnmkiPBMHsj8bwwc")
 				"""#
 			return: "7f41deed-d5e2-8b5e-7a13-ab4ff93cfad2"
 		},
