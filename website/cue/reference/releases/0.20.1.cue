@@ -7,7 +7,7 @@ releases: "0.20.1": {
 	description: """
 		The Vector team is pleased to announce version 0.20.1!
 
-		This patch release contains a few fixes for regressions in in 0.20.0.
+		This patch release contains a few fixes for regressions in 0.20.0.
 
 		**Note:** Please see the release notes for [`v0.20.0`](/releases/0.20.0/) for additional changes if upgrading from
 		`v0.19.X`. In particular, the upgrade guide for breaking changes.
