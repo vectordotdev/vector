@@ -184,6 +184,7 @@ aws-sdk-cloudwatchlogs = { version = "1.3.0", default-features = false, features
 aws-sdk-elasticsearch = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-sdk-firehose = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-sdk-kinesis = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
+aws-sdk-secretsmanager = { version = "1.3.0", default-features = false, features = ["behavior-version-latest"], optional = true }
 # The sts crate is needed despite not being referred to anywhere in the code because we need to set the
 # `behavior-version-latest` feature. Without this we get a runtime panic when `auth.assume_role` authentication
 # is configured.
@@ -402,17 +403,17 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
+default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise", "secrets"]
 # Default features for `cargo docs`. The same as `default` but without `rdkafka?/gssapi-vendored` which would require installing libsasl in our doc build environment.
-docs = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+docs = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise", "secrets"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
+default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise", "secrets"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "transforms", "enterprise"]
-default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
-default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
-default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
+default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "transforms", "enterprise", "secrets"]
+default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise", "secrets"]
+default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise", "secrets"]
+default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise", "secrets"]
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
 # Enables the binary secret-backend-example
@@ -424,18 +425,18 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "enterp
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "enterprise"]
-target-arm-unknown-linux-gnueabi = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
-target-arm-unknown-linux-musleabi = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "enterprise"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise", "secrets"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise", "secrets"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise", "secrets"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "enterprise", "secrets"]
+target-arm-unknown-linux-gnueabi = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise", "secrets"]
+target-arm-unknown-linux-musleabi = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "enterprise", "secrets"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise", "secrets"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise", "secrets"]
 # Does not currently build
-target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise", "secrets"]
 # Currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise"]
+target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "enterprise", "secrets"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
@@ -490,6 +491,11 @@ enrichment-tables-mmdb = ["dep:maxminddb"]
 
 # Codecs
 codecs-syslog = ["vector-lib/syslog"]
+
+# Secrets
+secrets = ["secrets-aws-secrets-manager"]
+
+secrets-aws-secrets-manager = ["aws-core", "dep:aws-sdk-secretsmanager"]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
