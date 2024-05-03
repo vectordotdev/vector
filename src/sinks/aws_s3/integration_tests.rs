@@ -384,12 +384,9 @@ async fn s3_healthchecks() {
     create_bucket(&bucket, false).await;
 
     let config = config(&bucket, 1);
-    let service = config
-        .create_service(&ProxyConfig::from_env())
-        .await
-        .unwrap();
     config
-        .build_healthcheck(service.client())
+        .build_healthcheck(&ProxyConfig::from_env())
+        .await
         .unwrap()
         .await
         .unwrap();
@@ -398,12 +395,9 @@ async fn s3_healthchecks() {
 #[tokio::test]
 async fn s3_healthchecks_invalid_bucket() {
     let config = config("s3_healthchecks_invalid_bucket", 1);
-    let service = config
-        .create_service(&ProxyConfig::from_env())
-        .await
-        .unwrap();
     assert!(config
-        .build_healthcheck(service.client())
+        .build_healthcheck(&ProxyConfig::from_env())
+        .await
         .unwrap()
         .await
         .is_err());

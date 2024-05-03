@@ -164,7 +164,22 @@ pub async fn create_client<T: ClientBuilder>(
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
 ) -> crate::Result<T::Client> {
-    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options)
+    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options, true)
+        .await
+        .map(|(client, _)| client)
+}
+
+/// Create the SDK client using the provided settings, with the additional option to select
+/// whether we should instrument the http calls with a bytes_sent metric.
+pub async fn create_client_instrument<T: ClientBuilder>(
+    auth: &AwsAuthentication,
+    region: Option<Region>,
+    endpoint: Option<String>,
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
+    instrument: bool,
+) -> crate::Result<T::Client> {
+    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options, instrument)
         .await
         .map(|(client, _)| client)
 }
@@ -176,6 +191,7 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
+    instrument: bool,
 ) -> crate::Result<(T::Client, Region)> {
     let retry_config = RetryConfig::disabled();
 
@@ -190,6 +206,7 @@ pub async fn create_client_and_region<T: ClientBuilder>(
 
     // Create a custom http connector that will emit the required metrics for us.
     let connector = AwsHttpClient {
+        instrument,
         http: connector,
         region: region.clone(),
     };
@@ -277,6 +294,7 @@ pub async fn sign_request(
 struct AwsHttpClient<T> {
     http: T,
     region: Region,
+    instrument: bool,
 }
 
 impl<T> HttpClient for AwsHttpClient<T>
@@ -291,6 +309,7 @@ where
         let http_connector = self.http.http_connector(settings, components);
 
         SharedHttpConnector::new(AwsConnector {
+            instrument: self.instrument,
             region: self.region.clone(),
             http: http_connector,
         })
@@ -299,6 +318,7 @@ where
 
 #[derive(Clone, Debug)]
 struct AwsConnector<T> {
+    instrument: bool,
     http: T,
     region: Region,
 }
@@ -319,11 +339,12 @@ where
 
         let fut = self.http.call(req);
         let region = self.region.clone();
+        let instrument = self.instrument;
 
         HttpConnectorFuture::new(fut.inspect(move |result| {
             let byte_size = bytes_sent.load(Ordering::Relaxed);
             if let Ok(result) = result {
-                if result.status().is_success() {
+                if result.status().is_success() && instrument {
                     emit!(AwsBytesSent {
                         byte_size,
                         region: Some(region),
