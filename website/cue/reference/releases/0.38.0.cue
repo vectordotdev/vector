@@ -161,7 +161,7 @@ releases: "0.38.0": {
 				"""
 		},
 		{
-			type: "breaking"
+			type: "chore"
 			description: """
 				The deprecated `--strict-env-vars` flag has been removed. The previous behavior of defaulting unset
 				environment variables can be accomplished by syntax like `${FOO-}` (which will default `FOO` to
