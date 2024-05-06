@@ -5,9 +5,7 @@ test_filter: '::databend::'
 
 runner:
   env:
-    DATABEND_ENDPOINT: http://databend:8000
-    DATABEND_USER: vector
-    DATABEND_PASSWORD: vector
+    DATABEND_ENDPOINT: databend://vector:vector@databend:8000?sslmode=disable&presign=detect
 
 matrix:
   version: ['latest']

@@ -217,7 +217,7 @@ releases: "0.29.0": {
 			scopes: ["codecs"]
 			description: """
 				Encoding of timestamps by the `gelf` codec was fixed to correctly encode as an
-				integer rather than an an RFC3339 string.
+				integer rather than an RFC3339 string.
 				"""
 			contributors: ["scMarkus"]
 			pr_numbers: [16749]

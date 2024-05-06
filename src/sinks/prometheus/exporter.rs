@@ -42,11 +42,7 @@ use crate::{
     http::{build_http_trace_layer, Auth},
     internal_events::PrometheusNormalizationError,
     sinks::{
-        util::{
-            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet},
-            statistic::validate_quantiles,
-            StreamSink,
-        },
+        util::{statistic::validate_quantiles, StreamSink},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -266,7 +262,6 @@ impl MetricMetadata {
 #[derive(Clone, Debug)]
 struct MetricRef {
     series: MetricSeries,
-    kind: MetricKind,
     value: Discriminant<MetricValue>,
     bounds: Option<Vec<f64>>,
 }
@@ -287,7 +282,6 @@ impl MetricRef {
 
         Self {
             series: metric.series().clone(),
-            kind: metric.kind(),
             value: discriminant(metric.value()),
             bounds,
         }
@@ -296,10 +290,7 @@ impl MetricRef {
 
 impl PartialEq for MetricRef {
     fn eq(&self, other: &Self) -> bool {
-        self.series == other.series
-            && self.kind == other.kind
-            && self.value == other.value
-            && self.bounds == other.bounds
+        self.series == other.series && self.value == other.value && self.bounds == other.bounds
     }
 }
 
@@ -308,50 +299,12 @@ impl Eq for MetricRef {}
 impl Hash for MetricRef {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.series.hash(state);
-        self.kind.hash(state);
         self.value.hash(state);
         if let Some(bounds) = &self.bounds {
             for bound in bounds {
                 bound.to_bits().hash(state);
             }
         }
-    }
-}
-
-struct PrometheusExporterMetricNormalizer {
-    distributions_as_summaries: bool,
-    buckets: Vec<f64>,
-}
-
-impl MetricNormalize for PrometheusExporterMetricNormalizer {
-    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        let new_metric = match metric.value() {
-            MetricValue::Distribution { .. } => {
-                // Convert the distribution as-is, and then let the normalizer absolute-ify it.
-                let (series, data, metadata) = metric.into_parts();
-                let (time, kind, value) = data.into_parts();
-
-                let new_value = if self.distributions_as_summaries {
-                    // We use a sketch when in summary mode because they're actually able to be
-                    // merged and provide correct output, unlike the aggregated summaries that
-                    // we handle from _sources_ like Prometheus.  The collector code itself
-                    // will render sketches as aggregated summaries, so we have continuity there.
-                    value
-                        .distribution_to_sketch()
-                        .expect("value should be distribution already")
-                } else {
-                    value
-                        .distribution_to_agg_histogram(&self.buckets)
-                        .expect("value should be distribution already")
-                };
-
-                let data = MetricData::from_parts(time, kind, new_value);
-                Metric::from_parts(series, data, metadata)
-            }
-            _ => metric,
-        };
-
-        state.make_absolute(new_metric)
     }
 }
 
@@ -526,6 +479,55 @@ impl PrometheusExporter {
         self.server_shutdown_trigger = Some(trigger);
         Ok(())
     }
+
+    fn normalize(&mut self, metric: Metric) -> Option<Metric> {
+        let new_metric = match metric.value() {
+            MetricValue::Distribution { .. } => {
+                // Convert the distribution as-is, and then absolute-ify it.
+                let (series, data, metadata) = metric.into_parts();
+                let (time, kind, value) = data.into_parts();
+
+                let new_value = if self.config.distributions_as_summaries {
+                    // We use a sketch when in summary mode because they're actually able to be
+                    // merged and provide correct output, unlike the aggregated summaries that
+                    // we handle from _sources_ like Prometheus.  The collector code itself
+                    // will render sketches as aggregated summaries, so we have continuity there.
+                    value
+                        .distribution_to_sketch()
+                        .expect("value should be distribution already")
+                } else {
+                    value
+                        .distribution_to_agg_histogram(&self.config.buckets)
+                        .expect("value should be distribution already")
+                };
+
+                let data = MetricData::from_parts(time, kind, new_value);
+                Metric::from_parts(series, data, metadata)
+            }
+            _ => metric,
+        };
+
+        match new_metric.kind() {
+            MetricKind::Absolute => Some(new_metric),
+            MetricKind::Incremental => {
+                let metrics = self.metrics.read().expect(LOCK_FAILED);
+                let metric_ref = MetricRef::from_metric(&new_metric);
+
+                if let Some(existing) = metrics.get(&metric_ref) {
+                    let mut current = existing.0.value().clone();
+                    if current.add(new_metric.value()) {
+                        // If we were able to add to the existing value (i.e. they were compatible),
+                        // return the result as an absolute metric.
+                        return Some(new_metric.with_value(current).into_absolute());
+                    }
+                }
+
+                // Otherwise, if we didn't have an existing value or we did and it was not
+                // compatible with the new value, simply return the new value as absolute.
+                Some(new_metric.into_absolute())
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -537,10 +539,6 @@ impl StreamSink<Event> for PrometheusExporter {
 
         let mut last_flush = Instant::now();
         let flush_period = self.config.flush_period_secs;
-        let mut normalizer = MetricNormalizer::from(PrometheusExporterMetricNormalizer {
-            distributions_as_summaries: self.config.distributions_as_summaries,
-            buckets: self.config.buckets.clone(),
-        });
 
         while let Some(event) = input.next().await {
             // If we've exceed our flush interval, go through all of the metrics we're currently
@@ -556,22 +554,14 @@ impl StreamSink<Event> for PrometheusExporter {
 
                 let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
-                let normalizer_mut = normalizer.get_state_mut();
-                metrics.retain(|metric_ref, (_, metadata)| {
-                    if metadata.has_expired(last_flush) {
-                        normalizer_mut.remove(&metric_ref.series);
-                        false
-                    } else {
-                        true
-                    }
-                });
+                metrics.retain(|_metric_ref, (_, metadata)| !metadata.has_expired(last_flush));
             }
 
             // Now process the metric we got.
             let mut metric = event.into_metric();
             let finalizers = metric.take_finalizers();
 
-            if let Some(normalized) = normalizer.normalize(metric) {
+            if let Some(normalized) = self.normalize(metric) {
                 let normalized = if self.config.suppress_timestamp {
                     normalized.with_timestamp(None)
                 } else {
@@ -1379,6 +1369,75 @@ mod tests {
             .get(&MetricRef::from_metric(&expected_histogram))
             .expect("histogram metric should exist");
         assert_eq!(actual_histogram.0.value(), expected_histogram.value());
+    }
+
+    #[tokio::test]
+    async fn sink_gauge_incremental_absolute_mix() {
+        // Because Prometheus does not, itself, have the concept of an Incremental metric, the
+        // Exporter must apply a normalization function that converts all metrics to Absolute ones
+        // before handling them.
+
+        // This test ensures that this normalization works correctly when applied to a mix of both
+        // Incremental and Absolute inputs.
+        let config = PrometheusExporterConfig {
+            address: next_addr(), // Not actually bound, just needed to fill config
+            tls: None,
+            ..Default::default()
+        };
+
+        let sink = PrometheusExporter::new(config);
+
+        let base_absolute_gauge_metric = Metric::new(
+            "gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 100.0 },
+        );
+
+        let base_incremental_gauge_metric = Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: -10.0 },
+        );
+
+        let metrics = vec![
+            base_absolute_gauge_metric.clone(),
+            base_absolute_gauge_metric
+                .clone()
+                .with_value(MetricValue::Gauge { value: 333.0 }),
+            base_incremental_gauge_metric.clone(),
+            base_incremental_gauge_metric
+                .clone()
+                .with_value(MetricValue::Gauge { value: 4.0 }),
+        ];
+
+        // Now run the events through the sink and see what ends up in the internal metric map.
+        let metrics_handle = Arc::clone(&sink.metrics);
+
+        let events = metrics
+            .iter()
+            .cloned()
+            .map(Event::Metric)
+            .collect::<Vec<_>>();
+
+        let sink = VectorSink::from_event_streamsink(sink);
+        let input_events = stream::iter(events).map(Into::into);
+        sink.run(input_events).await.unwrap();
+
+        let metrics_after = metrics_handle.read().unwrap();
+
+        // The gauge metric should be present.
+        assert_eq!(metrics_after.len(), 1);
+
+        let expected_gauge = Metric::new(
+            "gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 327.0 },
+        );
+
+        let actual_gauge = metrics_after
+            .get(&MetricRef::from_metric(&expected_gauge))
+            .expect("gauge metric should exist");
+        assert_eq!(actual_gauge.0.value(), expected_gauge.value());
     }
 }
 

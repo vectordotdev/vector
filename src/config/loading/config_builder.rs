@@ -33,14 +33,14 @@ impl ConfigBuilderLoader {
 
 impl Process for ConfigBuilderLoader {
     /// Prepares input for a `ConfigBuilder` by interpolating environment variables.
-    fn prepare<R: Read>(&mut self, input: R) -> Result<(String, Vec<String>), Vec<String>> {
-        let (prepared_input, warnings) = prepare_input(input)?;
+    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
+        let prepared_input = prepare_input(input)?;
         let prepared_input = self
             .secrets
             .as_ref()
             .map(|s| secret::interpolate(&prepared_input, s))
             .unwrap_or(Ok(prepared_input))?;
-        Ok((prepared_input, warnings))
+        Ok(prepared_input)
     }
 
     /// Merge a TOML `Table` with a `ConfigBuilder`. Component types extend specific keys.

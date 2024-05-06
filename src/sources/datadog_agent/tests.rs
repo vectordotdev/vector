@@ -118,7 +118,7 @@ fn test_decode_log_body() {
             assert_eq!(log["ddtags"], msg.ddtags.into());
 
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -320,7 +320,7 @@ async fn full_payload_v1() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -382,7 +382,7 @@ async fn full_payload_v2() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -444,7 +444,7 @@ async fn no_api_key() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -509,7 +509,7 @@ async fn api_key_in_url() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -574,7 +574,7 @@ async fn api_key_in_query_params() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -645,7 +645,7 @@ async fn api_key_in_header() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -789,7 +789,7 @@ async fn ignores_api_key() {
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -1498,7 +1498,7 @@ async fn split_outputs() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }

@@ -144,21 +144,17 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     config::init_log_schema(&paths, true)
         .map_err(&mut report_error)
         .ok()?;
-    let (builder, load_warnings) = config::load_builder_from_paths(&paths)
+    let builder = config::load_builder_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
 
     // Build
-    let (config, build_warnings) = builder
+    let (config, warnings) = builder
         .build_with_warnings()
         .map_err(&mut report_error)
         .ok()?;
 
     // Warnings
-    let warnings = load_warnings
-        .into_iter()
-        .chain(build_warnings)
-        .collect::<Vec<_>>();
     if !warnings.is_empty() {
         if opts.deny_warnings {
             report_error(warnings);

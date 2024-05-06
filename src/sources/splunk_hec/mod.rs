@@ -33,6 +33,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
 };
 use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStream};
+use vrl::path::OwnedTargetPath;
 use vrl::value::{kind::Collection, Kind};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -226,7 +227,8 @@ impl SourceConfig for SplunkConfig {
             LogNamespace::Vector => vector_lib::schema::Definition::new_with_default_metadata(
                 Kind::bytes().or_object(Collection::empty()),
                 [log_namespace],
-            ),
+            )
+            .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE),
         }
         .with_standard_vector_source_metadata()
         .with_source_metadata(
@@ -2532,6 +2534,7 @@ mod tests {
             Kind::object(Collection::empty()).or_bytes(),
             [LogNamespace::Vector],
         )
+        .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE)
         .with_metadata_field(
             &owned_value_path!("vector", "source_type"),
             Kind::bytes(),
