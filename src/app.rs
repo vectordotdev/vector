@@ -539,9 +539,11 @@ fn build_enterprise(
     config: &mut Config,
     config_paths: Vec<ConfigPath>,
 ) -> Result<Option<EnterpriseReporter<BoxFuture<'static, ()>>>, ExitCode> {
-    use crate::ENTERPRISE_ENABLED;
+    if config.enterprise.is_some() {
+        warn!("DEPRECATED: The `enterprise` feature has been deprecated and will be removed in the next release.");
+    }
 
-    ENTERPRISE_ENABLED
+    crate::ENTERPRISE_ENABLED
         .set(
             config
                 .enterprise
