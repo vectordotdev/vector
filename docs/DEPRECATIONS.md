@@ -18,4 +18,4 @@ For example:
 
 ## To be removed
 
-* v0.39.0 enterprise_feature The `enterprise` feature has been deprecated and will be removed.
+- v0.39.0 enterprise_feature The `enterprise` feature has been deprecated and will be removed.
