@@ -1,7 +1,7 @@
 package metadata
 
 releases: "0.38.0": {
-	date:     "2024-05-02"
+	date:     "2024-05-07"
 	codename: ""
 
 	whats_next: []
@@ -9,7 +9,7 @@ releases: "0.38.0": {
 	description: """
 		The Vector team is pleased to announce version 0.38.0!
 
-		Be sure to check out the [upgrade guide](/highlights/2024-05-06-0-38-0-upgrade-guide) for
+		Be sure to check out the [upgrade guide](/highlights/2024-05-07-0-38-0-upgrade-guide) for
 		breaking changes in this release.
 
 		This release just contains a mix of small enhancements and bug fixes. See the changelog
@@ -171,6 +171,22 @@ releases: "0.38.0": {
 				"""
 			breaking: true
 		},
+		{
+			type: "chore"
+			description: """
+				The `enterprise` global configuration has been deprecated and will be removed in
+				a future version. This corresponds to a deprecation for "Vector Enterprise" by the
+				Datadog Observability Pipelines product.
+				"""
+			breaking: true
+		},
+		{
+			type: "feat"
+			description: """
+				Support was added for loading secrets from AWS Secrets Manager (AWS SSM).
+				"""
+			breaking: true
+		},
 	]
 
 	commits: [
@@ -303,5 +319,13 @@ releases: "0.38.0": {
 		{sha: "fa0b5b388c26fb75f4665621f1962cf304e7fc38", date: "2024-05-03 06:57:08 UTC", description: "Bump roaring from 0.10.3 to 0.10.4", pr_number:                                              20409, scopes: ["deps"], type:                    "chore", breaking_change:       false, author: "dependabot[bot]", files_count:    3, insertions_count:  14, deletions_count:  3},
 		{sha: "ca00cc8835ff70c3c5865aa06925efe9ac25706f", date: "2024-05-03 03:13:05 UTC", description: "Bump rmp-serde from 1.2.0 to 1.3.0", pr_number:                                              20407, scopes: ["deps"], type:                    "chore", breaking_change:       false, author: "dependabot[bot]", files_count:    2, insertions_count:  3, deletions_count:   3},
 		{sha: "8ed9ec24c1eba0b2191d7c1f24ec2a7540b5bebf", date: "2024-05-03 04:39:56 UTC", description: "Remove deprecated `--strict-env-vars` flag", pr_number:                                      20422, scopes: ["config"], type:                  "chore", breaking_change:       true, author:  "Jesse Szwedko", files_count:      16, insertions_count: 107, deletions_count: 223},
+		{sha: "381326077ca7fb856c0dd645927ea652c0d70a37", date: "2024-05-03 18:38:56 UTC", description: "Bump timeout for `publish-new-environment` in CI", pr_number:                                20426, scopes: ["ci"], type:                      "chore", breaking_change:       false, author: "Jesse Szwedko", files_count:      1, insertions_count:  1, deletions_count:   1},
+		{sha: "4850a9ae033d474e94c8cec161c8f912a9b7c0d2", date: "2024-05-03 18:41:31 UTC", description: "Regenerate k8s manifests for chart 0.32.1", pr_number:                                       20280, scopes: ["releasing"], type:               "chore", breaking_change:       false, author: "Jesse Szwedko", files_count:      18, insertions_count: 22, deletions_count:  22},
+		{sha: "19ba8419eef8f73ff881f382aa655318875bb5ad", date: "2024-05-04 03:53:33 UTC", description: "Support loading secrets from AWS Secrets Manager", pr_number:                                20142, scopes: ["config"], type:                  "feat", breaking_change:        false, author: "Tommy Schmidt", files_count:      7, insertions_count:  202, deletions_count: 21},
+		{sha: "edcbf4382e383c29c76afc927d511706bb23f040", date: "2024-05-03 22:22:17 UTC", description: "Document new uuid_from_friendly_id function", pr_number:                                     20357, scopes: [], type:                          "docs", breaking_change:        false, author: "Andrew Martin", files_count:      2, insertions_count:  35, deletions_count:  0},
+		{sha: "c2765f45e243636b40d22a819d1496549eb40ed4", date: "2024-05-03 23:18:14 UTC", description: "component features comment trigger one runner label", pr_number:                             20430, scopes: ["ci"], type:                      "fix", breaking_change:         false, author: "neuronull", files_count:          1, insertions_count:  1, deletions_count:   1},
+		{sha: "e5a32a3fbf615a7a31d07eff2b31abea7ef6e560", date: "2024-05-06 19:51:48 UTC", description: "expose internals and test utils", pr_number:                                                 20429, scopes: ["datadog logs"], type:            "chore", breaking_change:       false, author: "Pavlos Rontidis", files_count:    5, insertions_count:  25, deletions_count:  23},
+		{sha: "04a6b55be891a7062ef526779aa0457d5d5b2972", date: "2024-05-06 21:03:51 UTC", description: "Bump timeouts for test-misc and integration tests", pr_number:                               20438, scopes: ["ci"], type:                      "chore", breaking_change:       false, author: "Jesse Szwedko", files_count:      2, insertions_count:  2, deletions_count:   2},
+		{sha: "79a22946c4018d0a07af662ecb4b6fad5d493e45", date: "2024-05-06 19:27:21 UTC", description: "Deprecate the `enterprise` feature", pr_number:                                              20437, scopes: ["enterprise"], type:              "chore", breaking_change:       false, author: "Bruce Guenter", files_count:      4, insertions_count:  9, deletions_count:   3},
 	]
 }
