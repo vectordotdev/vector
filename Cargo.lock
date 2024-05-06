@@ -974,7 +974,7 @@ dependencies = [
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "aws-types",
- "bytes 1.5.0",
+ "bytes 1.6.0",
  "fastrand 2.0.1",
  "http 0.2.9",
  "regex",
@@ -1766,9 +1766,9 @@ checksum = "a3e368af43e418a04d52505cf3dbc23dda4e3407ae2fa99fd0e4f308ce546acc"
 
 [[package]]
 name = "cached"
-version = "0.50.0"
+version = "0.51.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10a7d38ed2761b8a13ce42bc44b09d5a052b88da2f9fead624c779f31ac0729a"
+checksum = "827444961d1a2335221ca1f6026127ab6f767bcec3bf88d19b18204265c595c3"
 dependencies = [
  "ahash 0.8.11",
  "cached_proc_macro",
