@@ -22,10 +22,12 @@ pub mod logs;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub mod metrics;
 #[cfg(any(
+    all(feature = "sinks-datadog_logs", feature = "test-utils"),
+    all(feature = "sinks-datadog_metrics", feature = "test-utils"),
     all(feature = "sinks-datadog_logs", test),
     all(feature = "sinks-datadog_metrics", test)
 ))]
-mod test_utils;
+pub mod test_utils;
 #[cfg(feature = "sinks-datadog_traces")]
 pub mod traces;
 
@@ -46,7 +48,7 @@ pub struct LocalDatadogCommonConfig {
     #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
     #[configurable(metadata(docs::examples = "http://example.com:12345"))]
     #[serde(default)]
-    endpoint: Option<String>,
+    pub endpoint: Option<String>,
 
     /// The Datadog [site][dd_site] to send observability data to.
     ///
@@ -59,7 +61,7 @@ pub struct LocalDatadogCommonConfig {
     /// [dd_site]: https://docs.datadoghq.com/getting_started/site
     #[configurable(metadata(docs::examples = "us3.datadoghq.com"))]
     #[configurable(metadata(docs::examples = "datadoghq.eu"))]
-    site: Option<String>,
+    pub site: Option<String>,
 
     /// The default Datadog [API key][api_key] to use in authentication of HTTP requests.
     ///
@@ -73,11 +75,11 @@ pub struct LocalDatadogCommonConfig {
     /// [global_options]: /docs/reference/configuration/global-options/#datadog
     #[configurable(metadata(docs::examples = "${DATADOG_API_KEY_ENV_VAR}"))]
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
-    default_api_key: Option<SensitiveString>,
+    pub default_api_key: Option<SensitiveString>,
 
     #[configurable(derived)]
     #[serde(default)]
-    tls: Option<TlsEnableableConfig>,
+    pub tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
     #[serde(
@@ -85,7 +87,7 @@ pub struct LocalDatadogCommonConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl LocalDatadogCommonConfig {
@@ -136,7 +138,7 @@ pub struct DatadogCommonConfig {
 impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
     /// `<site>/api/v1/validate` endpoint is reachable.
-    fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
+    pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let validate_endpoint =
             get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_str())?;
 
