@@ -540,7 +540,7 @@ fn build_enterprise(
     config_paths: Vec<ConfigPath>,
 ) -> Result<Option<EnterpriseReporter<BoxFuture<'static, ()>>>, ExitCode> {
     if config.enterprise.is_some() {
-        warn!("DEPRECATED: The `enterprise` feature has been deprecated and will be removed in a future version.");
+        warn!("DEPRECATED: The `enterprise` feature has been deprecated and will be removed in the next release.");
     }
 
     crate::ENTERPRISE_ENABLED
