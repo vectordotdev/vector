@@ -967,8 +967,7 @@ mod tests {
         suppress_timestamp: bool,
     ) -> String {
         let bytes = export_and_fetch_raw(tls_config, events, suppress_timestamp, None);
-        let result = String::from_utf8(bytes.await.to_vec()).unwrap();
-        result
+        String::from_utf8(bytes.await.to_vec()).unwrap()
     }
 
     async fn export_and_fetch_with_auth(
