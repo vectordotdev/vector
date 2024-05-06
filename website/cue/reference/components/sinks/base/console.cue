@@ -99,11 +99,6 @@ base: components: sinks: console: configuration: {
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
-					pretty_json: """
-						Encodes an event as [JSON][json] in pretty format.
-
-						[json]: https://www.json.org/
-						"""
 					protobuf: """
 						Encodes an event as a [Protobuf][protobuf] message.
 
@@ -217,6 +212,16 @@ base: components: sinks: console: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			json: {
+				description:   "Options for the JsonSerializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: use_pretty_json: {
+					description: "Whether to use pretty JSON formatting."
+					required:    false
+					type: bool: default: false
+				}
+			}
 			metric_tag_values: {
 				description: """
 					Controls how metric tag values are encoded.
@@ -224,7 +229,7 @@ base: components: sinks: console: configuration: {
 					When set to `single`, only the last non-bare value of tags are displayed with the
 					metric.  When set to `full`, all metric tags are exposed as separate assignments.
 					"""
-				relevant_when: "codec = \"json\" or codec = \"pretty_json\" or codec = \"text\""
+				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"

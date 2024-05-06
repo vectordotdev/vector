@@ -209,7 +209,6 @@ fn serializer_config_to_deserializer(
         SerializerConfig::Csv { .. } => todo!(),
         SerializerConfig::Gelf => DeserializerConfig::Gelf(Default::default()),
         SerializerConfig::Json(_) => DeserializerConfig::Json(Default::default()),
-        SerializerConfig::PrettyJson(_) => DeserializerConfig::Json(Default::default()),
         SerializerConfig::Logfmt => todo!(),
         SerializerConfig::Native => DeserializerConfig::Native,
         SerializerConfig::NativeJson => DeserializerConfig::NativeJson(Default::default()),
