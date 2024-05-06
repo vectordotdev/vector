@@ -596,8 +596,8 @@ impl StreamSink<Event> for PrometheusExporter {
 #[cfg(test)]
 mod tests {
     use chrono::{Duration, Utc};
-    use futures::stream;
     use flate2::read::GzDecoder;
+    use futures::stream;
     use indoc::indoc;
     use similar_asserts::assert_eq;
     use std::io::Read;

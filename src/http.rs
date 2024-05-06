@@ -383,11 +383,9 @@ pub fn build_http_trace_layer<T, U>(
         .on_request(Box::new(|_request: &Request<T>, _span: &Span| {
             emit!(HttpServerRequestReceived);
         }))
-        .on_response(
-            |response: &Response<U>, latency: Duration, _span: &Span| {
-                emit!(HttpServerResponseSent { response, latency });
-            },
-        )
+        .on_response(|response: &Response<U>, latency: Duration, _span: &Span| {
+            emit!(HttpServerResponseSent { response, latency });
+        })
         .on_failure(())
         .on_body_chunk(())
         .on_eos(())
