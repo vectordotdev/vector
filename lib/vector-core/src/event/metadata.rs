@@ -2,6 +2,7 @@
 
 use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
 
+use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use vector_common::{byte_size_of::ByteSizeOf, config::ComponentKey, EventDataEq};
 use vrl::{
@@ -344,6 +345,26 @@ impl EventMetadata {
     /// Set the schema definition.
     pub fn set_schema_definition(&mut self, definition: &Arc<schema::Definition>) {
         self.schema_definition = Arc::clone(definition);
+    }
+
+    /// Helper function to add a semantic meaning to the schema definition.
+    ///
+    /// This replaces the common code sequence of:
+    ///
+    /// ```
+    /// let new_schema = log_event
+    ///     .metadata()
+    ///     .schema_definition()
+    ///     .as_ref()
+    ///     .clone()
+    ///     .with_meaning(target_path, meaning);
+    /// log_event
+    ///     .metadata_mut()
+    ///     .set_schema_definition(new_schema);
+    /// ````
+    pub fn add_schema_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
+        let schema = Arc::make_mut(&mut self.schema_definition);
+        schema.add_meaning(target_path, meaning);
     }
 }
 
