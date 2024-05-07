@@ -107,6 +107,8 @@ mod redis;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
 mod remap;
+#[cfg(all(feature = "aws-core", feature = "sinks-azure_blob"))]
+mod retries;
 mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
@@ -241,6 +243,8 @@ pub(crate) use self::redis::*;
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-remap")]
 pub(crate) use self::remap::*;
+#[cfg(all(feature = "aws-core", feature = "sinks-azure_blob"))]
+pub(crate) use self::retries::*;
 #[cfg(feature = "transforms-impl-sample")]
 pub(crate) use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
