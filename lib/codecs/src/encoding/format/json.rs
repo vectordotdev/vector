@@ -26,7 +26,7 @@ pub struct JsonSerializerConfig {
 pub struct JsonSerializerOptions {
     /// Whether to use pretty JSON formatting.
     #[serde(default)]
-    pub use_pretty_json: bool,
+    pub pretty: bool,
 }
 
 impl JsonSerializerConfig {
@@ -88,7 +88,7 @@ impl Encoder<Event> for JsonSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let writer = buffer.writer();
-        if self.options.use_pretty_json {
+        if self.options.pretty {
             match event {
                 Event::Log(log) => serde_json::to_writer_pretty(writer, &log),
                 Event::Metric(mut metric) => {
@@ -283,9 +283,7 @@ mod tests {
 
         fn get_pretty_json_config() -> JsonSerializerConfig {
             JsonSerializerConfig {
-                options: JsonSerializerOptions {
-                    use_pretty_json: true,
-                },
+                options: JsonSerializerOptions { pretty: true },
                 ..Default::default()
             }
         }
@@ -408,9 +406,7 @@ mod tests {
             let bytes = serialize(
                 JsonSerializerConfig {
                     metric_tag_values: MetricTagValues::Full,
-                    options: JsonSerializerOptions {
-                        use_pretty_json: true,
-                    },
+                    options: JsonSerializerOptions { pretty: true },
                 },
                 metric2(),
             );
@@ -437,9 +433,7 @@ mod tests {
             let bytes = serialize(
                 JsonSerializerConfig {
                     metric_tag_values: MetricTagValues::Single,
-                    options: JsonSerializerOptions {
-                        use_pretty_json: true,
-                    },
+                    options: JsonSerializerOptions { pretty: true },
                 },
                 metric2(),
             );

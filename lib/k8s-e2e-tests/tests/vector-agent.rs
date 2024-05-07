@@ -994,7 +994,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
               encoding:
                 codec: json
                 json:
-                    use_pretty_json: false
+                    pretty: false
     "#};
 
     let vector = framework
@@ -1398,7 +1398,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
               encoding:
                 codec: json
                 json:
-                    use_pretty_json: false
+                    pretty: false
     "#};
 
     let vector = framework

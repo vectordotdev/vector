@@ -490,7 +490,7 @@ mod tests {
                 codec = "json"
 
                 [sinks.sink0.encoding.json]
-                use_pretty_json = false
+                pretty = false
 
                 [sinks.sink0.healthcheck]
                 enabled = true
@@ -530,7 +530,7 @@ mod tests {
                 codec = "json"
 
                 [sinks.sink0.encoding.json]
-                use_pretty_json = false
+                pretty = false
 
                 [sinks.sink0.healthcheck]
                 enabled = true
@@ -564,7 +564,7 @@ mod tests {
                 codec = "json"
 
                 [sinks.sink0.encoding.json]
-                use_pretty_json = false
+                pretty = false
 
                 [sinks.sink0.healthcheck]
                 enabled = true
@@ -591,7 +591,7 @@ mod tests {
                 codec = "json"
 
                 [sinks.sink0.encoding.json]
-                use_pretty_json = false
+                pretty = false
 
                 [sinks.sink0.healthcheck]
                 enabled = true
@@ -704,7 +704,7 @@ mod tests {
                 encoding:
                   codec: json
                   json:
-                    use_pretty_json: false
+                    pretty: false
                 healthcheck:
                   enabled: true
                   uri: null
@@ -772,7 +772,7 @@ mod tests {
                   "encoding": {
                     "codec": "json",
                     "json": {
-                      "use_pretty_json": false
+                      "pretty": false
                     }
                   },
                   "healthcheck": {

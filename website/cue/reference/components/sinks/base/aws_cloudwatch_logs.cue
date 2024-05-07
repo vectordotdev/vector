@@ -408,7 +408,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 				description:   "Options for the JsonSerializer."
 				relevant_when: "codec = \"json\""
 				required:      false
-				type: object: options: use_pretty_json: {
+				type: object: options: pretty: {
 					description: "Whether to use pretty JSON formatting."
 					required:    false
 					type: bool: default: false
