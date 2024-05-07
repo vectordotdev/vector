@@ -202,6 +202,11 @@ base: components: sinks: clickhouse: configuration: {
 			}
 		}
 	}
+	insert_random_shard: {
+		description: "Sets `insert_distributed_one_random_shard`, allowing ClickHouse to insert data into a random shard when using Distributed Table Engine."
+		required:    false
+		type: bool: default: false
+	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.

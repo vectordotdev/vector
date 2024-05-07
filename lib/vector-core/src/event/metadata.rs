@@ -337,8 +337,8 @@ impl EventMetadata {
     }
 
     /// Get the schema definition.
-    pub fn schema_definition(&self) -> &schema::Definition {
-        self.schema_definition.as_ref()
+    pub fn schema_definition(&self) -> &Arc<schema::Definition> {
+        &self.schema_definition
     }
 
     /// Set the schema definition.
