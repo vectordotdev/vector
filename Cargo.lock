@@ -1765,39 +1765,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3e368af43e418a04d52505cf3dbc23dda4e3407ae2fa99fd0e4f308ce546acc"
 
 [[package]]
-name = "cached"
-version = "0.50.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10a7d38ed2761b8a13ce42bc44b09d5a052b88da2f9fead624c779f31ac0729a"
-dependencies = [
- "ahash 0.8.11",
- "cached_proc_macro",
- "cached_proc_macro_types",
- "hashbrown 0.14.5",
- "instant",
- "once_cell",
- "thiserror",
-]
-
-[[package]]
-name = "cached_proc_macro"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "771aa57f3b17da6c8bcacb187bb9ec9bc81c8160e72342e67c329e0e1651a669"
-dependencies = [
- "darling 0.20.8",
- "proc-macro2 1.0.81",
- "quote 1.0.36",
- "syn 2.0.60",
-]
-
-[[package]]
-name = "cached_proc_macro_types"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ade8366b8bd5ba243f0a58f036cc0ca8a2f069cff1a2351ef1cac6b083e16fc0"
-
-[[package]]
 name = "cargo_toml"
 version = "0.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10069,7 +10036,6 @@ name = "vdev"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "cached",
  "chrono",
  "clap 4.5.4",
  "clap-verbosity-flag",
