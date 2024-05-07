@@ -11,6 +11,16 @@ base: components: transforms: reduce: configuration: {
 		required: false
 		type: condition: {}
 	}
+	end_every_period_ms: {
+		description: """
+		  If supplied, every time this interval elapses for a given grouping, the reduced value
+      for that grouping is flushed. Checked every flush_period_ms.
+			"""
+		required: false
+		type: uint: {
+			unit: "milliseconds"
+		}
+	}
 	expire_after_ms: {
 		description: """
 			The maximum period of time to wait after the last event is received, in milliseconds, before
