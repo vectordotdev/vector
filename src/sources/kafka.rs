@@ -2002,15 +2002,12 @@ mod integration_test {
 
         // 5. Total number of events processed should equal the number sent
         let total = events1.len() + events2.len();
-        // TODO
-        // with the switch to the update Kafka image, the second consumer seems to be reading
-        // all of the events
-        //assert_ne!(
-        //events1.len(),
-        //0,
-        //"First batch of events should be non-zero (increase KAFKA_SHUTDOWN_DELAY?)"
-        //);
-        //assert_ne!(events2.len(), 0, "Second batch of events should be non-zero (decrease KAFKA_SHUTDOWN_DELAY or increase KAFKA_SEND_COUNT?) ");
+        assert_ne!(
+            events1.len(),
+            0,
+            "First batch of events should be non-zero (increase KAFKA_SHUTDOWN_DELAY?)"
+        );
+        assert_ne!(events2.len(), 0, "Second batch of events should be non-zero (decrease KAFKA_SHUTDOWN_DELAY or increase KAFKA_SEND_COUNT?) ");
         assert_eq!(total, expect_count);
     }
 
