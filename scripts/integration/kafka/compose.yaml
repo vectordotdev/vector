@@ -24,7 +24,6 @@ services:
     - KAFKA_SSL_CLIENT_AUTH=none
     - KAFKA_OPTS=-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf
     - KAFKA_SASL_ENABLED_MECHANISMS=PLAIN
-    - KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN
     ports:
     - 9091:9091
     - 9092:9092
