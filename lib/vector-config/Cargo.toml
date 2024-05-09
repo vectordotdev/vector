@@ -17,7 +17,7 @@ encoding_rs = { version = "0.8", default-features = false, features = ["alloc", 
 indexmap.workspace = true
 inventory = { version = "0.3" }
 no-proxy = { version = "0.3.4", default-features = false, features = ["serialize"] }
-num-traits = { version = "0.2.18", default-features = false }
+num-traits = { version = "0.2.19", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
 serde_with = { version = "3.8.1", default-features = false, features = ["std"] }
