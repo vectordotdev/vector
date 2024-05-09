@@ -50,7 +50,7 @@ indexmap.workspace = true
 metrics = "0.21.1"
 nom = { version = "7", optional = true }
 ordered-float = { version = "4.2.0", default-features = false }
-paste = "1.0.14"
+paste = "1.0.15"
 pin-project.workspace = true
 ryu = { version = "1", default-features = false }
 serde.workspace = true
