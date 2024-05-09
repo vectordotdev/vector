@@ -143,7 +143,7 @@ const_fn,https://github.com/taiki-e/const_fn,Apache-2.0 OR MIT,The const_fn Auth
 convert_case,https://github.com/rutrum/convert-case,MIT,David Purdum <purdum41@gmail.com>
 convert_case,https://github.com/rutrum/convert-case,MIT,Rutrum <dave@rutrum.net>
 cookie-factory,https://github.com/rust-bakery/cookie-factory,MIT,"Geoffroy Couprie <geo.couprie@gmail.com>, Pierre Chifflier <chifflier@wzdftpd.net>"
-core-foundation,https://github.com/servo/core-foundation-rs,MIT OR Apache-2.0,The Servo Project Developers
+core-foundation,https://github.com/servo/core-foundation-rs,MIT  OR  Apache-2.0,The Servo Project Developers
 core2,https://github.com/bbqsrc/core2,Apache-2.0 OR MIT,Brendan Molloy <brendan@bbqsrc.net>
 cpufeatures,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 crc,https://github.com/mrhooray/crc-rs,MIT OR Apache-2.0,"Rui Hu <code@mrhooray.com>, Akhil Velagapudi <4@4khil.com>"
@@ -293,7 +293,6 @@ ipconfig,https://github.com/liranringel/ipconfig,MIT OR Apache-2.0,Liran Ringel 
 ipnet,https://github.com/krisprice/ipnet,MIT OR Apache-2.0,Kris Price <kris@krisprice.nz>
 ipnetwork,https://github.com/achanda/ipnetwork,MIT OR Apache-2.0,"Abhishek Chanda <abhishek.becs@gmail.com>, Linus Färnstrand <faern@faern.net>"
 is-terminal,https://github.com/sunfishcode/is-terminal,MIT,"softprops <d.tangren@gmail.com>, Dan Gohman <dev@sunfishcode.online>"
-is_terminal_polyfill,https://github.com/polyfill-rs/is_terminal_polyfill,MIT OR Apache-2.0,The is_terminal_polyfill Authors
 itertools,https://github.com/rust-itertools/itertools,MIT OR Apache-2.0,bluss
 itoa,https://github.com/dtolnay/itoa,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 jni,https://github.com/jni-rs/jni-rs,MIT OR Apache-2.0,Josh Chase <josh@prevoty.com>
@@ -328,6 +327,7 @@ lz4,https://github.com/10xGenomics/lz4-rs,MIT,"Jens Heyens <jens.heyens@ewetel.n
 macaddr,https://github.com/svartalf/rust-macaddr,Apache-2.0 OR MIT,svartalf <self@svartalf.info>
 mach,https://github.com/fitzgen/mach,BSD-2-Clause,"Nick Fitzgerald <fitzgen@gmail.com>, David Cuddeback <david.cuddeback@gmail.com>, Gonzalo Brito Gadeschi <gonzalobg88@gmail.com>"
 mach2,https://github.com/JohnTitor/mach2,BSD-2-Clause OR MIT OR Apache-2.0,The mach2 Authors
+malloc_buf,https://github.com/SSheldon/malloc_buf,MIT,Steven Sheldon
 match_cfg,https://github.com/gnzlbg/match_cfg,MIT OR Apache-2.0,gnzlbg <gonzalobg88@gmail.com>
 matchers,https://github.com/hawkw/matchers,MIT,Eliza Weisman <eliza@buoyant.io>
 matches,https://github.com/SimonSapin/rust-std-candidates,MIT,The matches Authors
@@ -374,9 +374,7 @@ num_enum,https://github.com/illicitonion/num_enum,BSD-3-Clause OR MIT OR Apache-
 num_threads,https://github.com/jhpratt/num_threads,MIT OR Apache-2.0,Jacob Pratt <open-source@jhpratt.dev>
 number_prefix,https://github.com/ogham/rust-number-prefix,MIT,Benjamin Sago <ogham@bsago.me>
 oauth2,https://github.com/ramosbugs/oauth2-rs,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Florin Lipan <florinlipan@gmail.com>, David A. Ramos <ramos@cs.stanford.edu>"
-objc-sys,https://github.com/madsmtm/objc2,MIT,Mads Marquart <mads@marquart.dk>
-objc2,https://github.com/madsmtm/objc2,MIT,"Steven Sheldon, Mads Marquart <mads@marquart.dk>"
-objc2-foundation,https://github.com/madsmtm/objc2,MIT,The objc2-foundation Authors
+objc,http://github.com/SSheldon/rust-objc,MIT,Steven Sheldon
 object,https://github.com/gimli-rs/object,Apache-2.0 OR MIT,The object Authors
 ofb,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Developers
 once_cell,https://github.com/matklad/once_cell,MIT OR Apache-2.0,Aleksey Kladov <aleksey.kladov@gmail.com>
@@ -453,6 +451,7 @@ rand_hc,https://github.com/rust-random/rand,MIT OR Apache-2.0,The Rand Project D
 rand_xorshift,https://github.com/rust-random/rngs,MIT OR Apache-2.0,"The Rand Project Developers, The Rust Project Developers"
 ratatui,https://github.com/ratatui-org/ratatui,MIT,"Florian Dehau <work@fdehau.com>, The Ratatui Developers"
 raw-cpuid,https://github.com/gz/rust-cpuid,MIT,Gerd Zellweger <mail@gerdzellweger.com>
+raw-window-handle,https://github.com/rust-windowing/raw-window-handle,MIT OR Apache-2.0 OR Zlib,Osspial <osspial@gmail.com>
 rdkafka,https://github.com/fede1024/rust-rdkafka,MIT,Federico Giraud <giraud.federico@gmail.com>
 redis,https://github.com/redis-rs/redis-rs,BSD-3-Clause,The redis Authors
 redox_syscall,https://gitlab.redox-os.org/redox-os/syscall,MIT,Jeremy Soller <jackpot51@gmail.com>
