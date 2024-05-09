@@ -942,6 +942,8 @@ benches = [
   "sources-syslog",
   "transforms-lua",
   "transforms-sample",
+  "tracing/release_max_level_info",
+  "tracing/max_level_info",
 ]
 dnstap-benches = ["sources-dnstap"]
 language-benches = ["sinks-socket", "sources-socket", "transforms-lua", "transforms-remap"]
@@ -955,6 +957,12 @@ enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb"
 
 [[bench]]
 name = "default"
+harness = false
+required-features = ["benches"]
+
+[[bench]]
+name = "integration"
+path = "benches/integration/mod.rs"
 harness = false
 required-features = ["benches"]
 
