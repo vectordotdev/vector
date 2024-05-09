@@ -188,6 +188,7 @@ conffiles
 configkey
 configmap
 confl
+confluentinc
 confy
 consigliere
 CONTEUDO
