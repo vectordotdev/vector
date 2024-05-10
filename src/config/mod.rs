@@ -53,7 +53,7 @@ pub use id::{ComponentKey, Inputs};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
     load_from_str, load_source_from_paths, merge_path_lists, process_paths, COLLECTOR,
-    CONFIG_PATHS, STRICT_ENV_VARS,
+    CONFIG_PATHS,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
@@ -74,7 +74,7 @@ pub use vector_lib::config::{
 /// configured log schema defaults.
 /// If deny is set, will panic if schema has already been set.
 pub fn init_log_schema(config_paths: &[ConfigPath], deny_if_set: bool) -> Result<(), Vec<String>> {
-    let (builder, _) = load_builder_from_paths(config_paths)?;
+    let builder = load_builder_from_paths(config_paths)?;
     vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
     Ok(())
 }
