@@ -214,7 +214,7 @@ components: sources: opentelemetry: {
 			title: "Ingest OTLP traces"
 			body: """
 				Trace support is experimental and subject to change as Vector has no strongly-typed structure for traces internally. Instead traces are stored as a key/value map similar to logs. This may change in the future to be a structured format.
-			"""
+				"""
 		}
 	}
 
