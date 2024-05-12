@@ -4,7 +4,7 @@ use derivative::Derivative;
 use futures_util::{future, FutureExt, StreamExt};
 
 use tower::ServiceBuilder;
-use tracing::info;
+
 use vector::config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext};
 use vector::event::Event;
 use vector::sinks::prelude::{
@@ -26,6 +26,14 @@ pub struct DummySinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
+
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "vector::serde::bool_or_struct",
+        skip_serializing_if = "vector::serde::is_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl_generate_config_from_default!(DummySinkConfig);
@@ -51,7 +59,7 @@ impl SinkConfig for DummySinkConfig {
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
+        &self.acknowledgements
     }
 }
 

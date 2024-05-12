@@ -7,6 +7,7 @@ use criterion::{
     criterion_group, criterion_main, BatchSize, Bencher, BenchmarkId, Criterion, Throughput,
 };
 use indoc::indoc;
+use tokio::runtime::Handle;
 
 use tracing::info;
 use vector::config;
@@ -26,10 +27,28 @@ criterion_main! {
     benches,
 }
 
-fn run_benchmark(bench: &mut Bencher, params: &(usize, usize, usize, usize)) {
-    let (concurrency, batch_count, batch_size, message_size) = params.clone();
+struct BenchmarkItem<'a> {
+    start_barrier: StartBarrier,
+    topology: Option<RunningTopology>,
+    rt: &'a Handle,
+}
+
+// Hacky: this moves the shutdown out of the benchmark loop.
+impl<'a> Drop for BenchmarkItem<'a> {
+    fn drop(&mut self) {
+        self.rt.block_on(async {
+            self.topology.take().unwrap().stop().await;
+        });
+    }
+}
+
+fn run_benchmark(bench: &mut Bencher, params: &(usize, usize, usize, usize, bool)) {
+    let (concurrency, batch_count, batch_size, message_size, acknowledgements) = *params;
     let config = format!(
         indoc! {r#"
+            [acknowledgements]
+            enabled = {}
+
             [sources.in]
              type = "dummy_source"
              client_concurrency = {}
@@ -41,7 +60,7 @@ fn run_benchmark(bench: &mut Bencher, params: &(usize, usize, usize, usize)) {
              type = "dummy_sink"
              inputs = ["in"]
         "#},
-        concurrency, batch_count, batch_size, message_size
+        acknowledgements, concurrency, batch_count, batch_size, message_size
     );
 
     let rt = runtime();
@@ -49,7 +68,7 @@ fn run_benchmark(bench: &mut Bencher, params: &(usize, usize, usize, usize)) {
     bench.iter_batched(
         || {
             let mut config = config::load_from_str(&config, config::Format::Toml)
-                .expect(&format!("invalid TOML configuration: {}", &config));
+                .unwrap_or_else(|_| panic!("invalid TOML configuration: {}", &config));
 
             let barrier = StartBarrier::new(concurrency);
 
@@ -67,20 +86,21 @@ fn run_benchmark(bench: &mut Bencher, params: &(usize, usize, usize, usize)) {
                 barrier.wait_ready().await;
                 info!("All tasks ready!");
             });
-            (barrier, topology)
+            BenchmarkItem {
+                start_barrier: barrier,
+                topology: Some(topology),
+                rt: rt.handle(),
+            }
         },
-        |(barrier, topology)| {
-            rt.block_on(async {
-                info!("Starting!");
-                barrier.wait_start().await;
-                info!("Started!");
+        |item| {
+            item.rt.block_on(async {
+                item.start_barrier.wait_start().await;
+                let topology = item.topology.as_ref().unwrap();
                 topology.sources_finished().await;
-                info!("Stopping!");
-                topology.stop().await;
-                info!("Stopped!");
             });
+            item
         },
-        BatchSize::PerIteration,
+        BatchSize::NumIterations(10),
     );
 }
 
@@ -89,31 +109,41 @@ fn benchmark_update_parsing(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("integration/performance");
 
-    let concurrency_range = (50..=100).step_by(10);
+    let concurrency_range = (50..=50).step_by(10);
     let batch_count_range = (25..=25).step_by(1);
-    let batch_size_range = (10..=20).step_by(10);
-    let message_size_range = (512..=2048).step_by(512);
+    let batch_size_range = (20..=20).step_by(10);
+    let message_size_range = (20_480..=20_480).step_by(512);
+    let acknowledgements = [true, false];
 
     for concurrency in concurrency_range.clone() {
         for batch_count in batch_count_range.clone() {
             for batch_size in batch_size_range.clone() {
                 for message_size in message_size_range.clone() {
-                    let total_batches = concurrency * batch_count;
-                    let total_messages = total_batches * batch_size;
-                    let total_bytes = total_messages * message_size;
-                    group.throughput(Throughput::Bytes(total_bytes as u64));
+                    for acknowledgements in acknowledgements {
+                        let total_batches = concurrency * batch_count;
+                        let total_messages = total_batches * batch_size;
+                        let total_bytes = total_messages * message_size;
+                        group.throughput(Throughput::Bytes(total_bytes as u64));
 
-                    println!("Total batches: {}", total_batches);
-                    println!("Total messages: {}", total_messages);
-                    println!("Total megabytes: {}", total_bytes / 1024 / 1024);
+                        println!("Total batches   : {}", total_batches);
+                        println!("Total messages  : {}", total_messages);
+                        println!("Total megabytes : {}", total_bytes / 1024 / 1024);
+                        println!("Acknowledgements: {}", acknowledgements);
 
-                    group.sample_size(100);
-                    let benchmark_id = format!("concurrency={concurrency}/batch_count={batch_count}/batch_size={batch_size}/msg_size={message_size}");
-                    group.bench_with_input(
-                        BenchmarkId::from_parameter(benchmark_id),
-                        &(concurrency, batch_count, batch_size, message_size),
-                        run_benchmark,
-                    );
+                        group.sample_size(10);
+                        let benchmark_id = format!("concurrency={concurrency}/batch_count={batch_count}/batch_size={batch_size}/msg_size={message_size}/acks={acknowledgements}");
+                        group.bench_with_input(
+                            BenchmarkId::from_parameter(benchmark_id),
+                            &(
+                                concurrency,
+                                batch_count,
+                                batch_size,
+                                message_size,
+                                acknowledgements,
+                            ),
+                            run_benchmark,
+                        );
+                    }
                 }
             }
         }

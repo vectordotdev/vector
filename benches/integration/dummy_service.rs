@@ -13,7 +13,6 @@ use vector::sinks::util::encoding::Encoder as SinkEncoder;
 
 use vector_lib::Error;
 
-// pub struct DummyRequest(ProcessedEvent<LogEvent, String>);
 pub struct DummyRequest {
     bytes: Bytes,
     request_metadata: RequestMetadata,
