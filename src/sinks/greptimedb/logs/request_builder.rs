@@ -1,5 +1,5 @@
-use greptimedb_client::{
-    api::v1::{ColumnDataType, ColumnSchema, Row, RowInsertRequest, Rows, SemanticType},
+use greptimedb_ingester::{
+    api::v1::{Row, RowInsertRequest, Rows},
     helpers::values::{string_value, timestamp_millisecond_value},
 };
 use vector_lib::event::LogEvent;
