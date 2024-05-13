@@ -349,7 +349,7 @@ ratatui = { version = "0.26.3", optional = true, default-features = false, featu
 hex = { version = "0.4.3", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-ingester = { git = "https://github.com/paomian/greptimedb-ingester-rust.git", rev = "2e6b0c5eb6a5e7549c3100e4d356b07d15cce66d", optional = true }
+greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust.git", rev = "3ce31a19d5a476d7d1c805cad7423d235d584c20", optional = true }
 
 # External libs
 arc-swap = { version = "1.7", default-features = false, optional = true }
