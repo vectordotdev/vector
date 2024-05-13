@@ -1,1 +1,1 @@
-The `enterprise` feature and global configuration option has been removed .
+The deprecated `enterprise` feature and global configuration option has been removed.
