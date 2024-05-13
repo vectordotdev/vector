@@ -22,7 +22,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(name_errors);
     }
 
-    // precache remap transforms outputs in parallel
+    // pre cache remap transforms outputs in parallel
     builder.transforms.par_iter()
         .filter(|(_, t)| t.inner.get_component_name() == "remap")
         .for_each(|(k, t)| { get_transform_outputs(t, k.clone(), builder.schema.log_namespace()); } );
