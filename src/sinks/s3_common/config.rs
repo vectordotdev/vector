@@ -9,6 +9,7 @@ use aws_smithy_runtime_api::{
     client::{orchestrator::HttpResponse, result::SdkError},
     http::StatusCode,
 };
+use aws_smithy_types::error::metadata::ProvideErrorMetadata;
 use futures::FutureExt;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
@@ -19,6 +20,7 @@ use crate::{
     common::s3::S3ClientBuilder,
     config::ProxyConfig,
     http::status,
+    internal_events::{CheckRetryEvent},
     sinks::{util::retries::RetryLogic, Healthcheck},
     tls::TlsConfig,
 };
@@ -316,7 +318,18 @@ impl RetryLogic for S3RetryLogic {
     type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        is_retriable_error(error)
+        let retry = is_retriable_error(error);
+        info!(
+            message = "Considered retry on error.",
+            error = %error,
+            retry = retry,
+        );
+
+        emit!(CheckRetryEvent {
+            status_code: error.code().unwrap_or(""),
+            retry: retry,
+        });
+        retry
     }
 }
 
@@ -377,6 +390,13 @@ mod tests {
     use super::S3StorageClass;
     use crate::serde::json::to_string;
 
+    use super::*;
+    use aws_sdk_s3::operation::put_object::PutObjectError;
+    use aws_smithy_runtime_api::client::{result::SdkError, orchestrator::HttpResponse};
+    use aws_smithy_types::body::SdkBody;
+
+    use std::fmt;
+
     #[test]
     fn storage_class_names() {
         for &(name, storage_class) in &[
@@ -397,4 +417,34 @@ mod tests {
             assert_eq!(result, storage_class);
         }
     }
+
+    #[test]
+    fn test_retriable() {
+        // Handle unhandled + 400 status code case (from expired token code)
+        // Example response with token/host data removed
+        let response = "Once(Some(b\"<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\"?>\\n<Error><Code>ExpiredToken</Code><Message>The provided token has expired.</Message></Error>\"))";
+        assert!(
+            S3RetryLogic.is_retriable_error(
+                &SdkError::<PutObjectError, HttpResponse>::service_error(
+                    PutObjectError::unhandled(BadError),
+                    HttpResponse::new(
+                        http::StatusCode::from_u16(400).unwrap().into(),
+                        SdkBody::from(response)
+                    )
+                )
+            )
+        );
+    }
+
+
+    #[derive(Debug)]
+    struct BadError;
+
+    impl fmt::Display for BadError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "error")
+        }
+    }
+
+    impl std::error::Error for BadError {}
 }

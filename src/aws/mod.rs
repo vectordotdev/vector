@@ -52,7 +52,7 @@ static RETRIABLE_CODES: OnceLock<RegexSet> = OnceLock::new();
 pub fn is_retriable_error<T>(error: &SdkError<T, HttpResponse>) -> bool {
     match error {
         SdkError::TimeoutError(_) | SdkError::DispatchFailure(_) => true,
-        SdkError::ConstructionFailure(_) => false,
+        SdkError::ConstructionFailure(_) => true,
         SdkError::ResponseError(err) => check_response(err.raw()),
         SdkError::ServiceError(err) => check_response(err.raw()),
         _ => {
@@ -82,7 +82,7 @@ fn check_response(res: &HttpResponse) -> bool {
     //
     // Now just look for those when it's a client_error
     let re = RETRIABLE_CODES.get_or_init(|| {
-        RegexSet::new(["RequestTimeout", "RequestExpired", "ThrottlingException"])
+        RegexSet::new(["RequestTimeout", "RequestExpired", "ThrottlingException", "ExpiredToken"])
             .expect("invalid regex")
     });
 
