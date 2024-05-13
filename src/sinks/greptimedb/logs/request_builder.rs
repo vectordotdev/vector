@@ -8,7 +8,6 @@ use vrl::core::Value::*;
 pub fn log_to_insert_request(log: LogEvent, table: String) -> RowInsertRequest {
     let mut schema = Vec::new();
     let mut columns = Vec::new();
-    // warn!("{:?}", log);
 
     let v = log.value();
     let m = match v {
@@ -35,8 +34,6 @@ pub fn log_to_insert_request(log: LogEvent, table: String) -> RowInsertRequest {
             let s = std::str::from_utf8(b).unwrap().to_string();
             columns.push(string_value(s));
         }
-
-        warn!("{:?} {:?}", k, v);
     }
 
     RowInsertRequest {
