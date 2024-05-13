@@ -48,6 +48,7 @@ impl MetaDescriptive for S3Request {
 pub struct S3Metadata {
     pub partition_key: S3PartitionKey,
     pub s3_key: String,
+    pub count: usize,
     pub finalizers: EventFinalizers,
 }
 
