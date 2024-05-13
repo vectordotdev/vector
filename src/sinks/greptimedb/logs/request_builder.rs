@@ -1,9 +1,11 @@
 use greptimedb_client::{
-    api::v1::{ColumnDataType, ColumnSchema, Row, RowInsertRequest, Rows, SemanticType},
+    api::v1::{Row, RowInsertRequest, Rows},
     helpers::values::{string_value, timestamp_millisecond_value},
 };
 use vector_lib::event::LogEvent;
 use vrl::core::Value::*;
+
+use crate::sinks::greptimedb::{str_column, ts_column};
 
 pub fn log_to_insert_request(log: LogEvent, table: String) -> RowInsertRequest {
     let mut schema = Vec::new();
@@ -42,23 +44,5 @@ pub fn log_to_insert_request(log: LogEvent, table: String) -> RowInsertRequest {
             schema,
             rows: vec![Row { values: columns }],
         }),
-    }
-}
-
-fn ts_column(name: &str) -> ColumnSchema {
-    ColumnSchema {
-        column_name: name.to_owned(),
-        semantic_type: SemanticType::Timestamp as i32,
-        datatype: ColumnDataType::TimestampMillisecond as i32,
-        ..Default::default()
-    }
-}
-
-fn str_column(name: &str) -> ColumnSchema {
-    ColumnSchema {
-        column_name: name.to_owned(),
-        semantic_type: SemanticType::Field as i32,
-        datatype: ColumnDataType::String as i32,
-        ..Default::default()
     }
 }

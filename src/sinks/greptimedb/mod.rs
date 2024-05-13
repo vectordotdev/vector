@@ -18,12 +18,12 @@ mod metrics;
 
 mod request;
 
-pub(crate) fn default_dbname() -> String {
+fn default_dbname() -> String {
     greptimedb_client::DEFAULT_SCHEMA_NAME.to_string()
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct GreptimeDBDefaultBatchSettings;
+struct GreptimeDBDefaultBatchSettings;
 
 impl SinkBatchSettings for GreptimeDBDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
@@ -32,7 +32,7 @@ impl SinkBatchSettings for GreptimeDBDefaultBatchSettings {
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct GreptimeDBRetryLogic;
+struct GreptimeDBRetryLogic;
 
 impl RetryLogic for GreptimeDBRetryLogic {
     type Response = GreptimeDBBatchOutput;
@@ -44,7 +44,7 @@ impl RetryLogic for GreptimeDBRetryLogic {
 }
 
 #[derive(Debug)]
-pub(crate) struct GreptimeDBBatchOutput {
+struct GreptimeDBBatchOutput {
     pub _item_count: u32,
     pub metadata: RequestMetadata,
 }
@@ -64,7 +64,7 @@ impl DriverResponse for GreptimeDBBatchOutput {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct GreptimeDBService {
+struct GreptimeDBService {
     /// the client that connects to greptimedb
     client: Arc<Database>,
 }
@@ -121,7 +121,7 @@ impl GreptimeDBService {
     }
 }
 
-pub(crate) struct GreptimeDBServiceConfig {
+struct GreptimeDBServiceConfig {
     endpoint: String,
     dbname: String,
     username: Option<String>,
@@ -159,4 +159,40 @@ fn healthcheck(config: impl Into<GreptimeDBServiceConfig>) -> crate::Result<Heal
     let client = new_client_from_config(&config)?;
 
     Ok(async move { client.health_check().await.map_err(|error| error.into()) }.boxed())
+}
+
+fn f64_column(name: &str) -> ColumnSchema {
+    ColumnSchema {
+        column_name: name.to_owned(),
+        semantic_type: SemanticType::Field as i32,
+        datatype: ColumnDataType::Float64 as i32,
+        ..Default::default()
+    }
+}
+
+fn ts_column(name: &str) -> ColumnSchema {
+    ColumnSchema {
+        column_name: name.to_owned(),
+        semantic_type: SemanticType::Timestamp as i32,
+        datatype: ColumnDataType::TimestampMillisecond as i32,
+        ..Default::default()
+    }
+}
+
+fn tag_column(name: &str) -> ColumnSchema {
+    ColumnSchema {
+        column_name: name.to_owned(),
+        semantic_type: SemanticType::Tag as i32,
+        datatype: ColumnDataType::String as i32,
+        ..Default::default()
+    }
+}
+
+fn str_column(name: &str) -> ColumnSchema {
+    ColumnSchema {
+        column_name: name.to_owned(),
+        semantic_type: SemanticType::Field as i32,
+        datatype: ColumnDataType::String as i32,
+        ..Default::default()
+    }
 }
