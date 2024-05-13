@@ -1,6 +1,6 @@
 use chrono::Utc;
-use greptimedb_client::api::v1::*;
-use greptimedb_client::helpers::values::*;
+use greptimedb_ingester::api::v1::*;
+use greptimedb_ingester::helpers::values::*;
 use vector_lib::event::metric::{Bucket, MetricSketch, Quantile, Sample};
 use vector_lib::event::{Metric, MetricValue};
 use vector_lib::metrics::AgentDDSketch;

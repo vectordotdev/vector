@@ -4,7 +4,7 @@
 //! [GreptimeDB](https://github.com/greptimeteam/greptimedb), a cloud-native
 //! time-series database. It uses GreptimeDB's [gRPC
 //! API](https://docs.greptime.com/user-guide/write-data/grpc) and GreptimeDB's
-//! [rust client](https://github.com/GreptimeTeam/greptimedb-client-rust).
+//! [rust client](https://github.com/GreptimeTeam/greptimedb-ingester-rust).
 //!
 //! This sink transforms metrics into GreptimeDB table using following rules:
 //!

@@ -2,8 +2,8 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::task::Poll;
 
-use greptimedb_client::api::v1::*;
-use greptimedb_client::Error as GreptimeError;
+use greptimedb_ingester::api::v1::*;
+use greptimedb_ingester::Error as GreptimeError;
 use vector_lib::event::Metric;
 
 use crate::sinks::greptimedb::{GreptimeDBBatchOutput, GreptimeDBService};

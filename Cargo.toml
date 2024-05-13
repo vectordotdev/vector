@@ -409,7 +409,7 @@ hex = { version = "0.4.3", default-features = false, optional = true }
 sha2 = { version = "0.10.8", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-client = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust.git", rev = "d21dbcff680139ed2065b62100bac3123da7c789", optional = true }
+greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust.git", rev = "3ce31a19d5a476d7d1c805cad7423d235d584c20", optional = true }
 
 # External libs
 arc-swap = { version = "1.7", default-features = false, optional = true }
@@ -1302,8 +1302,8 @@ sinks-datadog_traces = [
 sinks-elasticsearch = ["transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
 sinks-gcp = ["dep:base64", "gcp"]
-sinks-greptimedb = ["dep:greptimedb-client"]
-sinks-greptimedb_logs = ["dep:greptimedb-client"]
+sinks-greptimedb = ["dep:greptimedb-ingester"]
+sinks-greptimedb_logs = ["dep:greptimedb-ingester"]
 sinks-honeycomb = []
 sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]

@@ -1,4 +1,4 @@
-use greptimedb_client::{
+use greptimedb_ingester::{
     api::v1::{Row, RowInsertRequest, Rows},
     helpers::values::{string_value, timestamp_millisecond_value},
 };

@@ -4,10 +4,10 @@ use vector_lib::request_metadata::RequestMetadata;
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::prelude::*;
-use greptimedb_client::api::v1::auth_header::AuthScheme;
-use greptimedb_client::api::v1::*;
-use greptimedb_client::channel_manager::*;
-use greptimedb_client::{Client, Database, Error as GreptimeError};
+use greptimedb_ingester::api::v1::auth_header::AuthScheme;
+use greptimedb_ingester::api::v1::*;
+use greptimedb_ingester::channel_manager::*;
+use greptimedb_ingester::{Client, Database, Error as GreptimeError};
 
 use self::logs::config::GreptimeDBLogsConfig;
 use self::metrics::GreptimeDBConfig;
@@ -19,7 +19,7 @@ mod metrics;
 mod request;
 
 fn default_dbname() -> String {
-    greptimedb_client::DEFAULT_SCHEMA_NAME.to_string()
+    greptimedb_ingester::DEFAULT_SCHEMA_NAME.to_string()
 }
 
 #[derive(Clone, Copy, Debug, Default)]

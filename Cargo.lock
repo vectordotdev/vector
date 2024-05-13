@@ -3716,9 +3716,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "greptimedb-client"
+name = "greptimedb-ingester"
 version = "0.1.0"
-source = "git+https://github.com/GreptimeTeam/greptimedb-ingester-rust.git?rev=d21dbcff680139ed2065b62100bac3123da7c789#d21dbcff680139ed2065b62100bac3123da7c789"
+source = "git+https://github.com/GreptimeTeam/greptimedb-ingester-rust.git?rev=3ce31a19d5a476d7d1c805cad7423d235d584c20#3ce31a19d5a476d7d1c805cad7423d235d584c20"
 dependencies = [
  "dashmap",
  "enum_dispatch",
@@ -10120,7 +10120,7 @@ dependencies = [
  "glob",
  "goauth",
  "governor",
- "greptimedb-client",
+ "greptimedb-ingester",
  "grok",
  "h2 0.4.4",
  "hash_hasher",
