@@ -246,19 +246,28 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
 
 dyn_clone::clone_trait_object!(TransformConfig);
 
-/// Often we want to call outputs just to retrieve the OutputId's without needing
-/// the schema definitions.
-pub fn get_transform_output_ids<T: TransformConfig + ?Sized>(
-    transform: &T,
+/// Just retrieve Outputs, without needing the schema definitions.
+pub fn get_transform_outputs<T: Configurable + Serialize + 'static>(
+    transform: &TransformOuter<T>,
     key: ComponentKey,
     global_log_namespace: LogNamespace,
-) -> impl Iterator<Item = OutputId> + '_ {
-    transform
+) -> Vec<TransformOutput> {
+    transform.inner
         .outputs(
             vector_lib::enrichment::TableRegistry::default(),
             &[(key.clone().into(), schema::Definition::any())],
             global_log_namespace,
         )
+}
+
+/// Often we want to call outputs just to retrieve the OutputId's without needing
+/// the schema definitions.
+pub fn get_transform_output_ids<T: Configurable + Serialize + 'static>(
+    transform: &TransformOuter<T>,
+    key: ComponentKey,
+    global_log_namespace: LogNamespace,
+) -> impl Iterator<Item = OutputId> + '_ {
+    get_transform_outputs(transform, key.clone(), global_log_namespace)
         .into_iter()
         .map(move |output| OutputId {
             component: key.clone(),

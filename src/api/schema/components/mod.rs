@@ -289,7 +289,7 @@ pub fn update_config(config: &Config) {
                 component_type: transform.inner.get_component_name().to_string(),
                 inputs: transform.inputs.clone(),
                 outputs: get_transform_output_ids(
-                    transform.inner.as_ref(),
+                    transform,
                     "".into(),
                     config.schema.log_namespace(),
                 )

@@ -185,7 +185,7 @@ impl UnitTestBuildMetadata {
             .iter()
             .flat_map(|(key, transform)| {
                 get_transform_output_ids(
-                    transform.inner.as_ref(),
+                    transform,
                     key.clone(),
                     builder.schema.log_namespace(),
                 )
@@ -456,7 +456,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
     let config = config.clone();
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         get_transform_output_ids(
-            transform.inner.as_ref(),
+            transform,
             key.clone(),
             config.schema.log_namespace(),
         )

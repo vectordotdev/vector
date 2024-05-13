@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::ops::DerefMut;
+use std::sync::Mutex;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use snafu::Snafu;
 use vector_lib::config::SourceOutput;
@@ -111,7 +114,7 @@ pub fn possible_definitions(
 pub(super) fn expanded_definitions(
     enrichment_tables: vector_lib::enrichment::TableRegistry,
     inputs: &[OutputId],
-    config: &dyn ComponentContainer,
+    config: &(dyn ComponentContainer + Sync),
     cache: &mut Cache,
 ) -> Result<Vec<(OutputId, Definition)>, Error> {
     // Try to get the definition from the cache.
@@ -119,10 +122,10 @@ pub(super) fn expanded_definitions(
         return Ok(definitions.clone());
     }
 
-    let mut definitions: Vec<(OutputId, Definition)> = vec![];
-    let mut merged_cache = HashMap::default();
+    let definitions: Mutex<Vec<(OutputId, Definition)>> = Mutex::new(vec![]);
+    let merged_cache = Mutex::new(HashMap::default());
 
-    for input in inputs {
+    inputs.par_iter().map(|input| {
         let key = &input.component;
 
         // If the input is a source, it'll always have schema definition attached, even if it is an
@@ -156,13 +159,13 @@ pub(super) fn expanded_definitions(
                 return Err(Error::ContainsNever);
             }
 
-            definitions.append(&mut source_definitions);
+            definitions.lock().unwrap().append(&mut source_definitions);
 
         // A transform can receive from multiple inputs, and each input needs to be expanded to
         // a new pipeline.
         } else if let Some(inputs) = config.transform_inputs(key) {
             let input_definitions =
-                possible_definitions(inputs, config, enrichment_tables.clone(), &mut merged_cache)?;
+                possible_definitions(inputs, config, enrichment_tables.clone(), merged_cache.lock().unwrap().deref_mut())?;
 
             let mut transform_definition = config
                 .transform_outputs(key, enrichment_tables.clone(), &input_definitions)
@@ -192,10 +195,12 @@ pub(super) fn expanded_definitions(
 
             // Append whatever number of additional pipelines we created to the existing
             // pipeline definitions.
-            definitions.append(&mut transform_definition);
+            definitions.lock().unwrap().append(&mut transform_definition);
         }
-    }
+        Ok(())
+    }).collect::<Result<Vec<()>, Error>>()?;
 
+    let definitions = definitions.into_inner().unwrap();
     cache.insert(
         (config.schema_enabled(), inputs.to_vec()),
         definitions.clone(),

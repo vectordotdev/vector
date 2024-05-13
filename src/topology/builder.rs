@@ -5,10 +5,12 @@ use std::{
     sync::{Arc, Mutex},
     time::Instant,
 };
+use std::ops::DerefMut;
 
 use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryStreamExt};
 use futures_util::stream::FuturesUnordered;
 use once_cell::sync::Lazy;
+use rayon::iter::{ParallelBridge, ParallelIterator};
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -16,7 +18,6 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
-use vector_lib::config::LogNamespace;
 use vector_lib::internal_event::{
     self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
 };
@@ -405,106 +406,122 @@ impl<'a> Builder<'a> {
         &mut self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
     ) {
-        let mut definition_cache = HashMap::default();
+        let definition_cache = Mutex::new(HashMap::default());
+        let config = self.config;
+        let diff = self.diff;
+        let extra_context = &self.extra_context;
 
-        for (key, transform) in self
-            .config
-            .transforms()
-            .filter(|(key, _)| self.diff.transforms.contains_new(key))
-        {
-            debug!(component = %key, "Building new transform.");
+        let errors = Mutex::new(&mut self.errors);
+        let inputs = Mutex::new(&mut self.inputs);
+        let outputs = Mutex::new(&mut self.outputs);
+        let tasks = Mutex::new(&mut self.tasks);
+        let rt = tokio::runtime::Handle::current();
+        tokio::task::block_in_place(|| {
+            self.config.transforms()
+                .par_bridge()
+                .filter(|(key, _)| diff.transforms.contains_new(key))
+                .for_each(|(key, transform)| {
+                    rt.block_on(
+                        async {
+                            debug!(component = %key, "Building new transform.");
 
-            let input_definitions = match schema::input_definitions(
-                &transform.inputs,
-                self.config,
-                enrichment_tables.clone(),
-                &mut definition_cache,
-            ) {
-                Ok(definitions) => definitions,
-                Err(_) => {
-                    // We have received an error whilst retrieving the definitions,
-                    // there is no point in continuing.
+                            let input_definitions = match schema::input_definitions(
+                                &transform.inputs,
+                                config,
+                                enrichment_tables.clone(),
+                                definition_cache.lock().unwrap().deref_mut(),
+                            ) {
+                                Ok(definitions) => definitions,
+                                Err(_) => {
+                                    // We have received an error whilst retrieving the definitions,
+                                    // there is no point in continuing.
 
-                    return;
-                }
-            };
+                                    return;
+                                }
+                            };
 
-            let merged_definition: Definition = input_definitions
-                .iter()
-                .map(|(_output_id, definition)| definition.clone())
-                .reduce(Definition::merge)
-                // We may not have any definitions if all the inputs are from metrics sources.
-                .unwrap_or_else(Definition::any);
+                            let merged_definition: Definition = input_definitions
+                                .iter()
+                                .map(|(_output_id, definition)| definition.clone())
+                                .reduce(Definition::merge)
+                                // We may not have any definitions if all the inputs are from metrics sources.
+                                .unwrap_or_else(Definition::any);
 
-            let span = error_span!(
-                "transform",
-                component_kind = "transform",
-                component_id = %key.id(),
-                component_type = %transform.inner.get_component_name(),
-            );
+                            let span = error_span!(
+                                "transform",
+                                component_kind = "transform",
+                                component_id = %key.id(),
+                                component_type = %transform.inner.get_component_name(),
+                            );
 
-            // Create a map of the outputs to the list of possible definitions from those outputs.
-            let schema_definitions = transform
-                .inner
-                .outputs(
-                    enrichment_tables.clone(),
-                    &input_definitions,
-                    self.config.schema.log_namespace(),
-                )
-                .into_iter()
-                .map(|output| {
-                    let definitions = output.schema_definitions(self.config.schema.enabled);
-                    (output.port, definitions)
-                })
-                .collect::<HashMap<_, _>>();
+                            let transform_outputs = transform
+                                .inner
+                                .outputs(
+                                    enrichment_tables.clone(),
+                                    &input_definitions,
+                                    config.schema.log_namespace(),
+                                );
 
-            let context = TransformContext {
-                key: Some(key.clone()),
-                globals: self.config.global.clone(),
-                enrichment_tables: enrichment_tables.clone(),
-                schema_definitions,
-                merged_schema_definition: merged_definition.clone(),
-                schema: self.config.schema,
-                extra_context: self.extra_context.clone(),
-            };
+                            // Create a map of the outputs to the list of possible definitions from those outputs.
+                            let schema_definitions =
+                                transform_outputs.clone().into_iter()
+                                .map(|output| {
+                                    let definitions = output.schema_definitions(config.schema.enabled);
+                                    (output.port, definitions)
+                                })
+                                .collect::<HashMap<_, _>>();
 
-            let node = TransformNode::from_parts(
-                key.clone(),
-                enrichment_tables.clone(),
-                transform,
-                &input_definitions,
-                self.config.schema.log_namespace(),
-            );
 
-            let transform = match transform
-                .inner
-                .build(&context)
-                .instrument(span.clone())
-                .await
-            {
-                Err(error) => {
-                    self.errors
-                        .push(format!("Transform \"{}\": {}", key, error));
-                    continue;
-                }
-                Ok(transform) => transform,
-            };
+                            let context = TransformContext {
+                                key: Some(key.clone()),
+                                globals: config.global.clone(),
+                                enrichment_tables: enrichment_tables.clone(),
+                                schema_definitions,
+                                merged_schema_definition: merged_definition.clone(),
+                                schema: config.schema,
+                                extra_context: extra_context.clone(),
+                            };
 
-            let (input_tx, input_rx) =
-                TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block, &span)
-                    .await;
+                            let node = TransformNode::from_parts(
+                                key.clone(),
+                                transform,
+                                transform_outputs
+                            );
 
-            self.inputs
-                .insert(key.clone(), (input_tx, node.inputs.clone()));
+                            let transform = match transform
+                                .inner
+                                .build(&context)
+                                .instrument(span.clone())
+                                .await
+                            {
+                                Err(error) => {
+                                    errors.lock().unwrap()
+                                        .push(format!("Transform \"{}\": {}", key, error));
 
-            let (transform_task, transform_outputs) = {
-                let _span = span.enter();
-                build_transform(transform, node, input_rx)
-            };
+                                    return;
+                                }
+                                Ok(transform) => transform,
+                            };
 
-            self.outputs.extend(transform_outputs);
-            self.tasks.insert(key.clone(), transform_task);
-        }
+
+                            let (input_tx, input_rx) =
+                                TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block, &span)
+                                    .await;
+
+                            inputs.lock().unwrap()
+                                .insert(key.clone(), (input_tx, node.inputs.clone()));
+
+                            let (transform_task, transform_outputs) = {
+                                let _span = span.enter();
+                                build_transform(transform, node, input_rx)
+                            };
+
+                            outputs.lock().unwrap().extend(transform_outputs);
+                            tasks.lock().unwrap().insert(key.clone(), transform_task);
+                        }
+                    );
+                });
+        });
     }
 
     async fn build_sinks(&mut self, enrichment_tables: &vector_lib::enrichment::TableRegistry) {
@@ -738,21 +755,15 @@ struct TransformNode {
 impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
         transform: &TransformOuter<OutputId>,
-        schema_definition: &[(OutputId, Definition)],
-        global_log_namespace: LogNamespace,
+        transform_outputs: Vec<TransformOutput>
     ) -> Self {
         Self {
             key,
             typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
-            outputs: transform.inner.outputs(
-                enrichment_tables,
-                schema_definition,
-                global_log_namespace,
-            ),
+            outputs: transform_outputs,
             enable_concurrency: transform.inner.enable_concurrency(),
         }
     }

@@ -175,7 +175,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         }
 
         if get_transform_output_ids(
-            transform.inner.as_ref(),
+            transform,
             key.clone(),
             config.schema.log_namespace(),
         )
@@ -341,7 +341,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
     });
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         get_transform_output_ids(
-            transform.inner.as_ref(),
+            transform,
             key.clone(),
             config.schema.log_namespace(),
         )

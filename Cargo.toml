@@ -131,7 +131,7 @@ members = [
 [workspace.dependencies]
 chrono = { version = "0.4.37", default-features = false, features = ["clock", "serde"] }
 clap = { version = "4.5.4", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
-indexmap = { version = "2.2.6", default-features = false, features = ["serde", "std"] }
+indexmap = { version = "2.2.6", default-features = false, features = ["serde", "std", "rayon"] }
 pin-project = { version = "1.1.5", default-features = false }
 proptest = "1.4"
 proptest-derive = "0.4.0"
@@ -319,6 +319,7 @@ postgres-openssl = { version = "0.5.0", default-features = false, features = ["r
 pulsar = { version = "6.2.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
+rayon = "1.10.0"
 rdkafka = { version = "0.35.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.24.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.10.4", default-features = false, features = ["std", "perf"] }

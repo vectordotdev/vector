@@ -1,9 +1,10 @@
 use super::{
-    builder::ConfigBuilder, graph::Graph, id::Inputs, transform::get_transform_output_ids,
+    builder::ConfigBuilder, graph::Graph, id::Inputs, transform::{get_transform_outputs, get_transform_output_ids},
     validation, Config, OutputId,
 };
 
 use indexmap::IndexSet;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -20,6 +21,11 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     ) {
         errors.extend(name_errors);
     }
+
+    // precache remap transforms outputs in parallel
+    builder.transforms.par_iter()
+        .filter(|(_, t)| t.inner.get_component_name() == "remap")
+        .for_each(|(k, t)| { get_transform_outputs(t, k.clone(), builder.schema.log_namespace()); } );
 
     expand_globs(&mut builder);
 
@@ -141,7 +147,7 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
                 })
         })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
-            get_transform_output_ids(t.inner.as_ref(), key.clone(), config.schema.log_namespace())
+            get_transform_output_ids(t, key.clone(), config.schema.log_namespace())
         }))
         .map(|output_id| output_id.to_string())
         .collect::<IndexSet<String>>();

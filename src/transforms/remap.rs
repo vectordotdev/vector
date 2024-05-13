@@ -5,19 +5,21 @@ use std::{
     io::{self, Read},
     path::PathBuf,
 };
+use std::sync::Mutex;
 
 use snafu::{ResultExt, Snafu};
 use vector_lib::codecs::MetricTagValues;
 use vector_lib::compile_vrl;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use vector_lib::enrichment::TableRegistry;
 use vector_lib::lookup::{metadata_path, owned_value_path, PathPrefix};
 use vector_lib::schema::Definition;
 use vector_lib::TimeZone;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::compiler::runtime::{Runtime, Terminate};
 use vrl::compiler::state::ExternalEnv;
-use vrl::compiler::{CompileConfig, ExpressionError, Function, Program, TypeState, VrlRuntime};
+use vrl::compiler::{CompileConfig, ExpressionError, Program, TypeState, VrlRuntime};
 use vrl::diagnostic::{DiagnosticMessage, Formatter, Note};
 use vrl::path;
 use vrl::path::ValuePath;
@@ -43,9 +45,9 @@ const DROPPED: &str = "dropped";
     "remap",
     "Modify your observability data as it passes through your topology using Vector Remap Language (VRL)."
 ))]
-#[derive(Clone, Debug, Derivative)]
+#[derive(Derivative)]
 #[serde(deny_unknown_fields)]
-#[derivative(Default)]
+#[derivative(Default, Debug)]
 pub struct RemapConfig {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
     ///
@@ -133,14 +135,39 @@ pub struct RemapConfig {
     #[configurable(derived, metadata(docs::hidden))]
     #[serde(default)]
     pub runtime: VrlRuntime,
+
+    #[configurable(derived, metadata(docs::hidden))]
+    #[serde(skip)]
+    #[derivative(Debug="ignore")]
+    pub cache: Mutex<Vec<((TableRegistry, schema::Definition), std::result::Result<(Program, String, MeaningList), String>)>>,
+}
+
+impl Clone for RemapConfig {
+    fn clone(&self) -> Self {
+        Self {
+            source: self.source.clone(),
+            file: self.file.clone(),
+            metric_tag_values: self.metric_tag_values,
+            timezone: self.timezone,
+            drop_on_error: self.drop_on_error,
+            drop_on_abort: self.drop_on_abort,
+            reroute_dropped: self.reroute_dropped,
+            runtime: self.runtime,
+            cache: Mutex::new(Default::default()),
+        }
+    }
 }
 
 impl RemapConfig {
     fn compile_vrl_program(
         &self,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        enrichment_tables: TableRegistry,
         merged_schema_definition: schema::Definition,
-    ) -> Result<(Program, String, Vec<Box<dyn Function>>, CompileConfig)> {
+    ) -> Result<(Program, String, MeaningList)> {
+        if let Some((_, res)) = self.cache.lock().unwrap().iter().find(|v| v.0.0 == enrichment_tables && v.0.1 == merged_schema_definition) {
+            return res.clone().map_err(Into::into);
+        }
+
         let source = match (&self.source, &self.file) {
             (Some(source), None) => source.to_owned(),
             (None, Some(path)) => {
@@ -169,24 +196,27 @@ impl RemapConfig {
         };
         let mut config = CompileConfig::default();
 
-        config.set_custom(enrichment_tables);
+        config.set_custom(enrichment_tables.clone());
         config.set_custom(MeaningList::default());
 
-        compile_vrl(&source, &functions, &state, config)
+        let res = compile_vrl(&source, &functions, &state, config)
             .map_err(|diagnostics| {
                 Formatter::new(&source, diagnostics)
                     .colored()
                     .to_string()
-                    .into()
             })
             .map(|result| {
                 (
                     result.program,
                     Formatter::new(&source, result.warnings).to_string(),
-                    functions,
-                    result.config,
+                    result.config.get_custom::<MeaningList>().unwrap().clone(),
                 )
-            })
+            });
+
+
+        self.cache.lock().unwrap().push(((enrichment_tables, merged_schema_definition), res.clone()));
+
+        res.map_err(Into::into)
     }
 }
 
@@ -235,14 +265,10 @@ impl TransformConfig for RemapConfig {
         // step.
         let compiled = self
             .compile_vrl_program(enrichment_tables, merged_definition)
-            .map(|(program, _, _, external_context)| {
+            .map(|(program, _, meaning_list)| {
                 (
                     program.final_type_info().state,
-                    external_context
-                        .get_custom::<MeaningList>()
-                        .cloned()
-                        .expect("context exists")
-                        .0,
+                    meaning_list.0,
                 )
             })
             .map_err(|_| ());
@@ -388,7 +414,7 @@ impl Remap<AstRunner> {
         config: RemapConfig,
         context: &TransformContext,
     ) -> crate::Result<(Self, String)> {
-        let (program, warnings, _, _) = config.compile_vrl_program(
+        let (program, warnings, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
         )?;
