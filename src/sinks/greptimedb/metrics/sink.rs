@@ -4,12 +4,14 @@ use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use vector_lib::event::{Metric, MetricValue};
 
+use crate::sinks::greptimedb::request::GreptimeDBRequest;
+use crate::sinks::greptimedb::GreptimeDBRetryLogic;
+use crate::sinks::greptimedb::GreptimeDBService;
 use crate::sinks::prelude::*;
 use crate::sinks::util::buffer::metrics::MetricNormalize;
 use crate::sinks::util::buffer::metrics::MetricSet;
 
 use super::batch::GreptimeDBBatchSizer;
-use super::service::{GreptimeDBRequest, GreptimeDBRetryLogic, GreptimeDBService};
 
 #[derive(Clone, Debug, Default)]
 pub struct GreptimeDBMetricNormalize;

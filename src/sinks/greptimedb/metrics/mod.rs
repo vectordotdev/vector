@@ -23,27 +23,16 @@ use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::prelude::*;
 
-use self::service::GreptimeDBRetryLogic;
+use super::{
+    default_dbname, healthcheck, GreptimeDBDefaultBatchSettings, GreptimeDBRetryLogic,
+    GreptimeDBService,
+};
 
-mod batch;
+pub(super) mod batch;
 #[cfg(all(test, feature = "greptimedb-integration-tests"))]
 mod integration_tests;
-mod request_builder;
-mod service;
+pub(super) mod request_builder;
 mod sink;
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct GreptimeDBDefaultBatchSettings;
-
-impl SinkBatchSettings for GreptimeDBDefaultBatchSettings {
-    const MAX_EVENTS: Option<usize> = Some(20);
-    const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: f64 = 1.0;
-}
-
-fn default_dbname() -> String {
-    greptimedb_client::DEFAULT_SCHEMA_NAME.to_string()
-}
 
 /// Configuration items for GreptimeDB
 #[configurable_component(sink("greptimedb", "Ingest metrics data into GreptimeDB."))]
@@ -94,7 +83,7 @@ pub struct GreptimeDBConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub batch: BatchConfig<GreptimeDBDefaultBatchSettings>,
+    pub(crate) batch: BatchConfig<GreptimeDBDefaultBatchSettings>,
 
     #[configurable(derived)]
     #[serde(
@@ -117,7 +106,7 @@ impl SinkConfig for GreptimeDBConfig {
         let request_settings = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_settings, GreptimeDBRetryLogic)
-            .service(service::GreptimeDBService::try_new(self)?);
+            .service(GreptimeDBService::try_new(self)?);
         let sink = sink::GreptimeDBSink {
             service,
             batch_settings: self.batch.into_batcher_settings()?,
@@ -134,12 +123,6 @@ impl SinkConfig for GreptimeDBConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-}
-
-fn healthcheck(config: &GreptimeDBConfig) -> crate::Result<Healthcheck> {
-    let client = service::new_client_from_config(config)?;
-
-    Ok(async move { client.health_check().await.map_err(|error| error.into()) }.boxed())
 }
 
 #[cfg(test)]

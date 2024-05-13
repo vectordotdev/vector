@@ -48,7 +48,7 @@ fn encode_f64_value(
     columns.push(f64_value(value));
 }
 
-pub(super) fn metric_to_insert_request(metric: Metric) -> RowInsertRequest {
+pub fn metric_to_insert_request(metric: Metric) -> RowInsertRequest {
     let ns = metric.namespace();
     let metric_name = metric.name();
     let table_name = if let Some(ns) = ns {

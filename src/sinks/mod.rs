@@ -53,7 +53,7 @@ pub mod file;
 pub mod gcp;
 #[cfg(feature = "sinks-gcp")]
 pub mod gcs_common;
-#[cfg(feature = "sinks-greptimedb")]
+#[cfg(any(feature = "sinks-greptimedb", feature = "sinks-greptimedb_logs"))]
 pub mod greptimedb;
 #[cfg(feature = "sinks-honeycomb")]
 pub mod honeycomb;

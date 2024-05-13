@@ -9,10 +9,10 @@ const F64_BYTE_SIZE: usize = 8;
 const I64_BYTE_SIZE: usize = 8;
 
 #[derive(Default)]
-pub(super) struct GreptimeDBBatchSizer;
+pub struct GreptimeDBBatchSizer;
 
 impl GreptimeDBBatchSizer {
-    pub(super) fn estimated_size_of(&self, item: &Metric) -> usize {
+    pub fn estimated_size_of(&self, item: &Metric) -> usize {
         // Metric name.
         item.series().name().name().len()
         // Metric namespace, with an additional 1 to account for the namespace separator.
