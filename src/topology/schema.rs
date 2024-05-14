@@ -822,13 +822,17 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
 
-            let got = expanded_definitions(
+            let mut got = expanded_definitions(
                 vector_lib::enrichment::TableRegistry::default(),
                 &inputs,
                 &case,
                 &mut HashMap::default(),
             )
             .unwrap();
+
+            got.sort_by(|v1, v2| v1.0.component.id().cmp(v2.0.component.id()));
+            let mut want = case.want.clone();
+            want.sort_by(|v1, v2| v1.0.component.id().cmp(v2.0.component.id()));
             assert_eq!(got, case.want, "{}", title);
         }
     }
