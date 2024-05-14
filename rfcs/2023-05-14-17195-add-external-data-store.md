@@ -14,7 +14,7 @@ Vector needs to support enriching events from external data stores. This RFC pro
 
 ### In scope
 
-- Adding new VRL functions to allow point data upserts.
+- Adding new VRL functions to allow point data upsert's.
 - Add an enum in Enrichment Tables to mark them as read or read/write which can be used for compile-time validation of VRL.
 
 ### Out of scope
