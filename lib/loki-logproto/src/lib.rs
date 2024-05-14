@@ -15,19 +15,34 @@ pub mod util {
 
     const NANOS_RANGE: i64 = 1_000_000_000;
 
-    // (<Timestamp in nanos>, <Line>)
-    pub struct Entry(pub i64, pub String);
+    // (<name>, <value>)
+    impl From<(String, String)> for logproto::LabelPairAdapter {
+        fn from(pair: (String, String)) -> Self {
+            logproto::LabelPairAdapter {
+                name: pair.0,
+                value: pair.1,
+            }
+        }
+    }
+
+    // (<Timestamp in nanos>, <Line>, <Structured metadata>)
+    pub struct Entry(pub i64, pub String, pub HashMap<String, String>);
 
     impl From<Entry> for logproto::EntryAdapter {
         fn from(entry: Entry) -> Self {
+            let line = entry.1;
+            let structured_metadata: Vec<logproto::LabelPairAdapter> =
+                entry.2.into_iter().map(|entry| entry.into()).collect();
+
             logproto::EntryAdapter {
                 timestamp: Some(prost_types::Timestamp {
                     seconds: entry.0 / NANOS_RANGE,
                     nanos: (entry.0 % NANOS_RANGE) as i32,
                 }),
-                line: entry.1,
-                structured_metadata: vec![],
-                parsed: vec![],
+                line: line,
+                structured_metadata: structured_metadata,
+                parsed: vec![], // TODO: Remove when Loki's proto doesn't require this in the
+                                // write-path anymore.
             }
         }
     }
