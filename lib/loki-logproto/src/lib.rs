@@ -26,6 +26,8 @@ pub mod util {
                     nanos: (entry.0 % NANOS_RANGE) as i32,
                 }),
                 line: entry.1,
+                structured_metadata: vec![],
+                parsed: vec![],
             }
         }
     }
