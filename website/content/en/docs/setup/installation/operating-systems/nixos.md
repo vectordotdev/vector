@@ -18,27 +18,29 @@ For example, place into a system's `configuration.nix`:
 services.vector = {
   enable = true;
   journaldAccess = true;
-  settings = builtins.fromTOML ''
-    [sources.journald]
-    type = "journald"
-    current_boot_only = true
+  settings = {
+    sources = {
+      journald.type = "journald";
 
-    [sources.vector_metrics]
-    type = "internal_metrics"
+      vector_metrics.type = "internal_metrics";
+    };
 
-    [sinks.loki]
-    type = "loki"
-    inputs = [ "journald" ]
-    endpoint = "https://loki.mycompany.com"
+    sinks = {
+      loki = {
+        type = "loki";
+        inputs = [ "journald" ];
+        endpoint = "https://loki.mycompany.com";
 
-    [sinks.loki.labels]
-    source = "journald"
+        labels.source = "journald";
+      };
 
-    [sinks.prometheus_exporter]
-    type = "prometheus_exporter"
-    inputs = [ "vector_metrics" ]
-    address = "[::]:9598"
-  '';
+      prometheus_exporter = {
+        type = "prometheus_exporter";
+        inputs = [ "vector_metrics" ];
+        address = "[::]:9598"
+      };
+    };
+  };
 };
 ```
 
