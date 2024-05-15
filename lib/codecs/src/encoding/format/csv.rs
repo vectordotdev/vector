@@ -75,6 +75,7 @@ impl CsvSerializerConfig {
 #[derive(Debug, Clone)]
 pub struct CsvSerializerOptions {
     /// The field delimiter to use when writing CSV.
+    #[configurable(metadata(docs::type_override = "ascii_char"))]
     #[serde(
         default = "default_delimiter",
         with = "vector_core::serde::ascii_char",
