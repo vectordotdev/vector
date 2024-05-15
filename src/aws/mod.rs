@@ -82,7 +82,7 @@ fn check_response(res: &HttpResponse) -> bool {
     //
     // Now just look for those when it's a client_error
     let re = RETRIABLE_CODES.get_or_init(|| {
-        RegexSet::new(["RequestTimeout", "RequestExpired", "ThrottlingException", "ExpiredToken"])
+        RegexSet::new(["RequestTimeout", "RequestExpired", "ThrottlingException", "ExpiredToken", "AccessDenied"])
             .expect("invalid regex")
     });
 
