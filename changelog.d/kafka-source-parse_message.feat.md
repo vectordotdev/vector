@@ -1,0 +1,1 @@
+The constructor of FrameRead will allocate an initial memory of 8192, In cases where Kafka messages are smaller than this value, additional memory will be used. Initializing it with msg.payload_len() would be more appropriate.
