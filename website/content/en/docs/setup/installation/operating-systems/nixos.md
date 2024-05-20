@@ -110,6 +110,14 @@ Vector is granted access to log files which belong to [Caddy][caddy]:
   };
 ```
 
+Other integration examples may be found at the
+[NixOS test suite for Vector][nixos-tests-vector]. These can also be run on a
+system with Nix with a local copy of the `nixpkgs` repo by executing:
+
+```shell
+nix-build -A nixosTests.vector
+```
+
 See also the [Nix] package page.
 
 ## Supported installers
@@ -117,7 +125,8 @@ See also the [Nix] package page.
 {{< supported-installers >}}
 
 [caddy]: https://caddyserver.com
-[nixos]: https://www.nixos.org
-[nixpkg-vector]: https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/logging/vector.nix
-[nixos-search]: https://search.nixos.org/options?query=services.vector
 [nix]: /docs/setup/installation/package-managers/nix
+[nixos]: https://www.nixos.org
+[nixos-search]: https://search.nixos.org/options?query=services.vector
+[nixos-tests-vector]: https://github.com/NixOS/nixpkgs/blob/master/nixos/tests/vector.nix
+[nixpkg-vector]: https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/logging/vector.nix
