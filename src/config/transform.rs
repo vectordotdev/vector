@@ -252,12 +252,11 @@ pub fn get_transform_outputs<T: Configurable + Serialize + 'static>(
     key: ComponentKey,
     global_log_namespace: LogNamespace,
 ) -> Vec<TransformOutput> {
-    transform.inner
-        .outputs(
-            vector_lib::enrichment::TableRegistry::default(),
-            &[(key.clone().into(), schema::Definition::any())],
-            global_log_namespace,
-        )
+    transform.inner.outputs(
+        vector_lib::enrichment::TableRegistry::default(),
+        &[(key.clone().into(), schema::Definition::any())],
+        global_log_namespace,
+    )
 }
 
 /// Often we want to call outputs just to retrieve the OutputId's without needing

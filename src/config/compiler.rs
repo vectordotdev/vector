@@ -1,5 +1,8 @@
 use super::{
-    builder::ConfigBuilder, graph::Graph, id::Inputs, transform::{get_transform_outputs, get_transform_output_ids},
+    builder::ConfigBuilder,
+    graph::Graph,
+    id::Inputs,
+    transform::{get_transform_output_ids, get_transform_outputs},
     validation, Config, OutputId,
 };
 
@@ -23,9 +26,13 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     }
 
     // pre cache remap transforms outputs in parallel
-    builder.transforms.par_iter()
+    builder
+        .transforms
+        .par_iter()
         .filter(|(_, t)| t.inner.get_component_name() == "remap")
-        .for_each(|(k, t)| { get_transform_outputs(t, k.clone(), builder.schema.log_namespace()); } );
+        .for_each(|(k, t)| {
+            get_transform_outputs(t, k.clone(), builder.schema.log_namespace());
+        });
 
     expand_globs(&mut builder);
 

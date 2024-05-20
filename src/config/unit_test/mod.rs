@@ -184,11 +184,7 @@ impl UnitTestBuildMetadata {
             .transforms
             .iter()
             .flat_map(|(key, transform)| {
-                get_transform_output_ids(
-                    transform,
-                    key.clone(),
-                    builder.schema.log_namespace(),
-                )
+                get_transform_output_ids(transform, key.clone(), builder.schema.log_namespace())
             })
             .collect::<HashSet<_>>();
 
@@ -455,13 +451,9 @@ async fn build_unit_test(
 fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String>> {
     let config = config.clone();
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
-        get_transform_output_ids(
-            transform,
-            key.clone(),
-            config.schema.log_namespace(),
-        )
-        .map(|output| output.to_string())
-        .collect::<Vec<_>>()
+        get_transform_output_ids(transform, key.clone(), config.schema.log_namespace())
+            .map(|output| output.to_string())
+            .collect::<Vec<_>>()
     });
 
     let mut loose_end_outputs = Vec::new();

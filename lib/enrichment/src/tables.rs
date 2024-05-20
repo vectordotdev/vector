@@ -53,7 +53,10 @@ pub struct TableRegistry {
 impl PartialEq for TableRegistry {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.tables, &other.tables) && Arc::ptr_eq(&self.loading, &other.loading)
-            || self.tables.load().is_none() && other.tables.load().is_none() && self.loading.lock().unwrap().is_none() && other.loading.lock().unwrap().is_none()
+            || self.tables.load().is_none()
+                && other.tables.load().is_none()
+                && self.loading.lock().unwrap().is_none()
+                && other.loading.lock().unwrap().is_none()
     }
 }
 impl Eq for TableRegistry {}

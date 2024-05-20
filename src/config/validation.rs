@@ -174,12 +174,8 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
 
-        if get_transform_output_ids(
-            transform,
-            key.clone(),
-            config.schema.log_namespace(),
-        )
-        .any(|output| matches!(output.port, Some(output) if output == DEFAULT_OUTPUT))
+        if get_transform_output_ids(transform, key.clone(), config.schema.log_namespace())
+            .any(|output| matches!(output.port, Some(output) if output == DEFAULT_OUTPUT))
         {
             errors.push(format!(
                 "Transform {key} cannot have a named output with reserved name: `{DEFAULT_OUTPUT}`"
@@ -340,13 +336,9 @@ pub fn warnings(config: &Config) -> Vec<String> {
             .collect::<Vec<_>>()
     });
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
-        get_transform_output_ids(
-            transform,
-            key.clone(),
-            config.schema.log_namespace(),
-        )
-        .map(|output| ("transform", output))
-        .collect::<Vec<_>>()
+        get_transform_output_ids(transform, key.clone(), config.schema.log_namespace())
+            .map(|output| ("transform", output))
+            .collect::<Vec<_>>()
     });
 
     for (input_type, id) in transform_ids.chain(source_ids) {

@@ -1,8 +1,11 @@
+use crate::config::transform::get_transform_outputs;
 use indexmap::{set::IndexSet, IndexMap};
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::config::transform::get_transform_outputs;
 
-use super::{schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter, TransformOutput};
+use super::{
+    schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
+    TransformOutput,
+};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -74,7 +77,7 @@ impl Graph {
                 id.clone(),
                 Node::Transform {
                     in_ty: transform.inner.input().data_type(),
-                    outputs: get_transform_outputs(transform, id.clone(), schema.log_namespace())
+                    outputs: get_transform_outputs(transform, id.clone(), schema.log_namespace()),
                 },
             );
         }

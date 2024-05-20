@@ -1,7 +1,7 @@
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Mutex;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use snafu::Snafu;
 use vector_lib::config::SourceOutput;
@@ -125,20 +125,21 @@ pub(super) fn expanded_definitions(
     let definitions: Mutex<Vec<(OutputId, Definition)>> = Mutex::new(vec![]);
     let merged_cache = Mutex::new(HashMap::default());
 
-    inputs.par_iter().map(|input| {
-        let key = &input.component;
+    inputs
+        .par_iter()
+        .map(|input| {
+            let key = &input.component;
 
-        // If the input is a source, it'll always have schema definition attached, even if it is an
-        // "empty" schema.
-        // We take the full schema definition regardless of `config.schema_enabled()`, the assumption
-        // being that the receiving component will not be validating the schema if schema checking is
-        // not enabled.
-        if let Some(outputs) = config.source_outputs(key) {
-            // After getting the source matching to the given input, we need to further narrow the
-            // actual output of the source feeding into this input, and then get the definition
-            // belonging to that output.
-            let mut source_definitions =
-                outputs
+            // If the input is a source, it'll always have schema definition attached, even if it is an
+            // "empty" schema.
+            // We take the full schema definition regardless of `config.schema_enabled()`, the assumption
+            // being that the receiving component will not be validating the schema if schema checking is
+            // not enabled.
+            if let Some(outputs) = config.source_outputs(key) {
+                // After getting the source matching to the given input, we need to further narrow the
+                // actual output of the source feeding into this input, and then get the definition
+                // belonging to that output.
+                let mut source_definitions = outputs
                     .into_iter()
                     .find_map(|output| {
                         if output.port == input.port {
@@ -155,50 +156,58 @@ pub(super) fn expanded_definitions(
                         unreachable!("source output mis-configured")
                     });
 
-            if contains_never(&source_definitions) {
-                return Err(Error::ContainsNever);
+                if contains_never(&source_definitions) {
+                    return Err(Error::ContainsNever);
+                }
+
+                definitions.lock().unwrap().append(&mut source_definitions);
+
+            // A transform can receive from multiple inputs, and each input needs to be expanded to
+            // a new pipeline.
+            } else if let Some(inputs) = config.transform_inputs(key) {
+                let input_definitions = possible_definitions(
+                    inputs,
+                    config,
+                    enrichment_tables.clone(),
+                    merged_cache.lock().unwrap().deref_mut(),
+                )?;
+
+                let mut transform_definition = config
+                    .transform_outputs(key, enrichment_tables.clone(), &input_definitions)
+                    .expect("already found inputs")
+                    .iter()
+                    .find_map(|output| {
+                        if output.port == input.port {
+                            Some(
+                                input.with_definitions(
+                                    output
+                                        .schema_definitions(config.schema_enabled())
+                                        .values()
+                                        .cloned(),
+                                ),
+                            )
+                        } else {
+                            None
+                        }
+                    })
+                    // If we find no match, it means the topology is misconfigured. This is a fatal
+                    // error, but other parts of the topology builder deal with this state.
+                    .expect("transform output misconfigured");
+
+                if contains_never(&transform_definition) {
+                    return Err(Error::ContainsNever);
+                }
+
+                // Append whatever number of additional pipelines we created to the existing
+                // pipeline definitions.
+                definitions
+                    .lock()
+                    .unwrap()
+                    .append(&mut transform_definition);
             }
-
-            definitions.lock().unwrap().append(&mut source_definitions);
-
-        // A transform can receive from multiple inputs, and each input needs to be expanded to
-        // a new pipeline.
-        } else if let Some(inputs) = config.transform_inputs(key) {
-            let input_definitions =
-                possible_definitions(inputs, config, enrichment_tables.clone(), merged_cache.lock().unwrap().deref_mut())?;
-
-            let mut transform_definition = config
-                .transform_outputs(key, enrichment_tables.clone(), &input_definitions)
-                .expect("already found inputs")
-                .iter()
-                .find_map(|output| {
-                    if output.port == input.port {
-                        Some(
-                            input.with_definitions(
-                                output
-                                    .schema_definitions(config.schema_enabled())
-                                    .values()
-                                    .cloned(),
-                            ),
-                        )
-                    } else {
-                        None
-                    }
-                })
-                // If we find no match, it means the topology is misconfigured. This is a fatal
-                // error, but other parts of the topology builder deal with this state.
-                .expect("transform output misconfigured");
-
-            if contains_never(&transform_definition) {
-                return Err(Error::ContainsNever);
-            }
-
-            // Append whatever number of additional pipelines we created to the existing
-            // pipeline definitions.
-            definitions.lock().unwrap().append(&mut transform_definition);
-        }
-        Ok(())
-    }).collect::<Result<Vec<()>, Error>>()?;
+            Ok(())
+        })
+        .collect::<Result<Vec<()>, Error>>()?;
 
     let definitions = definitions.into_inner().unwrap();
     cache.insert(

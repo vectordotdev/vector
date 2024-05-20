@@ -1,11 +1,11 @@
 use std::collections::HashMap;
+use std::sync::Mutex;
 use std::{
     collections::BTreeMap,
     fs::File,
     io::{self, Read},
     path::PathBuf,
 };
-use std::sync::Mutex;
 
 use snafu::{ResultExt, Snafu};
 use vector_lib::codecs::MetricTagValues;
@@ -138,8 +138,13 @@ pub struct RemapConfig {
 
     #[configurable(derived, metadata(docs::hidden))]
     #[serde(skip)]
-    #[derivative(Debug="ignore")]
-    pub cache: Mutex<Vec<((TableRegistry, schema::Definition), std::result::Result<(Program, String, MeaningList), String>)>>,
+    #[derivative(Debug = "ignore")]
+    pub cache: Mutex<
+        Vec<(
+            (TableRegistry, schema::Definition),
+            std::result::Result<(Program, String, MeaningList), String>,
+        )>,
+    >,
 }
 
 impl Clone for RemapConfig {
@@ -164,7 +169,13 @@ impl RemapConfig {
         enrichment_tables: TableRegistry,
         merged_schema_definition: schema::Definition,
     ) -> Result<(Program, String, MeaningList)> {
-        if let Some((_, res)) = self.cache.lock().unwrap().iter().find(|v| v.0.0 == enrichment_tables && v.0.1 == merged_schema_definition) {
+        if let Some((_, res)) = self
+            .cache
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|v| v.0 .0 == enrichment_tables && v.0 .1 == merged_schema_definition)
+        {
             return res.clone().map_err(Into::into);
         }
 
@@ -200,11 +211,7 @@ impl RemapConfig {
         config.set_custom(MeaningList::default());
 
         let res = compile_vrl(&source, &functions, &state, config)
-            .map_err(|diagnostics| {
-                Formatter::new(&source, diagnostics)
-                    .colored()
-                    .to_string()
-            })
+            .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())
             .map(|result| {
                 (
                     result.program,
@@ -213,8 +220,10 @@ impl RemapConfig {
                 )
             });
 
-
-        self.cache.lock().unwrap().push(((enrichment_tables, merged_schema_definition), res.clone()));
+        self.cache
+            .lock()
+            .unwrap()
+            .push(((enrichment_tables, merged_schema_definition), res.clone()));
 
         res.map_err(Into::into)
     }
@@ -265,12 +274,7 @@ impl TransformConfig for RemapConfig {
         // step.
         let compiled = self
             .compile_vrl_program(enrichment_tables, merged_definition)
-            .map(|(program, _, meaning_list)| {
-                (
-                    program.final_type_info().state,
-                    meaning_list.0,
-                )
-            })
+            .map(|(program, _, meaning_list)| (program.final_type_info().state, meaning_list.0))
             .map_err(|_| ());
 
         let mut dropped_definitions = HashMap::new();
