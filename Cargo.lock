@@ -10174,6 +10174,7 @@ dependencies = [
  "portpicker",
  "postgres-openssl",
  "proptest",
+ "proptest-derive",
  "prost 0.12.4",
  "prost-build 0.12.4",
  "prost-reflect",

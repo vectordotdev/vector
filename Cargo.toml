@@ -133,8 +133,8 @@ chrono = { version = "0.4.37", default-features = false, features = ["clock", "s
 clap = { version = "4.5.4", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 indexmap = { version = "2.2.6", default-features = false, features = ["serde", "std"] }
 pin-project = { version = "1.1.5", default-features = false }
-proptest = "1.4"
-proptest-derive = "0.4.0"
+proptest = { version = "1.4" }
+proptest-derive = { version = "0.4.0" }
 serde_json = { version = "1.0.116", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.201", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.12", default-features = false, features = ["display", "parse"] }
@@ -144,6 +144,8 @@ vrl = { version = "0.15.0", features = ["arbitrary", "cli", "test", "test_framew
 pin-project.workspace = true
 clap.workspace = true
 vrl.workspace = true
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
@@ -952,6 +954,7 @@ transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduc
 codecs-benches = []
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb"]
+proptest = ["dep:proptest", "dep:proptest-derive"]
 
 [[bench]]
 name = "default"
