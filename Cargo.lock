@@ -3778,15 +3778,15 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "816ec7294445779408f36fe57bc5b7fc1cf59664059096c65f905c1c61f58069"
+checksum = "fa82e28a107a8cc405f0839610bdc9b15f1e25ec7d696aa5cf173edbcb1486ab"
 dependencies = [
+ "atomic-waker",
  "bytes 1.6.0",
  "fnv",
  "futures-core",
  "futures-sink",
- "futures-util",
  "http 1.1.0",
  "indexmap 2.2.6",
  "slab",
@@ -10131,7 +10131,7 @@ dependencies = [
  "governor",
  "greptimedb-client",
  "grok",
- "h2 0.4.4",
+ "h2 0.4.5",
  "hash_hasher",
  "hashbrown 0.14.5",
  "headers",
