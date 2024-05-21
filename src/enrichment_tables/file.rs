@@ -4,7 +4,7 @@ use std::{collections::HashMap, fs, hash::Hasher, path::PathBuf, time::SystemTim
 use bytes::Bytes;
 use tracing::trace;
 use vector_lib::configurable::configurable_component;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use vector_lib::enrichment::{Case, Condition, Conditions, IndexHandle, Table};
 use vector_lib::{conversion::Conversion, TimeZone};
 use vrl::value::{ObjectMap, Value};
 
@@ -474,55 +474,53 @@ impl Table for File {
     fn find_table_row<'a>(
         &self,
         case: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&'a [String]>,
-        index: Option<IndexHandle>,
+        index: &[IndexHandle],
     ) -> Result<ObjectMap, String> {
-        match index {
-            None => {
-                // No index has been passed so we need to do a Sequential Scan.
-                single_or_err(self.sequential(self.data.iter(), case, condition, select))
-            }
-            Some(handle) => {
-                let result = self
-                    .indexed(case, condition, handle)?
-                    .ok_or_else(|| "no rows found in index".to_string())?
-                    .iter()
-                    .map(|idx| &self.data[*idx]);
+        if index.is_empty() {
+            let condition = condition[0];
+            // No index has been passed so we need to do a Sequential Scan.
+            single_or_err(self.sequential(self.data.iter(), case, condition, select))
+        } else {
+            let handle = index[0];
+            let condition = condition[0];
+            let result = self
+                .indexed(case, condition, handle)?
+                .ok_or_else(|| "no rows found in index".to_string())?
+                .iter()
+                .map(|idx| &self.data[*idx]);
 
-                // Perform a sequential scan over the indexed result.
-                single_or_err(self.sequential(result, case, condition, select))
-            }
+            // Perform a sequential scan over the indexed result.
+            single_or_err(self.sequential(result, case, condition, select))
         }
     }
 
     fn find_table_rows<'a>(
         &self,
         case: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&'a [String]>,
-        index: Option<IndexHandle>,
+        index: &[IndexHandle],
     ) -> Result<Vec<ObjectMap>, String> {
-        match index {
-            None => {
-                // No index has been passed so we need to do a Sequential Scan.
-                Ok(self
-                    .sequential(self.data.iter(), case, condition, select)
-                    .collect())
-            }
-            Some(handle) => {
-                // Perform a sequential scan over the indexed result.
-                Ok(self
-                    .sequential(
-                        self.indexed(case, condition, handle)?
-                            .iter()
-                            .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
-                        case,
-                        condition,
-                        select,
-                    )
-                    .collect())
-            }
+        if index.is_empty() {
+            // No index has been passed so we need to do a Sequential Scan.
+            Ok(self
+                .sequential(self.data.iter(), case, condition[0], select)
+                .collect())
+        } else {
+            let handle = index[0];
+            // Perform a sequential scan over the indexed result.
+            Ok(self
+                .sequential(
+                    self.indexed(case, condition[0], handle)?
+                        .iter()
+                        .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
+                    case,
+                    condition[0],
+                    select,
+                )
+                .collect())
         }
     }
 
@@ -714,7 +712,7 @@ mod tests {
                 ("field1".into(), Value::from("zirp")),
                 ("field2".into(), Value::from("zurp")),
             ])),
-            file.find_table_row(Case::Sensitive, &[condition], None, None)
+            file.find_table_row(Case::Sensitive, &[&[condition]], None, &[])
         );
     }
 
@@ -782,7 +780,7 @@ mod tests {
                 ("field1".into(), Value::from("zirp")),
                 ("field2".into(), Value::from("zurp")),
             ])),
-            file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
+            file.find_table_row(Case::Sensitive, &[&[condition]], None, &[handle])
         );
     }
 
@@ -814,12 +812,12 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Sensitive,
-                &[Condition::Equals {
+                &[&[Condition::Equals {
                     field: "field1",
                     value: Value::from("zip"),
-                }],
+                }]],
                 None,
-                Some(handle)
+                &[handle]
             )
         );
 
@@ -827,12 +825,12 @@ mod tests {
             Ok(vec![]),
             file.find_table_rows(
                 Case::Sensitive,
-                &[Condition::Equals {
+                &[&[Condition::Equals {
                     field: "field1",
                     value: Value::from("ZiP"),
-                }],
+                }]],
                 None,
-                Some(handle)
+                &[handle]
             )
         );
     }
@@ -874,9 +872,9 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Sensitive,
-                &[condition],
+                &[&[condition]],
                 Some(&["field1".to_string(), "field3".to_string()]),
-                Some(handle)
+                &[handle]
             )
         );
     }
@@ -909,12 +907,12 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Insensitive,
-                &[Condition::Equals {
+                &[&[Condition::Equals {
                     field: "field1",
                     value: Value::from("zip"),
-                }],
+                }]],
                 None,
-                Some(handle)
+                &[handle]
             )
         );
 
@@ -931,12 +929,12 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Insensitive,
-                &[Condition::Equals {
+                &[&[Condition::Equals {
                     field: "field1",
                     value: Value::from("ZiP"),
-                }],
+                }]],
                 None,
-                Some(handle)
+                &[handle]
             )
         );
     }
@@ -1002,7 +1000,7 @@ mod tests {
                     )
                 )
             ])),
-            file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
+            file.find_table_row(Case::Sensitive, &[&conditions], None, &[handle])
         );
     }
 
@@ -1025,7 +1023,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found".to_string()),
-            file.find_table_row(Case::Sensitive, &[condition], None, None)
+            file.find_table_row(Case::Sensitive, &[&[condition]], None, &[])
         );
     }
 
@@ -1050,7 +1048,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found in index".to_string()),
-            file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
+            file.find_table_row(Case::Sensitive, &[&[condition]], None, &[handle])
         );
     }
 }

@@ -8,9 +8,9 @@ impl enrichment::Table for TestEnrichmentTable {
     fn find_table_row<'a>(
         &self,
         _case: enrichment::Case,
-        _condition: &'a [enrichment::Condition<'a>],
+        _condition: &'a enrichment::Conditions<'a>,
         _select: Option<&[String]>,
-        _index: Option<enrichment::IndexHandle>,
+        _index: &[enrichment::IndexHandle],
     ) -> Result<ObjectMap, String> {
         let mut result = ObjectMap::new();
         result.insert("id".into(), Value::from(1));
@@ -23,9 +23,9 @@ impl enrichment::Table for TestEnrichmentTable {
     fn find_table_rows<'a>(
         &self,
         _case: enrichment::Case,
-        _condition: &'a [enrichment::Condition<'a>],
+        _condition: &'a enrichment::Conditions<'a>,
         _select: Option<&[String]>,
-        _index: Option<enrichment::IndexHandle>,
+        _index: &[enrichment::IndexHandle],
     ) -> Result<Vec<ObjectMap>, String> {
         let mut result1 = ObjectMap::new();
         result1.insert("id".into(), Value::from(1));

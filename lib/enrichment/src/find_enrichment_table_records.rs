@@ -4,7 +4,7 @@ use vrl::prelude::*;
 use crate::vrl_util::is_case_sensitive;
 use crate::{
     vrl_util::{self, add_index, evaluate_condition},
-    Case, Condition, IndexHandle, TableRegistry, TableSearch,
+    Case, Condition, Conditions, IndexHandle, TableRegistry, TableSearch,
 };
 
 fn find_enrichment_table_records(
@@ -12,8 +12,8 @@ fn find_enrichment_table_records(
     enrichment_tables: &TableSearch,
     table: &str,
     case_sensitive: Case,
-    condition: &[Condition],
-    index: Option<IndexHandle>,
+    condition: &Conditions,
+    index: &[IndexHandle],
 ) -> Resolved {
     let select = select
         .map(|select| match select {
@@ -112,10 +112,10 @@ impl Function for FindEnrichmentTableRecords {
         let select = arguments.optional("select");
 
         let case_sensitive = is_case_sensitive(&arguments, state)?;
-        let index = Some(
+        let index = vec![
             add_index(registry, &table, case_sensitive, &condition)
                 .map_err(|err| Box::new(err) as Box<_>)?,
-        );
+        ];
 
         Ok(FindEnrichmentTableRecordsFn {
             table,
@@ -133,7 +133,7 @@ impl Function for FindEnrichmentTableRecords {
 pub struct FindEnrichmentTableRecordsFn {
     table: String,
     condition: BTreeMap<KeyString, expression::Expr>,
-    index: Option<IndexHandle>,
+    index: Vec<IndexHandle>,
     select: Option<Box<dyn Expression>>,
     case_sensitive: Case,
     enrichment_tables: TableSearch,
@@ -158,7 +158,7 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
 
         let table = &self.table;
         let case_sensitive = self.case_sensitive;
-        let index = self.index;
+        let index = &self.index;
         let enrichment_tables = &self.enrichment_tables;
 
         find_enrichment_table_records(
@@ -166,7 +166,7 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
             enrichment_tables,
             table,
             case_sensitive,
-            &condition,
+            &[&condition],
             index,
         )
     }
@@ -196,7 +196,7 @@ mod tests {
                 "field".into(),
                 expression::Literal::from("value").into(),
             )]),
-            index: Some(IndexHandle(999)),
+            index: vec![IndexHandle(999)],
             select: None,
             case_sensitive: Case::Sensitive,
             enrichment_tables: registry.as_readonly(),
