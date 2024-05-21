@@ -8184,9 +8184,9 @@ dependencies = [
 
 [[package]]
 name = "serde-toml-merge"
-version = "0.3.6"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88075e75b01384301454b1c188243552c674263c0c0c3c7ed5dd82291b20798f"
+checksum = "e75a6b6c577215161d30ba4e13fb493c435a8b4140c442e590b61b4b2a27a226"
 dependencies = [
  "toml",
 ]
