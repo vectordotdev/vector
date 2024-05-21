@@ -1,16 +1,16 @@
 use std::collections::HashSet;
 
+use crate::event::{KeyString, LogEvent, Value};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
 use vrl::event_path;
 
-use crate::event::{KeyString, LogEvent, Value};
-
 /// Strategies for merging events.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(rename_all = "snake_case")]
 pub enum MergeStrategy {
     /// Discard all but the first value found.
