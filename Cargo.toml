@@ -440,7 +440,7 @@ governor = { version = "0.6.3", default-features = false, features = [
   "std",
 ], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
-h2 = { version = "0.4.3", default-features = false, optional = true }
+h2 = { version = "0.4.5", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = [
   "ahash",
