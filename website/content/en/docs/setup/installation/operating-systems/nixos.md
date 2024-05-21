@@ -128,5 +128,5 @@ See also the [Nix] package page.
 [nix]: /docs/setup/installation/package-managers/nix
 [nixos]: https://www.nixos.org
 [nixos-search]: https://search.nixos.org/options?query=services.vector
-[nixos-tests-vector]: https://github.com/NixOS/nixpkgs/blob/master/nixos/tests/vector.nix
+[nixos-tests-vector]: https://github.com/NixOS/nixpkgs/tree/master/nixos/tests/vector/
 [nixpkg-vector]: https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/logging/vector.nix
