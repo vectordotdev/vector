@@ -498,7 +498,7 @@ mod tests {
                     sources: IndexMap::from([(
                         "foo",
                         vec![SourceOutput::new_logs(
-                            DataType::all(),
+                            DataType::all_bits(),
                             Definition::default_legacy_namespace(),
                         )],
                     )]),
@@ -513,7 +513,7 @@ mod tests {
                     sources: IndexMap::from([(
                         "source-foo",
                         vec![SourceOutput::new_logs(
-                            DataType::all(),
+                            DataType::all_bits(),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("foo"),
                                 Kind::integer().or_bytes(),
@@ -540,7 +540,7 @@ mod tests {
                         (
                             "source-foo",
                             vec![SourceOutput::new_logs(
-                                DataType::all(),
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
                                     Kind::integer().or_bytes(),
@@ -551,7 +551,7 @@ mod tests {
                         (
                             "source-bar",
                             vec![SourceOutput::new_logs(
-                                DataType::all(),
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
                                     Kind::timestamp(),
@@ -589,7 +589,7 @@ mod tests {
                         (
                             "source-foo",
                             vec![SourceOutput::new_logs(
-                                DataType::all(),
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
                                     Kind::boolean(),
@@ -600,7 +600,7 @@ mod tests {
                         (
                             "source-bar",
                             vec![SourceOutput::new_logs(
-                                DataType::all(),
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("bar"),
                                     Kind::integer(),
@@ -614,7 +614,7 @@ mod tests {
                         (
                             vec![OutputId::from("source-foo")],
                             vec![TransformOutput::new(
-                                DataType::all(),
+                                DataType::all_bits(),
                                 [(
                                     "source-foo".into(),
                                     Definition::empty_legacy_namespace().with_event_field(
@@ -663,7 +663,7 @@ mod tests {
                         (
                             "Source 1",
                             vec![SourceOutput::new_logs(
-                                DataType::all(),
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("source-1"),
                                     Kind::boolean(),
@@ -674,7 +674,7 @@ mod tests {
                         (
                             "Source 2",
                             vec![SourceOutput::new_logs(
-                                DataType::all(),
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("source-2"),
                                     Kind::integer(),
@@ -689,7 +689,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 1")],
                                 vec![TransformOutput::new(
-                                    DataType::all(),
+                                    DataType::all_bits(),
                                     [(
                                         "Source 1".into(),
                                         Definition::empty_legacy_namespace().with_event_field(
@@ -707,7 +707,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![TransformOutput::new(
-                                    DataType::all(),
+                                    DataType::all_bits(),
                                     [(
                                         "Source 2".into(),
                                         Definition::empty_legacy_namespace().with_event_field(
@@ -725,7 +725,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![TransformOutput::new(
-                                    DataType::all(),
+                                    DataType::all_bits(),
                                     [(
                                         "Source 2".into(),
                                         Definition::empty_legacy_namespace().with_event_field(
@@ -743,7 +743,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![TransformOutput::new(
-                                    DataType::all(),
+                                    DataType::all_bits(),
                                     [(
                                         "Source 2".into(),
                                         Definition::empty_legacy_namespace().with_event_field(
@@ -761,7 +761,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Transform 3"), OutputId::from("Transform 4")],
                                 vec![TransformOutput::new(
-                                    DataType::all(),
+                                    DataType::all_bits(),
                                     [(
                                         "Transform 3".into(),
                                         Definition::empty_legacy_namespace().with_event_field(

@@ -128,13 +128,13 @@ impl TransformConfig for RouteConfig {
             .route
             .keys()
             .map(|output_name| {
-                TransformOutput::new(DataType::all(), clone_input_definitions(input_definitions))
+                TransformOutput::new(DataType::all_bits(), clone_input_definitions(input_definitions))
                     .with_port(output_name)
             })
             .collect();
         if self.reroute_unmatched {
             result.push(
-                TransformOutput::new(DataType::all(), clone_input_definitions(input_definitions))
+                TransformOutput::new(DataType::all_bits(), clone_input_definitions(input_definitions))
                     .with_port(UNMATCHED_ROUTE),
             );
         }
@@ -209,7 +209,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    TransformOutput::new(DataType::all(), HashMap::new())
+                    TransformOutput::new(DataType::all_bits(), HashMap::new())
                         .with_port(output_name.to_owned())
                 })
                 .collect(),
@@ -255,7 +255,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    TransformOutput::new(DataType::all(), HashMap::new())
+                    TransformOutput::new(DataType::all_bits(), HashMap::new())
                         .with_port(output_name.to_owned())
                 })
                 .collect(),
@@ -298,7 +298,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    TransformOutput::new(DataType::all(), HashMap::new())
+                    TransformOutput::new(DataType::all_bits(), HashMap::new())
                         .with_port(output_name.to_owned())
                 })
                 .collect(),
@@ -343,7 +343,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    TransformOutput::new(DataType::all(), HashMap::new())
+                    TransformOutput::new(DataType::all_bits(), HashMap::new())
                         .with_port(output_name.to_owned())
                 })
                 .collect(),

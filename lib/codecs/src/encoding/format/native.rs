@@ -20,7 +20,7 @@ impl NativeSerializerConfig {
 
     /// The data type of events that are accepted by `NativeSerializer`.
     pub fn input_type(&self) -> DataType {
-        DataType::all()
+        DataType::all_bits()
     }
 
     /// The schema required by the serializer.
