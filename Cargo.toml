@@ -357,19 +357,10 @@ async-graphql = { version = "7.0.5", default-features = false, optional = true, 
 async-graphql-warp = { version = "7.0.5", default-features = false, optional = true }
 
 # API client
-crossterm = { version = "0.27.0", default-features = false, features = [
-  "event-stream",
-  "windows",
-], optional = true }
-num-format = { version = "0.4.4", default-features = false, features = [
-  "with-num-bigint",
-], optional = true }
-number_prefix = { version = "0.4.0", default-features = false, features = [
-  "std",
-], optional = true }
-ratatui = { version = "0.26.2", optional = true, default-features = false, features = [
-  "crossterm",
-] }
+crossterm = { version = "0.27.0", default-features = false, features = ["event-stream", "windows"], optional = true }
+num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"], optional = true }
+number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
+ratatui = { version = "0.26.3", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
 
