@@ -25,3 +25,6 @@ echo "OPENSSL_SRC_PERL=C:\Strawberry\perl\bin\perl.exe" | Out-File -FilePath $en
 
 # Force the proto-build crate to avoid building the vendored protoc.
 echo "PROTO_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+# Workaround for https://github.com/nextest-rs/nextest/issues/1493
+echo "RUSTUP_WINDOWS_PATH_ADD_BIN=1" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
