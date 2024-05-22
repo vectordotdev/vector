@@ -133,10 +133,10 @@ chrono = { version = "0.4.37", default-features = false, features = ["clock", "s
 clap = { version = "4.5.4", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 indexmap = { version = "2.2.6", default-features = false, features = ["serde", "std"] }
 pin-project = { version = "1.1.5", default-features = false }
-proptest = "1.4"
-proptest-derive = "0.4.0"
+proptest = { version = "1.4" }
+proptest-derive = { version = "0.4.0" }
 serde_json = { version = "1.0.116", default-features = false, features = ["raw_value", "std"] }
-serde = { version = "1.0.201", default-features = false, features = ["alloc", "derive", "rc"] }
+serde = { version = "1.0.202", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.12", default-features = false, features = ["display", "parse"] }
 vrl = { version = "0.15.0", features = ["arbitrary", "cli", "test", "test_framework"] }
 
@@ -144,6 +144,8 @@ vrl = { version = "0.15.0", features = ["arbitrary", "cli", "test", "test_framew
 pin-project.workspace = true
 clap.workspace = true
 vrl.workspace = true
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
@@ -213,7 +215,7 @@ tower = { version = "0.4.13", default-features = false, features = ["buffer", "l
 tower-http = { version = "0.4.4", default-features = false, features = ["compression-full", "decompression-gzip", "trace"]}
 # Serde
 serde.workspace = true
-serde-toml-merge = { version = "0.3.6", default-features = false }
+serde-toml-merge = { version = "0.3.7", default-features = false }
 serde_bytes = { version = "0.11.14", default-features = false, features = ["std"], optional = true }
 serde_json.workspace = true
 serde_with = { version = "3.8.1", default-features = false, features = ["macros", "std"] }
@@ -280,7 +282,7 @@ futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.6.3", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
-h2 = { version = "0.4.3", default-features = false, optional = true }
+h2 = { version = "0.4.5", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.9", default-features = false }
@@ -296,7 +298,7 @@ infer = { version = "0.15.0", default-features = false, optional = true}
 indoc = { version = "2.0.5", default-features = false }
 inventory = { version = "0.3.15", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
-itertools = { version = "0.12.1", default-features = false, optional = false, features = ["use_alloc"] }
+itertools = { version = "0.13.0", default-features = false, optional = false, features = ["use_alloc"] }
 k8s-openapi = { version = "0.18.0", default-features = false, features = ["api", "v1_26"], optional = true }
 kube = { version = "0.82.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.1", default-features = false, optional = true }
@@ -316,7 +318,7 @@ ordered-float = { version = "4.2.0", default-features = false }
 paste = "1.0.15"
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "6.2.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
+pulsar = { version = "6.3.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.35.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
@@ -351,7 +353,7 @@ arr_macro = { version = "0.2.1" }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.9.7", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
+mlua = { version = "0.9.8", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7.0"
@@ -375,7 +377,7 @@ azure_storage_blobs = { version = "0.17", default-features = false, features = [
 azure_storage = { version = "0.17", default-features = false }
 base64 = "0.22.1"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
-itertools = { version = "0.12.1", default-features = false, features = ["use_alloc"] }
+itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
 libc = "0.2.154"
 similar-asserts = "1.5.0"
 proptest.workspace = true
@@ -636,7 +638,7 @@ transforms-log_to_metric = []
 transforms-lua = ["dep:mlua", "vector-lib/lua"]
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
-transforms-reduce = []
+transforms-reduce = ["transforms-impl-reduce"]
 transforms-remap = []
 transforms-route = []
 transforms-sample = ["transforms-impl-sample"]
@@ -646,6 +648,7 @@ transforms-throttle = ["dep:governor"]
 # Implementations of transforms
 transforms-impl-sample = []
 transforms-impl-dedupe = ["dep:lru"]
+transforms-impl-reduce = []
 
 # Sinks
 sinks = ["sinks-logs", "sinks-metrics"]
@@ -952,6 +955,7 @@ transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduc
 codecs-benches = []
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb"]
+proptest = ["dep:proptest", "dep:proptest-derive"]
 
 [[bench]]
 name = "default"
