@@ -29,7 +29,7 @@ remap: functions: parse_etld: {
 			description: """
 				Can be provided to use a different public suffix list.
 
-				By default https://publicsuffix.org/list/public_suffix_list.dat is used.
+				By default, https://publicsuffix.org/list/public_suffix_list.dat is used.
 				"""
 			required: false
 			type: ["string"]
