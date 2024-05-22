@@ -133,7 +133,7 @@ impl Function for FindEnrichmentTableRecords {
         let index = condition
             .iter()
             .map(|condition| {
-                add_index(registry, &table, case_sensitive, &condition)
+                add_index(registry, &table, case_sensitive, condition)
                     .map_err(|err| Box::new(err) as Box<_>)
             })
             .collect::<Result<Vec<_>, _>>()?;

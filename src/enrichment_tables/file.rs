@@ -611,9 +611,6 @@ fn merge_sorted<T>(left: &[T], right: &[T]) -> Vec<T>
 where
     T: PartialOrd + Copy + core::fmt::Debug,
 {
-    dbg!(left);
-    dbg!(right);
-
     let mut result = Vec::new();
     let mut leftidx = 0;
     let mut rightidx = 0;
@@ -625,7 +622,7 @@ where
                     result.push(*leftval);
                     leftidx += 1;
                     rightidx += 1;
-                } else if left < right {
+                } else if leftval < rightval {
                     result.push(*leftval);
                     leftidx += 1;
                 } else {
@@ -642,7 +639,6 @@ where
                 rightidx += 1;
             }
             (None, None) => {
-                dbg!(&result);
                 return result;
             }
         }
@@ -781,7 +777,7 @@ mod tests {
                 ("field1".into(), Value::from("zirp")),
                 ("field2".into(), Value::from("zurp")),
             ])),
-            file.find_table_row(Case::Sensitive, &[&[condition]], None, &[])
+            file.find_table_row(Case::Sensitive, &[vec![condition]], None, &[])
         );
     }
 
@@ -849,7 +845,7 @@ mod tests {
                 ("field1".into(), Value::from("zirp")),
                 ("field2".into(), Value::from("zurp")),
             ])),
-            file.find_table_row(Case::Sensitive, &[&[condition]], None, &[handle])
+            file.find_table_row(Case::Sensitive, &[vec![condition]], None, &[handle])
         );
     }
 
@@ -881,7 +877,7 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Sensitive,
-                &[&[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "field1",
                     value: Value::from("zip"),
                 }]],
@@ -894,7 +890,7 @@ mod tests {
             Ok(vec![]),
             file.find_table_rows(
                 Case::Sensitive,
-                &[&[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "field1",
                     value: Value::from("ZiP"),
                 }]],
@@ -941,7 +937,7 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Sensitive,
-                &[&[condition]],
+                &[vec![condition]],
                 Some(&["field1".to_string(), "field3".to_string()]),
                 &[handle]
             )
@@ -976,7 +972,7 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Insensitive,
-                &[&[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "field1",
                     value: Value::from("zip"),
                 }]],
@@ -998,7 +994,7 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Insensitive,
-                &[&[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "field1",
                     value: Value::from("ZiP"),
                 }]],
@@ -1038,7 +1034,7 @@ mod tests {
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
 
-        let conditions = [
+        let conditions = vec![
             Condition::Equals {
                 field: "field1",
                 value: "zip".into(),
@@ -1069,7 +1065,7 @@ mod tests {
                     )
                 )
             ])),
-            file.find_table_row(Case::Sensitive, &[&conditions], None, &[handle])
+            file.find_table_row(Case::Sensitive, &[conditions], None, &[handle])
         );
     }
 
@@ -1092,7 +1088,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found".to_string()),
-            file.find_table_row(Case::Sensitive, &[&[condition]], None, &[])
+            file.find_table_row(Case::Sensitive, &[vec![condition]], None, &[])
         );
     }
 
@@ -1117,7 +1113,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found in index".to_string()),
-            file.find_table_row(Case::Sensitive, &[&[condition]], None, &[handle])
+            file.find_table_row(Case::Sensitive, &[vec![condition]], None, &[handle])
         );
     }
 
@@ -1159,10 +1155,31 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Sensitive,
-                &[condition1.as_slice(), condition2.as_slice()],
+                &[condition1, condition2],
                 None,
                 &[handle, handle]
             )
+        );
+    }
+
+    #[test]
+    fn merge_sorted_merges() {
+        assert_eq!(
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+            merge_sorted(&[1, 3, 5, 7, 9], &[2, 4, 6, 8])
+        );
+    }
+
+    #[test]
+    fn merge_sorted_removes_dedupes() {
+        assert_eq!(
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+            merge_sorted(&[1, 2, 3, 4, 5, 6, 7, 8, 9], &[2, 4, 6, 8])
+        );
+
+        assert_eq!(
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+            merge_sorted(&[2, 4, 6, 8], &[1, 2, 3, 4, 5, 6, 7, 8, 9])
         );
     }
 }

@@ -264,7 +264,7 @@ mod tests {
         .unwrap()
         .find_table_rows(
             Case::Insensitive,
-            &[&[Condition::Equals {
+            &[vec![Condition::Equals {
                 field: "ip",
                 value: ip.into(),
             }]],

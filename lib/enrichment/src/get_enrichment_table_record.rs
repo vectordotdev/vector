@@ -124,7 +124,7 @@ impl Function for GetEnrichmentTableRecord {
         let index = condition
             .iter()
             .map(|condition| {
-                add_index(registry, &table, case_sensitive, &condition)
+                add_index(registry, &table, case_sensitive, condition)
                     .map_err(|err| Box::new(err) as Box<_>)
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -184,7 +184,7 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
             table,
             case_sensitive,
             &condition,
-            &index,
+            index,
         )
     }
 
@@ -209,10 +209,10 @@ mod tests {
         let registry = get_table_registry();
         let func = GetEnrichmentTableRecordFn {
             table: "dummy1".to_string(),
-            condition: BTreeMap::from([(
+            condition: vec![BTreeMap::from([(
                 "field".into(),
                 expression::Literal::from("value").into(),
-            )]),
+            )])],
             index: vec![IndexHandle(999)],
             select: None,
             case_sensitive: Case::Sensitive,

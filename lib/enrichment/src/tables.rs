@@ -320,7 +320,7 @@ mod tests {
             tables.find_table_row(
                 "dummy1",
                 Case::Sensitive,
-                &[&[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "thing",
                     value: Value::from("thang"),
                 }]],
@@ -361,7 +361,7 @@ mod tests {
             tables_search.find_table_row(
                 "dummy1",
                 Case::Sensitive,
-                &[&[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "thing",
                     value: Value::from("thang"),
                 }]],
