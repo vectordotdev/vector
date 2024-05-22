@@ -419,6 +419,7 @@ podman
 postgresql
 proxyuser
 pseudocode
+psl
 pushgateway
 qwerty
 rabbitmq
