@@ -1150,7 +1150,7 @@ transforms-log_to_metric = []
 transforms-lua = ["dep:mlua", "vector-lib/lua"]
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
-transforms-reduce = []
+transforms-reduce = ["transforms-impl-reduce"]
 transforms-remap = []
 transforms-route = []
 transforms-sample = ["transforms-impl-sample"]
@@ -1160,6 +1160,7 @@ transforms-throttle = ["dep:governor"]
 # Implementations of transforms
 transforms-impl-sample = []
 transforms-impl-dedupe = ["dep:lru"]
+transforms-impl-reduce = []
 
 # Sinks
 sinks = ["sinks-logs", "sinks-metrics"]
