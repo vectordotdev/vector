@@ -136,7 +136,7 @@ pin-project = { version = "1.1.5", default-features = false }
 proptest = { version = "1.4" }
 proptest-derive = { version = "0.4.0" }
 serde_json = { version = "1.0.116", default-features = false, features = ["raw_value", "std"] }
-serde = { version = "1.0.201", default-features = false, features = ["alloc", "derive", "rc"] }
+serde = { version = "1.0.202", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.12", default-features = false, features = ["display", "parse"] }
 vrl = { version = "0.15.0", features = ["arbitrary", "cli", "test", "test_framework"] }
 
@@ -282,7 +282,7 @@ futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.1", default-features = false }
 governor = { version = "0.6.3", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
-h2 = { version = "0.4.3", default-features = false, optional = true }
+h2 = { version = "0.4.5", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.9", default-features = false }
@@ -318,7 +318,7 @@ ordered-float = { version = "4.2.0", default-features = false }
 paste = "1.0.15"
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "6.2.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
+pulsar = { version = "6.3.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.35.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
