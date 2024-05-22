@@ -50,6 +50,13 @@ pub struct GreptimeDBLogsConfig {
     #[configurable(metadata(docs::examples = "password"))]
     #[serde(default)]
     pub password: Option<SensitiveString>,
+    /// Set gRPC compreesion encoding for the request
+    /// Default to none, `gzip` or `zstd` is supported.
+    ///
+    /// This is required if your instance has authentication enabled.
+    #[configurable(metadata(docs::examples = "grpc_compression"))]
+    #[serde(default)]
+    pub grpc_compression: Option<String>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -82,7 +89,7 @@ impl SinkConfig for GreptimeDBLogsConfig {
             .settings(request_settings, GreptimeDBRetryLogic)
             .service(GreptimeDBService::try_new(self)?);
         let sink = sink::GreptimeDBLogsSink {
-            _service: service,
+            service: service,
             batch_settings: self.batch.into_batcher_settings()?,
             table: self.table.clone(),
         };

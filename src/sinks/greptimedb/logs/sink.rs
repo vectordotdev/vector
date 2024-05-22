@@ -5,7 +5,7 @@ use crate::sinks::{
 };
 
 pub struct GreptimeDBLogsSink {
-    pub(super) _service: Svc<GreptimeDBService, GreptimeDBRetryLogic>,
+    pub(super) service: Svc<GreptimeDBService, GreptimeDBRetryLogic>,
     pub(super) batch_settings: BatcherSettings,
     pub(super) table: String,
 }
@@ -16,7 +16,7 @@ impl GreptimeDBLogsSink {
             .map(|event| event.into_log())
             .batched(self.batch_settings.as_byte_size_config())
             .map(|event| GreptimeDBRequest::from_logs(event, self.table.clone()))
-            .into_driver(self._service)
+            .into_driver(self.service)
             .protocol("grpc")
             .run()
             .await

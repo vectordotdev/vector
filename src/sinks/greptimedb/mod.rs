@@ -6,7 +6,7 @@ use vector_lib::sensitive_string::SensitiveString;
 use crate::sinks::prelude::*;
 use greptimedb_ingester::api::v1::auth_header::AuthScheme;
 use greptimedb_ingester::api::v1::*;
-use greptimedb_ingester::channel_manager::*;
+use greptimedb_ingester::{channel_manager::*, ClientBuilder, Compression};
 use greptimedb_ingester::{Client, Database, Error as GreptimeError};
 
 use self::logs::config::GreptimeDBLogsConfig;
@@ -70,18 +70,31 @@ struct GreptimeDBService {
 }
 
 fn new_client_from_config(config: &GreptimeDBServiceConfig) -> crate::Result<Client> {
+    let mut builder = ClientBuilder::default().peers(vec![&config.endpoint]);
+
+    if let Some(compression) = config.grpc_compression.as_ref() {
+        let compression = match compression.as_str() {
+            "gzip" => Compression::Gzip,
+            "zstd" => Compression::Zstd,
+            _ => {
+                warn!(message = "Unknown gRPC compression type: {compression}, disabled.");
+                Compression::None
+            }
+        };
+        builder = builder.compression(compression);
+    }
+
     if let Some(tls_config) = &config.tls {
         let channel_config = ChannelConfig {
             client_tls: Some(try_from_tls_config(tls_config)?),
             ..Default::default()
         };
-        Ok(Client::with_manager_and_urls(
-            ChannelManager::with_tls_config(channel_config).map_err(Box::new)?,
-            vec![&config.endpoint],
-        ))
-    } else {
-        Ok(Client::with_urls(vec![&config.endpoint]))
+
+        builder = builder
+            .channel_manager(ChannelManager::with_tls_config(channel_config).map_err(Box::new)?);
     }
+
+    Ok(builder.build())
 }
 
 fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption> {
@@ -126,6 +139,7 @@ struct GreptimeDBServiceConfig {
     dbname: String,
     username: Option<String>,
     password: Option<SensitiveString>,
+    grpc_compression: Option<String>,
     tls: Option<TlsConfig>,
 }
 
@@ -136,7 +150,7 @@ impl From<&GreptimeDBLogsConfig> for GreptimeDBServiceConfig {
             dbname: val.dbname.clone(),
             username: val.username.clone(),
             password: val.password.clone(),
-
+            grpc_compression: val.grpc_compression.clone(),
             tls: val.tls.clone(),
         }
     }
@@ -149,6 +163,7 @@ impl From<&GreptimeDBConfig> for GreptimeDBServiceConfig {
             dbname: val.dbname.clone(),
             username: val.username.clone(),
             password: val.password.clone(),
+            grpc_compression: val.grpc_compression.clone(),
             tls: val.tls.clone(),
         }
     }
