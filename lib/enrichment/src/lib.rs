@@ -16,7 +16,7 @@ use vrl::value::{ObjectMap, Value};
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
 
-pub type Conditions<'a> = [&'a [Condition<'a>]];
+pub type Conditions<'a> = [Vec<Condition<'a>>];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Condition<'a> {

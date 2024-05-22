@@ -390,19 +390,49 @@ impl File {
         &'a self,
         data: I,
         case: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&'a [String]>,
     ) -> impl Iterator<Item = ObjectMap> + 'a
     where
         I: Iterator<Item = &'a Vec<Value>> + 'a,
     {
         data.filter_map(move |row| {
-            if self.row_equals(case, condition, row) {
+            if condition
+                .iter()
+                .any(|condition| self.row_equals(case, condition, row))
+            {
                 Some(self.add_columns(select, row))
             } else {
                 None
             }
         })
+    }
+
+    /// Returns the union of the results of each condition.
+    /// Assumes that the conditions are ordered in the same order as the indexes.
+    fn union<'a>(
+        &'a self,
+        case: Case,
+        condition: &'a Conditions<'a>,
+        handle: &[IndexHandle],
+    ) -> Result<Option<Vec<usize>>, String> {
+        let mut accum = None;
+
+        for (condition, handle) in condition.iter().zip(handle) {
+            match accum {
+                None => {
+                    accum = self.indexed(case, condition, *handle)?.cloned();
+                }
+                Some(ref accuminner) => match self.indexed(case, condition, *handle)? {
+                    None => {}
+                    Some(indexed) => {
+                        accum = Some(merge_sorted(accuminner, indexed));
+                    }
+                },
+            }
+        }
+
+        Ok(accum)
     }
 
     fn indexed<'a>(
@@ -479,17 +509,13 @@ impl Table for File {
         index: &[IndexHandle],
     ) -> Result<ObjectMap, String> {
         if index.is_empty() {
-            let condition = condition[0];
             // No index has been passed so we need to do a Sequential Scan.
             single_or_err(self.sequential(self.data.iter(), case, condition, select))
         } else {
-            let handle = index[0];
-            let condition = condition[0];
             let result = self
-                .indexed(case, condition, handle)?
-                .ok_or_else(|| "no rows found in index".to_string())?
-                .iter()
-                .map(|idx| &self.data[*idx]);
+                .union(case, condition, index)?
+                .ok_or_else(|| "no rows found in index".to_string())?;
+            let result = result.iter().map(|idx| &self.data[*idx]);
 
             // Perform a sequential scan over the indexed result.
             single_or_err(self.sequential(result, case, condition, select))
@@ -506,18 +532,17 @@ impl Table for File {
         if index.is_empty() {
             // No index has been passed so we need to do a Sequential Scan.
             Ok(self
-                .sequential(self.data.iter(), case, condition[0], select)
+                .sequential(self.data.iter(), case, condition, select)
                 .collect())
         } else {
-            let handle = index[0];
             // Perform a sequential scan over the indexed result.
             Ok(self
                 .sequential(
-                    self.indexed(case, condition[0], handle)?
+                    self.union(case, condition, index)?
                         .iter()
                         .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
                     case,
-                    condition[0],
+                    condition,
                     select,
                 )
                 .collect())
@@ -577,6 +602,50 @@ impl std::fmt::Debug for File {
             self.data.len(),
             self.indexes.len()
         )
+    }
+}
+
+/// Merges two slices into a single sorted vector.
+/// The slices must be sorted.
+fn merge_sorted<T>(left: &[T], right: &[T]) -> Vec<T>
+where
+    T: PartialOrd + Copy + core::fmt::Debug,
+{
+    dbg!(left);
+    dbg!(right);
+
+    let mut result = Vec::new();
+    let mut leftidx = 0;
+    let mut rightidx = 0;
+
+    loop {
+        match (left.get(leftidx), right.get(rightidx)) {
+            (Some(leftval), Some(rightval)) => {
+                if leftval == rightval {
+                    result.push(*leftval);
+                    leftidx += 1;
+                    rightidx += 1;
+                } else if left < right {
+                    result.push(*leftval);
+                    leftidx += 1;
+                } else {
+                    result.push(*rightval);
+                    rightidx += 1;
+                }
+            }
+            (Some(leftval), None) => {
+                result.push(*leftval);
+                leftidx += 1;
+            }
+            (None, Some(rightval)) => {
+                result.push(*rightval);
+                rightidx += 1;
+            }
+            (None, None) => {
+                dbg!(&result);
+                return result;
+            }
+        }
     }
 }
 
@@ -1049,6 +1118,51 @@ mod tests {
         assert_eq!(
             Err("no rows found in index".to_string()),
             file.find_table_row(Case::Sensitive, &[&[condition]], None, &[handle])
+        );
+    }
+
+    #[test]
+    fn finds_union_with_single_index() {
+        let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
+            vec![
+                vec!["zip".into(), "zup".into()],
+                vec!["zirp".into(), "zurp".into()],
+                vec!["zip".into(), "zoop".into()],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field2"]).unwrap();
+
+        let condition1 = vec![Condition::Equals {
+            field: "field2",
+            value: Value::from("zup"),
+        }];
+
+        let condition2 = vec![Condition::Equals {
+            field: "field2",
+            value: Value::from("zoop"),
+        }];
+
+        assert_eq!(
+            Ok(vec![
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
+                ]),
+            ]),
+            file.find_table_rows(
+                Case::Sensitive,
+                &[condition1.as_slice(), condition2.as_slice()],
+                None,
+                &[handle, handle]
+            )
         );
     }
 }

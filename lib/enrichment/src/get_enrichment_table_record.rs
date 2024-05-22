@@ -54,7 +54,7 @@ impl Function for GetEnrichmentTableRecord {
             },
             Parameter {
                 keyword: "condition",
-                kind: kind::OBJECT,
+                kind: kind::OBJECT | kind::ARRAY,
                 required: true,
             },
             Parameter {
@@ -99,13 +99,35 @@ impl Function for GetEnrichmentTableRecord {
             .try_bytes_utf8_lossy()
             .expect("table is not valid utf8")
             .into_owned();
-        let condition = arguments.required_object("condition")?;
+
+        let condition = arguments
+            .required_array("condition")
+            .and_then(|arr| {
+                arr.into_iter()
+                    .map(|expr| match expr {
+                        expression::Expr::Container(expression::Container {
+                            variant: expression::Variant::Object(object),
+                        }) => Ok((*object).clone()),
+                        expr => Err(function::Error::UnexpectedExpression {
+                            keyword: "condition",
+                            expected: "object",
+                            expr,
+                        }),
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .or_else(|_| arguments.required_object("condition").map(|obj| vec![obj]))?;
 
         let select = arguments.optional("select");
 
         let case_sensitive = is_case_sensitive(&arguments, state)?;
-        let index = vec![add_index(registry, &table, case_sensitive, &condition)
-            .map_err(|err| Box::new(err) as Box<_>)?];
+        let index = condition
+            .iter()
+            .map(|condition| {
+                add_index(registry, &table, case_sensitive, &condition)
+                    .map_err(|err| Box::new(err) as Box<_>)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(GetEnrichmentTableRecordFn {
             table,
@@ -122,7 +144,7 @@ impl Function for GetEnrichmentTableRecord {
 #[derive(Debug, Clone)]
 pub struct GetEnrichmentTableRecordFn {
     table: String,
-    condition: BTreeMap<KeyString, expression::Expr>,
+    condition: Vec<BTreeMap<KeyString, expression::Expr>>,
     index: Vec<IndexHandle>,
     select: Option<Box<dyn Expression>>,
     case_sensitive: Case,
@@ -134,11 +156,16 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
         let condition = self
             .condition
             .iter()
-            .map(|(key, value)| {
-                let value = value.resolve(ctx)?;
-                evaluate_condition(key, value)
+            .map(|condition| {
+                condition
+                    .iter()
+                    .map(|(key, value)| {
+                        let value = value.resolve(ctx)?;
+                        evaluate_condition(key, value)
+                    })
+                    .collect::<ExpressionResult<Vec<Condition>>>()
             })
-            .collect::<ExpressionResult<Vec<Condition>>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         let select = self
             .select
@@ -156,7 +183,7 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
             enrichment_tables,
             table,
             case_sensitive,
-            &[&condition],
+            &condition,
             &index,
         )
     }
