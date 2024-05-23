@@ -473,14 +473,5 @@ components: sources: kubernetes_logs: {
 	telemetry: metrics: {
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
 		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
-		k8s_reflector_desyncs_total:            components.sources.internal_metrics.output.metrics.k8s_reflector_desyncs_total
-		k8s_state_ops_total:                    components.sources.internal_metrics.output.metrics.k8s_state_ops_total
-		k8s_stream_chunks_processed_total:      components.sources.internal_metrics.output.metrics.k8s_stream_chunks_processed_total
-		k8s_stream_processed_bytes_total:       components.sources.internal_metrics.output.metrics.k8s_stream_processed_bytes_total
-		k8s_watch_requests_invoked_total:       components.sources.internal_metrics.output.metrics.k8s_watch_requests_invoked_total
-		k8s_watch_requests_failed_total:        components.sources.internal_metrics.output.metrics.k8s_watch_requests_failed_total
-		k8s_watch_stream_failed_total:          components.sources.internal_metrics.output.metrics.k8s_watch_stream_failed_total
-		k8s_watch_stream_items_obtained_total:  components.sources.internal_metrics.output.metrics.k8s_watch_stream_items_obtained_total
-		k8s_watcher_http_error_total:           components.sources.internal_metrics.output.metrics.k8s_watcher_http_error_total
 	}
 }
