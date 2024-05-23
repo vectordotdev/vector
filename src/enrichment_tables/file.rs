@@ -1185,6 +1185,58 @@ mod tests {
     }
 
     #[test]
+    fn finds_union_with_multiple_indexes() {
+        let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
+            vec![
+                vec!["zip".into(), "zup".into()],
+                vec!["zirp".into(), "zurp".into()],
+                vec!["zirp".into(), "zoop".into()],
+                vec!["zip".into(), "zoop".into()],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let handle1 = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+        let handle2 = file.add_index(Case::Sensitive, &["field2"]).unwrap();
+
+        let condition1 = vec![Condition::Equals {
+            field: "field1",
+            value: Value::from("zip"),
+        }];
+
+        let condition2 = vec![Condition::Equals {
+            field: "field2",
+            value: Value::from("zurp"),
+        }];
+
+        assert_eq!(
+            Ok(vec![
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zirp")),
+                    ("field2".into(), Value::from("zurp")),
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
+                ]),
+            ]),
+            file.find_table_rows(
+                Case::Sensitive,
+                &[condition1, condition2],
+                None,
+                &[handle1, handle2]
+            )
+        );
+    }
+
+
+    #[test]
     fn merge_sorted_merges() {
         assert_eq!(
             vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
