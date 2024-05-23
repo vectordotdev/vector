@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use snafu::Snafu;
 
 pub mod dedupe;
+pub mod reduce;
 pub mod sample;
 
 #[cfg(feature = "transforms-aggregate")]
@@ -19,8 +20,6 @@ pub mod log_to_metric;
 pub mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
-#[cfg(feature = "transforms-reduce")]
-pub mod reduce;
 #[cfg(feature = "transforms-remap")]
 pub mod remap;
 #[cfg(feature = "transforms-route")]
