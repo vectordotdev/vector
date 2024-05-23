@@ -639,13 +639,19 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(DataType::all_bits(), Definition::any())],
+                outputs: vec![SourceOutput::new_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(DataType::all_bits(), Definition::any())],
+                outputs: vec![SourceOutput::new_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
             },
         );
         graph.nodes.insert(
@@ -670,7 +676,10 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(DataType::all_bits(), Definition::any())],
+                outputs: vec![SourceOutput::new_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
             },
         );
         graph.nodes.insert(
