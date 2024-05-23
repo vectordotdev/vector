@@ -1,2 +1,2 @@
-#[cfg(any(feature = "sinks-gcp-chronicle", feature = "sinks-gcp"))]
+#[cfg(feature = "sinks-gcp-chronicle")]
 pub mod chronicle_unstructured;
