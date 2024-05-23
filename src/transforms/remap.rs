@@ -316,12 +316,12 @@ impl TransformConfig for RemapConfig {
             );
         }
 
-        let default_output = TransformOutput::new(DataType::all(), default_definitions);
+        let default_output = TransformOutput::new(DataType::all_bits(), default_definitions);
 
         if self.reroute_dropped {
             vec![
                 default_output,
-                TransformOutput::new(DataType::all(), dropped_definitions).with_port(DROPPED),
+                TransformOutput::new(DataType::all_bits(), dropped_definitions).with_port(DROPPED),
             ]
         } else {
             vec![default_output]
@@ -1452,7 +1452,7 @@ mod tests {
                 LogNamespace::Legacy
             ),
             vec![TransformOutput::new(
-                DataType::all(),
+                DataType::all_bits(),
                 [("test".into(), schema_definition)].into()
             )]
         );
@@ -1519,8 +1519,8 @@ mod tests {
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                TransformOutput::new(DataType::all(), HashMap::new()),
-                TransformOutput::new(DataType::all(), HashMap::new()).with_port(DROPPED),
+                TransformOutput::new(DataType::all_bits(), HashMap::new()),
+                TransformOutput::new(DataType::all_bits(), HashMap::new()).with_port(DROPPED),
             ],
             1,
         );
@@ -1546,8 +1546,8 @@ mod tests {
     ) -> std::result::Result<Event, Event> {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
-                TransformOutput::new(DataType::all(), HashMap::new()),
-                TransformOutput::new(DataType::all(), HashMap::new()).with_port(DROPPED),
+                TransformOutput::new(DataType::all_bits(), HashMap::new()),
+                TransformOutput::new(DataType::all_bits(), HashMap::new()).with_port(DROPPED),
             ],
             1,
         );
@@ -1614,7 +1614,7 @@ mod tests {
 
         assert_eq!(
             vec![TransformOutput::new(
-                DataType::all(),
+                DataType::all_bits(),
                 // The `never` definition should have been passed on to the end.
                 [(
                     "in".into(),
@@ -1640,7 +1640,7 @@ mod tests {
 
         assert_eq!(
             vec![TransformOutput::new(
-                DataType::all(),
+                DataType::all_bits(),
                 [(
                     "in1".into(),
                     Definition::default_legacy_namespace()
@@ -1693,7 +1693,7 @@ mod tests {
 
         assert_eq!(
             vec![TransformOutput::new(
-                DataType::all(),
+                DataType::all_bits(),
                 [(
                     "in".into(),
                     Definition::new_with_default_metadata(
@@ -1725,7 +1725,7 @@ mod tests {
 
         assert_eq!(
             vec![TransformOutput::new(
-                DataType::all(),
+                DataType::all_bits(),
                 [(
                     "in1".into(),
                     Definition::default_legacy_namespace()
@@ -1774,7 +1774,7 @@ mod tests {
 
         assert_eq!(
             vec![TransformOutput::new(
-                DataType::all(),
+                DataType::all_bits(),
                 [(
                     "in".into(),
                     Definition::new_with_default_metadata(

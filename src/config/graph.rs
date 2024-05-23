@@ -523,7 +523,7 @@ mod test {
         graph.add_source("metric_source", DataType::Metric);
         graph.add_sink(
             "any_sink",
-            DataType::all(),
+            DataType::all_bits(),
             vec!["log_source", "metric_source"],
         );
 
@@ -533,16 +533,16 @@ mod test {
     #[test]
     fn allows_any_into_log_or_metric() {
         let mut graph = Graph::default();
-        graph.add_source("any_source", DataType::all());
+        graph.add_source("any_source", DataType::all_bits());
         graph.add_transform(
             "log_to_any",
             DataType::Log,
-            DataType::all(),
+            DataType::all_bits(),
             vec!["any_source"],
         );
         graph.add_transform(
             "any_to_log",
-            DataType::all(),
+            DataType::all_bits(),
             DataType::Log,
             vec!["any_source"],
         );
@@ -579,19 +579,19 @@ mod test {
         );
         graph.add_transform(
             "any_to_any",
-            DataType::all(),
-            DataType::all(),
+            DataType::all_bits(),
+            DataType::all_bits(),
             vec!["log_to_log", "metric_to_metric"],
         );
         graph.add_transform(
             "any_to_log",
-            DataType::all(),
+            DataType::all_bits(),
             DataType::Log,
             vec!["any_to_any"],
         );
         graph.add_transform(
             "any_to_metric",
-            DataType::all(),
+            DataType::all_bits(),
             DataType::Metric,
             vec!["any_to_any"],
         );
@@ -639,26 +639,32 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(DataType::all(), Definition::any())],
+                outputs: vec![SourceOutput::new_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(DataType::all(), Definition::any())],
+                outputs: vec![SourceOutput::new_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo"),
             Node::Transform {
-                in_ty: DataType::all(),
+                in_ty: DataType::all_bits(),
                 outputs: vec![
                     TransformOutput::new(
-                        DataType::all(),
+                        DataType::all_bits(),
                         [("test".into(), Definition::default_legacy_namespace())].into(),
                     ),
                     TransformOutput::new(
-                        DataType::all(),
+                        DataType::all_bits(),
                         [("test".into(), Definition::default_legacy_namespace())].into(),
                     )
                     .with_port("bar"),
@@ -670,20 +676,23 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(DataType::all(), Definition::any())],
+                outputs: vec![SourceOutput::new_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("baz"),
             Node::Transform {
-                in_ty: DataType::all(),
+                in_ty: DataType::all_bits(),
                 outputs: vec![
                     TransformOutput::new(
-                        DataType::all(),
+                        DataType::all_bits(),
                         [("test".into(), Definition::default_legacy_namespace())].into(),
                     ),
                     TransformOutput::new(
-                        DataType::all(),
+                        DataType::all_bits(),
                         [("test".into(), Definition::default_legacy_namespace())].into(),
                     )
                     .with_port("errors"),
