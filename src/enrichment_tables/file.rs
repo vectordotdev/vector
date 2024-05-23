@@ -511,6 +511,16 @@ impl Table for File {
         if index.is_empty() {
             // No index has been passed so we need to do a Sequential Scan.
             single_or_err(self.sequential(self.data.iter(), case, condition, select))
+        } else if index.len() == 1 {
+            // When we only have one index, we can use it directly, which saves an extra clone.
+            let result = self
+                .indexed(case, &condition[0], index[0])?
+                .ok_or_else(|| "no rows found in index".to_string())?
+                .iter()
+                .map(|idx| &self.data[*idx]);
+
+            // Perform a sequential scan over the indexed result.
+            single_or_err(self.sequential(result, case, condition, select))
         } else {
             let result = self
                 .union(case, condition, index)?
@@ -533,6 +543,18 @@ impl Table for File {
             // No index has been passed so we need to do a Sequential Scan.
             Ok(self
                 .sequential(self.data.iter(), case, condition, select)
+                .collect())
+        } else if index.len() == 1 {
+            // When we only have one index, we can use it directly, which saves an extra clone.
+            Ok(self
+                .sequential(
+                    self.indexed(case, &condition[0], index[0])?
+                        .iter()
+                        .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
+                    case,
+                    condition,
+                    select,
+                )
                 .collect())
         } else {
             // Perform a sequential scan over the indexed result.
