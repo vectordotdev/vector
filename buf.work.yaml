@@ -1,4 +1,5 @@
 version: v1
 directories:
-  - proto
+  - proto/third-party
+  - proto/vector
   - lib/vector-core/proto
