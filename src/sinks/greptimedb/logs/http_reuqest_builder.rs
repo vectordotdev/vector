@@ -58,13 +58,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
             .to_string();
 
         // prepare body
-        let payload = request.take_payload();
-        let message = String::from_utf8_lossy(payload.as_ref());
-        let now = chrono::Local::now().timestamp_millis();
-        let sql = format!("INSERT INTO {table}(time_local, message) values({now}, '{message}');");
-        let body = url::form_urlencoded::Serializer::new(String::new())
-            .append_pair("sql", &sql)
-            .finish();
+        let body = format_body(request.take_payload(), &table);
 
         let mut builder = Request::post(&url)
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
@@ -81,6 +75,27 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
             .context(HTTPRequestBuilderSnafu)
             .map_err(Into::into)
     }
+}
+
+fn format_body(payload: Bytes, table: &str) -> String {
+    let message = String::from_utf8_lossy(payload.as_ref());
+    let now = chrono::Local::now().timestamp_millis();
+
+    // 40 + table.len + message.len + 13 + 2 + 5 + 10
+    // last 10 is for buffer
+    let mut sql = String::with_capacity(70 + table.len() + message.len());
+    sql.push_str(format!("INSERT INTO {table}(time_local, message) values").as_str());
+
+    for message in message.split("\n") {
+        sql.push_str(format!("({now}, '{message}'),").as_str());
+    }
+    sql.pop();
+    sql.push_str(";");
+
+    let body = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("sql", &sql)
+        .finish();
+    body
 }
 
 impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBuilder {
