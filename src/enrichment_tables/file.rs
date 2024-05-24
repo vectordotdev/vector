@@ -1235,6 +1235,121 @@ mod tests {
         );
     }
 
+    #[test]
+    fn finds_union_with_dates() {
+        let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
+            vec![
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
+                ],
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
+                ],
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2017, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
+                ],
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2018, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
+                ],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+
+        let conditions = vec![
+            vec![
+                Condition::Equals {
+                    field: "field1",
+                    value: "zip".into(),
+                },
+                Condition::BetweenDates {
+                    field: "field2",
+                    from: chrono::Utc
+                        .with_ymd_and_hms(2016, 1, 1, 0, 0, 0)
+                        .single()
+                        .expect("invalid timestamp"),
+                    to: chrono::Utc
+                        .with_ymd_and_hms(2017, 1, 1, 0, 0, 0)
+                        .single()
+                        .expect("invalid timestamp"),
+                },
+            ],
+            vec![
+                Condition::Equals {
+                    field: "field1",
+                    value: "zip".into(),
+                },
+                Condition::BetweenDates {
+                    field: "field2",
+                    from: chrono::Utc
+                        .with_ymd_and_hms(2018, 1, 1, 0, 0, 0)
+                        .single()
+                        .expect("invalid timestamp"),
+                    to: chrono::Utc
+                        .with_ymd_and_hms(2019, 1, 1, 0, 0, 0)
+                        .single()
+                        .expect("invalid timestamp"),
+                },
+            ],
+        ];
+
+        assert_eq!(
+            Ok(vec![
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    (
+                        "field2".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp")
+                        )
+                    )
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    (
+                        "field2".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2018, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp")
+                        )
+                    )
+                ]),
+            ]),
+            file.find_table_rows(Case::Sensitive, &conditions, None, &[handle])
+        );
+    }
 
     #[test]
     fn merge_sorted_merges() {
