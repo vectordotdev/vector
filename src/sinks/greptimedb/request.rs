@@ -1,17 +1,13 @@
+use super::metrics::batch::GreptimeDBBatchSizer;
+use super::metrics::request_builder::metric_to_insert_request;
+use crate::sinks::greptimedb::{GreptimeDBBatchOutput, GreptimeDBService};
+use crate::sinks::prelude::*;
+use greptimedb_ingester::api::v1::*;
+use greptimedb_ingester::Error as GreptimeError;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::task::Poll;
-
-use greptimedb_ingester::api::v1::*;
-use greptimedb_ingester::Error as GreptimeError;
 use vector_lib::event::Metric;
-
-use crate::sinks::greptimedb::{GreptimeDBBatchOutput, GreptimeDBService};
-use crate::sinks::prelude::*;
-
-use super::logs::request_builder::log_to_insert_request;
-use super::metrics::batch::GreptimeDBBatchSizer;
-use super::metrics::request_builder::metric_to_insert_request;
 
 #[derive(Clone)]
 pub(super) struct GreptimeDBRequest {
@@ -36,31 +32,6 @@ impl GreptimeDBRequest {
             request_metadata_builder.track_event(metric.clone());
 
             items.push(metric_to_insert_request(metric));
-        }
-
-        let request_size =
-            NonZeroUsize::new(estimated_request_size).expect("request should never be zero length");
-
-        GreptimeDBRequest {
-            items: RowInsertRequests { inserts: items },
-            finalizers,
-            metadata: request_metadata_builder.with_request_size(request_size),
-        }
-    }
-
-    // convert logs event to GreptimeDBRequest
-    pub(super) fn from_logs(logs: Vec<LogEvent>, table: String) -> Self {
-        let mut items = Vec::with_capacity(logs.len());
-        let mut finalizers = EventFinalizers::default();
-        let mut request_metadata_builder = RequestMetadataBuilder::default();
-        let mut estimated_request_size = 0;
-        for mut log in logs.into_iter() {
-            finalizers.merge(log.take_finalizers());
-            estimated_request_size += log.size_of();
-
-            request_metadata_builder.track_event(log.clone());
-
-            items.push(log_to_insert_request(log, table.clone()));
         }
 
         let request_size =

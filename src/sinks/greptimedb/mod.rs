@@ -202,12 +202,3 @@ fn tag_column(name: &str) -> ColumnSchema {
         ..Default::default()
     }
 }
-
-fn str_column(name: &str) -> ColumnSchema {
-    ColumnSchema {
-        column_name: name.to_owned(),
-        semantic_type: SemanticType::Field as i32,
-        datatype: ColumnDataType::String as i32,
-        ..Default::default()
-    }
-}

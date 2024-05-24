@@ -1,12 +1,14 @@
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
-use crate::sinks::greptimedb::healthcheck;
-use crate::sinks::greptimedb::logs::sink;
+use crate::http::{Auth, HttpClient};
+use crate::sinks::greptimedb::logs::http_reuqest_builder::{
+    http_healthcheck, GreptimeDBHttpRetryLogic, GreptimeDBLogsHttpRequestBuilder, PartitionKey,
+};
+use crate::sinks::greptimedb::logs::sink::GreptimeDBLogsHttpSink;
+use crate::sinks::util::http::HttpService;
 use crate::sinks::{
-    greptimedb::{
-        default_dbname, GreptimeDBDefaultBatchSettings, GreptimeDBRetryLogic, GreptimeDBService,
-    },
+    greptimedb::{default_dbname, GreptimeDBDefaultBatchSettings},
     prelude::*,
 };
 
@@ -17,7 +19,7 @@ use crate::sinks::{
 pub struct GreptimeDBLogsConfig {
     /// The endpoint of the GreptimeDB server.
     #[serde(alias = "host")]
-    #[configurable(metadata(docs::examples = "localhost:4001"))]
+    #[configurable(metadata(docs::examples = "http://localhost:4000"))]
     pub endpoint: String,
 
     /// The table that data is inserted into.
@@ -83,18 +85,45 @@ impl_generate_config_from_default!(GreptimeDBLogsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "greptimedb_logs")]
 impl SinkConfig for GreptimeDBLogsConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let request_settings = self.request.into_settings();
-        let service = ServiceBuilder::new()
-            .settings(request_settings, GreptimeDBRetryLogic)
-            .service(GreptimeDBService::try_new(self)?);
-        let sink = sink::GreptimeDBLogsSink {
-            service: service,
-            batch_settings: self.batch.into_batcher_settings()?,
-            table: self.table.clone(),
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+
+        let auth = match (self.username.clone(), self.password.clone()) {
+            (Some(username), Some(password)) => Some(Auth::Basic {
+                user: username,
+                password,
+            }),
+            _ => None,
+        };
+        let request_builder = GreptimeDBLogsHttpRequestBuilder {
+            endpoint: self.endpoint.clone(),
+            auth: auth.clone(),
+            encoder: Default::default(),
         };
 
-        let healthcheck = healthcheck(self)?;
+        let service: HttpService<GreptimeDBLogsHttpRequestBuilder, PartitionKey> =
+            HttpService::new(client.clone(), request_builder.clone());
+
+        let request_limits = self.request.into_settings();
+
+        let service = ServiceBuilder::new()
+            .settings(request_limits, GreptimeDBHttpRetryLogic)
+            .service(service);
+
+        let sink = GreptimeDBLogsHttpSink::new(
+            self.batch.into_batcher_settings()?,
+            service,
+            self.dbname.clone(),
+            self.table.clone(),
+            request_builder,
+        );
+
+        let healthcheck = Box::pin(http_healthcheck(
+            client,
+            self.endpoint.clone(),
+            auth.clone(),
+        ));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
