@@ -252,6 +252,13 @@ pub struct FileConfig {
     #[configurable(derived)]
     #[serde(default)]
     internal_metrics: FileInternalMetricsConfig,
+
+    /// How long to keep an open handle to a rotated log file.
+    /// The default value represents "no limit"
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
+    pub rotate_wait: Duration,
 }
 
 fn default_max_line_bytes() -> usize {
@@ -286,6 +293,10 @@ fn default_line_delimiter() -> String {
     "\n".to_string()
 }
 
+const fn default_rotate_wait() -> Duration {
+    Duration::from_secs(u64::MAX / 2)
+}
+
 /// Configuration for how files should be identified.
 ///
 /// This is important for `checkpointing` when file rotation is used.
@@ -310,6 +321,7 @@ pub enum FingerprintConfig {
         /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
         ///
         /// This can be helpful if all files share a common header that should be skipped.
+        #[serde(default = "default_ignored_header_bytes")]
         #[configurable(metadata(docs::type_unit = "bytes"))]
         ignored_header_bytes: usize,
 
@@ -338,6 +350,10 @@ impl Default for FingerprintConfig {
             lines: default_lines(),
         }
     }
+}
+
+const fn default_ignored_header_bytes() -> usize {
+    0
 }
 
 const fn default_lines() -> usize {
@@ -404,6 +420,7 @@ impl Default for FileConfig {
             acknowledgements: Default::default(),
             log_namespace: None,
             internal_metrics: Default::default(),
+            rotate_wait: default_rotate_wait(),
         }
     }
 }
@@ -556,6 +573,7 @@ pub fn file_source(
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,
         handle: tokio::runtime::Handle::current(),
+        rotate_wait: config.rotate_wait,
     };
 
     let event_metadata = EventMetadata {

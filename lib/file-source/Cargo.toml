@@ -11,7 +11,7 @@ libc = "0.2"
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
-crc = "3.0.1"
+crc = "3.2.1"
 glob = "0.3.1"
 scan_fmt = "0.2.6"
 vector-config = { path = "../vector-config", default-features = false }
@@ -24,7 +24,7 @@ default-features = false
 features = []
 
 [dependencies.bytes]
-version = "1.5.0"
+version = "1.6.0"
 default-features = false
 features = []
 
@@ -39,7 +39,7 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "2.2.3"
+version = "2.2.6"
 default-features = false
 features = ["serde"]
 
@@ -69,14 +69,14 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.36.0"
+version = "1.37.0"
 default-features = false
 features = ["full"]
 
 [dev-dependencies]
 criterion = "0.5"
 quickcheck = "1"
-tempfile = "3.10.0"
+tempfile = "3.10.1"
 similar-asserts = "1.5.0"
 
 [[bench]]

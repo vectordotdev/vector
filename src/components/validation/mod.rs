@@ -6,7 +6,20 @@ mod test_case;
 pub mod util;
 mod validators;
 
+use vector_lib::config::LogNamespace;
+
 use crate::config::{BoxedSink, BoxedSource, BoxedTransform};
+
+/// For components implementing `ValidatableComponent`
+pub mod prelude {
+    pub use super::ComponentTestCaseConfig;
+    pub use super::ExternalResource;
+    pub use super::HttpResourceConfig;
+    pub use super::ResourceDirection;
+    pub use super::ValidatableComponent;
+    pub use super::ValidationConfiguration;
+    pub use crate::register_validatable_component;
+}
 
 pub use self::resources::*;
 #[cfg(feature = "component-validation-runner")]
@@ -57,6 +70,51 @@ pub enum ComponentConfiguration {
     Sink(BoxedSink),
 }
 
+/// Component configuration for a test case.
+#[derive(Clone)]
+pub struct ComponentTestCaseConfig {
+    config: ComponentConfiguration,
+    /// If specified, this name must match the `config_name` field of at least one of the test case events.
+    test_case: Option<String>,
+    external_resource: Option<ExternalResource>,
+}
+
+impl ComponentTestCaseConfig {
+    pub fn from_source<C: Into<BoxedSource>>(
+        config: C,
+        test_case: Option<String>,
+        external_resource: Option<ExternalResource>,
+    ) -> Self {
+        Self {
+            config: ComponentConfiguration::Source(config.into()),
+            test_case,
+            external_resource,
+        }
+    }
+    pub fn from_transform<C: Into<BoxedTransform>>(
+        config: C,
+        test_case: Option<String>,
+        external_resource: Option<ExternalResource>,
+    ) -> Self {
+        Self {
+            config: ComponentConfiguration::Transform(config.into()),
+            test_case,
+            external_resource,
+        }
+    }
+    pub fn from_sink<C: Into<BoxedSink>>(
+        config: C,
+        test_case: Option<String>,
+        external_resource: Option<ExternalResource>,
+    ) -> Self {
+        Self {
+            config: ComponentConfiguration::Sink(config.into()),
+            test_case,
+            external_resource,
+        }
+    }
+}
+
 /// Configuration for validating a component.
 ///
 /// This type encompasses all of the required information for configuring and validating a
@@ -66,46 +124,52 @@ pub enum ComponentConfiguration {
 pub struct ValidationConfiguration {
     component_name: &'static str,
     component_type: ComponentType,
-    component_configuration: ComponentConfiguration,
-    external_resource: Option<ExternalResource>,
+    /// There may be only one `ComponentTestCaseConfig` necessary to execute all test cases, but some cases
+    /// require more advanced configuration in order to hit the code path desired.
+    component_configurations: Vec<ComponentTestCaseConfig>,
+    log_namespace: LogNamespace,
 }
 
 impl ValidationConfiguration {
     /// Creates a new `ValidationConfiguration` for a source.
-    pub fn from_source<C: Into<BoxedSource>>(
+    pub fn from_source(
         component_name: &'static str,
-        config: C,
-        external_resource: Option<ExternalResource>,
+        log_namespace: LogNamespace,
+        component_configurations: Vec<ComponentTestCaseConfig>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Source,
-            component_configuration: ComponentConfiguration::Source(config.into()),
-            external_resource,
+            component_configurations,
+            log_namespace,
         }
     }
 
     /// Creates a new `ValidationConfiguration` for a transform.
-    pub fn from_transform(component_name: &'static str, config: impl Into<BoxedTransform>) -> Self {
+    pub fn from_transform(
+        component_name: &'static str,
+        log_namespace: LogNamespace,
+        component_configurations: Vec<ComponentTestCaseConfig>,
+    ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Transform,
-            component_configuration: ComponentConfiguration::Transform(config.into()),
-            external_resource: None,
+            component_configurations,
+            log_namespace,
         }
     }
 
     /// Creates a new `ValidationConfiguration` for a sink.
-    pub fn from_sink<C: Into<BoxedSink>>(
+    pub fn from_sink(
         component_name: &'static str,
-        config: C,
-        external_resource: Option<ExternalResource>,
+        log_namespace: LogNamespace,
+        component_configurations: Vec<ComponentTestCaseConfig>,
     ) -> Self {
         Self {
             component_name,
             component_type: ComponentType::Sink,
-            component_configuration: ComponentConfiguration::Sink(config.into()),
-            external_resource,
+            component_configurations,
+            log_namespace,
         }
     }
 
@@ -120,13 +184,36 @@ impl ValidationConfiguration {
     }
 
     /// Gets the configuration of the component.
-    pub fn component_configuration(&self) -> ComponentConfiguration {
-        self.component_configuration.clone()
+    pub fn component_configurations(&self) -> Vec<ComponentTestCaseConfig> {
+        self.component_configurations.clone()
+    }
+
+    /// Gets the LogNamespace that the component is using.
+    pub const fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
+    }
+
+    fn get_comp_test_case(&self, test_case: Option<&String>) -> Option<ComponentTestCaseConfig> {
+        let empty = String::from("");
+        let test_case = test_case.unwrap_or(&empty);
+        self.component_configurations
+            .clone()
+            .into_iter()
+            .find(|c| c.test_case.as_ref().unwrap_or(&String::from("")) == test_case)
+    }
+
+    /// Gets the configuration of the component.
+    pub fn component_configuration_for_test_case(
+        &self,
+        test_case: Option<&String>,
+    ) -> Option<ComponentConfiguration> {
+        self.get_comp_test_case(test_case).map(|c| c.config)
     }
 
     /// Gets the external resource definition for validating the component, if any.
-    pub fn external_resource(&self) -> Option<ExternalResource> {
-        self.external_resource.clone()
+    pub fn external_resource(&self, test_case: Option<&String>) -> Option<ExternalResource> {
+        self.get_comp_test_case(test_case)
+            .and_then(|c| c.external_resource)
     }
 }
 
@@ -193,180 +280,180 @@ pub struct RunnerMetrics {
     pub discarded_events_total: u64,
 }
 
-#[cfg(all(test, feature = "component-validation-tests"))]
-mod tests {
-    use std::{
-        collections::VecDeque,
-        path::{Component, Path, PathBuf},
-    };
+#[cfg(feature = "component-validation-runner")]
+fn run_validation(configuration: ValidationConfiguration, test_case_data_path: std::path::PathBuf) {
+    let component_name = configuration.component_name();
+    info!(
+        "Running validation for component '{}' (type: {:?})...",
+        component_name,
+        configuration.component_type()
+    );
 
-    use test_generator::test_resources;
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
 
-    use crate::components::validation::{Runner, StandardValidators};
-    use crate::extra_context::ExtraContext;
-
-    use super::{ComponentType, ValidatableComponentDescription, ValidationConfiguration};
-
-    #[test_resources("tests/validation/components/**/*.yaml")]
-    fn validate_component(test_case_data_path: &str) {
-        let test_case_data_path = PathBuf::from(test_case_data_path.to_string());
-        if !test_case_data_path.exists() {
-            panic!("Component validation test invoked with path to test case data that could not be found: {}", test_case_data_path.to_string_lossy());
-        }
-
-        let configuration = get_validation_configuration_from_test_case_path(&test_case_data_path)
-            .expect("Failed to find validation configuration from given test case data path.");
-
-        run_validation(configuration, test_case_data_path);
-    }
-
-    fn get_validation_configuration_from_test_case_path(
-        test_case_data_path: &Path,
-    ) -> Result<ValidationConfiguration, String> {
-        // The test case data path should follow a fixed structure where the 2nd to last segment is
-        // the component type, and the last segment -- when the extension is removed -- is the
-        // component name.
-        let mut path_segments = test_case_data_path
-            .components()
-            .filter_map(|c| match c {
-                Component::Normal(path) => Some(Path::new(path)),
-                _ => None,
-            })
-            .collect::<VecDeque<_>>();
-        if path_segments.len() <= 2 {
-            return Err(format!("Test case data path contained {} normal path segment(s), expected at least 2 or more.", path_segments.len()));
-        }
-
-        let component_name = path_segments
-            .pop_back()
-            .and_then(|segment| segment.file_stem().map(|s| s.to_string_lossy().to_string()))
-            .ok_or(format!(
-                "Test case data path '{}' contained unexpected or invalid filename.",
-                test_case_data_path.as_os_str().to_string_lossy()
-            ))?;
-
-        let component_type = path_segments
-            .pop_back()
-            .map(|segment| {
-                segment
-                    .as_os_str()
-                    .to_string_lossy()
-                    .to_string()
-                    .to_ascii_lowercase()
-            })
-            .and_then(|segment| match segment.as_str() {
-                "sources" => Some(ComponentType::Source),
-                "transforms" => Some(ComponentType::Transform),
-                "sinks" => Some(ComponentType::Sink),
-                _ => None,
-            })
-            .ok_or(format!(
-                "Test case data path '{}' contained unexpected or invalid component type.",
-                test_case_data_path.as_os_str().to_string_lossy()
-            ))?;
-
-        // Now that we've theoretically got the component type and component name, try to query the
-        // validatable component descriptions to find it.
-        ValidatableComponentDescription::query(&component_name, component_type).ok_or(format!(
-            "No validation configuration for component '{}' with component type '{}'.",
-            component_name,
-            component_type.as_str()
-        ))
-    }
-
-    fn run_validation(configuration: ValidationConfiguration, test_case_data_path: PathBuf) {
-        crate::test_util::trace_init();
-
-        let component_name = configuration.component_name();
-        info!(
-            "Running validation for component '{}' (type: {:?})...",
-            component_name,
-            configuration.component_type()
+    rt.block_on(async {
+        let mut runner = Runner::from_configuration(
+            configuration,
+            test_case_data_path,
+            crate::extra_context::ExtraContext::default(),
         );
+        runner.add_validator(StandardValidators::ComponentSpec);
 
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-        rt.block_on(async {
-            let mut runner = Runner::from_configuration(
-                configuration,
-                test_case_data_path,
-                ExtraContext::default(),
-            );
-            runner.add_validator(StandardValidators::ComponentSpec);
+        match runner.run_validation().await {
+            Ok(test_case_results) => {
+                let mut details = Vec::new();
+                let mut had_failures = false;
 
-            match runner.run_validation().await {
-                Ok(test_case_results) => {
-                    let mut details = Vec::new();
-                    let mut had_failures = false;
+                for test_case_result in test_case_results.into_iter() {
+                    for validator_result in test_case_result.validator_results() {
+                        match validator_result {
+                            Ok(success) => {
+                                if success.is_empty() {
+                                    details.push(format!(
+                                        "  test case '{}': passed",
+                                        test_case_result.test_name()
+                                    ));
+                                } else {
+                                    let formatted = success
+                                        .iter()
+                                        .map(|s| format!("    - {}\n", s))
+                                        .collect::<Vec<_>>();
 
-                    for test_case_result in test_case_results.into_iter() {
-                        for validator_result in test_case_result.validator_results() {
-                            match validator_result {
-                                Ok(success) => {
-                                    if success.is_empty() {
-                                        details.push(format!(
-                                            "  test case '{}': passed",
-                                            test_case_result.test_name()
-                                        ));
-                                    } else {
-                                        let formatted = success
-                                            .iter()
-                                            .map(|s| format!("    - {}\n", s))
-                                            .collect::<Vec<_>>();
-
-                                        details.push(format!(
-                                            "  test case '{}': passed\n{}",
-                                            test_case_result.test_name(),
-                                            formatted.join("")
-                                        ));
-                                    }
+                                    details.push(format!(
+                                        "  test case '{}': passed\n{}",
+                                        test_case_result.test_name(),
+                                        formatted.join("")
+                                    ));
                                 }
-                                Err(failure) => {
-                                    had_failures = true;
+                            }
+                            Err(failure) => {
+                                had_failures = true;
 
-                                    if failure.is_empty() {
-                                        details.push(format!(
-                                            "  test case '{}': failed",
-                                            test_case_result.test_name()
-                                        ));
-                                    } else {
-                                        let formatted = failure
-                                            .iter()
-                                            .map(|s| format!("    - {}\n", s))
-                                            .collect::<Vec<_>>();
+                                if failure.is_empty() {
+                                    details.push(format!(
+                                        "  test case '{}': failed",
+                                        test_case_result.test_name()
+                                    ));
+                                } else {
+                                    let formatted = failure
+                                        .iter()
+                                        .map(|s| format!("    - {}\n", s))
+                                        .collect::<Vec<_>>();
 
-                                        details.push(format!(
-                                            "  test case '{}': failed\n{}",
-                                            test_case_result.test_name(),
-                                            formatted.join("")
-                                        ));
-                                    }
+                                    details.push(format!(
+                                        "  test case '{}': failed\n{}",
+                                        test_case_result.test_name(),
+                                        formatted.join("")
+                                    ));
                                 }
                             }
                         }
                     }
-
-                    if had_failures {
-                        panic!(
-                            "Failed to validate component '{}':\n{}",
-                            component_name,
-                            details.join("")
-                        );
-                    } else {
-                        info!(
-                            "Successfully validated component '{}':\n{}",
-                            component_name,
-                            details.join("")
-                        );
-                    }
                 }
-                Err(e) => panic!(
-                    "Failed to complete validation run for component '{}': {}",
-                    component_name, e
-                ),
+
+                if had_failures {
+                    panic!(
+                        "Failed to validate component '{}':\n{}",
+                        component_name,
+                        details.join("")
+                    );
+                } else {
+                    info!(
+                        "Successfully validated component '{}':\n{}",
+                        component_name,
+                        details.join("")
+                    );
+                }
             }
-        });
+            Err(e) => panic!(
+                "Failed to complete validation run for component '{}': {}",
+                component_name, e
+            ),
+        }
+    });
+}
+
+#[cfg(feature = "component-validation-runner")]
+fn get_validation_configuration_from_test_case_path(
+    test_case_data_path: &std::path::Path,
+) -> Result<ValidationConfiguration, String> {
+    // The test case data path should follow a fixed structure where the 2nd to last segment is
+    // the component type, and the last segment -- when the extension is removed -- is the
+    // component name.
+    let mut path_segments = test_case_data_path
+        .components()
+        .filter_map(|c| match c {
+            std::path::Component::Normal(path) => Some(std::path::Path::new(path)),
+            _ => None,
+        })
+        .collect::<std::collections::VecDeque<_>>();
+    if path_segments.len() <= 2 {
+        return Err(format!(
+            "Test case data path contained {} normal path segment(s), expected at least 2 or more.",
+            path_segments.len()
+        ));
+    }
+
+    let component_name = path_segments
+        .pop_back()
+        .and_then(|segment| segment.file_stem().map(|s| s.to_string_lossy().to_string()))
+        .ok_or(format!(
+            "Test case data path '{}' contained unexpected or invalid filename.",
+            test_case_data_path.as_os_str().to_string_lossy()
+        ))?;
+
+    let component_type = path_segments
+        .pop_back()
+        .map(|segment| {
+            segment
+                .as_os_str()
+                .to_string_lossy()
+                .to_string()
+                .to_ascii_lowercase()
+        })
+        .and_then(|segment| match segment.as_str() {
+            "sources" => Some(ComponentType::Source),
+            "transforms" => Some(ComponentType::Transform),
+            "sinks" => Some(ComponentType::Sink),
+            _ => None,
+        })
+        .ok_or(format!(
+            "Test case data path '{}' contained unexpected or invalid component type.",
+            test_case_data_path.as_os_str().to_string_lossy()
+        ))?;
+
+    // Now that we've theoretically got the component type and component name, try to query the
+    // validatable component descriptions to find it.
+    ValidatableComponentDescription::query(&component_name, component_type).ok_or(format!(
+        "No validation configuration for component '{}' with component type '{}'.",
+        component_name,
+        component_type.as_str()
+    ))
+}
+
+#[cfg(feature = "component-validation-runner")]
+pub fn validate_component(test_case_data_path: std::path::PathBuf) {
+    if !test_case_data_path.exists() {
+        panic!("Component validation test invoked with path to test case data that could not be found: {}", test_case_data_path.to_string_lossy());
+    }
+
+    let configuration = get_validation_configuration_from_test_case_path(&test_case_data_path)
+        .expect("Failed to find validation configuration from given test case data path.");
+
+    run_validation(configuration, test_case_data_path);
+}
+
+#[cfg(all(test, feature = "component-validation-tests"))]
+mod tests {
+    #[test_generator::test_resources("tests/validation/components/**/*.yaml")]
+    pub fn validate_component(test_case_data_path: &str) {
+        crate::test_util::trace_init();
+
+        let test_case_data_path = std::path::PathBuf::from(test_case_data_path.to_string());
+
+        super::validate_component(test_case_data_path);
     }
 }

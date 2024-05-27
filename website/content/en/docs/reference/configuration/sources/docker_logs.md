@@ -1,7 +1,7 @@
 ---
 title: Docker logs
 description: Collect logs from [Docker](https://docker.com)
-kind: source
+component_kind: source
 layout: component
 tags: ["docker", "container", "component", "source", "logs"]
 ---

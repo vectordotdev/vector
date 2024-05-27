@@ -28,13 +28,8 @@ base: components: sinks: databend: configuration: {
 		}
 	}
 	auth: {
-		description: """
-			Configuration of the authentication strategy for HTTP requests.
-
-			HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
-			HTTP header without any additional encryption beyond what is provided by the transport itself.
-			"""
-		required: false
+		description: "The username and password to authenticate with. Overrides the username and password in DSN."
+		required:    false
 		type: object: options: {
 			password: {
 				description:   "The basic authentication password."
@@ -122,12 +117,9 @@ base: components: sinks: databend: configuration: {
 		}
 	}
 	database: {
-		description: "The database that contains the table that data is inserted into."
+		description: "The database that contains the table that data is inserted into. Overrides the database in DSN."
 		required:    false
-		type: string: {
-			default: "default"
-			examples: ["mydatabase"]
-		}
+		type: string: examples: ["mydatabase"]
 	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
@@ -280,9 +272,25 @@ base: components: sinks: databend: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint of the Databend server."
+		description: "The DSN of the Databend server."
 		required:    true
-		type: string: examples: ["http://localhost:8000"]
+		type: string: examples: ["databend://localhost:8000/default?sslmode=disable"]
+	}
+	missing_field_as: {
+		description: """
+			Defines how missing fields are handled for NDJson.
+			Refer to https://docs.databend.com/sql/sql-reference/file-format-options#null_field_as
+			"""
+		required: false
+		type: string: {
+			default: "NULL"
+			enum: {
+				ERROR:         "Generates an error if a missing field is encountered."
+				FIELD_DEFAULT: "Uses the default value of the field for missing fields."
+				NULL:          "Interprets missing fields as NULL values. An error will be generated for non-nullable fields."
+				TYPE_DEFAULT:  "Uses the default value of the field's data type for missing fields."
+			}
+		}
 	}
 	request: {
 		description: """
@@ -476,8 +484,10 @@ base: components: sinks: databend: configuration: {
 		type: string: examples: ["mytable"]
 	}
 	tls: {
-		description: "TLS configuration."
-		required:    false
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use arguments in the DSN instead."
+		description:        "The TLS configuration to use when connecting to the Databend server."
+		required:           false
 		type: object: options: {
 			alpn_protocols: {
 				description: """
@@ -530,14 +540,14 @@ base: components: sinks: databend: configuration: {
 			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

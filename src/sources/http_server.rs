@@ -2,7 +2,7 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use http::{StatusCode, Uri};
+use http::StatusCode;
 use http_serde;
 use tokio_util::codec::Decoder as _;
 use vrl::value::{kind::Collection, Kind};
@@ -22,14 +22,12 @@ use vector_lib::{
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    components::validation::*,
     config::{
         log_schema, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
     },
     event::{Event, Value},
     http::KeepaliveConfig,
-    register_validatable_component,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
         http::{add_query_parameters, HttpMethod},
@@ -290,30 +288,6 @@ impl Default for SimpleHttpConfig {
 }
 
 impl_generate_config_from_default!(SimpleHttpConfig);
-
-impl ValidatableComponent for SimpleHttpConfig {
-    fn validation_configuration() -> ValidationConfiguration {
-        let config = Self {
-            decoding: Some(DeserializerConfig::Json(Default::default())),
-            ..Default::default()
-        };
-
-        let listen_addr_http = format!("http://{}/", config.address);
-        let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
-
-        let external_resource = ExternalResource::new(
-            ResourceDirection::Push,
-            HttpResourceConfig::from_parts(uri, Some(config.method.into())),
-            config
-                .get_decoding_config()
-                .expect("should not fail to get decoding config"),
-        );
-
-        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
-    }
-}
-
-register_validatable_component!(SimpleHttpConfig);
 
 const fn default_http_method() -> HttpMethod {
     HttpMethod::Post
@@ -582,7 +556,7 @@ mod tests {
         Compression,
     };
     use futures::Stream;
-    use http::{HeaderMap, Method, StatusCode};
+    use http::{HeaderMap, Method, StatusCode, Uri};
     use similar_asserts::assert_eq;
     use vector_lib::codecs::{
         decoding::{DeserializerConfig, FramingConfig},
@@ -597,6 +571,7 @@ mod tests {
 
     use crate::sources::http_server::HttpMethod;
     use crate::{
+        components::validation::prelude::*,
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
         test_util::{
@@ -606,7 +581,7 @@ mod tests {
         SourceSender,
     };
 
-    use super::{remove_duplicates, socket_addr_to_ip_string, SimpleHttpConfig};
+    use super::{remove_duplicates, SimpleHttpConfig};
 
     #[test]
     fn generate_config() {
@@ -1613,41 +1588,37 @@ mod tests {
         }
     }
 
-    #[test]
-    fn validate_remote_ip_format() {
-        let socket_addr = SocketAddr::new("0.0.0.0".parse().unwrap(), 8080);
+    impl ValidatableComponent for SimpleHttpConfig {
+        fn validation_configuration() -> ValidationConfiguration {
+            let config = Self {
+                decoding: Some(DeserializerConfig::Json(Default::default())),
+                ..Default::default()
+            };
 
-        let output = socket_addr_to_ip_string(&socket_addr);
+            let log_namespace: LogNamespace = config.log_namespace.unwrap_or(false).into();
 
-        let expected = "0.0.0.0".to_string();
+            let listen_addr_http = format!("http://{}/", config.address);
+            let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
 
-        assert_eq!(output, expected);
+            let external_resource = ExternalResource::new(
+                ResourceDirection::Push,
+                HttpResourceConfig::from_parts(uri, Some(config.method.into())),
+                config
+                    .get_decoding_config()
+                    .expect("should not fail to get decoding config"),
+            );
+
+            ValidationConfiguration::from_source(
+                Self::NAME,
+                log_namespace,
+                vec![ComponentTestCaseConfig::from_source(
+                    config,
+                    None,
+                    Some(external_resource),
+                )],
+            )
+        }
     }
 
-    /// This indicates that provided IPv6 addresses, the rust formatter will try to compress the representation of the address.
-    #[test]
-    fn validate_remote_ip_format_ipv6() {
-        let socket_addr = SocketAddr::new(
-            "0000:0000:0000:0000:0000:0000:0000:0001".parse().unwrap(),
-            8080,
-        );
-
-        let output = socket_addr_to_ip_string(&socket_addr);
-
-        let expected = "::1".to_string();
-
-        assert_eq!(output, expected);
-    }
-
-    /// this test is to ensure that the format macro is not used to format the socket address, and
-    /// the output of the format macro changes based on the expression
-    #[test]
-    fn validate_format_macro_socket_addr() {
-        let socket_addr = SocketAddr::new("127.0.0.1".parse().unwrap(), 5432);
-
-        let wrong = format!("{:.4}", socket_addr.ip());
-        let right = socket_addr_to_ip_string(&socket_addr);
-
-        assert_ne!(wrong, right);
-    }
+    register_validatable_component!(SimpleHttpConfig);
 }

@@ -14,10 +14,13 @@ use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
-use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+use vector_lib::{
+    codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig},
+    lookup::{owned_value_path, OwnedTargetPath},
+};
 use vector_lib::{
     codecs::{
-        decoding::{Deserializer, DeserializerConfig, Framer},
+        decoding::{BytesDeserializerConfig, Deserializer, DeserializerConfig, Framer},
         BytesDecoder, BytesDeserializer,
     },
     config::DataType,
@@ -28,11 +31,13 @@ use vector_lib::{
     metric_tags,
 };
 use vrl::compiler::value::Collection;
+use vrl::value;
 use vrl::value::{Kind, ObjectMap};
 
 use crate::schema::Definition;
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
+    components::validation::prelude::*,
     config::{SourceConfig, SourceContext},
     event::{
         into_event_stream,
@@ -97,6 +102,7 @@ fn test_decode_log_body() {
             "http",
             Some(test_logs_schema_definition()),
             LogNamespace::Legacy,
+            false,
         );
 
         let events = decode_log_body(body, api_key, &source).unwrap();
@@ -112,7 +118,7 @@ fn test_decode_log_body() {
             assert_eq!(log["ddtags"], msg.ddtags.into());
 
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -121,6 +127,55 @@ fn test_decode_log_body() {
     }
 
     QuickCheck::new().quickcheck(inner as fn(Vec<LogMsg>) -> TestResult);
+}
+
+#[test]
+fn test_decode_log_body_parse_ddtags() {
+    let log_msgs = [LogMsg {
+        message: Bytes::from(String::from("message")),
+        status: Bytes::from(String::from("status")),
+        timestamp: Utc
+            .timestamp_millis_opt(1234)
+            .single()
+            .expect("invalid timestamp"),
+        hostname: Bytes::from(String::from("host")),
+        service: Bytes::from(String::from("service")),
+        ddsource: Bytes::from(String::from("ddsource")),
+        ddtags: Bytes::from(String::from("wizard:the_grey,env:staging")),
+    }];
+
+    let body = Bytes::from(serde_json::to_string(&log_msgs).unwrap());
+    let api_key = None;
+    let decoder = crate::codecs::Decoder::new(
+        Framer::Bytes(BytesDecoder::new()),
+        Deserializer::Bytes(BytesDeserializer),
+    );
+
+    let source = DatadogAgentSource::new(
+        true,
+        decoder,
+        "http",
+        Some(test_logs_schema_definition()),
+        LogNamespace::Legacy,
+        true,
+    );
+
+    let events = decode_log_body(body, api_key, &source).unwrap();
+
+    assert_eq!(events.len(), 1);
+
+    let event = events.first().unwrap();
+    let log = event.as_log();
+    let log_msg = log_msgs[0].clone();
+
+    assert_eq!(log["message"], log_msg.message.into());
+    assert_eq!(log["status"], log_msg.status.into());
+    assert_eq!(log["timestamp"], log_msg.timestamp.into());
+    assert_eq!(log["hostname"], log_msg.hostname.into());
+    assert_eq!(log["service"], log_msg.service.into());
+    assert_eq!(log["ddsource"], log_msg.ddsource.into());
+
+    assert_eq!(log["ddtags"], value!(["wizard:the_grey", "env:staging"]));
 }
 
 #[test]
@@ -138,6 +193,7 @@ fn test_decode_log_body_empty_object() {
         "http",
         Some(test_logs_schema_definition()),
         LogNamespace::Legacy,
+        false,
     );
 
     let events = decode_log_body(body, api_key, &source).unwrap();
@@ -264,7 +320,7 @@ async fn full_payload_v1() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -326,7 +382,7 @@ async fn full_payload_v2() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -388,7 +444,7 @@ async fn no_api_key() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -453,7 +509,7 @@ async fn api_key_in_url() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -518,7 +574,7 @@ async fn api_key_in_query_params() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -589,7 +645,7 @@ async fn api_key_in_header() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -733,7 +789,7 @@ async fn ignores_api_key() {
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -1442,7 +1498,7 @@ async fn split_outputs() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -1519,6 +1575,7 @@ fn test_config_outputs_with_disabled_data_types() {
             disable_logs,
             disable_metrics,
             disable_traces,
+            parse_ddtags: false,
             log_namespace: Some(false),
             keepalive: Default::default(),
         };
@@ -1533,7 +1590,7 @@ fn test_config_outputs_with_disabled_data_types() {
             assert_eq!(outputs.contains(&DataType::Trace), !disable_traces);
             assert_eq!(outputs.contains(&DataType::Metric), !disable_metrics);
         } else {
-            assert!(outputs.contains(&DataType::all()));
+            assert!(outputs.contains(&DataType::all_bits()));
             assert!(outputs.len() == 1);
         }
     }
@@ -1960,6 +2017,7 @@ fn test_config_outputs() {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            parse_ddtags: false,
             log_namespace: Some(false),
             keepalive: Default::default(),
         };
@@ -2444,3 +2502,62 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
 fn assert_tags(metric: &Metric, tags: MetricTags) {
     assert_eq!(metric.tags().expect("Missing tags"), &tags);
 }
+
+impl ValidatableComponent for DatadogAgentConfig {
+    fn validation_configuration() -> ValidationConfiguration {
+        use crate::codecs::DecodingConfig;
+
+        let config = DatadogAgentConfig {
+            address: "0.0.0.0:9007".parse().unwrap(),
+            tls: None,
+            store_api_key: false,
+            framing: CharacterDelimitedDecoderConfig {
+                character_delimited: CharacterDelimitedDecoderOptions {
+                    delimiter: b',',
+                    max_length: Some(usize::MAX),
+                },
+            }
+            .into(),
+            decoding: BytesDeserializerConfig::new().into(),
+            acknowledgements: Default::default(),
+            multiple_outputs: false,
+            disable_logs: false,
+            disable_metrics: false,
+            disable_traces: false,
+            parse_ddtags: false,
+            log_namespace: Some(false),
+            keepalive: Default::default(),
+        };
+
+        let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
+
+        // TODO set up separate test cases for metrics and traces endpoints
+
+        let logs_addr = format!("http://{}/api/v2/logs", config.address);
+        let uri = http::Uri::try_from(&logs_addr).expect("should not fail to parse URI");
+
+        let decoder = DecodingConfig::new(
+            config.framing.clone(),
+            DeserializerConfig::Json(Default::default()),
+            false.into(),
+        );
+
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(uri, None),
+            decoder,
+        );
+
+        ValidationConfiguration::from_source(
+            Self::NAME,
+            log_namespace,
+            vec![ComponentTestCaseConfig::from_source(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
+    }
+}
+
+register_validatable_component!(DatadogAgentConfig);

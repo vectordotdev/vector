@@ -306,39 +306,54 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-impl ValidatableComponent for HttpSinkConfig {
-    fn validation_configuration() -> ValidationConfiguration {
-        use std::str::FromStr;
-        use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::components::validation::prelude::*;
 
-        let config = Self {
-            uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
-                .expect("should never fail to parse"),
-            method: HttpMethod::Post,
-            encoding: EncodingConfigWithFraming::new(
-                None,
-                JsonSerializerConfig::new(MetricTagValues::Full).into(),
-                Transformer::default(),
-            ),
-            auth: None,
-            headers: None,
-            compression: Compression::default(),
-            batch: BatchConfig::default(),
-            request: RequestConfig::default(),
-            tls: None,
-            acknowledgements: AcknowledgementsConfig::default(),
-            payload_prefix: String::new(),
-            payload_suffix: String::new(),
-        };
+    impl ValidatableComponent for HttpSinkConfig {
+        fn validation_configuration() -> ValidationConfiguration {
+            use std::str::FromStr;
+            use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
+            use vector_lib::config::LogNamespace;
 
-        let external_resource = ExternalResource::new(
-            ResourceDirection::Push,
-            HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
-            config.encoding.clone(),
-        );
+            let config = HttpSinkConfig {
+                uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
+                    .expect("should never fail to parse"),
+                method: HttpMethod::Post,
+                encoding: EncodingConfigWithFraming::new(
+                    None,
+                    JsonSerializerConfig::new(MetricTagValues::Full).into(),
+                    Transformer::default(),
+                ),
+                auth: None,
+                headers: None,
+                compression: Compression::default(),
+                batch: BatchConfig::default(),
+                request: RequestConfig::default(),
+                tls: None,
+                acknowledgements: AcknowledgementsConfig::default(),
+                payload_prefix: String::new(),
+                payload_suffix: String::new(),
+            };
 
-        ValidationConfiguration::from_sink(Self::NAME, config, Some(external_resource))
+            let external_resource = ExternalResource::new(
+                ResourceDirection::Push,
+                HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
+                config.encoding.clone(),
+            );
+
+            ValidationConfiguration::from_sink(
+                Self::NAME,
+                LogNamespace::Legacy,
+                vec![ComponentTestCaseConfig::from_sink(
+                    config,
+                    None,
+                    Some(external_resource),
+                )],
+            )
+        }
     }
-}
 
-register_validatable_component!(HttpSinkConfig);
+    register_validatable_component!(HttpSinkConfig);
+}

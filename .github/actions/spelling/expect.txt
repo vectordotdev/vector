@@ -8,7 +8,6 @@ Acq
 AEAD
 agentpayload
 aimd
-akx
 allowerased
 amka
 amping
@@ -32,7 +31,6 @@ aqf
 architecting
 archivable
 ARNOTAREALIDD
-arshiyasolei
 asdf
 asdfasdf
 assertverify
@@ -190,6 +188,7 @@ conffiles
 configkey
 configmap
 confl
+confluentinc
 confy
 consigliere
 CONTEUDO
@@ -220,7 +219,6 @@ customizability
 customtype
 cwl
 Dailywarehousing
-dalegaard
 daschl
 dashmap
 datadir
@@ -288,7 +286,6 @@ Doop
 downcasted
 droptest
 dsl
-dsmith
 dstat
 dstport
 dtype
@@ -319,6 +316,7 @@ endler
 enduml
 eni
 enp
+Ensar
 enumdecl
 enumflags
 ENVARS
@@ -328,7 +326,6 @@ EOL'ed
 Err'ing
 errorf
 esb
-esensar
 esque
 etheus
 etl
@@ -416,7 +413,6 @@ fsevent
 fslock
 FSTRM
 fsyncdata
-fuchsnj
 fullhuman
 futs
 fuzzcheck
@@ -818,7 +814,6 @@ overaligned
 overalignment
 owo
 oyaml
-pablosichert
 pageheap
 paq
 parallelizable
@@ -951,6 +946,7 @@ samerole
 sameuser
 sandboxed
 sandboxing
+Saraj
 sccache
 schemaless
 schemars
@@ -1249,7 +1245,6 @@ wtime
 wtimeouts
 wtr
 wurstmeister
-wwang
 xact
 xcatsy
 Xcg

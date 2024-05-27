@@ -13,6 +13,12 @@ Table of Contents:
 - [CLI](#cli)
 - [Running Tests](#running-tests)
 
+## Pre-requisites
+
+This assumes that you have the following tools installed:
+
+- cargo-nextest - https://nexte.st/
+
 ## Installation
 
 Run the following command from the root of the Vector repository:

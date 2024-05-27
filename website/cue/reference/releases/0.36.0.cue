@@ -22,13 +22,28 @@ releases: "0.36.0": {
 		instructions on how to migrate.
 		"""
 
+	known_issues: [
+		"""
+			AWS components don't support use of `credentials_process` in AWS configs. Fixed in v0.36.1.
+			""",
+		"""
+			AWS components don't support auto-detection of region . Fixed in v0.36.1.
+			""",
+		"""
+			AWS components don't support use of `assume_role`. Fixed in v0.36.1.
+			""",
+		"""
+			The `kafka` sink occasionally panics during rebalance events. Fixed in v0.36.1.
+			""",
+	]
+
 	changelog: [
 		{
 			type: "feat"
 			description: """
 				Vector can now emulate a [Prometheus Pushgateway](https://github.com/prometheus/pushgateway) through the new `prometheus_pushgateway` source. Counters and histograms can optionally be aggregated across pushes to support use-cases like cron jobs.
 
-				There are some caveats, which are listed [here](https://github.com/Sinjo/vector/blob/0d4fc20091ddae7f3562bfdf07c9095c0c7223e0/src/sources/prometheus/pushgateway.rs#L8-L12).
+				There are some caveats, which are listed [in the implementation](https://github.com/vectordotdev/vector/tree/v0.36/src/sources/prometheus/pushgateway.rs#L8-L12).
 
 				"""
 			contributors: ["Sinjo"]

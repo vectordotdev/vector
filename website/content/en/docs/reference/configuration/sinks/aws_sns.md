@@ -1,7 +1,7 @@
 ---
 title: AWS SNS
 description: Publish observability events to [Simple Notification Service](https://aws.amazon.com/sns/) topics
-kind: sink
+component_kind: sink
 layout: component
 tags: ["aws", "sns", "component", "sink"]
 ---

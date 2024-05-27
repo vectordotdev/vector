@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Stateless-Aggregator
-    app.kubernetes.io/version: "0.35.1-distroless-libc"
+    app.kubernetes.io/version: "0.38.0-distroless-libc"
   annotations: {}
 spec:
   replicas: 1
@@ -17,6 +17,7 @@ spec:
       app.kubernetes.io/name: vector
       app.kubernetes.io/instance: vector
       app.kubernetes.io/component: Stateless-Aggregator
+  minReadySeconds: 0
   template:
     metadata:
       annotations: {}
@@ -30,7 +31,7 @@ spec:
       dnsPolicy: ClusterFirst
       containers:
         - name: vector
-          image: "timberio/vector:0.35.1-distroless-libc"
+          image: "timberio/vector:0.38.0-distroless-libc"
           imagePullPolicy: IfNotPresent
           args:
             - --config-dir

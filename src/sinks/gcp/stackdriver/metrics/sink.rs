@@ -32,7 +32,7 @@ pub(super) struct StackdriverMetricsSink<S> {
 
 impl<S> StackdriverMetricsSink<S>
 where
-    S: Service<HttpRequest> + Send + 'static,
+    S: Service<HttpRequest<()>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
@@ -89,7 +89,7 @@ where
 #[async_trait::async_trait]
 impl<S> StreamSink<Event> for StackdriverMetricsSink<S>
 where
-    S: Service<HttpRequest> + Send + 'static,
+    S: Service<HttpRequest<()>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,

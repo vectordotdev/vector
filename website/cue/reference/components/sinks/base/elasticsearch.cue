@@ -261,6 +261,33 @@ base: components: sinks: elasticsearch: configuration: {
 					syntax: "template"
 				}
 			}
+			version: {
+				description: "Version field value."
+				required:    false
+				type: string: {
+					examples: ["{{ obj_version }}-%Y-%m-%d", "123"]
+					syntax: "template"
+				}
+			}
+			version_type: {
+				description: """
+					Version type.
+
+					Possible values are `internal`, `external` or `external_gt` and `external_gte`.
+
+					[es_index_versioning]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html#index-versioning
+					"""
+				required: false
+				type: string: {
+					default: "internal"
+					enum: {
+						external:     "The `external` or `external_gt` type."
+						external_gte: "The `external_gte` type."
+						internal:     "The `internal` type."
+					}
+					examples: ["internal", "external"]
+				}
+			}
 		}
 	}
 	compression: {
@@ -814,14 +841,14 @@ base: components: sinks: elasticsearch: configuration: {
 			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

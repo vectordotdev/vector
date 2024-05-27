@@ -7,7 +7,6 @@ use std::{
     time::Duration,
 };
 
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use hyper::{service::make_service_fn, Server};
@@ -46,7 +45,6 @@ use super::{
     error::ErrorMessage,
 };
 
-#[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
     // This function can be defined to enrich events with additional HTTP
     // metadata. This function should be used rather than internal enrichment so

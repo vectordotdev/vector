@@ -42,7 +42,7 @@ base: components: transforms: tag_cardinality_limit: configuration: {
 				This mode has lower memory requirements than `exact`, but may occasionally allow metric
 				events to pass through the transform even when they contain new tags that exceed the
 				configured limit. The rate at which this happens can be controlled by changing the value of
-				`cache_size_per_tag`.
+				`cache_size_per_key`.
 				"""
 		}
 	}

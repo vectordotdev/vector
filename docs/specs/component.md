@@ -126,6 +126,8 @@ of these events:
 
 #### ComponentEventsReceived
 
+**Note**: Will be deprecated once `SourceNetworkBytesReceived` exists.
+
 _All components_ MUST emit a `ComponentEventsReceived` event that represents
 the reception of Vector events from an upstream component.
 
@@ -146,6 +148,8 @@ the reception of Vector events from an upstream component.
   - MUST NOT be rate limited.
 
 #### ComponentBytesReceived
+
+**Note**: Will be deprecated once `SourceNetworkBytesSent` exists.
 
 *Sources* MUST emit a `ComponentBytesReceived` event that represent the reception of bytes.
 

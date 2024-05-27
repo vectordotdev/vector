@@ -1,10 +1,10 @@
 ---
-title: What is Observability Pipelines?
+title: What are Observability Pipelines?
 weight: 2
 tags: ["concepts"]
 ---
 
-Datadog's Observability Pipelines is a commercial observability data pipeline for collecting, processing, and routing observability data from any source to any destination in the infrastructure that you own or manage.
+Datadog's Observability Pipelines are commercial observability data pipelines for collecting, processing, and routing observability data from any source to any destination in the infrastructure that you own or manage.
 
 Use Observability Pipelines to:
 

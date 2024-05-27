@@ -16,7 +16,6 @@ For example:
 
 ## To be migrated
 
-- v0.37.0 strict_env_vars Change the default for missing environment variable interpolation from
-  warning to erroring.
-
 ## To be removed
+
+- v0.39.0 enterprise_feature The `enterprise` feature has been deprecated and will be removed.

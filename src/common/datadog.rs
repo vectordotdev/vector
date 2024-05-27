@@ -4,10 +4,27 @@
 #![allow(dead_code)]
 #![allow(unreachable_pub)]
 use serde::{Deserialize, Serialize};
-use vector_lib::{event::DatadogMetricOriginMetadata, sensitive_string::SensitiveString};
+use vector_lib::{
+    event::DatadogMetricOriginMetadata, schema::meaning, sensitive_string::SensitiveString,
+};
 
 pub(crate) const DD_US_SITE: &str = "datadoghq.com";
 pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
+
+/// The datadog tags event path.
+pub const DDTAGS: &str = "ddtags";
+
+/// Mapping of the semantic meaning of well known Datadog reserved attributes
+/// to the field name that Datadog intake expects.
+// https://docs.datadoghq.com/logs/log_configuration/attributes_naming_convention/?s=severity#reserved-attributes
+pub const DD_RESERVED_SEMANTIC_ATTRS: [(&str, &str); 6] = [
+    (meaning::SEVERITY, "status"), // status is intentionally semantically defined as severity
+    (meaning::TIMESTAMP, "timestamp"),
+    (meaning::HOST, "hostname"),
+    (meaning::SERVICE, "service"),
+    (meaning::SOURCE, "ddsource"),
+    (meaning::TAGS, DDTAGS),
+];
 
 /// DatadogSeriesMetric
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
