@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 use serde::Serialize;
 use toml::{map::Map, Value};
 use vector_lib::configurable::component::{
-    ExampleError, SinkDescription, SourceDescription, TransformDescription,
+    SinkDescription, SourceDescription, TransformDescription,
 };
 use vector_lib::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
@@ -158,12 +158,10 @@ pub(crate) fn generate_example(
             let mut example = match SourceDescription::example(&source_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!(
-                            "failed to generate source '{}': {}",
-                            source_type, err
-                        ));
-                    }
+                    errs.push(format!(
+                        "failed to generate source '{}': {}",
+                        source_type, err
+                    ));
                     Value::Table(Map::new())
                 }
             };
@@ -221,12 +219,10 @@ pub(crate) fn generate_example(
             let mut example = match TransformDescription::example(&transform_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!(
-                            "failed to generate transform '{}': {}",
-                            transform_type, err
-                        ));
-                    }
+                    errs.push(format!(
+                        "failed to generate transform '{}': {}",
+                        transform_type, err
+                    ));
                     Value::Table(Map::new())
                 }
             };
@@ -273,9 +269,7 @@ pub(crate) fn generate_example(
             let mut example = match SinkDescription::example(&sink_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
-                    }
+                    errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
                     Value::Table(Map::new())
                 }
             };

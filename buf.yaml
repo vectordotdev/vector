@@ -1,0 +1,18 @@
+version: v2
+modules:
+  - path: lib/vector-core/proto
+  - path: proto/third-party
+  - path: proto/vector
+lint:
+  use:
+    - DEFAULT
+  except:
+    - FIELD_NOT_REQUIRED
+    - PACKAGE_NO_IMPORT_CYCLE
+  disallow_comment_ignores: true
+breaking:
+  use:
+    - FILE
+  except:
+    - EXTENSION_NO_DELETE
+    - FIELD_SAME_DEFAULT

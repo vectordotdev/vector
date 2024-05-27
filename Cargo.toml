@@ -135,7 +135,7 @@ indexmap = { version = "2.2.6", default-features = false, features = ["serde", "
 pin-project = { version = "1.1.5", default-features = false }
 proptest = { version = "1.4" }
 proptest-derive = { version = "0.4.0" }
-serde_json = { version = "1.0.116", default-features = false, features = ["raw_value", "std"] }
+serde_json = { version = "1.0.117", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.202", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.13", default-features = false, features = ["display", "parse"] }
 vrl = { version = "0.15.0", features = ["arbitrary", "cli", "test", "test_framework"] }
@@ -191,14 +191,14 @@ aws-sdk-secretsmanager = { version = "1.3.0", default-features = false, features
 # `behavior-version-latest` feature. Without this we get a runtime panic when `auth.assume_role` authentication
 # is configured.
 aws-sdk-sts = { version = "1.3.1", default-features = false, features = ["behavior-version-latest"], optional = true }
-aws-types = { version = "1.2.1", default-features = false, optional = true }
+aws-types = { version = "1.3.0", default-features = false, optional = true }
 aws-sigv4 = { version = "1.2.1", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest", "credentials-process"], optional = true }
 aws-credential-types = { version = "1.2.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream"], optional = true }
 aws-smithy-types = { version = "1.1.10", default-features = false, optional = true }
 aws-smithy-runtime-api = { version = "1.6.1", default-features = false, optional = true }
-aws-smithy-runtime = { version = "1.5.3", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
+aws-smithy-runtime = { version = "1.5.4", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
 aws-smithy-async = { version = "1.2.1", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
@@ -370,7 +370,7 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.14", default-features = false }
-aws-smithy-runtime = { version = "1.5.3", default-features = false, features = ["tls-rustls"] }
+aws-smithy-runtime = { version = "1.5.4", default-features = false, features = ["tls-rustls"] }
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
@@ -736,7 +736,8 @@ sinks-datadog_metrics = ["protobuf-build", "dep:prost-reflect"]
 sinks-datadog_traces = ["protobuf-build", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sinks-elasticsearch = ["transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
-sinks-gcp = ["dep:base64", "gcp"]
+sinks-gcp = ["sinks-gcp-chronicle", "dep:base64", "gcp"]
+sinks-gcp-chronicle =  ["gcp"]
 sinks-greptimedb = ["dep:greptimedb-client"]
 sinks-honeycomb = []
 sinks-http = []
