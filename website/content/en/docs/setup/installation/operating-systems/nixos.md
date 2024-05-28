@@ -11,39 +11,112 @@ page covers installing and managing Vector on NixOS.
 Nixpkgs has a [community maintained module][nixpkg-vector] for Vector, the
 options for which may be viewed on the [NixOS Search][nixos-search].
 
-This can be used to deploy and configure Vector on a NixOS system.
+This can be used to deploy and configure Vector on a NixOS system, the module
+will also verify that the Vector configuration is valid before enabling any
+changes.
+
 For example, place into a system's `configuration.nix`:
 
 ```nix
 services.vector = {
   enable = true;
   journaldAccess = true;
-  settings = builtins.fromTOML ''
-    [sources.journald]
-    type = "journald"
-    current_boot_only = true
+  settings = {
+    sources = {
+      journald.type = "journald";
 
-    [sources.vector_metrics]
-    type = "internal_metrics"
+      vector_metrics.type = "internal_metrics";
+    };
 
-    [sinks.loki]
-    type = "loki"
-    inputs = [ "journald" ]
-    endpoint = "https://loki.mycompany.com"
+    sinks = {
+      loki = {
+        type = "loki";
+        inputs = [ "journald" ];
+        endpoint = "https://loki.mycompany.com";
+        encoding = { codec = "json"; };
 
-    [sinks.loki.labels]
-    source = "journald"
+        labels.source = "journald";
+      };
 
-    [sinks.prometheus_exporter]
-    type = "prometheus_exporter"
-    inputs = [ "vector_metrics" ]
-    address = "[::]:9598"
-  '';
+      prometheus_exporter = {
+        type = "prometheus_exporter";
+        inputs = [ "vector_metrics" ];
+        address = "[::]:9598"
+      };
+    };
+  };
 };
 ```
 
-The module will also verify that the Vector configuration is valid before
-enabling any changes.
+Occasionally, it'll be necessary to provide Vector with additional permissions
+to access files which belong to other services. Below is an example in which
+Vector is granted access to log files which belong to [Caddy][caddy]:
+
+```nix
+  services.vector = {
+    enable = true;
+    journaldAccess = true;
+    settings = {
+      sources = {
+        journald.type = "journald";
+
+        caddy = {
+          type = "file";
+          include = [ "/var/log/caddy/*.log" ];
+        };
+
+        vector_metrics.type = "internal_metrics";
+      };
+
+      transforms = {
+        caddy_logs_timestamp = {
+          type = "remap";
+          inputs = [ "caddy" ];
+          source = ''
+            .tmp_timestamp, err = parse_json!(.message).ts * 1000000
+
+            if err != null {
+              log("Unable to parse ts value: " + err, level: "error")
+            } else {
+              .timestamp = from_unix_timestamp!(to_int!(.tmp_timestamp), unit: "microseconds")
+            }
+
+            del(.tmp_timestamp)
+          '';
+        };
+      };
+
+      sinks = {
+        loki = {
+          type = "loki";
+          encoding.codec = "json";
+          inputs = [ "caddy_logs_timestamp" "journald" ];
+          endpoint = "https://loki.mycompany.com";
+
+          labels.source = "vector";
+        };
+
+        prometheus_exporter = {
+          type = "prometheus_exporter";
+          inputs = [ "vector_metrics" ];
+          address = "[::]:9598";
+        };
+      };
+    };
+  };
+
+  systemd.services.vector.serviceConfig = {
+    SupplementaryGroups = [ "caddy" ];
+  };
+```
+
+Other integration examples may be found at the
+[NixOS test suite for Vector][nixos-tests-vector]. These can also be run on a
+system with Nix with a local copy of the `nixpkgs` repo by executing:
+
+```shell
+nix-build -A nixosTests.vector
+```
 
 See also the [Nix] package page.
 
@@ -51,7 +124,9 @@ See also the [Nix] package page.
 
 {{< supported-installers >}}
 
-[nixos]: https://www.nixos.org
-[nixpkg-vector]: https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/logging/vector.nix
-[nixos-search]: https://search.nixos.org/options?query=services.vector
+[caddy]: https://caddyserver.com
 [nix]: /docs/setup/installation/package-managers/nix
+[nixos]: https://www.nixos.org
+[nixos-search]: https://search.nixos.org/options?query=services.vector
+[nixos-tests-vector]: https://github.com/NixOS/nixpkgs/tree/master/nixos/tests/vector/
+[nixpkg-vector]: https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/services/logging/vector.nix
