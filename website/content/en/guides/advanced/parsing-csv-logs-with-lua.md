@@ -156,7 +156,7 @@ the whole transform:
       "location",
       "application_name",
       -- available only in postgres > 13, to remove for postgres <= 13
-      "backend_type",  
+      "backend_type",
       "leader_pid",
       "query_id"
     }
