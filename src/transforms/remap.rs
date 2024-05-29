@@ -139,6 +139,8 @@ pub struct RemapConfig {
     #[configurable(derived, metadata(docs::hidden))]
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
+    /// Cache can't be `BTreeMap` or `HashMap` because of `TableRegistry`, which doesn't allow us to inspect tables inside it.
+    /// And even if we allowed the inspection, the tables can be huge, resulting in a long comparison or hash computation
     pub cache: Mutex<
         Vec<(
             (TableRegistry, schema::Definition),
@@ -172,9 +174,9 @@ impl RemapConfig {
         if let Some((_, res)) = self
             .cache
             .lock()
-            .unwrap()
+            .expect("Data poisoned")
             .iter()
-            .find(|v| v.0 .0 == enrichment_tables && v.0 .1 == merged_schema_definition)
+            .find(|v| v.0.0 == enrichment_tables && v.0.1 == merged_schema_definition)
         {
             return res.clone().map_err(Into::into);
         }
@@ -222,7 +224,7 @@ impl RemapConfig {
 
         self.cache
             .lock()
-            .unwrap()
+            .expect("Data poisoned")
             .push(((enrichment_tables, merged_schema_definition), res.clone()));
 
         res.map_err(Into::into)
