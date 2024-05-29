@@ -200,13 +200,12 @@ impl GcpAuthenticator {
         match self {
             Self::Credentials(inner) => {
                 let expires_in = inner.token.read().unwrap().expires_in() as u64;
-                info!(message = "expires_in.", %expires_in);
                 let mut start = Instant::now();
                 // The first tick should occur during the known refresh window of the access token
                 if expires_in >= METADATA_TOKEN_CACHE_EXPIRY_SECS {
                     start = start
                         + Duration::from_secs(
-                            expires_in - METADATA_TOKEN_REFRESH_WINDOW_MIDPOINT_SECS
+                            expires_in - METADATA_TOKEN_REFRESH_WINDOW_MIDPOINT_SECS,
                         );
                 }
                 let period = Duration::from_secs(expires_in / 2);
