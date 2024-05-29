@@ -90,6 +90,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
+        let enable_source_ip = self.enable_source_ip();
+
         Ok(Box::pin(async move {
             let mut filter: BoxedFilter<()> = match method {
                 HttpMethod::Head => warp::head().boxed(),
@@ -190,7 +192,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             let span = Span::current();
             let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let remote_addr = conn.peer_addr();
-                let remote_addr_ref = Arc::new(remote_addr);
+                let remote_addr_ref = enable_source_ip.then(|| Arc::new(remote_addr));
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
@@ -201,9 +203,12 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         )
                     }))
                     .map_request(move |mut request: hyper::Request<_>| {
-                        request
-                            .extensions_mut()
-                            .insert(PeerAddr::new(Arc::clone(&remote_addr_ref)));
+                        if let Some(remote_addr_inner) = remote_addr_ref.as_ref() {
+                            request
+                                .extensions_mut()
+                                .insert(PeerAddr::new(Arc::clone(&remote_addr_inner)));
+                        }
+
                         request
                     })
                     .service(warp::service(routes.clone()));
@@ -226,6 +231,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
             Ok(())
         }))
+    }
+
+    fn enable_source_ip(&self) -> bool {
+        false
     }
 }
 

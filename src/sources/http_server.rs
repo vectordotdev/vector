@@ -23,8 +23,9 @@ use vector_lib::{
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
+        // log_schema
     },
     event::{Event, Value},
     http::KeepaliveConfig,
@@ -131,11 +132,8 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::examples = "vector_http_path"))]
     path_key: OptionalValuePath,
 
-    /// Overrides the name of the log field used to add the remote IP to each event.
+    /// Overrides the name of the log field used to add the remote IP to each event. By default, the remote IP is not added.
     ///
-    /// By default, the [global `log_schema.host_key` option](global_host_key) is used.
-    ///
-    /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "default_host_key")]
     #[configurable(metadata(docs::examples = "hostname"))]
     host_key: OptionalValuePath,
@@ -302,7 +300,8 @@ fn default_path_key() -> OptionalValuePath {
 }
 
 fn default_host_key() -> OptionalValuePath {
-    log_schema().host_key().cloned().into()
+    // log_schema().host_key().cloned().into()
+    OptionalValuePath::none()
 }
 
 const fn default_http_response_code() -> StatusCode {
@@ -543,6 +542,10 @@ impl HttpSource for SimpleHttpSource {
         }
 
         Ok(events)
+    }
+
+    fn enable_source_ip(&self) -> bool {
+        self.host_key.path.is_some()
     }
 }
 
