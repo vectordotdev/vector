@@ -176,7 +176,7 @@ impl RemapConfig {
             .lock()
             .expect("Data poisoned")
             .iter()
-            .find(|v| v.0.0 == enrichment_tables && v.0.1 == merged_schema_definition)
+            .find(|v| v.0 .0 == enrichment_tables && v.0 .1 == merged_schema_definition)
         {
             return res.clone().map_err(Into::into);
         }
