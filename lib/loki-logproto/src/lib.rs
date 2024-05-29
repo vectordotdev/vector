@@ -26,7 +26,7 @@ pub mod util {
     }
 
     // (<Timestamp in nanos>, <Line>, <Structured metadata>)
-    pub struct Entry(pub i64, pub String, pub HashMap<String, String>);
+    pub struct Entry(pub i64, pub String, pub Vec<(String, String)>);
 
     impl From<Entry> for logproto::EntryAdapter {
         fn from(entry: Entry) -> Self {

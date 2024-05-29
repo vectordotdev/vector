@@ -135,6 +135,7 @@ pub(super) struct EventEncoder {
     transformer: Transformer,
     encoder: Encoder<()>,
     labels: HashMap<Template, Template>,
+    structured_metadata: Option<String>,
     remove_label_fields: bool,
     remove_timestamp: bool,
 }
@@ -245,12 +246,25 @@ impl EventEncoder {
         }
     }
 
+    fn build_structured_metadata(&self, _event: &Event) -> Vec<(String, String)> {
+        // TODO: fetch this from the event data
+
+        return vec![];
+    }
+
     pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
         let tenant_id = self.key_partitioner.partition(&event);
         let finalizers = event.take_finalizers();
         let json_byte_size = event.estimated_json_encoded_size_of();
+        let mut structured_metadata: Vec<(String, String)> = Vec::new();
         let mut labels = self.build_labels(&event);
         self.remove_label_fields(&mut event);
+
+        if self.structured_metadata != Option::None {
+            structured_metadata.extend(
+                self.build_structured_metadata(&event)
+            );
+        }
 
         let timestamp = match event.as_log().get_timestamp() {
             Some(Value::Timestamp(ts)) => ts.timestamp_nanos_opt().expect("Timestamp out of range"),
@@ -284,6 +298,7 @@ impl EventEncoder {
             event: LokiEvent {
                 timestamp,
                 event: bytes.freeze(),
+                structured_metadata: structured_metadata.clone(),
             },
             partition,
             finalizers,
@@ -425,6 +440,7 @@ impl LokiSink {
                 transformer,
                 encoder,
                 labels: config.labels,
+                structured_metadata: config.structured_metadata,
                 remove_label_fields: config.remove_label_fields,
                 remove_timestamp: config.remove_timestamp,
             },
@@ -529,6 +545,7 @@ mod tests {
             transformer: Default::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
+            structured_metadata: Option::None,
             remove_label_fields: false,
             remove_timestamp: false,
         };
@@ -572,6 +589,7 @@ mod tests {
             transformer: Default::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
+            structured_metadata: Option::None,
             remove_label_fields: false,
             remove_timestamp: false,
         };
@@ -622,6 +640,7 @@ mod tests {
             transformer: Default::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
+            structured_metadata: Option::None,
             remove_label_fields: false,
             remove_timestamp: false,
         };
@@ -672,6 +691,7 @@ mod tests {
             transformer: Default::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
+            structured_metadata: Option::None,
             remove_label_fields: false,
             remove_timestamp: false,
         };
@@ -710,6 +730,7 @@ mod tests {
             transformer: Default::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
+            structured_metadata: Option::None,
             remove_label_fields: false,
             remove_timestamp: false,
         };
@@ -731,6 +752,7 @@ mod tests {
             transformer: Default::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
+            structured_metadata: Option::None,
             remove_label_fields: false,
             remove_timestamp: true,
         };
@@ -761,6 +783,7 @@ mod tests {
             transformer: Default::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels,
+            structured_metadata: Option::None,
             remove_label_fields: true,
             remove_timestamp: false,
         };
@@ -783,6 +806,7 @@ mod tests {
             transformer: Default::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
+            structured_metadata: Option::None,
             remove_label_fields: false,
             remove_timestamp: false,
         };
