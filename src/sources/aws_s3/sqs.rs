@@ -131,8 +131,9 @@ pub(super) struct Config {
     // Client timeout configuration for SQS operations. Take care when configuring these settings
     // to allow enough time for the polling interval configured in `poll_secs`.
     #[configurable(derived)]
-    #[serde(default)]
     #[derivative(Default)]
+    #[serde(default)]
+    #[serde(flatten)]
     pub(super) timeout: Option<AwsTimeout>,
 }
 

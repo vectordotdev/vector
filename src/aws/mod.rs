@@ -33,7 +33,6 @@ use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
 use snafu::Snafu;
-use std::time::SystemTime;
 use std::{
     error::Error,
     pin::Pin,
@@ -42,6 +41,7 @@ use std::{
         Arc, OnceLock,
     },
     task::{Context, Poll},
+    time::{Duration, SystemTime},
 };
 pub use timeout::AwsTimeout;
 
@@ -223,13 +223,18 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     }
 
     if let Some(timeout) = timeout {
-        config_builder = config_builder.timeout_config(
-            TimeoutConfig::builder()
-                .connect_timeout(timeout.connect_timeout())
-                .operation_timeout(timeout.operation_timeout())
-                .read_timeout(timeout.read_timeout())
-                .build(),
-        );
+        let mut timeout_config_builder = TimeoutConfig::builder();
+
+        let operation_timeout = timeout.operation_timeout();
+        let connect_timeout = timeout.connect_timeout();
+        let read_timeout = timeout.read_timeout();
+
+        timeout_config_builder
+            .set_operation_timeout(operation_timeout.map(Duration::from_secs))
+            .set_connect_timeout(connect_timeout.map(Duration::from_secs))
+            .set_read_timeout(read_timeout.map(Duration::from_secs));
+
+        config_builder = config_builder.timeout_config(timeout_config_builder.build());
     }
 
     let config = config_builder.build();
