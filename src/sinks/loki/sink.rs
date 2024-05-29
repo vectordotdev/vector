@@ -135,8 +135,9 @@ pub(super) struct EventEncoder {
     transformer: Transformer,
     encoder: Encoder<()>,
     labels: HashMap<Template, Template>,
-    structured_metadata: Option<String>,
     remove_label_fields: bool,
+    structured_metadata: Option<Vec<String>>,
+    remove_structured_metadata_fields: bool,
     remove_timestamp: bool,
 }
 
@@ -246,25 +247,39 @@ impl EventEncoder {
         }
     }
 
-    fn build_structured_metadata(&self, _event: &Event) -> Vec<(String, String)> {
-        // TODO: fetch this from the event data
+    fn build_structured_metadata(&self, event: &Event) -> Vec<(String, String)> {
+        if self.structured_metadata == Option::None {
+            return Vec::new();
+        }
 
-        return vec![];
+        let mut structured_metadata: Vec<(String, String)> = Vec::new();
+        for key in self.structured_metadata.iter() {
+            if let Ok(path) = parse_target_path(key) {
+                let value = event.as_log().get(&path);
+                structured_metadata.push((key, value));
+            }
+        }
+        Vec::from_iter(structured_metadata)
+    }
+
+    fn remove_structured_metadata_fields(&self, event: &mut Event) {
+        if self.remove_structured_metadata_fields && self.structured_metadata != Option::None {
+            for key in self.structured_metadata.iter() {
+                if let Ok(path) = parse_target_path(key) {
+                    event.as_mut_log().remove(&path);
+                }
+            }
+        }
     }
 
     pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
         let tenant_id = self.key_partitioner.partition(&event);
         let finalizers = event.take_finalizers();
         let json_byte_size = event.estimated_json_encoded_size_of();
-        let mut structured_metadata: Vec<(String, String)> = Vec::new();
-        let mut labels = self.build_labels(&event);
+        let mut labels: Vec<(String, String)> = self.build_labels(&event);
         self.remove_label_fields(&mut event);
-
-        if self.structured_metadata != Option::None {
-            structured_metadata.extend(
-                self.build_structured_metadata(&event)
-            );
-        }
+        let mut structured_metadata: Vec<(String, String)> = self.build_structured_metadata(&event);
+        self.remove_structured_metadata_fields(&mut event);
 
         let timestamp = match event.as_log().get_timestamp() {
             Some(Value::Timestamp(ts)) => ts.timestamp_nanos_opt().expect("Timestamp out of range"),
@@ -442,6 +457,7 @@ impl LokiSink {
                 labels: config.labels,
                 structured_metadata: config.structured_metadata,
                 remove_label_fields: config.remove_label_fields,
+                remove_structured_metadata_fields: config.remove_structured_metadata_fields,
                 remove_timestamp: config.remove_timestamp,
             },
             batch_settings: config.batch.into_batcher_settings()?,
@@ -547,6 +563,7 @@ mod tests {
             labels: HashMap::default(),
             structured_metadata: Option::None,
             remove_label_fields: false,
+            remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
@@ -591,6 +608,7 @@ mod tests {
             labels,
             structured_metadata: Option::None,
             remove_label_fields: false,
+            remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
@@ -642,6 +660,7 @@ mod tests {
             labels,
             structured_metadata: Option::None,
             remove_label_fields: false,
+            remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
 
@@ -693,6 +712,7 @@ mod tests {
             labels,
             structured_metadata: Option::None,
             remove_label_fields: false,
+            remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
 
@@ -732,6 +752,7 @@ mod tests {
             labels,
             structured_metadata: Option::None,
             remove_label_fields: false,
+            remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
 
@@ -754,6 +775,7 @@ mod tests {
             labels: HashMap::default(),
             structured_metadata: Option::None,
             remove_label_fields: false,
+            remove_structured_metadata_fields: false,
             remove_timestamp: true,
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
@@ -785,6 +807,7 @@ mod tests {
             labels,
             structured_metadata: Option::None,
             remove_label_fields: true,
+            remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
@@ -808,6 +831,7 @@ mod tests {
             labels: HashMap::default(),
             structured_metadata: Option::None,
             remove_label_fields: false,
+            remove_structured_metadata_fields: false,
             remove_timestamp: false,
         };
         let base = chrono::Utc::now();

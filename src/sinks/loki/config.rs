@@ -62,14 +62,18 @@ pub struct LokiConfig {
     #[configurable(metadata(docs::additional_props_description = "A Loki label."))]
     pub labels: HashMap<Template, Template>,
 
-    /// The key to add structured metadata to for Loki.
-    #[configurable(metadata(docs::examples = "loki_structured_metadata_examples()"))]
-    #[configurable(metadata(docs::additional_props_description = "Loki structured metadata."))]
-    pub structured_metadata: Option<String>,
-
     /// Whether or not to delete fields from the event when they are used as labels.
     #[serde(default = "crate::serde::default_false")]
     pub remove_label_fields: bool,
+
+    /// Fields to add to structured metadata.
+    #[configurable(metadata(docs::examples = "loki_structured_metadata_examples()"))]
+    #[configurable(metadata(docs::additional_props_description = "Loki structured metadata."))]
+    pub structured_metadata: Option<Vec<String>>,
+
+    /// Whether to delete fields that were passed as structured metadata
+    #[serde(default = "crate::serde::default_false")]
+    pub remove_structured_metadata_fields: bool,
 
     /// Whether or not to remove the timestamp from the event payload.
     ///
@@ -125,7 +129,11 @@ fn loki_labels_examples() -> HashMap<String, String> {
 }
 
 fn loki_structured_metadata_examples() -> Vec<String> {
-    return ["metadata", "data", ""].map(String::from).to_vec();
+    let mut examples = Vec::new();
+    examples.push("data");
+    examples.push("metadata");
+    examples.push("message");
+    examples
 }
 
 #[derive(Clone, Copy, Debug, Default)]
