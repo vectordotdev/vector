@@ -1,3 +1,3 @@
-Cache result of remap compilation which is called multiple times during vector initialization improving startup time with large remap transforms.
+Vector's start-up time was greatly improved when loading configurations including many `remap` transforms.
 
 authors: Zettroke
