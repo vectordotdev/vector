@@ -255,6 +255,7 @@ impl EventEncoder {
         let mut structured_metadata: Vec<(String, String)> = Vec::new();
         for key in self.structured_metadata.iter() {
             if let Ok(path) = parse_target_path(key) {
+                // TODO: call VRL flatten on whatever goes here?
                 let value = event.as_log().get(&path);
                 structured_metadata.push((key, value));
             }
@@ -820,6 +821,64 @@ mod tests {
         log.insert("value", "bar");
         let record = encoder.encode_event(event).unwrap();
         assert!(!String::from_utf8_lossy(&record.event.event).contains("value"));
+    }
+
+    #[test]
+    fn encoder_with_structured_metadata() -> Result<(), serde_json::Error> {
+        let mut encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            transformer: Default::default(),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
+            labels: HashMap::default(),
+            structured_metadata: vec!["kubernetes", "metadata", "data"],
+            remove_label_fields: false,
+            remove_structured_metadata_fields: false,
+            remove_timestamp: false,
+        };
+
+        let message = r#"
+        {
+        	"kubernetes": {
+        		"pod_labels": {
+        			"app": "web-server",
+        			"name": "unicorn"
+        		}
+        	},
+        	"metadata": {
+        		"cluster_name": "operations",
+        		"cluster_environment": "development",
+        		"cluster_version": "1.2.3"
+        	}
+        }
+        "#;
+
+        let msg: ObjectMap = serde_json::from_str(message)?;
+        let event = Event::Log(LogEvent::from(msg));
+        let record = encoder.encode_event(event).unwrap();
+        assert_eq!(record.event.structured_metadata.len(), 2);
+        let structured_metadata: HashMap<String, String> =
+            record.event.structured_metadata.into_iter().collect();
+        assert_eq!(
+            structured_metadata["kubernetes_pod_labels_app"],
+            "web-server".to_string()
+        );
+        assert_eq!(
+            structured_metadata["kubernetes_pod_labels_name"],
+            "unicorn".to_string()
+        );
+        assert_eq!(
+            structured_metadata["metadata_cluster_name"],
+            "static_cluster_name".to_string()
+        );
+        assert_eq!(
+            structured_metadata["metadata_cluster_environment"],
+            "development".to_string()
+        );
+        assert_eq!(
+            structured_metadata["metadata_cluster_version"],
+            "1.2.3".to_string()
+        );
+        Ok(())
     }
 
     #[tokio::test]
