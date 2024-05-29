@@ -69,7 +69,7 @@ pub struct LokiConfig {
     /// Fields to add to structured metadata.
     #[configurable(metadata(docs::examples = "loki_structured_metadata_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "Loki structured metadata."))]
-    pub structured_metadata: Option<Vec<String>>,
+    pub structured_metadata: Option<HashMap<Template, Template>>,
 
     /// Whether to delete fields that were passed as structured metadata
     #[serde(default = "crate::serde::default_false")]
@@ -129,10 +129,17 @@ fn loki_labels_examples() -> HashMap<String, String> {
 }
 
 fn loki_structured_metadata_examples() -> Vec<String> {
-    let mut examples = Vec::new();
-    examples.push("data");
-    examples.push("metadata");
-    examples.push("message");
+    let mut examples = HashMap::new();
+    examples.insert("source".to_string(), "vector".to_string());
+    examples.insert(
+        "\"pod_labels_*\"".to_string(),
+        "{{ kubernetes.pod_labels }}".to_string(),
+    );
+    examples.insert("\"*\"".to_string(), "{{ metadata }}".to_string());
+    examples.insert(
+        "{{ event_field }}".to_string(),
+        "{{ some_other_event_field }}".to_string(),
+    );
     examples
 }
 
