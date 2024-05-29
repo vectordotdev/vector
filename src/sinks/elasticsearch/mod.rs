@@ -266,6 +266,7 @@ impl ElasticsearchCommonMode {
 /// Configuration for Elasticsearch API version.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchApiVersion {
     /// Auto-detect the API version.
