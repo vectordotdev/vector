@@ -25,6 +25,11 @@ use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
+// See https://cloud.google.com/compute/docs/access/authenticate-workloads#applications
+const METADATA_TOKEN_CACHE_EXPIRY_SECS: u64 = 300;
+
+const METADATA_TOKEN_REFRESH_WINDOW_MIDPOINT_SECS: u64 = 150;
+
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
 pub static PUBSUB_ADDRESS: Lazy<String> = Lazy::new(|| {
@@ -194,12 +199,21 @@ impl GcpAuthenticator {
     async fn token_regenerator(self, sender: watch::Sender<()>) {
         match self {
             Self::Credentials(inner) => {
-                let period =
-                    Duration::from_secs(inner.token.read().unwrap().expires_in() as u64 / 2);
-                let mut interval = tokio::time::interval_at(Instant::now() + period, period);
+                let expires_in = inner.token.read().unwrap().expires_in() as u64;
+                info!(message = "expires_in.", %expires_in);
+                let mut start = Instant::now();
+                // The first tick should occur during the known refresh window of the access token
+                if expires_in >= METADATA_TOKEN_CACHE_EXPIRY_SECS {
+                    start = start
+                        + Duration::from_secs(
+                            expires_in - METADATA_TOKEN_REFRESH_WINDOW_MIDPOINT_SECS
+                        );
+                }
+                let period = Duration::from_secs(expires_in / 2);
+                let mut interval = tokio::time::interval_at(start, period);
                 loop {
                     interval.tick().await;
-                    debug!("Renewing GCP authentication token.");
+                    info!("Renewing GCP authentication token.");
                     match inner.regenerate_token().await {
                         Ok(()) => sender.send_replace(()),
                         Err(error) => {
@@ -242,7 +256,7 @@ async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token>
     let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
     let jwt = Jwt::new(claims, rsa_key, None);
 
-    debug!(
+    info!(
         message = "Fetching GCP authentication token.",
         project = ?creds.project(),
         iss = ?creds.iss(),
