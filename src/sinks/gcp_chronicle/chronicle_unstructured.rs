@@ -32,15 +32,17 @@ use crate::{
     http::HttpClient,
     schema,
     sinks::{
+        gcp_chronicle::{
+            partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
+            sink::ChronicleSink,
+        },
         gcs_common::{
             config::{healthcheck_response, GcsRetryLogic},
             service::GcsResponse,
-            sink::GcsSink,
         },
         util::{
             encoding::{as_tracked_write, Encoder},
             metadata::RequestMetadataBuilder,
-            partitioner::KeyPartitioner,
             request_builder::EncodeResult,
             BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
         },
@@ -130,8 +132,10 @@ pub struct ChronicleUnstructuredConfig {
     pub customer_id: String,
 
     /// User-configured environment namespace to identify the data domain the logs originated from.
-    #[configurable(metadata(docs::examples = "production"))]
-    pub namespace: Option<String>,
+    #[configurable(metadata(docs::templateable))]
+    #[configurable(metadata(docs::examples = "production", docs::examples = "production-{{ namespace }}",))]
+    #[configurable(metadata(docs::advanced))]
+    pub namespace: Option<Template>,
 
     /// A set of labels that are attached to each batch of events.
     #[configurable(metadata(docs::examples = "chronicle_labels_examples()"))]
@@ -265,7 +269,7 @@ impl ChronicleUnstructuredConfig {
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        let partitioner = self.key_partitioner()?;
+        let partitioner = self.partitioner()?;
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic)
@@ -273,13 +277,16 @@ impl ChronicleUnstructuredConfig {
 
         let request_settings = ChronicleRequestBuilder::new(self)?;
 
-        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings, "http");
+        let sink = ChronicleSink::new(svc, request_settings, partitioner, batch_settings, "http");
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        Ok(KeyPartitioner::new(self.log_type.clone()))
+    fn partitioner(&self) -> crate::Result<ChroniclePartitioner> {
+        Ok(ChroniclePartitioner::new(
+            self.log_type.clone(),
+            self.namespace.clone(),
+        ))
     }
 
     fn create_endpoint(&self, path: &str) -> Result<String, ChronicleError> {
@@ -333,19 +340,18 @@ struct ChronicleRequestBody {
 #[derive(Clone, Debug)]
 struct ChronicleEncoder {
     customer_id: String,
-    namespace: Option<String>,
     labels: Option<Vec<Label>>,
     encoder: codecs::Encoder<()>,
     transformer: codecs::Transformer,
 }
 
-impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
+impl Encoder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleEncoder {
     fn encode_input(
         &self,
-        input: (String, Vec<Event>),
+        input: (ChroniclePartitionKey, Vec<Event>),
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
-        let (partition_key, events) = input;
+        let (key, events) = input;
         let mut encoder = self.encoder.clone();
         let mut byte_size = telemetry().create_request_count_byte_size();
         let events = events
@@ -381,9 +387,9 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
 
         let json = json!(ChronicleRequestBody {
             customer_id: self.customer_id.clone(),
-            namespace: self.namespace.clone(),
+            namespace: key.namespace,
             labels: self.labels.clone(),
-            log_type: partition_key,
+            log_type: key.log_type,
             entries: events,
         });
 
@@ -420,9 +426,9 @@ impl AsRef<[u8]> for ChronicleRequestPayload {
     }
 }
 
-impl RequestBuilder<(String, Vec<Event>)> for ChronicleRequestBuilder {
+impl RequestBuilder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleRequestBuilder {
     type Metadata = EventFinalizers;
-    type Events = (String, Vec<Event>);
+    type Events = (ChroniclePartitionKey, Vec<Event>);
     type Encoder = ChronicleEncoder;
     type Payload = ChronicleRequestPayload;
     type Request = ChronicleRequest;
@@ -438,7 +444,7 @@ impl RequestBuilder<(String, Vec<Event>)> for ChronicleRequestBuilder {
 
     fn split_input(
         &self,
-        input: (String, Vec<Event>),
+        input: (ChroniclePartitionKey, Vec<Event>),
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
@@ -474,7 +480,6 @@ impl ChronicleRequestBuilder {
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
         let encoder = ChronicleEncoder {
             customer_id: config.customer_id.clone(),
-            namespace: config.namespace.clone(),
             labels: config.labels.as_ref().map(|labs| {
                 labs.iter()
                     .map(|(k, v)| Label {
@@ -584,7 +589,7 @@ mod integration_tests {
             indoc! { r#"
              endpoint = "{}"
              customer_id = "customer id"
-             namespace = "namespace"
+             namespace = "{}"
              credentials_path = "{}"
              log_type = "{}"
              encoding.codec = "text"
