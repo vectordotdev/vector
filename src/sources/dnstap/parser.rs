@@ -11,6 +11,7 @@ use chrono::{TimeZone, Utc};
 use dnsmsg_parser::{dns_message_parser::DnsParserOptions, ede::EDE};
 use hickory_proto::{
     rr::domain::Name,
+    rr::rdata::opt::ClientSubnet,
     serialize::binary::{BinDecodable, BinDecoder},
 };
 use once_cell::sync::Lazy;
@@ -826,6 +827,11 @@ impl DnstapParser {
                 edns.udp_max_payload_size,
             );
             DnstapParser::log_edns_ede(event, prefix.concat(&DNSTAP_VALUE_PATHS.ede), &edns.ede);
+            DnstapParser::log_edns_client_subnet(
+                event,
+                prefix.concat(&DNSTAP_VALUE_PATHS.client_subnet),
+                &edns.client_subnet,
+            );
             DnstapParser::log_edns_options(
                 event,
                 prefix.concat(&DNSTAP_VALUE_PATHS.options),
@@ -859,6 +865,42 @@ impl DnstapParser {
                 extra_text,
             );
         }
+    }
+
+    fn log_edns_client_subnet<'a>(
+        event: &mut LogEvent,
+        prefix: impl ValuePath<'a>,
+        options: &[ClientSubnet],
+    ) {
+        options.iter().enumerate().for_each(|(i, entry)| {
+            let index_segment = path!(i as isize);
+            DnstapParser::log_edns_client_subnet_entry(event, prefix.concat(index_segment), entry);
+        });
+    }
+
+    fn log_edns_client_subnet_entry<'a>(
+        event: &mut LogEvent,
+        prefix: impl ValuePath<'a>,
+        entry: &ClientSubnet,
+    ) {
+        DnstapParser::insert(
+            event,
+            prefix.clone(),
+            &DNSTAP_VALUE_PATHS.ecs_address,
+            entry.addr().to_string(),
+        );
+        DnstapParser::insert(
+            event,
+            prefix.clone(),
+            &DNSTAP_VALUE_PATHS.ecs_source_prefix_length,
+            entry.source_prefix(),
+        );
+        DnstapParser::insert(
+            event,
+            prefix.clone(),
+            &DNSTAP_VALUE_PATHS.ecs_scope_prefix_length,
+            entry.scope_prefix(),
+        );
     }
 
     fn log_edns_options<'a>(

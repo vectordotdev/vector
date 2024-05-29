@@ -1,4 +1,4 @@
-use hickory_proto::op::ResponseCode;
+use hickory_proto::{op::ResponseCode, rr::rdata::opt::ClientSubnet};
 
 use crate::ede::EDE;
 
@@ -83,6 +83,7 @@ pub struct OptPseudoSection {
     pub dnssec_ok: bool,
     pub udp_max_payload_size: u16,
     pub ede: Vec<EDE>,
+    pub client_subnet: Vec<ClientSubnet>,
     pub options: Vec<EdnsOptionEntry>,
 }
 

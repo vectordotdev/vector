@@ -2,6 +2,7 @@ use std::str::Utf8Error;
 use std::{fmt::Write as _, ops::Deref};
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
+use hickory_proto::rr::rdata::opt::ClientSubnet;
 use hickory_proto::{
     error::ProtoError,
     op::{message::Message as TrustDnsMessage, Query},
@@ -186,11 +187,11 @@ impl DnsMessageParser {
 
     pub(crate) fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
         let record_data = match record.data() {
-            Some(RData::Unknown { code, rdata }) => {
+            RData::Unknown { code, rdata } => {
                 self.format_unknown_rdata((*code).into(), rdata)
-            }
-            Some(rdata) => self.format_rdata(rdata),
-            None => Ok((Some(String::from("")), None)), // NULL record
+            },
+            RData::NULL(..) => Ok((Some(String::from("")), None)), // NULL record
+            rdata => self.format_rdata(rdata),
         }?;
 
         Ok(DnsRecord {
@@ -727,8 +728,10 @@ impl DnsMessageParser {
                         entry.extra_text().unwrap_or("".to_string())
                     ),
                 });
+                // ClientSubnet has been already parsed in parse_edns_options,
+                // additional special handling is not needed
                 let opt_data = parsed
-                    .1
+                    .2
                     .into_iter()
                     .chain(ede_data)
                     .map(|entry| format!("{}={}", entry.opt_name, entry.opt_data))
@@ -963,18 +966,21 @@ fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeade
 
 fn parse_edns(dns_message: &TrustDnsMessage) -> Option<DnsParserResult<OptPseudoSection>> {
     dns_message.extensions().as_ref().map(|edns| {
-        parse_edns_options(edns.options()).map(|(ede, rest)| OptPseudoSection {
+        parse_edns_options(edns.options()).map(|(ede, client_subnet, rest)| OptPseudoSection {
             extended_rcode: edns.rcode_high(),
             version: edns.version(),
             dnssec_ok: edns.dnssec_ok(),
             udp_max_payload_size: edns.max_payload(),
             ede,
+            client_subnet,
             options: rest,
         })
     })
 }
 
-fn parse_edns_options(edns: &OPT) -> DnsParserResult<(Vec<EDE>, Vec<EdnsOptionEntry>)> {
+fn parse_edns_options(
+    edns: &OPT,
+) -> DnsParserResult<(Vec<EDE>, Vec<ClientSubnet>, Vec<EdnsOptionEntry>)> {
     let ede_opts: Vec<EDE> = edns
         .as_ref()
         .iter()
@@ -990,10 +996,22 @@ fn parse_edns_options(edns: &OPT) -> DnsParserResult<(Vec<EDE>, Vec<EdnsOptionEn
         })
         .collect::<Result<Vec<EDE>, DnsMessageParserError>>()?;
 
+    let client_subnet_opts: Vec<ClientSubnet> = edns
+        .as_ref()
+        .iter()
+        .filter_map(|(_, option)| {
+            if let EdnsOption::Subnet(client_subnet) = option {
+                Some(Ok(client_subnet.clone()))
+            } else {
+                None
+            }
+        })
+        .collect::<Result<Vec<ClientSubnet>, DnsMessageParserError>>()?;
+
     let rest: Vec<EdnsOptionEntry> = edns
         .as_ref()
         .iter()
-        .filter(|(&code, _)| u16::from(code) != EDE_OPTION_CODE)
+        .filter(|(code, _)| u16::from(*code) != EDE_OPTION_CODE)
         .map(|(code, option)| match option {
             EdnsOption::DAU(algorithms)
             | EdnsOption::DHU(algorithms)
@@ -1007,7 +1025,7 @@ fn parse_edns_options(edns: &OPT) -> DnsParserResult<(Vec<EDE>, Vec<EdnsOptionEn
         })
         .collect::<Result<Vec<EdnsOptionEntry>, DnsMessageParserError>>()?;
 
-    Ok((ede_opts, rest))
+    Ok((ede_opts, client_subnet_opts, rest))
 }
 
 fn parse_edns_opt_dnssec_algorithms(
@@ -1268,7 +1286,6 @@ fn format_bytes_as_hex_string(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashMap,
         net::{Ipv4Addr, Ipv6Addr},
         str::FromStr,
     };
@@ -1380,6 +1397,24 @@ mod tests {
             opt_pseudo_section.ede[0].extra_text(),
             Some("no SEP matching the DS found for dnssec-failed.org.".to_string())
         );
+    }
+
+    #[test]
+    fn test_parse_as_query_message_with_client_subnet() {
+        let raw_dns_message =
+            "szgAAAABAAAAAAABAmg1B2V4YW1wbGUDY29tAAAGAAEAACkCAAAAAAAACwAIAAcAARgAwAAC";
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let parse_result = DnsMessageParser::new(raw_query_message).parse_as_query_message();
+        assert!(parse_result.is_ok());
+        let message = parse_result.expect("Message is not parsed.");
+        println!("{:?}", message);
+        let opt_pseudo_section = message.opt_pseudo_section.expect("OPT section was missing");
+        assert_eq!(opt_pseudo_section.client_subnet.len(), 1);
+        assert_eq!(opt_pseudo_section.client_subnet[0].addr(), Ipv4Addr::new(192, 0, 2, 0));
+        assert_eq!(opt_pseudo_section.client_subnet[0].source_prefix(), 24);
+        assert_eq!(opt_pseudo_section.client_subnet[0].scope_prefix(), 0);
     }
 
     #[test]
@@ -1985,11 +2020,12 @@ mod tests {
 
     #[test]
     fn test_format_rdata_for_opt_type() {
-        let mut options = HashMap::new();
-        options.insert(
-            EdnsCode::LLQ,
-            EdnsOption::Unknown(u16::from(EdnsCode::LLQ), vec![0x01; 18]),
-        );
+        let options = vec![
+            (
+                EdnsCode::LLQ,
+                EdnsOption::Unknown(u16::from(EdnsCode::LLQ), vec![0x01; 18]),
+            ),
+        ];
         let rdata = RData::OPT(OPT::new(options));
         let rdata_text = format_rdata(&rdata);
         assert!(rdata_text.is_ok());

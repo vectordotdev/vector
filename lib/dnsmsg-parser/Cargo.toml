@@ -9,7 +9,7 @@ license = "MIT"
 [dependencies]
 data-encoding = "2.6"
 thiserror = "1.0"
-hickory-proto = { version = "0.24", features = ["dnssec"] }
+hickory-proto = { version = "0.25.0-alpha.1", features = ["dnssec"] }
 
 [dev-dependencies]
 criterion = "0.5"
