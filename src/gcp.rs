@@ -212,7 +212,7 @@ impl GcpAuthenticator {
                 let mut interval = tokio::time::interval_at(start, period);
                 loop {
                     interval.tick().await;
-                    info!("Renewing GCP authentication token.");
+                    debug!("Renewing GCP authentication token.");
                     match inner.regenerate_token().await {
                         Ok(()) => sender.send_replace(()),
                         Err(error) => {
@@ -255,7 +255,7 @@ async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token>
     let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
     let jwt = Jwt::new(claims, rsa_key, None);
 
-    info!(
+    debug!(
         message = "Fetching GCP authentication token.",
         project = ?creds.project(),
         iss = ?creds.iss(),
