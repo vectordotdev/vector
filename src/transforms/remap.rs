@@ -141,6 +141,7 @@ pub struct RemapConfig {
     #[derivative(Debug = "ignore")]
     /// Cache can't be `BTreeMap` or `HashMap` because of `TableRegistry`, which doesn't allow us to inspect tables inside it.
     /// And even if we allowed the inspection, the tables can be huge, resulting in a long comparison or hash computation
+    /// while using `Vec` allows us to use just a shallow comparison
     pub cache: Mutex<
         Vec<(
             (TableRegistry, schema::Definition),
