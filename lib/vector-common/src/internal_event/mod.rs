@@ -216,7 +216,7 @@ macro_rules! registered_event {
             $( $field:ident: $type:ty = $value:expr, )*
         }
 
-        fn emit(&$slf:ident, $data_name:ident: $data:ident)
+        fn emit(&$slf:ident, $data_name:ident: $data_type:ty)
             $emit_body:block
 
         $(fn register($fixed_name:ident: $fixed_tags:ty, $tags_name:ident: $tags:ty)
@@ -243,9 +243,9 @@ macro_rules! registered_event {
             }
 
             impl $crate::internal_event::InternalEventHandle for [<$event Handle>] {
-                type Data = $data;
+                type Data = $data_type;
 
-                fn emit(&$slf, $data_name: $data)
+                fn emit(&$slf, $data_name: $data_type)
                     $emit_body
             }
 
