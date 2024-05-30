@@ -209,7 +209,7 @@ components: sources: opentelemetry: {
 				[OpenSSL configuration file](\(urls.openssl_conf)). The file location defaults to
 				`/usr/local/ssl/openssl.cnf` or can be specified with the `OPENSSL_CONF` environment variable.
 				"""
-		},
+		}
 		traces: {
 			title: "Ingest OTLP traces"
 			body: """
