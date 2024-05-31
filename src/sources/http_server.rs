@@ -23,8 +23,12 @@ use vector_lib::{
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
-        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput,
+        GenerateConfig,
+        Resource,
+        SourceAcknowledgementsConfig,
+        SourceConfig,
+        SourceContext,
+        SourceOutput,
         // log_schema
     },
     event::{Event, Value},
