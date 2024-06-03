@@ -4,21 +4,20 @@ use std::{
     sync::Arc,
 };
 
-use crate::azure;
 use async_stream::stream;
-use azure_storage_blobs;
 use azure_storage_blobs::prelude::ContainerClient;
-use azure_storage_queues;
-use azure_storage_queues::operations::Message;
-use azure_storage_queues::QueueClient;
-use base64::prelude::BASE64_STANDARD;
-use base64::Engine;
+use azure_storage_queues::{operations::Message, QueueClient};
+use base64::{prelude::BASE64_STANDARD, Engine};
 use futures::stream::StreamExt;
 use serde::Deserialize;
 use serde_with::serde_as;
-use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered};
+
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered,
+};
 
 use crate::{
+    azure,
     sinks::prelude::configurable_component,
     sources::azure_blob::{AzureBlobConfig, BlobPack, BlobPackStream},
 };
@@ -68,9 +67,7 @@ pub fn make_azure_row_stream(cfg: &AzureBlobConfig) -> crate::Result<BlobPackStr
     }))
 }
 
-pub fn make_queue_client(
-    cfg: &AzureBlobConfig,
-) -> crate::Result<Arc<azure_storage_queues::QueueClient>> {
+pub fn make_queue_client(cfg: &AzureBlobConfig) -> crate::Result<Arc<QueueClient>> {
     let q = cfg.queue.clone().ok_or("Missing queue.")?;
     azure::build_queue_client(
         cfg.connection_string
@@ -82,9 +79,7 @@ pub fn make_queue_client(
     )
 }
 
-pub fn make_container_client(
-    cfg: &AzureBlobConfig,
-) -> crate::Result<Arc<azure_storage_blobs::prelude::ContainerClient>> {
+pub fn make_container_client(cfg: &AzureBlobConfig) -> crate::Result<Arc<ContainerClient>> {
     azure::build_container_client(
         cfg.connection_string
             .as_ref()
