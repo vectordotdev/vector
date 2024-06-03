@@ -206,7 +206,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         if let Some(remote_addr_inner) = remote_addr_ref.as_ref() {
                             request
                                 .extensions_mut()
-                                .insert(PeerAddr::new(Arc::clone(&remote_addr_inner)));
+                                .insert(PeerAddr::new(Arc::clone(remote_addr_inner)));
                         }
 
                         request
