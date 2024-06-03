@@ -1,6 +1,4 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::time::Duration;
+use std::{future::Future, pin::Pin, time::Duration};
 
 use async_stream::stream;
 use bytes::Bytes;
@@ -9,27 +7,29 @@ use tokio::{select, time};
 use tokio_stream::wrappers::IntervalStream;
 use vrl::path;
 
-use vector_lib::codecs::decoding::{
-    DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions,
+use vector_lib::{
+    codecs::{
+        decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions},
+        NewlineDelimitedDecoderConfig,
+    },
+    config::LegacyKey,
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
+    sensitive_string::SensitiveString,
 };
-use vector_lib::codecs::NewlineDelimitedDecoderConfig;
-use vector_lib::config::LegacyKey;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
-};
-use vector_lib::sensitive_string::SensitiveString;
 
-use crate::codecs::{Decoder, DecodingConfig};
-use crate::config::{
-    LogNamespace, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+use crate::{
+    codecs::{Decoder, DecodingConfig},
+    config::{
+        LogNamespace, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+    },
+    event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event},
+    internal_events::{EventsReceived, StreamClosedError},
+    serde::{bool_or_struct, default_decoding},
+    shutdown::ShutdownSignal,
+    sinks::prelude::configurable_component,
+    sources::azure_blob::queue::make_azure_row_stream,
+    SourceSender,
 };
-use crate::event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event};
-use crate::internal_events::{EventsReceived, StreamClosedError};
-use crate::serde::{bool_or_struct, default_decoding};
-use crate::shutdown::ShutdownSignal;
-use crate::sinks::prelude::configurable_component;
-use crate::sources::azure_blob::queue::make_azure_row_stream;
-use crate::SourceSender;
 
 #[cfg(all(test, feature = "azure-blob-source-integration-tests"))]
 mod integration_tests;
