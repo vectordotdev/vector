@@ -5430,9 +5430,9 @@ dependencies = [
 
 [[package]]
 name = "mock_instant"
-version = "0.4.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c356644192565524790740e4075307c2cfc26d04d2543fb8e3ab9ef43a115ec"
+checksum = "cdcebb6db83796481097dedc7747809243cc81d9ed83e6a938b76d4ea0b249cf"
 
 [[package]]
 name = "mongodb"
