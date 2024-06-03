@@ -14,7 +14,9 @@ use vector_lib::codecs::decoding::{
 };
 use vector_lib::codecs::NewlineDelimitedDecoderConfig;
 use vector_lib::config::LegacyKey;
-use vector_lib::internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol};
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::codecs::{Decoder, DecodingConfig};
