@@ -18,6 +18,7 @@ use vector_lib::{
 };
 
 use crate::{
+    azure::ClientCredentials,
     codecs::{Decoder, DecodingConfig},
     config::{
         LogNamespace, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
@@ -103,6 +104,9 @@ pub struct AzureBlobConfig {
     /// [az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
     #[configurable(metadata(docs::examples = "mylogstorage"))]
     pub storage_account: Option<String>,
+
+    #[configurable(derived)]
+    pub client_credentials: Option<ClientCredentials>,
 
     /// The Azure Blob Storage Endpoint URL.
     ///

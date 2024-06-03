@@ -12,13 +12,13 @@ use futures::stream::StreamExt;
 use serde::Deserialize;
 use serde_with::serde_as;
 
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered,
+use vector_lib::{
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered},
 };
 
 use crate::{
     azure,
-    sinks::prelude::configurable_component,
     sources::azure_blob::{AzureBlobConfig, BlobPack, BlobPackStream},
 };
 
@@ -76,6 +76,7 @@ pub fn make_queue_client(cfg: &AzureBlobConfig) -> crate::Result<Arc<QueueClient
         cfg.storage_account.as_ref().map(|v| v.to_string()),
         q.queue_name.clone(),
         cfg.endpoint.clone(),
+        cfg.client_credentials.clone(),
     )
 }
 
@@ -87,6 +88,7 @@ pub fn make_container_client(cfg: &AzureBlobConfig) -> crate::Result<Arc<Contain
         cfg.storage_account.as_ref().map(|v| v.to_string()),
         cfg.container_name.clone(),
         cfg.endpoint.clone(),
+        cfg.client_credentials.clone(),
     )
 }
 

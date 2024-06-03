@@ -186,6 +186,7 @@ impl SinkConfig for AzureBlobSinkConfig {
             self.storage_account.as_ref().map(|v| v.to_string()),
             self.container_name.clone(),
             self.endpoint.clone(),
+            None,
         )?;
 
         let healthcheck = azure_common::config::build_healthcheck(
