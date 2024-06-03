@@ -4503,9 +4503,9 @@ checksum = "64e9829a50b42bb782c1df523f78d332fe371b10c661e78b7a3c34b0198e9fac"
 
 [[package]]
 name = "infer"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb33622da908807a06f9513c19b3c1ad50fab3e4137d82a78107d502075aa199"
+checksum = "bc150e5ce2330295b8616ce0e3f53250e53af31759a9dbedad1621ba29151847"
 
 [[package]]
 name = "inotify"
@@ -10200,7 +10200,7 @@ dependencies = [
  "hyper-proxy",
  "indexmap 2.2.6",
  "indoc",
- "infer 0.15.0",
+ "infer 0.16.0",
  "inventory",
  "ipnet",
  "itertools 0.13.0",
