@@ -29,7 +29,6 @@ use crate::{
         SourceConfig,
         SourceContext,
         SourceOutput,
-        // log_schema
     },
     event::{Event, Value},
     http::KeepaliveConfig,
@@ -136,8 +135,7 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::examples = "vector_http_path"))]
     path_key: OptionalValuePath,
 
-    /// Overrides the name of the log field used to add the remote IP to each event. By default, the remote IP is not added.
-    ///
+    /// If set, the name of the log field used to add the remote IP to each event
     #[serde(default = "default_host_key")]
     #[configurable(metadata(docs::examples = "hostname"))]
     host_key: OptionalValuePath,
@@ -304,7 +302,6 @@ fn default_path_key() -> OptionalValuePath {
 }
 
 fn default_host_key() -> OptionalValuePath {
-    // log_schema().host_key().cloned().into()
     OptionalValuePath::none()
 }
 
