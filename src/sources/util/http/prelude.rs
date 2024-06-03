@@ -3,7 +3,6 @@ use std::{
     convert::{Infallible, TryFrom},
     fmt,
     net::SocketAddr,
-    sync::Arc,
     time::Duration,
 };
 
@@ -165,7 +164,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     path.as_str(),
                                     &headers,
                                     &query_parameters,
-                                    addr.map(|PeerAddr(inner_addr)| inner_addr).as_deref(),
+                                    addr.map(|PeerAddr(inner_addr)| inner_addr).as_ref(),
                                 );
 
                                 events
@@ -192,7 +191,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             let span = Span::current();
             let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let remote_addr = conn.peer_addr();
-                let remote_addr_ref = enable_source_ip.then(|| Arc::new(remote_addr));
+                let remote_addr_ref = enable_source_ip.then(|| remote_addr);
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
@@ -206,7 +205,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         if let Some(remote_addr_inner) = remote_addr_ref.as_ref() {
                             request
                                 .extensions_mut()
-                                .insert(PeerAddr::new(Arc::clone(remote_addr_inner)));
+                                .insert(PeerAddr::new(*remote_addr_inner));
                         }
 
                         request
@@ -240,10 +239,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
 #[derive(Clone)]
 #[repr(transparent)]
-struct PeerAddr(Arc<SocketAddr>);
+struct PeerAddr(SocketAddr);
 
 impl PeerAddr {
-    fn new(addr: Arc<SocketAddr>) -> Self {
+    fn new(addr: SocketAddr) -> Self {
         Self(addr)
     }
 }
