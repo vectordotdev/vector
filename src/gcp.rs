@@ -265,7 +265,7 @@ async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token>
     let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
     let jwt = Jwt::new(claims, rsa_key, None);
 
-    info!(
+    debug!(
         message = "Fetching GCP authentication token.",
         project = ?creds.project(),
         iss = ?creds.iss(),
