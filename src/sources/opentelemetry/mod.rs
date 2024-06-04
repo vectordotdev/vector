@@ -11,15 +11,20 @@ mod status;
 use std::net::SocketAddr;
 
 use futures::{future::join, FutureExt, TryFutureExt};
+use tonic::codec::CompressionEncoding;
 use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
 use vector_lib::opentelemetry::convert::{
     ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY,
     SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
 };
 
+use tonic::transport::server::RoutesBuilder;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{BytesReceived, EventsReceived, Protocol};
-use vector_lib::opentelemetry::proto::collector::logs::v1::logs_service_server::LogsServiceServer;
+use vector_lib::opentelemetry::proto::collector::{
+    logs::v1::logs_service_server::LogsServiceServer,
+    trace::v1::trace_service_server::TraceServiceServer,
+};
 use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace},
     schema::Definition,
@@ -37,11 +42,12 @@ use crate::{
     },
     http::KeepaliveConfig,
     serde::bool_or_struct,
-    sources::{util::grpc::run_grpc_server, Source},
+    sources::{util::grpc::run_grpc_server_with_routes, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 pub const LOGS: &str = "logs";
+pub const TRACES: &str = "traces";
 
 /// Configuration for the `opentelemetry` source.
 #[configurable_component(source("opentelemetry", "Receive OTLP data through gRPC or HTTP."))]
@@ -138,20 +144,31 @@ impl SourceConfig for OpentelemetryConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(&self.grpc.tls, true)?;
-        let grpc_service = LogsServiceServer::new(Service {
+
+        let log_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
         })
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
-        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
+        .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
-        let grpc_source = run_grpc_server(
+        let trace_service = TraceServiceServer::new(Service {
+            pipeline: cx.out.clone(),
+            acknowledgements,
+            log_namespace,
+            events_received: events_received.clone(),
+        })
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(usize::MAX);
+
+        let mut builder = RoutesBuilder::default();
+        builder.add_service(log_service).add_service(trace_service);
+        let grpc_source = run_grpc_server_with_routes(
             self.grpc.address,
             grpc_tls_settings,
-            grpc_service,
+            builder.routes(),
             cx.shutdown.clone(),
         )
         .map_err(|error| {
@@ -269,7 +286,10 @@ impl SourceConfig for OpentelemetryConfig {
             }
         };
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition).with_port(LOGS)]
+        vec![
+            SourceOutput::new_logs(DataType::Log, schema_definition).with_port(LOGS),
+            SourceOutput::new_traces().with_port(TRACES),
+        ]
     }
 
     fn resources(&self) -> Vec<Resource> {
