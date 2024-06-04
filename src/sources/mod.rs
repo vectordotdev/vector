@@ -13,6 +13,8 @@ pub mod aws_kinesis_firehose;
 pub mod aws_s3;
 #[cfg(feature = "sources-aws_sqs")]
 pub mod aws_sqs;
+#[cfg(feature = "sources-azure_blob")]
+pub mod azure_blob;
 #[cfg(feature = "sources-datadog_agent")]
 pub mod datadog_agent;
 #[cfg(feature = "sources-demo_logs")]
@@ -88,6 +90,7 @@ pub mod syslog;
 pub mod vector;
 
 pub mod util;
+
 
 pub use vector_lib::source::Source;
 

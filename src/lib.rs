@@ -68,6 +68,7 @@ pub mod async_read;
 #[cfg(feature = "aws-config")]
 pub mod aws;
 #[allow(unreachable_pub)]
+pub mod azure;
 pub mod codecs;
 pub mod common;
 mod convert_config;
