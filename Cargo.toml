@@ -204,6 +204,7 @@ azure_core = { version = "0.17", default-features = false, features = ["enable_r
 azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
 azure_storage = { version = "0.17", default-features = false, optional = true }
 azure_storage_blobs = { version = "0.17", default-features = false, optional = true }
+azure_storage_queues = { version = "0.17", default-features = false, optional = true }
 
 # OpenDAL
 opendal = {version = "0.45", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
@@ -373,6 +374,7 @@ azure_core = { version = "0.17", default-features = false, features = ["enable_r
 azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { version = "0.17", default-features = false }
+azure_storage_queues = { version = "0.17", default-features = false }
 base64 = "0.22.1"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.12.1", default-features = false, features = ["use_alloc"] }
@@ -504,6 +506,7 @@ sources-logs = [
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
   "sources-aws_sqs",
+  "sources-azure_blob",
   "sources-datadog_agent",
   "sources-demo_logs",
   "sources-docker_logs",
@@ -550,6 +553,7 @@ sources-aws_ecs_metrics = ["sources-utils-http-client"]
 sources-aws_kinesis_firehose = ["dep:base64", "dep:infer"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
+sources-azure_blob= ["dep:azure_storage_queues"]
 sources-datadog_agent = ["sources-utils-http-error", "protobuf-build"]
 sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "protobuf-build"]
@@ -832,7 +836,8 @@ aws-integration-tests = [
 ]
 
 azure-integration-tests = [
-  "azure-blob-integration-tests"
+  "azure-blob-integration-tests",
+  "azure-blob-source-integration-tests"
 ]
 
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
@@ -846,6 +851,7 @@ aws-sqs-integration-tests = ["sinks-aws_sqs"]
 aws-sns-integration-tests = ["sinks-aws_sns"]
 axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
+azure-blob-source-integration-tests = ["sources-azure_blob"]
 chronicle-integration-tests = ["sinks-gcp"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
 databend-integration-tests = ["sinks-databend"]

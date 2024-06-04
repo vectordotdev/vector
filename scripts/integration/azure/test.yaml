@@ -16,4 +16,5 @@ matrix:
 paths:
 - "src/sinks/azure_**"
 - "src/sinks/util/**"
+- "src/sources/azure_**"
 - "scripts/integration/azure/**"

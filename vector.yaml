@@ -1,0 +1,17 @@
+sources:
+  in:
+    type: "azure_blob"
+    exec_interval_secs: 1
+    storage_account: "eventspocaccount"
+    container_name: "content"
+    strategy: "test"
+    queue:
+      queue_name: "example-astq"
+
+sinks:
+  out:
+    inputs:
+      - "in"
+    type: "console"
+    encoding:
+      codec: "json"
