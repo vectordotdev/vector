@@ -401,13 +401,11 @@ jobs:
     strategy:
       matrix:
         container:
-          - "quay.io/centos/centos:stream8"
           - "quay.io/centos/centos:stream9"
-          - "amazonlinux:1"
           - "amazonlinux:2"
-          - "fedora:37"
-          - "fedora:38"
+          - "amazonlinux:2023"
           - "fedora:39"
+          - "fedora:40"
     container:
       image: ${{ matrix.container }}
     steps:
