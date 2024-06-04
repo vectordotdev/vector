@@ -200,21 +200,19 @@ impl GcpAuthenticator {
         match self {
             Self::Credentials(inner) => {
                 let expires_in = inner.token.read().unwrap().expires_in() as u64;
-                let mut start = Instant::now();
-                // The first tick should occur during the known refresh window of the access token
-                if expires_in >= METADATA_TOKEN_CACHE_EXPIRY_SECS {
-                    start = start
-                        + Duration::from_secs(
-                            expires_in - METADATA_TOKEN_REFRESH_WINDOW_MIDPOINT_SECS,
-                        );
-                }
                 let period = Duration::from_secs(expires_in / 2);
-                let mut interval = tokio::time::interval_at(start, period);
+                let mut interval = tokio::time::interval(period);
+                GcpAuthenticator::calculate_start_time_and_reset_interval(expires_in, &mut interval);
                 loop {
                     interval.tick().await;
                     debug!("Renewing GCP authentication token.");
                     match inner.regenerate_token().await {
-                        Ok(()) => sender.send_replace(()),
+                        Ok(()) => {
+                            sender.send_replace(());
+                            let expires_in = inner.token.read().unwrap().expires_in() as u64;
+                            info!(Message = "expires_in.", %expires_in);
+                            GcpAuthenticator::calculate_start_time_and_reset_interval(expires_in, &mut interval);
+                        }
                         Err(error) => {
                             error!(
                                 message = "Failed to update GCP authentication token.",
@@ -231,6 +229,18 @@ impl GcpAuthenticator {
                 sender.closed().await
             }
         }
+    }
+
+    fn calculate_start_time_and_reset_interval(expires_in: u64, interval: &mut tokio::time::Interval) -> Instant {
+        let mut start = Instant::now();
+        if expires_in >= METADATA_TOKEN_CACHE_EXPIRY_SECS {
+            start = start
+                + Duration::from_secs(
+                expires_in - METADATA_TOKEN_REFRESH_WINDOW_MIDPOINT_SECS,
+            );
+        }
+        interval.reset_at(start);
+        start
     }
 }
 
@@ -255,7 +265,7 @@ async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token>
     let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
     let jwt = Jwt::new(claims, rsa_key, None);
 
-    debug!(
+    info!(
         message = "Fetching GCP authentication token.",
         project = ?creds.project(),
         iss = ?creds.iss(),
