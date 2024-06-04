@@ -191,7 +191,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             let span = Span::current();
             let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let remote_addr = conn.peer_addr();
-                let remote_addr_ref = enable_source_ip.then(|| remote_addr);
+                let remote_addr_ref = enable_source_ip.then_some(remote_addr);
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
@@ -242,7 +242,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 struct PeerAddr(SocketAddr);
 
 impl PeerAddr {
-    fn new(addr: SocketAddr) -> Self {
+    const fn new(addr: SocketAddr) -> Self {
         Self(addr)
     }
 }
