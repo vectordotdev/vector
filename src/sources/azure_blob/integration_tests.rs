@@ -32,6 +32,7 @@ impl AzureBlobConfig {
                 exec_interval_secs: 0,
                 log_namespace: None,
                 decoding: default_decoding(),
+                client_credentials: None,
             };
 
         config.ensure_container().await;
@@ -83,25 +84,23 @@ impl AzureBlobConfig {
         response.expect("Failed to create queue")
     }
 
-    async fn upload_blob(&self) {
+    async fn upload_blob(&self, name: String, content: String) {
         let container_client =
             make_container_client(self).expect("Failed to create container client");
-        let blob_client = container_client.blob_client("asdf");
-        let content = r#"{
-            "timestamp": "123",
-        }"#;
+        let blob_client = container_client.blob_client(name.clone());
         blob_client
             .put_block_blob(content)
             .await
             .expect("Failed putting blob");
 
         let queue_client = make_queue_client(self).expect("Failed to create queue client");
-        let message = r#"{
+        let message = format!(
+            r#"{{
           "topic": "/subscriptions/fa5f2180-1451-4461-9b1f-aae7d4b33cf8/resourceGroups/events_poc/providers/Microsoft.Storage/storageAccounts/eventspocaccount",
-          "subject": "/blobServices/default/containers/logs/blobs/asdf",
+          "subject": "/blobServices/default/containers/logs/blobs/{}",
           "eventType": "Microsoft.Storage.BlobCreated",
           "id": "be3f21f7-201e-000b-7605-a29195062628",
-          "data": {
+          "data": {{
             "api": "PutBlob",
             "clientRequestId": "1fa42c94-6dd3-4172-95c4-fd9cf56b5009",
             "requestId": "be3f21f7-201e-000b-7605-a29195000000",
@@ -109,16 +108,18 @@ impl AzureBlobConfig {
             "contentType": "application/octet-stream",
             "contentLength": 0,
             "blobType": "BlockBlob",
-            "url": "https://eventspocaccount.blob.core.windows.net/logs/asdf",
+            "url": "https://eventspocaccount.blob.core.windows.net/logs/{}",
             "sequencer": "0000000000000000000000000005C5360000000000276a63",
-            "storageDiagnostics": {
+            "storageDiagnostics": {{
               "batchId": "fec5b12c-2006-0034-0005-a25936000000"
-            }
-          },
+            }}
+          }},
           "dataVersion": "",
           "metadataVersion": "1",
           "eventTime": "2024-05-09T11:37:10.5637878Z"
-        }"#;
+        }}"#,
+            name, name
+        );
         queue_client
             .put_message(BASE64_STANDARD.encode(message))
             .await
@@ -127,10 +128,46 @@ impl AzureBlobConfig {
 }
 
 #[tokio::test]
-async fn azure_blob_read_lines_from_blob() {
+async fn azure_blob_read_single_line_from_blob() {
     let config = AzureBlobConfig::new_emulator().await;
-    config.upload_blob().await;
+    let content = "a";
+    config
+        .upload_blob("file.txt".to_string(), content.to_string())
+        .await;
 
-    let _events = config.run_assert().await;
-    assert_eq!(1, 2);
+    let events = config.run_assert().await;
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].as_log()["message"], "a".into());
+}
+
+#[tokio::test]
+async fn azure_blob_read_multiple_lines_from_blob() {
+    let config = AzureBlobConfig::new_emulator().await;
+    let content = "a\nb\nc";
+    config
+        .upload_blob("file.txt".to_string(), content.to_string())
+        .await;
+
+    let events = config.run_assert().await;
+    assert_eq!(events.len(), 3);
+    assert_eq!(events[0].as_log()["message"], "a".into());
+    assert_eq!(events[1].as_log()["message"], "b".into());
+    assert_eq!(events[2].as_log()["message"], "c".into());
+}
+
+#[tokio::test]
+async fn azure_blob_read_single_line_from_multiple_blobs() {
+    let config = AzureBlobConfig::new_emulator().await;
+    let contents = vec!["a", "b", "c"];
+    for (i, content) in contents.clone().iter().enumerate() {
+        config
+            .upload_blob(format!("file{}.txt", i), content.to_string())
+            .await;
+    }
+
+    let events = config.run_assert().await;
+    assert_eq!(events.len(), contents.len());
+    for (i, event) in events.iter().enumerate() {
+        assert_eq!(event.as_log()["message"], contents[i].into());
+    }
 }

@@ -38,6 +38,7 @@ async fn azure_blob_healthcheck_passed() {
         None,
         config.container_name.clone(),
         None,
+        None,
     )
     .expect("Failed to create client");
 
@@ -59,6 +60,7 @@ async fn azure_blob_healthcheck_unknown_container() {
         config.storage_account.map(Into::into),
         config.container_name.clone(),
         config.endpoint.clone(),
+        None,
     )
     .expect("Failed to create client");
 
@@ -249,6 +251,7 @@ impl AzureBlobSinkConfig {
             self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
             self.endpoint.clone(),
+            None,
         )
         .expect("Failed to create client");
 
@@ -268,6 +271,7 @@ impl AzureBlobSinkConfig {
             self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
             self.endpoint.clone(),
+            None,
         )
         .unwrap();
         let response = client
@@ -297,6 +301,7 @@ impl AzureBlobSinkConfig {
             self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
             self.endpoint.clone(),
+            None,
         )
         .unwrap();
         let response = client
@@ -334,6 +339,7 @@ impl AzureBlobSinkConfig {
             self.storage_account.clone().map(Into::into),
             self.container_name.clone(),
             self.endpoint.clone(),
+            None,
         )
         .unwrap();
         let request = client
