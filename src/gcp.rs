@@ -210,7 +210,6 @@ impl GcpAuthenticator {
                         Ok(()) => {
                             sender.send_replace(());
                             let expires_in = inner.token.read().unwrap().expires_in() as u64;
-                            debug!(Message = "expires_in.", %expires_in);
                             GcpAuthenticator::calculate_start_time_and_reset_interval(expires_in, &mut interval);
                         }
                         Err(error) => {
