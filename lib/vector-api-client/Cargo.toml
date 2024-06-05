@@ -17,7 +17,7 @@ anyhow = { version = "1.0.86", default-features = false, features = ["std"] }
 
 # Tokio / Futures
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "1.37.0", default-features = false, features = ["macros", "rt", "sync"] }
+tokio = { version = "1.38.0", default-features = false, features = ["macros", "rt", "sync"] }
 tokio-stream = { version = "0.1.15", default-features = false, features = ["sync"] }
 
 # GraphQL
