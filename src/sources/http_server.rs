@@ -205,7 +205,7 @@ impl SimpleHttpConfig {
                 SimpleHttpConfig::NAME,
                 self.host_key.path.clone().map(LegacyKey::Overwrite),
                 &owned_value_path!("host"),
-                Kind::bytes(),
+                Kind::bytes().or_undefined(),
                 None,
             )
             .with_standard_vector_source_metadata();
@@ -1516,7 +1516,7 @@ mod tests {
                 )
                 .with_metadata_field(
                     &owned_value_path!(SimpleHttpConfig::NAME, "host"),
-                    Kind::bytes(),
+                    Kind::bytes().or_undefined(),
                     None,
                 )
                 .with_metadata_field(
@@ -1549,7 +1549,7 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("path"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("host"), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!("host"), Kind::bytes().or_undefined(), None)
         .unknown_fields(Kind::bytes());
 
         assert_eq!(definitions, Some(expected_definition))
