@@ -142,11 +142,11 @@ pub struct RemapConfig {
     /// Cache can't be `BTreeMap` or `HashMap` because of `TableRegistry`, which doesn't allow us to inspect tables inside it.
     /// And even if we allowed the inspection, the tables can be huge, resulting in a long comparison or hash computation
     /// while using `Vec` allows us to use just a shallow comparison
+    type CacheKey = (TableRegistry, schema::Definition);
+    type CacheValue = (Program, String, MeaningList);
+    
     pub cache: Mutex<
-        Vec<(
-            (TableRegistry, schema::Definition),
-            std::result::Result<(Program, String, MeaningList), String>,
-        )>,
+        Vec<(CacheKey, std::result::Result<CacheValue, String>)>,
     >,
 }
 
