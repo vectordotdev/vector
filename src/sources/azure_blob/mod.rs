@@ -62,7 +62,6 @@ enum Strategy {
 #[derivative(Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct AzureBlobConfig {
-    // TODO : everything
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]

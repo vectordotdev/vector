@@ -126,7 +126,6 @@ async fn proccess_event_grid_message(
             return None;
         }
     };
-    // TODO get the event type const from library?
     if body.event_type != "Microsoft.Storage.BlobCreated" {
         warn!(
             "Ignoring event because of wrong event type: {}",
@@ -134,11 +133,16 @@ async fn proccess_event_grid_message(
         );
         return None;
     }
-    // TODO some smarter parsing should be done here
     let parts = body.subject.split("/").collect::<Vec<_>>();
+    if parts.len() != 7 {
+        warn!("Ignoring event because of wrong subject format");
+        return None;
+    }
     let container = parts[4];
-    // TODO here we'd like to check if container matches the container
-    // from config.
+    if container != container_client.container_name() {
+        // This shouldn't happen if everything is configured properly.
+        return None;
+    }
     let blob = parts[6];
     info!(
         "New blob created in container '{}': '{}'",
