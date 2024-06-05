@@ -119,7 +119,7 @@ impl EnrichmentTableConfig for PgtableConfig {
             }
         };
         let columns_with_commas : Vec<String> = intersperse(self.columns.clone().into_iter().map(surround_with_quotes), ",".to_string()).collect();
-        let select_query : String = ["SELECT ", &columns_with_commas.concat(), " FROM ", &self.table].concat();
+        let select_query = format!("SELECT {} FROM {}", &columns_with_commas.concat(), &self.table);
         let rows = client.query(&select_query, &[]).await?;
         let data = rows.into_iter().map(row_to_vec_value).collect();
         Ok(Box::new(Pgtable::new(data, self.columns.clone())))
