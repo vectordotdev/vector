@@ -16,6 +16,7 @@ use vector_lib::{
     internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
     sensitive_string::SensitiveString,
 };
+use vector_lib::internal_event::Registered;
 
 use crate::{
     azure::ClientCredentials,
@@ -177,127 +178,141 @@ pub struct BlobPack {
 }
 type BlobPackStream = Pin<Box<dyn Stream<Item = BlobPack> + Send>>;
 
-async fn run_streaming(
-    config: AzureBlobConfig,
+struct AzureBlobStreamer {
     shutdown: ShutdownSignal,
-    mut out: SourceSender,
+    out: SourceSender,
     log_namespace: LogNamespace,
-    mut blob_stream: BlobPackStream,
-    acknowledge: bool, // TODO: use proper enum
-) -> Result<(), ()> {
-    debug!("Starting Azure streaming.");
-
-    let framing = FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
-        newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
-    });
-    let decoder_base = DecodingConfig::new(framing, config.decoding.clone(), log_namespace)
-        .build()
-        .map_err(|e| {
-            error!("Failed to build decoder: {}", e);
-            ()
-        })?;
-
-    loop {
-        select! {
-            blob_pack = blob_stream.next() => {
-                match blob_pack{
-                    Some(blob_pack) => {
-                        process_blob_pack(blob_pack, &mut out, &log_namespace, decoder_base.clone(), acknowledge).await?;
-                    }
-                    None => {
-                        break; // end of stream
-                    }
-                }
-            },
-            _ = shutdown.clone() => {
-                break;
-            }
-        }
-    }
-
-    Ok(())
+    acknowledge: bool,
+    decoder: Decoder,
+    bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
 }
 
-async fn process_blob_pack(
-    blob_pack: BlobPack,
-    out: &mut SourceSender,
-    log_namespace: &LogNamespace,
-    decoder: Decoder,
-    acknowledge: bool,
-) -> Result<(), ()> {
-    let events_received = register!(EventsReceived);
-    events_received.emit(CountByteSize(1, 1.into()));
-    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
-    let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledge);
-    let mut row_stream = blob_pack.row_stream;
-    let mut output_stream = stream! {
-        // TODO: consider selecting with a shutdown
-        while let Some(row) = row_stream.next().await {
-            bytes_received.emit(ByteSize(row.len()));
-            let deser_result = decoder.deserializer_parse(Bytes::from(row));
-            if deser_result.is_err(){
-                continue;
-            }
-            let (events, _) = deser_result.unwrap();
-            for mut event in events.into_iter(){
-                event = event.with_batch_notifier_option(&batch);
-                match event {
-                    Event::Log(ref mut log_event) => {
-                        log_namespace.insert_source_metadata(
-                            AzureBlobConfig::NAME,
-                            log_event,
-                            Some(LegacyKey::Overwrite("ingest_timestamp")),
-                            path!("ingest_timestamp"),
-                            chrono::Utc::now().to_rfc3339(),
-                        );
-                        events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
-                        yield event
-                    }
-                    _ => {
-                        error!("Expected Azure rows as Log Events, but got {:?}.", event);
-                    }
-                }
-            }
-
-        }
-        // Explicitly dropping to showcase that the status of the batch is sent to the channel.
-        drop(batch);
-    }
-    .boxed();
-
-    // Return if send was unsuccessful.
-    if let Err(send_error) = out.send_event_stream(&mut output_stream).await {
-        // TODO: consider dedicated error.
-        error!("Failed to send event stream: {}.", send_error);
-        let (count, _) = output_stream.size_hint();
-        emit!(StreamClosedError { count });
-        return Ok(());
+impl AzureBlobStreamer {
+    pub fn new(
+        shutdown: ShutdownSignal,
+        out: SourceSender,
+        log_namespace: LogNamespace,
+        acknowledge: bool,
+        decoding: DeserializerConfig,
+    ) -> crate::Result<Self> {
+        Ok(Self {
+            shutdown,
+            out,
+            log_namespace: log_namespace.clone(),
+            acknowledge,
+            decoder: {
+                let framing = FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
+                    newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
+                });
+                DecodingConfig::new(framing, decoding, log_namespace)
+                    .build()?
+            },
+            bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
+            events_received: register!(EventsReceived),
+        })
     }
 
-    // dropping like s3 sender
-    drop(output_stream); // TODO: better explanation
+    pub async fn run_streaming(mut self, mut blob_stream: BlobPackStream) -> Result<(), ()> {
+        debug!("Starting Azure streaming.");
 
-    // Run success handler if there are no errors in send or acknowledgement.
-    match receiver {
-        None => (blob_pack.success_handler)().await,
-        Some(receiver) => {
-            let result = receiver.await;
-            match result {
-                BatchStatus::Delivered => (blob_pack.success_handler)().await, // TODO: emit
-                BatchStatus::Errored => {
-                    // TODO: emit a proper error
-                    error!("Batch event had a transient error in delivery.")
-                }
-                BatchStatus::Rejected => {
-                    // TODO: emit a proper error
-                    // TODO: consider allowing rejected events wihtout retrying, like s3
-                    error!("Batch event had a permanent failure or rejection.")
+        loop {
+            select! {
+                blob_pack = blob_stream.next() => {
+                    match blob_pack{
+                        Some(blob_pack) => {
+                            self.process_blob_pack(blob_pack).await?;
+                        }
+                        None => {
+                            break; // end of stream
+                        }
+                    }
+                },
+                _ = self.shutdown.clone() => {
+                    break;
                 }
             }
         }
+
+        Ok(())
     }
 
-    Ok(())
+    async fn process_blob_pack(&mut self, blob_pack: BlobPack) -> Result<(), ()> {
+        let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledge);
+        let mut row_stream = blob_pack.row_stream;
+        let mut output_stream = {
+            let bytes_received = self.bytes_received.clone();
+            let events_received = self.events_received.clone();
+            let log_namespace = self.log_namespace.clone();
+            let decoder = self.decoder.clone();
+            stream! {
+                // TODO: consider selecting with a shutdown
+                while let Some(row) = row_stream.next().await {
+                    bytes_received.emit(ByteSize(row.len()));
+                    let deser_result = decoder.deserializer_parse(Bytes::from(row));
+                    if deser_result.is_err(){
+                        continue;
+                    }
+                    let (events, _) = deser_result.unwrap();
+                    for mut event in events.into_iter(){
+                        event = event.with_batch_notifier_option(&batch);
+                        match event {
+                            Event::Log(ref mut log_event) => {
+                                log_namespace.insert_source_metadata(
+                                    AzureBlobConfig::NAME,
+                                    log_event,
+                                    Some(LegacyKey::Overwrite("ingest_timestamp")),
+                                    path!("ingest_timestamp"),
+                                    chrono::Utc::now().to_rfc3339(),
+                                );
+                                events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
+                                yield event
+                            }
+                            _ => {
+                                error!("Expected Azure rows as Log Events, but got {:?}.", event);
+                            }
+                        }
+                    }
+                }
+                // Explicitly dropping to showcase that the status of the batch is sent to the channel.
+                drop(batch);
+            }.boxed()
+        };
+
+        // Return if send was unsuccessful.
+        if let Err(send_error) = self.out.send_event_stream(&mut output_stream).await {
+            // TODO: consider dedicated error.
+            error!("Failed to send event stream: {}.", send_error);
+            let (count, _) = output_stream.size_hint();
+            emit!(StreamClosedError { count });
+            return Ok(());
+        }
+
+        // dropping like s3 sender
+        drop(output_stream); // TODO: better explanation
+
+        // Run success handler if there are no errors in send or acknowledgement.
+        match receiver {
+            None => (blob_pack.success_handler)().await,
+            Some(receiver) => {
+                let result = receiver.await;
+                match result {
+                    BatchStatus::Delivered => (blob_pack.success_handler)().await, // TODO: emit
+                    BatchStatus::Errored => {
+                        // TODO: emit a proper error
+                        error!("Batch event had a transient error in delivery.")
+                    }
+                    BatchStatus::Rejected => {
+                        // TODO: emit a proper error
+                        // TODO: consider allowing rejected events wihtout retrying, like s3
+                        error!("Batch event had a permanent failure or rejection.")
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -305,9 +320,13 @@ async fn process_blob_pack(
 impl SourceConfig for AzureBlobConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
-        let log_namespace = cx.log_namespace(self.log_namespace);
-        let self_clone = self.clone();
-        let acknowledgments = cx.do_acknowledgements(self.acknowledgements);
+        let azure_blob_streamer = AzureBlobStreamer::new(
+            cx.shutdown.clone(),
+            cx.out.clone(),
+            cx.log_namespace(self.log_namespace),
+            cx.do_acknowledgements(self.acknowledgements),
+            self.decoding.clone(),
+        )?;
 
         let blob_pack_stream: BlobPackStream = match self.strategy {
             Strategy::Test => {
@@ -338,14 +357,7 @@ impl SourceConfig for AzureBlobConfig {
             }
             Strategy::StorageQueue => make_azure_row_stream(self)?,
         };
-        Ok(Box::pin(run_streaming(
-            self_clone,
-            cx.shutdown,
-            cx.out.clone(),
-            log_namespace,
-            blob_pack_stream,
-            acknowledgments,
-        )))
+        Ok(Box::pin(azure_blob_streamer.run_streaming(blob_pack_stream)))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
