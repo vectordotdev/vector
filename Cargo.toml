@@ -320,7 +320,7 @@ tower-http = { version = "0.4.4", default-features = false, features = [
 ] }
 # Serde
 serde.workspace = true
-serde-toml-merge = { version = "0.3.7", default-features = false }
+serde-toml-merge = { version = "0.3.8", default-features = false }
 serde_bytes = { version = "0.11.14", default-features = false, features = ["std"], optional = true }
 serde_json.workspace = true
 serde_with = { version = "3.8.1", default-features = false, features = [
