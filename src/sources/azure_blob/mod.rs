@@ -374,7 +374,7 @@ impl SourceConfig for AzureBlobConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 
