@@ -409,16 +409,10 @@ base: components: sources: http_server: configuration: {
 		}
 	}
 	host_key: {
-		description: """
-			Overrides the name of the log field used to add the remote IP to each event.
-
-			By default, the [global `log_schema.host_key` option](global_host_key) is used.
-
-			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-			"""
-		required: false
+		description: "If set, the name of the log field used to add the remote IP to each event"
+		required:    false
 		type: string: {
-			default: "host"
+			default: ""
 			examples: ["hostname"]
 		}
 	}
