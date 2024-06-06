@@ -131,6 +131,11 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::examples = "vector_http_path"))]
     path_key: OptionalValuePath,
 
+    /// If set, the name of the log field used to add the remote IP to each event
+    #[serde(default = "default_host_key")]
+    #[configurable(metadata(docs::examples = "hostname"))]
+    host_key: OptionalValuePath,
+
     /// Specifies the action of the HTTP request.
     #[serde(default = "default_http_method")]
     method: HttpMethod,
@@ -196,6 +201,13 @@ impl SimpleHttpConfig {
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
+            .with_source_metadata(
+                SimpleHttpConfig::NAME,
+                self.host_key.path.clone().map(LegacyKey::Overwrite),
+                &owned_value_path!("host"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
             .with_standard_vector_source_metadata();
 
         // for metadata that is added to the events dynamically from config options
@@ -258,6 +270,7 @@ impl Default for SimpleHttpConfig {
             auth: None,
             path: default_path(),
             path_key: default_path_key(),
+            host_key: default_host_key(),
             method: default_http_method(),
             response_code: default_http_response_code(),
             strict_path: true,
@@ -284,6 +297,10 @@ fn default_path_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("path"))
 }
 
+fn default_host_key() -> OptionalValuePath {
+    OptionalValuePath::none()
+}
+
 const fn default_http_response_code() -> StatusCode {
     StatusCode::OK
 }
@@ -307,6 +324,11 @@ fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
         list.dedup();
     }
     list
+}
+
+/// Convert [`SocketAddr`] into a string, returning only the IP address.
+fn socket_addr_to_ip_string(addr: &SocketAddr) -> String {
+    addr.ip().to_string()
 }
 
 #[derive(Clone)]
@@ -335,6 +357,7 @@ impl SourceConfig for SimpleHttpConfig {
             headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"))?,
             query_parameters: remove_duplicates(self.query_parameters.clone(), "query_parameters"),
             path_key: self.path_key.clone(),
+            host_key: self.host_key.clone(),
             decoder,
             log_namespace,
         };
@@ -382,6 +405,7 @@ struct SimpleHttpSource {
     headers: Vec<HttpConfigParamKind>,
     query_parameters: Vec<String>,
     path_key: OptionalValuePath,
+    host_key: OptionalValuePath,
     decoder: Decoder,
     log_namespace: LogNamespace,
 }
@@ -395,6 +419,7 @@ impl HttpSource for SimpleHttpSource {
         request_path: &str,
         headers_config: &HeaderMap,
         query_parameters: &HashMap<String, String>,
+        source_ip: Option<&SocketAddr>,
     ) {
         let now = Utc::now();
         for event in events.iter_mut() {
@@ -458,6 +483,16 @@ impl HttpSource for SimpleHttpSource {
                         SimpleHttpConfig::NAME,
                         now,
                     );
+
+                    if let Some(addr) = source_ip {
+                        self.log_namespace.insert_source_metadata(
+                            SimpleHttpConfig::NAME,
+                            log,
+                            self.host_key.path.as_ref().map(LegacyKey::Overwrite),
+                            path!("host"),
+                            socket_addr_to_ip_string(addr),
+                        );
+                    }
                 }
                 _ => {
                     continue;
@@ -504,6 +539,10 @@ impl HttpSource for SimpleHttpSource {
         }
 
         Ok(events)
+    }
+
+    fn enable_source_ip(&self) -> bool {
+        self.host_key.path.is_some()
     }
 }
 
@@ -554,6 +593,7 @@ mod tests {
         headers: Vec<String>,
         query_parameters: Vec<String>,
         path_key: &'a str,
+        host_key: &'a str,
         path: &'a str,
         method: &'a str,
         response_code: StatusCode,
@@ -566,6 +606,7 @@ mod tests {
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let path = path.to_owned();
+        let host_key = OptionalValuePath::from(owned_value_path!(host_key));
         let path_key = OptionalValuePath::from(owned_value_path!(path_key));
         let context = SourceContext::new_test(sender, None);
         let method = match Method::from_str(method).unwrap() {
@@ -585,6 +626,7 @@ mod tests {
                 auth: None,
                 strict_path,
                 path_key,
+                host_key,
                 path,
                 method,
                 framing,
@@ -690,6 +732,7 @@ mod tests {
                 vec![],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -735,6 +778,7 @@ mod tests {
                 vec![],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -773,6 +817,7 @@ mod tests {
                 vec![],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -805,6 +850,7 @@ mod tests {
                 vec![],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -842,6 +888,7 @@ mod tests {
                 vec![],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -886,6 +933,7 @@ mod tests {
                 vec![],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -936,6 +984,7 @@ mod tests {
                 vec![],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -1021,6 +1070,7 @@ mod tests {
                 ],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -1064,6 +1114,7 @@ mod tests {
                 vec!["*".to_string()],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -1105,6 +1156,7 @@ mod tests {
                     "absent".to_string(),
                 ],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -1156,6 +1208,7 @@ mod tests {
                 vec![],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -1186,6 +1239,7 @@ mod tests {
                 vec![],
                 vec![],
                 "vector_http_path",
+                "vector_remote_ip",
                 "/event/path",
                 "POST",
                 StatusCode::OK,
@@ -1226,6 +1280,7 @@ mod tests {
                 vec![],
                 vec![],
                 "vector_http_path",
+                "vector_remote_ip",
                 "/event",
                 "POST",
                 StatusCode::OK,
@@ -1286,6 +1341,7 @@ mod tests {
             vec![],
             vec![],
             "vector_http_path",
+            "vector_remote_ip",
             "/",
             "POST",
             StatusCode::OK,
@@ -1310,6 +1366,7 @@ mod tests {
                 vec![],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::ACCEPTED,
@@ -1343,6 +1400,7 @@ mod tests {
                 vec![],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -1373,6 +1431,7 @@ mod tests {
                 vec![],
                 vec![],
                 "http_path",
+                "remote_ip",
                 "/",
                 "POST",
                 StatusCode::OK,
@@ -1405,6 +1464,7 @@ mod tests {
             vec![],
             vec![],
             "http_path",
+            "remote_ip",
             "/",
             "GET",
             StatusCode::OK,
@@ -1455,6 +1515,11 @@ mod tests {
                     None,
                 )
                 .with_metadata_field(
+                    &owned_value_path!(SimpleHttpConfig::NAME, "host"),
+                    Kind::bytes().or_undefined(),
+                    None,
+                )
+                .with_metadata_field(
                     &owned_value_path!("vector", "ingest_timestamp"),
                     Kind::timestamp(),
                     None,
@@ -1484,6 +1549,11 @@ mod tests {
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
         .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("path"), Kind::bytes(), None)
+        .with_event_field(
+            &owned_value_path!("host"),
+            Kind::bytes().or_undefined(),
+            None,
+        )
         .unknown_fields(Kind::bytes());
 
         assert_eq!(definitions, Some(expected_definition))
