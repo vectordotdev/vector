@@ -4,7 +4,14 @@
 #![allow(clippy::print_stdout)] // tests
 #![allow(clippy::print_stderr)] // tests
 
-use std::{collections::HashMap, fmt, net::{Ipv4Addr, SocketAddr, SocketAddrV4}, num::NonZeroU64, path::PathBuf, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt,
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    num::NonZeroU64,
+    path::PathBuf,
+    time::Duration,
+};
 
 use indexmap::IndexMap;
 use serde_with::serde_as;

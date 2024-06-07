@@ -37,7 +37,6 @@ impl Default for BytesEncoderConfig {
     }
 }
 
-
 impl Encoder<()> for BytesEncoder {
     type Error = BoxedFramingError;
 
