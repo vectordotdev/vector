@@ -16,7 +16,7 @@ use hyper::header::AUTHORIZATION;
 use once_cell::sync::Lazy;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
-use tokio::{sync::watch, time::Instant};
+use tokio::{sync::watch, time::Instant, time::sleep};
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -26,9 +26,7 @@ const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
 // See https://cloud.google.com/compute/docs/access/authenticate-workloads#applications
-const METADATA_TOKEN_CACHE_EXPIRY_SECS: u64 = 300;
-
-const METADATA_TOKEN_REFRESH_WINDOW_MIDPOINT_SECS: u64 = 150;
+const METADATA_TOKEN_EXPIRY_MARGIN_SECS: u64 = 200;
 
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
@@ -200,17 +198,20 @@ impl GcpAuthenticator {
         match self {
             Self::Credentials(inner) => {
                 let expires_in = inner.token.read().unwrap().expires_in() as u64;
-                let period = Duration::from_secs(expires_in / 2);
-                let mut interval = tokio::time::interval(period);
-                GcpAuthenticator::calculate_start_time_and_reset_interval(expires_in, &mut interval);
+                let next_refresh = sleep(Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS));
+                tokio::pin!(next_refresh);
                 loop {
-                    interval.tick().await;
                     debug!("Renewing GCP authentication token.");
                     match inner.regenerate_token().await {
                         Ok(()) => {
                             sender.send_replace(());
-                            let expires_in = inner.token.read().unwrap().expires_in() as u64;
-                            GcpAuthenticator::calculate_start_time_and_reset_interval(expires_in, &mut interval);
+                            tokio::select! {
+                                () = &mut next_refresh => {
+                                    let expires_in = inner.token.read().unwrap().expires_in() as u64;
+                                    let next_deadline = Instant::now() + Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
+                                    next_refresh.as_mut().reset(next_deadline);
+                                },
+                            }
                         }
                         Err(error) => {
                             error!(
@@ -228,18 +229,6 @@ impl GcpAuthenticator {
                 sender.closed().await
             }
         }
-    }
-
-    fn calculate_start_time_and_reset_interval(expires_in: u64, interval: &mut tokio::time::Interval) -> Instant {
-        let mut start = Instant::now();
-        if expires_in >= METADATA_TOKEN_CACHE_EXPIRY_SECS {
-            start = start
-                + Duration::from_secs(
-                expires_in - METADATA_TOKEN_REFRESH_WINDOW_MIDPOINT_SECS,
-            );
-        }
-        interval.reset_at(start);
-        start
     }
 }
 
