@@ -174,11 +174,11 @@ pub fn encode_test_event(
             let mut alt_encoder = if encoder.serializer().supports_json() {
                 Encoder::<encoding::Framer>::new(
                     LengthDelimitedEncoder::default().into(),
-                    LogfmtSerializer::new().into(),
+                    LogfmtSerializer.into(),
                 )
             } else {
                 Encoder::<encoding::Framer>::new(
-                    NewlineDelimitedEncoder::new().into(),
+                    NewlineDelimitedEncoder::default().into(),
                     JsonSerializer::new(MetricTagValues::default()).into(),
                 )
             };

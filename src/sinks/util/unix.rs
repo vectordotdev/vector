@@ -257,7 +257,7 @@ mod tests {
             .build(
                 Default::default(),
                 Encoder::<Framer>::new(
-                    NewlineDelimitedEncoder::new().into(),
+                    NewlineDelimitedEncoder::default().into(),
                     TextSerializerConfig::default().build().into(),
                 ),
             )

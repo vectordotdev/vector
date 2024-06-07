@@ -101,6 +101,7 @@ pub trait ContainerTestRunner: TestRunner {
 
     fn volumes(&self) -> Vec<String>;
 
+    #[allow(dead_code)]
     fn stop(&self) -> Result<()> {
         dockercmd(["stop", "--time", "0", &self.container_name()])
             .wait(format!("Stopping container {}", self.container_name()))

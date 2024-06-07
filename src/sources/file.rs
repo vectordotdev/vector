@@ -44,22 +44,6 @@ use crate::{
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("data_dir option required, but not given here or globally"))]
-    NoDataDir,
-    #[snafu(display(
-        "could not create subdirectory {:?} inside of data_dir {:?}",
-        subdir,
-        data_dir
-    ))]
-    MakeSubdirectoryError {
-        subdir: PathBuf,
-        data_dir: PathBuf,
-        source: std::io::Error,
-    },
-    #[snafu(display("data_dir {:?} does not exist", data_dir))]
-    MissingDataDir { data_dir: PathBuf },
-    #[snafu(display("data_dir {:?} is not writable", data_dir))]
-    DataDirNotWritable { data_dir: PathBuf },
     #[snafu(display(
         "message_start_indicator {:?} is not a valid regex: {}",
         indicator,

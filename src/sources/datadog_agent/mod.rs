@@ -319,8 +319,6 @@ impl SourceConfig for DatadogAgentConfig {
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
-    BadRequest,
-    InvalidDataFormat,
     ServerShutdown,
 }
 

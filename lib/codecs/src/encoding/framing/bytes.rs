@@ -15,8 +15,8 @@ impl BytesEncoderConfig {
     }
 
     /// Build the `BytesEncoder` from this configuration.
-    pub const fn build(&self) -> BytesEncoder {
-        BytesEncoder::new()
+    pub fn build(&self) -> BytesEncoder {
+        BytesEncoder
     }
 }
 
@@ -30,12 +30,13 @@ impl BytesEncoderConfig {
 #[derive(Debug, Clone)]
 pub struct BytesEncoder;
 
-impl BytesEncoder {
+impl Default for BytesEncoderConfig {
     /// Creates a `BytesEncoder`.
-    pub const fn new() -> Self {
+    fn default() -> Self {
         Self
     }
 }
+
 
 impl Encoder<()> for BytesEncoder {
     type Error = BoxedFramingError;
@@ -51,7 +52,7 @@ mod tests {
 
     #[test]
     fn encode() {
-        let mut codec = BytesEncoder::new();
+        let mut codec = BytesEncoder;
 
         let mut buffer = BytesMut::from("abc");
         codec.encode((), &mut buffer).unwrap();

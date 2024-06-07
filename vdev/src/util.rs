@@ -62,6 +62,7 @@ pub fn exists(path: impl AsRef<Path> + Debug) -> Result<bool> {
 
 pub trait ChainArgs {
     fn chain_args<I: Into<OsString>>(&self, args: impl IntoIterator<Item = I>) -> Vec<OsString>;
+    #[allow(dead_code)]
     fn chain_arg(&self, arg: impl Into<OsString>) -> Vec<OsString> {
         self.chain_args([arg])
     }

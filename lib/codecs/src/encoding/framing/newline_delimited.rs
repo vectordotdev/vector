@@ -15,8 +15,8 @@ impl NewlineDelimitedEncoderConfig {
     }
 
     /// Build the `NewlineDelimitedEncoder` from this configuration.
-    pub const fn build(&self) -> NewlineDelimitedEncoder {
-        NewlineDelimitedEncoder::new()
+    pub fn build(&self) -> NewlineDelimitedEncoder {
+        NewlineDelimitedEncoder::default()
     }
 }
 
@@ -24,9 +24,8 @@ impl NewlineDelimitedEncoderConfig {
 #[derive(Debug, Clone)]
 pub struct NewlineDelimitedEncoder(CharacterDelimitedEncoder);
 
-impl NewlineDelimitedEncoder {
-    /// Creates a new `NewlineDelimitedEncoder`.
-    pub const fn new() -> Self {
+impl Default for NewlineDelimitedEncoder {
+    fn default() -> Self {
         Self(CharacterDelimitedEncoder::new(b'\n'))
     }
 }
@@ -46,7 +45,7 @@ mod tests {
     #[test]
     fn encode_bytes() {
         let mut input = BytesMut::from("foo");
-        let mut encoder = NewlineDelimitedEncoder::new();
+        let mut encoder = NewlineDelimitedEncoder::default();
 
         encoder.encode((), &mut input).unwrap();
 

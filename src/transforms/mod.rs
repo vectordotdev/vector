@@ -2,8 +2,6 @@
 #[allow(unused_imports)]
 use std::collections::HashSet;
 
-use snafu::Snafu;
-
 pub mod dedupe;
 pub mod reduce;
 pub mod sample;
@@ -33,15 +31,6 @@ pub use vector_lib::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
     TransformOutputsBuf,
 };
-
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("Invalid regular expression: {}", source))]
-    InvalidRegex { source: regex::Error },
-
-    #[snafu(display("Invalid substring expression: {}", name))]
-    InvalidSubstring { name: String },
-}
 
 #[cfg(test)]
 mod test {

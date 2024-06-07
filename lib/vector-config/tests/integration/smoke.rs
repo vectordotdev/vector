@@ -4,13 +4,7 @@
 #![allow(clippy::print_stdout)] // tests
 #![allow(clippy::print_stderr)] // tests
 
-use std::{
-    collections::HashMap,
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-    num::NonZeroU64,
-    path::PathBuf,
-    time::Duration,
-};
+use std::{collections::HashMap, fmt, net::{Ipv4Addr, SocketAddr, SocketAddrV4}, num::NonZeroU64, path::PathBuf, time::Duration};
 
 use indexmap::IndexMap;
 use serde_with::serde_as;
@@ -37,9 +31,9 @@ pub struct Template {
 
 impl ConfigurableString for Template {}
 
-impl ToString for Template {
-    fn to_string(&self) -> String {
-        self.src.clone()
+impl fmt::Display for Template {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.src)
     }
 }
 

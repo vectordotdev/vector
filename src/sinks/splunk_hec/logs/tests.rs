@@ -182,9 +182,7 @@ fn splunk_encode_log_event_json() {
             .unwrap(),
         &serde_json::Value::from("hello world")
     );
-    assert!(event
-        .get(log_schema().timestamp_key().unwrap().to_string().as_str())
-        .is_none());
+    assert!(!event.contains_key(log_schema().timestamp_key().unwrap().to_string().as_str()));
 
     assert_eq!(hec_data.source, Some("test_source".to_string()));
     assert_eq!(hec_data.sourcetype, Some("test_sourcetype".to_string()));
