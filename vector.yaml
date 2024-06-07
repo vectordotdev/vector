@@ -15,3 +15,5 @@ sinks:
     type: "console"
     encoding:
       codec: "json"
+    acknowledgements:
+      enabled: true
