@@ -7,6 +7,7 @@ use tokio::{select, time};
 use tokio_stream::wrappers::IntervalStream;
 use vrl::path;
 
+use vector_lib::internal_event::Registered;
 use vector_lib::{
     codecs::{
         decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions},
@@ -16,7 +17,6 @@ use vector_lib::{
     internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
     sensitive_string::SensitiveString,
 };
-use vector_lib::internal_event::Registered;
 
 use crate::{
     azure::ClientCredentials,
@@ -36,6 +36,8 @@ use crate::{
 #[cfg(all(test, feature = "azure-blob-source-integration-tests"))]
 mod integration_tests;
 pub mod queue;
+#[cfg(test)]
+mod test;
 
 /// Strategies for consuming objects from Azure Storage.
 #[configurable_component]
@@ -205,8 +207,7 @@ impl AzureBlobStreamer {
                 let framing = FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
                     newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
                 });
-                DecodingConfig::new(framing, decoding, log_namespace)
-                    .build()?
+                DecodingConfig::new(framing, decoding, log_namespace).build()?
             },
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
             events_received: register!(EventsReceived),
@@ -357,7 +358,9 @@ impl SourceConfig for AzureBlobConfig {
             }
             Strategy::StorageQueue => make_azure_row_stream(self)?,
         };
-        Ok(Box::pin(azure_blob_streamer.run_streaming(blob_pack_stream)))
+        Ok(Box::pin(
+            azure_blob_streamer.run_streaming(blob_pack_stream),
+        ))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
