@@ -91,5 +91,5 @@ async fn test_messages_rejected() {
     };
     assert_eq!(events[0].as_log().value().to_string(), "\"foo\"");
     assert_eq!(events[1].as_log().value().to_string(), "\"bar\"");
-    assert!(success_receiver.try_recv().is_err()); // assert
+    assert!(success_receiver.try_recv().is_err()); // assert success handler not called
 }
