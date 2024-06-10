@@ -412,7 +412,7 @@ impl DatnameFilter {
 
     fn clean_databases(names: Vec<String>) -> (Vec<String>, bool) {
         let mut set = names.into_iter().collect::<HashSet<_>>();
-        let null = set.remove(&"".to_owned());
+        let null = set.remove("");
         (set.into_iter().collect(), null)
     }
 

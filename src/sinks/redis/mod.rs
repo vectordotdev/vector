@@ -27,8 +27,6 @@ use super::util::EncodedLength;
 pub(super) enum RedisSinkError {
     #[snafu(display("Creating Redis producer failed: {}", source))]
     RedisCreateFailed { source: RedisError },
-    #[snafu(display("Invalid key template: {}", source))]
-    KeyTemplate { source: TemplateParseError },
     #[snafu(display("Error sending query: {}", source))]
     SendError { source: RedisError },
 }

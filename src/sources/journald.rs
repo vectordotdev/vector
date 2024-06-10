@@ -77,8 +77,6 @@ static JOURNALCTL: Lazy<PathBuf> = Lazy::new(|| "journalctl".into());
 enum BuildError {
     #[snafu(display("journalctl failed to execute: {}", source))]
     JournalctlSpawn { source: io::Error },
-    #[snafu(display("Cannot use both `units` and `include_units`"))]
-    BothUnitsAndIncludeUnits,
     #[snafu(display(
         "The unit {:?} is duplicated in both include_units and exclude_units",
         unit

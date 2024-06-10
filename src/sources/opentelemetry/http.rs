@@ -40,7 +40,6 @@ use super::{reply::protobuf, status::Status};
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
-    BadRequest,
     ServerShutdown,
 }
 

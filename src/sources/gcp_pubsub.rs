@@ -14,7 +14,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
-    metadata::{errors::InvalidMetadataValue, MetadataValue},
+    metadata::MetadataValue,
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
@@ -94,28 +94,18 @@ mod proto {
 
 #[derive(Debug, Snafu)]
 pub(crate) enum PubsubError {
-    #[snafu(display("Could not parse credentials metadata: {}", source))]
-    Metadata { source: InvalidMetadataValue },
     #[snafu(display("Invalid endpoint URI: {}", source))]
     Uri { source: InvalidUri },
     #[snafu(display("Could not create endpoint: {}", source))]
     Endpoint { source: tonic::transport::Error },
     #[snafu(display("Could not set up endpoint TLS settings: {}", source))]
     EndpointTls { source: tonic::transport::Error },
-    #[snafu(display("Could not connect: {}", source))]
-    Connect { source: tonic::transport::Error },
-    #[snafu(display("Could not pull data from remote: {}", source))]
-    Pull { source: Status },
     #[snafu(display(
         "`ack_deadline_secs` is outside the valid range of {} to {}",
         MIN_ACK_DEADLINE_SECS,
         MAX_ACK_DEADLINE_SECS
     ))]
     InvalidAckDeadline,
-    #[snafu(display("Cannot set both `ack_deadline_secs` and `ack_deadline_seconds`"))]
-    BothAckDeadlineSecsAndSeconds,
-    #[snafu(display("Cannot set both `retry_delay_secs` and `retry_delay_seconds`"))]
-    BothRetryDelaySecsAndSeconds,
 }
 
 static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());

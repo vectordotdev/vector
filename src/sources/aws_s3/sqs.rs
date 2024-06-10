@@ -159,11 +159,6 @@ const fn default_true() -> bool {
 
 #[derive(Debug, Snafu)]
 pub(super) enum IngestorNewError {
-    #[snafu(display("Invalid visibility timeout {}: {}", timeout, source))]
-    InvalidVisibilityTimeout {
-        source: std::num::TryFromIntError,
-        timeout: u64,
-    },
     #[snafu(display("Invalid value for max_number_of_messages {}", messages))]
     InvalidNumberOfMessages { messages: u32 },
 }
