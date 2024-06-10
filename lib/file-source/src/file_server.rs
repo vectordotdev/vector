@@ -484,8 +484,8 @@ impl TimingStats {
 
     fn report(&self) {
         let total = self.started_at.elapsed();
-        let counted = self.segments.values().sum();
-        let other = self.started_at.elapsed() - counted;
+        let counted: Duration = self.segments.values().sum();
+        let other: Duration = self.started_at.elapsed() - counted;
         let mut ratios = self
             .segments
             .iter()
