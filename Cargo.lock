@@ -10353,7 +10353,6 @@ dependencies = [
  "serde_json",
  "serde_with 3.8.1",
  "serde_yaml 0.9.34+deprecated",
- "sha2",
  "similar-asserts",
  "smallvec",
  "smpl_jwt",

@@ -344,10 +344,9 @@ num-format = { version = "0.4.4", default-features = false, features = ["with-nu
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 ratatui = { version = "0.26.3", optional = true, default-features = false, features = ["crossterm"] }
 
-# Datadog Pipelines
+# Opentelemetry
 
 hex = { version = "0.4.3", default-features = false, optional = true }
-sha2 = { version = "0.10.8", default-features = false, optional = true }
 
 # GreptimeDB
 greptimedb-ingester = { git = "https://github.com/paomian/greptimedb-ingester-rust.git", rev = "2e6b0c5eb6a5e7549c3100e4d356b07d15cce66d", optional = true }
@@ -564,244 +563,40 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = [
-  "api",
-  "api-client",
-  "enrichment-tables",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "rdkafka?/gssapi-vendored",
-  "enterprise",
-  "secrets",
-]
+default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 # Default features for `cargo docs`. The same as `default` but without `rdkafka?/gssapi-vendored` which would require installing libsasl in our doc build environment.
-docs = [
-  "api",
-  "api-client",
-  "enrichment-tables",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "enterprise",
-  "secrets",
-]
+docs = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = [
-  "api",
-  "api-client",
-  "enrichment-tables",
-  "rdkafka?/cmake_build",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "rdkafka?/gssapi-vendored",
-  "enterprise",
-  "secrets",
-]
+default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-default-msvc = [
-  "api",
-  "api-client",
-  "enrichment-tables",
-  "rdkafka?/cmake_build",
-  "sinks",
-  "sources",
-  "transforms",
-  "enterprise",
-  "secrets",
-]
-default-musl = [
-  "api",
-  "api-client",
-  "enrichment-tables",
-  "rdkafka?/cmake_build",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "rdkafka?/gssapi-vendored",
-  "enterprise",
-  "secrets",
-]
-default-no-api-client = [
-  "api",
-  "enrichment-tables",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "rdkafka?/gssapi-vendored",
-  "enterprise",
-  "secrets",
-]
-default-no-vrl-cli = [
-  "api",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "rdkafka?/gssapi-vendored",
-  "enterprise",
-  "secrets",
-]
+default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "transforms", "secrets"]
+default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
+default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
+default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
 # Enables the binary secret-backend-example
 secret-backend-example = ["transforms"]
 
 all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
-all-metrics = [
-  "sinks-metrics",
-  "sources-metrics",
-  "transforms-metrics",
-  "enterprise",
-]
+all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = [
-  "api",
-  "api-client",
-  "enrichment-tables",
-  "rdkafka?/cmake_build",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "enterprise",
-  "secrets",
-]
-target-aarch64-unknown-linux-musl = [
-  "api",
-  "api-client",
-  "enrichment-tables",
-  "rdkafka?/cmake_build",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "enterprise",
-  "secrets",
-]
-target-armv7-unknown-linux-gnueabihf = [
-  "api",
-  "api-client",
-  "enrichment-tables",
-  "rdkafka?/cmake_build",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "enterprise",
-  "secrets",
-]
-target-armv7-unknown-linux-musleabihf = [
-  "api",
-  "api-client",
-  "rdkafka?/cmake_build",
-  "enrichment-tables",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "enterprise",
-  "secrets",
-]
-target-arm-unknown-linux-gnueabi = [
-  "api",
-  "api-client",
-  "enrichment-tables",
-  "rdkafka?/cmake_build",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "enterprise",
-  "secrets",
-]
-target-arm-unknown-linux-musleabi = [
-  "api",
-  "api-client",
-  "rdkafka?/cmake_build",
-  "enrichment-tables",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "enterprise",
-  "secrets",
-]
-target-x86_64-unknown-linux-gnu = [
-  "api",
-  "api-client",
-  "rdkafka?/cmake_build",
-  "enrichment-tables",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "rdkafka?/gssapi-vendored",
-  "enterprise",
-  "secrets",
-]
-target-x86_64-unknown-linux-musl = [
-  "api",
-  "api-client",
-  "rdkafka?/cmake_build",
-  "enrichment-tables",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "enterprise",
-  "secrets",
-]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "secrets"]
+target-arm-unknown-linux-gnueabi = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
+target-arm-unknown-linux-musleabi = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "secrets"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
 # Does not currently build
-target-powerpc64le-unknown-linux-gnu = [
-  "api",
-  "api-client",
-  "enrichment-tables",
-  "rdkafka?/cmake_build",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "enterprise",
-  "secrets",
-]
+target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
 # Currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = [
-  "api",
-  "api-client",
-  "enrichment-tables",
-  "rdkafka?/cmake_build",
-  "sinks",
-  "sources",
-  "sources-dnstap",
-  "transforms",
-  "unix",
-  "enterprise",
-  "secrets",
-]
+target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
@@ -1210,19 +1005,6 @@ sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build"]
 sinks-websocket = ["dep:tokio-tungstenite"]
 sinks-webhdfs = ["dep:opendal"]
 
-# Datadog integration
-enterprise = [
-  "dep:hex",
-  "dep:sha2",
-  "sinks-datadog_logs",
-  "sinks-datadog_metrics",
-  "sources-host_metrics",
-  "sources-internal_logs",
-  "sources-internal_metrics",
-  "transforms-remap",
-  "transforms-filter",
-]
-
 # Identifies that the build is a nightly build
 nightly = []
 
@@ -1380,14 +1162,7 @@ vector-unit-test-tests = [
   "transforms-route",
   "transforms-filter",
   "transforms-reduce",
-  "sinks-console",
-]
-enterprise-tests = [
-  "enterprise",
-  "sources-demo_logs",
-  "sinks-blackhole",
-  "sinks-loki",
-  "api",
+  "sinks-console"
 ]
 
 component-validation-runner = [

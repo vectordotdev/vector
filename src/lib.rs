@@ -131,25 +131,12 @@ pub use vector_lib::{shutdown, Error, Result};
 
 static APP_NAME_SLUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
-/// Flag denoting whether or not enterprise features are enabled.
-#[cfg(feature = "enterprise")]
-pub static ENTERPRISE_ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-
 /// The name used to identify this Vector application.
 ///
 /// This can be set at compile-time through the VECTOR_APP_NAME env variable.
 /// Defaults to "Vector".
 pub fn get_app_name() -> &'static str {
-    #[cfg(not(feature = "enterprise"))]
-    let app_name = "Vector";
-    #[cfg(feature = "enterprise")]
-    let app_name = if *ENTERPRISE_ENABLED.get().unwrap_or(&false) {
-        "Vector Enterprise"
-    } else {
-        "Vector"
-    };
-
-    option_env!("VECTOR_APP_NAME").unwrap_or(app_name)
+    option_env!("VECTOR_APP_NAME").unwrap_or("Vector")
 }
 
 /// Returns a slugified version of the name used to identify this Vector application.
