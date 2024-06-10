@@ -1,0 +1,195 @@
+name: Publish
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**-exaforce"
+  workflow_dispatch:
+
+# These permissions are needed to interact with GitHub's OIDC Token endpoint.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  PUSH: ${{ github.event_name != 'pull_request' }}
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+  VERBOSE: true
+  CI: true
+  DISABLE_MOLD: true
+  DEBIAN_FRONTEND: noninteractive
+  CONTAINER_TOOL: docker
+  CARGO_PROFILE_RELEASE_LTO: fat
+  CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  generate-publish-metadata:
+    name: Generate Publish-related Metadata
+    runs-on: ubuntu-20.04
+    timeout-minutes: 5
+    outputs:
+      vector_version: ${{ steps.generate-publish-metadata.outputs.vector_version }}
+      vector_build_desc: ${{ steps.generate-publish-metadata.outputs.vector_build_desc }}
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@v4
+      - name: Generate publish metadata
+        id: generate-publish-metadata
+        run: make ci-generate-publish-metadata
+
+  build-x86_64-unknown-linux-gnu-packages:
+    name: Build Vector for x86_64-unknown-linux-gnu (.tar.gz, DEB, RPM)
+    runs-on: ubuntu-20.04-xl
+    needs: generate-publish-metadata
+    timeout-minutes: 90
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@v4
+      - name: Bootstrap runner environment (Ubuntu-specific)
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - name: Bootstrap runner environment (generic)
+        run: bash scripts/environment/prepare.sh
+      - name: Build Vector
+        run: |
+          make test-integration-azure ENVIRONMENT=true
+          make package-x86_64-unknown-linux-gnu-all ENVIRONMENT=true
+      - name: Stage package artifacts for publish
+        uses: actions/upload-artifact@v4
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
+          path: target/artifacts/vector*
+
+  build-aarch64-unknown-linux-gnu-packages:
+    name: Build Vector for aarch64-unknown-linux-gnu (.tar.gz)
+    runs-on: ubuntu-20.04-xl
+    timeout-minutes: 180
+    needs: generate-publish-metadata
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@v4
+      - name: Bootstrap runner environment (Ubuntu-specific)
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - name: Bootstrap runner environment (generic)
+        run: bash scripts/environment/prepare.sh
+      - name: Build Vector
+        env:
+          DOCKER_PRIVILEGED: "true"
+        run: make package-aarch64-unknown-linux-gnu-all
+      - name: Stage package artifacts for publish
+        uses: actions/upload-artifact@v4
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
+          path: target/artifacts/vector*
+
+  # deb-verify:
+  #   name: Verify DEB Packages
+  #   runs-on: ubuntu-20.04
+  #   timeout-minutes: 5
+  #   needs:
+  #     - generate-publish-metadata
+  #     - build-x86_64-unknown-linux-gnu-packages
+  #   env:
+  #     VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+  #     DD_PKG_VERSION: "latest"
+  #   strategy:
+  #     matrix:
+  #       container:
+  #         - ubuntu:20.04
+  #         - ubuntu:22.04
+  #   container:
+  #     image: ${{ matrix.container }}
+  #   steps:
+  #     - run: |
+  #         apt-get update && \
+  #         apt-get install -y \
+  #         ca-certificates \
+  #         curl \
+  #         git \
+  #         systemd \
+  #         make
+  #     - name: Install dd-pkg for linting
+  #       run: |
+  #         curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_x86_64.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
+  #     - name: Fix Git safe directories issue when in containers (actions/checkout#760)
+  #       run: git config --global --add safe.directory /__w/vector/vector
+  #     - name: Checkout Vector
+  #       uses: actions/checkout@v4
+  #       # with:
+  #       #   ref: ${{ inputs.git_ref }}
+  #     - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
+  #         path: target/artifacts
+  #     - name: Verify install of DEB package.
+  #       run: |
+  #         ./scripts/verify-install.sh target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
+
+  publish-docker:
+    name: Publish to Docker
+    runs-on: ubuntu-20.04
+    timeout-minutes: 15
+    needs:
+      - generate-publish-metadata
+      - build-x86_64-unknown-linux-gnu-packages
+      - build-aarch64-unknown-linux-gnu-packages
+      # - deb-verify
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::157206707803:role/github-actions-ExaForce-operations
+          aws-region: us-east-2
+          mask-aws-account-id: "false"
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: "false"
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.0.0
+        with:
+          platforms: all
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3.3.0
+        with:
+          version: latest
+          install: true
+      - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
+        uses: actions/download-artifact@v4
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
+          path: target/artifacts
+      - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
+        uses: actions/download-artifact@v4
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
+          path: target/artifacts
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: target/artifacts
+          file: distribution/docker/debian/Dockerfile
+          push: ${{ env.PUSH }}
+          tags: 157206707803.dkr.ecr.us-east-2.amazonaws.com/vector:${{env.BRANCH_NAME}}-${{ github.sha }}
+          platforms: "linux/amd64,linux/arm64"
