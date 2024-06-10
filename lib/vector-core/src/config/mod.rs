@@ -91,7 +91,7 @@ impl Input {
 
     pub fn all() -> Self {
         Self {
-            ty: DataType::all(),
+            ty: DataType::all_bits(),
             log_schema_requirement: schema::Requirement::empty(),
         }
     }

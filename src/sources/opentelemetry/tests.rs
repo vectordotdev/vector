@@ -57,7 +57,7 @@ async fn receive_grpc_logs_vector_namespace() {
             .remove(0)
             .schema_definition(true);
 
-        let (sender, logs_output, _) = new_source(EventStatus::Delivered);
+        let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
         let server = source
             .build(SourceContext::new_test(sender, None))
             .await
@@ -195,7 +195,7 @@ async fn receive_grpc_logs_legacy_namespace() {
             .remove(0)
             .schema_definition(true);
 
-        let (sender, logs_output, _) = new_source(EventStatus::Delivered);
+        let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
         let server = source
             .build(SourceContext::new_test(sender, None))
             .await
@@ -285,16 +285,17 @@ async fn receive_grpc_logs_legacy_namespace() {
 
 pub(super) fn new_source(
     status: EventStatus,
+    event_name: String,
 ) -> (
     SourceSender,
     impl Stream<Item = Event>,
     impl Stream<Item = Event>,
 ) {
     let (mut sender, recv) = SourceSender::new_test_finalize(status);
-    let logs_output = sender
-        .add_outputs(status, LOGS.to_string())
+    let output = sender
+        .add_outputs(status, event_name)
         .flat_map(into_event_stream);
-    (sender, logs_output, recv)
+    (sender, output, recv)
 }
 
 fn str_into_hex_bytes(s: &str) -> Vec<u8> {

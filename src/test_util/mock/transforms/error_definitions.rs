@@ -37,7 +37,7 @@ impl TransformConfig for ErrorDefinitionTransformConfig {
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
-            DataType::all(),
+            DataType::all_bits(),
             definitions
                 .iter()
                 .map(|(output, definition)| {
