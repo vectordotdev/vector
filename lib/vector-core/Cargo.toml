@@ -15,7 +15,7 @@ crossbeam-utils = { version = "0.8.20", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 dyn-clone = { version = "1.0.17", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
-enumflags2 = { version = "0.7.9", default-features = false }
+enumflags2 = { version = "0.7.10", default-features = false }
 float_eq = { version = "1.0", default-features = false }
 futures = { version = "0.3.30", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false, features = ["std"] }
