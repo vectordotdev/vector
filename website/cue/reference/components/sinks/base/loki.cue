@@ -327,6 +327,16 @@ base: components: sinks: loki: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			json: {
+				description:   "Options for the JsonSerializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: pretty: {
+					description: "Whether to use pretty JSON formatting."
+					required:    false
+					type: bool: default: false
+				}
+			}
 			metric_tag_values: {
 				description: """
 					Controls how metric tag values are encoded.

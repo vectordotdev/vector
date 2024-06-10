@@ -483,6 +483,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -520,6 +523,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -551,6 +557,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -574,6 +583,9 @@ mod tests {
 
                 [sinks.sink0.encoding]
                 codec = "json"
+
+                [sinks.sink0.encoding.json]
+                pretty = false
 
                 [sinks.sink0.healthcheck]
                 enabled = true
@@ -685,6 +697,8 @@ mod tests {
                 type: console
                 encoding:
                   codec: json
+                  json:
+                    pretty: false
                 healthcheck:
                   enabled: true
                   uri: null
@@ -750,7 +764,10 @@ mod tests {
                   "target": "stdout",
                   "type": "console",
                   "encoding": {
-                    "codec": "json"
+                    "codec": "json",
+                    "json": {
+                      "pretty": false
+                    }
                   },
                   "healthcheck": {
                     "enabled": true,
