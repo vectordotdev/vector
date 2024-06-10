@@ -42,8 +42,6 @@ enum BuildError {
     AmqpCreateError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
-    #[snafu(display("Could not subscribe to AMQP queue: {}", source))]
-    AmqpSubscribeError { source: lapin::Error },
 }
 
 /// Configuration for the `amqp` source.

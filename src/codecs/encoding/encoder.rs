@@ -23,7 +23,7 @@ where
 impl Default for Encoder<Framer> {
     fn default() -> Self {
         Self {
-            framer: NewlineDelimitedEncoder::new().into(),
+            framer: NewlineDelimitedEncoder::default().into(),
             serializer: TextSerializerConfig::default().build().into(),
         }
     }
