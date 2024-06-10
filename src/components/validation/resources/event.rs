@@ -5,6 +5,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
+use vector_lib::codecs::encoding::format::JsonSerializerOptions;
 
 use crate::codecs::Encoder;
 use vector_lib::codecs::{
@@ -179,7 +180,11 @@ pub fn encode_test_event(
             } else {
                 Encoder::<encoding::Framer>::new(
                     NewlineDelimitedEncoder::new().into(),
-                    JsonSerializer::new(MetricTagValues::default()).into(),
+                    JsonSerializer::new(
+                        MetricTagValues::default(),
+                        JsonSerializerOptions::default(),
+                    )
+                    .into(),
                 )
             };
 
