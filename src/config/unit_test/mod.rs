@@ -88,8 +88,8 @@ pub async fn build_unit_tests_main(
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     config::init_log_schema(paths, false)?;
-    let (mut secrets_backends_loader, _) = loading::load_secret_backends_from_paths(paths)?;
-    let (config_builder, _) = if secrets_backends_loader.has_secrets_to_retrieve() {
+    let mut secrets_backends_loader = loading::load_secret_backends_from_paths(paths)?;
+    let config_builder = if secrets_backends_loader.has_secrets_to_retrieve() {
         let resolved_secrets = secrets_backends_loader
             .retrieve(&mut signal_handler.subscribe())
             .map_err(|e| vec![e])?;

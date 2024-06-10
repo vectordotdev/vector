@@ -1,1 +1,0 @@
-Previously the `datadog_agent` setting `parse_ddtags` parsed the tag string into an Object. It is now parsed into an Array of `key:value` strings, which matches the  behavior of the Datadog logs backend intake.

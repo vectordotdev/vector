@@ -357,6 +357,21 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 		required:    false
 		type: string: examples: ["127.0.0.1:8080", "example.com:12345"]
 	}
+	labels: {
+		description: "A set of labels that are attached to each batch of events."
+		required:    false
+		type: object: {
+			examples: [{
+				source: "vector"
+				tenant: "marketing"
+			}]
+			options: "*": {
+				description: "A Chronicle label."
+				required:    true
+				type: string: {}
+			}
+		}
+	}
 	log_type: {
 		description: """
 			The type of log entries in a request.

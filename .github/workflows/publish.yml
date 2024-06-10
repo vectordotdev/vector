@@ -347,6 +347,7 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      DD_PKG_VERSION: "latest"
     strategy:
       matrix:
         container:
@@ -369,6 +370,9 @@ jobs:
           git \
           systemd \
           make
+      - name: Install dd-pkg for linting
+        run: |
+          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_x86_64.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
@@ -393,16 +397,15 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      DD_PKG_VERSION: "latest"
     strategy:
       matrix:
         container:
-          - "quay.io/centos/centos:stream8"
           - "quay.io/centos/centos:stream9"
-          - "amazonlinux:1"
           - "amazonlinux:2"
-          - "fedora:37"
-          - "fedora:38"
+          - "amazonlinux:2023"
           - "fedora:39"
+          - "fedora:40"
     container:
       image: ${{ matrix.container }}
     steps:
@@ -419,6 +422,9 @@ jobs:
           if ! command -v curl &> /dev/null ; then
             yum install -y curl
           fi
+      - name: Install dd-pkg for linting
+        run: |
+          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_x86_64.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector

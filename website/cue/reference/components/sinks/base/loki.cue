@@ -452,7 +452,7 @@ base: components: sinks: loki: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "drop"
+			default: "accept"
 			enum: {
 				accept: """
 					Accept the event.

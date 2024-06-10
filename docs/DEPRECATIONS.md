@@ -18,5 +18,4 @@ For example:
 
 ## To be removed
 
-- v0.38.0 strict_env_vars Remove option for configuring missing environment variable interpolation
-  to be a warning rather than an error
+- v0.39.0 enterprise_feature The `enterprise` feature has been deprecated and will be removed.

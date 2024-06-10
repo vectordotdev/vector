@@ -89,7 +89,7 @@ impl DatadogLogsConfig {
         http::Uri::try_from(format!("{}/api/v2/logs", base_url)).expect("URI not valid")
     }
 
-    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
+    pub fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
         self.get_uri(dd_common)
             .scheme_str()
             .unwrap_or("http")

@@ -24,8 +24,8 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
-mod config;
-mod service;
-mod sink;
+pub mod config;
+pub mod service;
+pub mod sink;
 
 pub use self::config::DatadogLogsConfig;

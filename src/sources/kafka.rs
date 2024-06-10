@@ -571,9 +571,10 @@ impl ConsumerStateInner<Consuming> {
         }
     }
 
-    /// Spawn a task on the provided JoinSet to consume the kafka StreamPartitionQueue, and handle acknowledgements for the messages consumed
-    /// Returns a channel sender that can be used to signal that the consumer should stop and drain pending acknowledgements,
-    /// and an AbortHandle that can be used to forcefully end the task.
+    /// Spawn a task on the provided JoinSet to consume the kafka StreamPartitionQueue, and handle
+    /// acknowledgements for the messages consumed Returns a channel sender that can be used to
+    /// signal that the consumer should stop and drain pending acknowledgements, and an AbortHandle
+    /// that can be used to forcefully end the task.
     fn consume_partition(
         &self,
         join_set: &mut JoinSet<(TopicPartition, PartitionConsumerStatus)>,
@@ -603,10 +604,33 @@ impl ConsumerStateInner<Consuming> {
 
             loop {
                 tokio::select!(
+                    // Make sure to handle the acknowledgement stream before new messages to prevent
+                    // unbounded memory growth caused by those acks being handled slower than
+                    // incoming messages when the load is high.
+                    biased;
+
                     // is_some() checks prevent polling end_signal after it completes
                     _ = &mut end_signal, if finalizer.is_some() => {
                         finalizer.take();
                     },
+
+                    ack = ack_stream.next() => match ack {
+                        Some((status, entry)) => {
+                            if status == BatchStatus::Delivered {
+                                if let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
+                                    emit!(KafkaOffsetUpdateError { error });
+                                }
+                            }
+                        }
+                        None if finalizer.is_none() => {
+                            debug!("Acknowledgement stream complete for partition {}:{}.", &tp.0, tp.1);
+                            break
+                        }
+                        None => {
+                            debug!("Acknowledgement stream empty for {}:{}", &tp.0, tp.1);
+                        }
+                    },
+
                     message = messages.next(), if finalizer.is_some() => match message {
                         None => unreachable!("MessageStream never calls Ready(None)"),
                         Some(Err(error)) => match error {
@@ -627,23 +651,6 @@ impl ConsumerStateInner<Consuming> {
                             parse_message(msg, decoder.clone(), &keys, &mut out, acknowledgements, &finalizer, log_namespace).await;
                         }
                     },
-
-                    ack = ack_stream.next() => match ack {
-                        Some((status, entry)) => {
-                            if status == BatchStatus::Delivered {
-                                if let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
-                                    emit!(KafkaOffsetUpdateError { error });
-                                }
-                            }
-                        }
-                        None if finalizer.is_none() => {
-                            debug!("Acknowledgement stream complete for partition {}:{}.", &tp.0, tp.1);
-                            break
-                        }
-                        None => {
-                            debug!("Acknowledgement stream empty for {}:{}", &tp.0, tp.1);
-                        }
-                    }
                 )
             }
             (tp, status)
@@ -984,7 +991,7 @@ fn parse_stream<'a>(
 
     let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
-    let mut stream = FramedRead::new(payload, decoder);
+    let mut stream = FramedRead::with_capacity(payload, decoder, msg.payload_len());
     let (count, _) = stream.size_hint();
     let stream = stream! {
         while let Some(result) = stream.next().await {

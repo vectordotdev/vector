@@ -85,11 +85,11 @@ impl SecretBackendLoader {
 }
 
 impl Process for SecretBackendLoader {
-    fn prepare<R: Read>(&mut self, input: R) -> Result<(String, Vec<String>), Vec<String>> {
-        let (config_string, warnings) = prepare_input(input)?;
+    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
+        let config_string = prepare_input(input)?;
         // Collect secret placeholders just after env var processing
         collect_secret_keys(&config_string, &mut self.secret_keys);
-        Ok((config_string, warnings))
+        Ok(config_string)
     }
 
     fn merge(&mut self, table: Table, _: Option<ComponentHint>) -> Result<(), Vec<String>> {

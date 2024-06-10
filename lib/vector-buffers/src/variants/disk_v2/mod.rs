@@ -140,7 +140,7 @@
 //! ### Record ID generation, and its relation of events
 //!
 //! While the buffer talks a lot about writing "records", records are ostensibly a single event, or
-//! collection of events. We manage the organization and grouping of events at at a higher level
+//! collection of events. We manage the organization and grouping of events at a higher level
 //! (i.e. `EventArray`), but we're still required to confront this fact at the buffer layer. In
 //! order to maintain as little extra metadata as possible as records, and within the ledger, we
 //! encode the number of events in a buffer into the record ID. We do this by using the value
