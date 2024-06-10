@@ -185,11 +185,13 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts
+      - name: Set SHA env
+        run: echo "GITHUB_SHA_SHORT=$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-8)" >> $GITHUB_ENV
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: target/artifacts
           file: distribution/docker/debian/Dockerfile
           push: ${{ env.PUSH }}
-          tags: 157206707803.dkr.ecr.us-east-2.amazonaws.com/vector:${{env.BRANCH_NAME}}-${{ github.sha }}
+          tags: 157206707803.dkr.ecr.us-east-2.amazonaws.com/vector:${{env.BRANCH_NAME}}-${{ env.GITHUB_SHA_SHORT }}
           platforms: "linux/amd64,linux/arm64"
