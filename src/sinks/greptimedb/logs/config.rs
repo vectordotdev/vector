@@ -11,6 +11,7 @@ use crate::sinks::{
     greptimedb::{default_dbname, GreptimeDBDefaultBatchSettings},
     prelude::*,
 };
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 
 /// Configuration for the `greptimedb_logs` sink.
 #[configurable_component(sink("greptimedb_logs", "Ingest logs data into GreptimeDB."))]
@@ -40,6 +41,14 @@ pub struct GreptimeDBLogsConfig {
     #[serde(default = "default_dbname")]
     pub dbname: String,
 
+    /// pipeline name to be used for the logs
+    #[configurable(metadata(docs::examples = "pipeline_name"))]
+    pub pipeline_name: String,
+
+    /// pipeline version to be used for the logs
+    #[configurable(metadata(docs::examples = "2024-06-07 06:46:23.858293"))]
+    pub pipeline_version: Option<String>,
+
     /// The username for your GreptimeDB instance.
     ///
     /// This is required if your instance has authentication enabled.
@@ -56,9 +65,13 @@ pub struct GreptimeDBLogsConfig {
     /// Default to none, `gzip` or `zstd` is supported.
     ///
     /// This is required if your instance has authentication enabled.
-    #[configurable(metadata(docs::examples = "grpc_compression"))]
-    #[serde(default)]
-    pub grpc_compression: Option<String>,
+    #[configurable(derived)]
+    #[serde(default = "Compression::gzip_default")]
+    pub compression: Compression,
+
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub encoding: Transformer,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -99,7 +112,14 @@ impl SinkConfig for GreptimeDBLogsConfig {
         let request_builder = GreptimeDBLogsHttpRequestBuilder {
             endpoint: self.endpoint.clone(),
             auth: auth.clone(),
-            encoder: Default::default(),
+            encoder: (
+                self.encoding.clone(),
+                Encoder::<Framer>::new(
+                    NewlineDelimitedEncoderConfig.build().into(),
+                    JsonSerializerConfig::default().build().into(),
+                ),
+            ),
+            compression: self.compression,
         };
 
         let service: HttpService<GreptimeDBLogsHttpRequestBuilder, PartitionKey> =
@@ -116,6 +136,8 @@ impl SinkConfig for GreptimeDBLogsConfig {
             service,
             self.dbname.clone(),
             self.table.clone(),
+            self.pipeline_name.clone(),
+            self.pipeline_version.clone(),
             request_builder,
         );
 

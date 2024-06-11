@@ -9,6 +9,8 @@ pub struct GreptimeDBLogsHttpSink<S> {
     service: S,
     db: String,
     table: String,
+    pipeline_name: String,
+    pipeline_version: Option<String>,
     request_builder: GreptimeDBLogsHttpRequestBuilder,
 }
 
@@ -24,6 +26,8 @@ where
         service: S,
         db: String,
         table: String,
+        pipeline_name: String,
+        pipeline_version: Option<String>,
         request_builder: GreptimeDBLogsHttpRequestBuilder,
     ) -> Self {
         Self {
@@ -31,6 +35,8 @@ where
             service,
             db,
             table,
+            pipeline_name,
+            pipeline_version,
             request_builder,
         }
     }
@@ -42,6 +48,8 @@ where
                 PartitionKey {
                     db: self.db,
                     table: self.table,
+                    pipeline_name: self.pipeline_name,
+                    pipeline_version: self.pipeline_version,
                 },
                 || batcher_settings.as_byte_size_config(),
             )

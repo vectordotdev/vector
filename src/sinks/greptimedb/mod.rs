@@ -150,7 +150,7 @@ impl From<&GreptimeDBLogsConfig> for GreptimeDBServiceConfig {
             dbname: val.dbname.clone(),
             username: val.username.clone(),
             password: val.password.clone(),
-            grpc_compression: val.grpc_compression.clone(),
+            grpc_compression: None,
             tls: val.tls.clone(),
         }
     }

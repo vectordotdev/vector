@@ -8,7 +8,7 @@ use crate::sinks::prelude::{
 use crate::sinks::{HTTPRequestBuilderSnafu, HealthcheckError};
 use crate::Error;
 use bytes::Bytes;
-use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
+use http::header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE};
 use http::{Request, StatusCode};
 use hyper::Body;
 use snafu::ResultExt;
@@ -21,6 +21,8 @@ use crate::sinks::util::http::{HttpRequest, HttpResponse, HttpServiceRequestBuil
 pub(super) struct PartitionKey {
     pub db: String,
     pub table: String,
+    pub pipeline_name: String,
+    pub pipeline_version: Option<String>,
 }
 
 impl Partitioner for PartitionKey {
@@ -31,6 +33,8 @@ impl Partitioner for PartitionKey {
         Some(PartitionKey {
             db: self.db.clone(),
             table: self.table.clone(),
+            pipeline_name: self.pipeline_name.clone(),
+            pipeline_version: self.pipeline_version.clone(),
         })
     }
 }
@@ -40,6 +44,7 @@ pub(super) struct GreptimeDBLogsHttpRequestBuilder {
     pub(super) endpoint: String,
     pub(super) auth: Option<Auth>,
     pub(super) encoder: (Transformer, Encoder<Framer>),
+    pub(super) compression: Compression,
 }
 
 impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilder {
@@ -49,53 +54,40 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
         let db = metadata.db.clone();
 
         // prepare url
-        let endpoint = format!("{}/v1/sql", self.endpoint.as_str());
+        let endpoint = format!("{}/v1/events/logs", self.endpoint.as_str());
         let mut url = url::Url::parse(&endpoint).unwrap();
-        let url = url
-            .query_pairs_mut()
+        let mut url_builder = url.query_pairs_mut();
+        url_builder
             .append_pair("db", &db)
-            .finish()
-            .to_string();
+            .append_pair("table", &table)
+            .append_pair("pipeline_name", &metadata.pipeline_name);
+
+        if let Some(pipeline_version) = metadata.pipeline_version.as_ref() {
+            url_builder.append_pair("pipeline_version", pipeline_version);
+        }
+
+        let url = url_builder.finish().to_string();
 
         // prepare body
-        let body = format_body(request.take_payload(), &table);
+        let payload = request.take_payload();
 
         let mut builder = Request::post(&url)
-            .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .header(CONTENT_LENGTH, body.len());
+            .header(CONTENT_TYPE, "application/x-ndjson")
+            .header(CONTENT_LENGTH, payload.len());
 
-        // todo compression
+        if let Some(ce) = self.compression.content_encoding() {
+            builder = builder.header(CONTENT_ENCODING, ce);
+        }
 
         if let Some(auth) = self.auth.clone() {
             builder = auth.apply_builder(builder);
         }
 
         builder
-            .body(body.into())
+            .body(payload)
             .context(HTTPRequestBuilderSnafu)
             .map_err(Into::into)
     }
-}
-
-fn format_body(payload: Bytes, table: &str) -> String {
-    let message = String::from_utf8_lossy(payload.as_ref());
-    let now = chrono::Local::now().timestamp_millis();
-
-    // 40 + table.len + message.len + 13 + 2 + 5 + 10
-    // last 10 is for buffer
-    let mut sql = String::with_capacity(70 + table.len() + message.len());
-    sql.push_str(format!("INSERT INTO {table}(time_local, message) values").as_str());
-
-    for message in message.split("\n") {
-        sql.push_str(format!("({now}, '{message}'),").as_str());
-    }
-    sql.pop();
-    sql.push_str(";");
-
-    let body = url::form_urlencoded::Serializer::new(String::new())
-        .append_pair("sql", &sql)
-        .finish();
-    body
 }
 
 impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBuilder {
@@ -107,7 +99,7 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBui
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
-        Compression::None
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -139,6 +131,8 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBui
             PartitionKey {
                 db: key.db,
                 table: key.table,
+                pipeline_name: key.pipeline_name,
+                pipeline_version: key.pipeline_version,
             },
         )
     }
