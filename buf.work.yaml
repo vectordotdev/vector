@@ -1,4 +1,0 @@
-version: v1
-directories:
-  - proto
-  - lib/vector-core/proto
