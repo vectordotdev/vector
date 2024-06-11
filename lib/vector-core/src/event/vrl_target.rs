@@ -942,7 +942,7 @@ mod test {
                 BTreeMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!(r"foo bar", "foo"),
                 false,
-                Some(BTreeMap::new().into()),
+                Some(btreemap! { "foo" => "bar"}.into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
