@@ -3,6 +3,9 @@
 // Datadog component type, whether it's used in integration tests, etc.
 #![allow(dead_code)]
 #![allow(unreachable_pub)]
+
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use vector_lib::{
     event::DatadogMetricOriginMetadata, schema::meaning, sensitive_string::SensitiveString,
@@ -79,10 +82,26 @@ pub struct DatadogPoint<T>(pub i64, pub T);
 /// Gets the base API endpoint to use for any calls to Datadog.
 ///
 /// If `endpoint` is not specified, we fallback to `site`.
-pub(crate) fn get_api_base_endpoint(endpoint: Option<&String>, site: &str) -> String {
-    endpoint
-        .cloned()
-        .unwrap_or_else(|| format!("https://api.{}", site))
+pub(crate) fn get_api_base_endpoint(endpoint: Option<&str>, site: &str) -> String {
+    endpoint.map_or_else(|| format!("https://api.{}", site), compute_api_endpoint)
+}
+
+fn compute_api_endpoint(endpoint: &str) -> String {
+    // This mechanism is derived from the forwarder health check in the Datadog Agent:
+    // https://github.com/DataDog/datadog-agent/blob/cdcf0fc809b9ac1cd6e08057b4971c7dbb8dbe30/comp/forwarder/defaultforwarder/forwarder_health.go#L45-L47
+    // https://github.com/DataDog/datadog-agent/blob/cdcf0fc809b9ac1cd6e08057b4971c7dbb8dbe30/comp/forwarder/defaultforwarder/forwarder_health.go#L188-L190
+    static DOMAIN_REGEX: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(:?[a-z]{2}\d\.)?(datadoghq\.[a-z]+|ddog-gov\.com)/*$")
+            .expect("Could not build Datadog domain regex")
+    });
+
+    // If the endpoint domain matches one of the known Datadog domains, prefix that domain with
+    // `api.` to produce the API endpoint; otherwise, just use the given endpoint as-is.
+    if let Some(caps) = DOMAIN_REGEX.captures(endpoint) {
+        format!("https://api.{}", &caps[1])
+    } else {
+        endpoint.into()
+    }
 }
 
 /// Default settings to use for Datadog components.
