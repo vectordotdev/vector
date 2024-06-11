@@ -17,5 +17,3 @@ For example:
 ## To be migrated
 
 ## To be removed
-
-- v0.39.0 enterprise_feature The `enterprise` feature has been deprecated and will be removed.
