@@ -124,14 +124,6 @@ remap: expressions: path: {
 			return: input.log.parent.child
 		},
 		{
-			title: "Nested path coalescing"
-			input: log: grand_parent: parent2: child: "Hello, World!"
-			source: #"""
-				.grand_parent.(parent1 | parent2).child
-				"""#
-			return: input.log.grand_parent.parent2.child
-		},
-		{
 			title: "Array element path (first)"
 			input: log: array: ["first", "second"]
 			source: #"""
