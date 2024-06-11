@@ -44,18 +44,6 @@ remap: expressions: path: {
 							```
 							"""
 					}
-					coalescing: {
-						title:       "Path segment coalescing"
-						description: """
-							Path segments can be coalesced, allowing for the first non-null value to be used. This is
-							particularly useful when working with
-							[externally tagged](\(urls.externally_tagged_representation)) data:
-
-							```coffee
-							.grand_parent.(parent1 | parent2).child
-							```
-							"""
-					}
 					dynamic: {
 						title: "Dynamic paths"
 						description: """
