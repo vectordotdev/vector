@@ -192,7 +192,7 @@ aws-sdk-secretsmanager = { version = "1.3.0", default-features = false, features
 # is configured.
 aws-sdk-sts = { version = "1.3.1", default-features = false, features = ["behavior-version-latest"], optional = true }
 aws-types = { version = "1.3.1", default-features = false, optional = true }
-aws-sigv4 = { version = "1.2.1", default-features = false, features = ["sign-http"], optional = true }
+aws-sigv4 = { version = "1.2.2", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest", "credentials-process"], optional = true }
 aws-credential-types = { version = "1.2.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream"], optional = true }
