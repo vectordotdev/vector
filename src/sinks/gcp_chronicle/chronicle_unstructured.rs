@@ -133,7 +133,10 @@ pub struct ChronicleUnstructuredConfig {
 
     /// User-configured environment namespace to identify the data domain the logs originated from.
     #[configurable(metadata(docs::templateable))]
-    #[configurable(metadata(docs::examples = "production", docs::examples = "production-{{ namespace }}",))]
+    #[configurable(metadata(
+        docs::examples = "production",
+        docs::examples = "production-{{ namespace }}",
+    ))]
     #[configurable(metadata(docs::advanced))]
     pub namespace: Option<Template>,
 
