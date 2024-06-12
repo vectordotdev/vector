@@ -16,7 +16,7 @@ use hyper::header::AUTHORIZATION;
 use once_cell::sync::Lazy;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
-use tokio::{sync::watch, time::Instant, time::sleep};
+use tokio::{sync::watch};
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -27,6 +27,8 @@ const SERVICE_ACCOUNT_TOKEN_URL: &str =
 
 // See https://cloud.google.com/compute/docs/access/authenticate-workloads#applications
 const METADATA_TOKEN_EXPIRY_MARGIN_SECS: u64 = 200;
+
+const METADATA_TOKEN_ERROR_RETRY_SECS: u64 = 2;
 
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
@@ -198,28 +200,27 @@ impl GcpAuthenticator {
         match self {
             Self::Credentials(inner) => {
                 let expires_in = inner.token.read().unwrap().expires_in() as u64;
-                let next_refresh = sleep(Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS));
-                tokio::pin!(next_refresh);
+                let mut deadline = Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
+                let mut _next_refresh = tokio::time::sleep(deadline);
+                _next_refresh.await;
                 loop {
                     debug!("Renewing GCP authentication token.");
                     match inner.regenerate_token().await {
                         Ok(()) => {
                             sender.send_replace(());
-                            tokio::select! {
-                                () = &mut next_refresh => {
-                                    let expires_in = inner.token.read().unwrap().expires_in() as u64;
-                                    let next_deadline = Instant::now() + Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
-                                    next_refresh.as_mut().reset(next_deadline);
-                                },
-                            }
-                        }
+                            let expires_in = inner.token.read().unwrap().expires_in() as u64;
+                            deadline = Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
+                        },
                         Err(error) => {
                             error!(
                                 message = "Failed to update GCP authentication token.",
                                 %error
                             );
+                            deadline = Duration::from_secs(METADATA_TOKEN_ERROR_RETRY_SECS);
                         }
                     }
+                    _next_refresh = tokio::time::sleep(deadline);
+                    _next_refresh.await;
                 }
             }
             Self::ApiKey(_) | Self::None => {
