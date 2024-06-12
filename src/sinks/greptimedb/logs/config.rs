@@ -8,7 +8,7 @@ use crate::sinks::greptimedb::logs::http_reuqest_builder::{
 use crate::sinks::greptimedb::logs::sink::GreptimeDBLogsHttpSink;
 use crate::sinks::util::http::HttpService;
 use crate::sinks::{
-    greptimedb::{default_dbname, GreptimeDBDefaultBatchSettings},
+    greptimedb::{default_dbname_temaplte, GreptimeDBDefaultBatchSettings},
     prelude::*,
 };
 use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
@@ -25,7 +25,7 @@ pub struct GreptimeDBLogsConfig {
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
-    pub table: String,
+    pub table: Template,
 
     /// The GreptimeDB [database][database] name to connect.
     ///
@@ -37,17 +37,17 @@ pub struct GreptimeDBLogsConfig {
     ///
     /// [database]: https://docs.greptime.com/user-guide/concepts/key-concepts#database
     #[configurable(metadata(docs::examples = "public"))]
-    #[derivative(Default(value = "default_dbname()"))]
-    #[serde(default = "default_dbname")]
-    pub dbname: String,
+    #[derivative(Default(value = "default_dbname_temaplte()"))]
+    #[serde(default = "default_dbname_temaplte")]
+    pub dbname: Template,
 
     /// pipeline name to be used for the logs
     #[configurable(metadata(docs::examples = "pipeline_name"))]
-    pub pipeline_name: String,
+    pub pipeline_name: Template,
 
     /// pipeline version to be used for the logs
     #[configurable(metadata(docs::examples = "2024-06-07 06:46:23.858293"))]
-    pub pipeline_version: Option<String>,
+    pub pipeline_version: Option<Template>,
 
     /// The username for your GreptimeDB instance.
     ///

@@ -1,6 +1,7 @@
 use crate::codecs::{Encoder, Transformer};
 use crate::event::{Event, EventFinalizers, Finalizable};
 use crate::http::{Auth, HttpClient, HttpError};
+use crate::sinks::prelude::*;
 use crate::sinks::prelude::{
     Compression, EncodeResult, Partitioner, RequestBuilder, RequestMetadata,
     RequestMetadataBuilder, RetryAction, RetryLogic,
@@ -19,22 +20,66 @@ use crate::sinks::util::http::{HttpRequest, HttpResponse, HttpServiceRequestBuil
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub(super) struct PartitionKey {
-    pub db: String,
+    pub dbname: String,
     pub table: String,
     pub pipeline_name: String,
     pub pipeline_version: Option<String>,
 }
 
-impl Partitioner for PartitionKey {
+/// KeyPartitioner that partitions events by (dbname, table, pipeline_name, pipeline_version) pair.
+pub(super) struct KeyPartitioner {
+    dbname: Template,
+    table: Template,
+    pipeline_name: Template,
+    pipeline_version: Option<Template>,
+}
+
+impl KeyPartitioner {
+    pub const fn new(
+        db: Template,
+        table: Template,
+        pipeline_name: Template,
+        pipeline_version: Option<Template>,
+    ) -> Self {
+        Self {
+            dbname: db,
+            table,
+            pipeline_name,
+            pipeline_version,
+        }
+    }
+
+    fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
+        template
+            .render_string(item)
+            .map_err(|error| {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some(field),
+                    drop_event: true,
+                });
+            })
+            .ok()
+    }
+}
+
+impl Partitioner for KeyPartitioner {
     type Item = Event;
     type Key = Option<PartitionKey>;
 
-    fn partition(&self, _item: &Self::Item) -> Self::Key {
+    fn partition(&self, item: &Self::Item) -> Self::Key {
+        let dbname = Self::render(&self.dbname, item, "dbname_key")?;
+        let table = Self::render(&self.table, item, "table_key")?;
+        let pipeline_name = Self::render(&self.pipeline_name, item, "pipeline_name")?;
+        let pipeline_version = self
+            .pipeline_version
+            .as_ref()
+            .and_then(|template| Self::render(template, item, "pipeline_version"));
         Some(PartitionKey {
-            db: self.db.clone(),
-            table: self.table.clone(),
-            pipeline_name: self.pipeline_name.clone(),
-            pipeline_version: self.pipeline_version.clone(),
+            dbname,
+            table,
+            pipeline_name,
+            pipeline_version,
         })
     }
 }
@@ -51,7 +96,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
     fn build(&self, mut request: HttpRequest<PartitionKey>) -> Result<Request<Bytes>, Error> {
         let metadata = request.get_additional_metadata();
         let table = metadata.table.clone();
-        let db = metadata.db.clone();
+        let db = metadata.dbname.clone();
 
         // prepare url
         let endpoint = format!("{}/v1/events/logs", self.endpoint.as_str());
@@ -129,7 +174,7 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBui
             finalizers,
             request_metadata,
             PartitionKey {
-                db: key.db,
+                dbname: key.dbname,
                 table: key.table,
                 pipeline_name: key.pipeline_name,
                 pipeline_version: key.pipeline_version,

@@ -1,5 +1,5 @@
 use crate::sinks::greptimedb::logs::http_reuqest_builder::{
-    GreptimeDBLogsHttpRequestBuilder, PartitionKey,
+    GreptimeDBLogsHttpRequestBuilder, KeyPartitioner, PartitionKey,
 };
 use crate::sinks::prelude::*;
 use crate::sinks::util::http::HttpRequest;
@@ -7,10 +7,10 @@ use crate::sinks::util::http::HttpRequest;
 pub struct GreptimeDBLogsHttpSink<S> {
     batcher_settings: BatcherSettings,
     service: S,
-    db: String,
-    table: String,
-    pipeline_name: String,
-    pipeline_version: Option<String>,
+    dbname: Template,
+    table: Template,
+    pipeline_name: Template,
+    pipeline_version: Option<Template>,
     request_builder: GreptimeDBLogsHttpRequestBuilder,
 }
 
@@ -24,16 +24,16 @@ where
     pub const fn new(
         batcher_settings: BatcherSettings,
         service: S,
-        db: String,
-        table: String,
-        pipeline_name: String,
-        pipeline_version: Option<String>,
+        dbname: Template,
+        table: Template,
+        pipeline_name: Template,
+        pipeline_version: Option<Template>,
         request_builder: GreptimeDBLogsHttpRequestBuilder,
     ) -> Self {
         Self {
             batcher_settings,
             service,
-            db,
+            dbname,
             table,
             pipeline_name,
             pipeline_version,
@@ -45,12 +45,12 @@ where
         let batcher_settings = self.batcher_settings;
         input
             .batched_partitioned(
-                PartitionKey {
-                    db: self.db,
-                    table: self.table,
-                    pipeline_name: self.pipeline_name,
-                    pipeline_version: self.pipeline_version,
-                },
+                KeyPartitioner::new(
+                    self.dbname,
+                    self.table,
+                    self.pipeline_name,
+                    self.pipeline_version,
+                ),
                 || batcher_settings.as_byte_size_config(),
             )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
