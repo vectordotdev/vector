@@ -2246,7 +2246,7 @@ dependencies = [
  "futures-core",
  "prost 0.12.6",
  "prost-types 0.12.6",
- "tonic",
+ "tonic 0.10.2",
  "tracing-core 0.1.32",
 ]
 
@@ -2801,9 +2801,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d48cda787f839151732d396ac69e3473923d54312c070ee21e9effcaa8ca0b1d"
 dependencies = [
  "darling 0.20.8",
- "proc-macro2 1.0.82",
+ "proc-macro2 1.0.85",
  "quote 1.0.36",
- "syn 2.0.61",
+ "syn 2.0.66",
 ]
 
 [[package]]
@@ -2813,7 +2813,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "206868b8242f27cecce124c19fd88157fbd0dd334df2587f36417bafbc85097b"
 dependencies = [
  "derive_builder_core",
- "syn 2.0.61",
+ "syn 2.0.66",
 ]
 
 [[package]]
@@ -6158,7 +6158,7 @@ dependencies = [
  "ordered-float 4.2.0",
  "prost 0.12.6",
  "prost-build 0.12.6",
- "tonic",
+ "tonic 0.10.2",
  "tonic-build 0.10.2",
  "vector-core",
  "vector-lookup",
@@ -9531,7 +9531,7 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost 0.12.4",
+ "prost 0.12.6",
  "rustls-native-certs 0.7.0",
  "rustls-pemfile 2.1.0",
  "rustls-pki-types",
@@ -9578,10 +9578,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be4ef6dd70a610078cb4e338a0f79d06bc759ff1b22d2120c2ff02ae264ba9c2"
 dependencies = [
  "prettyplease 0.2.15",
- "proc-macro2 1.0.82",
- "prost-build 0.12.4",
+ "proc-macro2 1.0.85",
+ "prost-build 0.12.6",
  "quote 1.0.36",
- "syn 2.0.61",
+ "syn 2.0.66",
 ]
 
 [[package]]
