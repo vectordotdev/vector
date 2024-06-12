@@ -592,7 +592,7 @@ mod integration_tests {
             indoc! { r#"
              endpoint = "{}"
              customer_id = "customer id"
-             namespace = "{}"
+             namespace = "namespace"
              credentials_path = "{}"
              log_type = "{}"
              encoding.codec = "text"
