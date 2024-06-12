@@ -7,9 +7,6 @@ use greptimedb_ingester::Error as GreptimeError;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::task::Poll;
-
-use greptimedb_ingester::api::v1::*;
-use greptimedb_ingester::Error as GreptimeError;
 use vector_lib::event::Metric;
 
 #[derive(Clone)]
