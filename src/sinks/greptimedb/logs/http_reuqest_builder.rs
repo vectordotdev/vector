@@ -72,7 +72,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
         let payload = request.take_payload();
 
         let mut builder = Request::post(&url)
-            .header(CONTENT_TYPE, "application/x-ndjson")
+            .header(CONTENT_TYPE, "application/json")
             .header(CONTENT_LENGTH, payload.len());
 
         if let Some(ce) = self.compression.content_encoding() {
