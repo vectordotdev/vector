@@ -9,7 +9,10 @@ use futures::future::BoxFuture;
 use tower::Service;
 use tracing::Instrument;
 
-use crate::sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse};
+use crate::sinks::{
+    azure_common::config::{AzureBlobRequest, AzureBlobResponse},
+    util::vector_event::VectorSendEventMetadata,
+};
 
 #[derive(Clone)]
 pub struct AzureBlobService {
@@ -49,6 +52,13 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 None => blob,
             };
 
+            let send_event_metadata = VectorSendEventMetadata {
+                bytes: byte_size,
+                events_len: request.metadata.count,
+                blob: request.metadata.partition_key.clone(),
+                container: request.metadata.container_name.clone(),
+            };
+
             let result = blob
                 .into_future()
                 .instrument(info_span!("request").or_current())
@@ -61,6 +71,7 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                     .request_metadata
                     .into_events_estimated_json_encoded_byte_size(),
                 byte_size,
+                send_event_metadata,
             })
         })
     }

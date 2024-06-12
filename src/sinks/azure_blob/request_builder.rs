@@ -12,7 +12,7 @@ use crate::{
         azure_common::config::{AzureBlobMetadata, AzureBlobRequest},
         util::{
             metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-            RequestBuilder,
+            RequestBuilder, vector_event::VectorSendEventMetadata,
         },
     },
 };
@@ -50,6 +50,7 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         let finalizers = events.take_finalizers();
         let azure_metadata = AzureBlobMetadata {
             partition_key,
+            container_name: self.container_name.clone(),
             count: events.len(),
             byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
@@ -82,13 +83,12 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
 
         let blob_data = payload.into_payload();
 
-        info!(
-            message = "Sending events.",
-            bytes = ?blob_data.len(),
-            events_len = ?azure_metadata.count,
-            blob = ?azure_metadata.partition_key,
-            container = ?self.container_name,
-        );
+        VectorSendEventMetadata {
+            bytes: blob_data.len(),
+            events_len: azure_metadata.count,
+            blob: azure_metadata.partition_key.clone(),
+            container: self.container_name.clone(),
+        }.emit_sending_event();
 
         AzureBlobRequest {
             blob_data,
