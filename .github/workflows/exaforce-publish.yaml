@@ -88,7 +88,9 @@ jobs:
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
-        run: make package-aarch64-unknown-linux-gnu-all
+        run: |
+          make test-integration-azure ENVIRONMENT=true
+          make package-aarch64-unknown-linux-gnu-all
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v4
         with:
