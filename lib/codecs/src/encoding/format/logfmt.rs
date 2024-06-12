@@ -36,13 +36,6 @@ impl LogfmtSerializerConfig {
 #[derive(Debug, Clone)]
 pub struct LogfmtSerializer;
 
-impl LogfmtSerializer {
-    /// Creates a new `LogfmtSerializer`.
-    pub const fn new() -> Self {
-        Self
-    }
-}
-
 impl Encoder<Event> for LogfmtSerializer {
     type Error = vector_common::Error;
 
@@ -67,7 +60,7 @@ mod tests {
         let event = Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar")
         }));
-        let mut serializer = LogfmtSerializer::new();
+        let mut serializer = LogfmtSerializer;
         let mut bytes = BytesMut::new();
 
         serializer.encode(event, &mut bytes).unwrap();

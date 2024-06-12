@@ -303,7 +303,7 @@ impl SourceConfig for DatadogAgentConfig {
                 output.push(SourceOutput::new_traces().with_port(TRACES))
             }
         } else {
-            output.push(SourceOutput::new_logs(DataType::all(), definition))
+            output.push(SourceOutput::new_logs(DataType::all_bits(), definition))
         }
         output
     }
@@ -319,8 +319,6 @@ impl SourceConfig for DatadogAgentConfig {
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
-    BadRequest,
-    InvalidDataFormat,
     ServerShutdown,
 }
 

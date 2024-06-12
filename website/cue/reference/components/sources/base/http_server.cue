@@ -408,6 +408,14 @@ base: components: sources: http_server: configuration: {
 			items: type: string: examples: ["User-Agent", "X-My-Custom-Header", "X-*", "*"]
 		}
 	}
+	host_key: {
+		description: "If set, the name of the log field used to add the remote IP to each event"
+		required:    false
+		type: string: {
+			default: ""
+			examples: ["hostname"]
+		}
+	}
 	keepalive: {
 		description: "Configuration of HTTP server keepalive parameters."
 		required:    false

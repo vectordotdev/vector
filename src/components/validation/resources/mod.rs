@@ -78,7 +78,7 @@ impl ResourceCodec {
     pub fn into_encoder(&self) -> Encoder<encoding::Framer> {
         let (framer, serializer) = match self {
             Self::Encoding(config) => (
-                Framer::Bytes(BytesEncoder::new()),
+                Framer::Bytes(BytesEncoder),
                 config.build().expect("should not fail to build serializer"),
             ),
             Self::EncodingWithFraming(config) => {

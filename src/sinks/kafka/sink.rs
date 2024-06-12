@@ -21,8 +21,6 @@ use crate::{
 pub(super) enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: KafkaError },
-    #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateParseError },
 }
 
 pub struct KafkaSink {
@@ -108,15 +106,18 @@ impl KafkaSink {
 pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     trace!("Healthcheck started.");
     let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
-    let topic = match config.topic.render_string(&LogEvent::from_str_legacy("")) {
-        Ok(topic) => Some(topic),
-        Err(error) => {
-            warn!(
-                message = "Could not generate topic for healthcheck.",
-                %error,
-            );
-            None
-        }
+    let topic: Option<String> = match config.healthcheck_topic {
+        Some(topic) => Some(topic),
+        _ => match config.topic.render_string(&LogEvent::from_str_legacy("")) {
+            Ok(topic) => Some(topic),
+            Err(error) => {
+                warn!(
+                    message = "Could not generate topic for healthcheck.",
+                    %error,
+                );
+                None
+            }
+        },
     };
 
     tokio::task::spawn_blocking(move || {

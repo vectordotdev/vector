@@ -14,7 +14,7 @@ dashmap = { version = "5.5.3", default-features = false }
 [dev-dependencies]
 criterion = "0.5"
 tracing = "0.1.34"
-mock_instant = { version = "0.4" }
+mock_instant = { version = "0.5" }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = ["env-filter", "fmt"] }
 
 [[bench]]

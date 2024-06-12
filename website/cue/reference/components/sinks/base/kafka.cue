@@ -267,6 +267,16 @@ base: components: sinks: kafka: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			json: {
+				description:   "Options for the JsonSerializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: pretty: {
+					description: "Whether to use pretty JSON formatting."
+					required:    false
+					type: bool: default: false
+				}
+			}
 			metric_tag_values: {
 				description: """
 					Controls how metric tag values are encoded.
@@ -336,6 +346,16 @@ base: components: sinks: kafka: configuration: {
 			"""
 		required: false
 		type: string: examples: ["headers"]
+	}
+	healthcheck_topic: {
+		description: """
+			The topic name to use for healthcheck. If omitted, `topic` is used.
+			This option helps prevent healthcheck warnings when `topic` is templated.
+
+			It is ignored when healthcheck is disabled.
+			"""
+		required: false
+		type: string: {}
 	}
 	key_field: {
 		description: """

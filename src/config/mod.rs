@@ -27,8 +27,6 @@ mod cmd;
 mod compiler;
 mod diff;
 mod enrichment_table;
-#[cfg(feature = "enterprise")]
-pub mod enterprise;
 pub mod format;
 mod graph;
 mod id;
@@ -108,9 +106,6 @@ pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub schema: schema::Options,
-    pub hash: Option<String>,
-    #[cfg(feature = "enterprise")]
-    pub enterprise: Option<enterprise::Options>,
     pub global: GlobalOptions,
     pub healthchecks: HealthcheckOptions,
     sources: IndexMap<ComponentKey, SourceOuter>,
@@ -1099,128 +1094,6 @@ mod tests {
         assert_eq!(source.proxy.http, Some("http://server:3129".into()));
         assert_eq!(source.proxy.https, None);
         assert!(source.proxy.no_proxy.matches("localhost"));
-    }
-
-    #[test]
-    #[cfg(feature = "enterprise")]
-    fn order_independent_sha256_hashes() {
-        let config1: ConfigBuilder = format::deserialize(
-            indoc! {r#"
-                data_dir = "/tmp"
-
-                [api]
-                    enabled = true
-
-                [sources.file]
-                    type = "file"
-                    ignore_older_secs = 600
-                    include = ["/var/log/**/*.log"]
-                    read_from = "beginning"
-
-                [sources.internal_metrics]
-                    type = "internal_metrics"
-                    namespace = "pipelines"
-
-                [transforms.filter]
-                    type = "filter"
-                    inputs = ["internal_metrics"]
-                    condition = """
-                        .name == "component_received_bytes_total"
-                    """
-
-                [sinks.out]
-                    type = "console"
-                    inputs = ["filter"]
-                    target = "stdout"
-                    encoding.codec = "json"
-            "#},
-            Format::Toml,
-        )
-        .unwrap();
-
-        let config2: ConfigBuilder = format::deserialize(
-            indoc! {r#"
-                data_dir = "/tmp"
-
-                [sources.internal_metrics]
-                    type = "internal_metrics"
-                    namespace = "pipelines"
-
-                [sources.file]
-                    type = "file"
-                    ignore_older_secs = 600
-                    include = ["/var/log/**/*.log"]
-                    read_from = "beginning"
-
-                [transforms.filter]
-                    type = "filter"
-                    inputs = ["internal_metrics"]
-                    condition = """
-                        .name == "component_received_bytes_total"
-                    """
-
-                [sinks.out]
-                    type = "console"
-                    inputs = ["filter"]
-                    target = "stdout"
-                    encoding.codec = "json"
-
-                [api]
-                    enabled = true
-            "#},
-            Format::Toml,
-        )
-        .unwrap();
-
-        assert_eq!(config1.sha256_hash(), config2.sha256_hash())
-    }
-
-    #[test]
-    #[cfg(feature = "enterprise")]
-    fn enterprise_tags_ignored_sha256_hashes() {
-        let config1: ConfigBuilder = format::deserialize(
-            indoc! {r#"
-                [enterprise]
-                api_key = "api_key"
-                configuration_key = "configuration_key"
-
-                [enterprise.tags]
-                tag = "value"
-
-                [sources.internal_metrics]
-                type = "internal_metrics"
-
-                [sinks.datadog_metrics]
-                type = "datadog_metrics"
-                inputs = ["*"]
-                default_api_key = "default_api_key"
-            "#},
-            Format::Toml,
-        )
-        .unwrap();
-
-        let config2: ConfigBuilder = format::deserialize(
-            indoc! {r#"
-                [enterprise]
-                api_key = "api_key"
-                configuration_key = "configuration_key"
-
-                [enterprise.tags]
-                another_tag = "another value"
-
-                [sources.internal_metrics]
-                type = "internal_metrics"
-
-                [sinks.datadog_metrics]
-                type = "datadog_metrics"
-                inputs = ["*"]
-                default_api_key = "default_api_key"
-            "#},
-            Format::Toml,
-        )
-        .unwrap();
-
-        assert_eq!(config1.sha256_hash(), config2.sha256_hash())
     }
 }
 

@@ -160,8 +160,7 @@ the reception of Vector events from an upstream component.
   - `byte_size`
     - For UDP, TCP, and Unix protocols, the total number of bytes received from
       the socket excluding the delimiter.
-    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
-      represented by the `Content-Length` header.
+    - For HTTP-based protocols, the total number of bytes in the HTTP body, after decompression
     - For files, the total number of bytes read from the file excluding the
       delimiter.
   - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
@@ -188,8 +187,7 @@ the reception of Vector events from an upstream component.
   - `byte_size`
     - For UDP, TCP, and Unix protocols, the total number of bytes placed on the
       socket excluding the delimiter.
-    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
-      represented by the `Content-Length` header.
+    - For HTTP-based protocols, the total number of bytes in the HTTP body before compression
     - For files, the total number of bytes written to the file excluding the
       delimiter.
   - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,

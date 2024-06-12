@@ -8,14 +8,14 @@ publish = false
 [dependencies]
 async-graphql = { version = "7.0.5", default-features = false, features = ["playground" ], optional = true }
 async-trait = { version = "0.1", default-features = false }
-bitmask-enum = { version = "2.2.3", default-features = false }
+bitmask-enum = { version = "2.2.4", default-features = false }
 bytes = { version = "1.6.0", default-features = false, features = ["serde"] }
 chrono.workspace = true
-crossbeam-utils = { version = "0.8.19", default-features = false }
+crossbeam-utils = { version = "0.8.20", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 dyn-clone = { version = "1.0.17", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
-enumflags2 = { version = "0.7.9", default-features = false }
+enumflags2 = { version = "0.7.10", default-features = false }
 float_eq = { version = "1.0", default-features = false }
 futures = { version = "0.3.30", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.29", default-features = false, features = ["std"] }
@@ -28,18 +28,18 @@ lookup = { package = "vector-lookup", path = "../vector-lookup" }
 metrics = "0.21.1"
 metrics-tracing-context = { version = "0.14.0", default-features = false }
 metrics-util = { version = "0.15.1", default-features = false, features = ["registry"] }
-mlua = { version = "0.9.7", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.9.8", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.4", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.19", default-features = false }
 ordered-float = { version = "4.2.0", default-features = false }
 openssl = { version = "0.10.64", default-features = false, features = ["vendored"] }
-parking_lot = { version = "0.12.2", default-features = false }
+parking_lot = { version = "0.12.3", default-features = false }
 pin-project.workspace = true
 proptest = { version = "1.4", optional = true }
 prost-types = { version = "0.12", default-features = false }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 quanta = { version = "0.12.3", default-features = false }
-regex = { version = "1.10.4", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.10.5", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
@@ -47,7 +47,7 @@ serde_with = { version = "3.8.1", default-features = false, features = ["std", "
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.5", default-features = false }
 socket2 = { version = "0.5.7", default-features = false }
-tokio = { version = "1.37.0", default-features = false, features = ["net"] }
+tokio = { version = "1.38.0", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.4", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
