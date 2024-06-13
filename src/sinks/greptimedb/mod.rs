@@ -22,6 +22,10 @@ fn default_dbname() -> String {
     greptimedb_ingester::DEFAULT_SCHEMA_NAME.to_string()
 }
 
+fn default_dbname_temaplte() -> Template {
+    Template::try_from(default_dbname()).unwrap()
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 struct GreptimeDBDefaultBatchSettings;
 
@@ -147,10 +151,11 @@ impl From<&GreptimeDBLogsConfig> for GreptimeDBServiceConfig {
     fn from(val: &GreptimeDBLogsConfig) -> Self {
         GreptimeDBServiceConfig {
             endpoint: val.endpoint.clone(),
-            dbname: val.dbname.clone(),
+            // should be rewritten to use template
+            dbname: val.dbname.to_string(),
             username: val.username.clone(),
             password: val.password.clone(),
-            grpc_compression: val.grpc_compression.clone(),
+            grpc_compression: None,
             tls: val.tls.clone(),
         }
     }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -8,9 +10,14 @@ use crate::sinks::greptimedb::logs::http_reuqest_builder::{
 use crate::sinks::greptimedb::logs::sink::GreptimeDBLogsHttpSink;
 use crate::sinks::util::http::HttpService;
 use crate::sinks::{
-    greptimedb::{default_dbname, GreptimeDBDefaultBatchSettings},
+    greptimedb::{default_dbname_temaplte, GreptimeDBDefaultBatchSettings},
     prelude::*,
 };
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+
+fn extra_params_examples() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter([("source".to_owned(), "vector".to_owned())])
+}
 
 /// Configuration for the `greptimedb_logs` sink.
 #[configurable_component(sink("greptimedb_logs", "Ingest logs data into GreptimeDB."))]
@@ -24,7 +31,7 @@ pub struct GreptimeDBLogsConfig {
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
-    pub table: String,
+    pub table: Template,
 
     /// The GreptimeDB [database][database] name to connect.
     ///
@@ -36,9 +43,17 @@ pub struct GreptimeDBLogsConfig {
     ///
     /// [database]: https://docs.greptime.com/user-guide/concepts/key-concepts#database
     #[configurable(metadata(docs::examples = "public"))]
-    #[derivative(Default(value = "default_dbname()"))]
-    #[serde(default = "default_dbname")]
-    pub dbname: String,
+    #[derivative(Default(value = "default_dbname_temaplte()"))]
+    #[serde(default = "default_dbname_temaplte")]
+    pub dbname: Template,
+
+    /// pipeline name to be used for the logs
+    #[configurable(metadata(docs::examples = "pipeline_name"))]
+    pub pipeline_name: Template,
+
+    /// pipeline version to be used for the logs
+    #[configurable(metadata(docs::examples = "2024-06-07 06:46:23.858293"))]
+    pub pipeline_version: Option<Template>,
 
     /// The username for your GreptimeDB instance.
     ///
@@ -56,9 +71,20 @@ pub struct GreptimeDBLogsConfig {
     /// Default to none, `gzip` or `zstd` is supported.
     ///
     /// This is required if your instance has authentication enabled.
-    #[configurable(metadata(docs::examples = "grpc_compression"))]
+    #[configurable(derived)]
+    #[serde(default = "Compression::gzip_default")]
+    pub compression: Compression,
+
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub encoding: Transformer,
+
+    /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
     #[serde(default)]
-    pub grpc_compression: Option<String>,
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
+    #[configurable(metadata(docs::examples = "extra_params_examples()"))]
+    pub extra_params: Option<HashMap<String, String>>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -99,7 +125,15 @@ impl SinkConfig for GreptimeDBLogsConfig {
         let request_builder = GreptimeDBLogsHttpRequestBuilder {
             endpoint: self.endpoint.clone(),
             auth: auth.clone(),
-            encoder: Default::default(),
+            encoder: (
+                self.encoding.clone(),
+                Encoder::<Framer>::new(
+                    NewlineDelimitedEncoderConfig.build().into(),
+                    JsonSerializerConfig::default().build().into(),
+                ),
+            ),
+            compression: self.compression,
+            extra_params: self.extra_params.clone(),
         };
 
         let service: HttpService<GreptimeDBLogsHttpRequestBuilder, PartitionKey> =
@@ -116,6 +150,8 @@ impl SinkConfig for GreptimeDBLogsConfig {
             service,
             self.dbname.clone(),
             self.table.clone(),
+            self.pipeline_name.clone(),
+            self.pipeline_version.clone(),
             request_builder,
         );
 

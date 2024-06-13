@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use crate::codecs::{Encoder, Transformer};
 use crate::event::{Event, EventFinalizers, Finalizable};
 use crate::http::{Auth, HttpClient, HttpError};
+use crate::sinks::prelude::*;
 use crate::sinks::prelude::{
     Compression, EncodeResult, Partitioner, RequestBuilder, RequestMetadata,
     RequestMetadataBuilder, RetryAction, RetryLogic,
@@ -8,7 +11,7 @@ use crate::sinks::prelude::{
 use crate::sinks::{HTTPRequestBuilderSnafu, HealthcheckError};
 use crate::Error;
 use bytes::Bytes;
-use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
+use http::header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE};
 use http::{Request, StatusCode};
 use hyper::Body;
 use snafu::ResultExt;
@@ -19,18 +22,66 @@ use crate::sinks::util::http::{HttpRequest, HttpResponse, HttpServiceRequestBuil
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub(super) struct PartitionKey {
-    pub db: String,
+    pub dbname: String,
     pub table: String,
+    pub pipeline_name: String,
+    pub pipeline_version: Option<String>,
 }
 
-impl Partitioner for PartitionKey {
+/// KeyPartitioner that partitions events by (dbname, table, pipeline_name, pipeline_version) pair.
+pub(super) struct KeyPartitioner {
+    dbname: Template,
+    table: Template,
+    pipeline_name: Template,
+    pipeline_version: Option<Template>,
+}
+
+impl KeyPartitioner {
+    pub const fn new(
+        db: Template,
+        table: Template,
+        pipeline_name: Template,
+        pipeline_version: Option<Template>,
+    ) -> Self {
+        Self {
+            dbname: db,
+            table,
+            pipeline_name,
+            pipeline_version,
+        }
+    }
+
+    fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
+        template
+            .render_string(item)
+            .map_err(|error| {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some(field),
+                    drop_event: true,
+                });
+            })
+            .ok()
+    }
+}
+
+impl Partitioner for KeyPartitioner {
     type Item = Event;
     type Key = Option<PartitionKey>;
 
-    fn partition(&self, _item: &Self::Item) -> Self::Key {
+    fn partition(&self, item: &Self::Item) -> Self::Key {
+        let dbname = Self::render(&self.dbname, item, "dbname_key")?;
+        let table = Self::render(&self.table, item, "table_key")?;
+        let pipeline_name = Self::render(&self.pipeline_name, item, "pipeline_name")?;
+        let pipeline_version = self
+            .pipeline_version
+            .as_ref()
+            .and_then(|template| Self::render(template, item, "pipeline_version"));
         Some(PartitionKey {
-            db: self.db.clone(),
-            table: self.table.clone(),
+            dbname,
+            table,
+            pipeline_name,
+            pipeline_version,
         })
     }
 }
@@ -40,62 +91,57 @@ pub(super) struct GreptimeDBLogsHttpRequestBuilder {
     pub(super) endpoint: String,
     pub(super) auth: Option<Auth>,
     pub(super) encoder: (Transformer, Encoder<Framer>),
+    pub(super) compression: Compression,
+    pub(super) extra_params: Option<HashMap<String, String>>,
 }
 
 impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilder {
     fn build(&self, mut request: HttpRequest<PartitionKey>) -> Result<Request<Bytes>, Error> {
         let metadata = request.get_additional_metadata();
         let table = metadata.table.clone();
-        let db = metadata.db.clone();
+        let db = metadata.dbname.clone();
 
         // prepare url
-        let endpoint = format!("{}/v1/sql", self.endpoint.as_str());
+        let endpoint = format!("{}/v1/events/logs", self.endpoint.as_str());
         let mut url = url::Url::parse(&endpoint).unwrap();
-        let url = url
-            .query_pairs_mut()
+        let mut url_builder = url.query_pairs_mut();
+        url_builder
             .append_pair("db", &db)
-            .finish()
-            .to_string();
+            .append_pair("table", &table)
+            .append_pair("pipeline_name", &metadata.pipeline_name);
+
+        if let Some(pipeline_version) = metadata.pipeline_version.as_ref() {
+            url_builder.append_pair("pipeline_version", pipeline_version);
+        }
+
+        if let Some(extra_params) = self.extra_params.as_ref() {
+            for (key, value) in extra_params.iter() {
+                url_builder.append_pair(key, value);
+            }
+        }
+
+        let url = url_builder.finish().to_string();
 
         // prepare body
-        let body = format_body(request.take_payload(), &table);
+        let payload = request.take_payload();
 
         let mut builder = Request::post(&url)
-            .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .header(CONTENT_LENGTH, body.len());
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_LENGTH, payload.len());
 
-        // todo compression
+        if let Some(ce) = self.compression.content_encoding() {
+            builder = builder.header(CONTENT_ENCODING, ce);
+        }
 
         if let Some(auth) = self.auth.clone() {
             builder = auth.apply_builder(builder);
         }
 
         builder
-            .body(body.into())
+            .body(payload)
             .context(HTTPRequestBuilderSnafu)
             .map_err(Into::into)
     }
-}
-
-fn format_body(payload: Bytes, table: &str) -> String {
-    let message = String::from_utf8_lossy(payload.as_ref());
-    let now = chrono::Local::now().timestamp_millis();
-
-    // 40 + table.len + message.len + 13 + 2 + 5 + 10
-    // last 10 is for buffer
-    let mut sql = String::with_capacity(70 + table.len() + message.len());
-    sql.push_str(format!("INSERT INTO {table}(time_local, message) values").as_str());
-
-    for message in message.split("\n") {
-        sql.push_str(format!("({now}, '{message}'),").as_str());
-    }
-    sql.pop();
-    sql.push_str(";");
-
-    let body = url::form_urlencoded::Serializer::new(String::new())
-        .append_pair("sql", &sql)
-        .finish();
-    body
 }
 
 impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBuilder {
@@ -107,7 +153,7 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBui
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
-        Compression::None
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -137,8 +183,10 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBui
             finalizers,
             request_metadata,
             PartitionKey {
-                db: key.db,
+                dbname: key.dbname,
                 table: key.table,
+                pipeline_name: key.pipeline_name,
+                pipeline_version: key.pipeline_version,
             },
         )
     }
