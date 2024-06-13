@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use anyhow::anyhow;
 use async_stream::stream;
 use azure_storage_blobs::prelude::ContainerClient;
 use azure_storage_queues::{operations::Message, QueueClient};
@@ -11,6 +12,7 @@ use base64::{prelude::BASE64_STANDARD, Engine};
 use futures::stream::StreamExt;
 use serde::Deserialize;
 use serde_with::serde_as;
+use tokio::{select, time};
 
 use vector_lib::{
     configurable::configurable_component,
@@ -19,6 +21,7 @@ use vector_lib::{
 
 use crate::{
     azure,
+    shutdown::ShutdownSignal,
     sources::azure_blob::{AzureBlobConfig, BlobPack, BlobPackStream},
 };
 
@@ -31,12 +34,28 @@ use crate::{
 pub(super) struct Config {
     /// The name of the storage queue to poll for events.
     pub(super) queue_name: String,
+
+    /// How long to wait while polling the event grid queue for new messages, in seconds.
+    ///
+    // NOTE: We restrict this to u32 for safe conversion to i32 later.
+    #[serde(default = "default_poll_secs")]
+    #[derivative(Default(value = "default_poll_secs()"))]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    pub(super) poll_secs: u32,
 }
 
-pub fn make_azure_row_stream(cfg: &AzureBlobConfig) -> crate::Result<BlobPackStream> {
+pub fn make_azure_row_stream(
+    cfg: &AzureBlobConfig,
+    shutdown: ShutdownSignal,
+) -> crate::Result<BlobPackStream> {
     let queue_client = make_queue_client(cfg)?;
     let container_client = make_container_client(cfg)?;
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+    let poll_interval = std::time::Duration::from_secs(
+        cfg.queue.as_ref().ok_or(
+            anyhow!("Missing Event Grid queue config.")
+        )?.poll_secs as u64
+    );
 
     Ok(Box::pin(stream! {
         // TODO: add a way to stop this loop, possibly with shutdown
@@ -62,6 +81,14 @@ pub fn make_azure_row_stream(cfg: &AzureBlobConfig) -> crate::Result<BlobPackStr
                             no blob stream stream created from it. \
                             Will retry on next message."),
                 }
+            }
+            // allow shutdown to break sleeping
+            select! {
+                _ = shutdown.clone() => {
+                    info!("Shutdown signal received, terminating azure row stream.");
+                    break;
+                },
+                _ = time::sleep(poll_interval) => { }
             }
         }
     }))
@@ -184,6 +211,10 @@ async fn proccess_event_grid_message(
             })
         }),
     })
+}
+
+const fn default_poll_secs() -> u32 {
+    15
 }
 
 #[test]
