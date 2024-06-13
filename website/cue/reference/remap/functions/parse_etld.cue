@@ -82,8 +82,8 @@ remap: functions: parse_etld: {
 				"""#
 			return: {
 				etld:         "acmecorp"
-				etld_plus:    "vector.acmecorp"
-				known_suffix: true
+				etld_plus:    "acmecorp"
+				known_suffix: false
 			}
 		},
 	]
