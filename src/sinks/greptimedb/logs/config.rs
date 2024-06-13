@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -12,6 +14,10 @@ use crate::sinks::{
     prelude::*,
 };
 use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+
+fn extra_params_examples() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter([("source".to_owned(), "vector".to_owned())])
+}
 
 /// Configuration for the `greptimedb_logs` sink.
 #[configurable_component(sink("greptimedb_logs", "Ingest logs data into GreptimeDB."))]
@@ -73,6 +79,13 @@ pub struct GreptimeDBLogsConfig {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
+    /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
+    #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
+    #[configurable(metadata(docs::examples = "extra_params_examples()"))]
+    pub extra_params: Option<HashMap<String, String>>,
+
     #[configurable(derived)]
     #[serde(default)]
     pub(crate) batch: BatchConfig<GreptimeDBDefaultBatchSettings>,
@@ -120,6 +133,7 @@ impl SinkConfig for GreptimeDBLogsConfig {
                 ),
             ),
             compression: self.compression,
+            extra_params: self.extra_params.clone(),
         };
 
         let service: HttpService<GreptimeDBLogsHttpRequestBuilder, PartitionKey> =

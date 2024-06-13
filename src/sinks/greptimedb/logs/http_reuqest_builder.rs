@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::codecs::{Encoder, Transformer};
 use crate::event::{Event, EventFinalizers, Finalizable};
 use crate::http::{Auth, HttpClient, HttpError};
@@ -90,6 +92,7 @@ pub(super) struct GreptimeDBLogsHttpRequestBuilder {
     pub(super) auth: Option<Auth>,
     pub(super) encoder: (Transformer, Encoder<Framer>),
     pub(super) compression: Compression,
+    pub(super) extra_params: Option<HashMap<String, String>>,
 }
 
 impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilder {
@@ -109,6 +112,12 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
 
         if let Some(pipeline_version) = metadata.pipeline_version.as_ref() {
             url_builder.append_pair("pipeline_version", pipeline_version);
+        }
+
+        if let Some(extra_params) = self.extra_params.as_ref() {
+            for (key, value) in extra_params.iter() {
+                url_builder.append_pair(key, value);
+            }
         }
 
         let url = url_builder.finish().to_string();
