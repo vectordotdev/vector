@@ -78,7 +78,7 @@ remap: functions: parse_etld: {
 		{
 			title: "Parse eTLD with custom PSL"
 			source: #"""
-				parse_etld!("vector.acmecorp", psl: "custom_psl_file.dat")
+				parse_etld!("vector.acmecorp", psl: "resources/public_suffix_list.dat")
 				"""#
 			return: {
 				etld:         "acmecorp"
