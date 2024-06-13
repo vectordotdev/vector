@@ -1,6 +1,14 @@
 package metadata
 
 base: components: transforms: reduce: configuration: {
+	end_every_period_ms: {
+		description: """
+			If supplied, every time this interval elapses for a given grouping, the reduced value
+			for that grouping is flushed. Checked every flush_period_ms.
+			"""
+		required: false
+		type: uint: {}
+	}
 	ends_when: {
 		description: """
 			A condition used to distinguish the final event of a transaction.
