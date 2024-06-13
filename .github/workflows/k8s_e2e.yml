@@ -148,11 +148,10 @@ jobs:
             // https://cloud.google.com/kubernetes-engine/docs/release-notes
             // https://docs.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli#aks-kubernetes-release-calendar
             const kubernetes_version = [
-              { version: "v1.23.3",  is_essential: true  },
-              { version: "v1.22.5",  is_essential: false },
-              { version: "v1.21.8",  is_essential: false },
-              { version: "v1.20.14", is_essential: false },
-              { version: "v1.19.8",  is_essential: false },
+              { version: "v1.30.2",  is_essential: true  },
+              { version: "v1.29.6",  is_essential: true  },
+              { version: "v1.28.11", is_essential: true  },
+              { version: "v1.27.15", is_essential: true  },
             ]
             const container_runtime = [
               "docker",
