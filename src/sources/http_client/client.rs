@@ -10,11 +10,11 @@ use snafu::ResultExt;
 use std::{collections::HashMap, time::Duration};
 use tokio_util::codec::Decoder as _;
 
+use crate::sources::util::http_client;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     http::Auth,
-    register_validatable_component,
     serde::{default_decoding, default_framing_message_based},
     sources,
     sources::util::{
@@ -27,7 +27,6 @@ use crate::{
     tls::{TlsConfig, TlsSettings},
     Result,
 };
-use crate::{components::validation::*, sources::util::http_client};
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
@@ -176,7 +175,7 @@ impl_generate_config_from_default!(HttpClientConfig);
 impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
         // build the url
-        let endpoints = vec![self.endpoint.clone()];
+        let endpoints = [self.endpoint.clone()];
         let urls = endpoints
             .iter()
             .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
@@ -235,29 +234,6 @@ impl SourceConfig for HttpClientConfig {
         false
     }
 }
-
-impl ValidatableComponent for HttpClientConfig {
-    fn validation_configuration() -> ValidationConfiguration {
-        let uri = Uri::from_static("http://127.0.0.1:9898/logs");
-
-        let config = Self {
-            endpoint: uri.to_string(),
-            interval: Duration::from_secs(1),
-            decoding: DeserializerConfig::Json(Default::default()),
-            ..Default::default()
-        };
-
-        let external_resource = ExternalResource::new(
-            ResourceDirection::Pull,
-            HttpResourceConfig::from_parts(uri, Some(config.method.into())),
-            config.get_decoding_config(None),
-        );
-
-        ValidationConfiguration::from_source(Self::NAME, config, Some(external_resource))
-    }
-}
-
-register_validatable_component!(HttpClientConfig);
 
 impl HttpClientConfig {
     pub fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {

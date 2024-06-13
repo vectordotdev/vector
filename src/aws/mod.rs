@@ -1,45 +1,55 @@
-#![allow(missing_docs)]
+//! Shared functionality for the AWS components.
 pub mod auth;
 pub mod region;
 
-use std::error::Error;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, OnceLock};
-use std::task::{Context, Poll};
-use std::time::SystemTime;
-
 pub use auth::{AwsAuthentication, ImdsAuthentication};
-use aws_config::meta::region::ProvideRegion;
+use aws_config::{meta::region::ProvideRegion, retry::RetryConfig, Region, SdkConfig};
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
-use aws_sigv4::http_request::{SignableRequest, SigningSettings};
-use aws_sigv4::SigningParams;
+use aws_sigv4::{
+    http_request::{SignableBody, SignableRequest, SigningSettings},
+    sign::v4,
+};
 use aws_smithy_async::rt::sleep::TokioSleep;
-use aws_smithy_client::bounds::SmithyMiddleware;
-use aws_smithy_client::erase::{DynConnector, DynMiddleware};
-use aws_smithy_client::{Builder, SdkError};
-use aws_smithy_http::body::{BoxBody, SdkBody};
-use aws_smithy_http::operation::{Request, Response};
-use aws_smithy_types::retry::RetryConfig;
-use aws_types::region::Region;
-use aws_types::SdkConfig;
+use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
+use aws_smithy_runtime_api::client::{
+    http::{
+        HttpClient, HttpConnector, HttpConnectorFuture, HttpConnectorSettings, SharedHttpConnector,
+    },
+    identity::Identity,
+    orchestrator::{HttpRequest, HttpResponse},
+    result::SdkError,
+    runtime_components::RuntimeComponents,
+};
+use aws_smithy_types::body::SdkBody;
+use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
+use futures_util::FutureExt;
 use http::HeaderMap;
-use http_body::Body;
+use http_body::{combinators::BoxBody, Body};
 use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
-use tower::{Layer, Service, ServiceBuilder};
+use snafu::Snafu;
+use std::time::SystemTime;
+use std::{
+    error::Error,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, OnceLock,
+    },
+    task::{Context, Poll},
+};
 
 use crate::config::ProxyConfig;
-use crate::http::{build_proxy_connector, build_tls_connector};
+use crate::http::{build_proxy_connector, build_tls_connector, status};
 use crate::internal_events::AwsBytesSent;
 use crate::tls::{MaybeTlsSettings, TlsConfig};
 
 static RETRIABLE_CODES: OnceLock<RegexSet> = OnceLock::new();
 
-pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
+/// Checks if the request can be retried after the given error was returned.
+pub fn is_retriable_error<T>(error: &SdkError<T, HttpResponse>) -> bool {
     match error {
         SdkError::TimeoutError(_) | SdkError::DispatchFailure(_) => true,
         SdkError::ConstructionFailure(_) => false,
@@ -52,11 +62,11 @@ pub fn is_retriable_error<T>(error: &SdkError<T>) -> bool {
     }
 }
 
-fn check_response(res: &Response) -> bool {
+fn check_response(res: &HttpResponse) -> bool {
     // This header is a direct indication that we should retry the request. Eventually it'd
     // be nice to actually schedule the retry after the given delay, but for now we just
     // check that it contains a positive value.
-    let retry_header = res.http().headers().get("x-amz-retry-after").is_some();
+    let retry_header = res.headers().get("x-amz-retry-after").is_some();
 
     // Certain 400-level responses will contain an error code indicating that the request
     // should be retried. Since we don't retry 400-level responses by default, we'll look
@@ -76,62 +86,68 @@ fn check_response(res: &Response) -> bool {
             .expect("invalid regex")
     });
 
-    let status = res.http().status();
-    let response_body = String::from_utf8_lossy(res.http().body().bytes().unwrap_or(&[]));
+    let status = res.status();
+    let response_body = String::from_utf8_lossy(res.body().bytes().unwrap_or(&[]));
 
     retry_header
         || status.is_server_error()
-        || status == http::StatusCode::TOO_MANY_REQUESTS
+        || status.as_u16() == status::TOO_MANY_REQUESTS
         || (status.is_client_error() && re.is_match(response_body.as_ref()))
 }
 
-pub trait ClientBuilder {
-    type Config;
-    type Client;
-    type DefaultMiddleware: SmithyMiddleware<DynConnector> + Clone + Send + Sync + 'static;
-
-    fn default_middleware() -> Self::DefaultMiddleware;
-
-    fn build(client: aws_smithy_client::Client, config: &SdkConfig) -> Self::Client;
-}
-
-pub async fn create_smithy_client<T: ClientBuilder>(
-    region: Region,
+/// Creates the http connector that has been configured to use the given proxy and TLS settings.
+/// All AWS requests should use this connector as the aws crates by default use RustTLS which we
+/// have turned off as we want to consistently use openssl.
+fn connector(
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
-    is_sink: bool,
-    retry_config: RetryConfig,
-) -> crate::Result<aws_smithy_client::Client> {
+) -> crate::Result<SharedHttpClient> {
     let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
 
-    let connector = if proxy.enabled {
+    if proxy.enabled {
         let proxy = build_proxy_connector(tls_settings, proxy)?;
-        let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
-        DynConnector::new(hyper_client)
+        Ok(HyperClientBuilder::new().build(proxy))
     } else {
         let tls_connector = build_tls_connector(tls_settings)?;
-        let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(tls_connector);
-        DynConnector::new(hyper_client)
-    };
-
-    let middleware_builder = ServiceBuilder::new()
-        .layer(CaptureRequestSize::new(is_sink, region))
-        .layer(T::default_middleware());
-    let middleware = DynMiddleware::new(middleware_builder);
-
-    let mut client_builder = Builder::new()
-        .connector(connector)
-        .middleware(middleware)
-        .sleep_impl(Arc::new(TokioSleep::new()));
-    client_builder.set_retry_config(Some(retry_config.into()));
-
-    Ok(client_builder.build())
+        Ok(HyperClientBuilder::new().build(tls_connector))
+    }
 }
 
-pub async fn resolve_region(region: Option<Region>) -> crate::Result<Region> {
+/// Implement for each AWS service to create the appropriate AWS sdk client.
+pub trait ClientBuilder {
+    /// The type of the client in the SDK.
+    type Client;
+
+    /// Build the client using the given config settings.
+    fn build(config: &SdkConfig) -> Self::Client;
+}
+
+fn region_provider(
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
+) -> crate::Result<impl ProvideRegion> {
+    let config = aws_config::provider_config::ProviderConfig::default()
+        .with_http_client(connector(proxy, tls_options)?);
+
+    Ok(aws_config::meta::region::RegionProviderChain::first_try(
+        aws_config::environment::EnvironmentVariableRegionProvider::new(),
+    )
+    .or_else(aws_config::profile::ProfileFileRegionProvider::builder().build())
+    .or_else(
+        aws_config::imds::region::ImdsRegionProvider::builder()
+            .configure(&config)
+            .build(),
+    ))
+}
+
+async fn resolve_region(
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
+    region: Option<Region>,
+) -> crate::Result<Region> {
     match region {
         Some(region) => Ok(region),
-        None => aws_config::default_provider::region::default_provider()
+        None => region_provider(proxy, tls_options)?
             .region()
             .await
             .ok_or_else(|| {
@@ -140,40 +156,53 @@ pub async fn resolve_region(region: Option<Region>) -> crate::Result<Region> {
     }
 }
 
+/// Create the SDK client using the provided settings.
 pub async fn create_client<T: ClientBuilder>(
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
-    is_sink: bool,
 ) -> crate::Result<T::Client> {
-    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options, is_sink)
+    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options)
         .await
         .map(|(client, _)| client)
 }
 
+/// Create the SDK client and resolve the region using the provided settings.
 pub async fn create_client_and_region<T: ClientBuilder>(
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
-    is_sink: bool,
 ) -> crate::Result<(T::Client, Region)> {
     let retry_config = RetryConfig::disabled();
 
     // The default credentials chains will look for a region if not given but we'd like to
     // error up front if later SDK calls will fail due to lack of region configuration
-    let region = resolve_region(region).await?;
+    let region = resolve_region(proxy, tls_options, region).await?;
 
     let provider_config =
         aws_config::provider_config::ProviderConfig::empty().with_region(Some(region.clone()));
 
+    let connector = connector(proxy, tls_options)?;
+
+    // Create a custom http connector that will emit the required metrics for us.
+    let connector = AwsHttpClient {
+        http: connector,
+        region: region.clone(),
+    };
+
     // Build the configuration first.
     let mut config_builder = SdkConfig::builder()
-        .credentials_cache(auth.credentials_cache().await?)
-        .credentials_provider(auth.credentials_provider(region.clone()).await?)
+        .http_client(connector)
+        .sleep_impl(Arc::new(TokioSleep::new()))
+        .identity_cache(auth.credentials_cache().await?)
+        .credentials_provider(
+            auth.credentials_provider(region.clone(), proxy, tls_options)
+                .await?,
+        )
         .region(region.clone())
         .retry_config(retry_config.clone());
 
@@ -189,134 +218,119 @@ pub async fn create_client_and_region<T: ClientBuilder>(
 
     let config = config_builder.build();
 
-    let client =
-        create_smithy_client::<T>(region.clone(), proxy, tls_options, is_sink, retry_config)
-            .await?;
-
-    Ok((T::build(client, &config), region))
+    Ok((T::build(&config), region))
 }
 
+#[derive(Snafu, Debug)]
+enum SigningError {
+    #[snafu(display("cannot sign the request because the headers are not valid utf-8"))]
+    NotUTF8Header,
+}
+
+/// Sign the request prior to sending to AWS.
+/// The signature is added to the provided `request`.
 pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
 ) -> crate::Result<()> {
-    let signable_request = SignableRequest::from(&*request);
+    let headers = request
+        .headers()
+        .iter()
+        .map(|(k, v)| {
+            Ok((
+                k.as_str(),
+                std::str::from_utf8(v.as_bytes()).map_err(|_| SigningError::NotUTF8Header)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, SigningError>>()?;
+
+    let signable_request = SignableRequest::new(
+        request.method().as_str(),
+        request.uri().to_string(),
+        headers.into_iter(),
+        SignableBody::Bytes(request.body().as_ref()),
+    )?;
+
     let credentials = credentials_provider.provide_credentials().await?;
-    let mut signing_params_builder = SigningParams::builder()
-        .access_key(credentials.access_key_id())
-        .secret_key(credentials.secret_access_key())
+    let identity = Identity::new(credentials, None);
+    let signing_params_builder = v4::SigningParams::builder()
+        .identity(&identity)
         .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
-        .service_name(service_name)
+        .name(service_name)
         .time(SystemTime::now())
         .settings(SigningSettings::default());
 
-    signing_params_builder.set_security_token(credentials.session_token());
+    let signing_params = signing_params_builder
+        .build()
+        .expect("all signing params set");
 
     let (signing_instructions, _signature) =
-        aws_sigv4::http_request::sign(signable_request, &signing_params_builder.build()?)?
-            .into_parts();
-    signing_instructions.apply_to_request(request);
+        aws_sigv4::http_request::sign(signable_request, &signing_params.into())?.into_parts();
+    signing_instructions.apply_to_request_http0x(request);
 
     Ok(())
 }
 
-/// Layer for capturing the payload size for AWS API client requests and emitting internal telemetry.
-#[derive(Clone)]
-struct CaptureRequestSize {
-    enabled: bool,
+#[derive(Debug)]
+struct AwsHttpClient<T> {
+    http: T,
     region: Region,
 }
 
-impl CaptureRequestSize {
-    const fn new(enabled: bool, region: Region) -> Self {
-        Self { enabled, region }
-    }
-}
-
-impl<S> Layer<S> for CaptureRequestSize {
-    type Service = CaptureRequestSizeService<S>;
-
-    fn layer(&self, inner: S) -> Self::Service {
-        CaptureRequestSizeService {
-            enabled: self.enabled,
-            region: self.region.clone(),
-            inner,
-        }
-    }
-}
-
-/// Service for capturing the payload size for AWS API client requests and emitting internal telemetry.
-#[derive(Clone)]
-struct CaptureRequestSizeService<S> {
-    enabled: bool,
-    region: Region,
-    inner: S,
-}
-
-impl<S> Service<Request> for CaptureRequestSizeService<S>
+impl<T> HttpClient for AwsHttpClient<T>
 where
-    S: Service<Request, Response = Response> + Send + Sync + 'static,
-    S::Future: Send + 'static,
+    T: HttpClient,
 {
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    fn http_connector(
+        &self,
+        settings: &HttpConnectorSettings,
+        components: &RuntimeComponents,
+    ) -> SharedHttpConnector {
+        let http_connector = self.http.http_connector(settings, components);
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
+        SharedHttpConnector::new(AwsConnector {
+            region: self.region.clone(),
+            http: http_connector,
+        })
     }
+}
 
-    fn call(&mut self, req: Request) -> Self::Future {
-        // Attach a body callback that will capture the bytes sent by interrogating the body chunks that get read as it
-        // sends the request out over the wire. We'll read the shared atomic counter, which will contain the number of
-        // bytes "read", aka the bytes it actually sent, if and only if we get back a successful response.
-        let (req, maybe_bytes_sent) = if self.enabled {
-            let shared_bytes_sent = Arc::new(AtomicUsize::new(0));
-            let (request, properties) = req.into_parts();
-            let (parts, body) = request.into_parts();
+#[derive(Clone, Debug)]
+struct AwsConnector<T> {
+    http: T,
+    region: Region,
+}
 
-            let body = {
-                let shared_bytes_sent = Arc::clone(&shared_bytes_sent);
+impl<T> HttpConnector for AwsConnector<T>
+where
+    T: HttpConnector,
+{
+    fn call(&self, req: HttpRequest) -> HttpConnectorFuture {
+        let bytes_sent = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let req = req.map(|body| {
+            let bytes_sent = Arc::clone(&bytes_sent);
+            body.map_preserve_contents(move |body| {
+                let body = MeasuredBody::new(body, Arc::clone(&bytes_sent));
+                SdkBody::from_body_0_4(BoxBody::new(body))
+            })
+        });
 
-                body.map_immutable(move |body| {
-                    let body = MeasuredBody::new(body, Arc::clone(&shared_bytes_sent));
-                    SdkBody::from_dyn(BoxBody::new(body))
-                })
-            };
-
-            let req = Request::from_parts(http::Request::from_parts(parts, body), properties);
-
-            (req, Some(shared_bytes_sent))
-        } else {
-            (req, None)
-        };
-
+        let fut = self.http.call(req);
         let region = self.region.clone();
-        let fut = self.inner.call(req);
 
-        Box::pin(async move {
-            // Perform the actual API call and see if it was successful by HTTP status code standards. If so, we emit a
-            // `BytesSent` event to ensure that we capture the data flowing out as API calls.
-            let result = fut.await;
-            if let Ok(response) = &result {
-                let byte_size = maybe_bytes_sent
-                    .map(|s| s.load(Ordering::Acquire))
-                    .unwrap_or(0);
-
-                // TODO: Should we actually emit for any other range of status codes? Right now, `is_success` is true
-                // for `200 <= status < 300`, which feels comprehensive... but are there other valid statuses?
-                if response.http().status().is_success() && byte_size != 0 {
+        HttpConnectorFuture::new(fut.inspect(move |result| {
+            let byte_size = bytes_sent.load(Ordering::Relaxed);
+            if let Ok(result) = result {
+                if result.status().is_success() {
                     emit!(AwsBytesSent {
                         byte_size,
                         region: Some(region),
                     });
                 }
             }
-
-            result
-        })
+        }))
     }
 }
 

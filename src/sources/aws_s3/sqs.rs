@@ -1,14 +1,16 @@
 use std::collections::HashMap;
 use std::{future::ready, num::NonZeroUsize, panic, sync::Arc};
 
-use aws_sdk_s3::{error::GetObjectError, Client as S3Client};
-use aws_sdk_sqs::{
-    error::{DeleteMessageBatchError, ReceiveMessageError},
-    model::{DeleteMessageBatchRequestEntry, Message},
-    output::DeleteMessageBatchOutput,
-    Client as SqsClient,
+use aws_sdk_s3::operation::get_object::GetObjectError;
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_sqs::operation::delete_message_batch::{
+    DeleteMessageBatchError, DeleteMessageBatchOutput,
 };
-use aws_smithy_client::SdkError;
+use aws_sdk_sqs::operation::receive_message::ReceiveMessageError;
+use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message};
+use aws_sdk_sqs::Client as SqsClient;
+use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
+use aws_smithy_runtime_api::client::result::SdkError;
 use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
@@ -100,6 +102,13 @@ pub(super) struct Config {
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
 
+    /// Whether to delete non-retryable messages.
+    ///
+    /// If a message is rejected by the sink and not retryable, it is deleted from the queue.
+    #[serde(default = "default_true")]
+    #[derivative(Default(value = "default_true()"))]
+    pub(super) delete_failed_message: bool,
+
     /// Number of concurrent tasks to create for polling the queue for messages.
     ///
     /// Defaults to the number of available CPUs on the system.
@@ -112,6 +121,19 @@ pub(super) struct Config {
     #[configurable(metadata(docs::type_unit = "tasks"))]
     #[configurable(metadata(docs::examples = 5))]
     pub(super) client_concurrency: Option<NonZeroUsize>,
+
+    /// Maximum number of messages to poll from SQS in a batch
+    ///
+    /// Defaults to 10
+    ///
+    /// Should be set to a smaller value when the files are large to help prevent the ingestion of
+    /// one file from causing the other files to exceed the visibility_timeout. Valid values are 1 - 10
+    // NOTE: We restrict this to u32 for safe conversion to i32 later.
+    #[serde(default = "default_max_number_of_messages")]
+    #[derivative(Default(value = "default_max_number_of_messages()"))]
+    #[configurable(metadata(docs::human_name = "Max Messages"))]
+    #[configurable(metadata(docs::examples = 1))]
+    pub(super) max_number_of_messages: u32,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -127,17 +149,18 @@ const fn default_visibility_timeout_secs() -> u32 {
     300
 }
 
+const fn default_max_number_of_messages() -> u32 {
+    10
+}
+
 const fn default_true() -> bool {
     true
 }
 
 #[derive(Debug, Snafu)]
 pub(super) enum IngestorNewError {
-    #[snafu(display("Invalid visibility timeout {}: {}", timeout, source))]
-    InvalidVisibilityTimeout {
-        source: std::num::TryFromIntError,
-        timeout: u64,
-    },
+    #[snafu(display("Invalid value for max_number_of_messages {}", messages))]
+    InvalidNumberOfMessages { messages: u32 },
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -154,7 +177,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to fetch s3://{}/{}: {}", bucket, key, source))]
     GetObject {
-        source: SdkError<GetObjectError>,
+        source: SdkError<GetObjectError, HttpResponse>,
         bucket: String,
         key: String,
     },
@@ -198,9 +221,11 @@ pub struct State {
 
     queue_url: String,
     poll_secs: i32,
+    max_number_of_messages: i32,
     client_concurrency: usize,
     visibility_timeout_secs: i32,
     delete_message: bool,
+    delete_failed_message: bool,
     decoder: Decoder,
 }
 
@@ -218,6 +243,11 @@ impl Ingestor {
         multiline: Option<line_agg::Config>,
         decoder: Decoder,
     ) -> Result<Ingestor, IngestorNewError> {
+        if config.max_number_of_messages < 1 || config.max_number_of_messages > 10 {
+            return Err(IngestorNewError::InvalidNumberOfMessages {
+                messages: config.max_number_of_messages,
+            });
+        }
         let state = Arc::new(State {
             region,
 
@@ -229,12 +259,14 @@ impl Ingestor {
 
             queue_url: config.queue_url,
             poll_secs: config.poll_secs as i32,
+            max_number_of_messages: config.max_number_of_messages as i32,
             client_concurrency: config
                 .client_concurrency
                 .map(|n| n.get())
                 .unwrap_or_else(crate::num_threads),
             visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
+            delete_failed_message: config.delete_failed_message,
             decoder,
         });
 
@@ -359,7 +391,8 @@ impl IngestorProcess {
                             DeleteMessageBatchRequestEntry::builder()
                                 .id(message_id)
                                 .receipt_handle(receipt_handle)
-                                .build(),
+                                .build()
+                                .expect("all required builder params specified"),
                         );
                     }
                 }
@@ -379,20 +412,16 @@ impl IngestorProcess {
                 Ok(result) => {
                     // Batch deletes can have partial successes/failures, so we have to check
                     // for both cases and emit accordingly.
-                    if let Some(successful_entries) = &result.successful {
-                        if !successful_entries.is_empty() {
-                            emit!(SqsMessageDeleteSucceeded {
-                                message_ids: result.successful.unwrap_or_default(),
-                            });
-                        }
+                    if !result.successful.is_empty() {
+                        emit!(SqsMessageDeleteSucceeded {
+                            message_ids: result.successful,
+                        });
                     }
 
-                    if let Some(failed_entries) = &result.failed {
-                        if !failed_entries.is_empty() {
-                            emit!(SqsMessageDeletePartialError {
-                                entries: result.failed.unwrap_or_default()
-                            });
-                        }
+                    if !result.failed.is_empty() {
+                        emit!(SqsMessageDeletePartialError {
+                            entries: result.failed
+                        });
                     }
                 }
                 Err(err) => {
@@ -610,9 +639,11 @@ impl IngestorProcess {
                         BatchStatus::Delivered => Ok(()),
                         BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
                         BatchStatus::Rejected => {
-                            // Sinks are responsible for emitting ComponentEventsDropped.
-                            // Failed events cannot be retried, so continue to delete the SQS source message.
-                            Ok(())
+                            if self.state.delete_failed_message {
+                                Ok(())
+                            } else {
+                                Err(ProcessingError::ErrorAcknowledgement)
+                            }
                         }
                     }
                 }
@@ -620,12 +651,14 @@ impl IngestorProcess {
         }
     }
 
-    async fn receive_messages(&mut self) -> Result<Vec<Message>, SdkError<ReceiveMessageError>> {
+    async fn receive_messages(
+        &mut self,
+    ) -> Result<Vec<Message>, SdkError<ReceiveMessageError, HttpResponse>> {
         self.state
             .sqs_client
             .receive_message()
             .queue_url(self.state.queue_url.clone())
-            .max_number_of_messages(10)
+            .max_number_of_messages(self.state.max_number_of_messages)
             .visibility_timeout(self.state.visibility_timeout_secs)
             .wait_time_seconds(self.state.poll_secs)
             .send()
@@ -636,7 +669,7 @@ impl IngestorProcess {
     async fn delete_messages(
         &mut self,
         entries: Vec<DeleteMessageBatchRequestEntry>,
-    ) -> Result<DeleteMessageBatchOutput, SdkError<DeleteMessageBatchError>> {
+    ) -> Result<DeleteMessageBatchOutput, SdkError<DeleteMessageBatchError, HttpResponse>> {
         self.state
             .sqs_client
             .delete_message_batch()

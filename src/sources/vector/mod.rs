@@ -137,7 +137,7 @@ pub struct VectorConfig {
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
-    log_namespace: Option<bool>,
+    pub log_namespace: Option<bool>,
 }
 
 impl VectorConfig {
@@ -200,7 +200,10 @@ impl SourceConfig for VectorConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_logs(DataType::all(), schema_definition)]
+        vec![SourceOutput::new_logs(
+            DataType::all_bits(),
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {

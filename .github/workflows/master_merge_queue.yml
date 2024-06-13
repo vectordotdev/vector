@@ -20,8 +20,8 @@ on:
     types: [checks_requested]
 
 concurrency:
-  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
+  # `github.ref` is unique for MQ runs and PRs
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -105,6 +105,7 @@ jobs:
     # Always run this so that pull_request triggers are marked as success.
     if: always()
     runs-on: ubuntu-20.04
+    timeout-minutes: 5
     needs:
       - changes
       - test-cli

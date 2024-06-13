@@ -307,7 +307,7 @@ where
     Ok(())
 }
 
-/// Create a pod for our other pods to have an affinity to to ensure they are all deployed on
+/// Create a pod for our other pods to have an affinity to ensure they are all deployed on
 /// the same node.
 pub async fn create_affinity_pod(
     framework: &Framework,

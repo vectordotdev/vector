@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Aggregator
-    app.kubernetes.io/version: "0.34.2-distroless-libc"
+    app.kubernetes.io/version: "0.38.0-distroless-libc"
   annotations: {}
 spec:
   replicas: 1
@@ -18,6 +18,7 @@ spec:
       app.kubernetes.io/name: vector
       app.kubernetes.io/instance: vector
       app.kubernetes.io/component: Aggregator
+  minReadySeconds: 0
   serviceName: vector-headless
   template:
     metadata:
@@ -32,12 +33,14 @@ spec:
       dnsPolicy: ClusterFirst
       containers:
         - name: vector
-          image: "timberio/vector:0.34.2-distroless-libc"
+          image: "timberio/vector:0.38.0-distroless-libc"
           imagePullPolicy: IfNotPresent
           args:
             - --config-dir
             - /etc/vector/
           env:
+            - name: VECTOR_LOG
+              value: "info"
           ports:
             - name: datadog-agent
               containerPort: 8282

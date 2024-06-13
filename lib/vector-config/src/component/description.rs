@@ -10,9 +10,6 @@ use crate::{schema, Configurable, ConfigurableRef, GenerateError, Metadata};
 
 #[derive(Debug, Snafu, Clone, PartialEq, Eq)]
 pub enum ExampleError {
-    #[snafu(display("unable to create an example for this component"))]
-    MissingExample,
-
     #[snafu(display("component '{}' does not exist", component_name))]
     DoesNotExist { component_name: String },
 }
@@ -23,7 +20,7 @@ pub struct ComponentDescription<T: ComponentMarker + Sized> {
     description: &'static str,
     label: &'static str,
     logical_name: &'static str,
-    example_value: fn() -> Option<Value>,
+    example_value: fn() -> Value,
     config: ConfigurableRef,
     _component_type: PhantomData<T>,
 }
@@ -53,7 +50,7 @@ where
             description,
             label,
             logical_name,
-            example_value: || Some(C::generate_config()),
+            example_value: C::generate_config,
             config: ConfigurableRef::new::<C>(),
             _component_type: PhantomData,
         }
@@ -72,7 +69,7 @@ where
             .ok_or_else(|| ExampleError::DoesNotExist {
                 component_name: component_name.to_owned(),
             })
-            .and_then(|t| (t.example_value)().ok_or(ExampleError::MissingExample))
+            .map(|t| (t.example_value)())
     }
 
     /// Gets a sorted list of all registered components of the given component type.

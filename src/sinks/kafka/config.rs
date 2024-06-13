@@ -43,6 +43,12 @@ pub struct KafkaSinkConfig {
     ))]
     pub topic: Template,
 
+    /// The topic name to use for healthcheck. If omitted, `topic` is used.
+    /// This option helps prevent healthcheck warnings when `topic` is templated.
+    ///
+    /// It is ignored when healthcheck is disabled.
+    pub healthcheck_topic: Option<String>,
+
     /// The log field name or tag key to use for the topic key.
     ///
     /// If the field does not exist in the log or in the tags, a blank value is used. If
@@ -115,7 +121,7 @@ pub struct KafkaSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -241,6 +247,7 @@ impl GenerateConfig for KafkaSinkConfig {
         toml::Value::try_from(Self {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: Template::try_from("topic-1234".to_owned()).unwrap(),
+            healthcheck_topic: None,
             key_field: Some(ConfigTargetPath::try_from("user_id".to_owned()).unwrap()),
             encoding: JsonSerializerConfig::default().into(),
             batch: Default::default(),

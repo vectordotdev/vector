@@ -257,7 +257,7 @@ releases: "0.31.0": {
 			type: "fix"
 			scopes: ["http provider"]
 			description: """
-				The `Proxy-Authorization` header is now added to to HTTP requests from components
+				The `Proxy-Authorization` header is now added to HTTP requests from components
 				that support HTTP proxies when authentication is used.
 				"""
 			contributors: ["syedriko"]

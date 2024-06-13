@@ -12,19 +12,19 @@ path = "tests/bin/generate-avro-fixtures.rs"
 [dependencies]
 apache-avro = { version = "0.16.0", default-features = false }
 bytes = { version = "1", default-features = false }
-chrono = { version = "0.4", default-features = false }
+chrono.workspace = true
 csv-core = { version = "0.1.10", default-features = false }
 derivative = { version = "2", default-features = false }
 dyn-clone = { version = "1", default-features = false }
-lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false }
+lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
 once_cell = { version = "1.19", default-features = false }
 ordered-float = { version = "4.2.0", default-features = false }
-prost = { version = "0.12.3", default-features = false, features = ["std"] }
-prost-reflect = { version = "0.12", default-features = false, features = ["serde"] }
-regex = { version = "1.10.2", default-features = false, features = ["std", "perf"] }
-serde = { version = "1", default-features = false, features = ["derive"] }
-serde_json = { version = "1", default-features = false }
+prost = { version = "0.12.6", default-features = false, features = ["std"] }
+prost-reflect = { version = "0.13", default-features = false, features = ["serde"] }
+regex = { version = "1.10.5", default-features = false, features = ["std", "perf"] }
+serde.workspace = true
+serde_json.workspace = true
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
 syslog_loose = { version = "0.21", default-features = false, optional = true }
@@ -35,16 +35,16 @@ vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-common = { path = "../vector-config-common", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
-vector-core = { path = "../vector-core", default-features = false }
+vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 
 [dev-dependencies]
 futures = { version = "0.3", default-features = false }
 indoc = { version = "2", default-features = false }
 tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.5.0"
-vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
+vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
-rstest = "0.18.2"
+rstest = "0.21.0"
 vrl.workspace = true
 
 [features]

@@ -123,10 +123,7 @@ pub struct Ec2Metadata {
     refresh_timeout_secs: Duration,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 
     /// Requires the transform to be able to successfully query the EC2 metadata before starting to process the data.
@@ -640,11 +637,6 @@ fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
             }
             OwnedSegment::Index(i) => {
                 output += &i.to_string();
-            }
-            OwnedSegment::Coalesce(fields) => {
-                if let Some(first) = fields.first() {
-                    output += first;
-                }
             }
         }
     }

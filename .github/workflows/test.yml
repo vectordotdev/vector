@@ -6,8 +6,8 @@ on:
     types: [checks_requested]
 
 concurrency:
-  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
+  # `github.ref` is unique for MQ runs and PRs
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -35,7 +35,8 @@ jobs:
 
   checks:
     name: Checks
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-20.04-8core
+    timeout-minutes: 60
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -45,7 +46,7 @@ jobs:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         name: Cache Cargo registry + index
         with:
           path: |
@@ -79,6 +80,10 @@ jobs:
         run: make test
         env:
           CARGO_BUILD_JOBS: 5
+
+      # Validates components for adherence to the Component Specification
+      - name: Check Component Spec
+        run: make test-component-validation
 
       - name: Upload test results
         run: scripts/upload-test-results.sh
@@ -118,10 +123,17 @@ jobs:
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
         run: cargo vdev test-vrl
 
+      - name: Build VRL Playground
+        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
+        run: |
+          cd lib/vector-vrl/web-playground/
+          wasm-pack build --target web --out-dir public/pkg
+
   # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   all-checks:
     name: Test Suite
     runs-on: ubuntu-20.04
+    timeout-minutes: 5
     if: always()
     needs: [changes, checks]
     env:

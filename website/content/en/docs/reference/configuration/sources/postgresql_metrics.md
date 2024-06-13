@@ -1,7 +1,7 @@
 ---
 title: PostgreSQL metrics
 description: Collect metrics from the [PostgreSQL](https://postgresql.org) database
-kind: source
+component_kind: source
 layout: component
 tags: ["postgresql", "postgres", "component", "source", "metrics"]
 ---

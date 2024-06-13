@@ -5,10 +5,10 @@
 (?:^|/)amplify\.yml$
 (?:^|/)build_preview_sites\.yml$
 (?:^|/)create_preview_sites\.yml$
-(?:^|/)preview_site_trigger\.yml$
 (?:^|/)go\.sum$
 (?:^|/)package(?:-lock|)\.json$
 (?:^|/)Pipfile$
+(?:^|/)preview_site_trigger\.yml$
 (?:^|/)pyproject.toml
 (?:^|/)requirements(?:-dev|-doc|-test|)\.txt$
 (?:^|/)vendor/
@@ -82,6 +82,9 @@
 ^\Qbenches/transform/route.rs\E$
 ^\Qlib/codecs/tests/data/decoding/protobuf/test_protobuf.desc\E$
 ^\Qlib/codecs/tests/data/decoding/protobuf/test_protobuf3.desc\E$
+^\Qlib/codecs/tests/data/protobuf/protos/test.desc\E$
+^\Qlib/codecs/tests/data/protobuf/protos/test_protobuf.desc\E$
+^\Qlib/codecs/tests/data/protobuf/protos/test_protobuf3.desc\E$
 ^\Qlib/codecs/tests/data/protobuf/test.desc\E$
 ^\Qlib/codecs/tests/data/protobuf/test_protobuf.desc\E$
 ^\Qlib/codecs/tests/data/protobuf/test_protobuf3.desc\E$
@@ -91,6 +94,7 @@
 ^\Qlib/value/tests/data/fixtures/value/boolean/false.json\E$
 ^\Qlib/vector-core/tests/data/fixtures/lookup/quoted\E$
 ^\Qlib/vector-lookup/tests/fixtures/lookup/quoted\E$
+^\Qlib/vector-vrl/tests/resources/protobuf_descriptor_set.desc\E$
 ^\Qlib/vrl/lookup/tests/fixtures/lookup/quoted\E$
 ^\Qlib/vrl/stdlib/benches/benches.rs\E$
 ^\Qlib/vrl/stdlib/src/encode_percent.rs\E$
@@ -101,6 +105,7 @@
 ^\Qscripts/integration/invalidchronicleauth.json\E$
 ^\Qsrc/sources/dnstap/parser.rs\E$
 ^\Qtests/data/ca/intermediate_client/index.txt.old\E$
+^\Qtests/data/ca/intermediate_server/private/kafka.pass\E$
 ^\Qtests/data/databend/miniodat/databend/.keep\E$
 ^\Qtests/data/gzipped.log\E$
 ^\Qtests/data/nats/nats-bad.creds\E$

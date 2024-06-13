@@ -529,6 +529,32 @@
         .b == "bar"
       '''
 
+[transforms.remap_function_uuid_v7]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = uuid_v7()
+
+    if uuid_v7() != "" {
+      .b = "bar"
+    }
+  """
+[[tests]]
+  name = "remap_function_uuid_v7"
+  [tests.input]
+    insert_at = "remap_function_uuid_v7"
+    type = "log"
+    [tests.input.log_fields]
+      b = "foo"
+  [[tests.outputs]]
+    extract_from = "remap_function_uuid_v7"
+    [[tests.outputs.conditions]]
+      type = "vrl"
+      source = '''
+        match(string!(.a), r'(?i)^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$') &&
+        .b == "bar"
+      '''
+
 [transforms.remap_function_sha1]
   inputs = []
   type = "remap"
@@ -2146,6 +2172,26 @@
      [tests.input.log_fields]
    [[tests.outputs]]
      extract_from = "remap_function_get_hostname"
+     [[tests.outputs.conditions]]
+       type = "vrl"
+       source = '''
+         .a != ""
+       '''
+
+ [transforms.remap_function_get_timezone_name]
+   inputs = []
+   type = "remap"
+   source = """
+     .a = get_timezone_name!()
+   """
+ [[tests]]
+   name = "remap_function_get_timezone_name"
+   [tests.input]
+     insert_at = "remap_function_get_timezone_name"
+     type = "log"
+     [tests.input.log_fields]
+   [[tests.outputs]]
+     extract_from = "remap_function_get_timezone_name"
      [[tests.outputs.conditions]]
        type = "vrl"
        source = '''

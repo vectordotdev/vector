@@ -40,8 +40,10 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::event::{BatchNotifier, BatchStatus};
 use vector_lib::internal_event::{EventsReceived, Registered};
 use vector_lib::lookup::owned_value_path;
+use vector_lib::schema::meaning;
 use vector_lib::tls::MaybeTlsIncomingStream;
 use vrl::path::OwnedTargetPath;
+use vrl::value::kind::Collection;
 use vrl::value::Kind;
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -110,6 +112,12 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
+    /// If this is set to `true`, when log events contain the field `ddtags`, the string value that
+    /// contains a list of key:value pairs set by the Agent is parsed and expanded into an array.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default = "crate::serde::default_false")]
+    parse_ddtags: bool,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
@@ -148,6 +156,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_metrics: false,
             disable_traces: false,
             multiple_outputs: false,
+            parse_ddtags: false,
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
         })
@@ -165,8 +174,7 @@ impl SourceConfig for DatadogAgentConfig {
             .schema_definitions
             .get(&Some(LOGS.to_owned()))
             .or_else(|| cx.schema_definitions.get(&None))
-            .expect("registered log schema required")
-            .clone();
+            .cloned();
 
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
@@ -179,6 +187,7 @@ impl SourceConfig for DatadogAgentConfig {
             tls.http_protocol_name(),
             logs_schema_definition,
             log_namespace,
+            self.parse_ddtags,
         );
         let listener = tls.bind(&self.address).await?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
@@ -230,59 +239,73 @@ impl SourceConfig for DatadogAgentConfig {
         let definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
+            // NOTE: "status" is intentionally semantically mapped to "severity",
+            //       since that is what DD designates as the semantic meaning of status
+            // https://docs.datadoghq.com/logs/log_configuration/attributes_naming_convention/?s=severity#reserved-attributes
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("status"))),
                 &owned_value_path!("status"),
                 Kind::bytes(),
-                Some("severity"),
+                Some(meaning::SEVERITY),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
-                Some("timestamp"),
+                Some(meaning::TIMESTAMP),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
                 &owned_value_path!("hostname"),
                 Kind::bytes(),
-                Some("host"),
+                Some(meaning::HOST),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
                 &owned_value_path!("service"),
                 Kind::bytes(),
-                Some("service"),
+                Some(meaning::SERVICE),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddsource"))),
                 &owned_value_path!("ddsource"),
                 Kind::bytes(),
-                Some("source"),
+                Some(meaning::SOURCE),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
                 &owned_value_path!("ddtags"),
-                Kind::bytes(),
-                Some("tags"),
+                if self.parse_ddtags {
+                    Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined()
+                } else {
+                    Kind::bytes()
+                },
+                Some(meaning::TAGS),
             )
             .with_standard_vector_source_metadata();
 
+        let mut output = Vec::with_capacity(1);
+
         if self.multiple_outputs {
-            vec![
-                SourceOutput::new_logs(DataType::Log, definition).with_port(LOGS),
-                SourceOutput::new_metrics().with_port(METRICS),
-                SourceOutput::new_traces().with_port(TRACES),
-            ]
+            if !self.disable_logs {
+                output.push(SourceOutput::new_logs(DataType::Log, definition).with_port(LOGS))
+            }
+            if !self.disable_metrics {
+                output.push(SourceOutput::new_metrics().with_port(METRICS))
+            }
+            if !self.disable_traces {
+                output.push(SourceOutput::new_traces().with_port(TRACES))
+            }
         } else {
-            vec![SourceOutput::new_logs(DataType::all(), definition)]
+            output.push(SourceOutput::new_logs(DataType::all_bits(), definition))
         }
+        output
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -296,8 +319,6 @@ impl SourceConfig for DatadogAgentConfig {
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
-    BadRequest,
-    InvalidDataFormat,
     ServerShutdown,
 }
 
@@ -317,8 +338,9 @@ pub(crate) struct DatadogAgentSource {
     pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
     protocol: &'static str,
-    logs_schema_definition: Arc<schema::Definition>,
+    logs_schema_definition: Option<Arc<schema::Definition>>,
     events_received: Registered<EventsReceived>,
+    parse_ddtags: bool,
 }
 
 #[derive(Clone)]
@@ -353,8 +375,9 @@ impl DatadogAgentSource {
         store_api_key: bool,
         decoder: Decoder,
         protocol: &'static str,
-        logs_schema_definition: schema::Definition,
+        logs_schema_definition: Option<schema::Definition>,
         log_namespace: LogNamespace,
+        parse_ddtags: bool,
     ) -> Self {
         Self {
             api_key_extractor: ApiKeyExtractor {
@@ -372,9 +395,10 @@ impl DatadogAgentSource {
                 .clone(),
             decoder,
             protocol,
-            logs_schema_definition: Arc::new(logs_schema_definition),
+            logs_schema_definition: logs_schema_definition.map(Arc::new),
             log_namespace,
             events_received: register!(EventsReceived),
+            parse_ddtags,
         }
     }
 

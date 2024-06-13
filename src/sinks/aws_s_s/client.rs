@@ -1,14 +1,16 @@
-use super::{request_builder::SendMessageEntry, service::SendMessageResponse};
-use aws_sdk_sqs::types::SdkError;
+use std::future::Future;
 
-#[async_trait::async_trait]
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
+
+use super::{request_builder::SendMessageEntry, service::SendMessageResponse};
+
 pub(super) trait Client<R>
 where
     R: std::fmt::Debug + std::fmt::Display + std::error::Error,
 {
-    async fn send_message(
+    fn send_message(
         &self,
         entry: SendMessageEntry,
         byte_size: usize,
-    ) -> Result<SendMessageResponse, SdkError<R>>;
+    ) -> impl Future<Output = Result<SendMessageResponse, SdkError<R, HttpResponse>>> + Send;
 }

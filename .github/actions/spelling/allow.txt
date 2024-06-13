@@ -23,6 +23,8 @@ Arival
 Arnova
 Asus
 Atlassian
+atleastonce
+atmostonce
 Attab
 Audiosonic
 avsc
@@ -52,8 +54,12 @@ dkr
 Dockerfiles
 DOOV
 Douban
+E2ETest
+emqx
+eventloop
 Enot
 Evercoss
+exactlyonce
 Explay
 FAQs
 FDO
@@ -109,6 +115,7 @@ Lifetab
 Lifetouch
 Lumia
 Malata
+manden
 Maxthon
 Mediacom
 Medion
@@ -124,6 +131,7 @@ Moto
 Mpman
 Multilaser
 Mumbai
+musleabi
 Mytab
 NLB
 Nabi
@@ -157,6 +165,7 @@ pront
 Proscan
 Qmobilevn
 RPZ
+RRSIGs
 Rackspace
 Rathi
 Regza
@@ -166,6 +175,7 @@ Rockchip
 Roku
 Roundcube
 Rowling
+rumqttc
 SBT
 SKtelesys
 Salesforce
@@ -245,6 +255,7 @@ buildname
 buildroot
 bytestream
 callsites
+cdnskey
 cncf
 codepath
 codepaths
@@ -253,6 +264,7 @@ compiletime
 coredns
 corejs
 coreutils
+csync
 curta
 daemonset
 dalek
@@ -261,6 +273,7 @@ datacenter
 datadog
 datadoghq
 datanode
+ddog
 debian
 demuxing
 dfs
@@ -274,8 +287,11 @@ dnsutils
 dockercmd
 downsides
 downwardapi
+ede
 emoji
 esbuild
+etld
+fakeintake
 fargate
 fibonacci
 fileapi
@@ -293,6 +309,7 @@ gcr
 gcs
 gdpr
 github
+gnueabi
 gnueabihf
 gnupg
 gnuplot
@@ -326,11 +343,13 @@ htmltest
 https
 humungus
 icecream
+idn
 ifeq
 ifneq
 imobile
 influxd
 ionik
+ipallowlist
 ipod
 ircd
 jemalloc
@@ -401,6 +420,7 @@ podman
 postgresql
 proxyuser
 pseudocode
+pushgateway
 qwerty
 rabbitmq
 rclone
@@ -415,14 +435,19 @@ rsyslog
 rsyslogd
 security-tab
 servlet
+Sinjo
 sublocation
+sundar
+svcb
 snyk
 socketaddr
 solarwinds
 splunk
 ssh
 staticuser
+statsd
 symbian
+tanushri
 timeframe
 timeseries
 timespan

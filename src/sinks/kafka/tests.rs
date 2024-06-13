@@ -55,6 +55,31 @@ mod integration_test {
         let config = KafkaSinkConfig {
             bootstrap_servers: kafka_address(9091),
             topic: Template::try_from(topic.clone()).unwrap(),
+            healthcheck_topic: None,
+            key_field: None,
+            encoding: TextSerializerConfig::default().into(),
+            batch: BatchConfig::default(),
+            compression: KafkaCompression::None,
+            auth: KafkaAuthConfig::default(),
+            socket_timeout_ms: Duration::from_millis(60000),
+            message_timeout_ms: Duration::from_millis(300000),
+            librdkafka_options: HashMap::new(),
+            headers_key: None,
+            acknowledgements: Default::default(),
+        };
+        self::sink::healthcheck(config).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn healthcheck_topic() {
+        crate::test_util::trace_init();
+
+        let topic = format!("{{ {} }}", random_string(10));
+
+        let config = KafkaSinkConfig {
+            bootstrap_servers: kafka_address(9091),
+            topic: Template::try_from(topic.clone()).unwrap(),
+            healthcheck_topic: Some(String::from("topic-1234")),
             key_field: None,
             encoding: TextSerializerConfig::default().into(),
             batch: BatchConfig::default(),
@@ -151,6 +176,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: Template::try_from(format!("{}-%Y%m%d", topic)).unwrap(),
             compression: KafkaCompression::None,
+            healthcheck_topic: None,
             encoding: TextSerializerConfig::default().into(),
             key_field: None,
             auth: KafkaAuthConfig {
@@ -301,6 +327,7 @@ mod integration_test {
         let config = KafkaSinkConfig {
             bootstrap_servers: server.clone(),
             topic: Template::try_from(format!("{}-%Y%m%d", topic)).unwrap(),
+            healthcheck_topic: None,
             key_field: None,
             encoding: TextSerializerConfig::default().into(),
             batch: BatchConfig::default(),

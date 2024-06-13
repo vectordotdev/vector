@@ -2,7 +2,7 @@
 title: GCP Cloud Storage (GCS)
 description: Store observability events in GCP [Cloud Storage](https://cloud.google.com/storage)
 short: GCP Cloud Storage
-kind: sink
+component_kind: sink
 layout: component
 tags: ["gcp", "gcs", "cloud storage", "component", "sink"]
 ---

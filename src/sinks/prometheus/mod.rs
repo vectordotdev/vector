@@ -3,8 +3,8 @@ use vector_lib::event::Metric;
 use vector_lib::sensitive_string::SensitiveString;
 
 mod collector;
-pub(crate) mod exporter;
-pub(crate) mod remote_write;
+pub mod exporter;
+pub mod remote_write;
 
 use vector_lib::configurable::configurable_component;
 

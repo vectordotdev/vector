@@ -1,7 +1,6 @@
-use aws_sdk_kinesis::{
-    error::{DescribeStreamError, PutRecordsErrorKind},
-    types::SdkError,
-};
+use aws_sdk_kinesis::operation::describe_stream::DescribeStreamError;
+use aws_sdk_kinesis::operation::put_records::PutRecordsError;
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::FutureExt;
 use snafu::Snafu;
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
@@ -27,30 +26,19 @@ use super::{
 enum HealthcheckError {
     #[snafu(display("DescribeStream failed: {}", source))]
     DescribeStreamFailed {
-        source: SdkError<DescribeStreamError>,
+        source: SdkError<DescribeStreamError, HttpResponse>,
     },
     #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
-    #[snafu(display(
-        "Stream returned does not contain any streams that match {}",
-        stream_name
-    ))]
-    NoMatchingStreamName { stream_name: String },
 }
 
 pub struct KinesisClientBuilder;
 
 impl ClientBuilder for KinesisClientBuilder {
-    type Config = aws_sdk_kinesis::config::Config;
     type Client = KinesisClient;
-    type DefaultMiddleware = aws_sdk_kinesis::middleware::DefaultMiddleware;
 
-    fn default_middleware() -> Self::DefaultMiddleware {
-        aws_sdk_kinesis::middleware::DefaultMiddleware::new()
-    }
-
-    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
-        KinesisClient::with_config(client, config.into())
+    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+        KinesisClient::new(config)
     }
 }
 
@@ -97,7 +85,7 @@ impl KinesisStreamsSinkConfig {
             Ok(resp) => {
                 let name = resp
                     .stream_description
-                    .and_then(|x| x.stream_name)
+                    .map(|x| x.stream_name)
                     .unwrap_or_default();
                 if name == stream_name {
                     Ok(())
@@ -116,7 +104,6 @@ impl KinesisStreamsSinkConfig {
             self.base.region.endpoint(),
             proxy,
             &self.base.tls,
-            true,
         )
         .await
     }
@@ -180,7 +167,7 @@ struct KinesisRetryLogic {
 }
 
 impl RetryLogic for KinesisRetryLogic {
-    type Error = SdkError<KinesisError>;
+    type Error = SdkError<KinesisError, HttpResponse>;
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
@@ -191,8 +178,10 @@ impl RetryLogic for KinesisRetryLogic {
             // request.
             //
             // https://github.com/vectordotdev/vector/issues/359
-            if let PutRecordsErrorKind::ProvisionedThroughputExceededException(_) = inner.err().kind
-            {
+            if matches!(
+                inner.err(),
+                PutRecordsError::ProvisionedThroughputExceededException(_)
+            ) {
                 return true;
             }
         }

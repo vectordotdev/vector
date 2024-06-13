@@ -10,7 +10,7 @@ use vector_lib::config::LogNamespace;
 
 use super::{
     request_builder::ElasticsearchRequestBuilder, ElasticsearchApiVersion, ElasticsearchEncoder,
-    InvalidHostSnafu, Request,
+    InvalidHostSnafu, Request, VersionType,
 };
 use crate::{
     http::{HttpClient, MaybeAuth},
@@ -78,7 +78,9 @@ impl ElasticsearchCommon {
                     .ok_or(ParseError::RegionRequired)?
                     .ok_or(ParseError::RegionRequired)?;
                 Some(Auth::Aws {
-                    credentials_provider: aws.credentials_provider(region.clone()).await?,
+                    credentials_provider: aws
+                        .credentials_provider(region.clone(), proxy_config, &config.tls)
+                        .await?,
                     region,
                 })
             }
@@ -90,6 +92,23 @@ impl ElasticsearchCommon {
         let mode = config.common_mode()?;
 
         let tower_request = config.request.tower.into_settings();
+
+        if config.bulk.version.is_some() && config.bulk.version_type == VersionType::Internal {
+            return Err(ParseError::ExternalVersionIgnoredWithInternalVersioning.into());
+        }
+        if config.bulk.version.is_some()
+            && (config.bulk.version_type == VersionType::External
+                || config.bulk.version_type == VersionType::ExternalGte)
+            && config.id_key.is_none()
+        {
+            return Err(ParseError::ExternalVersioningWithoutDocumentID.into());
+        }
+        if config.bulk.version.is_none()
+            && (config.bulk.version_type == VersionType::External
+                || config.bulk.version_type == VersionType::ExternalGte)
+        {
+            return Err(ParseError::ExternalVersioningWithoutVersion.into());
+        }
 
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert(

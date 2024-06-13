@@ -71,17 +71,14 @@ pub struct FileSinkConfig {
     pub encoding: EncodingConfigWithFraming,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub compression: Compression,
 
     #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
@@ -584,7 +581,7 @@ mod tests {
 
         run_assert_sink(config, input.clone().into_iter()).await;
 
-        let output = vec![
+        let output = [
             lines_from_file(directory.join("warnings-2019-26-07.log")),
             lines_from_file(directory.join("errors-2019-26-07.log")),
             lines_from_file(directory.join("warnings-2019-27-07.log")),

@@ -20,8 +20,6 @@ apt-get install --yes \
   apt-utils \
   apt-transport-https
 
-apt-get upgrade --yes
-
 # Deps
 apt-get install --yes --no-install-recommends \
     awscli \
@@ -41,7 +39,6 @@ apt-get install --yes --no-install-recommends \
     llvm \
     locales \
     pkg-config \
-    python3-pip \
     rename \
     rpm \
     ruby-bundler \
@@ -206,3 +203,6 @@ EOF
 rustc-wrapper = "$RUSTC_WRAPPER"
 EOF
 fi
+
+mkdir -p /var/lib/vector
+chmod 777 /var/lib/vector

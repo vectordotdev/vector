@@ -13,7 +13,7 @@ env:
 jobs:
   release-build-optimized:
     name: "Release Build (optimized)"
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-20.04-8core
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
@@ -24,7 +24,7 @@ jobs:
 
   release-build-normal:
     name: "Release Build (normal)"
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-20.04-8core
     env:
       # We're not actually doing a debug build, we're just turning off the logic
       # in release-flags.sh so that we don't override the Cargo "release" profile
@@ -40,7 +40,7 @@ jobs:
 
   debug-build:
     name: "Debug Build"
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-20.04-8core
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
@@ -51,7 +51,7 @@ jobs:
 
   debug-rebuild:
     name: "Debug Rebuild"
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-20.04-8core
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3
@@ -64,7 +64,7 @@ jobs:
 
   check:
     name: "Cargo Check"
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-20.04-8core
     steps:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v3

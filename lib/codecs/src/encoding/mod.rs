@@ -67,7 +67,7 @@ pub enum FramingConfig {
     /// Event data is prefixed with its length in bytes.
     ///
     /// The prefix is a 32-bit unsigned integer, little endian.
-    LengthDelimited,
+    LengthDelimited(LengthDelimitedEncoderConfig),
 
     /// Event data is delimited by a newline (LF) character.
     NewlineDelimited,
@@ -86,8 +86,8 @@ impl From<CharacterDelimitedEncoderConfig> for FramingConfig {
 }
 
 impl From<LengthDelimitedEncoderConfig> for FramingConfig {
-    fn from(_: LengthDelimitedEncoderConfig) -> Self {
-        Self::LengthDelimited
+    fn from(config: LengthDelimitedEncoderConfig) -> Self {
+        Self::LengthDelimited(config)
     }
 }
 
@@ -103,9 +103,7 @@ impl FramingConfig {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesEncoderConfig.build()),
             FramingConfig::CharacterDelimited(config) => Framer::CharacterDelimited(config.build()),
-            FramingConfig::LengthDelimited => {
-                Framer::LengthDelimited(LengthDelimitedEncoderConfig.build())
-            }
+            FramingConfig::LengthDelimited(config) => Framer::LengthDelimited(config.build()),
             FramingConfig::NewlineDelimited => {
                 Framer::NewlineDelimited(NewlineDelimitedEncoderConfig.build())
             }
@@ -194,7 +192,20 @@ pub enum SerializerConfig {
 
     /// Encodes an event as a [GELF][gelf] message.
     ///
+    /// This codec is experimental for the following reason:
+    ///
+    /// The GELF specification is more strict than the actual Graylog receiver.
+    /// Vector's encoder currently adheres more strictly to the GELF spec, with
+    /// the exception that some characters such as `@`  are allowed in field names.
+    ///
+    /// Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
+    /// by Graylog, and is much more relaxed than the GELF spec.
+    ///
+    /// Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
+    /// the codec may continue to relax the enforcement of specification.
+    ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
+    /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
     Gelf,
 
     /// Encodes an event as [JSON][json].
@@ -347,7 +358,9 @@ impl SerializerConfig {
             // [1]: https://avro.apache.org/docs/1.11.1/specification/_print/#message-framing
             SerializerConfig::Avro { .. }
             | SerializerConfig::Native
-            | SerializerConfig::Protobuf(_) => FramingConfig::LengthDelimited,
+            | SerializerConfig::Protobuf(_) => {
+                FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
+            }
             SerializerConfig::Csv(_)
             | SerializerConfig::Gelf
             | SerializerConfig::Json(_)

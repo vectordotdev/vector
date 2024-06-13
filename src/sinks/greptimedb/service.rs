@@ -12,7 +12,7 @@ use crate::sinks::prelude::*;
 
 use super::batch::GreptimeDBBatchSizer;
 use super::request_builder::metric_to_insert_request;
-use super::{GreptimeDBConfig, GreptimeDBConfigError};
+use super::GreptimeDBConfig;
 
 #[derive(Clone, Default)]
 pub(super) struct GreptimeDBRetryLogic;
@@ -28,7 +28,7 @@ impl RetryLogic for GreptimeDBRetryLogic {
 
 #[derive(Clone)]
 pub(super) struct GreptimeDBRequest {
-    items: Vec<InsertRequest>,
+    items: RowInsertRequests,
     finalizers: EventFinalizers,
     metadata: RequestMetadata,
 }
@@ -54,7 +54,7 @@ impl GreptimeDBRequest {
             NonZeroUsize::new(estimated_request_size).expect("request should never be zero length");
 
         GreptimeDBRequest {
-            items,
+            items: RowInsertRequests { inserts: items },
             finalizers,
             metadata: request_metadata_builder.with_request_size(request_size),
         }
@@ -103,20 +103,42 @@ pub struct GreptimeDBService {
     client: Arc<Database>,
 }
 
+pub(crate) fn new_client_from_config(config: &GreptimeDBConfig) -> crate::Result<Client> {
+    if let Some(tls_config) = &config.tls {
+        let channel_config = ChannelConfig {
+            client_tls: Some(try_from_tls_config(tls_config)?),
+            ..Default::default()
+        };
+        Ok(Client::with_manager_and_urls(
+            ChannelManager::with_tls_config(channel_config).map_err(Box::new)?,
+            vec![&config.endpoint],
+        ))
+    } else {
+        Ok(Client::with_urls(vec![&config.endpoint]))
+    }
+}
+
+fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption> {
+    if tls_config.key_pass.is_some()
+        || tls_config.alpn_protocols.is_some()
+        || tls_config.verify_certificate.is_some()
+        || tls_config.verify_hostname.is_some()
+    {
+        warn!(
+                    message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
+                );
+    }
+
+    Ok(ClientTlsOption {
+        server_ca_cert_path: tls_config.ca_file.clone(),
+        client_cert_path: tls_config.crt_file.clone(),
+        client_key_path: tls_config.key_file.clone(),
+    })
+}
+
 impl GreptimeDBService {
     pub fn try_new(config: &GreptimeDBConfig) -> crate::Result<Self> {
-        let grpc_client = if let Some(tls_config) = &config.tls {
-            let channel_config = ChannelConfig {
-                client_tls: Self::try_from_tls_config(tls_config)?,
-                ..Default::default()
-            };
-            Client::with_manager_and_urls(
-                ChannelManager::with_tls_config(channel_config).map_err(Box::new)?,
-                vec![&config.endpoint],
-            )
-        } else {
-            Client::with_urls(vec![&config.endpoint])
-        };
+        let grpc_client = new_client_from_config(config)?;
 
         let mut client = Database::new_with_dbname(&config.dbname, grpc_client);
 
@@ -130,37 +152,6 @@ impl GreptimeDBService {
         Ok(GreptimeDBService {
             client: Arc::new(client),
         })
-    }
-
-    fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<Option<ClientTlsOption>> {
-        if let Some(ca_path) = tls_config.ca_file.as_ref() {
-            let cert_path = tls_config
-                .crt_file
-                .as_ref()
-                .ok_or(GreptimeDBConfigError::TlsMissingCert)?;
-            let key_path = tls_config
-                .key_file
-                .as_ref()
-                .ok_or(GreptimeDBConfigError::TlsMissingKey)?;
-
-            if tls_config.key_pass.is_some()
-                || tls_config.alpn_protocols.is_some()
-                || tls_config.verify_certificate.is_some()
-                || tls_config.verify_hostname.is_some()
-            {
-                warn!(
-                    message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
-                );
-            }
-
-            Ok(Some(ClientTlsOption {
-                server_ca_cert_path: ca_path.clone(),
-                client_key_path: key_path.clone(),
-                client_cert_path: cert_path.clone(),
-            }))
-        } else {
-            Ok(None)
-        }
     }
 }
 
@@ -179,7 +170,7 @@ impl Service<GreptimeDBRequest> for GreptimeDBService {
 
         Box::pin(async move {
             let metadata = req.metadata;
-            let result = client.insert(req.items).await?;
+            let result = client.row_insert(req.items).await?;
 
             Ok(GreptimeDBBatchOutput {
                 item_count: result,

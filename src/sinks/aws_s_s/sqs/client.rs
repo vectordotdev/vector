@@ -1,5 +1,6 @@
 use super::{Client, SendMessageEntry, SendMessageResponse};
-use aws_sdk_sqs::{error::SendMessageError, types::SdkError};
+use aws_sdk_sqs::operation::send_message::SendMessageError;
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::TryFutureExt;
 use tracing::Instrument;
 
@@ -14,13 +15,13 @@ impl SqsMessagePublisher {
         Self { client, queue_url }
     }
 }
-#[async_trait::async_trait]
+
 impl Client<SendMessageError> for SqsMessagePublisher {
     async fn send_message(
         &self,
         entry: SendMessageEntry,
         byte_size: usize,
-    ) -> Result<SendMessageResponse, SdkError<SendMessageError>> {
+    ) -> Result<SendMessageResponse, SdkError<SendMessageError, HttpResponse>> {
         self.client
             .send_message()
             .message_body(entry.message_body)

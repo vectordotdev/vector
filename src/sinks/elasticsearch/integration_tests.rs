@@ -1,6 +1,6 @@
 use std::{fs::File, io::Read};
 
-use aws_smithy_http::body::SdkBody;
+use aws_smithy_types::body::SdkBody;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
@@ -293,7 +293,7 @@ async fn auto_version_aws() {
             },
         )),
         endpoints: vec![aws_server()],
-        aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
+        aws: Some(RegionOrEndpoint::with_region(String::from("us-east-1"))),
         api_version: ElasticsearchApiVersion::Auto,
         batch: batch_settings(),
         ..Default::default()
@@ -399,7 +399,7 @@ async fn insert_events_on_aws() {
                 },
             )),
             endpoints: vec![aws_server()],
-            aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
+            aws: Some(RegionOrEndpoint::with_region(String::from("us-east-1"))),
             api_version: ElasticsearchApiVersion::V6,
             batch: batch_settings(),
             ..Default::default()
@@ -425,7 +425,7 @@ async fn insert_events_on_aws_with_compression() {
                 },
             )),
             endpoints: vec![aws_server()],
-            aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
+            aws: Some(RegionOrEndpoint::with_region(String::from("us-east-1"))),
             compression: Compression::gzip_default(),
             api_version: ElasticsearchApiVersion::V6,
             batch: batch_settings(),

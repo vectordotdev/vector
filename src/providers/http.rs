@@ -51,10 +51,7 @@ pub struct HttpConfig {
     tls_options: Option<TlsConfig>,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 }
 
@@ -134,14 +131,7 @@ async fn http_request_to_config_builder(
         .await
         .map_err(|e| vec![e.to_owned()])?;
 
-    let (config_builder, warnings) =
-        config::load(config_str.chunk(), crate::config::format::Format::Toml)?;
-
-    for warning in warnings.into_iter() {
-        warn!("{}", warning);
-    }
-
-    Ok(config_builder)
+    config::load(config_str.chunk(), crate::config::format::Format::Toml)?
 }
 
 /// Polls the HTTP endpoint after/every `poll_interval_secs`, returning a stream of `ConfigBuilder`.
@@ -172,7 +162,6 @@ fn poll_http(
     }
 }
 
-#[async_trait::async_trait]
 impl ProviderConfig for HttpConfig {
     async fn build(&mut self, signal_handler: &mut signal::SignalHandler) -> BuildResult {
         let url = self

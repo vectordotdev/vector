@@ -1,7 +1,7 @@
 features:
 - datadog-logs-integration-tests
 
-test_filter: '::datadog::logs::'
+test_filter: '::datadog::logs::integration_tests::'
 
 runner:
   env:

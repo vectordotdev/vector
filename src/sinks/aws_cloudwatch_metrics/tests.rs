@@ -1,4 +1,4 @@
-use aws_sdk_cloudwatch::types::DateTime;
+use aws_smithy_types::DateTime;
 use chrono::{offset::TimeZone, Timelike, Utc};
 use similar_asserts::assert_eq;
 use vector_lib::metric_tags;
@@ -22,7 +22,7 @@ fn generate_config() {
 fn config() -> CloudWatchMetricsSinkConfig {
     CloudWatchMetricsSinkConfig {
         default_namespace: "vector".into(),
-        region: RegionOrEndpoint::with_region("local".to_owned()),
+        region: RegionOrEndpoint::with_region("us-east-1".to_owned()),
         ..Default::default()
     }
 }

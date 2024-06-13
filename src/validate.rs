@@ -21,6 +21,10 @@ pub struct Opts {
     #[arg(long)]
     pub no_environment: bool,
 
+    /// Disables health checks during validation.
+    #[arg(long)]
+    pub skip_healthchecks: bool,
+
     /// Fail validation on warnings that are probably a mistake in the configuration
     /// or are recommended to be fixed.
     #[arg(short, long)]
@@ -140,21 +144,17 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     config::init_log_schema(&paths, true)
         .map_err(&mut report_error)
         .ok()?;
-    let (builder, load_warnings) = config::load_builder_from_paths(&paths)
+    let builder = config::load_builder_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
 
     // Build
-    let (config, build_warnings) = builder
+    let (config, warnings) = builder
         .build_with_warnings()
         .map_err(&mut report_error)
         .ok()?;
 
     // Warnings
-    let warnings = load_warnings
-        .into_iter()
-        .chain(build_warnings)
-        .collect::<Vec<_>>();
     if !warnings.is_empty() {
         if opts.deny_warnings {
             report_error(warnings);
@@ -178,8 +178,7 @@ async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter)
     } else {
         return false;
     };
-
-    validate_healthchecks(opts, config, &diff, &mut pieces, fmt).await
+    opts.skip_healthchecks || validate_healthchecks(opts, config, &diff, &mut pieces, fmt).await
 }
 
 async fn validate_components(

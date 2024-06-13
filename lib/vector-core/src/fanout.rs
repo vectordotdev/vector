@@ -74,7 +74,7 @@ impl Fanout {
 
     fn remove(&mut self, id: &ComponentKey) {
         assert!(
-            self.senders.remove(id).is_some(),
+            self.senders.shift_remove(id).is_some(),
             "Removing nonexistent sink from fanout: {id}"
         );
     }
@@ -300,7 +300,7 @@ impl<'a> SendGroup<'a> {
             if i == last_sender_idx {
                 sender.input = events.take();
             } else {
-                sender.input = events.clone();
+                sender.input.clone_from(&events);
             }
             sender.send_reference = send_reference;
 
@@ -349,7 +349,7 @@ impl<'a> SendGroup<'a> {
         // to also detach the send future for the sender if it exists, otherwise we'd be hanging
         // around still trying to send to it.
         assert!(
-            self.senders.remove(id).is_some(),
+            self.senders.shift_remove(id).is_some(),
             "Removing nonexistent sink from fanout: {id}"
         );
 
