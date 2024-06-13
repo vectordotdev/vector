@@ -179,7 +179,6 @@ mod tests {
             logic.should_retry_response(&ElasticsearchResponse {
                 http_response: response,
                 event_status: EventStatus::Rejected,
-                batch_size: 1,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
             RetryAction::DontRetry(_)
@@ -200,7 +199,6 @@ mod tests {
             logic.should_retry_response(&ElasticsearchResponse {
                 http_response: response,
                 event_status: EventStatus::Errored,
-                batch_size: 1,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
             RetryAction::Retry(_)
