@@ -140,7 +140,7 @@ jobs:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.24.0",
+              "v1.33.1",
             ]
 
             // Aim to test against oldest supported k8s cloud-provider versions
