@@ -24,6 +24,7 @@ impl AzureBlobConfig {
                 strategy: Strategy::StorageQueue,
                 queue: Some(Config {
                     queue_name: "myqueue".to_string(),
+                    poll_secs: 1,
                 }),
                 // TODO shouldn't we have blob_endpoint and queue_endpoint?
                 endpoint: None,
@@ -165,7 +166,9 @@ async fn azure_blob_read_single_line_from_multiple_blobs() {
             .await;
     }
 
-    let events = config.run_assert().await;
+    let events = run_and_assert_source_compliance(
+        config.clone(), Duration::from_secs(4), &SOURCE_TAGS
+    ).await;
     assert_eq!(events.len(), contents.len());
     for (i, event) in events.iter().enumerate() {
         assert_eq!(event.as_log()["message"], contents[i].into());

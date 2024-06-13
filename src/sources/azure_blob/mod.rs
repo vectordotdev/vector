@@ -356,7 +356,7 @@ impl SourceConfig for AzureBlobConfig {
                     }
                 }.boxed()
             }
-            Strategy::StorageQueue => make_azure_row_stream(self)?,
+            Strategy::StorageQueue => make_azure_row_stream(self, cx.shutdown.clone())?,
         };
         Ok(Box::pin(
             azure_blob_streamer.run_streaming(blob_pack_stream),

@@ -346,6 +346,7 @@ uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.7", default-features = false }
 zstd = { version = "0.13.0", default-features = false }
 arr_macro = { version = "0.2.1" }
+anyhow = "1.0.82"
 
 # depending on fork for bumped nix dependency
 # https://github.com/heim-rs/heim/pull/360
