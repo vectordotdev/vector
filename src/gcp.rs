@@ -201,8 +201,8 @@ impl GcpAuthenticator {
             Self::Credentials(inner) => {
                 let expires_in = inner.token.read().unwrap().expires_in() as u64;
                 let mut deadline = Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
-                let mut _next_refresh = tokio::time::sleep(deadline);
-                _next_refresh.await;
+                let mut next_refresh = tokio::time::sleep(deadline);
+                next_refresh.await;
                 loop {
                     debug!("Renewing GCP authentication token.");
                     match inner.regenerate_token().await {
@@ -219,8 +219,8 @@ impl GcpAuthenticator {
                             deadline = Duration::from_secs(METADATA_TOKEN_ERROR_RETRY_SECS);
                         }
                     }
-                    _next_refresh = tokio::time::sleep(deadline);
-                    _next_refresh.await;
+                    next_refresh = tokio::time::sleep(deadline);
+                    next_refresh.await;
                 }
             }
             Self::ApiKey(_) | Self::None => {
