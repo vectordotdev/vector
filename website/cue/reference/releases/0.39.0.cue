@@ -38,7 +38,7 @@ releases: "0.39.0": {
 		{
 			type: "enhancement"
 			description: """
-				The `kafka` sink has a new `healthcheck_topic` configuration option to configure the topic to try to list for healthchecks. Previously, `topic` was used to perform healthchecks, but a templated value would cause healthchecks to fail.
+				The `kafka` sink has a new `healthcheck_topic` configuration option to configure the topic used for healthchecks. Previously, `topic` was used to perform healthchecks, but a templated value would cause healthchecks to fail.
 				"""
 			contributors: ["yalinglee"]
 		},
