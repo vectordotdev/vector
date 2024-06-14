@@ -79,7 +79,6 @@ impl MetaDescriptive for GreptimeDBRequest {
 
 #[derive(Debug)]
 pub struct GreptimeDBBatchOutput {
-    pub item_count: u32,
     pub metadata: RequestMetadata,
 }
 
@@ -170,12 +169,9 @@ impl Service<GreptimeDBRequest> for GreptimeDBService {
 
         Box::pin(async move {
             let metadata = req.metadata;
-            let result = client.row_insert(req.items).await?;
+            client.row_insert(req.items).await?;
 
-            Ok(GreptimeDBBatchOutput {
-                item_count: result,
-                metadata,
-            })
+            Ok(GreptimeDBBatchOutput { metadata })
         })
     }
 }
