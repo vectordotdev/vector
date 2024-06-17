@@ -24,6 +24,7 @@ struct ReduceState {
     events: usize,
     fields: HashMap<KeyString, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
+    creation: Instant,
     metadata: EventMetadata,
 }
 
@@ -35,6 +36,7 @@ impl ReduceState {
         Self {
             events: 0,
             stale_since: Instant::now(),
+            creation: Instant::now(),
             fields,
             metadata,
         }
@@ -93,6 +95,7 @@ impl ReduceState {
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
+    end_every_period: Option<Duration>,
     group_by: Vec<String>,
     merge_strategies: IndexMap<KeyString, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
@@ -126,6 +129,7 @@ impl Reduce {
         Ok(Reduce {
             expire_after: config.expire_after_ms,
             flush_period: config.flush_period_ms,
+            end_every_period: config.end_every_period_ms,
             group_by,
             merge_strategies: config.merge_strategies.clone(),
             reduce_merge_states: HashMap::new(),
@@ -139,6 +143,12 @@ impl Reduce {
         let mut flush_discriminants = Vec::new();
         let now = Instant::now();
         for (k, t) in &self.reduce_merge_states {
+            if let Some(period) = self.end_every_period {
+                if (now - t.creation) >= period {
+                    flush_discriminants.push(k.clone());
+                }
+            }
+
             if (now - t.stale_since) >= self.expire_after {
                 flush_discriminants.push(k.clone());
             }

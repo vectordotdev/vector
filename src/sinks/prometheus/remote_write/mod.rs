@@ -5,7 +5,6 @@
 //!
 //! [remote_write]: https://prometheus.io/docs/concepts/remote_write_spec/
 
-use snafu::prelude::*;
 use vector_lib::event::Metric;
 
 use crate::sinks::{
@@ -27,9 +26,9 @@ mod integration_tests;
 #[cfg(all(test, feature = "sources-prometheus-remote-write"))]
 pub use config::RemoteWriteConfig;
 
-#[derive(Debug, Snafu)]
+#[cfg(feature = "aws-core")]
+#[derive(Debug, snafu::Snafu)]
 enum Errors {
-    #[cfg(feature = "aws-core")]
     #[snafu(display("aws.region required when AWS authentication is in use"))]
     AwsRegionRequired,
 }

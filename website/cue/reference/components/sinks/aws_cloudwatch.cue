@@ -1,4 +1,3 @@
 package metadata
 
-components: sinks: _aws_cloudwatch: {
-}
+components: sinks: _aws_cloudwatch: {}
