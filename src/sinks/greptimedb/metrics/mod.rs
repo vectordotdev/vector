@@ -1,4 +1,4 @@
-//! `GreptimeDB` sink for vector.
+//! `GreptimeDB` grpc sink for vector.
 //!
 //! This sink writes Vector's metric data into
 //! [GreptimeDB](https://github.com/greptimeteam/greptimedb), a cloud-native
