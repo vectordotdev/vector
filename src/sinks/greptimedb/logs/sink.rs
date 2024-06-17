@@ -4,6 +4,7 @@ use crate::sinks::greptimedb::logs::http_reuqest_builder::{
 use crate::sinks::prelude::*;
 use crate::sinks::util::http::HttpRequest;
 
+/// A sink that ingests logs into GreptimeDB.
 pub struct GreptimeDBLogsHttpSink<S> {
     batcher_settings: BatcherSettings,
     service: S,

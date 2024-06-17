@@ -5,7 +5,6 @@ use vector_lib::event::metric::{Bucket, MetricSketch, Quantile, Sample};
 use vector_lib::event::{Metric, MetricValue};
 use vector_lib::metrics::AgentDDSketch;
 
-use crate::sinks::greptimedb::{f64_column, tag_column, ts_column};
 use crate::sinks::util::statistic::DistributionStatistic;
 
 pub(super) const DISTRIBUTION_QUANTILES: [f64; 5] = [0.5, 0.75, 0.90, 0.95, 0.99];
@@ -161,6 +160,33 @@ fn encode_sketch(sketch: &AgentDDSketch, schema: &mut Vec<ColumnSchema>, columns
             let column_name = format!("p{:02}", q * 100f64);
             encode_f64_value(&column_name, quantile, schema, columns);
         }
+    }
+}
+
+fn f64_column(name: &str) -> ColumnSchema {
+    ColumnSchema {
+        column_name: name.to_owned(),
+        semantic_type: SemanticType::Field as i32,
+        datatype: ColumnDataType::Float64 as i32,
+        ..Default::default()
+    }
+}
+
+fn ts_column(name: &str) -> ColumnSchema {
+    ColumnSchema {
+        column_name: name.to_owned(),
+        semantic_type: SemanticType::Timestamp as i32,
+        datatype: ColumnDataType::TimestampMillisecond as i32,
+        ..Default::default()
+    }
+}
+
+fn tag_column(name: &str) -> ColumnSchema {
+    ColumnSchema {
+        column_name: name.to_owned(),
+        semantic_type: SemanticType::Tag as i32,
+        datatype: ColumnDataType::String as i32,
+        ..Default::default()
     }
 }
 

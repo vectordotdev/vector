@@ -1,3 +1,3 @@
-pub(super) mod config;
+mod config;
 mod http_reuqest_builder;
 mod sink;

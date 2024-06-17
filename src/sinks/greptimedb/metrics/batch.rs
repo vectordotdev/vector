@@ -8,6 +8,7 @@ use super::request_builder::{
 const F64_BYTE_SIZE: usize = 8;
 const I64_BYTE_SIZE: usize = 8;
 
+/// GreptimeDBBatchSizer is a batch sizer for metrics.
 #[derive(Default)]
 pub struct GreptimeDBBatchSizer;
 

@@ -20,6 +20,7 @@ use vector_lib::codecs::encoding::Framer;
 
 use crate::sinks::util::http::{HttpRequest, HttpResponse, HttpServiceRequestBuilder};
 
+/// Partition key for GreptimeDB logs sink.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub(super) struct PartitionKey {
     pub dbname: String,
@@ -86,6 +87,7 @@ impl Partitioner for KeyPartitioner {
     }
 }
 
+/// GreptimeDB logs HTTP request builder.
 #[derive(Debug, Clone)]
 pub(super) struct GreptimeDBLogsHttpRequestBuilder {
     pub(super) endpoint: String,
@@ -212,6 +214,7 @@ pub(super) async fn http_healthcheck(
     }
 }
 
+/// GreptimeDB HTTP retry logic.
 #[derive(Clone, Default)]
 pub(super) struct GreptimeDBHttpRetryLogic;
 
