@@ -8,7 +8,7 @@ fn default_dbname() -> String {
     greptimedb_ingester::DEFAULT_SCHEMA_NAME.to_string()
 }
 
-fn default_dbname_temaplte() -> Template {
+fn default_dbname_template() -> Template {
     Template::try_from(default_dbname()).unwrap()
 }
 

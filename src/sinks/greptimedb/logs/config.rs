@@ -4,13 +4,13 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::http::{Auth, HttpClient};
-use crate::sinks::greptimedb::logs::http_reuqest_builder::{
+use crate::sinks::greptimedb::logs::http_request_builder::{
     http_healthcheck, GreptimeDBHttpRetryLogic, GreptimeDBLogsHttpRequestBuilder, PartitionKey,
 };
 use crate::sinks::greptimedb::logs::sink::GreptimeDBLogsHttpSink;
 use crate::sinks::util::http::HttpService;
 use crate::sinks::{
-    greptimedb::{default_dbname_temaplte, GreptimeDBDefaultBatchSettings},
+    greptimedb::{default_dbname_template, GreptimeDBDefaultBatchSettings},
     prelude::*,
 };
 use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
@@ -43,8 +43,8 @@ pub struct GreptimeDBLogsConfig {
     ///
     /// [database]: https://docs.greptime.com/user-guide/concepts/key-concepts#database
     #[configurable(metadata(docs::examples = "public"))]
-    #[derivative(Default(value = "default_dbname_temaplte()"))]
-    #[serde(default = "default_dbname_temaplte")]
+    #[derivative(Default(value = "default_dbname_template()"))]
+    #[serde(default = "default_dbname_template")]
     pub dbname: Template,
 
     /// pipeline name to be used for the logs
@@ -67,10 +67,8 @@ pub struct GreptimeDBLogsConfig {
     #[configurable(metadata(docs::examples = "password"))]
     #[serde(default)]
     pub password: Option<SensitiveString>,
-    /// Set gRPC compreesion encoding for the request
+    /// Set http compression encoding for the request
     /// Default to none, `gzip` or `zstd` is supported.
-    ///
-    /// This is required if your instance has authentication enabled.
     #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,

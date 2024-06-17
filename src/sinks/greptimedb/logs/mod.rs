@@ -14,5 +14,5 @@
 //!
 
 mod config;
-mod http_reuqest_builder;
+mod http_request_builder;
 mod sink;

@@ -1,4 +1,4 @@
-use crate::sinks::greptimedb::logs::http_reuqest_builder::{
+use crate::sinks::greptimedb::logs::http_request_builder::{
     GreptimeDBLogsHttpRequestBuilder, KeyPartitioner, PartitionKey,
 };
 use crate::sinks::prelude::*;

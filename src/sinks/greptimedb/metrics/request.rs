@@ -18,7 +18,7 @@ pub(super) struct GreptimeDBGrpcRequest {
 }
 
 impl GreptimeDBGrpcRequest {
-    // convert metrics event to GreptimeDBReqesut
+    // convert metrics event to GreptimeDBGrpcRequest
     pub(super) fn from_metrics(metrics: Vec<Metric>) -> Self {
         let mut items = Vec::with_capacity(metrics.len());
         let mut finalizers = EventFinalizers::default();
