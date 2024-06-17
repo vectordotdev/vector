@@ -882,7 +882,7 @@ fn decode_array_as_bytes(array: &[JsonValue]) -> Option<JsonValue> {
         .iter()
         .map(|item| {
             item.as_u64().and_then(|num| match num {
-                num if num <= u8::max_value() as u64 => Some(num as u8),
+                num if num <= u8::MAX as u64 => Some(num as u8),
                 _ => None,
             })
         })

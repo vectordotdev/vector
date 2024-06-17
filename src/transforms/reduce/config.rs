@@ -36,6 +36,13 @@ pub struct ReduceConfig {
     #[configurable(metadata(docs::human_name = "Expire After"))]
     pub expire_after_ms: Duration,
 
+    /// If supplied, every time this interval elapses for a given grouping, the reduced value
+    /// for that grouping is flushed. Checked every flush_period_ms.
+    #[serde_as(as = "Option<serde_with::DurationMilliSeconds<u64>>")]
+    #[derivative(Default(value = "Option::None"))]
+    #[configurable(metadata(docs::human_name = "End-Every Period"))]
+    pub end_every_period_ms: Option<Duration>,
+
     /// The interval to check for and flush any expired events, in milliseconds.
     #[serde(default = "default_flush_period_ms")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]

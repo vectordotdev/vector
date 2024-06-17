@@ -273,6 +273,7 @@ datacenter
 datadog
 datadoghq
 datanode
+ddog
 debian
 demuxing
 dfs
@@ -419,6 +420,7 @@ podman
 postgresql
 proxyuser
 pseudocode
+psl
 pushgateway
 qwerty
 rabbitmq
