@@ -1,11 +1,11 @@
 mod common;
 mod config;
-mod encoder;
-mod health;
-mod request_builder;
-mod retry;
-mod service;
-mod sink;
+pub mod encoder;
+pub mod health;
+pub mod request_builder;
+pub mod retry;
+pub mod service;
+pub mod sink;
 
 #[cfg(test)]
 mod tests;
