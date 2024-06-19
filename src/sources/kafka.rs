@@ -446,7 +446,7 @@ async fn kafka_source(
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     if let Err(e) = consumer.subscribe(&topics).context(SubscribeSnafu) {
         error!("{}", e);
-        return Err(())
+        return Err(());
     }
 
     let coordination_task = {
