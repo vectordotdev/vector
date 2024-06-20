@@ -189,11 +189,13 @@ jobs:
           path: target/artifacts
       - name: Set SHA env
         run: echo "GITHUB_SHA_SHORT=$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-8)" >> $GITHUB_ENV
+      - name: Sanitize branch name
+        run: echo "SANITIZED_BRANCH_NAME=$(echo ${{ github.ref_name }} | tr '/' '_')" >> $GITHUB_ENV
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: target/artifacts
           file: distribution/docker/debian/Dockerfile
           push: ${{ env.PUSH }}
-          tags: 157206707803.dkr.ecr.us-east-2.amazonaws.com/vector-base:${{env.BRANCH_NAME}}-${{ env.GITHUB_SHA_SHORT }} , 157206707803.dkr.ecr.us-east-2.amazonaws.com/vector-base:${{env.BRANCH_NAME}}-latest
+          tags: 157206707803.dkr.ecr.us-east-2.amazonaws.com/vector-base:${{ env.SANITIZED_BRANCH_NAME }}-${{ env.GITHUB_SHA_SHORT }} , 157206707803.dkr.ecr.us-east-2.amazonaws.com/vector-base:${{ env.SANITIZED_BRANCH_NAME }}-latest
           platforms: "linux/amd64,linux/arm64"

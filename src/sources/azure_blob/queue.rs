@@ -52,9 +52,10 @@ pub fn make_azure_row_stream(
     let container_client = make_container_client(cfg)?;
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     let poll_interval = std::time::Duration::from_secs(
-        cfg.queue.as_ref().ok_or(
-            anyhow!("Missing Event Grid queue config.")
-        )?.poll_secs as u64
+        cfg.queue
+            .as_ref()
+            .ok_or(anyhow!("Missing Event Grid queue config."))?
+            .poll_secs as u64,
     );
 
     Ok(Box::pin(stream! {
@@ -77,7 +78,7 @@ pub fn make_azure_row_stream(
                     bytes_received.clone()
                 ).await {
                     Some(blob_pack) => yield blob_pack,
-                    None => info!("Message {msg_id} failed to be processed, \
+                    None => trace!("Message {msg_id} failed to be processed or is ignored, \
                             no blob stream stream created from it. \
                             Will retry on next message."),
                 }
@@ -160,57 +161,69 @@ async fn proccess_event_grid_message(
         );
         return None;
     }
-    let parts = body.subject.split("/").collect::<Vec<_>>();
-    if parts.len() != 7 {
+    match parse_subject(body.subject) {
+        Some((container, blob)) => {
+            if container != container_client.container_name() {
+                trace!("Container name does not match. Skipping.");
+                return None;
+            }
+            trace!(
+                "New blob created in container '{}': '{}'",
+                &container,
+                &blob
+            );
+            let blob_client = container_client.blob_client(blob);
+            let mut result: Vec<u8> = vec![];
+            let mut stream = blob_client.get().into_stream();
+            while let Some(value) = stream.next().await {
+                let mut body = value.unwrap().data;
+                while let Some(value) = body.next().await {
+                    let value = value.expect("Failed to read body chunk");
+                    result.extend(&value);
+                }
+            }
+
+            let reader = Cursor::new(result);
+            let buffered = BufReader::new(reader);
+            let queue_client_copy = queue_client.clone();
+            let bytes_received_copy = bytes_received.clone();
+
+            Some(BlobPack {
+                row_stream: Box::pin(stream! {
+                    for line in buffered.lines() {
+                        let line = line.map(|line| line.as_bytes().to_vec());
+                        let line = line.expect("ASDF");
+                        bytes_received_copy.emit(ByteSize(line.len()));
+                        yield line;
+                    }
+                }),
+                success_handler: Box::new(|| {
+                    Box::pin(async move {
+                        queue_client_copy
+                            .pop_receipt_client(message)
+                            .delete()
+                            .await
+                            .expect("Failed removing messages from queue");
+                    })
+                }),
+            })
+        }
+        None => {
+            warn!("Failed parsing subject. Skipping.");
+            return None;
+        }
+    }
+}
+
+fn parse_subject(subject: String) -> Option<(String, String)> {
+    let parts: Vec<&str> = subject.split('/').collect();
+    if parts.len() < 7 {
         warn!("Ignoring event because of wrong subject format");
         return None;
     }
     let container = parts[4];
-    if container != container_client.container_name() {
-        // This shouldn't happen if everything is configured properly.
-        return None;
-    }
-    let blob = parts[6];
-    info!(
-        "New blob created in container '{}': '{}'",
-        &container, &blob
-    );
-
-    let blob_client = container_client.blob_client(blob);
-    let mut result: Vec<u8> = vec![];
-    let mut stream = blob_client.get().into_stream();
-    while let Some(value) = stream.next().await {
-        let mut body = value.unwrap().data;
-        while let Some(value) = body.next().await {
-            let value = value.expect("Failed to read body chunk");
-            result.extend(&value);
-        }
-    }
-
-    let reader = Cursor::new(result);
-    let buffered = BufReader::new(reader);
-    let queue_client_copy = queue_client.clone();
-    let bytes_received_copy = bytes_received.clone();
-
-    Some(BlobPack {
-        row_stream: Box::pin(stream! {
-            for line in buffered.lines() {
-                let line = line.map(|line| line.as_bytes().to_vec());
-                let line = line.expect("ASDF");
-                bytes_received_copy.emit(ByteSize(line.len()));
-                yield line;
-            }
-        }),
-        success_handler: Box::new(|| {
-            Box::pin(async move {
-                queue_client_copy
-                    .pop_receipt_client(message)
-                    .delete()
-                    .await
-                    .expect("Failed removing messages from queue");
-            })
-        }),
-    })
+    let blob = parts[6..].join("/");
+    Some((container.to_string(), blob))
 }
 
 const fn default_poll_secs() -> u32 {
@@ -252,5 +265,26 @@ fn test_azure_storage_event() {
     assert_eq!(
         event_value.event_type,
         "Microsoft.Storage.BlobCreated".to_string()
+    );
+}
+
+#[test]
+fn test_parse_subject_no_dir() {
+    let subject = "/blobServices/default/containers/content/blobs/foo".to_string();
+    let result = parse_subject(subject);
+    assert_eq!(result, Some(("content".to_string(), "foo".to_string())));
+}
+
+#[test]
+fn test_parse_subject_with_dirs() {
+    let subject = "/blobServices/default/containers/insights-logs-signinlogs/blobs/tenantId=0e35ee7a-425d-45a5-9013-218c1eae8fd4/y=2024/m=06/d=20/h=05/m=00/PT1H.json".to_string();
+    let result = parse_subject(subject);
+    assert_eq!(
+        result,
+        Some((
+            "insights-logs-signinlogs".to_string(),
+            "tenantId=0e35ee7a-425d-45a5-9013-218c1eae8fd4/y=2024/m=06/d=20/h=05/m=00/PT1H.json"
+                .to_string()
+        ))
     );
 }
