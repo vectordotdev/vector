@@ -2565,16 +2565,15 @@ dependencies = [
 
 [[package]]
 name = "curve25519-dalek"
-version = "4.1.1"
+version = "4.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e89b8c6a2e4b1f45971ad09761aafb85514a84744b67a95e32c3cc1352d1f65c"
+checksum = "97fb8b7c4503de7d6ae7b42ab72a5a59857b4c937ec27a3d4539dba95b5ab2be"
 dependencies = [
  "cfg-if",
  "cpufeatures",
  "curve25519-dalek-derive",
  "digest",
  "fiat-crypto",
- "platforms 3.1.2",
  "rustc_version 0.4.0",
  "subtle",
  "zeroize",
@@ -4006,7 +4005,7 @@ dependencies = [
  "log",
  "mach",
  "ntapi",
- "platforms 1.1.0",
+ "platforms",
  "winapi",
 ]
 
@@ -6746,12 +6745,6 @@ name = "platforms"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "989d43012e2ca1c4a02507c67282691a0a3207f9dc67cec596b43fe925b3d325"
-
-[[package]]
-name = "platforms"
-version = "3.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4503fa043bf02cee09a9582e9554b4c6403b2ef55e4612e96561d294419429f8"
 
 [[package]]
 name = "plotters"
@@ -10418,7 +10411,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.39.0"
+version = "0.40.0"
 dependencies = [
  "apache-avro",
  "approx",
