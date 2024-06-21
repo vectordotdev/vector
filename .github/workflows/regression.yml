@@ -396,10 +396,6 @@ jobs:
       - compute-metadata
       - confirm-valid-credentials
     steps:
-      - name: 'Download comparison image'
-        uses: actions/download-artifact@v3
-        with:
-          name: comparison-image
 
       - name: Load comparison image
         run: |
