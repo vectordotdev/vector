@@ -73,18 +73,16 @@ configuration: {
 		expire_metrics_secs: {
 			common: false
 			description: """
-				If set, Vector will configure the internal metrics system to automatically
-				remove all metrics that have not been updated in the given number of seconds.
-				This value must be positive.
+				Vector will expire internal metrics that haven't been emitted/updated in the
+				configured interval (default 300 seconds). This value must be positive.
 
-				Note that internal counters that are expired but are later updated will have
-				their values reset to zero.
-				Be careful to set this value high enough to avoid
-				expiring critical but infrequently updated internal counters.
+				Note that internal counters that are expired but are later updated will have their
+				values reset to zero. Be careful to set this value high enough to avoid expiring
+				critical but infrequently updated internal counters.
 				"""
 			required: false
 			type: float: {
-				default: null
+				default: 300.0
 				examples: [60.0]
 				unit: "seconds"
 			}
