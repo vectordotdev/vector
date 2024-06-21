@@ -48,7 +48,7 @@ jobs:
   should-run:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.event_name != 'pull_request'
+      #if: github.event_name != 'pull_request'
     outputs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
