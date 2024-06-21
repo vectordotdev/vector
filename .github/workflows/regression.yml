@@ -140,16 +140,20 @@ jobs:
 
           gh pr checkout ${{ github.event.issue.number }}
 
-          export BASELINE_SHA=$(git merge-base master HEAD)
+          #export BASELINE_SHA=$(git merge-base master HEAD)
+          export BASELINE_SHA="0.38.0"
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
-          export COMPARISON_SHA=$(git rev-parse HEAD)
+          #export COMPARISON_SHA=$(git rev-parse HEAD)
+          export COMPARISON_SHA="0.39.0"
           echo "COMPARISON_SHA=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
 
-          export BASELINE_TAG="${PR_NUMBER}-${COMPARISON_SHA}-${BASELINE_SHA}"
+          #export BASELINE_TAG="${PR_NUMBER}-${COMPARISON_SHA}-${BASELINE_SHA}"
+          export BASELINE_TAG="0.39.0-distroless-libc"
           echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
 
-          export COMPARISON_TAG="${PR_NUMBER}-${COMPARISON_SHA}-${COMPARISON_SHA}"
+          #export COMPARISON_TAG="${PR_NUMBER}-${COMPARISON_SHA}-${COMPARISON_SHA}"
+          export COMPARISON_TAG="0.38.0-distroless-libc"
           echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
 
           echo "pr number is: ${PR_NUMBER}"
@@ -355,16 +359,11 @@ jobs:
     needs:
       - compute-metadata
       - confirm-valid-credentials
-      - build-baseline
     steps:
-      - name: 'Download baseline image'
-        uses: actions/download-artifact@v3
-        with:
-          name: baseline-image
 
       - name: Load baseline image
         run: |
-          docker load --input baseline-image.tar
+          docker pull timberio/vector:${{ needs.compute-metadata.outputs.baseline-tag }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.2
@@ -394,7 +393,6 @@ jobs:
     needs:
       - compute-metadata
       - confirm-valid-credentials
-      - build-comparison
     steps:
       - name: 'Download comparison image'
         uses: actions/download-artifact@v3
@@ -403,7 +401,7 @@ jobs:
 
       - name: Load comparison image
         run: |
-          docker load --input comparison-image.tar
+          docker pull timberio/vector:${{ needs.compute-metadata.outputs.comparison-tag }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.2
