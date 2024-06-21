@@ -445,8 +445,8 @@ jobs:
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - uses: actions/checkout@v3
-        with:
-          ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
+       #with:
+       #  ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.2
