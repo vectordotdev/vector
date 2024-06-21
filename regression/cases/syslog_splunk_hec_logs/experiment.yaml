@@ -1,4 +1,5 @@
-optimization_goal: egress_throughput
+
+optimization_goal: ingress_throughput
 
 target:
   name: vector
