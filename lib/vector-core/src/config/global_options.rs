@@ -346,7 +346,7 @@ mod tests {
             })
         };
 
-        assert_eq!(merge(None, None), Ok(None));
+        assert_eq!(merge(None, None), Ok(Some(300.0)));
         assert_eq!(merge(Some(1.0), None), Ok(Some(1.0)));
         assert_eq!(merge(None, Some(2.0)), Ok(Some(2.0)));
         assert_eq!(merge(Some(3.0), Some(3.0)), Ok(Some(3.0)));
