@@ -140,12 +140,12 @@ jobs:
 
           gh pr checkout 20712
 
-          export BASELINE_SHA=$(git merge-base master HEAD)
-          #export BASELINE_SHA="0.38.0"
+          #export BASELINE_SHA=$(git merge-base master HEAD)
+          export BASELINE_SHA="ea0ec6f4f871c6cfae354b4c00403b646ba144bb"
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
-          export COMPARISON_SHA=$(git rev-parse HEAD)
-          #export COMPARISON_SHA="0.39.0"
+          #export COMPARISON_SHA=$(git rev-parse HEAD)
+          export COMPARISON_SHA="73da9bbf89d49ce7abc5ad8c8526c7679f289dae"
           echo "COMPARISON_SHA=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
 
           #export BASELINE_TAG="${PR_NUMBER}-${COMPARISON_SHA}-${BASELINE_SHA}"
