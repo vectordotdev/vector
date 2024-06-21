@@ -9,5 +9,5 @@ target:
 
   environment:
     VECTOR_THREADS: 4
-    VECTOR_REQUIRE_HEALTHY: true
+    
 
