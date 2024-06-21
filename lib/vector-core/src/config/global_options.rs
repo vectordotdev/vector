@@ -110,6 +110,8 @@ pub struct GlobalOptions {
     pub expire_metrics_secs: Option<f64>,
 }
 
+// https://github.com/rust-lang/rust-clippy/issues/6427
+#[allow(clippy::unnecessary_wraps)]
 fn default_expire_metrics_secs() -> Option<f64> {
     Some(300.0)
 }
