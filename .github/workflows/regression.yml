@@ -140,12 +140,12 @@ jobs:
 
           gh pr checkout 20712
 
-          #export BASELINE_SHA=$(git merge-base master HEAD)
-          export BASELINE_SHA="0.38.0"
+          export BASELINE_SHA=$(git merge-base master HEAD)
+          #export BASELINE_SHA="0.38.0"
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
-          #export COMPARISON_SHA=$(git rev-parse HEAD)
-          export COMPARISON_SHA="0.39.0"
+          export COMPARISON_SHA=$(git rev-parse HEAD)
+          #export COMPARISON_SHA="0.39.0"
           echo "COMPARISON_SHA=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
 
           #export BASELINE_TAG="${PR_NUMBER}-${COMPARISON_SHA}-${BASELINE_SHA}"
@@ -256,81 +256,81 @@ jobs:
   ## BUILD
   ##
 
-  build-baseline:
-    name: Build baseline Vector container
-    runs-on: ubuntu-20.04-4core
-    timeout-minutes: 30
-    needs:
-      - compute-metadata
-    steps:
-      - uses: colpal/actions-clean@v1
+ #build-baseline:
+ #  name: Build baseline Vector container
+ #  runs-on: ubuntu-20.04-4core
+ #  timeout-minutes: 30
+ #  needs:
+ #    - compute-metadata
+ #  steps:
+ #    - uses: colpal/actions-clean@v1
 
-      - uses: actions/checkout@v3
+ #    - uses: actions/checkout@v3
 
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ needs.compute-metadata.outputs.baseline-sha }}
-          path: baseline-vector
+ #    - uses: actions/checkout@v3
+ #      with:
+ #        ref: ${{ needs.compute-metadata.outputs.baseline-sha }}
+ #        path: baseline-vector
 
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v3.3.0
+ #    - name: Set up Docker Buildx
+ #      id: buildx
+ #      uses: docker/setup-buildx-action@v3.3.0
 
-      - name: Build 'vector' target image
-        uses: docker/build-push-action@v5.4.0
-        with:
-          context: baseline-vector/
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: regression/Dockerfile
-          builder: ${{ steps.buildx.outputs.name }}
-          outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
-          tags: |
-            vector:${{ needs.compute-metadata.outputs.baseline-tag }}
+ #    - name: Build 'vector' target image
+ #      uses: docker/build-push-action@v5.4.0
+ #      with:
+ #        context: baseline-vector/
+ #        cache-from: type=gha
+ #        cache-to: type=gha,mode=max
+ #        file: regression/Dockerfile
+ #        builder: ${{ steps.buildx.outputs.name }}
+ #        outputs: type=docker,dest=${{ runner.temp }}/baseline-image.tar
+ #        tags: |
+ #          vector:${{ needs.compute-metadata.outputs.baseline-tag }}
 
-      - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: baseline-image
-          path: "${{ runner.temp }}/baseline-image.tar"
+ #    - name: Upload image as artifact
+ #      uses: actions/upload-artifact@v3
+ #      with:
+ #        name: baseline-image
+ #        path: "${{ runner.temp }}/baseline-image.tar"
 
-  build-comparison:
-    name: Build comparison Vector container
-    runs-on: ubuntu-20.04-4core
-    timeout-minutes: 30
-    needs:
-      - compute-metadata
-    steps:
-      - uses: colpal/actions-clean@v1
+ #build-comparison:
+ #  name: Build comparison Vector container
+ #  runs-on: ubuntu-20.04-4core
+ #  timeout-minutes: 30
+ #  needs:
+ #    - compute-metadata
+ #  steps:
+ #    - uses: colpal/actions-clean@v1
 
-      - uses: actions/checkout@v3
+ #    - uses: actions/checkout@v3
 
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
-          path: comparison-vector
+ #    - uses: actions/checkout@v3
+ #      with:
+ #        ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
+ #        path: comparison-vector
 
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v3.3.0
+ #    - name: Set up Docker Buildx
+ #      id: buildx
+ #      uses: docker/setup-buildx-action@v3.3.0
 
-      - name: Build 'vector' target image
-        uses: docker/build-push-action@v5.4.0
-        with:
-          context: comparison-vector/
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          file: regression/Dockerfile
-          builder: ${{ steps.buildx.outputs.name }}
-          outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
-          tags: |
-            vector:${{ needs.compute-metadata.outputs.comparison-tag }}
+ #    - name: Build 'vector' target image
+ #      uses: docker/build-push-action@v5.4.0
+ #      with:
+ #        context: comparison-vector/
+ #        cache-from: type=gha
+ #        cache-to: type=gha,mode=max
+ #        file: regression/Dockerfile
+ #        builder: ${{ steps.buildx.outputs.name }}
+ #        outputs: type=docker,dest=${{ runner.temp }}/comparison-image.tar
+ #        tags: |
+ #          vector:${{ needs.compute-metadata.outputs.comparison-tag }}
 
-      - name: Upload image as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: comparison-image
-          path: "${{ runner.temp }}/comparison-image.tar"
+ #    - name: Upload image as artifact
+ #      uses: actions/upload-artifact@v3
+ #      with:
+ #        name: comparison-image
+ #        path: "${{ runner.temp }}/comparison-image.tar"
 
   confirm-valid-credentials:
     name: Confirm AWS credentials are minimally valid
