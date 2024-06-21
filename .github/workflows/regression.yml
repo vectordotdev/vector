@@ -135,10 +135,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          export PR_NUMBER=${{ github.event.issue.number }}
+          export PR_NUMBER="20712"
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
-          gh pr checkout ${{ github.event.issue.number }}
+          gh pr checkout 20712
 
           #export BASELINE_SHA=$(git merge-base master HEAD)
           export BASELINE_SHA="0.38.0"
@@ -183,7 +183,9 @@ jobs:
       # queue to 1, we can get the PR number by parsing the merge queue temp branch's ref.
       - name: Get PR metadata (merge queue)
         id: pr-metadata-merge-queue
-        if: github.event_name != 'issue_comment'
+          #if: github.event_name != 'issue_comment'
+        # Something known to be false
+        if: github.repository == 'octo-org/octo-repo-prod'
         run: |
           export PR_NUMBER=$(echo "${{ github.ref }}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p')
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
