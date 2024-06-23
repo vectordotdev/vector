@@ -13,6 +13,7 @@
   <img src="website/static/img/diagram.svg" alt="Vector">
 </p>
 
+##POC
 ## What is Vector?
 
 Vector is a high-performance, end-to-end (agent & aggregator) observability data
