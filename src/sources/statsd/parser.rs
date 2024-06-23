@@ -263,9 +263,9 @@ mod test {
     #[test]
     fn tagged_counter() {
         assert_event_data_eq!(
-            parse("foo/hou@se baz:1|c|#tag1,tag2:value"),
+            parse("foo/how@ever baz:1|c|#tag1,tag2:value"),
             Ok(Metric::new(
-                "foo-house_baz",
+                "foo-however_baz",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
