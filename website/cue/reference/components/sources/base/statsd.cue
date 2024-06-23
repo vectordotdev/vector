@@ -66,7 +66,7 @@ base: components: sources: statsd: configuration: {
 			\t  "/" is replaced with "-"
 			\t  All whitespace is replaced with "_"
 			\t  All non alphanumeric characters [^a-zA-Z_\\-0-9\\.] are removed.
-			\tFor backwards compatilibty this is remains the default behavior.
+			\tFor backwards compatibility this is remains the default behavior.
 			\tTo disable sanitization, set to false
 			"""
 		required: false

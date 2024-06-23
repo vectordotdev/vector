@@ -125,7 +125,7 @@ pub struct TcpConfig {
     ///	  "/" is replaced with "-"
     ///	  All whitespace is replaced with "_"
     ///	  All non alphanumeric characters [^a-zA-Z_\-0-9\.] are removed.
-    ///	For backwards compatilibty this is remains the default behavior.
+    ///	For backwards compatibility this is remains the default behavior.
     ///	To disable sanitization, set to false
     #[serde(default = "default_sanitize")]
     #[configurable(derived)]

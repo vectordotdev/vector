@@ -244,7 +244,7 @@ mod test {
     }
 
     const NON_SANITIZING_PARSER: Parser = Parser::new(false);
-    fn nsparse(packet: &str) -> Result<Metric, ParseError> {
+    fn unsanitized_parse(packet: &str) -> Result<Metric, ParseError> {
         NON_SANITIZING_PARSER.parse(packet)
     }
 
@@ -263,9 +263,9 @@ mod test {
     #[test]
     fn tagged_counter() {
         assert_event_data_eq!(
-            parse("foo/bar@baz baz:1|c|#tag1,tag2:value"),
+            parse("foo/hou@se baz:1|c|#tag1,tag2:value"),
             Ok(Metric::new(
-                "foo-barbaz_baz",
+                "foo-house_baz",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
@@ -279,7 +279,7 @@ mod test {
     #[test]
     fn tagged_not_sanitized_counter() {
         assert_event_data_eq!(
-            nsparse("foo/bar@baz baz:1|c|#tag1,tag2:value"),
+            unsanitized_parse("foo/bar@baz baz:1|c|#tag1,tag2:value"),
             Ok(Metric::new(
                 "foo/bar@baz baz",
                 MetricKind::Incremental,
