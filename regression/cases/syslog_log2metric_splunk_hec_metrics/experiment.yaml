@@ -9,5 +9,3 @@ target:
 
   environment:
     VECTOR_THREADS: 4
-
-
