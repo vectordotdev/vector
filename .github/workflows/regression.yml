@@ -147,6 +147,9 @@ jobs:
 
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
+          echo "Valid git refs"
+          git show-ref
+
 
           # Maybe this style of checkout is giving issues for `origin/master` / `master` refnames
           # If its triggered by a PR, we're already on the branch
