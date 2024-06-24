@@ -147,10 +147,14 @@ jobs:
 
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
-          gh pr checkout "${PR_NUMBER}"
 
-          # TODO previous gives 'fatal: Not a valid object name master'
-          export BASELINE_SHA=$(git merge-base --fork-point origin/master)
+          # Maybe this style of checkout is giving issues for `origin/master` / `master` refnames
+          # If its triggered by a PR, we're already on the branch
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+              gh pr checkout ${{ github.event.issue.number }}
+          fi
+
+          export BASELINE_SHA=$(git merge-base --fork-point master)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
