@@ -131,9 +131,9 @@ jobs:
 
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 1000
+          fetch-depth: 0 # If depth is 0, then everything is fetched. Otherwise there is no guarantee that `master` will be among the fetched refs
 
       # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
@@ -151,13 +151,12 @@ jobs:
           git show-ref
 
 
-          # Maybe this style of checkout is giving issues for `origin/master` / `master` refnames
           # If its triggered by a PR, we're already on the branch
           if [ "${{ github.event_name }}" != "pull_request" ]; then
               gh pr checkout ${{ github.event.issue.number }}
           fi
 
-          export BASELINE_SHA=$(git merge-base --fork-point remotes/origin/master)
+          export BASELINE_SHA=$(git merge-base --fork-point origin/master)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
