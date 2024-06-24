@@ -48,11 +48,10 @@ jobs:
   should-run:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    #if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request'
     outputs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
-      is_pr: ${{ steps.is_pr.outputs.IS_PR }}
     steps:
     - uses: actions/checkout@v3
 
@@ -84,13 +83,6 @@ jobs:
             - "LICENSE-3rdparty.csv"
             - "LICENSE"
 
-    - name: Handle PR
-      id: is_pr
-      if: github.event_name == 'pull_request'
-      run: |
-        export IS_PR="true"
-        echo "IS_PR=${IS_PR}" >> $GITHUB_OUTPUT
-
     # This step allows us to conservatively run the tests if we added a new
     # file or directory for source code, but forgot to add it to this workflow.
     # Instead, we may unnecessarily run the test on new file or dir additions that
@@ -121,7 +113,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     needs: should-run
-    if: github.event_name != 'merge_group' || needs.should-run.outputs.source_changed == 'true' || needs.should-run.outputs.is_pr == 'true'
+    if: github.event_name != 'merge_group' || needs.should-run.outputs.source_changed == 'true'
     outputs:
       pr-number: ${{ steps.pr-metadata-merge-queue.outputs.PR_NUMBER || steps.pr-metadata-comment.outputs.PR_NUMBER }}
       baseline-sha: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_SHA || steps.pr-metadata-comment.outputs.BASELINE_SHA }}
@@ -133,30 +125,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # If depth is 0, then everything is fetched. Otherwise there is no guarantee that `master` will be among the fetched refs
+          fetch-depth: 1000
 
       # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
       - name: Get PR metadata (issue_comment)
         id: pr-metadata-comment
-        if: github.event_name == 'issue_comment' || github.event_name == 'pull_request'
+        if: github.event_name == 'issue_comment'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          export PR_NUMBER=$(if [ "${{ github.event_name }}" = "pull_request" ]; then echo "${{ github.event.number }}"; else echo "${{ github.event.issue.number }}"; fi)
+          export PR_NUMBER=${{ github.event.issue.number }}
 
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
-          echo "Valid git refs"
-          git show-ref
+          gh pr checkout ${{ github.event.issue.number }}
 
-
-          # If its triggered by a PR, we're already on the branch
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-              gh pr checkout ${{ github.event.issue.number }}
-          fi
-
-          export BASELINE_SHA=$(git merge-base --fork-point origin/master)
+          export BASELINE_SHA=$(git merge-base master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
@@ -195,7 +180,7 @@ jobs:
       # queue to 1, we can get the PR number by parsing the merge queue temp branch's ref.
       - name: Get PR metadata (merge queue)
         id: pr-metadata-merge-queue
-        if: github.event_name != 'issue_comment' && github.event_name != 'pull_request'
+        if: github.event_name != 'issue_comment'
         run: |
           export PR_NUMBER=$(echo "${{ github.ref }}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p')
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
