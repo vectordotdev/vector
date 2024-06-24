@@ -52,6 +52,7 @@ jobs:
     outputs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
+      is_pr: ${{ steps.is_pr.outputs.IS_PR }}
     steps:
     - uses: actions/checkout@v3
 
@@ -83,6 +84,13 @@ jobs:
             - "LICENSE-3rdparty.csv"
             - "LICENSE"
 
+    - name: Handle PR
+      id: is_pr
+      if: github.event_name == 'pull_request'
+      run: |
+        export IS_PR="true"
+        echo "IS_PR=${IS_PR}" >> $GITHUB_OUTPUT
+
     # This step allows us to conservatively run the tests if we added a new
     # file or directory for source code, but forgot to add it to this workflow.
     # Instead, we may unnecessarily run the test on new file or dir additions that
@@ -113,7 +121,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     needs: should-run
-    if: github.event_name != 'merge_group' || needs.should-run.outputs.source_changed == 'true'
+    if: github.event_name != 'merge_group' || needs.should-run.outputs.source_changed == 'true' || needs.should-run.outputs.is_pr == 'true'
     outputs:
       pr-number: ${{ steps.pr-metadata-merge-queue.outputs.PR_NUMBER || steps.pr-metadata-comment.outputs.PR_NUMBER }}
       baseline-sha: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_SHA || steps.pr-metadata-comment.outputs.BASELINE_SHA }}
@@ -131,7 +139,7 @@ jobs:
       # But, we can retrieve this info from some commands.
       - name: Get PR metadata (issue_comment)
         id: pr-metadata-comment
-        if: github.event_name == 'issue_comment'
+        if: github.event_name == 'issue_comment' || github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
