@@ -71,6 +71,7 @@ jobs:
           push: ${{ github.ref == 'refs/heads/master' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
 
       - name: (PR comment) Set latest commit status as ${{ job.status }}
         uses: myrotvorets/set-commit-status-action@v2.0.1
