@@ -155,7 +155,7 @@ async fn proccess_event_grid_message(
         }
     };
     if body.event_type != "Microsoft.Storage.BlobCreated" {
-        warn!(
+        trace!(
             "Ignoring event because of wrong event type: {}",
             body.event_type
         );
@@ -176,10 +176,26 @@ async fn proccess_event_grid_message(
             let mut result: Vec<u8> = vec![];
             let mut stream = blob_client.get().into_stream();
             while let Some(value) = stream.next().await {
-                let mut body = value.unwrap().data;
-                while let Some(value) = body.next().await {
-                    let value = value.expect("Failed to read body chunk");
-                    result.extend(&value);
+                match value {
+                    Ok(response) => {
+                        let mut body = response.data;
+                        while let Some(value) = body.next().await {
+                            match value {
+                                Ok(chunk) => result.extend(&chunk),
+                                Err(e) => {
+                                    // This should now happen as long as `next()` is working
+                                    // correctly. Leaving just a safeguard, not to crash Vector.
+                                    trace!("Failed to read body chunk: {}", e);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        // Logging as trace, as it will be retired.
+                        trace!("Failed to get response: {}", e);
+                        return None;
+                    }
                 }
             }
 
@@ -192,18 +208,27 @@ async fn proccess_event_grid_message(
                 row_stream: Box::pin(stream! {
                     for line in buffered.lines() {
                         let line = line.map(|line| line.as_bytes().to_vec());
-                        let line = line.expect("ASDF");
+                        let line = match line {
+                            Ok(l) => l,
+                            Err(e) => {
+                                error!("Failed to map line: {}", e);
+                                break;
+                            }
+                        };
                         bytes_received_copy.emit(ByteSize(line.len()));
                         yield line;
                     }
                 }),
                 success_handler: Box::new(|| {
                     Box::pin(async move {
-                        queue_client_copy
-                            .pop_receipt_client(message)
-                            .delete()
-                            .await
-                            .expect("Failed removing messages from queue");
+                        let res = queue_client_copy.pop_receipt_client(message).delete().await;
+
+                        match res {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("Failed removing messages from queue: {}", e);
+                            }
+                        }
                     })
                 }),
             })
