@@ -27,7 +27,7 @@ sinks:
   splunk_hec_logs:
     type:     "splunk_hec_logs"
     inputs: [ "syslog" ]
-    endpoint: "http://localhost:8080"
+    endpoint: "http://0.0.0.0:8080"
     encoding:
       codec: "json"
     token:    "abcd1234"
