@@ -149,7 +149,8 @@ jobs:
 
           gh pr checkout "${PR_NUMBER}"
 
-          export BASELINE_SHA=$(git merge-base master HEAD)
+          # TODO previous gives 'fatal: Not a valid object name master'
+          export BASELINE_SHA=$(git merge-base --fork-point master)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
