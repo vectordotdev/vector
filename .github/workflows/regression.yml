@@ -154,7 +154,7 @@ jobs:
               gh pr checkout ${{ github.event.issue.number }}
           fi
 
-          export BASELINE_SHA=$(git merge-base --fork-point master)
+          export BASELINE_SHA=$(git merge-base --fork-point remotes/origin/master)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
