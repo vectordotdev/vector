@@ -50,7 +50,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: |
-      github.event.issue.pull_request && ( contains(github.event.comment.body, '/ci-run-all')
+      github.event.issue.pull_request &&
+        github.repository == 'vectordotdev/vector' && (
+          contains(github.event.comment.body, '/ci-run-all')
           || contains(github.event.comment.body, '/ci-run-cli')
           || contains(github.event.comment.body, '/ci-run-misc')
           || contains(github.event.comment.body, '/ci-run-deny')
@@ -62,7 +64,7 @@ jobs:
           || contains(github.event.comment.body, '/ci-run-regression')
           || contains(github.event.comment.body, '/ci-run-k8s')
           || contains(github.event.comment.body, '/ci-run-workload-checks')
-      )
+        )
     steps:
       - name: Generate authentication token
         id: generate_token
