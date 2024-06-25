@@ -17,7 +17,6 @@
 # /ci-run-environment         : runs Environment Suite
 # /ci-run-regression          : runs Regression Detection Suite
 # /ci-run-k8s                 : runs K8s E2E Suite
-# /ci-run-workload-checks     : runs Workload Checks Suite
 
 name: Comment Trigger
 
@@ -61,7 +60,6 @@ jobs:
           || contains(github.event.comment.body, '/ci-run-environment')
           || contains(github.event.comment.body, '/ci-run-regression')
           || contains(github.event.comment.body, '/ci-run-k8s')
-          || contains(github.event.comment.body, '/ci-run-workload-checks')
       )
     steps:
       - name: Generate authentication token
@@ -140,10 +138,4 @@ jobs:
     needs: validate
     if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-k8s')
     uses: ./.github/workflows/k8s_e2e.yml
-    secrets: inherit
-
-  workload-checks:
-    needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-workload-checks')
-    uses: ./.github/workflows/workload_checks.yml
     secrets: inherit
