@@ -1,4 +1,3 @@
-use aws_sdk_s3::Client as S3Client;
 use tower::ServiceBuilder;
 use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
@@ -10,8 +9,9 @@ use vector_lib::TimeZone;
 
 use super::sink::S3RequestOptions;
 use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint},
+    aws::{create_client_instrument, AwsAuthentication, RegionOrEndpoint},
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
+    common::s3::S3ClientBuilder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         s3_common::{
@@ -177,7 +177,7 @@ impl GenerateConfig for S3SinkConfig {
 impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let service = self.create_service(&cx.proxy).await?;
-        let healthcheck = self.build_healthcheck(service.client())?;
+        let healthcheck = self.build_healthcheck(&cx.proxy).await?;
         let sink = self.build_processor(service, cx)?;
         Ok((sink, healthcheck))
     }
@@ -246,7 +246,17 @@ impl S3SinkConfig {
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
-    pub fn build_healthcheck(&self, client: S3Client) -> crate::Result<Healthcheck> {
+    pub async fn build_healthcheck(&self, proxy: &ProxyConfig) -> crate::Result<Healthcheck> {
+        let client = create_client_instrument::<S3ClientBuilder>(
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint(),
+            proxy,
+            &self.tls,
+            // Make use the healthcheck doesn't emit a `BytesSent` event.
+            false,
+        )
+        .await?;
         s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }
 
