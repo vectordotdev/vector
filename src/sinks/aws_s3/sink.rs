@@ -2,6 +2,7 @@ use std::io;
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
+use crate::internal_events::AwsS3RequestEvent;
 use uuid::Uuid;
 use vector_lib::codecs::encoding::Framer;
 use vector_lib::event::Finalizable;
@@ -103,8 +104,17 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
 
         s3metadata.s3_key = format_s3_key(&s3metadata.s3_key, &filename, &extension);
 
+        let blob_data = payload.into_payload();
+
+        emit!(AwsS3RequestEvent {
+            bytes_size: blob_data.len(),
+            events: request_metadata.event_count(),
+            bucket: &self.bucket,
+            s3_key: &s3metadata.s3_key,
+        });
+
         S3Request {
-            body: payload.into_payload(),
+            body: blob_data,
             bucket: self.bucket.clone(),
             metadata: s3metadata,
             request_metadata,

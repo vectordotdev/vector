@@ -1,3 +1,4 @@
+use crate::internal_events::AzureBlobRequestEvent;
 use bytes::Bytes;
 use chrono::Utc;
 use uuid::Uuid;
@@ -82,13 +83,12 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
 
         let blob_data = payload.into_payload();
 
-        debug!(
-            message = "Sending events.",
-            bytes = ?blob_data.len(),
-            events_len = ?azure_metadata.count,
-            blob = ?azure_metadata.partition_key,
-            container = ?self.container_name,
-        );
+        emit!(AzureBlobRequestEvent {
+            bytes_size: blob_data.len(),
+            events: azure_metadata.count,
+            container_name: &self.container_name,
+            partition_key: &azure_metadata.partition_key
+        });
 
         AzureBlobRequest {
             blob_data,
