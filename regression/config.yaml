@@ -1,0 +1,37 @@
+lading:
+  version: 0.19.1
+
+target:
+
+
+# Link templates for reports.
+#
+# Values may be removed to disable corresponding links in reports.
+#
+# Links that may be set:
+# - `metrics_dashboard`: link to a metrics dashboard
+# - `profiles`: link to profiles
+# - `per_experiment_logs`: link to logs, for each experiment
+#
+# Additionally, arbitrary links may be added to experiment configuration files.
+# These should be added as a list of key-value pairs in a 'report_links'
+# section. For example:
+# ```
+# report_links:
+#   - text: Link Text
+#     link: "link template"
+# ```
+#
+# Available variables:
+# - `job_id`: the job ID
+# - `start_time_ms`: start time of the job's metrics data, in ms
+# - `end_time_ms`: end time of the job's metrics data, in ms
+# - `filter_start`: arbitrary time before this job's replicates were run,
+#   suitable for filtering logs and profiles by job ID.
+# - `filter_end`: arbitrary time after this job's replicates were run and logs
+#   were uploaded, suitable for filtering logs and profiles by job ID.
+#
+# Additional variables for per-experiment links:
+# - `experiment`: the name of the experiment
+report:
+  metrics_dashboard: "https://app.datadoghq.com/dashboard/ykh-ua8-vcu/SMP-Regression-Detector-Metrics?fromUser=true&refresh_mode=paused&tpl_var_run-id%5B0%5D={{ job_id }}&view=spans&from_ts={{ start_time_ms }}&to_ts={{ end_time_ms }}&live=false"

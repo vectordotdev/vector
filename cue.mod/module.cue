@@ -5,3 +5,6 @@
 // on the Vector docs build.
 
 module: "vector.dev"
+language: {
+	version: "v0.9.0"
+}
