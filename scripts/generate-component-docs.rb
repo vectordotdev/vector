@@ -746,7 +746,11 @@ def resolve_schema(root_schema, schema)
   # process to provide the actual details. We only need to specify the custom type name.
   type_override = get_schema_metadata(schema, 'docs::type_override')
   if !type_override.nil?
-    resolved = { 'type' => { type_override.to_s => {} } }
+    if type_override == 'ascii_char'
+      resolved = { 'type' => { type_override.to_s => { 'default' => schema['default'].chr } } }
+    else
+      resolved = { 'type' => { type_override.to_s => {} } }
+    end
     description = get_rendered_description_from_schema(schema)
     resolved['description'] = description unless description.empty?
     return resolved
