@@ -49,8 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: |
-      github.event.issue.pull_request &&
-        github.repository == 'vectordotdev/vector' && (
+      github.event.issue.pull_request && (
           contains(github.event.comment.body, '/ci-run-all')
           || contains(github.event.comment.body, '/ci-run-cli')
           || contains(github.event.comment.body, '/ci-run-misc')
@@ -70,6 +69,13 @@ jobs:
         with:
           app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
+      - name: Get PR author
+        id: pr
+        uses: tspascoal/get-user-teams-membership@v3
+        with:
+          username: ${{ github.issue.user.login }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
       - name: Get PR comment author
         id: comment
         uses: tspascoal/get-user-teams-membership@v3
@@ -79,7 +85,7 @@ jobs:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: Validate author membership
-        if: steps.comment.outputs.isTeamMember == 'false'
+        if: steps.pr.outputs.isTeamMember == 'false' || steps.comment.outputs.isTeamMember == 'false'
         run: exit 1
 
   cli:
