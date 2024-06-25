@@ -26,12 +26,12 @@ sinks:
   prometheus:
     type:    "prometheus_exporter"
     inputs: [ "internal_metrics" ]
-    address: "0.0.0.0:9090"
+    address: "localhost:9090"
 
   elasticsearch:
     type:        "elasticsearch"
     inputs: [ "fluent" ]
-    endpoint:    "http://0.0.0.0:8080"
+    endpoint:    "http://localhost:8080"
     mode:        "bulk"
     pipeline:    "pipeline-name"
     compression: "none"
