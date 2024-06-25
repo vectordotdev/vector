@@ -60,7 +60,10 @@ assets = [
   ["config/vector.yaml", "/etc/vector/vector.yaml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],
-  ["distribution/systemd/vector.default", "/etc/default/vector", "600"],
+  ["distribution/systemd/vector@.service", "/lib/systemd/system/vector@.service", "644"],
+  ["distribution/systemd/hardened-vector.service", "/lib/systemd/system/hardened-vector.service", "644"],
+  ["distribution/systemd/hardened-vector@.service", "/lib/systemd/system/hardened-vector@.service", "644"],
+  ["distribution/systemd/vector.default", "/etc/default/vector", "600"]
   ["licenses/*", "/usr/share/vector/licenses/", "644"],
   ["NOTICE", "/usr/share/vector/NOTICE", "644"],
   ["LICENSE-3rdparty.csv", "/usr/share/vector/LICENSE-3rdparty.csv", "644"],
