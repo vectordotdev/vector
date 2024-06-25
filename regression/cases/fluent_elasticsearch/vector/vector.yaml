@@ -23,11 +23,6 @@ sources:
 ##
 
 sinks:
-  prometheus:
-    type:    "prometheus_exporter"
-    inputs: [ "internal_metrics" ]
-    address: "localhost:9090"
-
   elasticsearch:
     type:        "elasticsearch"
     inputs: [ "fluent" ]
