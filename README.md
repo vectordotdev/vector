@@ -15,6 +15,7 @@
 
 ## What is Vector?
 
+
 Vector is a high-performance, end-to-end (agent & aggregator) observability data
 pipeline that puts you in control of your observability data.
 [Collect][docs.sources], [transform][docs.transforms], and [route][docs.sinks]
