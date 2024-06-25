@@ -24,6 +24,7 @@ data enrichment, and data security where you need it, not where it is most
 convenient for your vendors. Additionally, it is open source and up to 10x
 faster than every alternative in the space.
 
+
 To get started, follow our [**quickstart guide**][docs.quickstart] or [**install
 Vector**][docs.installation].
 
