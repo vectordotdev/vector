@@ -99,6 +99,7 @@ pub struct CsvSerializerOptions {
     /// like \ (instead of escaping quotes by doubling them).
     ///
     /// To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+    #[configurable(metadata(docs::type_override = "ascii_char"))]
     #[serde(
         default = "default_escape",
         with = "vector_core::serde::ascii_char",
@@ -107,6 +108,7 @@ pub struct CsvSerializerOptions {
     pub escape: u8,
 
     /// The quote character to use when writing CSV.
+    #[configurable(metadata(docs::type_override = "ascii_char"))]
     #[serde(
         default = "default_escape",
         with = "vector_core::serde::ascii_char",

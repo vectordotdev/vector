@@ -744,6 +744,11 @@ def resolve_schema(root_schema, schema)
   #
   # We intentially set no actual definition for these types, relying on the documentation generation
   # process to provide the actual details. We only need to specify the custom type name.
+  #
+  # To handle u8 types as ascii characters and not there uint represeentation between 0 and 255 we
+  # added a special handling of these exact values. This means
+  # `#[configurable(metadata(docs::type_override = "ascii_char"))]` should only be used for rust
+  # u8 type. See lib/codecs/src/encoding/format/csv.rs for an exmaple.
   type_override = get_schema_metadata(schema, 'docs::type_override')
   if !type_override.nil?
     if type_override == 'ascii_char'
