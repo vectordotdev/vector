@@ -173,7 +173,7 @@ base: components: sinks: mqtt: configuration: {
 																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
 																"""
 						required: false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					fields: {
 						description: """
@@ -191,7 +191,7 @@ base: components: sinks: mqtt: configuration: {
 					quote: {
 						description: "The quote character to use when writing CSV."
 						required:    false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					quote_style: {
 						description: "The quoting style to use when writing CSV data."
