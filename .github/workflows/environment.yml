@@ -14,7 +14,7 @@ env:
 jobs:
   publish-new-environment:
     runs-on: ubuntu-20.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
