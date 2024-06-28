@@ -61,13 +61,10 @@ base: components: sources: statsd: configuration: {
 	}
 	sanitize: {
 		description: """
-			sanitize
-			\tBy default all stat names (keys) are sanitized.
-			\t  "/" is replaced with "-"
-			\t  All whitespace is replaced with "_"
-			\t  All non alphanumeric characters [^a-zA-Z_\\-0-9\\.] are removed.
-			\tFor backwards compatibility this remains the default behavior.
-			\tTo disable sanitization, set to false
+			Whether to sanitize incoming statsd key names. When `true`, keys are sanitized by:
+			- "/" is replaced with "-"
+			- All whitespace is replaced with "_"
+			- All non alphanumeric characters [^a-zA-Z_\\-0-9\\.] are removed.
 			"""
 		required: false
 		type: bool: default: true
