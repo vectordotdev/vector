@@ -261,6 +261,13 @@ async fn demo_logs_source(
                             path!("service"),
                             "vector",
                         );
+                        log_namespace.insert_source_metadata(
+                            DemoLogsConfig::NAME,
+                            log,
+                            Some(LegacyKey::InsertIfEmpty(path!("host"))),
+                            path!("host"),
+                            "localhost",
+                        );
 
                         event
                     });
@@ -481,6 +488,24 @@ mod tests {
 
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn host_is_set() {
+        let host_key = log_schema().host_key().unwrap().to_string();
+        let mut rx = runit(
+            r#"format = "syslog"
+            count = 5"#,
+        )
+        .await;
+
+        let event = match poll!(rx.next()) {
+            Poll::Ready(event) => event.unwrap(),
+            _ => unreachable!(),
+        };
+        let log = event.as_log();
+        let host = log[&host_key].to_string_lossy();
+        assert_eq!("localhost", host);
     }
 
     #[tokio::test]
