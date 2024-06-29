@@ -66,6 +66,15 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_false")]
     pub remove_label_fields: bool,
 
+    /// Fields to add to structured metadata.
+    #[configurable(metadata(docs::examples = "loki_structured_metadata_examples()"))]
+    #[configurable(metadata(docs::additional_props_description = "Loki structured metadata."))]
+    pub structured_metadata: Option<HashMap<Template, Template>>,
+
+    /// Whether to delete fields that were passed as structured metadata
+    #[serde(default = "crate::serde::default_false")]
+    pub remove_structured_metadata_fields: bool,
+
     /// Whether or not to remove the timestamp from the event payload.
     ///
     /// The timestamp is still sent as event metadata for Loki to use for indexing.
@@ -105,6 +114,21 @@ pub struct LokiConfig {
 }
 
 fn loki_labels_examples() -> HashMap<String, String> {
+    let mut examples = HashMap::new();
+    examples.insert("source".to_string(), "vector".to_string());
+    examples.insert(
+        "\"pod_labels_*\"".to_string(),
+        "{{ kubernetes.pod_labels }}".to_string(),
+    );
+    examples.insert("\"*\"".to_string(), "{{ metadata }}".to_string());
+    examples.insert(
+        "{{ event_field }}".to_string(),
+        "{{ some_other_event_field }}".to_string(),
+    );
+    examples
+}
+
+fn loki_structured_metadata_examples() -> Vec<String> {
     let mut examples = HashMap::new();
     examples.insert("source".to_string(), "vector".to_string());
     examples.insert(
