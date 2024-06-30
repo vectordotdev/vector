@@ -745,11 +745,11 @@ def resolve_schema(root_schema, schema)
   # We intentially set no actual definition for these types, relying on the documentation generation
   # process to provide the actual details. We only need to specify the custom type name.
   #
-  # To handle u8 types as ascii characters and not there uint representation between 0 and 255 we
-  # added a special handling of these exact values. This means
-  # `#[configurable(metadata(docs::type_override = "ascii_char"))]` should only be used consciously
-  # for rust u8 type. See lib/codecs/src/encoding/format/csv.rs for an example and
-  # https://github.com/vectordotdev/vector/pull/20498
+# For `u8` fields that have a type override of `ascii_char` type, we specifically use the
+# character representation of the default value, which ensures that we display the default
+# values as an actual string character instead of an ordinal value.
+#
+# See `lib/codecs/src/encoding/format/csv.rs` for an example.
   type_override = get_schema_metadata(schema, 'docs::type_override')
   if !type_override.nil?
     if type_override == 'ascii_char'
