@@ -17,7 +17,6 @@
 # /ci-run-environment         : runs Environment Suite
 # /ci-run-regression          : runs Regression Detection Suite
 # /ci-run-k8s                 : runs K8s E2E Suite
-# /ci-run-workload-checks     : runs Workload Checks Suite
 
 name: Comment Trigger
 
@@ -50,7 +49,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: |
-      github.event.issue.pull_request && ( contains(github.event.comment.body, '/ci-run-all')
+      github.event.issue.pull_request && (
+          contains(github.event.comment.body, '/ci-run-all')
           || contains(github.event.comment.body, '/ci-run-cli')
           || contains(github.event.comment.body, '/ci-run-misc')
           || contains(github.event.comment.body, '/ci-run-deny')
@@ -61,8 +61,7 @@ jobs:
           || contains(github.event.comment.body, '/ci-run-environment')
           || contains(github.event.comment.body, '/ci-run-regression')
           || contains(github.event.comment.body, '/ci-run-k8s')
-          || contains(github.event.comment.body, '/ci-run-workload-checks')
-      )
+        )
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -70,6 +69,13 @@ jobs:
         with:
           app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
+      - name: Get PR author
+        id: pr
+        uses: tspascoal/get-user-teams-membership@v3
+        with:
+          username: ${{ github.event.issue.user.login }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
       - name: Get PR comment author
         id: comment
         uses: tspascoal/get-user-teams-membership@v3
@@ -79,7 +85,7 @@ jobs:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: Validate author membership
-        if: steps.comment.outputs.isTeamMember == 'false'
+        if: steps.pr.outputs.isTeamMember == 'false' || steps.comment.outputs.isTeamMember == 'false'
         run: exit 1
 
   cli:
@@ -140,10 +146,4 @@ jobs:
     needs: validate
     if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-k8s')
     uses: ./.github/workflows/k8s_e2e.yml
-    secrets: inherit
-
-  workload-checks:
-    needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-workload-checks')
-    uses: ./.github/workflows/workload_checks.yml
     secrets: inherit
