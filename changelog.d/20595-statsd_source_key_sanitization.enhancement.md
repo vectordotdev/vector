@@ -1,4 +1,3 @@
-The statsd source sanitizes stats keys, replacing '/' with '-', whitespace with '_' and removing all
-other non alphanumeric characters.
+The `statsd` source now has a configuration option to disable key sanitization: `sanitize`. The default is `true` to maintain backwards compatibility.
 
-The enhancement allows disabling this behavior.
+authors: to-m
