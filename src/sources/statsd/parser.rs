@@ -167,7 +167,7 @@ fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {
 }
 
 fn sanitize_key(key: &str, sanitize: bool) -> String {
-    if sanitize == false {
+    if !sanitize {
         key.to_owned()
     } else {
         let s = key.replace('/', "'-");
