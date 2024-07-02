@@ -3661,14 +3661,14 @@ dependencies = [
 
 [[package]]
 name = "goauth"
-version = "0.14.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d351469a584f3b3565e2e740d4da60839bddc4320dadd7d61da8bdd77ffb373b"
+checksum = "7b1f1228623a5a37d4834f984573a01086708b109bbf0f7c2ee8d70b0c90d7a5"
 dependencies = [
  "arc-swap",
  "futures 0.3.30",
  "log",
- "reqwest 0.11.26",
+ "reqwest 0.12.4",
  "serde",
  "serde_derive",
  "serde_json",
@@ -4410,6 +4410,22 @@ dependencies = [
  "native-tls",
  "tokio",
  "tokio-native-tls",
+]
+
+[[package]]
+name = "hyper-tls"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
+dependencies = [
+ "bytes 1.6.0",
+ "http-body-util",
+ "hyper 1.2.0",
+ "hyper-util",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
+ "tower-service",
 ]
 
 [[package]]
@@ -7785,7 +7801,7 @@ dependencies = [
  "http-body 0.4.5",
  "hyper 0.14.28",
  "hyper-rustls 0.24.2",
- "hyper-tls",
+ "hyper-tls 0.5.0",
  "ipnet",
  "js-sys",
  "log",
@@ -7823,6 +7839,7 @@ checksum = "566cafdd92868e0939d3fb961bd0dc25fcfaaed179291093b3d43e6b3150ea10"
 dependencies = [
  "base64 0.22.1",
  "bytes 1.6.0",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "http 1.1.0",
@@ -7830,12 +7847,14 @@ dependencies = [
  "http-body-util",
  "hyper 1.2.0",
  "hyper-rustls 0.26.0",
+ "hyper-tls 0.6.0",
  "hyper-util",
  "ipnet",
  "js-sys",
  "log",
  "mime",
  "mime_guess",
+ "native-tls",
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
@@ -7847,6 +7866,7 @@ dependencies = [
  "serde_urlencoded",
  "sync_wrapper",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls 0.25.0",
  "tokio-util",
  "tower-service",
