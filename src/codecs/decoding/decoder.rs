@@ -163,5 +163,12 @@ mod tests {
             event.get("short_message").unwrap(),
             &Value::from("A short message")
         );
+
+        let next = stream.next().await.unwrap();
+        let event = next.unwrap().0.pop().unwrap().into_log();
+        assert_eq!(
+            event.get("short_message").unwrap(),
+            &Value::from("Another short message")
+        );
     }
 }
