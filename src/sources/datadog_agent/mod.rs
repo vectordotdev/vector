@@ -461,6 +461,12 @@ impl DatadogAgentSource {
                             .map_err(|error| handle_decode_error(encoding, error))?;
                         decoded.into()
                     }
+                    "zstd" => {
+                        let mut decoded = Vec::new();
+                        zstd::stream::copy_decode(body.reader(), &mut decoded)
+                            .map_err(|error| handle_decode_error(encoding, error))?;
+                        decoded.into()
+                    }
                     "deflate" | "x-deflate" => {
                         let mut decoded = Vec::new();
                         ZlibDecoder::new(body.reader())
