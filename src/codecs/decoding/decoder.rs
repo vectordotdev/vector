@@ -106,7 +106,7 @@ mod tests {
     use futures::{stream, StreamExt};
     use tokio_util::{codec::FramedRead, io::StreamReader};
     use vector_lib::codecs::{
-        decoding::{Deserializer, Framer},
+        decoding::{Deserializer,DeserializerConfig, Framer},
         JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
     };
     use vrl::value::Value;
@@ -137,5 +137,34 @@ mod tests {
         let next = stream.next().await.unwrap();
         let event = next.unwrap().0.pop().unwrap().into_log();
         assert_eq!(event.get("bar").unwrap(), &Value::from(2));
+    }
+
+    #[tokio::test]
+    async fn gelf_streaming_decoding() {
+        let iter = stream::iter(
+            [
+                r#"{"version": "1.1", "host": "example.org", "short_message": "A short message", "timestamp": 1620000000, "level": 6}"#,
+                "\0",
+                r#"{"version": "1.1", "host": "example.org", "short_message": "Another short message", "timestamp": 1620000000, "level": 6}"#,
+            ]
+            .into_iter()
+            .map(Bytes::from),
+        );
+        let stream = iter.map(Ok::<_, std::io::Error>);
+        let reader = StreamReader::new(stream);
+        let deserializer_config = DeserializerConfig::from(GelfDeserializerConfig::default());
+        let framing_config = deserializer_config.default_stream_framing();
+        let decoder = Decoder::new(
+            framing_config.build().unwrap(),
+            deserializer_config.build().unwrap(),
+        );
+        let mut stream = FramedRead::new(reader, decoder);
+
+        let next = stream.next().await.unwrap();
+        let event = next.unwrap().0.pop().unwrap().into_log();
+        assert_eq!(
+            event.get("short_message").unwrap(),
+            &Value::from("A short message")
+        );
     }
 }

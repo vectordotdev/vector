@@ -334,7 +334,6 @@ impl DeserializerConfig {
             DeserializerConfig::Native => FramingConfig::LengthDelimited(Default::default()),
             DeserializerConfig::Bytes
             | DeserializerConfig::Json(_)
-            | DeserializerConfig::Gelf(_)
             | DeserializerConfig::NativeJson(_) => {
                 FramingConfig::NewlineDelimited(Default::default())
             }
@@ -342,6 +341,9 @@ impl DeserializerConfig {
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(_) => FramingConfig::NewlineDelimited(Default::default()),
             DeserializerConfig::Vrl(_) => FramingConfig::Bytes,
+            DeserializerConfig::Gelf(_) => {
+                FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig::new(0))
+            }
         }
     }
 
