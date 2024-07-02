@@ -16,7 +16,7 @@ use hyper::header::AUTHORIZATION;
 use once_cell::sync::Lazy;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
-use tokio::{sync::watch};
+use tokio::sync::watch;
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -200,7 +200,8 @@ impl GcpAuthenticator {
         match self {
             Self::Credentials(inner) => {
                 let expires_in = inner.token.read().unwrap().expires_in() as u64;
-                let mut deadline = Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
+                let mut deadline =
+                    Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
                 loop {
                     tokio::time::sleep(deadline).await;
                     debug!("Renewing GCP authentication token.");
@@ -208,8 +209,9 @@ impl GcpAuthenticator {
                         Ok(()) => {
                             sender.send_replace(());
                             let expires_in = inner.token.read().unwrap().expires_in() as u64;
-                            deadline = Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
-                        },
+                            deadline =
+                                Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
+                        }
                         Err(error) => {
                             error!(
                                 message = "Failed to update GCP authentication token.",
