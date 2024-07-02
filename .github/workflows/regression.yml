@@ -265,7 +265,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.3.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v5.4.0
+        uses: docker/build-push-action@v6.2.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -303,7 +303,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.3.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v5.4.0
+        uses: docker/build-push-action@v6.2.0
         with:
           context: comparison-vector/
           cache-from: type=gha
