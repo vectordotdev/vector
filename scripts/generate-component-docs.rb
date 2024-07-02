@@ -744,9 +744,19 @@ def resolve_schema(root_schema, schema)
   #
   # We intentially set no actual definition for these types, relying on the documentation generation
   # process to provide the actual details. We only need to specify the custom type name.
+  #
+# For `u8` fields that have a type override of `ascii_char` type, we specifically use the
+# character representation of the default value, which ensures that we display the default
+# values as an actual string character instead of an ordinal value.
+#
+# See `lib/codecs/src/encoding/format/csv.rs` for an example.
   type_override = get_schema_metadata(schema, 'docs::type_override')
   if !type_override.nil?
-    resolved = { 'type' => { type_override.to_s => {} } }
+    if type_override == 'ascii_char'
+      resolved = { 'type' => { type_override.to_s => { 'default' => schema['default'].chr } } }
+    else
+      resolved = { 'type' => { type_override.to_s => {} } }
+    end
     description = get_rendered_description_from_schema(schema)
     resolved['description'] = description unless description.empty?
     return resolved
