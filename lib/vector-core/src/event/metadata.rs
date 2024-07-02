@@ -1,7 +1,8 @@
 #![deny(missing_docs)]
 
-use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, fmt, mem, sync::Arc};
 
+use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use vector_common::{byte_size_of::ByteSizeOf, config::ComponentKey, EventDataEq};
 use vrl::{
@@ -20,6 +21,7 @@ const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct EventMetadata {
     /// Arbitrary data stored with an event
@@ -344,6 +346,33 @@ impl EventMetadata {
     /// Set the schema definition.
     pub fn set_schema_definition(&mut self, definition: &Arc<schema::Definition>) {
         self.schema_definition = Arc::clone(definition);
+    }
+
+    /// Helper function to add a semantic meaning to the schema definition.
+    ///
+    /// This replaces the common code sequence of:
+    /// ```
+    /// let new_schema = log_event
+    ///     .metadata()
+    ///     .schema_definition()
+    ///     .as_ref()
+    ///     .clone()
+    ///     .with_meaning(target_path, meaning);
+    /// log_event
+    ///     .metadata_mut()
+    ///     .set_schema_definition(new_schema);
+    /// ````
+    ///
+    /// Note: This plays games with uninitialized memory to avoid cloning a new schema if possible.
+    pub fn add_schema_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
+        // This use of uninitialized invalid values is safe because we immediately replace the value
+        // with a modified schema. We could probably avoid this `unsafe` by owning `self`, but that
+        // makes the calling convention harder here, since most callers will only have a `&mut self`.
+        #[allow(invalid_value, clippy::uninit_assumed_init)]
+        let dummy = unsafe { mem::MaybeUninit::uninit().assume_init() };
+        let schema = mem::replace(&mut self.schema_definition, dummy);
+        let schema = Arc::unwrap_or_clone(schema).with_meaning(target_path, meaning);
+        self.schema_definition = Arc::new(schema);
     }
 }
 
