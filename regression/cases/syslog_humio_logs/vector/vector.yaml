@@ -27,7 +27,7 @@ sinks:
   humio_logs:
     type:     "humio_logs"
     inputs: [ "syslog" ]
-    endpoint: "http://localhost:8080"
+    endpoint: "http://0.0.0.0:8080"
     encoding:
       codec: "json"
     token:    "humio_token"
