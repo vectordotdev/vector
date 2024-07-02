@@ -71,3 +71,18 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
         counter!("rewritten_timestamp_events_total", self.count as u64);
     }
 }
+
+#[derive(Debug)]
+pub struct LokiEventTimestampOutOfRangeError;
+
+impl InternalEvent for LokiEventTimestampOutOfRangeError {
+    fn emit(self) {
+        error!(
+            message = "Event timestamp out of range.",
+            reason = "out_of_range",
+            internal_log_rate_limit = true,
+        );
+
+        counter!("timestamp_out_of_range_total", 1,);
+    }
+}
