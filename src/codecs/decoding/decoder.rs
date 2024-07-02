@@ -106,7 +106,7 @@ mod tests {
     use futures::{stream, StreamExt};
     use tokio_util::{codec::FramedRead, io::StreamReader};
     use vector_lib::codecs::{
-        decoding::{Deserializer,DeserializerConfig, Framer},
+        decoding::{Deserializer, DeserializerConfig, Framer, GelfDeserializerConfig},
         JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
     };
     use vrl::value::Value;
@@ -154,10 +154,7 @@ mod tests {
         let reader = StreamReader::new(stream);
         let deserializer_config = DeserializerConfig::from(GelfDeserializerConfig::default());
         let framing_config = deserializer_config.default_stream_framing();
-        let decoder = Decoder::new(
-            framing_config.build().unwrap(),
-            deserializer_config.build().unwrap(),
-        );
+        let decoder = Decoder::new(framing_config.build(), deserializer_config.build().unwrap());
         let mut stream = FramedRead::new(reader, decoder);
 
         let next = stream.next().await.unwrap();
