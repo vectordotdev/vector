@@ -118,7 +118,7 @@ releases: "0.39.0": {
 		{
 			type: "chore"
 			description: """
-				The deprecated `enterprise` feature and global configuration option has been removed.
+				The deprecated `enterprise` feature and global configuration option has been removed. See the upgrade guide for details.
 				"""
 		},
 		{
