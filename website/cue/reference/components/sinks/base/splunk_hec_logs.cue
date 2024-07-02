@@ -328,6 +328,16 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			json: {
+				description:   "Options for the JsonSerializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: pretty: {
+					description: "Whether to use pretty JSON formatting."
+					required:    false
+					type: bool: default: false
+				}
+			}
 			metric_tag_values: {
 				description: """
 					Controls how metric tag values are encoded.
@@ -432,12 +442,13 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		description: """
 			Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
 
-			By default, the [global `log_schema.host_key` option][global_host_key] is used.
+			By default, the [global `log_schema.host_key` option][global_host_key] is used if log
+			events are Legacy namespaced, or the semantic meaning of "host" is used, if defined.
 
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: default: ".host"
+		type: string: {}
 	}
 	index: {
 		description: """
@@ -680,15 +691,13 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			Overrides the name of the log field used to retrieve the timestamp to send to Splunk HEC.
 			When set to `“”`, a timestamp is not set in the events sent to Splunk HEC.
 
-			By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
+			By default, either the [global `log_schema.timestamp_key` option][global_timestamp_key] is used
+			if log events are Legacy namespaced, or the semantic meaning of "timestamp" is used, if defined.
 
 			[global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
 			"""
 		required: false
-		type: string: {
-			default: ".timestamp"
-			examples: ["timestamp", ""]
-		}
+		type: string: examples: ["timestamp", ""]
 	}
 	tls: {
 		description: "TLS configuration."
@@ -745,14 +754,14 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

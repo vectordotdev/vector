@@ -121,10 +121,6 @@ cli: {
 			description: env_vars.VECTOR_ALLOW_EMPTY_CONFIG.description
 			env_var:     "VECTOR_ALLOW_EMPTY_CONFIG"
 		}
-		"strict-env-vars": {
-			description: env_vars.VECTOR_STRICT_ENV_VARS.description
-			env_var:     "VECTOR_STRICT_ENV_VARS"
-		}
 	}
 
 	_core_config_options: {

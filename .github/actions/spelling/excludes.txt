@@ -94,6 +94,7 @@
 ^\Qlib/value/tests/data/fixtures/value/boolean/false.json\E$
 ^\Qlib/vector-core/tests/data/fixtures/lookup/quoted\E$
 ^\Qlib/vector-lookup/tests/fixtures/lookup/quoted\E$
+^\Qlib/vector-vrl/tests/resources/protobuf_descriptor_set.desc\E$
 ^\Qlib/vrl/lookup/tests/fixtures/lookup/quoted\E$
 ^\Qlib/vrl/stdlib/benches/benches.rs\E$
 ^\Qlib/vrl/stdlib/src/encode_percent.rs\E$
@@ -104,6 +105,7 @@
 ^\Qscripts/integration/invalidchronicleauth.json\E$
 ^\Qsrc/sources/dnstap/parser.rs\E$
 ^\Qtests/data/ca/intermediate_client/index.txt.old\E$
+^\Qtests/data/ca/intermediate_server/private/kafka.pass\E$
 ^\Qtests/data/databend/miniodat/databend/.keep\E$
 ^\Qtests/data/gzipped.log\E$
 ^\Qtests/data/nats/nats-bad.creds\E$

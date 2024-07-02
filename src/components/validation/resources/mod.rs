@@ -4,12 +4,16 @@ mod http;
 use std::sync::Arc;
 
 use tokio::sync::{mpsc, Mutex};
-use vector_lib::codecs::{
-    decoding::{self, DeserializerConfig},
-    encoding::{
-        self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig, TextSerializerConfig,
+use vector_lib::{
+    codecs::{
+        decoding::{self, DeserializerConfig},
+        encoding::{
+            self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig,
+            TextSerializerConfig,
+        },
+        BytesEncoder,
     },
-    BytesEncoder,
+    config::LogNamespace,
 };
 use vector_lib::{config::DataType, event::Event};
 
@@ -17,6 +21,7 @@ use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingCo
 
 pub use self::event::{encode_test_event, TestEvent};
 pub use self::http::HttpResourceConfig;
+use self::http::HttpResourceOutputContext;
 
 use super::{
     sync::{Configuring, TaskCoordinator},
@@ -73,7 +78,7 @@ impl ResourceCodec {
     pub fn into_encoder(&self) -> Encoder<encoding::Framer> {
         let (framer, serializer) = match self {
             Self::Encoding(config) => (
-                Framer::Bytes(BytesEncoder::new()),
+                Framer::Bytes(BytesEncoder),
                 config.build().expect("should not fail to build serializer"),
             ),
             Self::EncodingWithFraming(config) => {
@@ -101,7 +106,7 @@ impl ResourceCodec {
     ///
     /// The decoder is generated as an inverse to the input codec: if an encoding configuration was
     /// given, we generate a decoder that satisfies that encoding configuration, and vice versa.
-    pub fn into_decoder(&self) -> vector_lib::Result<Decoder> {
+    pub fn into_decoder(&self, log_namespace: LogNamespace) -> vector_lib::Result<Decoder> {
         let (framer, deserializer) = match self {
             Self::Decoding(config) => return config.build(),
             Self::Encoding(config) => (
@@ -118,7 +123,7 @@ impl ResourceCodec {
             }
         };
 
-        Ok(Decoder::new(framer, deserializer))
+        Ok(Decoder::new(framer, deserializer).with_log_namespace(log_namespace))
     }
 }
 
@@ -182,7 +187,11 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
                 },
             })
         }
-        decoding::FramingConfig::LengthDelimited => encoding::FramingConfig::LengthDelimited,
+        decoding::FramingConfig::LengthDelimited(config) => {
+            encoding::FramingConfig::LengthDelimited(encoding::LengthDelimitedEncoderConfig {
+                length_delimited: config.length_delimited.clone(),
+            })
+        }
         decoding::FramingConfig::NewlineDelimited(_) => encoding::FramingConfig::NewlineDelimited,
         // TODO: There's no equivalent octet counting framer for encoding... although
         // there's no particular reason that would make it hard to write.
@@ -228,7 +237,11 @@ fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decod
                 },
             })
         }
-        encoding::FramingConfig::LengthDelimited => decoding::FramingConfig::LengthDelimited,
+        encoding::FramingConfig::LengthDelimited(config) => {
+            decoding::FramingConfig::LengthDelimited(decoding::LengthDelimitedDecoderConfig {
+                length_delimited: config.length_delimited.clone(),
+            })
+        }
         encoding::FramingConfig::NewlineDelimited => {
             decoding::FramingConfig::NewlineDelimited(Default::default())
         }
@@ -342,16 +355,20 @@ impl ExternalResource {
         task_coordinator: &TaskCoordinator<Configuring>,
         input_events: Vec<TestEvent>,
         runner_metrics: &Arc<Mutex<RunnerMetrics>>,
+        log_namespace: LogNamespace,
     ) -> vector_lib::Result<()> {
         match self.definition {
-            ResourceDefinition::Http(http_config) => http_config.spawn_as_output(
-                self.direction,
-                self.codec,
-                output_tx,
-                task_coordinator,
-                input_events,
-                runner_metrics,
-            ),
+            ResourceDefinition::Http(http_config) => {
+                http_config.spawn_as_output(HttpResourceOutputContext {
+                    direction: self.direction,
+                    codec: self.codec,
+                    output_tx,
+                    task_coordinator,
+                    input_events,
+                    runner_metrics,
+                    log_namespace,
+                })
+            }
         }
     }
 }

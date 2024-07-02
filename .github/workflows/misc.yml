@@ -5,8 +5,8 @@ on:
 
 jobs:
   test-misc:
-    runs-on: [linux, ubuntu-20.04-4core]
-    timeout-minutes: 45
+    runs-on: ubuntu-20.04-4core
+    timeout-minutes: 60
     env:
       CARGO_INCREMENTAL: 0
     steps:

@@ -70,11 +70,11 @@ pub struct EventMetadata {
 /// Metric Origin metadata for submission to Datadog.
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DatadogMetricOriginMetadata {
-    /// OriginProduct
+    /// `OriginProduct`
     product: Option<u32>,
-    /// OriginCategory
+    /// `OriginCategory`
     category: Option<u32>,
-    /// OriginService
+    /// `OriginService`
     service: Option<u32>,
 }
 
@@ -337,8 +337,8 @@ impl EventMetadata {
     }
 
     /// Get the schema definition.
-    pub fn schema_definition(&self) -> &schema::Definition {
-        self.schema_definition.as_ref()
+    pub fn schema_definition(&self) -> &Arc<schema::Definition> {
+        &self.schema_definition
     }
 
     /// Set the schema definition.
@@ -416,7 +416,7 @@ impl Secrets {
 
     /// Removes a secret
     pub fn remove(&mut self, key: &str) {
-        self.0.remove(&key.to_owned());
+        self.0.remove(key);
     }
 
     /// Merged both together. If there are collisions, the value from `self` is kept.

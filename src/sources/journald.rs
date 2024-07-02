@@ -77,8 +77,6 @@ static JOURNALCTL: Lazy<PathBuf> = Lazy::new(|| "journalctl".into());
 enum BuildError {
     #[snafu(display("journalctl failed to execute: {}", source))]
     JournalctlSpawn { source: io::Error },
-    #[snafu(display("Cannot use both `units` and `include_units`"))]
-    BothUnitsAndIncludeUnits,
     #[snafu(display(
         "The unit {:?} is duplicated in both include_units and exclude_units",
         unit
@@ -884,7 +882,7 @@ fn decode_array_as_bytes(array: &[JsonValue]) -> Option<JsonValue> {
         .iter()
         .map(|item| {
             item.as_u64().and_then(|num| match num {
-                num if num <= u8::max_value() as u64 => Some(num as u8),
+                num if num <= u8::MAX as u64 => Some(num as u8),
                 _ => None,
             })
         })
@@ -992,6 +990,7 @@ impl Checkpointer {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&filename)
             .await?;
         Ok(Checkpointer { file, filename })

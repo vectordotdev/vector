@@ -300,7 +300,7 @@ impl<'a> SendGroup<'a> {
             if i == last_sender_idx {
                 sender.input = events.take();
             } else {
-                sender.input = events.clone();
+                sender.input.clone_from(&events);
             }
             sender.send_reference = send_reference;
 

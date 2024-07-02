@@ -30,6 +30,8 @@ mod batch;
 mod codecs;
 mod common;
 mod conditions;
+#[cfg(feature = "sources-datadog_agent")]
+mod datadog_agent;
 #[cfg(feature = "sinks-datadog_metrics")]
 mod datadog_metrics;
 #[cfg(feature = "sinks-datadog_traces")]
@@ -106,7 +108,7 @@ mod prometheus;
 mod pulsar;
 #[cfg(feature = "sources-redis")]
 mod redis;
-#[cfg(feature = "transforms-reduce")]
+#[cfg(feature = "transforms-impl-reduce")]
 mod reduce;
 mod remap;
 mod sample;
@@ -165,6 +167,8 @@ pub(crate) use self::aws_kinesis_firehose::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
 pub(crate) use self::codecs::*;
+#[cfg(feature = "sources-datadog_agent")]
+pub(crate) use self::datadog_agent::*;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub(crate) use self::datadog_metrics::*;
 #[cfg(feature = "sinks-datadog_traces")]
@@ -241,7 +245,7 @@ pub(crate) use self::prometheus::*;
 pub(crate) use self::pulsar::*;
 #[cfg(feature = "sources-redis")]
 pub(crate) use self::redis::*;
-#[cfg(feature = "transforms-reduce")]
+#[cfg(feature = "transforms-impl-reduce")]
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-remap")]
 pub(crate) use self::remap::*;

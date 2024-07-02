@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/add-to-project@v0.6.0
+      - uses: actions/add-to-project@v1.0.1
         with:
           project-url: https://github.com/orgs/vectordotdev/projects/49
           github-token: ${{ secrets.GH_PROJECT_PAT }}

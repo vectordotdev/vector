@@ -8,7 +8,6 @@ use std::{
     fmt::Debug,
     fs::{File, ReadDir},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, Ordering},
     sync::Mutex,
 };
 
@@ -26,18 +25,6 @@ use super::{
 use crate::{config::ProviderConfig, signal};
 
 pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
-
-// Technically, this global should be a parameter to the `config::vars::interpolate` function, which
-// is passed in from its caller `prepare_input` below, etc. However:
-//
-// 1. That ended up needing to have the parameter added to literally dozens of functions, as
-// `prepare_input` has long chains of callers.
-//
-// 2. This variable is only ever set in one place, at program global startup from the command line.
-//
-// 3. This setting is intended to be transitional, anyways, and is marked as deprecated to be
-// removed in a future version after strict mode becomes the default.
-pub static STRICT_ENV_VARS: AtomicBool = AtomicBool::new(false);
 
 pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
     path.as_ref()
@@ -123,16 +110,20 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
     paths.sort();
     paths.dedup();
     // Ignore poison error and let the current main thread continue running to do the cleanup.
-    drop(CONFIG_PATHS.lock().map(|mut guard| *guard = paths.clone()));
+    drop(
+        CONFIG_PATHS
+            .lock()
+            .map(|mut guard| guard.clone_from(&paths)),
+    );
 
     Some(paths)
 }
 
 pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
-    let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    let builder = load_builder_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
-    for warning in load_warnings.into_iter().chain(build_warnings) {
+    for warning in build_warnings {
         warn!("{}", warning);
     }
 
@@ -148,10 +139,9 @@ pub async fn load_from_paths_with_provider_and_secrets(
     allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
     // Load secret backends first
-    let (mut secrets_backends_loader, secrets_warning) =
-        load_secret_backends_from_paths(config_paths)?;
+    let mut secrets_backends_loader = load_secret_backends_from_paths(config_paths)?;
     // And then, if needed, retrieve secrets from configured backends
-    let (mut builder, load_warnings) = if secrets_backends_loader.has_secrets_to_retrieve() {
+    let mut builder = if secrets_backends_loader.has_secrets_to_retrieve() {
         debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
         let resolved_secrets = secrets_backends_loader
             .retrieve(&mut signal_handler.subscribe())
@@ -177,11 +167,7 @@ pub async fn load_from_paths_with_provider_and_secrets(
 
     validation::check_buffer_preconditions(&new_config).await?;
 
-    for warning in secrets_warning
-        .into_iter()
-        .chain(load_warnings)
-        .chain(build_warnings)
-    {
+    for warning in build_warnings {
         warn!("{}", warning);
     }
 
@@ -189,15 +175,11 @@ pub async fn load_from_paths_with_provider_and_secrets(
 }
 
 /// Iterators over `ConfigPaths`, and processes a file/dir according to a provided `Loader`.
-fn loader_from_paths<T, L>(
-    mut loader: L,
-    config_paths: &[ConfigPath],
-) -> Result<(T, Vec<String>), Vec<String>>
+fn loader_from_paths<T, L>(mut loader: L, config_paths: &[ConfigPath]) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
     L: Loader<T> + Process,
 {
-    let mut warnings = Vec::new();
     let mut errors = Vec::new();
 
     for config_path in config_paths {
@@ -209,13 +191,13 @@ where
                         .or_else(move || Format::from_path(&path).ok())
                         .unwrap_or_default(),
                 ) {
-                    Ok(warns) => warnings.extend(warns),
+                    Ok(()) => {}
                     Err(errs) => errors.extend(errs),
                 };
             }
             ConfigPath::Dir(path) => {
                 match loader.load_from_dir(path) {
-                    Ok(warns) => warnings.extend(warns),
+                    Ok(()) => {}
                     Err(errs) => errors.extend(errs),
                 };
             }
@@ -223,16 +205,14 @@ where
     }
 
     if errors.is_empty() {
-        Ok((loader.take(), warnings))
+        Ok(loader.take())
     } else {
         Err(errors)
     }
 }
 
 /// Uses `ConfigBuilderLoader` to process `ConfigPaths`, deserializing to a `ConfigBuilder`.
-pub fn load_builder_from_paths(
-    config_paths: &[ConfigPath],
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+pub fn load_builder_from_paths(config_paths: &[ConfigPath]) -> Result<ConfigBuilder, Vec<String>> {
     loader_from_paths(ConfigBuilderLoader::new(), config_paths)
 }
 
@@ -240,29 +220,29 @@ pub fn load_builder_from_paths(
 pub fn load_builder_from_paths_with_secrets(
     config_paths: &[ConfigPath],
     secrets: HashMap<String, String>,
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+) -> Result<ConfigBuilder, Vec<String>> {
     loader_from_paths(ConfigBuilderLoader::with_secrets(secrets), config_paths)
 }
 
 /// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
-) -> Result<(toml::value::Table, Vec<String>), Vec<String>> {
+) -> Result<toml::value::Table, Vec<String>> {
     loader_from_paths(SourceLoader::new(), config_paths)
 }
 
 /// Uses `SecretBackendLoader` to process `ConfigPaths`, deserializing to a `SecretBackends`.
 pub fn load_secret_backends_from_paths(
     config_paths: &[ConfigPath],
-) -> Result<(SecretBackendLoader, Vec<String>), Vec<String>> {
+) -> Result<SecretBackendLoader, Vec<String>> {
     loader_from_paths(SecretBackendLoader::new(), config_paths)
 }
 
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
-    let (builder, load_warnings) = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
+    let builder = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
-    for warning in load_warnings.into_iter().chain(build_warnings) {
+    for warning in build_warnings {
         warn!("{}", warning);
     }
 
@@ -271,29 +251,25 @@ pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>>
 
 fn load_from_inputs(
     inputs: impl IntoIterator<Item = (impl std::io::Read, Format)>,
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+) -> Result<ConfigBuilder, Vec<String>> {
     let mut config = Config::builder();
     let mut errors = Vec::new();
-    let mut warnings = Vec::new();
 
     for (input, format) in inputs {
-        if let Err(errs) = load(input, format).and_then(|(n, warn)| {
-            warnings.extend(warn);
-            config.append(n)
-        }) {
+        if let Err(errs) = load(input, format).and_then(|n| config.append(n)) {
             // TODO: add back paths
             errors.extend(errs.iter().map(|e| e.to_string()));
         }
     }
 
     if errors.is_empty() {
-        Ok((config, warnings))
+        Ok(config)
     } else {
         Err(errors)
     }
 }
 
-pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<String>), Vec<String>> {
+pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<String, Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
@@ -305,20 +281,16 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<Stri
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
-    vars::interpolate(
-        &source_string,
-        &vars,
-        STRICT_ENV_VARS.load(Ordering::Relaxed),
-    )
+    vars::interpolate(&source_string, &vars)
 }
 
-pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<(T, Vec<String>), Vec<String>>
+pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
 {
-    let (with_vars, warnings) = prepare_input(input)?;
+    let with_vars = prepare_input(input)?;
 
-    format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
+    format::deserialize(&with_vars, format)
 }
 
 #[cfg(not(windows))]
@@ -363,8 +335,7 @@ mod tests {
             .join("namespacing")
             .join("success");
         let configs = vec![ConfigPath::Dir(path)];
-        let (builder, warnings) = load_builder_from_paths(&configs).unwrap();
-        assert!(warnings.is_empty());
+        let builder = load_builder_from_paths(&configs).unwrap();
         assert!(builder
             .transforms
             .contains_key(&ComponentKey::from("apache_parser")));
@@ -384,8 +355,7 @@ mod tests {
             .join("namespacing")
             .join("ignore-invalid");
         let configs = vec![ConfigPath::Dir(path)];
-        let (_, warns) = load_builder_from_paths(&configs).unwrap();
-        assert!(warns.is_empty());
+        load_builder_from_paths(&configs).unwrap();
     }
 
     #[test]
@@ -395,8 +365,7 @@ mod tests {
             .join("config-dir")
             .join("ignore-unknown");
         let configs = vec![ConfigPath::Dir(path)];
-        let (_, warnings) = load_builder_from_paths(&configs).unwrap();
-        assert!(warnings.is_empty());
+        load_builder_from_paths(&configs).unwrap();
     }
 
     #[test]
@@ -406,8 +375,7 @@ mod tests {
             .join("config-dir")
             .join("globals");
         let configs = vec![ConfigPath::Dir(path)];
-        let (_, warnings) = load_builder_from_paths(&configs).unwrap();
-        assert!(warnings.is_empty());
+        load_builder_from_paths(&configs).unwrap();
     }
 
     #[test]
@@ -417,7 +385,6 @@ mod tests {
             .join("config-dir")
             .join("globals-duplicate");
         let configs = vec![ConfigPath::Dir(path)];
-        let (_, warnings) = load_builder_from_paths(&configs).unwrap();
-        assert!(warnings.is_empty());
+        load_builder_from_paths(&configs).unwrap();
     }
 }

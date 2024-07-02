@@ -228,6 +228,16 @@ base: components: sinks: amqp: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			json: {
+				description:   "Options for the JsonSerializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: pretty: {
+					description: "Whether to use pretty JSON formatting."
+					required:    false
+					type: bool: default: false
+				}
+			}
 			metric_tag_values: {
 				description: """
 					Controls how metric tag values are encoded.
@@ -312,6 +322,11 @@ base: components: sinks: amqp: configuration: {
 				required:    false
 				type: string: {}
 			}
+			expiration_ms: {
+				description: "Expiration for AMQP messages (in milliseconds)"
+				required:    false
+				type: uint: {}
+			}
 		}
 	}
 	routing_key: {
@@ -374,14 +389,14 @@ base: components: sinks: amqp: configuration: {
 			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

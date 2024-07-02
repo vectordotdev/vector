@@ -4,6 +4,9 @@ fn main() {
         .protoc_arg("--experimental_allow_proto3_optional")
         .btree_map(["."])
         .bytes(["raw_bytes"])
-        .compile_protos(&["proto/event.proto"], &["proto", "../../proto"])
+        .compile_protos(
+            &["proto/event.proto"],
+            &["proto", "../../proto/third-party", "../../proto/vector"],
+        )
         .unwrap();
 }

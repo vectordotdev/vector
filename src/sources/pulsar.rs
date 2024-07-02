@@ -595,7 +595,7 @@ mod integration_tests {
                 acknowledgements,
                 log_namespace,
             ));
-            producer.send(msg).await.unwrap();
+            producer.send_non_blocking(msg).await.unwrap();
 
             collect_n(rx, 1).await
         })

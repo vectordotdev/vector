@@ -143,19 +143,19 @@ impl SinkBatchSettings for LokiDefaultBatchSettings {
 #[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 pub enum OutOfOrderAction {
-    /// Drop the event.
-    #[derivative(Default)]
-    Drop,
-
-    /// Rewrite the timestamp of the event to the timestamp of the latest event seen by the sink.
-    RewriteTimestamp,
-
     /// Accept the event.
     ///
     /// The event is not dropped and is sent without modification.
     ///
     /// Requires Loki 2.4.0 or newer.
+    #[derivative(Default)]
     Accept,
+
+    /// Rewrite the timestamp of the event to the timestamp of the latest event seen by the sink.
+    RewriteTimestamp,
+
+    /// Drop the event.
+    Drop,
 }
 
 impl GenerateConfig for LokiConfig {

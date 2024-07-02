@@ -88,8 +88,8 @@ pub trait TowerRequestConfigDefaults {
     const CONCURRENCY: Concurrency = Concurrency::Adaptive;
     const TIMEOUT_SECS: u64 = 60;
     const RATE_LIMIT_DURATION_SECS: u64 = 1;
-    const RATE_LIMIT_NUM: u64 = i64::max_value() as u64; // i64 avoids TOML deserialize issue
-    const RETRY_ATTEMPTS: usize = isize::max_value() as usize; // isize avoids TOML deserialize issue
+    const RATE_LIMIT_NUM: u64 = i64::MAX as u64; // i64 avoids TOML deserialize issue
+    const RETRY_ATTEMPTS: usize = isize::MAX as usize; // isize avoids TOML deserialize issue
     const RETRY_MAX_DURATION_SECS: u64 = 30;
     const RETRY_INITIAL_BACKOFF_SECS: u64 = 1;
 }
@@ -459,8 +459,8 @@ mod tests {
         assert_eq!(settings.concurrency, None);
         assert_eq!(settings.timeout, Duration::from_secs(60));
         assert_eq!(settings.rate_limit_duration, Duration::from_secs(1));
-        assert_eq!(settings.rate_limit_num, i64::max_value() as u64);
-        assert_eq!(settings.retry_attempts, isize::max_value() as usize);
+        assert_eq!(settings.rate_limit_num, i64::MAX as u64);
+        assert_eq!(settings.retry_attempts, isize::MAX as usize);
         assert_eq!(settings.retry_max_duration, Duration::from_secs(30));
         assert_eq!(settings.retry_initial_backoff, Duration::from_secs(1));
     }

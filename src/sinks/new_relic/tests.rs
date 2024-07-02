@@ -80,17 +80,17 @@ fn generate_event_api_model() {
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
     assert_eq!(model.0.len(), 1);
-    assert!(model.0[0].get("eventType").is_some());
+    assert!(model.0[0].contains_key("eventType"));
     assert_eq!(
         model.0[0].get("eventType").unwrap().to_string_lossy(),
         "TestEvent".to_owned()
     );
-    assert!(model.0[0].get("user").is_some());
+    assert!(model.0[0].contains_key("user"));
     assert_eq!(
         model.0[0].get("user").unwrap().to_string_lossy(),
         "Joe".to_owned()
     );
-    assert!(model.0[0].get("user_id").is_some());
+    assert!(model.0[0].contains_key("user_id"));
     assert_eq!(model.0[0].get("user_id").unwrap(), &Value::Integer(123456));
 
     // With message field
@@ -107,19 +107,19 @@ fn generate_event_api_model() {
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
     assert_eq!(model.0.len(), 1);
-    assert!(model.0[0].get("eventType").is_some());
+    assert!(model.0[0].contains_key("eventType"));
     assert_eq!(
         model.0[0].get("eventType").unwrap().to_string_lossy(),
         "TestEvent".to_owned()
     );
-    assert!(model.0[0].get("user").is_some());
+    assert!(model.0[0].contains_key("user"));
     assert_eq!(
         model.0[0].get("user").unwrap().to_string_lossy(),
         "Joe".to_owned()
     );
-    assert!(model.0[0].get("user_id").is_some());
+    assert!(model.0[0].contains_key("user_id"));
     assert_eq!(model.0[0].get("user_id").unwrap(), &Value::Integer(123456));
-    assert!(model.0[0].get("message").is_some());
+    assert!(model.0[0].contains_key("message"));
     assert_eq!(
         model.0[0].get("message").unwrap().to_string_lossy(),
         "This is a message".to_owned()
@@ -139,19 +139,19 @@ fn generate_event_api_model() {
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
     assert_eq!(model.0.len(), 1);
-    assert!(model.0[0].get("eventType").is_some());
+    assert!(model.0[0].contains_key("eventType"));
     assert_eq!(
         model.0[0].get("eventType").unwrap().to_string_lossy(),
         "TestEvent".to_owned()
     );
-    assert!(model.0[0].get("user").is_some());
+    assert!(model.0[0].contains_key("user"));
     assert_eq!(
         model.0[0].get("user").unwrap().to_string_lossy(),
         "Joe".to_owned()
     );
-    assert!(model.0[0].get("user_id").is_some());
+    assert!(model.0[0].contains_key("user_id"));
     assert_eq!(model.0[0].get("user_id").unwrap(), &Value::Integer(123456));
-    assert!(model.0[0].get("my_key").is_some());
+    assert!(model.0[0].contains_key("my_key"));
     assert_eq!(
         model.0[0].get("my_key").unwrap().to_string_lossy(),
         "my_value".to_owned()
@@ -168,12 +168,12 @@ fn generate_log_api_model() {
     let logs = model.0[0].get("logs").expect("Logs data store not present");
 
     assert_eq!(logs.len(), 1);
-    assert!(logs[0].get("tag_key").is_some());
+    assert!(logs[0].contains_key("tag_key"));
     assert_eq!(
         logs[0].get("tag_key").unwrap().to_string_lossy(),
         "tag_value".to_owned()
     );
-    assert!(logs[0].get("message").is_some());
+    assert!(logs[0].contains_key("message"));
 
     // With message field
     let mut map = HashMap::<KeyString, Value>::new();
@@ -187,12 +187,12 @@ fn generate_log_api_model() {
     let logs = model.0[0].get("logs").expect("Logs data store not present");
 
     assert_eq!(logs.len(), 1);
-    assert!(logs[0].get("tag_key").is_some());
+    assert!(logs[0].contains_key("tag_key"));
     assert_eq!(
         logs[0].get("tag_key").unwrap().to_string_lossy(),
         "tag_value".to_owned()
     );
-    assert!(logs[0].get("message").is_some());
+    assert!(logs[0].contains_key("message"));
     assert_eq!(
         logs[0].get("message").unwrap().to_string_lossy(),
         "This is a message".to_owned()
@@ -214,14 +214,14 @@ fn generate_metric_api_model() {
         .expect("Metric data store not present");
 
     assert_eq!(metrics.len(), 1);
-    assert!(metrics[0].get("name").is_some());
+    assert!(metrics[0].contains_key("name"));
     assert_eq!(
         metrics[0].get("name").unwrap().to_string_lossy(),
         "my_metric".to_owned()
     );
-    assert!(metrics[0].get("value").is_some());
+    assert!(metrics[0].contains_key("value"));
     assert_eq!(metrics[0].get("value").unwrap(), &Value::from(100.0));
-    assert!(metrics[0].get("timestamp").is_some());
+    assert!(metrics[0].contains_key("timestamp"));
 
     // With timestamp
     let m = Metric::new(
@@ -238,14 +238,14 @@ fn generate_metric_api_model() {
         .expect("Metric data store not present");
 
     assert_eq!(metrics.len(), 1);
-    assert!(metrics[0].get("name").is_some());
+    assert!(metrics[0].contains_key("name"));
     assert_eq!(
         metrics[0].get("name").unwrap().to_string_lossy(),
         "my_metric".to_owned()
     );
-    assert!(metrics[0].get("value").is_some());
+    assert!(metrics[0].contains_key("value"));
     assert_eq!(metrics[0].get("value").unwrap(), &Value::from(100.0));
-    assert!(metrics[0].get("timestamp").is_some());
+    assert!(metrics[0].contains_key("timestamp"));
 
     // Incremental counter
     let m = Metric::new(
@@ -263,14 +263,14 @@ fn generate_metric_api_model() {
         .expect("Metric data store not present");
 
     assert_eq!(metrics.len(), 1);
-    assert!(metrics[0].get("name").is_some());
+    assert!(metrics[0].contains_key("name"));
     assert_eq!(
         metrics[0].get("name").unwrap().to_string_lossy(),
         "my_metric".to_owned()
     );
-    assert!(metrics[0].get("value").is_some());
+    assert!(metrics[0].contains_key("value"));
     assert_eq!(metrics[0].get("value").unwrap(), &Value::from(100.0));
-    assert!(metrics[0].get("timestamp").is_some());
-    assert!(metrics[0].get("interval.ms").is_some());
+    assert!(metrics[0].contains_key("timestamp"));
+    assert!(metrics[0].contains_key("interval.ms"));
     assert_eq!(metrics[0].get("interval.ms").unwrap(), &Value::from(1000));
 }

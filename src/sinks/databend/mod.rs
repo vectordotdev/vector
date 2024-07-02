@@ -1,8 +1,6 @@
-mod api;
 mod compression;
 mod config;
 mod encoding;
-mod error;
 #[cfg(all(test, feature = "databend-integration-tests"))]
 mod integration_tests;
 mod request_builder;

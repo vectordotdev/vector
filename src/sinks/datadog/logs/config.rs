@@ -89,7 +89,7 @@ impl DatadogLogsConfig {
         http::Uri::try_from(format!("{}/api/v2/logs", base_url)).expect("URI not valid")
     }
 
-    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
+    pub fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
         self.get_uri(dd_common)
             .scheme_str()
             .unwrap_or("http")
@@ -185,7 +185,10 @@ mod test {
     use super::*;
     use crate::codecs::EncodingConfigWithFraming;
     use crate::components::validation::prelude::*;
-    use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
+    use vector_lib::{
+        codecs::{encoding::format::JsonSerializerOptions, JsonSerializerConfig, MetricTagValues},
+        config::LogNamespace,
+    };
 
     #[test]
     fn generate_config() {
@@ -206,7 +209,8 @@ mod test {
 
             let encoding = EncodingConfigWithFraming::new(
                 None,
-                JsonSerializerConfig::new(MetricTagValues::Full).into(),
+                JsonSerializerConfig::new(MetricTagValues::Full, JsonSerializerOptions::default())
+                    .into(),
                 config.encoding.clone(),
             );
 
@@ -223,6 +227,7 @@ mod test {
 
             ValidationConfiguration::from_sink(
                 Self::NAME,
+                LogNamespace::Legacy,
                 vec![ComponentTestCaseConfig::from_sink(
                     config,
                     None,

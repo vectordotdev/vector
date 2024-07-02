@@ -70,8 +70,6 @@ pub struct LokiRequestBuilder {
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuildError {
-    #[snafu(display("Encoded payload is greater than the max limit."))]
-    PayloadTooBig,
     #[snafu(display("Failed to build payload with error: {}", error))]
     Io { error: std::io::Error },
 }

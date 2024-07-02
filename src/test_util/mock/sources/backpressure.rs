@@ -65,7 +65,7 @@ impl SourceConfig for BackpressureSourceConfig {
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         vec![SourceOutput::new_logs(
-            DataType::all(),
+            DataType::all_bits(),
             Definition::default_legacy_namespace(),
         )]
     }
