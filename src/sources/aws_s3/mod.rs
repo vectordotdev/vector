@@ -237,6 +237,7 @@ impl AwsS3Config {
             endpoint.clone(),
             proxy,
             &self.tls_options,
+            &None,
         )
         .await?;
 
@@ -252,6 +253,7 @@ impl AwsS3Config {
                     endpoint,
                     proxy,
                     &sqs.tls_options,
+                    &sqs.timeout,
                 )
                 .await?;
 

@@ -1,9 +1,12 @@
 //! Shared functionality for the AWS components.
 pub mod auth;
 pub mod region;
+pub mod timeout;
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
-use aws_config::{meta::region::ProvideRegion, retry::RetryConfig, Region, SdkConfig};
+use aws_config::{
+    meta::region::ProvideRegion, retry::RetryConfig, timeout::TimeoutConfig, Region, SdkConfig,
+};
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::{
     http_request::{SignableBody, SignableRequest, SigningSettings},
@@ -30,7 +33,6 @@ use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
 use snafu::Snafu;
-use std::time::SystemTime;
 use std::{
     error::Error,
     pin::Pin,
@@ -39,7 +41,9 @@ use std::{
         Arc, OnceLock,
     },
     task::{Context, Poll},
+    time::{Duration, SystemTime},
 };
+pub use timeout::AwsTimeout;
 
 use crate::config::ProxyConfig;
 use crate::http::{build_proxy_connector, build_tls_connector, status};
@@ -163,8 +167,9 @@ pub async fn create_client<T: ClientBuilder>(
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
+    timeout: &Option<AwsTimeout>,
 ) -> crate::Result<T::Client> {
-    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options)
+    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options, timeout)
         .await
         .map(|(client, _)| client)
 }
@@ -176,6 +181,7 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
+    timeout: &Option<AwsTimeout>,
 ) -> crate::Result<(T::Client, Region)> {
     let retry_config = RetryConfig::disabled();
 
@@ -214,6 +220,21 @@ pub async fn create_client_and_region<T: ClientBuilder>(
         aws_config::default_provider::use_fips::use_fips_provider(&provider_config).await
     {
         config_builder = config_builder.use_fips(use_fips);
+    }
+
+    if let Some(timeout) = timeout {
+        let mut timeout_config_builder = TimeoutConfig::builder();
+
+        let operation_timeout = timeout.operation_timeout();
+        let connect_timeout = timeout.connect_timeout();
+        let read_timeout = timeout.read_timeout();
+
+        timeout_config_builder
+            .set_operation_timeout(operation_timeout.map(Duration::from_secs))
+            .set_connect_timeout(connect_timeout.map(Duration::from_secs))
+            .set_read_timeout(read_timeout.map(Duration::from_secs));
+
+        config_builder = config_builder.timeout_config(timeout_config_builder.build());
     }
 
     let config = config_builder.build();
