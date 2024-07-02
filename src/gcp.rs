@@ -16,7 +16,7 @@ use hyper::header::AUTHORIZATION;
 use once_cell::sync::Lazy;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
-use tokio::{sync::watch, time::Instant};
+use tokio::sync::watch;
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -24,6 +24,11 @@ use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
 
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
+
+// See https://cloud.google.com/compute/docs/access/authenticate-workloads#applications
+const METADATA_TOKEN_EXPIRY_MARGIN_SECS: u64 = 200;
+
+const METADATA_TOKEN_ERROR_RETRY_SECS: u64 = 2;
 
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
@@ -194,19 +199,25 @@ impl GcpAuthenticator {
     async fn token_regenerator(self, sender: watch::Sender<()>) {
         match self {
             Self::Credentials(inner) => {
-                let period =
-                    Duration::from_secs(inner.token.read().unwrap().expires_in() as u64 / 2);
-                let mut interval = tokio::time::interval_at(Instant::now() + period, period);
+                let expires_in = inner.token.read().unwrap().expires_in() as u64;
+                let mut deadline =
+                    Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
                 loop {
-                    interval.tick().await;
+                    tokio::time::sleep(deadline).await;
                     debug!("Renewing GCP authentication token.");
                     match inner.regenerate_token().await {
-                        Ok(()) => sender.send_replace(()),
+                        Ok(()) => {
+                            sender.send_replace(());
+                            let expires_in = inner.token.read().unwrap().expires_in() as u64;
+                            deadline =
+                                Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
+                        }
                         Err(error) => {
                             error!(
                                 message = "Failed to update GCP authentication token.",
                                 %error
                             );
+                            deadline = Duration::from_secs(METADATA_TOKEN_ERROR_RETRY_SECS);
                         }
                     }
                 }
