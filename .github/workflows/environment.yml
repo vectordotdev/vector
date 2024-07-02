@@ -13,7 +13,7 @@ env:
 
 jobs:
   publish-new-environment:
-    runs-on: ubuntu-20.04
+    runs-on: release-builder-linux
     timeout-minutes: 360
     steps:
       - name: (PR comment) Get PR branch
