@@ -41,7 +41,7 @@ hdrhistogram = "7.5.4"
 metrics-tracing-context = { version = "0.14.0", default-features = false }
 metrics-util = { version = "0.15.1", default-features = false, features = ["debugging"] }
 once_cell = "1.19"
-proptest = "1.4"
+proptest = "1.5"
 quickcheck = "1.0"
 rand = "0.8.5"
 serde_yaml = { version = "0.9", default-features = false }
