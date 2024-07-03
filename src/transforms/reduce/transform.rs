@@ -1,10 +1,10 @@
-use std::collections::{hash_map, BTreeMap, HashMap};
+use std::collections::hash_map::Entry;
+use std::collections::{hash_map, HashMap};
 use std::pin::Pin;
 use std::time::{Duration, Instant};
 
 use futures::Stream;
 use indexmap::IndexMap;
-use vrl::core::Value;
 use vrl::prelude::KeyString;
 
 use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
@@ -30,34 +30,25 @@ struct ReduceState {
 
 impl ReduceState {
     fn new() -> Self {
-        let fields = HashMap::new();
-        let metadata = EventMetadata::default();
-
         Self {
             events: 0,
             stale_since: Instant::now(),
             creation: Instant::now(),
-            fields,
-            metadata,
+            fields: HashMap::new(),
+            metadata: EventMetadata::default(),
         }
     }
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<KeyString, MergeStrategy>) {
-        let (value, metadata) = e.into_parts();
-        self.metadata.merge(metadata);
+        self.metadata.merge(e.metadata().clone());
 
-        let fields = if let Value::Object(fields) = value {
-            fields
-        } else {
-            BTreeMap::new()
-        };
-
-        for (k, v) in fields.into_iter() {
-            let strategy = strategies.get(&k);
-            match self.fields.entry(k) {
-                hash_map::Entry::Vacant(entry) => {
-                    if let Some(strat) = strategy {
-                        match get_value_merger(v, strat) {
+        let fields_iter = e.all_event_fields_skip_array_elements().unwrap();
+        for (path, value) in fields_iter {
+            let maybe_strategy = strategies.get(&path);
+            match self.fields.entry(path) {
+                Entry::Vacant(entry) => {
+                    if let Some(strategy) = maybe_strategy {
+                        match get_value_merger(value.clone(), strategy) {
                             Ok(m) => {
                                 entry.insert(m);
                             }
@@ -66,16 +57,17 @@ impl ReduceState {
                             }
                         }
                     } else {
-                        entry.insert(v.clone().into());
+                        entry.insert(value.clone().into());
                     }
                 }
-                hash_map::Entry::Occupied(mut entry) => {
-                    if let Err(error) = entry.get_mut().add(v.clone()) {
+                Entry::Occupied(mut entry) => {
+                    if let Err(error) = entry.get_mut().add(value.clone()) {
                         warn!(message = "Failed to merge value.", %error);
                     }
                 }
             }
         }
+
         self.events += 1;
         self.stale_since = Instant::now();
     }
@@ -261,9 +253,9 @@ impl TaskTransform<Event> for Reduce {
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
-
+    use indoc::indoc;
     use serde_json::json;
+    use std::sync::Arc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vrl::value::Kind;
@@ -753,6 +745,75 @@ merge_strategies.bar = "concat"
             assert_eq!(output_2["foo"], json!([[2, 4], [6, 8], "done"]).into());
             assert_eq!(output_2["bar"], json!([2, 4, 6, 8, "done"]).into());
             assert_eq!(output_2.metadata(), &metadata_2);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn nested_path_strat() {
+        let reduce_config = toml::from_str::<ReduceConfig>(indoc!(
+            r#"
+            group_by = [ "g" ]
+
+            merge_strategies.g = "discard"
+            merge_strategies."a.b.c" = "array"
+
+            [ends_when]
+              type = "vrl"
+              source = "exists(.test_end)"
+            "#,
+        ))
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+
+            let new_schema_definition = reduce_config.outputs(
+                TableRegistry::default(),
+                &[(OutputId::from("in"), Definition::default_legacy_namespace())],
+                LogNamespace::Legacy,
+            )[0]
+            .clone()
+            .log_schema_definitions
+            .get(&OutputId::from("in"))
+            .unwrap()
+            .clone();
+
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let mut e_1 = LogEvent::from("foo");
+            e_1.insert("a.b.c", json!(1));
+            e_1.insert("g", json!(777));
+            let mut metadata_1 = e_1.metadata().clone();
+            metadata_1.set_upstream_id(Arc::new(OutputId::from("reduce")));
+            metadata_1.set_schema_definition(&Arc::new(new_schema_definition.clone()));
+
+            tx.send(e_1.into()).await.unwrap();
+
+            let mut e_2 = LogEvent::from("bar");
+            e_2.insert("a.b.c", 2);
+            e_2.insert("g", json!(777));
+            e_2.insert("test_end", "done");
+            tx.send(e_2.into()).await.unwrap();
+
+            let mut output = out.recv().await.unwrap().into_log();
+            output.remove_timestamp();
+            output.remove("timestamp_end");
+
+            assert_eq!(
+                *output.value(),
+                btreemap! {
+                    "message" => "foo",
+                    "a.b.c" => json!([1, 2]),
+                    "g" => json!(777),
+                    "test_end" => "done",
+                }
+                .into()
+            );
 
             drop(tx);
             topology.stop().await;

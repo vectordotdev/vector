@@ -22,6 +22,10 @@ pub fn all_fields_non_object_root(value: &Value) -> FieldsIter {
     FieldsIter::non_object(value)
 }
 
+pub fn all_fields_skip_array_elements(fields: &ObjectMap) -> FieldsIter {
+    FieldsIter::new_with_skip_array_elements(fields)
+}
+
 #[derive(Clone, Debug)]
 enum LeafIter<'a> {
     Root((&'a Value, bool)),
@@ -46,6 +50,8 @@ pub struct FieldsIter<'a> {
     stack: Vec<LeafIter<'a>>,
     /// Path components from the root up to the top of the stack.
     path: Vec<PathComponent<'a>>,
+    /// Treat array as a single value and don't traverse each element.
+    skip_array_elements: bool,
 }
 
 impl<'a> FieldsIter<'a> {
@@ -55,6 +61,7 @@ impl<'a> FieldsIter<'a> {
             path_prefix: None,
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
+            skip_array_elements: false,
         }
     }
 
@@ -63,6 +70,7 @@ impl<'a> FieldsIter<'a> {
             path_prefix: Some(path_prefix),
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
+            skip_array_elements: false,
         }
     }
 
@@ -73,6 +81,16 @@ impl<'a> FieldsIter<'a> {
             path_prefix: None,
             stack: vec![LeafIter::Root((value, false))],
             path: vec![],
+            skip_array_elements: false,
+        }
+    }
+
+    fn new_with_skip_array_elements(fields: &'a ObjectMap) -> FieldsIter<'a> {
+        FieldsIter {
+            path_prefix: None,
+            stack: vec![LeafIter::Map(fields.iter())],
+            path: vec![],
+            skip_array_elements: true,
         }
     }
 
@@ -84,9 +102,13 @@ impl<'a> FieldsIter<'a> {
                 None
             }
             Value::Array(array) if !array.is_empty() => {
-                self.stack.push(LeafIter::Array(array.iter().enumerate()));
-                self.path.push(component);
-                None
+                if self.skip_array_elements {
+                    Some(value)
+                } else {
+                    self.stack.push(LeafIter::Array(array.iter().enumerate()));
+                    self.path.push(component);
+                    None
+                }
             }
             _ => Some(value),
         }
