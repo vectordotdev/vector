@@ -14,7 +14,9 @@ pub struct RegionOrEndpoint {
     pub region: Option<String>,
 
     /// Custom endpoint for use with AWS-compatible services.
-    #[configurable(metadata(docs::examples = "http://127.0.0.0:5000/path/to/service"))]
+    ///
+    /// Note: the trailing slash is required when building the locator.
+    #[configurable(metadata(docs::examples = "http://127.0.0.0:5000/path/to/service/"))]
     #[configurable(metadata(docs::advanced))]
     pub endpoint: Option<String>,
 }
