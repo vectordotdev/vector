@@ -140,7 +140,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn gelf_streaming_decoding() {
+    async fn gelf_stream_decoding() {
         let iter = stream::iter(
             [
                 r#"{"version": "1.1", "host": "example.org", "short_message": "A short message", "timestamp": 1620000000, "level": 6}"#,
@@ -160,14 +160,14 @@ mod tests {
         let next = stream.next().await.unwrap();
         let event = next.unwrap().0.pop().unwrap().into_log();
         assert_eq!(
-            event.get("short_message").unwrap(),
+            event.get("message").unwrap(),
             &Value::from("A short message")
         );
 
         let next = stream.next().await.unwrap();
         let event = next.unwrap().0.pop().unwrap().into_log();
         assert_eq!(
-            event.get("short_message").unwrap(),
+            event.get("message").unwrap(),
             &Value::from("Another short message")
         );
     }
