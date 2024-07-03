@@ -120,10 +120,10 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
-    ///	Whether to sanitize incoming statsd key names. When "true", keys are sanitized by:
+    ///	Whether or not to sanitize incoming statsd key names. When "true", keys are sanitized by:
     /// - "/" is replaced with "-"
     /// - All whitespace is replaced with "_"
-    ///- All non alphanumeric characters [^a-zA-Z_\-0-9\.] are removed.
+    /// - All non alphanumeric characters [^a-zA-Z_\-0-9\.] are removed.
     #[serde(default = "default_sanitize")]
     #[configurable(derived)]
     sanitize: bool,
