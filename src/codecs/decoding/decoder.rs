@@ -143,7 +143,7 @@ mod tests {
     async fn gelf_stream_decoding() {
         let iter = stream::iter(
             [
-                r#"{"version": "1.1", "host": "example.org", "short_message": "A short message", "timestamp": 1620000000, "level": 6}"#,
+                r#"{"version": "1.1", "host": "example.org", "short_message": "A short message", "timestamp": 1620000000, "level": 6, "_additional_field": "additional_content"}"#,
                 "\0",
                 r#"{"version": "1.1", "host": "example.org", "short_message": "Another short message", "timestamp": 1620000000, "level": 6}"#,
             ]
@@ -162,6 +162,10 @@ mod tests {
         assert_eq!(
             event.get("message").unwrap(),
             &Value::from("A short message")
+        );
+        assert_eq!(
+            event.get("additional_field").unwrap(),
+            &Value::from("additional_content")
         );
 
         let next = stream.next().await.unwrap();
