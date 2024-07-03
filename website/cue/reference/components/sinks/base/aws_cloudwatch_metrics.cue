@@ -208,9 +208,9 @@ base: components: sinks: aws_cloudwatch_metrics: configuration: {
 		type: string: examples: ["service"]
 	}
 	endpoint: {
-		description: "Custom endpoint for use with AWS-compatible services. Note: the trailing slash is required when building the locator."
+		description: "Custom endpoint for use with AWS-compatible services."
 		required:    false
-		type: string: examples: ["http://127.0.0.0:5000/path/to/service/"]
+		type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
 	}
 	region: {
 		description: """
