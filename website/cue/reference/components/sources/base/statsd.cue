@@ -59,6 +59,16 @@ base: components: sources: statsd: configuration: {
 		required:      false
 		type: uint: unit: "bytes"
 	}
+	sanitize: {
+		description: """
+			Whether or not to sanitize incoming statsd key names. When "true", keys are sanitized by:
+			- "/" is replaced with "-"
+			- All whitespace is replaced with "_"
+			- All non alphanumeric characters [^a-zA-Z_\\-0-9\\.] are removed.
+			"""
+		required: false
+		type: bool: default: true
+	}
 	shutdown_timeout_secs: {
 		description:   "The timeout before a connection is forcefully closed during shutdown."
 		relevant_when: "mode = \"tcp\""
