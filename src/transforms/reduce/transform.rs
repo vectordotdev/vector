@@ -42,31 +42,33 @@ impl ReduceState {
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<KeyString, MergeStrategy>) {
         self.metadata.merge(e.metadata().clone());
 
-        let fields_iter = e.all_event_fields_skip_array_elements().unwrap();
-        for (path, value) in fields_iter {
-            let maybe_strategy = strategies.get(&path);
-            match self.fields.entry(path) {
-                Entry::Vacant(entry) => {
-                    if let Some(strategy) = maybe_strategy {
-                        match get_value_merger(value.clone(), strategy) {
-                            Ok(m) => {
-                                entry.insert(m);
+        if let Some(fields_iter) = e.all_event_fields_skip_array_elements() {
+            for (path, value) in fields_iter {
+                let maybe_strategy = strategies.get(&path);
+                match self.fields.entry(path) {
+                    Entry::Vacant(entry) => {
+                        if let Some(strategy) = maybe_strategy {
+                            match get_value_merger(value.clone(), strategy) {
+                                Ok(m) => {
+                                    entry.insert(m);
+                                }
+                                Err(error) => {
+                                    warn!(message = "Failed to merge value.", %error);
+                                }
                             }
-                            Err(error) => {
-                                warn!(message = "Failed to merge value.", %error);
-                            }
+                        } else {
+                            entry.insert(value.clone().into());
                         }
-                    } else {
-                        entry.insert(value.clone().into());
                     }
-                }
-                Entry::Occupied(mut entry) => {
-                    if let Err(error) = entry.get_mut().add(value.clone()) {
-                        warn!(message = "Failed to merge value.", %error);
+                    Entry::Occupied(mut entry) => {
+                        if let Err(error) = entry.get_mut().add(value.clone()) {
+                            warn!(message = "Failed to merge value.", %error);
+                        }
                     }
                 }
             }
         }
+        // else the event root is not an object (see https://github.com/vectordotdev/vector/issues/18219)
 
         self.events += 1;
         self.stale_since = Instant::now();
@@ -754,7 +756,7 @@ merge_strategies.bar = "concat"
     }
 
     #[tokio::test]
-    async fn nested_path_strat() {
+    async fn nested_path_strategy() {
         let reduce_config = toml::from_str::<ReduceConfig>(indoc!(
             r#"
             group_by = [ "g" ]
