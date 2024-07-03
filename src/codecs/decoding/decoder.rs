@@ -164,7 +164,7 @@ mod tests {
             &Value::from("A short message")
         );
         assert_eq!(
-            event.get("additional_field").unwrap(),
+            event.get("_additional_field").unwrap(),
             &Value::from("additional_content")
         );
 
