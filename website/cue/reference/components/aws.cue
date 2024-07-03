@@ -108,11 +108,11 @@ components: _aws: {
 
 			endpoint: {
 				common:      false
-				description: "Custom endpoint for use with AWS-compatible services. Note: the trailing slash is required when building the locator."
+				description: "Custom endpoint for use with AWS-compatible services."
 				required:    false
 				type: string: {
 					default: null
-					examples: ["http://127.0.0.0:5000/path/to/service/"]
+					examples: ["http://127.0.0.0:5000/path/to/service"]
 				}
 			}
 			region: {
