@@ -174,9 +174,9 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required:    false
 		type: object: options: {
 			endpoint: {
-				description: "Custom endpoint for use with AWS-compatible services. Note: the trailing slash is required when building the locator."
+				description: "Custom endpoint for use with AWS-compatible services."
 				required:    false
-				type: string: examples: ["http://127.0.0.0:5000/path/to/service/"]
+				type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
 			}
 			region: {
 				description: """
