@@ -49,17 +49,17 @@ pub struct AwsTimeout {
 
 impl AwsTimeout {
     /// returns the connection timeout
-    pub fn connect_timeout(&self) -> Option<u64> {
+    pub const fn connect_timeout(&self) -> Option<u64> {
         self.connect_timeout
     }
 
     /// returns the operation timeout
-    pub fn operation_timeout(&self) -> Option<u64> {
+    pub const fn operation_timeout(&self) -> Option<u64> {
         self.operation_timeout
     }
 
     /// returns the read timeout
-    pub fn read_timeout(&self) -> Option<u64> {
+    pub const fn read_timeout(&self) -> Option<u64> {
         self.read_timeout
     }
 }
