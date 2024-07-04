@@ -140,6 +140,7 @@ serde = { version = "1.0.203", default-features = false, features = ["alloc", "d
 toml = { version = "0.8.14", default-features = false, features = ["display", "parse"] }
 vrl = { version = "0.16.0", features = ["arbitrary", "cli", "test", "test_framework"] }
 tokio = { version = "1.38.0", default-features = false, features = ["full"] }
+thiserror = "1.0"
 
 [dependencies]
 pin-project.workspace = true

@@ -37,6 +37,7 @@ vector-config = { path = "../vector-config", default-features = false }
 vector-config-common = { path = "../vector-config-common", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
+thiserror.workspace = true
 
 [dev-dependencies]
 futures = { version = "0.3", default-features = false }

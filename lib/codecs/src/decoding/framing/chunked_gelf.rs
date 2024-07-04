@@ -1,12 +1,16 @@
-use super::BoxedFramingError;
+use crate::StreamDecodingError;
+
+use super::{BoxedFramingError, FramingError};
 use bytes::{Buf, Bytes, BytesMut};
 use derivative::Derivative;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use thiserror::Error;
 use tokio;
+use tokio::task::JoinHandle;
 use tokio_util::codec::Decoder;
-use tracing::warn;
+use tracing::{info, warn};
 use vector_config::configurable_component;
 
 const GELF_MAGIC: [u8; 2] = [0x1e, 0x0f];
@@ -60,28 +64,88 @@ impl Default for ChunkedGelfDecoderOptions {
     }
 }
 
+#[derive(Debug)]
+pub struct MessageState {
+    total_chunks: u8,
+    chunks: [Bytes; MAX_TOTAL_CHUNKS as usize],
+    chunks_bitmap: u128,
+    timeout_task: JoinHandle<()>,
+}
+
+impl MessageState {
+    pub fn new(total_chunks: u8, timeout_task: JoinHandle<()>) -> Self {
+        Self {
+            total_chunks,
+            chunks: DEFAULT_CHUNKS,
+            chunks_bitmap: 0,
+            timeout_task,
+        }
+    }
+
+    pub fn is_chunk_present(&self, sequence_number: u8) -> bool {
+        let chunk_bitmap_id = 1 << sequence_number;
+        self.chunks_bitmap & chunk_bitmap_id != 0
+    }
+
+    pub fn add_chunk(&mut self, sequence_number: u8, chunk: Bytes) {
+        let chunk_bitmap_id = 1 << sequence_number;
+        self.chunks[sequence_number as usize] = chunk;
+        self.chunks_bitmap |= chunk_bitmap_id;
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.chunks_bitmap.count_ones() == self.total_chunks as u32
+    }
+
+    pub fn retrieve_message(&mut self) -> Option<Bytes> {
+        if self.is_complete() {
+            self.timeout_task.abort();
+            let chunks = &self.chunks[0..self.total_chunks as usize];
+            let mut message = BytesMut::new();
+            for chunk in chunks {
+                message.extend_from_slice(chunk);
+            }
+            Some(message.freeze())
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum ChunkedGelfDecoderError {
+    #[error("Poisoned lock")]
+    PoisonedLock,
+}
+
+impl From<ChunkedGelfDecoderError> for BoxedFramingError {
+    fn from(error: ChunkedGelfDecoderError) -> Self {
+        Box::new(error)
+    }
+}
+impl StreamDecodingError for ChunkedGelfDecoderError {
+    fn can_continue(&self) -> bool {
+        match self {
+            ChunkedGelfDecoderError::PoisonedLock => false,
+        }
+    }
+}
+
+impl FramingError for ChunkedGelfDecoderError {}
+
 /// A decoder for handling GELF messages that are chunked.
-// TODO: manual implement clone, it is not okay to clone the Arc as it is, we should create a new decoder
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ChunkedGelfDecoder {
     /// TODO
     state: Arc<Mutex<HashMap<u64, MessageState>>>,
     timeout: Duration,
 }
 
-#[derive(Debug, Clone)]
-pub struct MessageState {
-    total_chunks: u8,
-    chunks: [Bytes; MAX_TOTAL_CHUNKS as usize],
-    chunks_bitmap: u128,
-}
-
-impl MessageState {
-    pub fn new(total_chunks: u8) -> Self {
+impl Clone for ChunkedGelfDecoder {
+    fn clone(&self) -> Self {
         Self {
-            total_chunks,
-            chunks: DEFAULT_CHUNKS,
-            chunks_bitmap: 0,
+            state: Arc::new(Mutex::new(HashMap::new())),
+            timeout: self.timeout,
         }
     }
 }
@@ -99,61 +163,94 @@ impl ChunkedGelfDecoder {
     pub fn decode_chunk(
         &mut self,
         src: &mut bytes::BytesMut,
-    ) -> Result<Option<Bytes>, BoxedFramingError> {
-        // TODO: handle malformed and do not panic
+    ) -> Result<Option<Bytes>, ChunkedGelfDecoderError> {
+        // We need 10 bits to read the message id, sequence number and total chunks
+        if src.remaining() < 10 {
+            let src_display = format!("{src:?}");
+            warn!(message = "Received malformed chunk headers (message ID, sequence number and total chunks) with less than 10 bytes. Ignoring it.",
+                src = src_display,
+                remaining = src.remaining(),
+                internal_log_rate_limit = true);
+            src.clear();
+            return Ok(None);
+        }
         let message_id = src.get_u64();
         let sequence_number = src.get_u8();
         let total_chunks = src.get_u8();
 
-        // TODO: Warn and do not panic
-        assert!(total_chunks <= MAX_TOTAL_CHUNKS);
-        assert!(sequence_number < total_chunks);
-
-        // TODO: handle this unwrap
-        let mut state_lock = self.state.lock().unwrap();
-        let message_state = state_lock.entry(message_id).or_insert_with(|| {
-            // TODO: we need tokio due to the sleep function. We need to spawn a task that will clear the message state after a certain time
-            // otherwise we will have a memory leak
-            // let timeout = self.timeout.clone();
-            let state = Arc::clone(&self.state);
-            let timeout = self.timeout.clone();
-            tokio::spawn(async move {
-                tokio::time::sleep(timeout).await;
-                let mut state_lock = state.lock().unwrap();
-                if let Some(_) = state_lock.remove(&message_id) {
-                    warn!("Message with id {message_id} was not fully received within the timeout window of {}ms. Discarding it.",timeout.as_millis());
-                }
-            });
-            MessageState::new(total_chunks)
-        });
-
-        if message_state.total_chunks != total_chunks {
-            // TODO: improve logging
-            warn!("Received a chunk with a different total_chunks than the original. Ignoring it.");
+        if total_chunks == 0 || total_chunks > MAX_TOTAL_CHUNKS {
+            warn!(
+                message = "Received a chunk with an invalid total chunks value. Ignoring it.",
+                message_id = message_id,
+                sequence_number = sequence_number,
+                total_chunks = total_chunks,
+                internal_log_rate_limit = true
+            );
             src.clear();
             return Ok(None);
         }
 
-        let chunk_bitmap_id = 1 << sequence_number;
-        if message_state.chunks_bitmap & chunk_bitmap_id != 0 {
+        if sequence_number >= total_chunks {
+            warn!(
+                message = "Received a chunk with a sequence number greater than total chunks. Ignoring it.",
+                message_id = message_id,
+                sequence_number = sequence_number,
+                total_chunks = total_chunks,
+                internal_log_rate_limit = true
+            );
+            src.clear();
+            return Ok(None);
+        }
+
+        // TODO: handle this unwrap
+        let Ok(mut state_lock) = self.state.lock() else {
+            return Err(ChunkedGelfDecoderError::PoisonedLock);
+        };
+
+        let message_state = state_lock.entry(message_id).or_insert_with(|| {
+            // TODO: we need tokio due to the sleep function. We need to spawn a task that will clear the message state after a certain time
+            // otherwise we will have a memory leak
+            let state = Arc::clone(&self.state);
+            let timeout = self.timeout.clone();
+            let timeout_handle = tokio::spawn(async move {
+                tokio::time::sleep(timeout).await;
+                let mut state_lock = state.lock().unwrap();
+                if let Some(_) = state_lock.remove(&message_id) {
+                    let message = format!("Message with id {message_id} was not fully received within the timeout window of {}ms. Discarding it.", timeout.as_millis());
+                    warn!(message = message, internal_log_rate_limit = true);
+                }
+            });
+            MessageState::new(total_chunks, timeout_handle)
+        });
+
+        if message_state.total_chunks != total_chunks {
+            warn!(message_id = "Received a chunk with a different total_chunks than the original. Ignoring it.",
+                original_total_chunks = message_state.total_chunks,
+                received_total_chunks = total_chunks,
+                internal_log_rate_limit = true,
+                message_id = message_id);
+            src.clear();
+            return Ok(None);
+        }
+
+        if message_state.is_chunk_present(sequence_number) {
             // TOOD: improve logging
-            warn!("Received a duplicate chunk. Ignoring it.");
+            info!(
+                message = "Received a duplicate chunk. Ignoring it.",
+                sequence_number = sequence_number,
+                message_id = message_id,
+                internal_log_rate_limit = true
+            );
             src.clear();
             return Ok(None);
         }
 
         let chunk = src.split().freeze();
-        message_state.chunks[sequence_number as usize] = chunk;
-        message_state.chunks_bitmap |= chunk_bitmap_id;
+        message_state.add_chunk(sequence_number, chunk);
 
-        if message_state.chunks_bitmap.count_ones() == message_state.total_chunks as u32 {
-            let chunks = &message_state.chunks[0..message_state.total_chunks as usize];
-            let mut message = BytesMut::new();
-            for chunk in chunks {
-                message.extend_from_slice(chunk);
-            }
+        if let Some(message) = message_state.retrieve_message() {
             state_lock.remove(&message_id);
-            Ok(Some(message.freeze()))
+            Ok(Some(message))
         } else {
             Ok(None)
         }
@@ -179,7 +276,7 @@ impl Decoder for ChunkedGelfDecoder {
         let magic = src.get(0..2);
         if magic.is_some_and(|magic| magic == GELF_MAGIC) {
             src.advance(2);
-            self.decode_chunk(src)
+            Ok(self.decode_chunk(src)?)
         } else {
             // The gelf message is not chunked
             let frame = src.split();
