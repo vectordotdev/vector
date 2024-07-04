@@ -5,6 +5,7 @@
 
 mod bytes;
 mod character_delimited;
+mod chunked_gelf;
 mod length_delimited;
 mod newline_delimited;
 mod octet_counting;
@@ -15,6 +16,7 @@ use ::bytes::Bytes;
 pub use character_delimited::{
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions,
 };
+pub use chunked_gelf::{ChunkedGelfDecoder, ChunkedGelfDecoderConfig};
 use dyn_clone::DynClone;
 pub use length_delimited::{LengthDelimitedDecoder, LengthDelimitedDecoderConfig};
 pub use newline_delimited::{

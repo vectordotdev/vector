@@ -10,7 +10,6 @@ use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use vrl::value::{kind::Collection, Kind};
 
 #[cfg(unix)]
-use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
     config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
@@ -152,12 +151,12 @@ impl SourceConfig for SocketConfig {
             }
             Mode::Udp(config) => {
                 let log_namespace = cx.log_namespace(config.log_namespace);
-                let decoder = DecodingConfig::new(
-                    config.framing().clone(),
-                    config.decoding().clone(),
-                    log_namespace,
-                )
-                .build()?;
+                let decoding = config.decoding().clone();
+                let framing = config
+                    .framing()
+                    .clone()
+                    .unwrap_or_else(|| decoding.default_message_based_framing());
+                let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
                 Ok(udp::udp(
                     config,
                     decoder,
@@ -168,16 +167,14 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
+                // TODO: test for unix datagram with chunked gelf
                 let log_namespace = cx.log_namespace(config.log_namespace);
-                let decoder = DecodingConfig::new(
-                    config
-                        .framing
-                        .clone()
-                        .unwrap_or_else(default_framing_message_based),
-                    config.decoding.clone(),
-                    log_namespace,
-                )
-                .build()?;
+                let decoding = config.decoding.clone();
+                let framing = config
+                    .framing
+                    .clone()
+                    .unwrap_or_else(|| decoding.default_message_based_framing());
+                let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
                 unix::unix_datagram(config, decoder, cx.shutdown, cx.out, log_namespace)
             }
@@ -1059,10 +1056,12 @@ mod test {
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
             config.max_length = 10;
-            config.framing = CharacterDelimitedDecoderConfig {
-                character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
-            }
-            .into();
+            config.framing = Some(
+                CharacterDelimitedDecoderConfig {
+                    character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
+                }
+                .into(),
+            );
             let address = init_udp_with_config(tx, config).await;
 
             send_lines_udp(

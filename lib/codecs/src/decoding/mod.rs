@@ -24,6 +24,7 @@ pub use framing::{
     NewlineDelimitedDecoderConfig, NewlineDelimitedDecoderOptions, OctetCountingDecoder,
     OctetCountingDecoderConfig, OctetCountingDecoderOptions,
 };
+use framing::{ChunkedGelfDecoder, ChunkedGelfDecoderConfig};
 use smallvec::SmallVec;
 use std::fmt::Debug;
 use vector_config::configurable_component;
@@ -98,6 +99,11 @@ pub enum FramingConfig {
     ///
     /// [octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
     OctetCounting(OctetCountingDecoderConfig),
+
+    /// Byte frames which are chunked GELF messages.
+    ///
+    /// [chunked_gelf]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html
+    ChunkedGelf(ChunkedGelfDecoderConfig),
 }
 
 impl From<BytesDecoderConfig> for FramingConfig {
@@ -129,6 +135,11 @@ impl From<OctetCountingDecoderConfig> for FramingConfig {
         Self::OctetCounting(config)
     }
 }
+impl From<ChunkedGelfDecoderConfig> for FramingConfig {
+    fn from(config: ChunkedGelfDecoderConfig) -> Self {
+        Self::ChunkedGelf(config)
+    }
+}
 
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
@@ -139,6 +150,7 @@ impl FramingConfig {
             FramingConfig::LengthDelimited(config) => Framer::LengthDelimited(config.build()),
             FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
             FramingConfig::OctetCounting(config) => Framer::OctetCounting(config.build()),
+            FramingConfig::ChunkedGelf(config) => Framer::ChunkedGelf(config.build()),
         }
     }
 }
@@ -158,6 +170,8 @@ pub enum Framer {
     OctetCounting(OctetCountingDecoder),
     /// Uses an opaque `Framer` implementation for framing.
     Boxed(BoxedFramer),
+    /// Uses a `ChunkedGelfDecoder` for framing.
+    ChunkedGelf(ChunkedGelfDecoder),
 }
 
 impl tokio_util::codec::Decoder for Framer {
@@ -172,6 +186,7 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::NewlineDelimited(framer) => framer.decode(src),
             Framer::OctetCounting(framer) => framer.decode(src),
             Framer::Boxed(framer) => framer.decode(src),
+            Framer::ChunkedGelf(framer) => framer.decode(src),
         }
     }
 
@@ -183,6 +198,7 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::NewlineDelimited(framer) => framer.decode_eof(src),
             Framer::OctetCounting(framer) => framer.decode_eof(src),
             Framer::Boxed(framer) => framer.decode_eof(src),
+            Framer::ChunkedGelf(framer) => framer.decode_eof(src),
         }
     }
 }
@@ -338,10 +354,21 @@ impl DeserializerConfig {
             | DeserializerConfig::NativeJson(_) => {
                 FramingConfig::NewlineDelimited(Default::default())
             }
+            // TODO: the default framing of the gelf codec should be chunked gelf?
+            // or only with the udp input? Why is the newline delimited used for gelf? gelf is not newline delimited
             DeserializerConfig::Protobuf(_) => FramingConfig::Bytes,
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(_) => FramingConfig::NewlineDelimited(Default::default()),
             DeserializerConfig::Vrl(_) => FramingConfig::Bytes,
+        }
+    }
+
+    /// Returns an appropriate default framing config for the given deserializer with message based inputs.
+    /// This is only relevant for the GELF codec (or any chunked codec) with datagram inputs, such as udp sockest or unix datagram sockets.
+    pub fn default_message_based_framing(&self) -> FramingConfig {
+        match self {
+            DeserializerConfig::Gelf(_) => FramingConfig::ChunkedGelf(Default::default()),
+            _ => FramingConfig::Bytes,
         }
     }
 
