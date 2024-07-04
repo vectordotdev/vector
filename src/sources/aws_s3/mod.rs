@@ -252,6 +252,7 @@ impl AwsS3Config {
                     endpoint,
                     proxy,
                     &sqs.tls_options,
+                    true,
                 )
                 .await?;
 
