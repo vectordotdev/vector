@@ -216,8 +216,16 @@ impl ChunkedGelfDecoder {
                 tokio::time::sleep(timeout).await;
                 let mut state_lock = state.lock().unwrap();
                 if let Some(_) = state_lock.remove(&message_id) {
-                    let message = format!("Message with id {message_id} was not fully received within the timeout window of {}ms. Discarding it.", timeout.as_millis());
-                    warn!(message = message, internal_log_rate_limit = true);
+                    let message = format!(
+                        "Message was not fully received within the timeout window. Discarding it."
+                    );
+                    // TODO: log the variables in the message or use structured logging?
+                    warn!(
+                        message = message,
+                        message_id = message_id,
+                        timeout = timeout.as_millis(),
+                        internal_log_rate_limit = true
+                    );
                 }
             });
             MessageState::new(total_chunks, timeout_handle)
@@ -234,7 +242,6 @@ impl ChunkedGelfDecoder {
         }
 
         if message_state.is_chunk_present(sequence_number) {
-            // TOOD: improve logging
             info!(
                 message = "Received a duplicate chunk. Ignoring it.",
                 sequence_number = sequence_number,
