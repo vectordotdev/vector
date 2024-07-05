@@ -130,27 +130,6 @@ impl MessageState {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum ChunkedGelfDecoderError {
-    #[error("Poisoned lock")]
-    PoisonedLock,
-}
-
-impl From<ChunkedGelfDecoderError> for BoxedFramingError {
-    fn from(error: ChunkedGelfDecoderError) -> Self {
-        Box::new(error)
-    }
-}
-impl StreamDecodingError for ChunkedGelfDecoderError {
-    fn can_continue(&self) -> bool {
-        match self {
-            ChunkedGelfDecoderError::PoisonedLock => false,
-        }
-    }
-}
-
-impl FramingError for ChunkedGelfDecoderError {}
-
 /// A decoder for handling GELF messages that may be chunked.
 #[derive(Debug, Clone)]
 pub struct ChunkedGelfDecoder {
@@ -174,7 +153,7 @@ impl ChunkedGelfDecoder {
     pub fn decode_chunk(
         &mut self,
         src: &mut bytes::BytesMut,
-    ) -> Result<Option<Bytes>, ChunkedGelfDecoderError> {
+    ) -> Result<Option<Bytes>, BoxedFramingError> {
         // We need 10 bits to read the message id, sequence number and total chunks
         if src.remaining() < 10 {
             let src_display = format!("{src:?}");
@@ -210,9 +189,7 @@ impl ChunkedGelfDecoder {
             return Ok(None);
         }
 
-        let Ok(mut state_lock) = self.state.lock() else {
-            return Err(ChunkedGelfDecoderError::PoisonedLock);
-        };
+        let mut state_lock = self.state.lock().unwrap();
 
         if state_lock.len() >= self.pending_messages_limit {
             warn!(
@@ -299,9 +276,9 @@ impl Decoder for ChunkedGelfDecoder {
         let magic = src.get(0..2);
         if magic.is_some_and(|magic| magic == GELF_MAGIC) {
             src.advance(2);
-            let frame = self.decode_chunk(src)?;
+            let frame = self.decode_chunk(src);
             src.clear();
-            return Ok(frame);
+            return frame;
         } else {
             // The gelf message is not chunked
             let frame = src.split();
