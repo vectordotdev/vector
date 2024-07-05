@@ -1,12 +1,9 @@
-use crate::StreamDecodingError;
-
-use super::{BoxedFramingError, FramingError};
+use super::BoxedFramingError;
 use bytes::{Buf, Bytes, BytesMut};
 use derivative::Derivative;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use thiserror::Error;
 use tokio;
 use tokio::task::JoinHandle;
 use tokio_util::codec::Decoder;

@@ -2110,7 +2110,6 @@ dependencies = [
  "smallvec",
  "snafu 0.7.5",
  "syslog_loose",
- "thiserror",
  "tokio",
  "tokio-util",
  "tracing 0.1.40",
