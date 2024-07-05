@@ -77,7 +77,7 @@ pub struct LokiEventTimestampOutOfRangeError;
 
 impl InternalEvent for LokiEventTimestampOutOfRangeError {
     fn emit(self) {
-        error!(
+        warn!(
             message = "Event timestamp out of range.",
             reason = "out_of_range",
             internal_log_rate_limit = true,

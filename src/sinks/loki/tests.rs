@@ -149,6 +149,7 @@ async fn healthcheck_grafana_cloud() {
 
 #[tokio::test]
 async fn timestamp_out_of_range() {
+    use vector_lib::config::log_schema;
     let (config, cx) = load_sink::<LokiConfig>(
         r#"
         endpoint = "http://localhost:3100"
@@ -161,7 +162,6 @@ async fn timestamp_out_of_range() {
     let mut sink = LokiSink::new(config, client).unwrap();
 
     let mut e1 = LogEvent::from("hello world");
-    use vector_lib::config::log_schema;
     if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
         let date = chrono::NaiveDate::from_ymd_opt(1677, 9, 21)
              .unwrap()
