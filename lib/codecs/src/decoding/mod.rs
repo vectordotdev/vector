@@ -364,7 +364,6 @@ impl DeserializerConfig {
     }
 
     /// Returns an appropriate default framing config for the given deserializer with message based inputs.
-    /// This is only relevant for the GELF codec (or any chunked codec) with datagram inputs, such as udp sockest or unix datagram sockets.
     pub fn default_message_based_framing(&self) -> FramingConfig {
         match self {
             DeserializerConfig::Gelf(_) => FramingConfig::ChunkedGelf(Default::default()),
