@@ -354,8 +354,6 @@ impl DeserializerConfig {
             | DeserializerConfig::NativeJson(_) => {
                 FramingConfig::NewlineDelimited(Default::default())
             }
-            // TODO: the default framing of the gelf codec should be chunked gelf?
-            // or only with the udp input? Why is the newline delimited used for gelf? gelf is not newline delimited
             DeserializerConfig::Protobuf(_) => FramingConfig::Bytes,
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(_) => FramingConfig::NewlineDelimited(Default::default()),
