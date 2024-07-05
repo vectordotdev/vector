@@ -47,6 +47,7 @@ similar-asserts = "1.5.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 rstest = "0.21.0"
+tracing-test = "0.2.5"
 vrl.workspace = true
 
 [features]
