@@ -840,4 +840,64 @@ merge_strategies.bar = "concat"
         })
         .await;
     }
+
+    #[tokio::test]
+    async fn strategy_path_with_indexed_field() {
+        let reduce_config = toml::from_str::<ReduceConfig>(indoc!(
+            r#"
+        group_by = [ "id" ]
+
+        merge_strategies.id = "discard"
+        merge_strategies."arr[0]" = "concat"
+
+        [ends_when]
+          type = "vrl"
+          source = "exists(.test_end)"
+        "#,
+        ))
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let e_1 = LogEvent::from(Value::from(btreemap! {
+                "id" => 777,
+                "arr" => vec![ vec![1] ]
+            }));
+            let mut metadata_1 = e_1.metadata().clone();
+            metadata_1.set_upstream_id(Arc::new(OutputId::from("reduce")));
+
+            tx.send(e_1.into()).await.unwrap();
+
+            let e_2 = LogEvent::from(Value::from(btreemap! {
+                "id" => 777,
+                "arr" => vec![ vec![2] ],
+                "test_end" => "done",
+            }));
+            tx.send(e_2.into()).await.unwrap();
+
+            let mut output = out.recv().await.unwrap().into_log();
+
+            // Remove timestamp fields which were automatically added.
+            output.remove_timestamp();
+            output.remove("timestamp_end");
+
+            assert_eq!(
+                *output.value(),
+                btreemap! {
+                    "id" => 777,
+                     "arr" => vec![ vec![ 1 ]],
+                    "test_end" => "done",
+                }
+                .into()
+            );
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
 }
