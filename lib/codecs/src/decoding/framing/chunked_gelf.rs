@@ -282,8 +282,6 @@ impl Decoder for ChunkedGelfDecoder {
             return Ok(Some(frame.freeze()));
         }
     }
-
-    // TODO: implement decode_eof
 }
 
 #[cfg(test)]
