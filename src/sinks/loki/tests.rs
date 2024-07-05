@@ -7,6 +7,7 @@ use crate::{
     sinks::util::test::{build_test_server, load_sink},
     test_util,
 };
+use vector_lib::config::log_schema;
 
 #[test]
 fn generate_config() {
@@ -149,7 +150,6 @@ async fn healthcheck_grafana_cloud() {
 
 #[tokio::test]
 async fn timestamp_out_of_range() {
-    use vector_lib::config::log_schema;
     let (config, cx) = load_sink::<LokiConfig>(
         r#"
         endpoint = "http://localhost:3100"
@@ -164,11 +164,11 @@ async fn timestamp_out_of_range() {
     let mut e1 = LogEvent::from("hello world");
     if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
         let date = chrono::NaiveDate::from_ymd_opt(1677, 9, 21)
-             .unwrap()
-             .and_hms_nano_opt(0, 12, 43, 145_224_191)
-             .unwrap()
-             .and_local_timezone(chrono::Utc)
-             .unwrap();
+            .unwrap()
+            .and_hms_nano_opt(0, 12, 43, 145_224_191)
+            .unwrap()
+            .and_local_timezone(chrono::Utc)
+            .unwrap();
         e1.insert(timestamp_key, date);
     }
     let e1 = Event::Log(e1);
