@@ -151,23 +151,13 @@ impl StreamDecodingError for ChunkedGelfDecoderError {
 
 impl FramingError for ChunkedGelfDecoderError {}
 
-/// A decoder for handling GELF messages that are chunked.
-#[derive(Debug)]
+/// A decoder for handling GELF messages that may be chunked.
+#[derive(Debug, Clone)]
 pub struct ChunkedGelfDecoder {
     /// TODO
     state: Arc<Mutex<HashMap<u64, MessageState>>>,
     timeout: Duration,
     pending_messages_limit: usize,
-}
-
-impl Clone for ChunkedGelfDecoder {
-    fn clone(&self) -> Self {
-        Self {
-            state: Arc::new(Mutex::new(HashMap::new())),
-            timeout: self.timeout,
-            pending_messages_limit: self.pending_messages_limit,
-        }
-    }
 }
 
 impl ChunkedGelfDecoder {
@@ -268,6 +258,7 @@ impl ChunkedGelfDecoder {
         }
 
         if message_state.is_chunk_present(sequence_number) {
+            // TODO: add a PR comment asking for info or warn
             info!(
                 message = "Received a duplicate chunk. Ignoring it.",
                 sequence_number = sequence_number,
