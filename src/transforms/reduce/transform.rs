@@ -47,7 +47,11 @@ impl ReduceState {
             for (path, value) in fields_iter {
                 let (path, value) = if path.ends_with("]") {
                     // an array element - process an array instead if we have not done it already
-                    let path = path.as_str().rfind('[').map(|i| &path.as_str()[..i]).expect("invalid array path");
+                    let path = path
+                        .as_str()
+                        .rfind('[')
+                        .map(|i| &path.as_str()[..i])
+                        .expect("invalid array path");
                     if processed_arrays.contains(&path.to_string()) {
                         continue;
                     } else {
@@ -853,7 +857,7 @@ merge_strategies.bar = "concat"
               source = "exists(.test_end)"
             "#,
         ))
-            .unwrap();
+        .unwrap();
 
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
@@ -863,11 +867,11 @@ merge_strategies.bar = "concat"
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
                 LogNamespace::Legacy,
             )[0]
-                .clone()
-                .log_schema_definitions
-                .get(&OutputId::from("in"))
-                .unwrap()
-                .clone();
+            .clone()
+            .log_schema_definitions
+            .get(&OutputId::from("in"))
+            .unwrap()
+            .clone();
 
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
@@ -898,13 +902,13 @@ merge_strategies.bar = "concat"
                     "g" => json!(777),
                     "test_end" => "done",
                 }
-                    .into()
+                .into()
             );
 
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
         })
-            .await;
+        .await;
     }
 }

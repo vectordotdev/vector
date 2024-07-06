@@ -4,8 +4,8 @@ use crate::event::{LogEvent, Value};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
-use vrl::path::PathParseError;
 use vector_lib::configurable::configurable_component;
+use vrl::path::PathParseError;
 use vrl::value::KeyString;
 
 /// Strategies for merging events.
@@ -295,10 +295,7 @@ impl ReduceValueMerger for FlatUniqueMerger {
     }
 
     fn insert_into(self: Box<Self>, k: KeyString, v: &mut LogEvent) -> Result<(), PathParseError> {
-        v.parse_path_and_insert(
-            &k,
-            Value::Array(self.v.into_iter().collect()),
-        )?;
+        v.parse_path_and_insert(&k, Value::Array(self.v.into_iter().collect()))?;
         Ok(())
     }
 }
@@ -332,9 +329,7 @@ impl ReduceValueMerger for TimestampWindowMerger {
     }
 
     fn insert_into(self: Box<Self>, k: KeyString, v: &mut LogEvent) -> Result<(), PathParseError> {
-        v.parse_path_and_insert(format!("{}_end", k).as_str(),
-            Value::Timestamp(self.latest),
-        )?;
+        v.parse_path_and_insert(format!("{}_end", k).as_str(), Value::Timestamp(self.latest))?;
         v.parse_path_and_insert(&k, Value::Timestamp(self.started))?;
         Ok(())
     }
@@ -880,7 +875,9 @@ mod test {
         let mut merger = get_value_merger(initial, strategy)?;
         merger.add(additional)?;
         let mut output = LogEvent::default();
-        merger.insert_into(KeyString::from("out"), &mut output).map_err(|e| e.to_string())?;
+        merger
+            .insert_into(KeyString::from("out"), &mut output)
+            .map_err(|e| e.to_string())?;
         Ok(output.remove("out").unwrap())
     }
 }
