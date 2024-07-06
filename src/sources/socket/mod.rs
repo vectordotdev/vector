@@ -150,6 +150,8 @@ impl SourceConfig for SocketConfig {
                 )
             }
             Mode::Udp(config) => {
+                // TODO: add tests for udp with chunked gelf, use a big payload so we ensure
+                // that the decode_eof method gets called due to tokio buffering
                 let log_namespace = cx.log_namespace(config.log_namespace);
                 let decoding = config.decoding().clone();
                 let framing = config

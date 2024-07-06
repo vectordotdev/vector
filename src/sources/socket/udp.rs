@@ -202,10 +202,8 @@ pub(super) fn udp(
                     };
 
                     bytes_received.emit(ByteSize(byte_size));
-
                     let payload = buf.split_to(byte_size);
                     let truncated = byte_size == max_length + 1;
-
                     let mut stream = FramedRead::new(payload.as_ref(), decoder.clone()).peekable();
 
                     while let Some(result) = stream.next().await {
