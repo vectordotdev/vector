@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::BTreeMap, time::Duration};
-
+use std::time::Instant;
 use colored::{ColoredString, Colorize};
+use tokio::time::timeout;
 use tokio_stream::StreamExt;
 use url::Url;
 use vector_lib::api_client::{
@@ -98,12 +99,27 @@ async fn run(
         );
     };
 
+    let start_time = Instant::now();
+    let stream_duration = match opts.duration {
+        Some(duration) => Duration::from_millis(duration),
+        None => Duration::MAX,
+    };
+
     // Loop over the returned results, printing out tap events.
     #[allow(clippy::print_stdout)]
     #[allow(clippy::print_stderr)]
     loop {
-        let message = stream.next().await;
-        if let Some(Some(res)) = message {
+        if start_time.elapsed() >= stream_duration {
+            return exitcode::OK;
+        }
+
+        let message = 
+            timeout(stream_duration - start_time.elapsed(), stream.next()).await;
+        if message.is_err() {
+            return exitcode::OK;
+        }
+
+        if let Ok(Some(Some(res))) = message {
             if let Some(d) = res.data {
                 for tap_event in d.output_events_by_component_id_patterns.iter() {
                     match tap_event {

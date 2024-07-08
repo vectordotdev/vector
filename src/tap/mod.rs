@@ -52,6 +52,10 @@ pub struct Opts {
     /// Whether to reconnect if the underlying API connection drops. By default, tap will attempt to reconnect if the connection drops.
     #[arg(short, long)]
     no_reconnect: bool,
+
+    /// Specifies a duration (in ms) to sample logs (e.g. specifying 10000 will sample logs for 10 seconds then exit)
+    #[arg(short, long)]
+    duration: Option<u64>,
 }
 
 impl Opts {
