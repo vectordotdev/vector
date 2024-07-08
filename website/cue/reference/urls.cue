@@ -628,7 +628,7 @@ urls: {
 	vector_topologies:                          "/docs/setup/deployment/topologies"
 	vector_transforms:                          "/docs/reference/configuration/transforms"
 	vector_twitter:                             "https://twitter.com/vectordotdev"
-	vector_unit_tests:                          "\(vector_configuration)/unit-tests"
+	vector_unit_tests:                          "/docs/reference/configuration/unit-tests"
 	vector_version_branches:                    "\(vector_repo)/branches/all?query=v"
 	vrl_announcement:                           "/blog/vector-remap-language"
 	vrl_boolean_expression:                     "\(vrl_reference)#boolean-expressions"
