@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-use super::GreptimeDBConfig;
+use crate::sinks::greptimedb::metrics::config::GreptimeDBConfig;
 
 #[tokio::test]
 async fn test_greptimedb_sink() {
