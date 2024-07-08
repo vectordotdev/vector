@@ -148,8 +148,6 @@ fn merge_url_and_key(base_url: &str, key: &str) -> String {
     let base_url = base_url.strip_suffix('/').unwrap_or(base_url);
     let key = key.strip_prefix('/').unwrap_or(key);
     format!("{base_url}/{key}")
-
-    format!("{}{}", base_url, key)
 }
 
 #[cfg(test)]
