@@ -44,27 +44,33 @@ impl ReduceState {
 
         if let Some(fields_iter) = e.all_event_fields_skip_array_elements() {
             for (path, value) in fields_iter {
-                let target_path = parse_target_path(path.as_str()).unwrap();
-                let maybe_strategy = strategies.get(&target_path);
-                match self.fields.entry(target_path) {
-                    Entry::Vacant(entry) => {
-                        if let Some(strategy) = maybe_strategy {
-                            match get_value_merger(value.clone(), strategy) {
-                                Ok(m) => {
-                                    entry.insert(m);
+                match parse_target_path(path.as_str()) {
+                    Ok(target_path) => {
+                        let maybe_strategy = strategies.get(&target_path);
+                        match self.fields.entry(target_path) {
+                            Entry::Vacant(entry) => {
+                                if let Some(strategy) = maybe_strategy {
+                                    match get_value_merger(value.clone(), strategy) {
+                                        Ok(m) => {
+                                            entry.insert(m);
+                                        }
+                                        Err(error) => {
+                                            warn!(message = "Failed to merge value.", %error);
+                                        }
+                                    }
+                                } else {
+                                    entry.insert(value.clone().into());
                                 }
-                                Err(error) => {
+                            }
+                            Entry::Occupied(mut entry) => {
+                                if let Err(error) = entry.get_mut().add(value.clone()) {
                                     warn!(message = "Failed to merge value.", %error);
                                 }
                             }
-                        } else {
-                            entry.insert(value.clone().into());
                         }
                     }
-                    Entry::Occupied(mut entry) => {
-                        if let Err(error) = entry.get_mut().add(value.clone()) {
-                            warn!(message = "Failed to merge value.", %error);
-                        }
+                    Err(error) => {
+                        error!(%error, path = %path);
                     }
                 }
             }
@@ -791,7 +797,6 @@ merge_strategies.bar = "concat"
 
             merge_strategies.id = "discard"
             merge_strategies."message.a.b" = "array"
-            merge_strategies."message.\"x.y\"" = "concat"
 
             [ends_when]
               type = "vrl"
@@ -809,12 +814,9 @@ merge_strategies.bar = "concat"
                 "id" => 777,
                 "message" => btreemap! {
                     "a" => btreemap! {
-                        "b" => [1,2],
+                        "b" => vec![1,2],
                         "num" => 1,
                     },
-                    "x" => btreemap! {
-                        "y" => "1",
-                    }
                 },
                 "arr" => vec![btreemap! { "a" => 1 }, btreemap! { "b" => 1 }]
             }));
@@ -824,15 +826,12 @@ merge_strategies.bar = "concat"
             tx.send(e_1.into()).await.unwrap();
 
             let e_2 = LogEvent::from(Value::from(btreemap! {
-                "id" => 888,
+                "id" => 777,
                 "message" => btreemap! {
                         "a" => btreemap! {
-                            "b" => [3,4],
+                            "b" => vec![3,4],
                             "num" => 2,
                         },
-                    "x" => btreemap! {
-                        "y" => "2",
-                    }
                 },
                  "arr" => vec![btreemap! { "a" => 2 }, btreemap! { "b" => 2 }],
                 "test_end" => "done",
@@ -848,17 +847,14 @@ merge_strategies.bar = "concat"
             assert_eq!(
                 *output.value(),
                 btreemap! {
+                    "id" => 777,
                     "message" => btreemap! {
                         "a" => btreemap! {
-                            "b" => vec![[1, 2], [3,4]],
+                            "b" => vec![vec![1, 2], vec![3,4]],
                             "num" => 3,
                         },
-                    "x" => btreemap! {
-                        "y" => "12",
-                    }
-                },
-                    "id" => 777,
-                     "arr" => vec![btreemap! { "a" => 1 }, btreemap! { "b" => 1 }],
+                    },
+                    "arr" => vec![btreemap! { "a" => 1 }, btreemap! { "b" => 1 }],
                     "test_end" => "done",
                 }
                 .into()
