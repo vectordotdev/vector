@@ -177,7 +177,7 @@ pub struct SimpleHttpConfig {
 
 fn example_custom_response_headers() -> HashMap<String, String> {
     HashMap::<_, _>::from_iter([
-        ("Access-Control-Allow-Origin", "*"),
+        ("Access-Control-Allow-Origin", "my-cool-server"),
     ])
 }
 
