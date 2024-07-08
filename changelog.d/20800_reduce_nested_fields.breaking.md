@@ -53,6 +53,7 @@ merge_strategies."a.b[0]" = "array"
 #### Reduced Event
 
 Old behavior:
+
 ```json
 {
   "id": 777,
@@ -71,6 +72,7 @@ Old behavior:
 ```
 
 New behavior:
+
 ```json
 {
   "id": 777,
