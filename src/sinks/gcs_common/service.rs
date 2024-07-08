@@ -145,13 +145,9 @@ impl Service<GcsRequest> for GcsService {
 
 /// converts // to / between the base url and the key if necessary
 fn merge_url_and_key(base_url: &str, key: &str) -> String {
-    let key = if base_url.ends_with("/") {
-        key.strip_prefix('/').unwrap_or_else(|| key)
-    } else if !key.starts_with('/') {
-        &format!("/{}", key)
-    } else {
-        key
-    };
+    let base_url = base_url.strip_suffix('/').unwrap_or(base_url);
+    let key = key.strip_prefix('/').unwrap_or(key);
+    format!("{base_url}/{key}")
 
     format!("{}{}", base_url, key)
 }
