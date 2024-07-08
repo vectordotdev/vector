@@ -4,6 +4,14 @@ The new behavior is to use the default strategy based on the element type.
 
 ### Example
 
+#### Config
+
+```toml
+group_by = [ "id" ]
+merge_strategies.id = "discard"
+merge_strategies."a.b[0]" = "array"
+```
+
 #### Event 1
 
 ```json
