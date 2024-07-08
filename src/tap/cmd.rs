@@ -100,48 +100,47 @@ async fn run(
     };
 
     let start_time = Instant::now();
-    let stream_duration = match opts.duration {
-        Some(duration) => Duration::from_millis(duration),
-        None => Duration::MAX,
-    };
+    let stream_duration = opts.duration.map(Duration::from_millis).unwrap_or(Duration::MAX);
 
     // Loop over the returned results, printing out tap events.
     #[allow(clippy::print_stdout)]
     #[allow(clippy::print_stderr)]
     loop {
-        if start_time.elapsed() >= stream_duration {
+        let time_elapsed = start_time.elapsed();
+        if time_elapsed >= stream_duration {
             return exitcode::OK;
         }
 
-        let message = 
-            timeout(stream_duration - start_time.elapsed(), stream.next()).await;
-        if message.is_err() {
-            return exitcode::OK;
-        }
-
-        if let Ok(Some(Some(res))) = message {
-            if let Some(d) = res.data {
-                for tap_event in d.output_events_by_component_id_patterns.iter() {
-                    match tap_event {
-                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
-                            println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                        },
-                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => {
-                            println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                        },
-                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Trace(ev) => {
-                            println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                        },
-                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
-                            if !opts.quiet {
-                                eprintln!("{}", ev.message);
-                            }
-                        },
+        let message =
+            timeout(stream_duration - time_elapsed, stream.next()).await;
+        match message {
+            Ok(Some(Some(res))) =>
+                if let Some(d) = res.data {
+                    for tap_event in d.output_events_by_component_id_patterns.iter() {
+                        match tap_event {
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                            },
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => {
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                            },
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Trace(ev) => {
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                            },
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
+                                if !opts.quiet {
+                                    eprintln!("{}", ev.message);
+                                }
+                            },
+                        }
                     }
                 }
-            }
-        } else {
-            return exitcode::TEMPFAIL;
+            Err(_) =>
+                // If the stream times out, that indicates the duration specified by the user
+                // has elapsed. We should exit gracefully. 
+                return exitcode::OK,
+            Ok(_) =>
+                return exitcode::TEMPFAIL,
         }
     }
 }
