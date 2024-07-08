@@ -70,6 +70,11 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         decode(encoding_header, body)
     }
 
+    // This function can be defined to enrich warp::Replies.
+    fn enrich_reply<T : warp::Reply>(&self, reply: T) -> T {
+        reply
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn run(
         self,
@@ -186,7 +191,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     });
                     Err(r)
                 }
-            });
+            }).map(|reply| &self.enrich_reply(reply));
 
             let span = Span::current();
             let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {

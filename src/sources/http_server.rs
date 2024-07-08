@@ -98,6 +98,11 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::examples = "X-*"))]
     #[configurable(metadata(docs::examples = "*"))]
     headers: Vec<String>,
+    
+    /// Custom response headers to be added to the HTTP response
+    #[serde(default)]    
+    #[configurable(metadata(docs::examples = "example_custom_response_headers()"))]
+    custom_response_headers: HashMap<String, String>,
 
     /// A list of URL query parameters to include in the log event.
     ///
@@ -168,6 +173,12 @@ pub struct SimpleHttpConfig {
     #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
+}
+
+fn example_custom_response_headers() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter([
+        ("Access-Control-Allow-Origin", "*"),
+    ])
 }
 
 impl SimpleHttpConfig {
@@ -265,6 +276,7 @@ impl Default for SimpleHttpConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             encoding: None,
             headers: Vec::new(),
+            custom_response_headers: HashMap::new(),
             query_parameters: Vec::new(),
             tls: None,
             auth: None,
@@ -355,6 +367,7 @@ impl SourceConfig for SimpleHttpConfig {
 
         let source = SimpleHttpSource {
             headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"))?,
+            custom_response_headers: self.custom_response_headers.clone(),
             query_parameters: remove_duplicates(self.query_parameters.clone(), "query_parameters"),
             path_key: self.path_key.clone(),
             host_key: self.host_key.clone(),
@@ -403,6 +416,7 @@ impl SourceConfig for SimpleHttpConfig {
 #[derive(Clone)]
 struct SimpleHttpSource {
     headers: Vec<HttpConfigParamKind>,
+    custom_response_headers: HashMap<String, String>,
     query_parameters: Vec<String>,
     path_key: OptionalValuePath,
     host_key: OptionalValuePath,
@@ -543,6 +557,20 @@ impl HttpSource for SimpleHttpSource {
 
     fn enable_source_ip(&self) -> bool {
         self.host_key.path.is_some()
+    }
+
+    /// Enriches the warp::reply::Reply with custom headers
+    ///
+    /// This method adds the custom headers specified in the configuration
+    /// to the HTTP response.
+    fn enrich_reply<T : warp::Reply>(
+        &self,
+        mut reply: T
+    ) -> warp::http::response::Builder {
+        for (key, value) in &self.custom_response_headers {
+            reply = warp::reply::with_headers(reply, key, value);
+        }
+        reply
     }
 }
 
