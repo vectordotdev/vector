@@ -100,7 +100,8 @@ async fn run(
     };
 
     let start_time = Instant::now();
-    let stream_duration = opts.duration.map(Duration::from_millis).unwrap_or(Duration::MAX);
+    let stream_duration = 
+        opts.duration_ms.map(Duration::from_millis).unwrap_or(Duration::MAX);
 
     // Loop over the returned results, printing out tap events.
     #[allow(clippy::print_stdout)]
@@ -137,7 +138,7 @@ async fn run(
                 }
             Err(_) =>
                 // If the stream times out, that indicates the duration specified by the user
-                // has elapsed. We should exit gracefully. 
+                // has elapsed. We should exit gracefully.
                 return exitcode::OK,
             Ok(_) =>
                 return exitcode::TEMPFAIL,

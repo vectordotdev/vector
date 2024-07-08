@@ -53,9 +53,9 @@ pub struct Opts {
     #[arg(short, long)]
     no_reconnect: bool,
 
-    /// Specifies a duration (in ms) to sample logs (e.g. specifying 10000 will sample logs for 10 seconds then exit)
-    #[arg(short, long)]
-    duration: Option<u64>,
+    /// Specifies a duration (in milliseconds) to sample logs (e.g. specifying 10000 will sample logs for 10 seconds then exit)
+    #[arg(short = 'd', long)]
+    duration_ms: Option<u64>,
 }
 
 impl Opts {

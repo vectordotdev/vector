@@ -307,9 +307,9 @@ cli: {
 					_short:      "n"
 					description: "Whether to reconnect if the underlying Vector API connection drops. By default, tap will attempt to reconnect if the connection drops."
 				}
-				"duration": {
+				"duration_ms": {
 					_short:      "d"
-					description: "Specifies a duration (in ms) to sample logs (e.g. passing in 10000 will sample logs for 10 seconds then exit)."
+					description: "Specifies a duration (in milliseconds) to sample logs (e.g. passing in 10000 will sample logs for 10 seconds then exit)."
 				}
 			}
 
