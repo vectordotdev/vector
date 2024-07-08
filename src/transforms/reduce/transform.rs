@@ -791,6 +791,7 @@ merge_strategies.bar = "concat"
 
             merge_strategies.id = "discard"
             merge_strategies."message.a.b" = "array"
+            merge_strategies."message.\"x.y\"" = "concat"
 
             [ends_when]
               type = "vrl"
@@ -810,6 +811,9 @@ merge_strategies.bar = "concat"
                     "a" => btreemap! {
                         "b" => [1,2],
                         "num" => 1,
+                    },
+                    "x" => btreemap! {
+                        "y" => "1",
                     }
                 },
                 "arr" => vec![btreemap! { "a" => 1 }, btreemap! { "b" => 1 }]
@@ -820,12 +824,15 @@ merge_strategies.bar = "concat"
             tx.send(e_1.into()).await.unwrap();
 
             let e_2 = LogEvent::from(Value::from(btreemap! {
-                "id" => 777,
+                "id" => 888,
                 "message" => btreemap! {
                         "a" => btreemap! {
                             "b" => [3,4],
                             "num" => 2,
                         },
+                    "x" => btreemap! {
+                        "y" => "2",
+                    }
                 },
                  "arr" => vec![btreemap! { "a" => 2 }, btreemap! { "b" => 2 }],
                 "test_end" => "done",
@@ -845,7 +852,10 @@ merge_strategies.bar = "concat"
                         "a" => btreemap! {
                             "b" => vec![[1, 2], [3,4]],
                             "num" => 3,
-                        }
+                        },
+                    "x" => btreemap! {
+                        "y" => "12",
+                    }
                 },
                     "id" => 777,
                      "arr" => vec![btreemap! { "a" => 1 }, btreemap! { "b" => 1 }],
