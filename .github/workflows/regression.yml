@@ -41,6 +41,7 @@ concurrency:
 
 env:
   SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
+  SMP_WARMUP_SECONDS: 70 # default is 45 seconds
 
 jobs:
 
@@ -473,6 +474,7 @@ jobs:
             --baseline-sha ${{ needs.compute-metadata.outputs.baseline-sha }} \
             --comparison-sha ${{ needs.compute-metadata.outputs.comparison-sha }} \
             --target-config-dir ${{ github.workspace }}/regression/ \
+            --warmup-seconds ${{ env.SMP_WARMUP_SECONDS }}
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - uses: actions/upload-artifact@v3
