@@ -30,11 +30,13 @@ mod batch;
 mod codecs;
 mod common;
 mod conditions;
+#[cfg(feature = "sources-datadog_agent")]
+mod datadog_agent;
 #[cfg(feature = "sinks-datadog_metrics")]
 mod datadog_metrics;
 #[cfg(feature = "sinks-datadog_traces")]
 mod datadog_traces;
-#[cfg(feature = "transforms-dedupe")]
+#[cfg(feature = "transforms-impl-dedupe")]
 mod dedupe;
 #[cfg(feature = "sources-demo_logs")]
 mod demo_logs;
@@ -87,6 +89,8 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
+#[cfg(feature = "sinks-mqtt")]
+mod mqtt;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
@@ -100,11 +104,11 @@ mod process;
     feature = "sinks-prometheus"
 ))]
 mod prometheus;
-#[cfg(feature = "sinks-pulsar")]
+#[cfg(any(feature = "sinks-pulsar", feature = "sources-pulsar"))]
 mod pulsar;
 #[cfg(feature = "sources-redis")]
 mod redis;
-#[cfg(feature = "transforms-reduce")]
+#[cfg(feature = "transforms-impl-reduce")]
 mod reduce;
 mod remap;
 mod sample;
@@ -163,11 +167,13 @@ pub(crate) use self::aws_kinesis_firehose::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
 pub(crate) use self::codecs::*;
+#[cfg(feature = "sources-datadog_agent")]
+pub(crate) use self::datadog_agent::*;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub(crate) use self::datadog_metrics::*;
 #[cfg(feature = "sinks-datadog_traces")]
 pub(crate) use self::datadog_traces::*;
-#[cfg(feature = "transforms-dedupe")]
+#[cfg(feature = "transforms-impl-dedupe")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-demo_logs")]
 pub(crate) use self::demo_logs::*;
@@ -221,6 +227,8 @@ pub(crate) use self::loki::*;
 pub(crate) use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
+#[cfg(feature = "sinks-mqtt")]
+pub(crate) use self::mqtt::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
 #[allow(unused_imports)]
@@ -233,15 +241,15 @@ pub(crate) use self::postgresql_metrics::*;
     feature = "sinks-prometheus"
 ))]
 pub(crate) use self::prometheus::*;
-#[cfg(feature = "sinks-pulsar")]
+#[cfg(any(feature = "sinks-pulsar", feature = "sources-pulsar"))]
 pub(crate) use self::pulsar::*;
 #[cfg(feature = "sources-redis")]
 pub(crate) use self::redis::*;
-#[cfg(feature = "transforms-reduce")]
+#[cfg(feature = "transforms-impl-reduce")]
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-remap")]
 pub(crate) use self::remap::*;
-#[cfg(feature = "transforms-sample")]
+#[cfg(feature = "transforms-impl-sample")]
 pub(crate) use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
 pub(crate) use self::sematext_metrics::*;

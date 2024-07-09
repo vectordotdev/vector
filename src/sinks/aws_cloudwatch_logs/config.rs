@@ -50,7 +50,7 @@ pub struct Retention {
     #[serde(
         default,
         deserialize_with = "retention_days",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub days: u32,
 }
@@ -161,7 +161,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -174,6 +174,7 @@ impl CloudwatchLogsSinkConfig {
             self.region.endpoint(),
             proxy,
             &self.tls,
+            &None,
         )
         .await
     }

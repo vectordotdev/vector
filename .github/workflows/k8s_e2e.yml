@@ -25,13 +25,15 @@ on:
     - cron: '0 0 * * 2-6'
 
 concurrency:
-  # In flight runs will be canceled through re-trigger in the merge queue, scheduled run. The comment.html_url should always be unique.
+  # In flight runs will be canceled through re-trigger in the merge queue, scheduled run, or if
+  # additional PR commits are pushed. The comment.html_url should always be unique.
+  #
   # Note that technically this workflow can run on PRs which have code changes that affect K8s. Choosing not to add the PR commit to
   # the concurrency group settings- since that would result in new PR commits canceling out manual runs on any PR that doesn't flag
   # change detection. This is a "conservative" approach that means we may have some runs that could be canceled, but it's safer than
   # having user's runs canceled when they shouldn't be. In practice this shouldn't happen very often given this component does not change
   # often so any increased cost from the conservative approach should be negligible.
-  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.event.merge_group.head_sha || github.event.schedule }}
+  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.ref || github.event.schedule }}
   cancel-in-progress: true
 
 env:
@@ -57,7 +59,8 @@ jobs:
 
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
-    runs-on: [linux, ubuntu-20.04-4core]
+    runs-on: ubuntu-20.04-4core
+    timeout-minutes: 45
     needs: changes
     # Run this job even if `changes` job is skipped (non- pull request trigger)
     if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true') }}
@@ -74,7 +77,7 @@ jobs:
 
       - name: (PR comment) Set latest commit status as pending
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@v2.0.0
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -90,7 +93,7 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -108,7 +111,7 @@ jobs:
           path: target/artifacts/*
 
       - name: (PR comment) Set latest commit status as 'failure'
-        uses: myrotvorets/set-commit-status-action@v2.0.0
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         if: failure() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -124,6 +127,7 @@ jobs:
   compute-k8s-test-plan:
     name: Compute K8s test plan
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: changes
     # Run this job even if `changes` job is skipped
     if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true') }}
@@ -136,7 +140,7 @@ jobs:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.24.0",
+              "v1.33.1",
             ]
 
             // Aim to test against oldest supported k8s cloud-provider versions
@@ -177,7 +181,8 @@ jobs:
 
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
-    runs-on: [linux, ubuntu-20.04-4core]
+    runs-on: ubuntu-20.04-4core
+    timeout-minutes: 45
     needs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
@@ -221,7 +226,7 @@ jobs:
           CARGO_INCREMENTAL: 0
 
       - name: (PR comment) Set latest commit status as failure
-        uses: myrotvorets/set-commit-status-action@v2.0.0
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         if: failure() && github.event_name == 'issue_comment'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
@@ -231,6 +236,7 @@ jobs:
   final-result:
     name: K8s E2E Suite
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs:
       - changes
       - build-x86_64-unknown-linux-gnu
@@ -247,7 +253,7 @@ jobs:
 
       - name: (PR comment) Submit PR result as success
         if: github.event_name == 'issue_comment' && env.FAILED != 'true'
-        uses: myrotvorets/set-commit-status-action@v2.0.0
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -312,21 +312,28 @@ mod source {
     pub struct FileUnwatched<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
+        pub reached_eof: bool,
     }
 
     impl<'a> InternalEvent for FileUnwatched<'a> {
         fn emit(self) {
+            let reached_eof = if self.reached_eof { "true" } else { "false" };
             info!(
                 message = "Stopped watching file.",
                 file = %self.file.display(),
+                reached_eof
             );
             if self.include_file_metric_tag {
                 counter!(
                     "files_unwatched_total",
                     "file" => self.file.to_string_lossy().into_owned(),
+                    "reached_eof" => reached_eof,
                 )
             } else {
-                counter!("files_unwatched_total")
+                counter!(
+                    "files_unwatched_total",
+                    "reached_eof" => reached_eof,
+                )
             }
             .increment(1);
         }
@@ -518,10 +525,11 @@ mod source {
             });
         }
 
-        fn emit_file_unwatched(&self, file: &Path) {
+        fn emit_file_unwatched(&self, file: &Path, reached_eof: bool) {
             emit!(FileUnwatched {
                 file,
-                include_file_metric_tag: self.include_file_metric_tag
+                include_file_metric_tag: self.include_file_metric_tag,
+                reached_eof
             });
         }
 

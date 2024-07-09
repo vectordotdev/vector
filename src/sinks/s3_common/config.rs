@@ -158,6 +158,9 @@ pub enum S3StorageClass {
     /// Infrequently Accessed.
     StandardIa,
 
+    /// High Performance (single Availability zone).
+    ExpressOnezone,
+
     /// Infrequently Accessed (single Availability zone).
     OnezoneIa,
 
@@ -175,6 +178,7 @@ impl From<S3StorageClass> for StorageClass {
             S3StorageClass::ReducedRedundancy => Self::ReducedRedundancy,
             S3StorageClass::IntelligentTiering => Self::IntelligentTiering,
             S3StorageClass::StandardIa => Self::StandardIa,
+            S3StorageClass::ExpressOnezone => Self::ExpressOnezone,
             S3StorageClass::OnezoneIa => Self::OnezoneIa,
             S3StorageClass::Glacier => Self::Glacier,
             S3StorageClass::DeepArchive => Self::DeepArchive,
@@ -363,7 +367,7 @@ pub async fn create_service(
     let endpoint = region.endpoint();
     let region = region.region();
     let client =
-        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options)
+        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options, &None)
             .await?;
     Ok(S3Service::new(client))
 }
@@ -379,6 +383,7 @@ mod tests {
             ("DEEP_ARCHIVE", S3StorageClass::DeepArchive),
             ("GLACIER", S3StorageClass::Glacier),
             ("INTELLIGENT_TIERING", S3StorageClass::IntelligentTiering),
+            ("EXPRESS_ONEZONE", S3StorageClass::ExpressOnezone),
             ("ONEZONE_IA", S3StorageClass::OnezoneIa),
             ("REDUCED_REDUNDANCY", S3StorageClass::ReducedRedundancy),
             ("STANDARD", S3StorageClass::Standard),

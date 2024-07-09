@@ -107,7 +107,7 @@ pub struct CloudWatchMetricsSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -177,6 +177,7 @@ impl CloudWatchMetricsSinkConfig {
             self.region.endpoint(),
             proxy,
             &self.tls,
+            &None,
         )
         .await
     }

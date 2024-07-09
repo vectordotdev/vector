@@ -67,17 +67,11 @@ where
     healthcheck: SinkHealthcheckOptions,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_lib::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub buffer: BufferConfig,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_lib::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     proxy: ProxyConfig,
 
     #[serde(flatten)]
@@ -244,6 +238,9 @@ pub struct SinkContext {
     pub schema: schema::Options,
     pub app_name: String,
     pub app_name_slug: String,
+
+    /// Extra context data provided by the running app and shared across all components. This can be
+    /// used to pass shared settings or other data from outside the components.
     pub extra_context: ExtraContext,
 }
 

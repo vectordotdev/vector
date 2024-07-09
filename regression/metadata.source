@@ -1,2 +1,0 @@
-REPOSITORY="git@github.com:vectordotdev/vector.git"
-TARGET_ENVARS="VECTOR_THREADS=8,VECTOR_REQUIRE_HEALTHY=true"

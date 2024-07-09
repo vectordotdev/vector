@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Agent
-    app.kubernetes.io/version: "0.34.2-distroless-libc"
+    app.kubernetes.io/version: "0.39.0-distroless-libc"
   annotations: {}
 spec:
   selector:
@@ -30,12 +30,14 @@ spec:
       dnsPolicy: ClusterFirst
       containers:
         - name: vector
-          image: "timberio/vector:0.34.2-distroless-libc"
+          image: "timberio/vector:0.39.0-distroless-libc"
           imagePullPolicy: IfNotPresent
           args:
             - --config-dir
             - /etc/vector/
           env:
+            - name: VECTOR_LOG
+              value: "info"
             - name: VECTOR_SELF_NODE_NAME
               valueFrom:
                 fieldRef:
@@ -52,8 +54,6 @@ spec:
               value: "/host/proc"
             - name: SYSFS_ROOT
               value: "/host/sys"
-            - name: VECTOR_LOG
-              value: "info"
           ports:
             - name: prom-exporter
               containerPort: 9090

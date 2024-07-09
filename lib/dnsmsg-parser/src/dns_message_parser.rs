@@ -1,16 +1,19 @@
-use std::fmt::Write as _;
 use std::str::Utf8Error;
+use std::{fmt::Write as _, ops::Deref};
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
 use hickory_proto::{
     error::ProtoError,
-    op::{message::Message as TrustDnsMessage, Edns, Query},
+    op::{message::Message as TrustDnsMessage, Query},
     rr::{
-        dnssec::{rdata::DNSSECRData, Algorithm, SupportedAlgorithms},
+        dnssec::{
+            rdata::{DNSSECRData, DNSKEY, DS},
+            Algorithm, SupportedAlgorithms,
+        },
         rdata::{
             caa::Value,
             opt::{EdnsCode, EdnsOption},
-            A, AAAA, NULL,
+            A, AAAA, NULL, OPT, SVCB,
         },
         record_data::RData,
         resource::Record,
@@ -19,6 +22,8 @@ use hickory_proto::{
     serialize::binary::{BinDecodable, BinDecoder},
 };
 use thiserror::Error;
+
+use crate::ede::{EDE, EDE_OPTION_CODE};
 
 use super::dns_message::{
     self, DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection,
@@ -39,6 +44,27 @@ pub enum DnsMessageParserError {
 /// Result alias for parsing
 pub type DnsParserResult<T> = Result<T, DnsMessageParserError>;
 
+/// Options for DNS message parser
+#[derive(Debug, Default, Clone)]
+pub struct DnsParserOptions {
+    /// Whether hostnames in RData should be lowercased, for consistency
+    pub lowercase_hostnames: bool,
+}
+
+trait DnsParserOptionsTarget {
+    fn to_string_with_options(&self, options: &DnsParserOptions) -> String;
+}
+
+impl DnsParserOptionsTarget for Name {
+    fn to_string_with_options(&self, options: &DnsParserOptions) -> String {
+        if options.lowercase_hostnames {
+            self.to_lowercase().to_string()
+        } else {
+            self.to_string()
+        }
+    }
+}
+
 /// A DNS message parser
 #[derive(Debug)]
 pub struct DnsMessageParser {
@@ -50,6 +76,7 @@ pub struct DnsMessageParser {
     // contain compressed domain name, and store it here as a member field; for
     // subsequent invocations of the same call, we simply reuse this copy.
     raw_message_for_rdata_parsing: Option<Vec<u8>>,
+    options: DnsParserOptions,
 }
 
 impl DnsMessageParser {
@@ -57,6 +84,15 @@ impl DnsMessageParser {
         DnsMessageParser {
             raw_message,
             raw_message_for_rdata_parsing: None,
+            options: DnsParserOptions::default(),
+        }
+    }
+
+    pub fn with_options(raw_message: Vec<u8>, options: DnsParserOptions) -> Self {
+        DnsMessageParser {
+            raw_message,
+            raw_message_for_rdata_parsing: None,
+            options,
         }
     }
 
@@ -113,7 +149,7 @@ impl DnsMessageParser {
 
     fn parse_dns_query_question(&self, question: &Query) -> QueryQuestion {
         QueryQuestion {
-            name: question.name().to_string(),
+            name: question.name().to_string_with_options(&self.options),
             class: question.query_class().to_string(),
             record_type: format_record_type(question.query_type()),
             record_type_id: u16::from(question.query_type()),
@@ -148,17 +184,17 @@ impl DnsMessageParser {
             .collect::<Result<Vec<_>, _>>()
     }
 
-    fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
+    pub(crate) fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
         let record_data = match record.data() {
             Some(RData::Unknown { code, rdata }) => {
                 self.format_unknown_rdata((*code).into(), rdata)
             }
-            Some(rdata) => format_rdata(rdata),
+            Some(rdata) => self.format_rdata(rdata),
             None => Ok((Some(String::from("")), None)), // NULL record
         }?;
 
         Ok(DnsRecord {
-            name: record.name().to_string(),
+            name: record.name().to_string_with_options(&self.options),
             class: record.dns_class().to_string(),
             record_type: format_record_type(record.record_type()),
             record_type_id: u16::from(record.record_type()),
@@ -239,7 +275,7 @@ impl DnsMessageParser {
             let mut dec = BinDecoder::new(&address_vec);
             parse_ipv6_address(&mut dec)?
         };
-        let domain_name = parse_domain_name(&mut decoder)?;
+        let domain_name = Self::parse_domain_name(&mut decoder, &self.options)?;
         Ok((
             Some(format!("{} {} {}", prefix, ipv6_address, domain_name)),
             None,
@@ -345,57 +381,49 @@ impl DnsMessageParser {
     ) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
         match code {
             dns_message::RTYPE_MB => {
+                let options = self.options.clone();
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
-                let madname = parse_domain_name(&mut decoder)?;
-                Ok((Some(madname.to_string()), None))
+                let madname = Self::parse_domain_name(&mut decoder, &options)?;
+                Ok((Some(madname), None))
             }
 
             dns_message::RTYPE_MG => {
+                let options = self.options.clone();
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
-                let mgname = parse_domain_name(&mut decoder)?;
-                Ok((Some(mgname.to_string()), None))
+                let mgname = Self::parse_domain_name(&mut decoder, &options)?;
+                Ok((Some(mgname), None))
             }
 
             dns_message::RTYPE_MR => {
+                let options = self.options.clone();
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
-                let newname = parse_domain_name(&mut decoder)?;
-                Ok((Some(newname.to_string()), None))
+                let newname = Self::parse_domain_name(&mut decoder, &options)?;
+                Ok((Some(newname), None))
             }
 
             dns_message::RTYPE_WKS => self.parse_wks_rdata(rdata.anything()),
 
-            dns_message::RTYPE_HINFO => {
-                let mut decoder = BinDecoder::new(rdata.anything());
-                let cpu = parse_character_string(&mut decoder)?;
-                let os = parse_character_string(&mut decoder)?;
-                Ok((
-                    Some(format!(
-                        "\"{}\" \"{}\"",
-                        escape_string_for_text_representation(cpu),
-                        escape_string_for_text_representation(os)
-                    )),
-                    None,
-                ))
-            }
-
             dns_message::RTYPE_MINFO => {
+                let options = self.options.clone();
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
-                let rmailbx = parse_domain_name(&mut decoder)?;
-                let emailbx = parse_domain_name(&mut decoder)?;
+                let rmailbx = Self::parse_domain_name(&mut decoder, &options)?;
+                let emailbx = Self::parse_domain_name(&mut decoder, &options)?;
                 Ok((Some(format!("{} {}", rmailbx, emailbx)), None))
             }
 
             dns_message::RTYPE_RP => {
+                let options = self.options.clone();
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
-                let mbox = parse_domain_name(&mut decoder)?;
-                let txt = parse_domain_name(&mut decoder)?;
+                let mbox = Self::parse_domain_name(&mut decoder, &options)?;
+                let txt = Self::parse_domain_name(&mut decoder, &options)?;
                 Ok((Some(format!("{} {}", mbox, txt)), None))
             }
 
             dns_message::RTYPE_AFSDB => {
+                let options = self.options.clone();
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let subtype = parse_u16(&mut decoder)?;
-                let hostname = parse_domain_name(&mut decoder)?;
+                let hostname = Self::parse_domain_name(&mut decoder, &options)?;
                 Ok((Some(format!("{} {}", subtype, hostname)), None))
             }
 
@@ -436,9 +464,10 @@ impl DnsMessageParser {
             }
 
             dns_message::RTYPE_RT => {
+                let options = self.options.clone();
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let preference = parse_u16(&mut decoder)?;
-                let intermediate_host = parse_domain_name(&mut decoder)?;
+                let intermediate_host = Self::parse_domain_name(&mut decoder, &options)?;
                 Ok((Some(format!("{} {}", preference, intermediate_host)), None))
             }
 
@@ -451,19 +480,21 @@ impl DnsMessageParser {
             }
 
             dns_message::RTYPE_PX => {
+                let options = self.options.clone();
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let preference = parse_u16(&mut decoder)?;
-                let map822 = parse_domain_name(&mut decoder)?;
-                let mapx400 = parse_domain_name(&mut decoder)?;
+                let map822 = Self::parse_domain_name(&mut decoder, &options)?;
+                let mapx400 = Self::parse_domain_name(&mut decoder, &options)?;
                 Ok((Some(format!("{} {} {}", preference, map822, mapx400)), None))
             }
 
             dns_message::RTYPE_LOC => self.parse_loc_rdata(rdata.anything()),
 
             dns_message::RTYPE_KX => {
+                let options = self.options.clone();
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let preference = parse_u16(&mut decoder)?;
-                let exchanger = parse_domain_name(&mut decoder)?;
+                let exchanger = Self::parse_domain_name(&mut decoder, &options)?;
                 Ok((Some(format!("{} {}", preference, exchanger)), None))
             }
 
@@ -522,258 +553,305 @@ impl DnsMessageParser {
             _ => Ok((None, Some(rdata.anything().to_vec()))),
         }
     }
-}
 
-fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
-    match rdata {
-        RData::A(ip) => Ok((Some(ip.to_string()), None)),
-        RData::AAAA(ip) => Ok((Some(ip.to_string()), None)),
-        RData::ANAME(name) => Ok((Some(name.to_string()), None)),
-        RData::CNAME(name) => Ok((Some(name.to_string()), None)),
-        RData::MX(mx) => {
-            let srv_rdata = format!("{} {}", mx.preference(), mx.exchange(),);
-            Ok((Some(srv_rdata), None))
-        }
-        RData::NULL(null) => Ok((Some(BASE64.encode(null.anything())), None)),
-        RData::NS(ns) => Ok((Some(ns.to_string()), None)),
-        RData::OPENPGPKEY(key) => {
-            if let Ok(key_string) = String::from_utf8(Vec::from(key.public_key())) {
-                Ok((Some(format!("({})", &key_string)), None))
-            } else {
-                Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("Invalid OPENPGPKEY rdata"),
-                })
+    fn format_rdata(&self, rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
+        match rdata {
+            RData::A(ip) => Ok((Some(ip.to_string()), None)),
+            RData::AAAA(ip) => Ok((Some(ip.to_string()), None)),
+            RData::ANAME(name) => Ok((Some(name.to_string_with_options(&self.options)), None)),
+            RData::CNAME(name) => Ok((Some(name.to_string_with_options(&self.options)), None)),
+            RData::CSYNC(csync) => {
+                // Using CSYNC's formatter since not all data is exposed otherwise
+                let csync_rdata = format!("{}", csync);
+                Ok((Some(csync_rdata), None))
             }
-        }
-        RData::PTR(ptr) => Ok((Some(ptr.to_string()), None)),
-        RData::SOA(soa) => Ok((
-            Some(format!(
-                "{} {} {} {} {} {} {}",
-                soa.mname(),
-                soa.rname(),
-                soa.serial(),
-                soa.refresh(),
-                soa.retry(),
-                soa.expire(),
-                soa.minimum()
-            )),
-            None,
-        )),
-        RData::SRV(srv) => {
-            let srv_rdata = format!(
-                "{} {} {} {}",
-                srv.priority(),
-                srv.weight(),
-                srv.port(),
-                srv.target()
-            );
-            Ok((Some(srv_rdata), None))
-        }
-        RData::TXT(txt) => {
-            let txt_rdata = txt
-                .txt_data()
-                .iter()
-                .map(|value| {
-                    format!(
-                        "\"{}\"",
-                        escape_string_for_text_representation(
-                            String::from_utf8_lossy(value).to_string()
-                        )
-                    )
-                })
-                .collect::<Vec<String>>()
-                .join(" ");
-            Ok((Some(txt_rdata), None))
-        }
-        RData::CAA(caa) => {
-            let caa_rdata = format!(
-                "{} {} \"{}\"",
-                caa.issuer_critical() as u8,
-                caa.tag().as_str(),
-                match caa.value() {
-                    Value::Url(url) => {
-                        url.as_str().to_string()
-                    }
-                    Value::Issuer(option_name, vec_keyvalue) => {
-                        let mut final_issuer = String::new();
-                        if let Some(name) = option_name {
-                            final_issuer.push_str(&name.to_utf8());
-                            for keyvalue in vec_keyvalue.iter() {
-                                final_issuer.push_str("; ");
-                                final_issuer.push_str(keyvalue.key());
-                                final_issuer.push('=');
-                                final_issuer.push_str(keyvalue.value());
-                            }
-                        }
-                        final_issuer.trim_end().to_string()
-                    }
-                    Value::Unknown(unknown) => std::str::from_utf8(unknown)
-                        .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
-                        .to_string(),
-                }
-            );
-            Ok((Some(caa_rdata), None))
-        }
-
-        RData::TLSA(tlsa) => {
-            let tlsa_rdata = format!(
-                "{} {} {} {}",
-                u8::from(tlsa.cert_usage()),
-                u8::from(tlsa.selector()),
-                u8::from(tlsa.matching()),
-                HEXUPPER.encode(tlsa.cert_data())
-            );
-            Ok((Some(tlsa_rdata), None))
-        }
-        RData::SSHFP(sshfp) => {
-            let sshfp_rdata = format!(
-                "{} {} {}",
-                Into::<u8>::into(sshfp.algorithm()),
-                Into::<u8>::into(sshfp.fingerprint_type()),
-                HEXUPPER.encode(sshfp.fingerprint())
-            );
-            Ok((Some(sshfp_rdata), None))
-        }
-        RData::NAPTR(naptr) => {
-            let naptr_rdata = format!(
-                r#"{} {} "{}" "{}" "{}" {}"#,
-                naptr.order(),
-                naptr.preference(),
-                escape_string_for_text_representation(
-                    std::str::from_utf8(naptr.flags())
-                        .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
-                        .to_string()
-                ),
-                escape_string_for_text_representation(
-                    std::str::from_utf8(naptr.services())
-                        .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
-                        .to_string()
-                ),
-                escape_string_for_text_representation(
-                    std::str::from_utf8(naptr.regexp())
-                        .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
-                        .to_string()
-                ),
-                naptr.replacement().to_utf8()
-            );
-            Ok((Some(naptr_rdata), None))
-        }
-        RData::DNSSEC(dnssec) => match dnssec {
-            // See https://tools.ietf.org/html/rfc4034 for details
-            // on dnssec related rdata formats
-            DNSSECRData::DS(ds) => {
-                let ds_rdata = format!(
-                    "{} {} {} {}",
-                    ds.key_tag(),
-                    u8::from(ds.algorithm()),
-                    u8::from(ds.digest_type()),
-                    HEXUPPER.encode(ds.digest())
-                );
-                Ok((Some(ds_rdata), None))
-            }
-            DNSSECRData::DNSKEY(dnskey) => {
-                let dnskey_rdata = format!(
-                    "{} 3 {} {}",
-                    {
-                        if dnskey.revoke() {
-                            0b0000_0000_0000_0000
-                        } else if dnskey.zone_key() && dnskey.secure_entry_point() {
-                            0b0000_0001_0000_0001
-                        } else {
-                            0b0000_0001_0000_0000
-                        }
-                    },
-                    u8::from(dnskey.algorithm()),
-                    BASE64.encode(dnskey.public_key())
-                );
-                Ok((Some(dnskey_rdata), None))
-            }
-            DNSSECRData::NSEC(nsec) => {
-                let nsec_rdata = format!(
+            RData::MX(mx) => {
+                let srv_rdata = format!(
                     "{} {}",
-                    nsec.next_domain_name(),
-                    nsec.type_bit_maps()
-                        .iter()
-                        .flat_map(|e| format_record_type(*e))
-                        .collect::<Vec<String>>()
-                        .join(" ")
+                    mx.preference(),
+                    mx.exchange().to_string_with_options(&self.options),
                 );
-                Ok((Some(nsec_rdata), None))
+                Ok((Some(srv_rdata), None))
             }
-            DNSSECRData::NSEC3(nsec3) => {
-                let nsec3_rdata = format!(
-                    "{} {} {} {} {} {}",
-                    u8::from(nsec3.hash_algorithm()),
-                    nsec3.opt_out() as u8,
-                    nsec3.iterations(),
-                    HEXUPPER.encode(nsec3.salt()),
-                    BASE32HEX_NOPAD.encode(nsec3.next_hashed_owner_name()),
-                    nsec3
-                        .type_bit_maps()
-                        .iter()
-                        .flat_map(|e| format_record_type(*e))
-                        .collect::<Vec<String>>()
-                        .join(" ")
-                );
-                Ok((Some(nsec3_rdata), None))
+            RData::NULL(null) => Ok((Some(BASE64.encode(null.anything())), None)),
+            RData::NS(ns) => Ok((Some(ns.to_string_with_options(&self.options)), None)),
+            RData::OPENPGPKEY(key) => {
+                if let Ok(key_string) = String::from_utf8(Vec::from(key.public_key())) {
+                    Ok((Some(format!("({})", &key_string)), None))
+                } else {
+                    Err(DnsMessageParserError::SimpleError {
+                        cause: String::from("Invalid OPENPGPKEY rdata"),
+                    })
+                }
             }
-            DNSSECRData::NSEC3PARAM(nsec3param) => {
-                let nsec3param_rdata = format!(
+            RData::PTR(ptr) => Ok((Some(ptr.to_string_with_options(&self.options)), None)),
+            RData::SOA(soa) => Ok((
+                Some(format!(
+                    "{} {} {} {} {} {} {}",
+                    soa.mname().to_string_with_options(&self.options),
+                    soa.rname().to_string_with_options(&self.options),
+                    soa.serial(),
+                    soa.refresh(),
+                    soa.retry(),
+                    soa.expire(),
+                    soa.minimum()
+                )),
+                None,
+            )),
+            RData::SRV(srv) => {
+                let srv_rdata = format!(
                     "{} {} {} {}",
-                    u8::from(nsec3param.hash_algorithm()),
-                    nsec3param.opt_out() as u8,
-                    nsec3param.iterations(),
-                    HEXUPPER.encode(nsec3param.salt()),
+                    srv.priority(),
+                    srv.weight(),
+                    srv.port(),
+                    srv.target().to_string_with_options(&self.options)
                 );
-                Ok((Some(nsec3param_rdata), None))
+                Ok((Some(srv_rdata), None))
+            }
+            RData::TXT(txt) => {
+                let txt_rdata = txt
+                    .txt_data()
+                    .iter()
+                    .map(|value| {
+                        format!(
+                            "\"{}\"",
+                            escape_string_for_text_representation(
+                                String::from_utf8_lossy(value).to_string()
+                            )
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join(" ");
+                Ok((Some(txt_rdata), None))
+            }
+            RData::CAA(caa) => {
+                let caa_rdata = format!(
+                    "{} {} \"{}\"",
+                    caa.issuer_critical() as u8,
+                    caa.tag().as_str(),
+                    match caa.value() {
+                        Value::Url(url) => {
+                            url.as_str().to_string()
+                        }
+                        Value::Issuer(option_name, vec_keyvalue) => {
+                            let mut final_issuer = String::new();
+                            if let Some(name) = option_name {
+                                final_issuer.push_str(&name.to_string_with_options(&self.options));
+                                for keyvalue in vec_keyvalue.iter() {
+                                    final_issuer.push_str("; ");
+                                    final_issuer.push_str(keyvalue.key());
+                                    final_issuer.push('=');
+                                    final_issuer.push_str(keyvalue.value());
+                                }
+                            }
+                            final_issuer.trim_end().to_string()
+                        }
+                        Value::Unknown(unknown) => std::str::from_utf8(unknown)
+                            .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
+                            .to_string(),
+                    }
+                );
+                Ok((Some(caa_rdata), None))
             }
 
-            DNSSECRData::SIG(sig) => {
-                let sig_rdata = format!(
-                    "{} {} {} {} {} {} {} {} {}",
-                    match format_record_type(sig.type_covered()) {
-                        Some(record_type) => record_type,
-                        None => String::from("Unknown record type"),
-                    },
-                    u8::from(sig.algorithm()),
-                    sig.num_labels(),
-                    sig.original_ttl(),
-                    sig.sig_expiration(), // currently in epoch convert to human readable ?
-                    sig.sig_inception(),  // currently in epoch convert to human readable ?
-                    sig.key_tag(),
-                    sig.signer_name(),
-                    BASE64.encode(sig.sig())
+            RData::TLSA(tlsa) => {
+                let tlsa_rdata = format!(
+                    "{} {} {} {}",
+                    u8::from(tlsa.cert_usage()),
+                    u8::from(tlsa.selector()),
+                    u8::from(tlsa.matching()),
+                    HEXUPPER.encode(tlsa.cert_data())
                 );
-                Ok((Some(sig_rdata), None))
+                Ok((Some(tlsa_rdata), None))
             }
-            // RSIG is a derivation of SIG but choosing to keep this duplicate code in lieu of the alternative
-            // which is to allocate to the heap with Box in order to deref.
-            DNSSECRData::RRSIG(sig) => {
-                let sig_rdata = format!(
-                    "{} {} {} {} {} {} {} {} {}",
-                    match format_record_type(sig.type_covered()) {
-                        Some(record_type) => record_type,
-                        None => String::from("Unknown record type"),
-                    },
-                    u8::from(sig.algorithm()),
-                    sig.num_labels(),
-                    sig.original_ttl(),
-                    sig.sig_expiration(), // currently in epoch convert to human readable ?
-                    sig.sig_inception(),  // currently in epoch convert to human readable ?
-                    sig.key_tag(),
-                    sig.signer_name(),
-                    BASE64.encode(sig.sig())
+            RData::SSHFP(sshfp) => {
+                let sshfp_rdata = format!(
+                    "{} {} {}",
+                    Into::<u8>::into(sshfp.algorithm()),
+                    Into::<u8>::into(sshfp.fingerprint_type()),
+                    HEXUPPER.encode(sshfp.fingerprint())
                 );
-                Ok((Some(sig_rdata), None))
+                Ok((Some(sshfp_rdata), None))
             }
-            DNSSECRData::Unknown { code: _, rdata } => Ok((None, Some(rdata.anything().to_vec()))),
+            RData::NAPTR(naptr) => {
+                let naptr_rdata = format!(
+                    r#"{} {} "{}" "{}" "{}" {}"#,
+                    naptr.order(),
+                    naptr.preference(),
+                    escape_string_for_text_representation(
+                        std::str::from_utf8(naptr.flags())
+                            .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
+                            .to_string()
+                    ),
+                    escape_string_for_text_representation(
+                        std::str::from_utf8(naptr.services())
+                            .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
+                            .to_string()
+                    ),
+                    escape_string_for_text_representation(
+                        std::str::from_utf8(naptr.regexp())
+                            .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
+                            .to_string()
+                    ),
+                    naptr.replacement().to_string_with_options(&self.options)
+                );
+                Ok((Some(naptr_rdata), None))
+            }
+            RData::HINFO(hinfo) => {
+                let hinfo_data = format!(
+                    r#""{}" "{}""#,
+                    std::str::from_utf8(hinfo.cpu())
+                        .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?,
+                    std::str::from_utf8(hinfo.os())
+                        .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?,
+                );
+                Ok((Some(hinfo_data), None))
+            }
+            RData::HTTPS(https) => {
+                let https_data = format_svcb_record(&https.0, &self.options);
+                Ok((Some(https_data), None))
+            }
+            RData::SVCB(svcb) => {
+                let svcb_data = format_svcb_record(svcb, &self.options);
+                Ok((Some(svcb_data), None))
+            }
+            RData::OPT(opt) => {
+                let parsed = parse_edns_options(opt)?;
+                let ede_data = parsed.0.iter().map(|entry| EdnsOptionEntry {
+                    opt_code: 15u16,
+                    opt_name: "EDE".to_string(),
+                    opt_data: format!(
+                        "EDE={}({}){}",
+                        entry.info_code(),
+                        entry.purpose().unwrap_or(""),
+                        entry.extra_text().unwrap_or("".to_string())
+                    ),
+                });
+                let opt_data = parsed
+                    .1
+                    .into_iter()
+                    .chain(ede_data)
+                    .map(|entry| format!("{}={}", entry.opt_name, entry.opt_data))
+                    .collect::<Vec<String>>()
+                    .join(",");
+                Ok((Some(opt_data), None))
+            }
+            RData::DNSSEC(dnssec) => match dnssec {
+                // See https://tools.ietf.org/html/rfc4034 for details
+                // on dnssec related rdata formats
+                DNSSECRData::CDS(cds) => Ok((Some(format_ds_record(cds.deref())), None)),
+                DNSSECRData::DS(ds) => Ok((Some(format_ds_record(ds)), None)),
+                DNSSECRData::CDNSKEY(cdnskey) => {
+                    Ok((Some(format_dnskey_record(cdnskey.deref())), None))
+                }
+                DNSSECRData::DNSKEY(dnskey) => Ok((Some(format_dnskey_record(dnskey)), None)),
+                DNSSECRData::NSEC(nsec) => {
+                    let nsec_rdata = format!(
+                        "{} {}",
+                        nsec.next_domain_name()
+                            .to_string_with_options(&self.options),
+                        nsec.type_bit_maps()
+                            .iter()
+                            .flat_map(|e| format_record_type(*e))
+                            .collect::<Vec<String>>()
+                            .join(" ")
+                    );
+                    Ok((Some(nsec_rdata), None))
+                }
+                DNSSECRData::NSEC3(nsec3) => {
+                    let nsec3_rdata = format!(
+                        "{} {} {} {} {} {}",
+                        u8::from(nsec3.hash_algorithm()),
+                        nsec3.opt_out() as u8,
+                        nsec3.iterations(),
+                        HEXUPPER.encode(nsec3.salt()),
+                        BASE32HEX_NOPAD.encode(nsec3.next_hashed_owner_name()),
+                        nsec3
+                            .type_bit_maps()
+                            .iter()
+                            .flat_map(|e| format_record_type(*e))
+                            .collect::<Vec<String>>()
+                            .join(" ")
+                    );
+                    Ok((Some(nsec3_rdata), None))
+                }
+                DNSSECRData::NSEC3PARAM(nsec3param) => {
+                    let nsec3param_rdata = format!(
+                        "{} {} {} {}",
+                        u8::from(nsec3param.hash_algorithm()),
+                        nsec3param.opt_out() as u8,
+                        nsec3param.iterations(),
+                        HEXUPPER.encode(nsec3param.salt()),
+                    );
+                    Ok((Some(nsec3param_rdata), None))
+                }
+
+                DNSSECRData::SIG(sig) => {
+                    let sig_rdata = format!(
+                        "{} {} {} {} {} {} {} {} {}",
+                        match format_record_type(sig.type_covered()) {
+                            Some(record_type) => record_type,
+                            None => String::from("Unknown record type"),
+                        },
+                        u8::from(sig.algorithm()),
+                        sig.num_labels(),
+                        sig.original_ttl(),
+                        sig.sig_expiration(), // currently in epoch convert to human readable ?
+                        sig.sig_inception(),  // currently in epoch convert to human readable ?
+                        sig.key_tag(),
+                        sig.signer_name().to_string_with_options(&self.options),
+                        BASE64.encode(sig.sig())
+                    );
+                    Ok((Some(sig_rdata), None))
+                }
+                // RSIG is a derivation of SIG but choosing to keep this duplicate code in lieu of the alternative
+                // which is to allocate to the heap with Box in order to deref.
+                DNSSECRData::RRSIG(sig) => {
+                    let sig_rdata = format!(
+                        "{} {} {} {} {} {} {} {} {}",
+                        match format_record_type(sig.type_covered()) {
+                            Some(record_type) => record_type,
+                            None => String::from("Unknown record type"),
+                        },
+                        u8::from(sig.algorithm()),
+                        sig.num_labels(),
+                        sig.original_ttl(),
+                        sig.sig_expiration(), // currently in epoch convert to human readable ?
+                        sig.sig_inception(),  // currently in epoch convert to human readable ?
+                        sig.key_tag(),
+                        sig.signer_name().to_string_with_options(&self.options),
+                        BASE64.encode(sig.sig())
+                    );
+                    Ok((Some(sig_rdata), None))
+                }
+                DNSSECRData::KEY(key) => {
+                    let key_rdata = format!(
+                        "{} {} {} {}",
+                        key.flags(),
+                        u8::from(key.protocol()),
+                        u8::from(key.algorithm()),
+                        BASE64.encode(key.public_key())
+                    );
+                    Ok((Some(key_rdata), None))
+                }
+                DNSSECRData::Unknown { code: _, rdata } => {
+                    Ok((None, Some(rdata.anything().to_vec())))
+                }
+                _ => Err(DnsMessageParserError::SimpleError {
+                    cause: format!("Unsupported rdata {:?}", rdata),
+                }),
+            },
             _ => Err(DnsMessageParserError::SimpleError {
                 cause: format!("Unsupported rdata {:?}", rdata),
             }),
-        },
-        _ => Err(DnsMessageParserError::SimpleError {
-            cause: format!("Unsupported rdata {:?}", rdata),
-        }),
+        }
+    }
+
+    fn parse_domain_name(
+        decoder: &mut BinDecoder<'_>,
+        options: &DnsParserOptions,
+    ) -> DnsParserResult<String> {
+        parse_domain_name(decoder).map(|n| n.to_string_with_options(options))
     }
 }
 
@@ -782,6 +860,46 @@ fn format_record_type(record_type: RecordType) -> Option<String> {
         RecordType::Unknown(code) => parse_unknown_record_type(code),
         _ => Some(record_type.to_string()),
     }
+}
+
+fn format_svcb_record(svcb: &SVCB, options: &DnsParserOptions) -> String {
+    format!(
+        "{} {} {}",
+        svcb.svc_priority(),
+        svcb.target_name().to_string_with_options(options),
+        svcb.svc_params()
+            .iter()
+            .map(|(key, value)| format!(r#"{}="{}""#, key, value.to_string().trim_end_matches(',')))
+            .collect::<Vec<_>>()
+            .join(" ")
+    )
+}
+
+fn format_dnskey_record(dnskey: &DNSKEY) -> String {
+    format!(
+        "{} 3 {} {}",
+        {
+            if dnskey.revoke() {
+                0b0000_0000_0000_0000
+            } else if dnskey.zone_key() && dnskey.secure_entry_point() {
+                0b0000_0001_0000_0001
+            } else {
+                0b0000_0001_0000_0000
+            }
+        },
+        u8::from(dnskey.algorithm()),
+        BASE64.encode(dnskey.public_key())
+    )
+}
+
+fn format_ds_record(ds: &DS) -> String {
+    format!(
+        "{} {} {} {}",
+        ds.key_tag(),
+        u8::from(ds.algorithm()),
+        u8::from(ds.digest_type()),
+        HEXUPPER.encode(ds.digest())
+    )
 }
 
 fn parse_response_code(rcode: u16) -> Option<&'static str> {
@@ -845,20 +963,37 @@ fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeade
 
 fn parse_edns(dns_message: &TrustDnsMessage) -> Option<DnsParserResult<OptPseudoSection>> {
     dns_message.extensions().as_ref().map(|edns| {
-        parse_edns_options(edns).map(|options| OptPseudoSection {
+        parse_edns_options(edns.options()).map(|(ede, rest)| OptPseudoSection {
             extended_rcode: edns.rcode_high(),
             version: edns.version(),
             dnssec_ok: edns.dnssec_ok(),
             udp_max_payload_size: edns.max_payload(),
-            options,
+            ede,
+            options: rest,
         })
     })
 }
 
-fn parse_edns_options(edns: &Edns) -> DnsParserResult<Vec<EdnsOptionEntry>> {
-    edns.options()
+fn parse_edns_options(edns: &OPT) -> DnsParserResult<(Vec<EDE>, Vec<EdnsOptionEntry>)> {
+    let ede_opts: Vec<EDE> = edns
         .as_ref()
         .iter()
+        .filter_map(|(_, option)| {
+            if let EdnsOption::Unknown(EDE_OPTION_CODE, option) = option {
+                Some(
+                    EDE::from_bytes(option)
+                        .map_err(|source| DnsMessageParserError::TrustDnsError { source }),
+                )
+            } else {
+                None
+            }
+        })
+        .collect::<Result<Vec<EDE>, DnsMessageParserError>>()?;
+
+    let rest: Vec<EdnsOptionEntry> = edns
+        .as_ref()
+        .iter()
+        .filter(|(&code, _)| u16::from(code) != EDE_OPTION_CODE)
         .map(|(code, option)| match option {
             EdnsOption::DAU(algorithms)
             | EdnsOption::DHU(algorithms)
@@ -870,7 +1005,9 @@ fn parse_edns_options(edns: &Edns) -> DnsParserResult<Vec<EdnsOptionEntry>> {
                 .map(|bytes| parse_edns_opt(*code, &bytes))
                 .map_err(|source| DnsMessageParserError::TrustDnsError { source }),
         })
-        .collect()
+        .collect::<Result<Vec<EdnsOptionEntry>, DnsMessageParserError>>()?;
+
+    Ok((ede_opts, rest))
 }
 
 fn parse_edns_opt_dnssec_algorithms(
@@ -897,7 +1034,7 @@ fn parse_loc_rdata_size(data: u8) -> DnsParserResult<f64> {
     let base = (data & 0xF0) >> 4;
     if base > 9 {
         return Err(DnsMessageParserError::SimpleError {
-            cause: format!("The base shouldnt be greater than 9. Base: {}", base),
+            cause: format!("The base shouldn't be greater than 9. Base: {}", base),
         });
     }
 
@@ -905,7 +1042,7 @@ fn parse_loc_rdata_size(data: u8) -> DnsParserResult<f64> {
     if exponent > 9 {
         return Err(DnsMessageParserError::SimpleError {
             cause: format!(
-                "The exponent shouldnt be greater than 9. Exponent: {}",
+                "The exponent shouldn't be greater than 9. Exponent: {}",
                 exponent
             ),
         });
@@ -1131,15 +1268,23 @@ fn format_bytes_as_hex_string(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use std::{
+        collections::HashMap,
         net::{Ipv4Addr, Ipv6Addr},
         str::FromStr,
     };
 
+    #[allow(deprecated)]
     use hickory_proto::rr::{
         dnssec::{
             rdata::{
-                dnskey::DNSKEY, ds::DS, nsec::NSEC, nsec3::NSEC3, nsec3param::NSEC3PARAM, sig::SIG,
-                DNSSECRData, RRSIG,
+                dnskey::DNSKEY,
+                ds::DS,
+                key::{KeyTrust, KeyUsage, Protocol, UpdateScope},
+                nsec::NSEC,
+                nsec3::NSEC3,
+                nsec3param::NSEC3PARAM,
+                sig::SIG,
+                DNSSECRData, KEY, RRSIG,
             },
             Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
         },
@@ -1147,10 +1292,12 @@ mod tests {
         rdata::{
             caa::KeyValue,
             sshfp::{Algorithm, FingerprintType},
+            svcb,
             tlsa::{CertUsage, Matching, Selector},
-            CAA, NAPTR, SSHFP, TLSA, TXT,
+            CAA, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
         },
     };
+    use hickory_proto::serialize::binary::Restrict;
 
     use super::*;
 
@@ -1158,6 +1305,17 @@ mod tests {
         pub fn raw_message_for_rdata_parsing(&self) -> Option<&Vec<u8>> {
             self.raw_message_for_rdata_parsing.as_ref()
         }
+    }
+
+    fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
+        DnsMessageParser::new(Vec::new()).format_rdata(rdata)
+    }
+
+    fn format_rdata_with_options(
+        rdata: &RData,
+        options: DnsParserOptions,
+    ) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
+        DnsMessageParser::with_options(Vec::new(), options).format_rdata(rdata)
     }
 
     #[test]
@@ -1188,6 +1346,43 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_as_query_message_with_ede() {
+        let raw_dns_message =
+            "szgAAAABAAAAAAABAmg1B2V4YW1wbGUDY29tAAAGAAEAACkE0AEBQAAABgAPAAIAFQ==";
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let parse_result = DnsMessageParser::new(raw_query_message).parse_as_query_message();
+        assert!(parse_result.is_ok());
+        let message = parse_result.expect("Message is not parsed.");
+        let opt_pseudo_section = message.opt_pseudo_section.expect("OPT section was missing");
+        assert_eq!(opt_pseudo_section.ede.len(), 1);
+        assert_eq!(opt_pseudo_section.ede[0].info_code(), 21u16);
+        assert_eq!(opt_pseudo_section.ede[0].purpose(), Some("Not Supported"));
+        assert_eq!(opt_pseudo_section.ede[0].extra_text(), None);
+    }
+
+    #[test]
+    fn test_parse_as_query_message_with_ede_with_extra_text() {
+        let raw_dns_message =
+            "szgAAAABAAAAAAABAmg1B2V4YW1wbGUDY29tAAAGAAEAACkE0AEBQAAAOQAPADUACW5vIFNFUCBtYXRjaGluZyB0aGUgRFMgZm91bmQgZm9yIGRuc3NlYy1mYWlsZWQub3JnLg==";
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let parse_result = DnsMessageParser::new(raw_query_message).parse_as_query_message();
+        assert!(parse_result.is_ok());
+        let message = parse_result.expect("Message is not parsed.");
+        let opt_pseudo_section = message.opt_pseudo_section.expect("OPT section was missing");
+        assert_eq!(opt_pseudo_section.ede.len(), 1);
+        assert_eq!(opt_pseudo_section.ede[0].info_code(), 9u16);
+        assert_eq!(opt_pseudo_section.ede[0].purpose(), Some("DNSKEY Missing"));
+        assert_eq!(
+            opt_pseudo_section.ede[0].extra_text(),
+            Some("no SEP matching the DS found for dnssec-failed.org.".to_string())
+        );
+    }
+
+    #[test]
     fn test_parse_as_query_message_with_invalid_data() {
         let err = DnsMessageParser::new(vec![1, 2, 3])
             .parse_as_query_message()
@@ -1214,6 +1409,41 @@ mod tests {
             .expect("Invalid DNS query message.");
         assert_eq!(dns_query_message.answer_section[0].rdata, None);
         assert_ne!(dns_query_message.answer_section[0].rdata_bytes, None);
+    }
+
+    #[test]
+    fn test_parse_response_with_https_rdata() {
+        let raw_response_message_base64 = "Oe2BgAABAAEAAAABBGNkbnAHc2FuamFnaANjb20AAEEAAcAMAEEAAQAAASwAPQABAAABAAYCaDMCaDIABAAIrEDEHKxAxRwABgAgJgZHAADmAAAAAAAArEDEHCYGRwAA5gAAAAAAAKxAxRwAACkE0AAAAAAAHAAKABjWOVAgEGik/gEAAABlwiAuXkvEOviB1sk=";
+        let raw_response_message = BASE64
+            .decode(raw_response_message_base64.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let dns_response_message = DnsMessageParser::new(raw_response_message)
+            .parse_as_query_message()
+            .expect("Invalid DNS query message.");
+        assert_eq!(
+            dns_response_message.answer_section[0].rdata,
+            Some(r#"1 . alpn="h3,h2" ipv4hint="172.64.196.28,172.64.197.28" ipv6hint="2606:4700:e6::ac40:c41c,2606:4700:e6::ac40:c51c""#.to_string())
+        );
+        assert_eq!(dns_response_message.answer_section[0].record_type_id, 65u16);
+        assert_eq!(dns_response_message.answer_section[0].rdata_bytes, None);
+    }
+
+    #[test]
+    fn test_parse_response_with_hinfo_rdata() {
+        let raw_response_message_base64 =
+            "wS2BgAABAAEAAAAAB3RyYWNrZXIEZGxlcgNvcmcAAP8AAcAMAA0AAQAAC64ACQdSRkM4NDgyAA==";
+        let raw_response_message = BASE64
+            .decode(raw_response_message_base64.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let dns_response_message = DnsMessageParser::new(raw_response_message)
+            .parse_as_query_message()
+            .expect("Invalid DNS query message.");
+        assert_eq!(
+            dns_response_message.answer_section[0].rdata,
+            Some(r#""RFC8482" """#.to_string())
+        );
+        assert_eq!(dns_response_message.answer_section[0].record_type_id, 13u16);
+        assert_eq!(dns_response_message.answer_section[0].rdata_bytes, None);
     }
 
     #[test]
@@ -1330,6 +1560,24 @@ mod tests {
             Name::from_str("www.example.com.").unwrap(),
         ));
         let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!("www.example.com.", parsed.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_cname_type_downcase() {
+        let rdata = RData::CNAME(hickory_proto::rr::rdata::CNAME(
+            Name::from_str("WWW.Example.Com.").unwrap(),
+        ));
+        let rdata_text = format_rdata_with_options(
+            &rdata,
+            DnsParserOptions {
+                lowercase_hostnames: true,
+            },
+        );
         assert!(rdata_text.is_ok());
         if let Ok((parsed, raw_rdata)) = rdata_text {
             assert!(raw_rdata.is_none());
@@ -1577,6 +1825,36 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_format_rdata_for_key_type() {
+        let rdata = RData::DNSSEC(DNSSECRData::KEY(KEY::new(
+            KeyTrust::NotPrivate,
+            KeyUsage::Host,
+            #[allow(deprecated)]
+            UpdateScope {
+                zone: false,
+                strong: false,
+                unique: true,
+                general: true,
+            },
+            Protocol::DNSSEC,
+            DNSSEC_Algorithm::RSASHA256,
+            vec![
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                23, 24, 25, 26, 27, 28, 29, 29, 31,
+            ],
+        )));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!(
+                "16387 3 8 AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHR8=",
+                parsed.unwrap()
+            );
+        }
+    }
+
     // rsig is a derivation of the SIG record data, but the upstream crate does not handle that with an trait
     // so there isn't really a great way to reduce code duplication here.
     #[test]
@@ -1623,8 +1901,102 @@ mod tests {
     }
 
     #[test]
+    fn test_format_rdata_for_svcb_type() {
+        let rdata = RData::SVCB(svcb::SVCB::new(
+            1,
+            Name::root(),
+            vec![
+                (
+                    svcb::SvcParamKey::Alpn,
+                    svcb::SvcParamValue::Alpn(svcb::Alpn(vec!["h3".to_string(), "h2".to_string()])),
+                ),
+                (
+                    svcb::SvcParamKey::Ipv4Hint,
+                    svcb::SvcParamValue::Ipv4Hint(svcb::IpHint(vec![
+                        A(Ipv4Addr::new(104, 18, 36, 155)),
+                        A(Ipv4Addr::new(172, 64, 151, 101)),
+                    ])),
+                ),
+            ],
+        ));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!(
+                r#"1 . alpn="h3,h2" ipv4hint="104.18.36.155,172.64.151.101""#,
+                parsed.unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_https_type() {
+        let rdata = RData::HTTPS(HTTPS(svcb::SVCB::new(
+            1,
+            Name::root(),
+            vec![
+                (
+                    svcb::SvcParamKey::Alpn,
+                    svcb::SvcParamValue::Alpn(svcb::Alpn(vec!["h3".to_string(), "h2".to_string()])),
+                ),
+                (
+                    svcb::SvcParamKey::Ipv4Hint,
+                    svcb::SvcParamValue::Ipv4Hint(svcb::IpHint(vec![
+                        A(Ipv4Addr::new(104, 18, 36, 155)),
+                        A(Ipv4Addr::new(172, 64, 151, 101)),
+                    ])),
+                ),
+            ],
+        )));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!(
+                r#"1 . alpn="h3,h2" ipv4hint="104.18.36.155,172.64.151.101""#,
+                parsed.unwrap()
+            );
+        }
+    }
+
+    #[test]
     fn test_format_rdata_for_hinfo_type() {
-        test_format_rdata("BWludGVsBWxpbnV4", 13, "\"intel\" \"linux\"");
+        let rdata = RData::HINFO(HINFO::new("intel".to_string(), "linux".to_string()));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!(r#""intel" "linux""#, parsed.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_csync_type() {
+        let types = vec![RecordType::A, RecordType::NS, RecordType::AAAA];
+        let rdata = RData::CSYNC(CSYNC::new(123, true, true, types));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!("123 3 A NS AAAA", parsed.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_opt_type() {
+        let mut options = HashMap::new();
+        options.insert(
+            EdnsCode::LLQ,
+            EdnsOption::Unknown(u16::from(EdnsCode::LLQ), vec![0x01; 18]),
+        );
+        let rdata = RData::OPT(OPT::new(options));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!("LLQ=AQEBAQEBAQEBAQEBAQEBAQEB", parsed.unwrap());
+        }
     }
 
     #[test]
@@ -1829,11 +2201,22 @@ mod tests {
         let raw_rdata = BASE64
             .decode(raw_data.as_bytes())
             .expect("Invalid base64 encoded rdata.");
-        let record_rdata = NULL::with(raw_rdata);
-        let rdata_text =
-            DnsMessageParser::new(Vec::<u8>::new()).format_unknown_rdata(code, &record_rdata);
+        let mut decoder = BinDecoder::new(&raw_rdata);
+        let record = Record::from_rdata(
+            Name::new(),
+            1,
+            RData::read(
+                &mut decoder,
+                RecordType::from(code),
+                Restrict::new(raw_rdata.len() as u16),
+            )
+            .unwrap(),
+        );
+        let rdata_text = DnsMessageParser::new(Vec::<u8>::new())
+            .parse_dns_record(&record)
+            .map(|r| r.rdata);
         assert!(rdata_text.is_ok());
-        assert_eq!(expected_output, rdata_text.unwrap().0.unwrap());
+        assert_eq!(expected_output, rdata_text.unwrap().unwrap());
     }
 
     fn test_format_rdata_with_compressed_domain_names(

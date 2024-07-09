@@ -1,5 +1,3 @@
-use std::fmt;
-
 use bytes::BytesMut;
 use http::{header::CONTENT_TYPE, HeaderValue};
 use prost::Message;
@@ -55,14 +53,3 @@ impl Reply for Protobuf {
         }
     }
 }
-
-#[derive(Debug)]
-pub(crate) struct ReplyProtobufError;
-
-impl fmt::Display for ReplyProtobufError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("http::reply::protobuf() failed")
-    }
-}
-
-impl std::error::Error for ReplyProtobufError {}

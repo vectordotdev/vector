@@ -5,6 +5,7 @@ use std::{
     convert::TryFrom,
     io::{self, Read},
 };
+use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::ZlibDecoder;
@@ -44,6 +45,9 @@ pub struct LogstashConfig {
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
+    pub permit_origin: Option<IpAllowlistConfig>,
 
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
@@ -117,6 +121,7 @@ impl Default for LogstashConfig {
         Self {
             address: SocketListenAddr::SocketAddr("0.0.0.0:5044".parse().unwrap()),
             keepalive: None,
+            permit_origin: None,
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
@@ -162,6 +167,7 @@ impl SourceConfig for LogstashConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            self.permit_origin.clone().map(Into::into),
             LogstashConfig::NAME,
             log_namespace,
         )
@@ -716,6 +722,7 @@ mod test {
             let source = LogstashConfig {
                 address: address.into(),
                 tls: None,
+                permit_origin: None,
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: true.into(),
@@ -946,19 +953,16 @@ mod integration_tests {
     ) -> impl Stream<Item = Event> + Unpin {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: SocketAddr = address.parse().unwrap();
-        let tls_options = match tls {
-            Some(options) => options,
-            None => TlsEnableableConfig::default(),
-        };
         let tls_config = TlsSourceConfig {
             client_metadata_key: None,
-            tls_config: tls_options,
+            tls_config: tls.unwrap_or_default(),
         };
         tokio::spawn(async move {
             LogstashConfig {
                 address: address.into(),
                 tls: Some(tls_config),
                 keepalive: None,
+                permit_origin: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
                 connection_limit: None,

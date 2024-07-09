@@ -1,0 +1,46 @@
+
+[[tests]]
+name = "Test log_to_metric conversion of sets"
+
+# The inputs for the test
+[[tests.inputs]]
+insert_at = "parse_json"
+type = "log"
+
+[tests.inputs.log_fields]
+message = '{"name": "sample.set.metric", "tags": {"host": "my-host", "region": "us-west"}, "kind": "incremental", "values": [1, 2, 3, 4, 5]}'
+
+[[tests.outputs]]
+extract_from = "convert_metrics"
+
+# We just validate that the values are the same
+[[tests.outputs.conditions]]
+type = "vrl"
+source = '''
+assert!(.name == "sample.set.metric")
+assert!(.tags.host == "my-host")
+assert!(.tags.region == "us-west")
+assert!(.kind == "incremental")
+'''
+
+[sources.stdin]
+type = "stdin"
+
+[sinks.stdout]
+inputs = ["convert_metrics"]
+type = "console"
+encoding.codec = "json"
+
+[transforms.parse_json]
+inputs = ["stdin"]
+type = "remap"
+source = '''
+. = parse_json!(.message)
+'''
+
+[transforms.convert_metrics]
+inputs = ["parse_json"]
+type = "log_to_metric"
+all_metrics = true
+metrics = []
+

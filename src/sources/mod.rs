@@ -17,7 +17,7 @@ pub mod aws_sqs;
 pub mod datadog_agent;
 #[cfg(feature = "sources-demo_logs")]
 pub mod demo_logs;
-#[cfg(all(unix, feature = "sources-dnstap"))]
+#[cfg(feature = "sources-dnstap")]
 pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 pub mod docker_logs;
@@ -72,6 +72,8 @@ pub mod postgresql_metrics;
     feature = "sources-prometheus-pushgateway"
 ))]
 pub mod prometheus;
+#[cfg(feature = "sources-pulsar")]
+pub mod pulsar;
 #[cfg(feature = "sources-redis")]
 pub mod redis;
 #[cfg(feature = "sources-socket")]
@@ -89,6 +91,7 @@ pub mod util;
 
 pub use vector_lib::source::Source;
 
+#[allow(dead_code)] // Easier than listing out all the features that use this
 /// Common build errors
 #[derive(Debug, Snafu)]
 enum BuildError {

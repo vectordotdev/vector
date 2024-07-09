@@ -33,7 +33,7 @@ sources:
     type: "file"
     include:
       - "/var/log/apache2/*.log" # supports globbing
-    ignore_older: 86400          # 1 day
+    ignore_older_secs: 86400     # 1 day
 
 # Structure and parse via Vector's Remap Language
 transforms:
@@ -93,9 +93,9 @@ enabled = false
 
 # Ingest data by tailing one or more files
 [sources.apache_logs]
-type         = "file"
-include      = ["/var/log/apache2/*.log"]    # supports globbing
-ignore_older = 86400                         # 1 day
+type              = "file"
+include           = ["/var/log/apache2/*.log"]    # supports globbing
+ignore_older_secs = 86400                         # 1 day
 
 # Structure and parse via Vector's Remap Language
 [transforms.apache_parser]

@@ -1,0 +1,34 @@
+api_key: DEADBEEF
+log_level: 'debug'
+
+# disable bunch of stuff we don't need
+inventories_configuration_enabled: false
+enable_metadata_collection: false
+enable_gohai: false
+cloud_provider_metadata: []
+
+apm_config:
+  enabled: false
+
+process_config:
+  container_collection:
+    enabled: false
+  process_discovery:
+    enabled: false
+  disable_realtime_checks: true
+
+use_dogstatsd: false
+
+# configure logs
+logs_enabled: true
+
+logs_config:
+  logs_no_ssl: true
+  force_use_http: true
+  batch_wait: 1
+
+# send to vector
+vector:
+  logs:
+    enabled: true
+    url: "http://vector:8181"

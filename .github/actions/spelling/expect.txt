@@ -8,7 +8,6 @@ Acq
 AEAD
 agentpayload
 aimd
-akx
 allowerased
 amka
 amping
@@ -21,7 +20,6 @@ andy
 ansicpg
 anumber
 anycondition
-anymap
 anypb
 apievent
 apipodspec
@@ -33,7 +31,6 @@ aqf
 architecting
 archivable
 ARNOTAREALIDD
-arshiyasolei
 asdf
 asdfasdf
 assertverify
@@ -168,7 +165,6 @@ clibtype
 clickhouse
 clonable
 cloudresourcemanager
-cloudsmith
 cloudwatchlogs
 cmark
 CMK
@@ -189,9 +185,9 @@ concating
 concats
 condrestart
 conffiles
-configkey
 configmap
 confl
+confluentinc
 confy
 consigliere
 CONTEUDO
@@ -289,7 +285,6 @@ Doop
 downcasted
 droptest
 dsl
-dsmith
 dstat
 dstport
 dtype
@@ -320,6 +315,7 @@ endler
 enduml
 eni
 enp
+Ensar
 enumdecl
 enumflags
 ENVARS
@@ -328,7 +324,6 @@ EOIG
 EOL'ed
 Err'ing
 errorf
-Errorsfor
 esb
 esque
 etheus
@@ -417,7 +412,6 @@ fsevent
 fslock
 FSTRM
 fsyncdata
-fuchsnj
 fullhuman
 futs
 fuzzcheck
@@ -449,6 +443,7 @@ gnux
 gny
 Godbolt
 gogoproto
+gohai
 goldberg
 goldmark
 GPB
@@ -565,6 +560,7 @@ jmxrmi
 jmxtrans
 Jolokia
 jsn
+JSONAs
 jsonify
 jsonlines
 jstype
@@ -656,7 +652,6 @@ maybeanothertest
 mbean
 mcache
 mcr
-meh
 meln
 memfd
 memmap
@@ -818,7 +813,6 @@ overaligned
 overalignment
 owo
 oyaml
-pablosichert
 pageheap
 paq
 parallelizable
@@ -869,6 +863,7 @@ protoc
 protofbuf
 protosizer
 Prt
+psl
 psv
 publickey
 purgecss
@@ -951,6 +946,7 @@ samerole
 sameuser
 sandboxed
 sandboxing
+Saraj
 sccache
 schemaless
 schemars
@@ -1146,7 +1142,6 @@ trivy
 Troutwine
 trustarc
 truste
-TRUSTSTORE
 TSDB
 Tsvg
 turbofish
@@ -1237,7 +1232,6 @@ wktpointer
 wmem
 woooooow
 woothee
-wor
 wordlist
 workdir
 workstreams
@@ -1249,8 +1243,6 @@ wtcache
 wtime
 wtimeouts
 wtr
-wurstmeister
-wwang
 xact
 xcatsy
 Xcg

@@ -116,7 +116,8 @@ configuration: {
 					type: string: {
 						enum: {
 							"file":  "Enrich data from a CSV file."
-							"geoip": "Enrich data from a [MaxMind](\(urls.maxmind)) database."
+							"geoip": "Enrich data from a [GeoIp](\(urls.maxmind_geoip2)) [MaxMind](\(urls.maxmind)) database."
+							"mmdb":  "Enrich data from any [MaxMind](\(urls.maxmind)) database."
 						}
 					}
 				}
@@ -245,6 +246,29 @@ configuration: {
 							type: string: {
 								default: "en"
 								examples: ["de", "en", "es", "fr", "ja", "pt-BR", "ru", "zh-CN"]
+							}
+						}
+					}
+				}
+			}
+			type: object: options: {
+				mmdb: {
+					required:    true
+					description: """
+						Configuration options for generic [MaxMind](\(urls.maxmind)) databases.
+
+						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
+
+						This enrichment table only supports lookup with IP address.
+						"""
+					type: object: options: {
+						path: {
+							description: """
+								Path to the database file.
+								"""
+							required: true
+							type: string: {
+								examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
 							}
 						}
 					}
@@ -449,9 +473,8 @@ configuration: {
 			common: false
 			description: """
 				Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
-				in Vector config. Currently, only the exec backend is supported. Multiple backends can be configured. To signify
-				Vector that it should look for a secret to retrieve use the `SECRET[<backend_name>.<secret_key>]`. This placeholder
-				will then be replaced by the secret retrieved from the relevant backend.
+				in Vector config. Multiple backends can be configured. Use `SECRET[<backend_name>.<secret_key>]` to tell Vector to retrieve the secret. This placeholder is replaced by the secret
+				retrieved from the relevant backend.
 				"""
 			required: false
 			type: object: options: {
@@ -479,7 +502,7 @@ configuration: {
 						If an `error` is returned for any secrets, or if the command exits with a non-zero status code,
 						Vector will log the errors and exit.
 
-						Secrets will be loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
 						configuration reload process.
 						"""
 					type: object: options: {
@@ -500,6 +523,36 @@ configuration: {
 							type: uint: {
 								default: 5
 								unit:    "seconds"
+							}
+						}
+					}
+				}
+				aws_secrets_manager: {
+					required: true
+					description: """
+						Retrieve secrets from AWS Secrets Manager.
+
+						The secret must be a JSON text string with key/value pairs. For example:
+						```json
+						{
+							"username": "test",
+							"password": "example-password"
+						}
+						```
+
+						If an error occurred retrieving the secrets, Vector logs the error and exits.
+
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						secret_id: {
+							description: """
+								The ID of the secret to be retrieved.
+								"""
+							required: true
+							type: string: {
+								examples: ["/secret/foo-bar"]
 							}
 						}
 					}

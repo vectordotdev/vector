@@ -102,7 +102,11 @@ outputs to reference the filter, and finally update the outputs of `workflow_cal
 ### Git Branches
 
 _All_ changes must be made in a branch and submitted as [pull requests](#github-pull-requests).
-Vector does not adopt any type of branch naming style, but please use something
+
+If you want your branch to have a website preview build created, include the word `website` in the
+branch.
+
+Otherwise, Vector does not adopt any type of branch naming style, but please use something
 descriptive of your changes.
 
 ### Git Commits
@@ -237,7 +241,7 @@ first to ensure they pass.
 
 ```sh
 # Run the Clippy linter to catch common mistakes.
-cargo vdev check rust
+cargo vdev check rust --clippy
 # Ensure all code is properly formatted. Code can be run through `rustfmt` using `cargo fmt` to ensure it is properly formatted.
 cargo vdev check fmt
 # Ensure the internal metrics that Vector emits conform to standards.

@@ -145,6 +145,7 @@ impl SourceConfig for SocketConfig {
                     cx,
                     false.into(),
                     config.connection_limit,
+                    config.permit_origin.map(Into::into),
                     SocketConfig::NAME,
                     log_namespace,
                 )
@@ -948,6 +949,7 @@ mod test {
                 acknowledgements: false,
                 schema: Default::default(),
                 schema_definitions: HashMap::default(),
+                extra_context: Default::default(),
             })
             .await
             .unwrap();

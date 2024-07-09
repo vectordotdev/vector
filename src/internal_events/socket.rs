@@ -1,4 +1,4 @@
-use metrics::counter;
+use metrics::{counter, histogram};
 use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 use vector_lib::{
     internal_event::{error_stage, error_type},
@@ -41,6 +41,7 @@ impl InternalEvent for SocketBytesReceived {
             "protocol" => protocol,
         )
         .increment(self.byte_size as u64);
+        histogram!("component_received_bytes").record(self.byte_size as f64);
     }
 }
 
@@ -63,6 +64,7 @@ impl InternalEvent for SocketEventsReceived {
         counter!("component_received_events_total", "mode" => mode).increment(self.count as u64);
         counter!("component_received_event_bytes_total", "mode" => mode)
             .increment(self.byte_size.get() as u64);
+        histogram!("component_received_bytes", "mode" => mode).record(self.byte_size.get() as f64);
     }
 }
 

@@ -19,7 +19,7 @@ use crate::{
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
             ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchCommon,
-            ElasticsearchCommonMode, ElasticsearchMode,
+            ElasticsearchCommonMode, ElasticsearchMode, VersionType,
         },
         util::{
             http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
@@ -124,10 +124,7 @@ pub struct ElasticsearchConfig {
     #[configurable(derived)]
     pub compression: Compression,
 
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     pub encoding: Transformer,
@@ -183,7 +180,7 @@ pub struct ElasticsearchConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     #[configurable(derived)]
     pub acknowledgements: AcknowledgementsConfig,
@@ -233,6 +230,8 @@ impl ElasticsearchConfig {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
                 index: self.bulk.index.clone(),
                 action: self.bulk.action.clone(),
+                version: self.bulk.version.clone(),
+                version_type: self.bulk.version_type,
             }),
             ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
@@ -261,6 +260,21 @@ pub struct BulkConfig {
     #[configurable(metadata(docs::examples = "application-{{ application_id }}-%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "{{ index }}"))]
     pub index: Template,
+
+    /// Version field value.
+    #[configurable(metadata(docs::examples = "{{ obj_version }}-%Y-%m-%d"))]
+    #[configurable(metadata(docs::examples = "123"))]
+    pub version: Option<Template>,
+
+    /// Version type.
+    ///
+    /// Possible values are `internal`, `external` or `external_gt` and `external_gte`.
+    ///
+    /// [es_index_versioning]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html#index-versioning
+    #[serde(default = "default_version_type")]
+    #[configurable(metadata(docs::examples = "internal"))]
+    #[configurable(metadata(docs::examples = "external"))]
+    pub version_type: VersionType,
 }
 
 fn default_bulk_action() -> Template {
@@ -271,11 +285,17 @@ fn default_index() -> Template {
     Template::try_from("vector-%Y.%m.%d").expect("unable to parse template")
 }
 
+const fn default_version_type() -> VersionType {
+    VersionType::Internal
+}
+
 impl Default for BulkConfig {
     fn default() -> Self {
         Self {
             action: default_bulk_action(),
             index: default_index(),
+            version: Default::default(),
+            version_type: default_version_type(),
         }
     }
 }

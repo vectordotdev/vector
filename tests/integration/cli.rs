@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::{fs::read_dir, process::Command};
 
 use assert_cmd::prelude::*;
@@ -105,11 +106,11 @@ fn validate_cleanup() {
 
     // Assert that data folder didn't change
     assert_eq!(
-        vec![path],
+        HashSet::from([path]),
         read_dir(dir)
             .unwrap()
             .map(|entry| entry.unwrap().path())
-            .collect::<Vec<_>>()
+            .collect::<HashSet<_>>()
     );
 }
 

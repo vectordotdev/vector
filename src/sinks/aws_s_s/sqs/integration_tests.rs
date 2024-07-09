@@ -35,6 +35,7 @@ async fn create_test_client() -> SqsClient {
         Some(endpoint),
         &proxy,
         &None,
+        &None,
     )
     .await
     .unwrap()

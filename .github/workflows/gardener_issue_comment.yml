@@ -14,7 +14,8 @@ jobs:
   move-to-backlog:
     name: Move issues back to Gardener project board Triage
     runs-on: ubuntu-latest
-    if: contains(github.event.issue.url, 'issues')
+    timeout-minutes: 5
+    if: ${{ !github.event.issue.pull_request }}
     steps:
       - name: Generate authentication token
         id: generate_token

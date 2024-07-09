@@ -28,3 +28,9 @@ image = "vector-cross-env:armv7-unknown-linux-gnueabihf"
 
 [target.armv7-unknown-linux-musleabihf]
 image = "vector-cross-env:armv7-unknown-linux-musleabihf"
+
+[target.arm-unknown-linux-gnueabi]
+image = "vector-cross-env:arm-unknown-linux-gnueabi"
+
+[target.arm-unknown-linux-musleabi]
+image = "vector-cross-env:arm-unknown-linux-musleabi"

@@ -5,7 +5,7 @@ use bytes::Bytes;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
 use serde_with::serde_as;
-use snafu::{ResultExt, Snafu};
+use snafu::ResultExt;
 use vector_lib::configurable::configurable_component;
 use vector_lib::{config::LogNamespace, event::Event};
 
@@ -34,12 +34,6 @@ static PARSE_ERROR_NO_PATH: &str = "No path is set on the endpoint and we got a 
 static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 404,\
                                   did you mean to use /metrics?\
                                   This behavior changed in version 0.11.";
-
-#[derive(Debug, Snafu)]
-enum ConfigError {
-    #[snafu(display("Cannot set both `endpoints` and `hosts`"))]
-    BothEndpointsAndHosts,
-}
 
 /// Configuration for the `prometheus_scrape` source.
 #[serde_as]

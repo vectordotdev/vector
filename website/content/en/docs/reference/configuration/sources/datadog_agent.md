@@ -1,7 +1,7 @@
 ---
 title: Datadog agent
 description: Receive logs, metrics, and traces collected by a [Datadog Agent](https://docs.datadoghq.com/agent)
-kind: source
+component_kind: source
 layout: component
 tags: ["datadog", "agent", "component", "source", "logs", "metrics", "traces"]
 ---
