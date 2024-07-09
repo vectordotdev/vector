@@ -64,7 +64,7 @@ pub struct ChunkedGelfDecoderOptions {
     pub timeout_millis: u64,
 
     /// The maximum number of pending uncomplete messages. If this limit is reached, the decoder will start
-    /// dropping chunks of new messages.
+    /// dropping chunks of new messages. This limit ensures the memory usage of the decoder is bounded.
     #[serde(
         default = "default_pending_messages_limit",
         skip_serializing_if = "vector_core::serde::is_default"
@@ -134,7 +134,9 @@ impl MessageState {
 pub struct ChunkedGelfDecoder {
     // We have to use this decoder to read all the bytes from the buffer first and don't let tokio
     // read it buffered, as tokio FramedRead will not always call the decode method with the
-    // whole message. (see https://docs.rs/tokio-util/latest/src/tokio_util/codec/framed_impl.rs.html#26)
+    // whole message. (see https://docs.rs/tokio-util/latest/src/tokio_util/codec/framed_impl.rs.html#26).
+    // This limitation is due to the fact that the GELF format does not specify the length of the
+    // message, so we have to read all the bytes from the message (datagram)
     inner_decoder: BytesDecoder,
     state: Arc<Mutex<HashMap<u64, MessageState>>>,
     timeout: Duration,
@@ -204,8 +206,8 @@ impl ChunkedGelfDecoder {
         }
 
         let message_state = state_lock.entry(message_id).or_insert_with(|| {
-            // TODO: we need tokio due to the sleep function. We need to spawn a task that will clear the message state after a certain time
-            // otherwise we will have a memory leak
+            // We need to spawn a task that will clear the message state after a certain time
+            // otherwise we will have a memory leak due to messages that never complete
             let state = Arc::clone(&self.state);
             let timeout = self.timeout.clone();
             let timeout_handle = tokio::spawn(async move {
@@ -281,14 +283,14 @@ impl Decoder for ChunkedGelfDecoder {
     type Error = BoxedFramingError;
 
     fn decode(&mut self, src: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // TODO: add a PR comment here stating that this will never call the decode_message since
-        // the bytes decoder will always return a Ok(None) in this method, but leaving this
-        // here for consistency. Would be better to add a unreachable/panic here if the inner decoder returns
-        // the Some variant?
         if src.is_empty() {
             return Ok(None);
         }
 
+        // TODO: add a PR comment here stating that this will never call the decode_message since
+        // the bytes decoder will always return a Ok(None) in this method, but leaving this
+        // here for consistency. Would be better to add a unreachable/panic here if the inner decoder returns
+        // the Some variant?
         self.inner_decoder
             .decode(src)?
             .and_then(|frame| self.decode_message(frame).transpose())
@@ -313,32 +315,31 @@ mod tests {
     use rstest::{fixture, rstest};
     use tracing_test::traced_test;
 
-    // TODO: return BytesMut instead of Bytes
     fn create_chunk(
         message_id: u64,
         sequence_number: u8,
         total_chunks: u8,
         payload: &str,
-    ) -> Bytes {
+    ) -> BytesMut {
         let mut chunk = BytesMut::new();
         chunk.put_slice(&GELF_MAGIC);
         chunk.put_u64(message_id);
         chunk.put_u8(sequence_number);
         chunk.put_u8(total_chunks);
         chunk.extend_from_slice(payload.as_bytes());
-        chunk.freeze()
+        chunk
     }
 
     #[fixture]
-    fn unchunked_message() -> (Bytes, String) {
+    fn unchunked_message() -> (BytesMut, String) {
         let payload = "foo";
-        (Bytes::from(payload), payload.to_string())
+        (BytesMut::from(payload), payload.to_string())
     }
 
     // TODO: add a malformed chunk message
 
     #[fixture]
-    fn two_chunks_message() -> ([Bytes; 2], String) {
+    fn two_chunks_message() -> ([BytesMut; 2], String) {
         let message_id = 1u64;
         let total_chunks = 2u8;
 
@@ -367,7 +368,7 @@ mod tests {
     }
 
     #[fixture]
-    fn three_chunks_message() -> ([Bytes; 3], String) {
+    fn three_chunks_message() -> ([BytesMut; 3], String) {
         let message_id = 2u64;
         let total_chunks = 3u8;
 
@@ -404,123 +405,97 @@ mod tests {
         )
     }
 
-    // TODO: refactor those tests so we use the FramedRead from tokio as the
-    // bytes decoder
     #[rstest]
     #[tokio::test]
-    async fn decode_chunked(two_chunks_message: ([Bytes; 2], String)) {
-        let mut src = BytesMut::new();
-        let (chunks, expected_message) = two_chunks_message;
+    async fn decode_chunked(two_chunks_message: ([BytesMut; 2], String)) {
+        let (mut chunks, expected_message) = two_chunks_message;
         let mut decoder = ChunkedGelfDecoder::default();
 
-        // TODO: replace extend_from_slice to just call the decoder
-        // with the chunk[0]
-        src.extend_from_slice(&chunks[0]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut chunks[0]).unwrap();
         assert!(frame.is_none());
 
-        src.extend_from_slice(&chunks[1]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
-
+        let frame = decoder.decode_eof(&mut chunks[1]).unwrap();
         assert_eq!(frame, Some(Bytes::from(expected_message)));
     }
 
     #[rstest]
     #[tokio::test]
-    async fn decode_unchunked(unchunked_message: (Bytes, String)) {
-        let mut src = BytesMut::new();
-        let (message, expected_message) = unchunked_message;
+    async fn decode_unchunked(unchunked_message: (BytesMut, String)) {
+        let (mut message, expected_message) = unchunked_message;
         let mut decoder = ChunkedGelfDecoder::default();
 
-        src.extend_from_slice(&message);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut message).unwrap();
         assert_eq!(frame, Some(Bytes::from(expected_message)));
     }
 
     #[rstest]
     #[tokio::test]
-    async fn decode_unordered_chunks(two_chunks_message: ([Bytes; 2], String)) {
-        let mut src = BytesMut::new();
-        let (chunks, expected_message) = two_chunks_message;
+    async fn decode_unordered_chunks(two_chunks_message: ([BytesMut; 2], String)) {
+        let (mut chunks, expected_message) = two_chunks_message;
         let mut decoder = ChunkedGelfDecoder::default();
 
-        src.extend_from_slice(&chunks[1]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut chunks[1]).unwrap();
         assert!(frame.is_none());
 
-        src.extend_from_slice(&chunks[0]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
-
+        let frame = decoder.decode_eof(&mut chunks[0]).unwrap();
         assert_eq!(frame, Some(Bytes::from(expected_message)));
     }
 
     #[rstest]
     #[tokio::test]
     async fn decode_unordered_messages(
-        two_chunks_message: ([Bytes; 2], String),
-        three_chunks_message: ([Bytes; 3], String),
+        two_chunks_message: ([BytesMut; 2], String),
+        three_chunks_message: ([BytesMut; 3], String),
     ) {
-        let mut src = BytesMut::new();
-        let (two_chunks, two_chunks_expected) = two_chunks_message;
-        let (three_chunks, three_chunks_expected) = three_chunks_message;
+        let (mut two_chunks, two_chunks_expected) = two_chunks_message;
+        let (mut three_chunks, three_chunks_expected) = three_chunks_message;
         let mut decoder = ChunkedGelfDecoder::default();
 
-        src.extend_from_slice(&three_chunks[2]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut three_chunks[2]).unwrap();
         assert!(frame.is_none());
 
-        src.extend_from_slice(&two_chunks[0]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut two_chunks[0]).unwrap();
         assert!(frame.is_none());
 
-        src.extend_from_slice(&three_chunks[0]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut three_chunks[0]).unwrap();
         assert!(frame.is_none());
 
-        src.extend_from_slice(&two_chunks[1]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut two_chunks[1]).unwrap();
         assert_eq!(frame, Some(Bytes::from(two_chunks_expected)));
 
-        src.extend_from_slice(&three_chunks[1]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut three_chunks[1]).unwrap();
         assert_eq!(frame, Some(Bytes::from(three_chunks_expected)));
     }
 
     #[rstest]
     #[tokio::test]
     async fn decode_mixed_chunked_and_unchunked_messages(
-        unchunked_message: (Bytes, String),
-        two_chunks_message: ([Bytes; 2], String),
+        unchunked_message: (BytesMut, String),
+        two_chunks_message: ([BytesMut; 2], String),
     ) {
-        let mut src = BytesMut::new();
-        let (unchunked_message, expected_unchunked_message) = unchunked_message;
-        let (chunks, expected_chunked_message) = two_chunks_message;
+        let (mut unchunked_message, expected_unchunked_message) = unchunked_message;
+        let (mut chunks, expected_chunked_message) = two_chunks_message;
         let mut decoder = ChunkedGelfDecoder::default();
 
-        src.extend_from_slice(&chunks[1]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut chunks[1]).unwrap();
         assert!(frame.is_none());
 
-        src.extend_from_slice(&unchunked_message);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut unchunked_message).unwrap();
         assert_eq!(frame, Some(Bytes::from(expected_unchunked_message)));
 
-        src.extend_from_slice(&chunks[0]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut chunks[0]).unwrap();
         assert_eq!(frame, Some(Bytes::from(expected_chunked_message)));
     }
 
     #[rstest]
     #[tokio::test(start_paused = true)]
     #[traced_test]
-    async fn decode_timeout(two_chunks_message: ([Bytes; 2], String)) {
+    async fn decode_timeout(two_chunks_message: ([BytesMut; 2], String)) {
         let timeout = 300;
-        let mut src = BytesMut::new();
-        let (chunks, _) = two_chunks_message;
+        let (mut chunks, _) = two_chunks_message;
         let mut decoder = ChunkedGelfDecoder::new(timeout, DEFAULT_PENDING_MESSAGES_LIMIT);
 
-        src.extend_from_slice(&chunks[0]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut chunks[0]).unwrap();
         assert!(frame.is_none());
         assert!(!decoder.state.lock().unwrap().is_empty());
 
@@ -531,12 +506,14 @@ mod tests {
             "Message was not fully received within the timeout window. Discarding it."
         ));
 
-        src.extend_from_slice(&chunks[1]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut chunks[1]).unwrap();
         assert!(frame.is_none());
 
         tokio::time::sleep(Duration::from_millis(timeout + 1)).await;
         assert!(decoder.state.lock().unwrap().is_empty());
+        assert!(logs_contain(
+            "Message was not fully received within the timeout window. Discarding it."
+        ));
     }
 
     #[tokio::test]
@@ -553,10 +530,10 @@ mod tests {
     async fn decode_chunk_with_malformed_header() {
         let malformed_chunk = [0x12, 0x23];
         let mut src = BytesMut::new();
-        let mut decoder = ChunkedGelfDecoder::default();
-
         src.extend_from_slice(&GELF_MAGIC);
         src.extend_from_slice(&malformed_chunk);
+        let mut decoder = ChunkedGelfDecoder::default();
+
         let frame = decoder.decode_eof(&mut src).unwrap();
         assert!(frame.is_none());
         assert!(logs_contain("Received malformed chunk headers (message ID, sequence number and total chunks) with less than 10 bytes. Ignoring it."));
@@ -569,12 +546,10 @@ mod tests {
         let sequence_number = 1u8;
         let invalid_total_chunks = MAX_TOTAL_CHUNKS + 1;
         let payload = "foo";
-        let chunk = create_chunk(message_id, sequence_number, invalid_total_chunks, payload);
-        let mut src = BytesMut::new();
+        let mut chunk = create_chunk(message_id, sequence_number, invalid_total_chunks, payload);
         let mut decoder = ChunkedGelfDecoder::default();
 
-        src.extend_from_slice(&chunk);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut chunk).unwrap();
         assert!(frame.is_none());
         assert!(logs_contain(
             "Received a chunk with an invalid total chunks value. Ignoring it."
@@ -588,12 +563,10 @@ mod tests {
         let total_chunks = 2u8;
         let invalid_sequence_number = total_chunks + 1;
         let payload = "foo";
-        let chunk = create_chunk(message_id, invalid_sequence_number, total_chunks, payload);
-        let mut src = BytesMut::new();
+        let mut chunk = create_chunk(message_id, invalid_sequence_number, total_chunks, payload);
         let mut decoder = ChunkedGelfDecoder::default();
 
-        src.extend_from_slice(&chunk);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut chunk).unwrap();
         assert!(frame.is_none());
         assert!(logs_contain(
             "Received a chunk with a sequence number greater than total chunks. Ignoring it."
@@ -604,22 +577,19 @@ mod tests {
     #[tokio::test]
     #[traced_test]
     async fn decode_when_reached_pending_messages_limit(
-        two_chunks_message: ([Bytes; 2], String),
-        three_chunks_message: ([Bytes; 3], String),
+        two_chunks_message: ([BytesMut; 2], String),
+        three_chunks_message: ([BytesMut; 3], String),
     ) {
         let pending_messages_limit = 1;
-        let mut src = BytesMut::new();
-        let (two_chunks, _) = two_chunks_message;
-        let (three_chunks, _) = three_chunks_message;
+        let (mut two_chunks, _) = two_chunks_message;
+        let (mut three_chunks, _) = three_chunks_message;
         let mut decoder = ChunkedGelfDecoder::new(DEFAULT_TIMEOUT_MILLIS, pending_messages_limit);
 
-        src.extend_from_slice(&two_chunks[0]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut two_chunks[0]).unwrap();
         assert!(frame.is_none());
         assert!(decoder.state.lock().unwrap().len() == 1);
 
-        src.extend_from_slice(&three_chunks[0]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut three_chunks[0]).unwrap();
         assert!(frame.is_none());
         assert!(decoder.state.lock().unwrap().len() == 1);
         assert!(logs_contain(
@@ -635,17 +605,15 @@ mod tests {
         let sequence_number = 0u8;
         let total_chunks = 2u8;
         let payload = "foo";
-        let first_chunk = create_chunk(message_id, sequence_number, total_chunks, payload);
-        let second_chunk = create_chunk(message_id, sequence_number + 1, total_chunks + 1, payload);
-        let mut src = BytesMut::new();
+        let mut first_chunk = create_chunk(message_id, sequence_number, total_chunks, payload);
+        let mut second_chunk =
+            create_chunk(message_id, sequence_number + 1, total_chunks + 1, payload);
         let mut decoder = ChunkedGelfDecoder::default();
 
-        src.extend_from_slice(&first_chunk);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut first_chunk).unwrap();
         assert!(frame.is_none());
 
-        src.extend_from_slice(&second_chunk);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut second_chunk).unwrap();
         assert!(frame.is_none());
         assert!(logs_contain(
             "Received a chunk with a different total chunks than the original. Ignoring it."
@@ -655,17 +623,14 @@ mod tests {
     #[rstest]
     #[tokio::test]
     #[traced_test]
-    async fn decode_when_duplicated_chunk(two_chunks_message: ([Bytes; 2], String)) {
-        let mut src = BytesMut::new();
-        let (chunks, _) = two_chunks_message;
+    async fn decode_when_duplicated_chunk(two_chunks_message: ([BytesMut; 2], String)) {
+        let (mut chunks, _) = two_chunks_message;
         let mut decoder = ChunkedGelfDecoder::default();
 
-        src.extend_from_slice(&chunks[0]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut chunks[0].clone()).unwrap();
         assert!(frame.is_none());
 
-        src.extend_from_slice(&chunks[0]);
-        let frame = decoder.decode_eof(&mut src).unwrap();
+        let frame = decoder.decode_eof(&mut chunks[0]).unwrap();
         assert!(frame.is_none());
         assert!(logs_contain("Received a duplicate chunk. Ignoring it."));
     }
