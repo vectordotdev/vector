@@ -254,7 +254,6 @@ impl EventEncoder {
             Some(Value::Timestamp(ts)) => match ts.timestamp_nanos_opt() {
                 Some(timestamp) => timestamp,
                 None => {
-                    let finalizers = event.take_finalizers();
                     finalizers.update_status(EventStatus::Errored);
                     emit!(LokiEventTimestampOutOfRangeError);
                     return None;
