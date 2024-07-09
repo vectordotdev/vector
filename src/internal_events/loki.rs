@@ -77,12 +77,21 @@ pub struct LokiEventTimestampOutOfRangeError;
 
 impl InternalEvent for LokiEventTimestampOutOfRangeError {
     fn emit(self) {
-        warn!(
+        error!(
             message = "Event timestamp out of range.",
-            reason = "out_of_range",
+            error_type = error_type::CONVERSION_FAILED,
+            stage = error_stage::PROCESSING,
             internal_log_rate_limit = true,
         );
-
-        counter!("timestamp_out_of_range_total", 1,);
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONVERSION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        counter!(
+            "component_discarded_events_total", 1,
+            "error_type" => error_type::CONVERSION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
     }
 }
