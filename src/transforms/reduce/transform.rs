@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use futures::Stream;
 use indexmap::IndexMap;
 use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
-use vrl::path::{parse_target_path, OwnedTargetPath};
+use vrl::path::parse_target_path;
 use vrl::prelude::KeyString;
 
 use crate::transforms::reduce::merge_strategy::{
@@ -22,7 +22,7 @@ use crate::{
 #[derive(Debug)]
 struct ReduceState {
     events: usize,
-    fields: HashMap<OwnedTargetPath, Box<dyn ReduceValueMerger>>,
+    fields: HashMap<KeyString, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
     creation: Instant,
     metadata: EventMetadata,
@@ -39,38 +39,31 @@ impl ReduceState {
         }
     }
 
-    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<OwnedTargetPath, MergeStrategy>) {
+    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<KeyString, MergeStrategy>) {
         self.metadata.merge(e.metadata().clone());
 
         if let Some(fields_iter) = e.all_event_fields_skip_array_elements() {
             for (path, value) in fields_iter {
-                match parse_target_path(path.as_str()) {
-                    Ok(target_path) => {
-                        let maybe_strategy = strategies.get(&target_path);
-                        match self.fields.entry(target_path) {
-                            Entry::Vacant(entry) => {
-                                if let Some(strategy) = maybe_strategy {
-                                    match get_value_merger(value.clone(), strategy) {
-                                        Ok(m) => {
-                                            entry.insert(m);
-                                        }
-                                        Err(error) => {
-                                            warn!(message = "Failed to merge value.", %error);
-                                        }
-                                    }
-                                } else {
-                                    entry.insert(value.clone().into());
+                let maybe_strategy = strategies.get(&path);
+                match self.fields.entry(path) {
+                    Entry::Vacant(entry) => {
+                        if let Some(strategy) = maybe_strategy {
+                            match get_value_merger(value.clone(), strategy) {
+                                Ok(m) => {
+                                    entry.insert(m);
                                 }
-                            }
-                            Entry::Occupied(mut entry) => {
-                                if let Err(error) = entry.get_mut().add(value.clone()) {
+                                Err(error) => {
                                     warn!(message = "Failed to merge value.", %error);
                                 }
                             }
+                        } else {
+                            entry.insert(value.clone().into());
                         }
                     }
-                    Err(error) => {
-                        error!(%error, path = %path);
+                    Entry::Occupied(mut entry) => {
+                        if let Err(error) = entry.get_mut().add(value.clone()) {
+                            warn!(message = "Failed to merge value.", %error);
+                        }
                     }
                 }
             }
@@ -84,7 +77,7 @@ impl ReduceState {
     fn flush(mut self) -> LogEvent {
         let mut event = LogEvent::new_with_metadata(self.metadata);
         for (k, v) in self.fields.drain() {
-            if let Err(error) = v.insert_into(k, &mut event) {
+            if let Err(error) = v.insert_into(k.as_str(), &mut event) {
                 warn!(message = "Failed to merge values for field.", %error);
             }
         }
@@ -99,26 +92,21 @@ pub struct Reduce {
     flush_period: Duration,
     end_every_period: Option<Duration>,
     group_by: Vec<String>,
-    merge_strategies: IndexMap<OwnedTargetPath, MergeStrategy>,
+    merge_strategies: IndexMap<KeyString, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
     max_events: Option<usize>,
 }
 
-fn convert_merge_strategies(
-    strategies: IndexMap<KeyString, MergeStrategy>,
-) -> crate::Result<IndexMap<OwnedTargetPath, MergeStrategy>> {
-    let converted_strategies: IndexMap<OwnedTargetPath, MergeStrategy> = strategies
-        .into_iter()
-        .map(|(key, strategy)| {
-            let path = parse_target_path(key.as_str())?;
-            Ok((path, strategy.clone()))
-        })
-        .collect::<crate::Result<IndexMap<OwnedTargetPath, MergeStrategy>>>()?;
-
-    for (path, _) in &converted_strategies {
-        let contains_index = path.path.segments.iter().any(|segment| segment.is_index());
+fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> crate::Result<()> {
+    for (path, _) in &strategies {
+        let contains_index = parse_target_path(path)
+            .map_err(|_| format!("Could not parse path: `{path}`"))?
+            .path
+            .segments
+            .iter()
+            .any(|segment| segment.is_index());
         if contains_index {
             return Err(format!(
                 "Merge strategies with indexes are currently not supported. Path: `{path}`"
@@ -127,7 +115,7 @@ fn convert_merge_strategies(
         }
     }
 
-    Ok(converted_strategies)
+    Ok(())
 }
 
 impl Reduce {
@@ -152,14 +140,14 @@ impl Reduce {
         let group_by = config.group_by.clone().into_iter().collect();
         let max_events = config.max_events.map(|max| max.into());
 
-        let merge_strategies = convert_merge_strategies(config.merge_strategies.clone())?;
+        validate_merge_strategies(config.merge_strategies.clone())?;
 
         Ok(Reduce {
             expire_after: config.expire_after_ms,
             flush_period: config.flush_period_ms,
             end_every_period: config.end_every_period_ms,
             group_by,
-            merge_strategies,
+            merge_strategies: config.merge_strategies.clone(),
             reduce_merge_states: HashMap::new(),
             ends_when,
             starts_when,
@@ -881,7 +869,7 @@ merge_strategies.bar = "concat"
         let error = Reduce::new(&config, &TableRegistry::default()).unwrap_err();
         assert_eq!(
             error.to_string(),
-            "Merge strategies with indexes are currently not supported. Path: `.a.b[0]`"
+            "Merge strategies with indexes are currently not supported. Path: `a.b[0]`"
         );
     }
 }
