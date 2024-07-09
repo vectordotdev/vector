@@ -136,7 +136,7 @@ pin-project = { version = "1.1.5", default-features = false }
 proptest = { version = "1.5" }
 proptest-derive = { version = "0.4.0" }
 serde_json = { version = "1.0.120", default-features = false, features = ["raw_value", "std"] }
-serde = { version = "1.0.203", default-features = false, features = ["alloc", "derive", "rc"] }
+serde = { version = "1.0.204", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.14", default-features = false, features = ["display", "parse"] }
 vrl = { version = "0.16.1", features = ["arbitrary", "cli", "test", "test_framework"] }
 
