@@ -13,7 +13,7 @@ use tracing::{info, warn};
 use vector_config::configurable_component;
 
 const GELF_MAGIC: [u8; 2] = [0x1e, 0x0f];
-const MAX_TOTAL_CHUNKS: u8 = 128;
+pub const MAX_TOTAL_CHUNKS: u8 = 128;
 const DEFAULT_CHUNKS: [Bytes; MAX_TOTAL_CHUNKS as usize] =
     [const { Bytes::new() }; MAX_TOTAL_CHUNKS as usize];
 const DEFAULT_TIMEOUT_MILLIS: u64 = 5000;
@@ -162,7 +162,8 @@ impl ChunkedGelfDecoder {
             warn!(message = "Received malformed chunk headers (message ID, sequence number and total chunks) with less than 10 bytes. Ignoring it.",
                 src = src_display,
                 remaining = chunk.remaining(),
-                internal_log_rate_limit = true);
+                internal_log_rate_limit = true
+            );
             return Ok(None);
         }
         let message_id = chunk.get_u64();
@@ -229,10 +230,10 @@ impl ChunkedGelfDecoder {
 
         if message_state.total_chunks != total_chunks {
             warn!(message_id = "Received a chunk with a different total chunks than the original. Ignoring it.",
+                message_id = message_id
                 original_total_chunks = message_state.total_chunks,
                 received_total_chunks = total_chunks,
                 internal_log_rate_limit = true,
-                message_id = message_id
             );
             return Ok(None);
         }
