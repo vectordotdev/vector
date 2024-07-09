@@ -230,10 +230,10 @@ impl ChunkedGelfDecoder {
 
         if message_state.total_chunks != total_chunks {
             warn!(message_id = "Received a chunk with a different total chunks than the original. Ignoring it.",
-                message_id = message_id
+                message_id = message_id,
                 original_total_chunks = message_state.total_chunks,
                 received_total_chunks = total_chunks,
-                internal_log_rate_limit = true,
+                internal_log_rate_limit = true
             );
             return Ok(None);
         }
