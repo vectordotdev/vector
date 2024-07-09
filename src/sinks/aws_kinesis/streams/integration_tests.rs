@@ -177,9 +177,16 @@ async fn client() -> aws_sdk_kinesis::Client {
     let auth = AwsAuthentication::test_auth();
     let proxy = ProxyConfig::default();
     let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address());
-    create_client::<KinesisClientBuilder>(&auth, region.region(), region.endpoint(), &proxy, &None)
-        .await
-        .unwrap()
+    create_client::<KinesisClientBuilder>(
+        &auth,
+        region.region(),
+        region.endpoint(),
+        &proxy,
+        &None,
+        &None,
+    )
+    .await
+    .unwrap()
 }
 
 async fn ensure_stream(stream_name: String) {
