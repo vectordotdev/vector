@@ -1,4 +1,5 @@
 optimization_goal: egress_throughput
+erratic: true
 
 target:
   name: vector

@@ -64,6 +64,7 @@ impl SecretBackend for AwsSecretsManagerBackend {
                 self.region.endpoint(),
                 &ProxyConfig::default(),
                 &self.tls,
+                &None,
             )
             .await
         })?;
