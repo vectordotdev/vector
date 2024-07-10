@@ -100,7 +100,7 @@ async fn run(
     };
 
     let start_time = Instant::now();
-    let stream_duration = 
+    let stream_duration =
         opts.duration_ms.map(Duration::from_millis).unwrap_or(Duration::MAX);
 
     // Loop over the returned results, printing out tap events.
