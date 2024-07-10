@@ -587,6 +587,18 @@ base: components: sources: aws_s3: configuration: {
 					unit: "tasks"
 				}
 			}
+			connect_timeout_seconds: {
+				description: """
+					The connection timeout for AWS requests
+
+					Limits the amount of time allowed to initiate a socket connection.
+					"""
+				required: false
+				type: uint: {
+					examples: [20]
+					unit: "seconds"
+				}
+			}
 			delete_failed_message: {
 				description: """
 					Whether to delete non-retryable messages.
@@ -620,6 +632,21 @@ base: components: sources: aws_s3: configuration: {
 					examples: [1]
 				}
 			}
+			operation_timeout_seconds: {
+				description: """
+					The operation timeout for AWS requests
+
+					Limits the amount of time allowed for an operation to be fully serviced; an
+					operation represents the full request/response lifecycle of a call to a service.
+					Take care when configuring this settings to allow enough time for the polling
+					interval configured in `poll_secs`
+					"""
+				required: false
+				type: uint: {
+					examples: [20]
+					unit: "seconds"
+				}
+			}
 			poll_secs: {
 				description: """
 					How long to wait while polling the queue for new messages, in seconds.
@@ -637,6 +664,20 @@ base: components: sources: aws_s3: configuration: {
 				description: "The URL of the SQS queue to poll for bucket notifications."
 				required:    true
 				type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
+			}
+			read_timeout_seconds: {
+				description: """
+					The read timeout for AWS requests
+
+					Limits the amount of time allowed to read the first byte of a response from the
+					time the request is initiated. Take care when configuring this settings to allow
+					enough time for the polling interval configured in `poll_secs`
+					"""
+				required: false
+				type: uint: {
+					examples: [20]
+					unit: "seconds"
+				}
 			}
 			tls_options: {
 				description: "TLS configuration."

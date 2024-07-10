@@ -41,6 +41,7 @@ concurrency:
 
 env:
   SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
+  SMP_WARMUP_SECONDS: 70 # default is 45 seconds
 
 jobs:
 
@@ -121,19 +122,9 @@ jobs:
       comparison-sha: ${{ steps.pr-metadata-merge-queue.outputs.COMPARISON_SHA || steps.pr-metadata-comment.outputs.COMPARISON_SHA }}
       comparison-tag: ${{ steps.pr-metadata-merge-queue.outputs.COMPARISON_TAG || steps.pr-metadata-comment.outputs.COMPARISON_TAG }}
 
-      # below are used in the experiment/analyze jobs
-      cpus: ${{ steps.system.outputs.CPUS }}
-      memory: ${{ steps.system.outputs.MEMORY }}
-      vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
-
-      replicas: ${{ steps.experimental-meta.outputs.REPLICAS }}
-      warmup-seconds: ${{ steps.experimental-meta.outputs.WARMUP_SECONDS }}
-      total-samples: ${{ steps.experimental-meta.outputs.TOTAL_SAMPLES }}
-      p-value: ${{ steps.experimental-meta.outputs.P_VALUE }}
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
-      lading-version: ${{ steps.experimental-meta.outputs.LADING_VERSION }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1000
 
@@ -146,6 +137,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           export PR_NUMBER=${{ github.event.issue.number }}
+
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
           gh pr checkout ${{ github.event.issue.number }}
@@ -229,44 +221,12 @@ jobs:
             exit 1
           fi
 
-      - name: Setup experimental metadata
+      - name: Set SMP version
         id: experimental-meta
         run: |
-          export WARMUP_SECONDS="45"
-          export REPLICAS="10"
-          export TOTAL_SAMPLES="600"
-          export P_VALUE="0.1"
-          export SMP_CRATE_VERSION="0.11.0"
-          export LADING_VERSION="0.19.1"
-
-          echo "warmup seconds: ${WARMUP_SECONDS}"
-          echo "replicas: ${REPLICAS}"
-          echo "total samples: ${TOTAL_SAMPLES}"
-          echo "regression p-value: ${P_VALUE}"
+          export SMP_CRATE_VERSION="0.15.1"
           echo "smp crate version: ${SMP_CRATE_VERSION}"
-          echo "lading version: ${LADING_VERSION}"
-
-          echo "WARMUP_SECONDS=${WARMUP_SECONDS}" >> $GITHUB_OUTPUT
-          echo "REPLICAS=${REPLICAS}" >> $GITHUB_OUTPUT
-          echo "TOTAL_SAMPLES=${TOTAL_SAMPLES}" >> $GITHUB_OUTPUT
-          echo "P_VALUE=${P_VALUE}" >> $GITHUB_OUTPUT
           echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
-          echo "LADING_VERSION=${LADING_VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Setup system details
-        id: system
-        run: |
-          export CPUS="7"
-          export MEMORY="30g"
-          export VECTOR_CPUS="4"
-
-          echo "cpus total: ${CPUS}"
-          echo "memory total: ${MEMORY}"
-          echo "vector cpus: ${VECTOR_CPUS}"
-
-          echo "CPUS=${CPUS}" >> $GITHUB_OUTPUT
-          echo "MEMORY=${MEMORY}" >> $GITHUB_OUTPUT
-          echo "VECTOR_CPUS=${VECTOR_CPUS}" >> $GITHUB_OUTPUT
 
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
@@ -306,7 +266,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.3.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v5.4.0
+        uses: docker/build-push-action@v6.3.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -344,7 +304,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.3.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v5.4.0
+        uses: docker/build-push-action@v6.3.0
         with:
           context: comparison-vector/
           cache-from: type=gha
@@ -509,20 +469,12 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job submit \
-            --lading-version ${{ needs.compute-metadata.outputs.lading-version }} \
-            --total-samples ${{ needs.compute-metadata.outputs.total-samples }} \
-            --warmup-seconds ${{ needs.compute-metadata.outputs.warmup-seconds }} \
-            --replicas ${{ needs.compute-metadata.outputs.replicas }} \
             --baseline-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.baseline-tag }} \
             --comparison-image ${{ steps.login-ecr.outputs.registry }}/${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }}-vector:${{ needs.compute-metadata.outputs.comparison-tag }} \
             --baseline-sha ${{ needs.compute-metadata.outputs.baseline-sha }} \
             --comparison-sha ${{ needs.compute-metadata.outputs.comparison-sha }} \
-            --target-command "/usr/local/bin/vector" \
             --target-config-dir ${{ github.workspace }}/regression/ \
-            --target-cpu-allotment "${{ needs.compute-metadata.outputs.cpus }}" \
-            --target-memory-allotment "${{ needs.compute-metadata.outputs.memory }}" \
-            --target-environment-variables "VECTOR_THREADS=${{ needs.compute-metadata.outputs.vector-cpus }},VECTOR_REQUIRE_HEALTHY=true" \
-            --target-name vector \
+            --warmup-seconds ${{ env.SMP_WARMUP_SECONDS }} \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - uses: actions/upload-artifact@v3
@@ -541,7 +493,6 @@ jobs:
             --wait \
             --wait-delay-seconds 60 \
             --wait-timeout-minutes 90 \
-            --use-consignor welch \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Handle cancellation if necessary
@@ -632,7 +583,7 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job result \
-            --submission-metadata ${{ runner.temp }}/submission-metadata --use-consignor welch
+            --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Check status, cancelled
         if: ${{ cancelled() }}
@@ -725,7 +676,7 @@ jobs:
 
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job sync \
             --submission-metadata ${{ runner.temp }}/submission-metadata \
-            --output-path "${{ runner.temp }}/outputs" --use-consignor welch
+            --output-path "${{ runner.temp }}/outputs"
 
       - name: Read regression report
         id: read-analysis
