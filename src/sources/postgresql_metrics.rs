@@ -1031,7 +1031,7 @@ mod integration_tests {
         include_databases: Option<Vec<String>>,
         exclude_databases: Option<Vec<String>>,
     ) -> Vec<Event> {
-        assert_source_compliance(&PULL_SOURCE_TAGS, async move {
+        assert_source_compliance(&PULL_SOURCE_TAGS, |_controller| async move {
             let config: Config = endpoint.parse().unwrap();
             let tags_endpoint = config_to_endpoint(&config);
             let tags_host = match config.get_hosts().first().unwrap() {

@@ -1137,7 +1137,7 @@ mod tests {
         checkpoint: Option<&str>,
         emit_cursor: bool,
     ) -> Vec<Event> {
-        assert_source_compliance(&["protocol"], async move {
+        assert_source_compliance(&["protocol"], |_controller| async move {
             let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
             let tempdir = tempdir().unwrap();

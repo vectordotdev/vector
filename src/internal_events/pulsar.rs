@@ -1,6 +1,6 @@
 use metrics::counter;
 #[cfg(feature = "sources-pulsar")]
-use metrics::{counter, Counter};
+use metrics::Counter;
 use vector_lib::internal_event::{
     error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
 };

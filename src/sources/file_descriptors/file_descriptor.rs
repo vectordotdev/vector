@@ -122,7 +122,7 @@ mod tests {
 
     #[tokio::test]
     async fn file_descriptor_decodes_line() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let (tx, rx) = SourceSender::new_test();
             let (read_fd, write_fd) = pipe().unwrap();
             let config = FileDescriptorSourceConfig {
@@ -163,7 +163,7 @@ mod tests {
 
     #[tokio::test]
     async fn file_descriptor_decodes_line_vector_namespace() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let (tx, rx) = SourceSender::new_test();
             let (read_fd, write_fd) = pipe().unwrap();
             let config = FileDescriptorSourceConfig {

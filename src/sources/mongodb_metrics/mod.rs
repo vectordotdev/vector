@@ -1114,7 +1114,7 @@ mod integration_tests {
     }
 
     async fn test_instance(endpoint: String) {
-        assert_source_compliance(&PULL_SOURCE_TAGS, async {
+        assert_source_compliance(&PULL_SOURCE_TAGS, |_controller| async {
             let host = ClientOptions::parse(endpoint.as_str()).await.unwrap().hosts[0].to_string();
             let namespace = "vector_mongodb";
 

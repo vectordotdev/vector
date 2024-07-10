@@ -1095,7 +1095,7 @@ mod integration_tests {
     }
 
     async fn test_fluentbit(status: EventStatus) {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async move {
             let test_address = next_addr();
             let (out, source_address) = source(status).await;
 
@@ -1172,7 +1172,7 @@ mod integration_tests {
     }
 
     async fn test_fluentd(status: EventStatus, options: &str) {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async move {
             let test_address = next_addr();
             let (out, source_address) = source(status).await;
 

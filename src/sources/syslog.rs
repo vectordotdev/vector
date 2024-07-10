@@ -1115,7 +1115,7 @@ mod test {
 
     #[tokio::test]
     async fn test_tcp_syslog() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
             let num_messages: usize = 10000;
             let in_addr = next_addr();
 
@@ -1190,7 +1190,7 @@ mod test {
         use tokio::net::UnixStream;
         use tokio_util::codec::{FramedWrite, LinesCodec};
 
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
             let num_messages: usize = 1;
             let in_path = tempfile::tempdir().unwrap().into_path().join("stream_test");
 
@@ -1259,7 +1259,7 @@ mod test {
 
     #[tokio::test]
     async fn test_octet_counting_syslog() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
             let num_messages: usize = 10000;
             let in_addr = next_addr();
 

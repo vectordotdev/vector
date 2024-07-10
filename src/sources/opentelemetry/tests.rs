@@ -35,7 +35,7 @@ fn generate_config() {
 
 #[tokio::test]
 async fn receive_grpc_logs_vector_namespace() {
-    assert_source_compliance(&SOURCE_TAGS, async {
+    assert_source_compliance(&SOURCE_TAGS, |_controller| async {
         let grpc_addr = next_addr();
         let http_addr = next_addr();
 
@@ -173,7 +173,7 @@ async fn receive_grpc_logs_vector_namespace() {
 
 #[tokio::test]
 async fn receive_grpc_logs_legacy_namespace() {
-    assert_source_compliance(&SOURCE_TAGS, async {
+    assert_source_compliance(&SOURCE_TAGS, |_controller| async {
         let grpc_addr = next_addr();
         let http_addr = next_addr();
 

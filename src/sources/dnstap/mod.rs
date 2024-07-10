@@ -436,7 +436,7 @@ mod integration_tests {
     };
 
     async fn test_dnstap(raw_data: bool, query_type: &'static str) {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let (sender, mut recv) = SourceSender::new_test();
 
             tokio::spawn(async move {

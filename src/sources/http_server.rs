@@ -725,28 +725,29 @@ mod tests {
 
     #[tokio::test]
     async fn http_multiline_text() {
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
-            let body = "test body\ntest body 2";
+        let mut events =
+            assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async move {
+                let body = "test body\ntest body 2";
 
-            let (rx, addr) = source(
-                vec![],
-                vec![],
-                "http_path",
-                "remote_ip",
-                "/",
-                "POST",
-                StatusCode::OK,
-                true,
-                EventStatus::Delivered,
-                true,
-                None,
-                None,
-            )
+                let (rx, addr) = source(
+                    vec![],
+                    vec![],
+                    "http_path",
+                    "remote_ip",
+                    "/",
+                    "POST",
+                    StatusCode::OK,
+                    true,
+                    EventStatus::Delivered,
+                    true,
+                    None,
+                    None,
+                )
+                .await;
+
+                spawn_ok_collect_n(send(addr, body), rx, 2).await
+            })
             .await;
-
-            spawn_ok_collect_n(send(addr, body), rx, 2).await
-        })
-        .await;
 
         {
             let event = events.remove(0);
@@ -773,26 +774,27 @@ mod tests {
         //same as above test but with a newline at the end
         let body = "test body\ntest body 2\n";
 
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
-            let (rx, addr) = source(
-                vec![],
-                vec![],
-                "http_path",
-                "remote_ip",
-                "/",
-                "POST",
-                StatusCode::OK,
-                true,
-                EventStatus::Delivered,
-                true,
-                None,
-                None,
-            )
-            .await;
+        let mut events =
+            assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async move {
+                let (rx, addr) = source(
+                    vec![],
+                    vec![],
+                    "http_path",
+                    "remote_ip",
+                    "/",
+                    "POST",
+                    StatusCode::OK,
+                    true,
+                    EventStatus::Delivered,
+                    true,
+                    None,
+                    None,
+                )
+                .await;
 
-            spawn_ok_collect_n(send(addr, body), rx, 2).await
-        })
-        .await;
+                spawn_ok_collect_n(send(addr, body), rx, 2).await
+            })
+            .await;
 
         {
             let event = events.remove(0);
@@ -812,26 +814,27 @@ mod tests {
     async fn http_bytes_codec_preserves_newlines() {
         let body = "foo\nbar";
 
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
-            let (rx, addr) = source(
-                vec![],
-                vec![],
-                "http_path",
-                "remote_ip",
-                "/",
-                "POST",
-                StatusCode::OK,
-                true,
-                EventStatus::Delivered,
-                true,
-                Some(BytesDecoderConfig::new().into()),
-                None,
-            )
-            .await;
+        let mut events =
+            assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async move {
+                let (rx, addr) = source(
+                    vec![],
+                    vec![],
+                    "http_path",
+                    "remote_ip",
+                    "/",
+                    "POST",
+                    StatusCode::OK,
+                    true,
+                    EventStatus::Delivered,
+                    true,
+                    Some(BytesDecoderConfig::new().into()),
+                    None,
+                )
+                .await;
 
-            spawn_ok_collect_n(send(addr, body), rx, 1).await
-        })
-        .await;
+                spawn_ok_collect_n(send(addr, body), rx, 1).await
+            })
+            .await;
 
         assert_eq!(events.len(), 1);
 
@@ -845,7 +848,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_json_parsing() {
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let (rx, addr) = source(
                 vec![],
                 vec![],
@@ -883,7 +886,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_json_values() {
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let (rx, addr) = source(
                 vec![],
                 vec![],
@@ -928,7 +931,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_json_dotted_keys() {
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let (rx, addr) = source(
                 vec![],
                 vec![],
@@ -979,7 +982,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_ndjson() {
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let (rx, addr) = source(
                 vec![],
                 vec![],
@@ -1055,7 +1058,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_headers() {
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let mut headers = HeaderMap::new();
             headers.insert("User-Agent", "test_client".parse().unwrap());
             headers.insert("Upgrade-Insecure-Requests", "false".parse().unwrap());
@@ -1105,7 +1108,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_headers_wildcard() {
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let mut headers = HeaderMap::new();
             headers.insert("User-Agent", "test_client".parse().unwrap());
             headers.insert("X-Case-Sensitive-Value", "CaseSensitive".parse().unwrap());
@@ -1147,7 +1150,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_query() {
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let (rx, addr) = source(
                 vec![],
                 vec![
@@ -1190,7 +1193,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_gzip_deflate() {
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let body = "test body";
 
             let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -1234,7 +1237,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_path() {
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let (rx, addr) = source(
                 vec![],
                 vec![],
@@ -1275,7 +1278,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_path_no_restriction() {
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let (rx, addr) = source(
                 vec![],
                 vec![],
@@ -1361,7 +1364,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_status_code() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async move {
             let (rx, addr) = source(
                 vec![],
                 vec![],
@@ -1395,7 +1398,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_delivery_failure() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let (rx, addr) = source(
                 vec![],
                 vec![],
@@ -1426,7 +1429,7 @@ mod tests {
 
     #[tokio::test]
     async fn ignores_disabled_acknowledgements() {
-        let events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
             let (rx, addr) = source(
                 vec![],
                 vec![],

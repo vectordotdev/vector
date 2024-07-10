@@ -1690,19 +1690,22 @@ mod integration_test {
 
         let now = send_events(topic.clone(), 1, 10).await;
 
-        let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
-            let (tx, rx) = SourceSender::new_test_errors(error_at);
-            let (trigger_shutdown, shutdown_done) =
-                spawn_kafka(tx, config, acknowledgements, false, log_namespace);
-            let events = collect_n(rx, SEND_COUNT).await;
-            // Yield to the finalization task to let it collect the
-            // batch status receivers before signalling the shutdown.
-            tokio::task::yield_now().await;
-            drop(trigger_shutdown);
-            shutdown_done.await;
+        let events = assert_source_compliance(
+            &["protocol", "topic", "partition"],
+            |_controller| async move {
+                let (tx, rx) = SourceSender::new_test_errors(error_at);
+                let (trigger_shutdown, shutdown_done) =
+                    spawn_kafka(tx, config, acknowledgements, false, log_namespace);
+                let events = collect_n(rx, SEND_COUNT).await;
+                // Yield to the finalization task to let it collect the
+                // batch status receivers before signalling the shutdown.
+                tokio::task::yield_now().await;
+                drop(trigger_shutdown);
+                shutdown_done.await;
 
-            events
-        })
+                events
+            },
+        )
         .await;
 
         let offset = fetch_tpl_offset(&group_id, &topic, 0);

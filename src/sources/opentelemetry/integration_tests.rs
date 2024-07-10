@@ -40,7 +40,7 @@ fn source_http_address() -> String {
 
 #[tokio::test]
 async fn receive_logs_legacy_namespace() {
-    assert_source_compliance(&SOURCE_TAGS, async {
+    assert_source_compliance(&SOURCE_TAGS, |_controller| async {
         wait_ready(otel_health_url()).await;
 
         let config = OpentelemetryConfig {
@@ -137,7 +137,7 @@ async fn receive_trace() {
     };
     let body = req.encode_to_vec();
 
-    assert_source_compliance(&SOURCE_TAGS, async {
+    assert_source_compliance(&SOURCE_TAGS, |_controller| async {
         wait_ready(otel_health_url()).await;
 
         let config = OpentelemetryConfig {

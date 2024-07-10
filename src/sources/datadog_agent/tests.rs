@@ -268,7 +268,7 @@ async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, pat
 
 #[tokio::test]
 async fn full_payload_v1() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
         let mut events = spawn_collect_n(
@@ -330,7 +330,7 @@ async fn full_payload_v1() {
 
 #[tokio::test]
 async fn full_payload_v2() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
         let mut events = spawn_collect_n(
@@ -392,7 +392,7 @@ async fn full_payload_v2() {
 
 #[tokio::test]
 async fn no_api_key() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
         let mut events = spawn_collect_n(
@@ -454,7 +454,7 @@ async fn no_api_key() {
 
 #[tokio::test]
 async fn api_key_in_url() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
         let mut events = spawn_collect_n(
@@ -519,7 +519,7 @@ async fn api_key_in_url() {
 
 #[tokio::test]
 async fn api_key_in_query_params() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
         let mut events = spawn_collect_n(
@@ -584,7 +584,7 @@ async fn api_key_in_query_params() {
 
 #[tokio::test]
 async fn api_key_in_header() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
         let mut headers = HeaderMap::new();
@@ -691,7 +691,7 @@ async fn delivery_failure() {
 
 #[tokio::test]
 async fn ignores_disabled_acknowledgements() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Rejected, false, true, false).await;
 
         let events = spawn_collect_n(
@@ -731,7 +731,7 @@ async fn ignores_disabled_acknowledgements() {
 
 #[tokio::test]
 async fn ignores_api_key() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, false, false).await;
 
         let mut headers = HeaderMap::new();
@@ -799,7 +799,7 @@ async fn ignores_api_key() {
 
 #[tokio::test]
 async fn decode_series_endpoint_v1() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
         let mut headers = HeaderMap::new();
@@ -1016,7 +1016,7 @@ async fn decode_series_endpoint_v1() {
 
 #[tokio::test]
 async fn decode_sketches() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
         let mut headers = HeaderMap::new();
@@ -1130,7 +1130,7 @@ async fn decode_sketches() {
 
 #[tokio::test]
 async fn decode_traces() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
         let mut headers = HeaderMap::new();
@@ -1371,7 +1371,7 @@ async fn decode_traces() {
 
 #[tokio::test]
 async fn split_outputs() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (_, rx_logs, rx_metrics, addr) = source(EventStatus::Delivered, true, true, true).await;
 
         let mut headers_for_log = HeaderMap::new();
@@ -2040,7 +2040,7 @@ fn test_config_outputs() {
 
 #[tokio::test]
 async fn decode_series_endpoint_v2() {
-    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
         let mut headers = HeaderMap::new();

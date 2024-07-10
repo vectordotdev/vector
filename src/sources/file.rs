@@ -2310,7 +2310,7 @@ mod tests {
         log_namespace: LogNamespace,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
-        assert_source_compliance(&FILE_SOURCE_TAGS, async move {
+        assert_source_compliance(&FILE_SOURCE_TAGS, |_controller| async move {
             let (tx, rx) = if acking_mode == Acks {
                 let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
                 (tx, rx.boxed())

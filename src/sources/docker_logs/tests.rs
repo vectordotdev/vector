@@ -300,7 +300,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let message = "log container_with_tty";
             let name = "container_with_tty_namespaced";
 
@@ -330,7 +330,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let message = "log container_with_tty";
             let name = "container_with_tty";
 
@@ -363,7 +363,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let message = "9";
             let name = "vector_test_newly_started_namespaced";
             let label = "vector_test_label_newly_started";
@@ -423,7 +423,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let message = "9";
             let name = "vector_test_newly_started";
             let label = "vector_test_label_newly_started";
@@ -464,7 +464,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let message = "10";
             let name = "vector_test_restart";
 
@@ -497,7 +497,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let message = "11";
             let name0 = "vector_test_include_container_0";
             let name1 = "vector_test_include_container_1";
@@ -533,7 +533,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let will_be_read = "12";
 
             let prefix = "vector_test_exclude_containers";
@@ -583,7 +583,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let message = "13";
             let name0 = "vector_test_include_labels_0";
             let name1 = "vector_test_include_labels_1";
@@ -620,7 +620,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let message = "14";
             let name = "vector_test_currently_running";
             let label = "vector_test_label_currently_running";
@@ -661,7 +661,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let message = "15";
             let name = "vector_test_include_image";
             let config = DockerLogsConfig {
@@ -717,7 +717,7 @@ mod integration_tests {
     async fn not_include_running_image_legacy_namespace() {
         trace_init();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let message = "17";
             let name = "vector_test_not_include_running_image";
             let config_ex = DockerLogsConfig {
@@ -755,7 +755,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let message = "18";
             let name = "vector_test_flat_labels";
             let label = "vector.test.label.flat.labels";
@@ -802,7 +802,7 @@ mod integration_tests {
             .schema_definition
             .clone();
 
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let mut message = String::with_capacity(20 * 1024);
             for _ in 0..message.capacity() {
                 message.push('0');
@@ -828,7 +828,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn merge_multiline_vector_namespace() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             trace_init();
             let schema_definitions = DockerLogsConfig::default()
                 .outputs(LogNamespace::Vector)
@@ -900,7 +900,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn merge_multiline_legacy_namespace() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             trace_init();
             let schema_definitions = DockerLogsConfig::default()
                 .outputs(LogNamespace::Legacy)

@@ -716,7 +716,7 @@ mod test {
     }
 
     async fn test_protocol(status: EventStatus, sends_ack: bool) {
-        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
             let (sender, recv) = SourceSender::new_test_finalize(status);
             let address = next_addr();
             let source = LogstashConfig {
@@ -888,7 +888,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn beats_heartbeat() {
-        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
             let out = source(heartbeat_address(), None).await;
 
             timeout(Duration::from_secs(60), collect_n(out, 1))
@@ -916,7 +916,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn logstash() {
-        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
             let out = source(
                 logstash_address(),
                 Some(TlsEnableableConfig {

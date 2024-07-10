@@ -820,7 +820,7 @@ mod integration_tests {
         decoding: DeserializerConfig,
         custom_options: Option<HashMap<String, Box<dyn Any>>>,
     ) {
-        assert_source_compliance(&SOURCE_TAGS, async move {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
             let s3 = s3_client().await;

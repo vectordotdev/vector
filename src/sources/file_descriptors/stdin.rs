@@ -126,7 +126,7 @@ mod tests {
 
     #[tokio::test]
     async fn stdin_decodes_line() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let (tx, rx) = SourceSender::new_test();
             let config = StdinConfig::default();
             let buf = Cursor::new("hello world\nhello world again");
@@ -167,7 +167,7 @@ mod tests {
 
     #[tokio::test]
     async fn stdin_decodes_line_vector_namespace() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
             let (tx, rx) = SourceSender::new_test();
             let config = StdinConfig::default();
             let buf = Cursor::new("hello world\nhello world again");

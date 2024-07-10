@@ -380,7 +380,7 @@ mod integration_tests {
         let nc_pub = nc.clone();
         let msg = "my message";
 
-        let events = assert_source_compliance(&SOURCE_TAGS, async move {
+        let events = assert_source_compliance(&SOURCE_TAGS, |_controller| async move {
             let (tx, rx) = SourceSender::new_test();
             let decoder = DecodingConfig::new(
                 conf.framing.clone(),
