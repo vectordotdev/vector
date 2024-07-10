@@ -1,6 +1,6 @@
-use std::{borrow::Cow, collections::BTreeMap, time::Duration};
-use std::time::Instant;
 use colored::{ColoredString, Colorize};
+use std::time::Instant;
+use std::{borrow::Cow, collections::BTreeMap, time::Duration};
 use tokio::time::timeout;
 use tokio_stream::StreamExt;
 use url::Url;
@@ -100,8 +100,10 @@ async fn run(
     };
 
     let start_time = Instant::now();
-    let stream_duration =
-        opts.duration_ms.map(Duration::from_millis).unwrap_or(Duration::MAX);
+    let stream_duration = opts
+        .duration_ms
+        .map(Duration::from_millis)
+        .unwrap_or(Duration::MAX);
 
     // Loop over the returned results, printing out tap events.
     #[allow(clippy::print_stdout)]
@@ -112,10 +114,9 @@ async fn run(
             return exitcode::OK;
         }
 
-        let message =
-            timeout(stream_duration - time_elapsed, stream.next()).await;
+        let message = timeout(stream_duration - time_elapsed, stream.next()).await;
         match message {
-            Ok(Some(Some(res))) =>
+            Ok(Some(Some(res))) => {
                 if let Some(d) = res.data {
                     for tap_event in d.output_events_by_component_id_patterns.iter() {
                         match tap_event {
@@ -136,12 +137,14 @@ async fn run(
                         }
                     }
                 }
+            }
             Err(_) =>
-                // If the stream times out, that indicates the duration specified by the user
-                // has elapsed. We should exit gracefully.
-                return exitcode::OK,
-            Ok(_) =>
-                return exitcode::TEMPFAIL,
+            // If the stream times out, that indicates the duration specified by the user
+            // has elapsed. We should exit gracefully.
+            {
+                return exitcode::OK
+            }
+            Ok(_) => return exitcode::TEMPFAIL,
         }
     }
 }
