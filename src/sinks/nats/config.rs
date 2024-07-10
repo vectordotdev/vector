@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use futures_util::TryFutureExt;
 use snafu::ResultExt;
 use vector_lib::codecs::JsonSerializerConfig;
@@ -76,6 +77,10 @@ pub struct NatsSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub(super) request: TowerRequestConfig<NatsTowerRequestConfigDefaults>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub(super) jetstream: bool,
 }
 
 fn default_name() -> String {
@@ -93,6 +98,7 @@ impl GenerateConfig for NatsSinkConfig {
             tls: None,
             url: "nats://127.0.0.1:4222".into(),
             request: Default::default(),
+            jetstream: Default::default(),
         })
         .unwrap()
     }
@@ -130,8 +136,56 @@ impl NatsSinkConfig {
 
         options.connect(&self.url).await.context(ConnectSnafu)
     }
+
+    pub(super) async fn publisher(&self) -> Result<NatsPublisher, NatsError> {
+        let connection = self.connect().await?;
+
+        match self.jetstream {
+            true => Ok(NatsPublisher::JetStream(async_nats::jetstream::new(
+                connection,
+            ))),
+            false => Ok(NatsPublisher::Core(connection)),
+        }
+    }
 }
 
 async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
     config.connect().map_ok(|_| ()).map_err(|e| e.into()).await
+}
+
+pub enum NatsPublisher {
+    Core(async_nats::Client),
+    JetStream(async_nats::jetstream::Context),
+}
+
+impl NatsPublisher {
+    pub(super) async fn publish<S: async_nats::subject::ToSubject>(
+        &self,
+        subject: S,
+        payload: Bytes,
+    ) -> Result<(), NatsError> {
+        match self {
+            NatsPublisher::Core(client) => {
+                client
+                    .publish(subject, payload)
+                    .await
+                    .map_err(|e| NatsError::PublishError {
+                        source: Box::new(e),
+                    })?;
+                client.flush().await.map_err(|e| NatsError::PublishError {
+                    source: Box::new(e),
+                })
+            }
+            NatsPublisher::JetStream(jetstream) => {
+                let ack = jetstream.publish(subject, payload).await.map_err(|e| {
+                    NatsError::PublishError {
+                        source: Box::new(e),
+                    }
+                })?;
+                ack.await.map(|_| ()).map_err(|e| NatsError::PublishError {
+                    source: Box::new(e),
+                })
+            }
+        }
+    }
 }
