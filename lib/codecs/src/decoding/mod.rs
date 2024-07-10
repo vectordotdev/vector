@@ -19,12 +19,12 @@ pub use format::{
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesDecoder, BytesDecoderConfig, CharacterDelimitedDecoder,
-    CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions, FramingError,
-    LengthDelimitedDecoder, LengthDelimitedDecoderConfig, NewlineDelimitedDecoder,
-    NewlineDelimitedDecoderConfig, NewlineDelimitedDecoderOptions, OctetCountingDecoder,
-    OctetCountingDecoderConfig, OctetCountingDecoderOptions,
+    CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions, ChunkedGelfDecoder,
+    ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions, FramingError, LengthDelimitedDecoder,
+    LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
+    NewlineDelimitedDecoderOptions, OctetCountingDecoder, OctetCountingDecoderConfig,
+    OctetCountingDecoderOptions,
 };
-use framing::{ChunkedGelfDecoder, ChunkedGelfDecoderConfig};
 use smallvec::SmallVec;
 use std::fmt::Debug;
 use vector_config::configurable_component;

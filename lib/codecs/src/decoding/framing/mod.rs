@@ -16,7 +16,7 @@ use ::bytes::Bytes;
 pub use character_delimited::{
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions,
 };
-pub use chunked_gelf::{ChunkedGelfDecoder, ChunkedGelfDecoderConfig};
+pub use chunked_gelf::{ChunkedGelfDecoder, ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions};
 use dyn_clone::DynClone;
 pub use length_delimited::{LengthDelimitedDecoder, LengthDelimitedDecoderConfig};
 pub use newline_delimited::{

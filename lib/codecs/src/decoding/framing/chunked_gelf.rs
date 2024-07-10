@@ -13,9 +13,9 @@ use tracing::{info, warn};
 use vector_config::configurable_component;
 
 const GELF_MAGIC: [u8; 2] = [0x1e, 0x0f];
-pub const MAX_TOTAL_CHUNKS: u8 = 128;
-const DEFAULT_CHUNKS: [Bytes; MAX_TOTAL_CHUNKS as usize] =
-    [const { Bytes::new() }; MAX_TOTAL_CHUNKS as usize];
+const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
+const DEFAULT_CHUNKS: [Bytes; GELF_MAX_TOTAL_CHUNKS as usize] =
+    [const { Bytes::new() }; GELF_MAX_TOTAL_CHUNKS as usize];
 const DEFAULT_TIMEOUT_MILLIS: u64 = 5000;
 const DEFAULT_PENDING_MESSAGES_LIMIT: usize = 1000;
 
@@ -84,7 +84,7 @@ impl Default for ChunkedGelfDecoderOptions {
 #[derive(Debug)]
 pub struct MessageState {
     total_chunks: u8,
-    chunks: [Bytes; MAX_TOTAL_CHUNKS as usize],
+    chunks: [Bytes; GELF_MAX_TOTAL_CHUNKS as usize],
     chunks_bitmap: u128,
     timeout_task: JoinHandle<()>,
 }
@@ -170,7 +170,7 @@ impl ChunkedGelfDecoder {
         let sequence_number = chunk.get_u8();
         let total_chunks = chunk.get_u8();
 
-        if total_chunks == 0 || total_chunks > MAX_TOTAL_CHUNKS {
+        if total_chunks == 0 || total_chunks > GELF_MAX_TOTAL_CHUNKS {
             warn!(
                 message = "Received a chunk with an invalid total chunks value. Ignoring it.",
                 message_id = message_id,
@@ -545,7 +545,7 @@ mod tests {
     async fn decode_chunk_with_invalid_total_chunks() {
         let message_id = 1u64;
         let sequence_number = 1u8;
-        let invalid_total_chunks = MAX_TOTAL_CHUNKS + 1;
+        let invalid_total_chunks = GELF_MAX_TOTAL_CHUNKS + 1;
         let payload = "foo";
         let mut chunk = create_chunk(message_id, sequence_number, invalid_total_chunks, payload);
         let mut decoder = ChunkedGelfDecoder::default();

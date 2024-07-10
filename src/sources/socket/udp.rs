@@ -79,7 +79,7 @@ pub struct UdpConfig {
 
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
-    decoding: DeserializerConfig,
+    pub(super) decoding: DeserializerConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
