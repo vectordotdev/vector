@@ -17,6 +17,7 @@ const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
 const DEFAULT_CHUNKS: [Bytes; GELF_MAX_TOTAL_CHUNKS as usize] =
     [const { Bytes::new() }; GELF_MAX_TOTAL_CHUNKS as usize];
 const DEFAULT_TIMEOUT_MILLIS: u64 = 5000;
+// TODO: ask what would be an appropriate default value for this
 const DEFAULT_PENDING_MESSAGES_LIMIT: usize = 1000;
 
 const fn default_timeout_millis() -> u64 {
@@ -27,7 +28,7 @@ const fn default_pending_messages_limit() -> usize {
     DEFAULT_PENDING_MESSAGES_LIMIT
 }
 
-/// Config used to build a `ChunkedGelfDecoderConfig`.
+/// Config used to build a `ChunkedGelfDecoder`.
 #[configurable_component]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChunkedGelfDecoderConfig {
@@ -37,12 +38,7 @@ pub struct ChunkedGelfDecoderConfig {
 }
 
 impl ChunkedGelfDecoderConfig {
-    /// Creates a new `BytesDecoderConfig`.
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// Build the `ByteDecoder` from this configuration.
+    /// Build the `ChunkedGelfDecoder` from this configuration.
     pub fn build(&self) -> ChunkedGelfDecoder {
         ChunkedGelfDecoder::new(
             self.chunked_gelf.timeout_millis,
@@ -56,7 +52,8 @@ impl ChunkedGelfDecoderConfig {
 #[derive(Clone, Debug, Derivative, PartialEq, Eq)]
 pub struct ChunkedGelfDecoderOptions {
     /// The timeout in milliseconds for a message to be fully received. If the timeout is reached, the
-    /// decoder will drop all the received chunks of the message and start over.
+    /// decoder will drop all the received chunks of the uncomplete message and start over.
+    ///  The default value is 5 seconds.
     #[serde(
         default = "default_timeout_millis",
         skip_serializing_if = "vector_core::serde::is_default"
@@ -64,7 +61,8 @@ pub struct ChunkedGelfDecoderOptions {
     pub timeout_millis: u64,
 
     /// The maximum number of pending uncomplete messages. If this limit is reached, the decoder will start
-    /// dropping chunks of new messages. This limit ensures the memory usage of the decoder is bounded.
+    /// dropping chunks of new messages. This limit ensures the memory usage of the decoder's state is bounded.
+    /// The default value is 1000.
     #[serde(
         default = "default_pending_messages_limit",
         skip_serializing_if = "vector_core::serde::is_default"
@@ -82,7 +80,7 @@ impl Default for ChunkedGelfDecoderOptions {
 }
 
 #[derive(Debug)]
-pub struct MessageState {
+struct MessageState {
     total_chunks: u8,
     chunks: [Bytes; GELF_MAX_TOTAL_CHUNKS as usize],
     chunks_bitmap: u128,
@@ -129,7 +127,7 @@ impl MessageState {
     }
 }
 
-/// A decoder for handling GELF messages that may be chunked.
+/// A codec for handling GELF messages that may be chunked.
 #[derive(Debug, Clone)]
 pub struct ChunkedGelfDecoder {
     // We have to use this decoder to read all the bytes from the buffer first and don't let tokio
@@ -137,7 +135,7 @@ pub struct ChunkedGelfDecoder {
     // whole message. (see https://docs.rs/tokio-util/latest/src/tokio_util/codec/framed_impl.rs.html#26).
     // This limitation is due to the fact that the GELF format does not specify the length of the
     // message, so we have to read all the bytes from the message (datagram)
-    inner_decoder: BytesDecoder,
+    bytes_decoder: BytesDecoder,
     state: Arc<Mutex<HashMap<u64, MessageState>>>,
     timeout: Duration,
     pending_messages_limit: usize,
@@ -147,15 +145,28 @@ impl ChunkedGelfDecoder {
     /// Creates a new `ChunkedGelfDecoder`.
     pub fn new(timeout_millis: u64, pending_messages_limit: usize) -> Self {
         Self {
-            inner_decoder: BytesDecoder::new(),
+            bytes_decoder: BytesDecoder::new(),
             state: Arc::new(Mutex::new(HashMap::new())),
             timeout: Duration::from_millis(timeout_millis),
             pending_messages_limit,
         }
     }
 
-    /// TODO: document this
+    /// Decode a GELF chunk
     pub fn decode_chunk(&mut self, mut chunk: Bytes) -> Result<Option<Bytes>, BoxedFramingError> {
+        // Encoding scheme:
+        //
+        // +------------+-----------------+--------------+----------------------+
+        // | Message id | Sequence number | Total chunks |    Chunk payload     |
+        // +------------+-----------------+--------------+----------------------+
+        // | 64 bits    | 8 bits          | 8 bits       | remaining bits       |
+        // +------------+-----------------+--------------+----------------------+
+        //
+        // As this codec is oriented for UDP, the chunks (datagrams) are not guaranteed to be received in order,
+        // nor to be received at all. So, we have to store the chunks in a buffer (state field) until we receive
+        // all the chunks of a message. When we receive all the chunks of a message, we can concatenate them
+        // and return the complete payload.
+
         // We need 10 bits to read the message id, sequence number and total chunks
         if chunk.remaining() < 10 {
             let src_display = format!("{chunk:?}");
@@ -199,7 +210,6 @@ impl ChunkedGelfDecoder {
                 message = "Received a chunk but reached the pending messages limit. Ignoring it.",
                 message_id = message_id,
                 sequence_number = sequence_number,
-                total_chunks = total_chunks,
                 pending_messages_limit = self.pending_messages_limit,
                 internal_log_rate_limit = true
             );
@@ -215,10 +225,11 @@ impl ChunkedGelfDecoder {
                 tokio::time::sleep(timeout).await;
                 let mut state_lock = state.lock().unwrap();
                 if let Some(_) = state_lock.remove(&message_id) {
-                    // TODO: log the variables in the message or use structured logging?
                     // TODO: record metrics here? it would be insteresting to know how many messages are being discarded
+                    let message = format!("Message was not fully received within the timeout window of {}ms. Discarding it.",
+                        timeout.as_millis());
                     warn!(
-                        message = "Message was not fully received within the timeout window. Discarding it.",
+                        message = message,
                         message_id = message_id,
                         timeout = timeout.as_millis(),
                         internal_log_rate_limit = true
@@ -242,8 +253,8 @@ impl ChunkedGelfDecoder {
             // TODO: add a PR comment asking for info or warn
             info!(
                 message = "Received a duplicate chunk. Ignoring it.",
-                sequence_number = sequence_number,
                 message_id = message_id,
+                sequence_number = sequence_number,
                 internal_log_rate_limit = true
             );
             return Ok(None);
@@ -259,7 +270,9 @@ impl ChunkedGelfDecoder {
         }
     }
 
-    /// TODO: document this
+    /// Decode a GELF message that may be chunked or not. The source bytes are expected to be
+    /// datagram-based (or message-based), so it must not contain multiple GELF messages
+    /// delimited by '\0', such as it would be in a stream-based protocol.
     pub fn decode_message(&mut self, mut src: Bytes) -> Result<Option<Bytes>, BoxedFramingError> {
         let magic = src.get(0..2);
         if magic.is_some_and(|magic| magic == GELF_MAGIC) {
@@ -292,7 +305,7 @@ impl Decoder for ChunkedGelfDecoder {
         // the bytes decoder will always return a Ok(None) in this method, but leaving this
         // here for consistency. Would be better to add a unreachable/panic here if the inner decoder returns
         // the Some variant?
-        self.inner_decoder
+        self.bytes_decoder
             .decode(src)?
             .and_then(|frame| self.decode_message(frame).transpose())
             .transpose()
@@ -302,7 +315,7 @@ impl Decoder for ChunkedGelfDecoder {
             return Ok(None);
         }
 
-        self.inner_decoder
+        self.bytes_decoder
             .decode_eof(buf)?
             .and_then(|frame| self.decode_message(frame).transpose())
             .transpose()
@@ -336,8 +349,6 @@ mod tests {
         let payload = "foo";
         (BytesMut::from(payload), payload.to_string())
     }
-
-    // TODO: add a malformed chunk message
 
     #[fixture]
     fn two_chunks_message() -> ([BytesMut; 2], String) {
@@ -492,16 +503,15 @@ mod tests {
     #[tokio::test(start_paused = true)]
     #[traced_test]
     async fn decode_timeout(two_chunks_message: ([BytesMut; 2], String)) {
-        let timeout = 300;
         let (mut chunks, _) = two_chunks_message;
-        let mut decoder = ChunkedGelfDecoder::new(timeout, DEFAULT_PENDING_MESSAGES_LIMIT);
+        let mut decoder = ChunkedGelfDecoder::default();
 
         let frame = decoder.decode_eof(&mut chunks[0]).unwrap();
         assert!(frame.is_none());
         assert!(!decoder.state.lock().unwrap().is_empty());
 
         // The message state should be cleared after a certain time
-        tokio::time::sleep(Duration::from_millis(timeout + 1)).await;
+        tokio::time::sleep(Duration::from_millis(DEFAULT_TIMEOUT_MILLIS + 1)).await;
         assert!(decoder.state.lock().unwrap().is_empty());
         assert!(logs_contain(
             "Message was not fully received within the timeout window. Discarding it."
@@ -510,7 +520,7 @@ mod tests {
         let frame = decoder.decode_eof(&mut chunks[1]).unwrap();
         assert!(frame.is_none());
 
-        tokio::time::sleep(Duration::from_millis(timeout + 1)).await;
+        tokio::time::sleep(Duration::from_millis(DEFAULT_TIMEOUT_MILLIS + 1)).await;
         assert!(decoder.state.lock().unwrap().is_empty());
         assert!(logs_contain(
             "Message was not fully received within the timeout window. Discarding it."
@@ -529,9 +539,10 @@ mod tests {
     #[tokio::test]
     #[traced_test]
     async fn decode_chunk_with_malformed_header() {
-        let malformed_chunk = [0x12, 0x23];
         let mut src = BytesMut::new();
         src.extend_from_slice(&GELF_MAGIC);
+        // Malformed chunk header with less than 10 bytes
+        let malformed_chunk = [0x12, 0x34];
         src.extend_from_slice(&malformed_chunk);
         let mut decoder = ChunkedGelfDecoder::default();
 
