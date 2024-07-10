@@ -171,10 +171,7 @@ impl NatsPublisher {
                     .await
                     .map_err(|e| NatsError::PublishError {
                         source: Box::new(e),
-                    })?;
-                client.flush().await.map_err(|e| NatsError::PublishError {
-                    source: Box::new(e),
-                })
+                    })
             }
             NatsPublisher::JetStream(jetstream) => {
                 let ack = jetstream.publish(subject, payload).await.map_err(|e| {
