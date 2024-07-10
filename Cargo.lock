@@ -1844,13 +1844,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3e368af43e418a04d52505cf3dbc23dda4e3407ae2fa99fd0e4f308ce546acc"
 
 [[package]]
-name = "cargo_toml"
-version = "0.20.5"
+name = "cargo-lock"
+version = "9.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88da5a13c620b4ca0078845707ea9c3faf11edbc3ffd8497d11d686211cd1ac0"
+checksum = "e11c675378efb449ed3ce8de78d75d0d80542fc98487c26aba28eb3b82feac72"
 dependencies = [
+ "semver 1.0.23",
  "serde",
- "toml",
+ "toml 0.7.8",
+ "url",
 ]
 
 [[package]]
@@ -2274,7 +2276,7 @@ dependencies = [
  "directories",
  "serde",
  "thiserror",
- "toml",
+ "toml 0.8.19",
 ]
 
 [[package]]
@@ -5117,11 +5119,12 @@ checksum = "3f35c735096c0293d313e8f2a641627472b83d01b937177fe76e5e2708d31e0d"
 
 [[package]]
 name = "lalrpop-util"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "108dc8f5dabad92c65a03523055577d847f5dcc00f3e7d3a68bc4d48e01d8fe1"
+checksum = "feee752d43abd0f4807a921958ab4131f692a44d4d599733d4419c5d586176ce"
 dependencies = [
  "regex-automata 0.4.8",
+ "rustversion",
 ]
 
 [[package]]
@@ -8437,7 +8440,7 @@ version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93b4e415d6bff989e5e48649ca9b8b4d4997cb069a0c90a84bfd38c7df5e3968"
 dependencies = [
- "toml",
+ "toml 0.8.19",
 ]
 
 [[package]]
@@ -9616,6 +9619,18 @@ dependencies = [
 
 [[package]]
 name = "toml"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd79e69d3b627db300ff956027cc6c3798cef26d22526befdfcd12feeb6d2257"
+dependencies = [
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "toml_edit 0.19.15",
+]
+
+[[package]]
+name = "toml"
 version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1ed1f98e3fdc28d6d910e6737ae6ab1a93bf1985935a1193e68f93eeb68d24e"
@@ -9642,6 +9657,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
 dependencies = [
  "indexmap 2.5.0",
+ "serde",
+ "serde_spanned",
  "toml_datetime",
  "winnow 0.5.18",
 ]
@@ -10351,7 +10368,7 @@ dependencies = [
  "serde_yaml 0.9.34+deprecated",
  "sha2",
  "tempfile",
- "toml",
+ "toml 0.8.19",
 ]
 
 [[package]]
@@ -10522,7 +10539,7 @@ dependencies = [
  "tokio-test",
  "tokio-tungstenite 0.20.1",
  "tokio-util",
- "toml",
+ "toml 0.8.19",
  "tonic",
  "tonic-build 0.11.0",
  "tower",
@@ -10662,7 +10679,7 @@ dependencies = [
  "serde_json",
  "serde_with 3.10.0",
  "snafu 0.7.5",
- "toml",
+ "toml 0.8.19",
  "tracing 0.1.40",
  "url",
  "vector-config-common",
@@ -10766,7 +10783,7 @@ dependencies = [
  "tokio-stream",
  "tokio-test",
  "tokio-util",
- "toml",
+ "toml 0.8.19",
  "tonic",
  "tracing 0.1.40",
  "tracing-core 0.1.32",
@@ -10901,7 +10918,7 @@ dependencies = [
 name = "vector-vrl-web-playground"
 version = "0.1.0"
 dependencies = [
- "cargo_toml",
+ "cargo-lock",
  "enrichment",
  "getrandom 0.2.15",
  "gloo-utils",
@@ -10927,8 +10944,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c22ec61cbd43e563df185521f9a2fb2f42f6ab96604a574c82f6564049fb431"
+source = "git+https://github.com/vectordotdev/vrl?branch=main#3295458dc84142abab4637095248771ca6087800"
 dependencies = [
  "aes",
  "ansi_term",
@@ -10971,7 +10987,7 @@ dependencies = [
  "influxdb-line-protocol",
  "itertools 0.13.0",
  "lalrpop",
- "lalrpop-util 0.21.0",
+ "lalrpop-util 0.22.0",
  "md-5",
  "mlua",
  "nom",
