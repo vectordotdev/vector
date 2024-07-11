@@ -523,7 +523,7 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(DEFAULT_TIMEOUT_MILLIS + 1)).await;
         assert!(decoder.state.lock().unwrap().is_empty());
         assert!(logs_contain(
-            "Message was not fully received within the timeout window. Discarding it."
+            "Message was not fully received within the timeout window of 5000ms. Discarding it"
         ));
     }
 
