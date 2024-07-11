@@ -78,7 +78,9 @@ pub struct NatsSinkConfig {
     #[serde(default)]
     pub(super) request: TowerRequestConfig<NatsTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
+    /// Send messages using [Jetstream][jetstream].
+    ///
+    /// [jetstream]: https://docs.nats.io/nats-concepts/jetstream
     #[serde(default)]
     pub(super) jetstream: bool,
 }
@@ -140,11 +142,12 @@ impl NatsSinkConfig {
     pub(super) async fn publisher(&self) -> Result<NatsPublisher, NatsError> {
         let connection = self.connect().await?;
 
-        match self.jetstream {
-            true => Ok(NatsPublisher::JetStream(async_nats::jetstream::new(
+        if self.jetstream {
+            Ok(NatsPublisher::JetStream(async_nats::jetstream::new(
                 connection,
-            ))),
-            false => Ok(NatsPublisher::Core(connection)),
+            )))
+        } else {
+            Ok(NatsPublisher::Core(connection))
         }
     }
 }
