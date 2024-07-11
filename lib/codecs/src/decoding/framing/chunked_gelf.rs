@@ -167,7 +167,7 @@ impl ChunkedGelfDecoder {
         // all the chunks of a message. When we receive all the chunks of a message, we can concatenate them
         // and return the complete payload.
 
-        // We need 10 bits to read the message id, sequence number and total chunks
+        // We need 10 bytes to read the message id, sequence number and total chunks
         if chunk.remaining() < 10 {
             let src_display = format!("{chunk:?}");
             warn!(message = "Received malformed chunk headers (message ID, sequence number and total chunks) with less than 10 bytes. Ignoring it.",
