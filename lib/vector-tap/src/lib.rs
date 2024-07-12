@@ -22,7 +22,7 @@ use vector_api_client::{
     },
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EventFormatter {
     meta: bool,
     format: TapEncodingFormat,
@@ -98,6 +98,7 @@ impl EventFormatter {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum OutputChannel {
     Stdout(EventFormatter),
     AsyncChannel(tokio_mpsc::Sender<Vec<GraphQLTapOutputEvents>>),
