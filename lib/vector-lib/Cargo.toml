@@ -18,6 +18,7 @@ vector-config = { path = "../vector-config" }
 vector-core = { path = "../vector-core", default-features = false }
 vector-lookup = { path = "../vector-lookup", features = ["test"] }
 vector-stream = { path = "../vector-stream" }
+vector-tap = { path = "../vector-tap" }
 
 [features]
 api = ["vector-core/api"]

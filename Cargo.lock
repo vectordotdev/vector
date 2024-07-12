@@ -10681,6 +10681,7 @@ dependencies = [
  "vector-core",
  "vector-lookup",
  "vector-stream",
+ "vector-tap",
 ]
 
 [[package]]
@@ -10713,6 +10714,20 @@ dependencies = [
  "twox-hash",
  "vector-common",
  "vector-core",
+]
+
+[[package]]
+name = "vector-tap"
+version = "0.1.0"
+dependencies = [
+ "colored",
+ "serde_yaml 0.9.34+deprecated",
+ "snafu 0.7.5",
+ "tokio",
+ "tokio-stream",
+ "tracing 0.1.40",
+ "url",
+ "vector-api-client",
 ]
 
 [[package]]
