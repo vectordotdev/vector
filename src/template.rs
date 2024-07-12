@@ -392,6 +392,7 @@ fn render_timestamp(
 mod tests {
     use chrono::{Offset, TimeZone, Utc};
     use chrono_tz::Tz;
+    use vector_lib::config::LogNamespace;
     use vector_lib::lookup::{metadata_path, PathPrefix};
     use vector_lib::metric_tags;
 
@@ -540,6 +541,8 @@ mod tests {
 
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("@timestamp", ts);
+        // use Vector namespace instead of legacy
+        LogNamespace::Vector.insert_vector_metadata(event.as_mut_log(), Some("foo"), "foo", "bar");
         let new_schema = event
             .as_mut_log()
             .metadata()
