@@ -387,6 +387,8 @@ base: components: sinks: nats: configuration: {
 		description: """
 			Send messages using [Jetstream][jetstream].
 
+			If set, the `subject` must belong to an existing JetStream stream.
+
 			[jetstream]: https://docs.nats.io/nats-concepts/jetstream
 			"""
 		required: false

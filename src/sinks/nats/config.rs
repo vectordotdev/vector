@@ -80,6 +80,8 @@ pub struct NatsSinkConfig {
 
     /// Send messages using [Jetstream][jetstream].
     ///
+    /// If set, the `subject` must belong to an existing JetStream stream.
+    ///
     /// [jetstream]: https://docs.nats.io/nats-concepts/jetstream
     #[serde(default)]
     pub(super) jetstream: bool,
