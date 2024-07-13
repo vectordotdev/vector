@@ -1,3 +1,3 @@
-Loki sink drop events with timestamp can not parsed by chrono.
+Loki sink now drops events with non-parseable timestamps.
 
 authors: suikammd
