@@ -1,6 +1,6 @@
 use std::{time::Duration};
 use vector_lib::api_client::Client;
-use vector_lib::tap::{exec_tap, EventFormatter, OutputChannel, TapExecutorError};
+use vector_lib::tap::{exec_tap, EventFormatter, TapExecutorError};
 
 use crate::signal::{SignalRx, SignalTo};
 
@@ -37,7 +37,7 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
 /// Observe event flow from specified components
 pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitCode {
     let subscription_url = opts.web_socket_url();
-    let output_channel = OutputChannel::Stdout(EventFormatter::new(opts.meta, opts.format));
+    let formatter = EventFormatter::new(opts.meta, opts.format);
     let outputs_patterns = opts.outputs_patterns();
 
     loop {
@@ -45,21 +45,21 @@ pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
             biased;
             Ok(SignalTo::Shutdown(_) | SignalTo::Quit) = signal_rx.recv() => break,
             exec_result = exec_tap(
-                subscription_url.clone(),
+                &subscription_url,
                 opts.interval as i64,
                 opts.limit as i64,
                 opts.duration_ms,
                 opts.inputs_of.clone(),
                 outputs_patterns.clone(),
                 opts.format,
-                output_channel.clone(),
+                &formatter,
                 opts.quiet,
             ) => {
                 match exec_result {
                     Ok(_) => {
                         break;
                     }
-                    Err(TapExecutorError::ConnectionFailure) | Err(TapExecutorError::NoEventsFound) => {
+                    Err(TapExecutorError::ConnectionFailure) | Err(TapExecutorError::GraphQLError) => {
                         if !opts.no_reconnect {
                             #[allow(clippy::print_stderr)]
                             {

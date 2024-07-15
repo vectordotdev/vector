@@ -1,6 +1,5 @@
 #![deny(warnings)]
 
-#[macro_use]
 extern crate tracing;
 
 use std::{borrow::Cow, collections::BTreeMap};
@@ -109,22 +108,22 @@ pub enum OutputChannel {
 pub enum TapExecutorError {
     #[snafu(display("[tap] Couldn't connect to API via WebSockets"))]
     ConnectionFailure,
-    NoEventsFound,
+    GraphQLError,
 }
 
 #[allow(clippy::too_many_arguments)]
 pub async fn exec_tap(
-    url: Url,
+    url: &Url,
     interval: i64,
     limit: i64,
     duration_ms: Option<u64>,
     input_patterns: Vec<String>,
     output_patterns: Vec<String>,
     format: TapEncodingFormat,
-    output_channel: OutputChannel,
+    formatter: &EventFormatter,
     quiet: bool,
 ) -> Result<(), TapExecutorError> {
-    let subscription_client = match connect_subscription_client(url.clone()).await {
+    let subscription_client = match connect_subscription_client((*url).clone()).await {
         Ok(c) => c,
         Err(e) => {
             #[allow(clippy::print_stderr)]
@@ -164,43 +163,32 @@ pub async fn exec_tap(
         match message {
             Ok(Some(Some(res))) => {
                 if let Some(d) = res.data {
-                    match &output_channel {
-                        OutputChannel::Stdout(formatter) => {
-                            for tap_event in d.output_events_by_component_id_patterns.iter() {
-                                match tap_event {
-                                    GraphQLTapOutputEvents::Log(ev) => {
-                                        println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                                    }
-                                    GraphQLTapOutputEvents::Metric(ev) => {
-                                        println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                                    }
-                                    GraphQLTapOutputEvents::Trace(ev) => {
-                                        println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                                    }
-                                    GraphQLTapOutputEvents::EventNotification(ev) => {
-                                        if !quiet {
-                                            eprintln!("{}", ev.message);
-                                        }
-                                    }
-                                }
+                    for tap_event in d.output_events_by_component_id_patterns.iter() {
+                        match tap_event {
+                            GraphQLTapOutputEvents::Log(ev) => {
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
                             }
-                        }
-                        OutputChannel::AsyncChannel (sender_tx) => {
-                            if sender_tx.send(d.output_events_by_component_id_patterns).await.is_err() {
-                                debug!("Could not send events");
+                            GraphQLTapOutputEvents::Metric(ev) => {
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                            }
+                            GraphQLTapOutputEvents::Trace(ev) => {
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                            }
+                            GraphQLTapOutputEvents::EventNotification(ev) => {
+                                if !quiet {
+                                    eprintln!("{}", ev.message);
+                                }
                             }
                         }
                     }
                 }
             }
-            Err(_) =>
-            // If the stream times out, that indicates the duration specified by the user
-            // has elapsed. We should exit gracefully.
-                {
-                    return Ok(())
-                }
-            Ok(_) => return Err(TapExecutorError::NoEventsFound)
+            Err(_) => {
+                // If the stream times out, that indicates the duration specified by the user
+                // has elapsed. We should exit gracefully.
+                return Ok(())
+            }
+            Ok(_) => return Err(TapExecutorError::GraphQLError)
         }
     }
 }
-
