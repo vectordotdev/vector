@@ -54,6 +54,6 @@ impl FunctionExpression for RemoveSecretFn {
     }
 
     fn type_def(&self, _: &TypeState) -> TypeDef {
-        TypeDef::null().infallible()
+        TypeDef::null().infallible().impure()
     }
 }

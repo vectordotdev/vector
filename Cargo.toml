@@ -130,15 +130,15 @@ members = [
 
 [workspace.dependencies]
 chrono = { version = "0.4.37", default-features = false, features = ["clock", "serde"] }
-clap = { version = "4.5.7", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.8", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 indexmap = { version = "2.2.6", default-features = false, features = ["serde", "std"] }
 pin-project = { version = "1.1.5", default-features = false }
-proptest = { version = "1.4" }
+proptest = { version = "1.5" }
 proptest-derive = { version = "0.4.0" }
-serde_json = { version = "1.0.117", default-features = false, features = ["raw_value", "std"] }
-serde = { version = "1.0.203", default-features = false, features = ["alloc", "derive", "rc"] }
+serde_json = { version = "1.0.120", default-features = false, features = ["raw_value", "std"] }
+serde = { version = "1.0.204", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.14", default-features = false, features = ["display", "parse"] }
-vrl = { version = "0.16.0", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { version = "0.16.1", features = ["arbitrary", "cli", "test", "test_framework"] }
 tokio = { version = "1.38.0", default-features = false, features = ["full"] }
 
 [dependencies]
@@ -159,7 +159,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.5", default-features = false }
-async-trait = { version = "0.1.80", default-features = false }
+async-trait = { version = "0.1.81", default-features = false }
 futures = { version = "0.3.30", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio.workspace = true
 tokio-openssl = { version = "0.6.4", default-features = false }
@@ -217,9 +217,9 @@ tower-http = { version = "0.4.4", default-features = false, features = ["compres
 # Serde
 serde.workspace = true
 serde-toml-merge = { version = "0.3.8", default-features = false }
-serde_bytes = { version = "0.11.14", default-features = false, features = ["std"], optional = true }
+serde_bytes = { version = "0.11.15", default-features = false, features = ["std"], optional = true }
 serde_json.workspace = true
-serde_with = { version = "3.8.1", default-features = false, features = ["macros", "std"] }
+serde_with = { version = "3.8.3", default-features = false, features = ["macros", "std"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 
 # Messagepack
@@ -246,7 +246,7 @@ async-graphql-warp = { version = "7.0.6", default-features = false, optional = t
 crossterm = { version = "0.27.0", default-features = false, features = ["event-stream", "windows"], optional = true }
 num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
-ratatui = { version = "0.26.3", optional = true, default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.27.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Opentelemetry
 
@@ -314,7 +314,7 @@ notify = { version = "6.1.1", default-features = false, features = ["macos_fseve
 once_cell = { version = "1.19", default-features = false }
 openssl = { version = "0.10.64", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
-ordered-float = { version = "4.2.0", default-features = false }
+ordered-float = { version = "4.2.1", default-features = false }
 paste = "1.0.15"
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
@@ -342,7 +342,7 @@ toml.workspace = true
 tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.16", default-features = false }
-url = { version = "2.5.1", default-features = false, features = ["serde"] }
+url = { version = "2.5.2", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.7", default-features = false }
 zstd = { version = "0.13.0", default-features = false }

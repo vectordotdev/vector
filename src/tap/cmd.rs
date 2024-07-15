@@ -1,6 +1,7 @@
-use std::{borrow::Cow, collections::BTreeMap, time::Duration};
-
 use colored::{ColoredString, Colorize};
+use std::time::Instant;
+use std::{borrow::Cow, collections::BTreeMap, time::Duration};
+use tokio::time::timeout;
 use tokio_stream::StreamExt;
 use url::Url;
 use vector_lib::api_client::{
@@ -98,34 +99,52 @@ async fn run(
         );
     };
 
+    let start_time = Instant::now();
+    let stream_duration = opts
+        .duration_ms
+        .map(Duration::from_millis)
+        .unwrap_or(Duration::MAX);
+
     // Loop over the returned results, printing out tap events.
     #[allow(clippy::print_stdout)]
     #[allow(clippy::print_stderr)]
     loop {
-        let message = stream.next().await;
-        if let Some(Some(res)) = message {
-            if let Some(d) = res.data {
-                for tap_event in d.output_events_by_component_id_patterns.iter() {
-                    match tap_event {
-                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
-                            println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                        },
-                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => {
-                            println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                        },
-                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Trace(ev) => {
-                            println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                        },
-                        OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
-                            if !opts.quiet {
-                                eprintln!("{}", ev.message);
-                            }
-                        },
+        let time_elapsed = start_time.elapsed();
+        if time_elapsed >= stream_duration {
+            return exitcode::OK;
+        }
+
+        let message = timeout(stream_duration - time_elapsed, stream.next()).await;
+        match message {
+            Ok(Some(Some(res))) => {
+                if let Some(d) = res.data {
+                    for tap_event in d.output_events_by_component_id_patterns.iter() {
+                        match tap_event {
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => {
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                            },
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Metric(ev) => {
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                            },
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Trace(ev) => {
+                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                            },
+                            OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::EventNotification(ev) => {
+                                if !opts.quiet {
+                                    eprintln!("{}", ev.message);
+                                }
+                            },
+                        }
                     }
                 }
             }
-        } else {
-            return exitcode::TEMPFAIL;
+            Err(_) =>
+            // If the stream times out, that indicates the duration specified by the user
+            // has elapsed. We should exit gracefully.
+            {
+                return exitcode::OK
+            }
+            Ok(_) => return exitcode::TEMPFAIL,
         }
     }
 }
