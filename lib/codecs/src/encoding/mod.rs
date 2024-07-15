@@ -550,5 +550,3 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
         }
     }
 }
-
-// TODO: add tests here for GELF chunked framing and parsing
