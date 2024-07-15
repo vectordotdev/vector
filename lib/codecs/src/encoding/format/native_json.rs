@@ -98,9 +98,6 @@ mod tests {
         serializer
             .encode(histogram_event.clone(), &mut bytes)
             .unwrap();
-        // TODO: remove this comment. Add a PR comment stating that converting the histogram_event to a serde_json::Value
-        // Changed the order of the keys to alphabetical order and the string comparison failed due to the Event struct
-        // not serializing the keys in the same order as the serde_json::Value.
         assert_eq!(
             bytes.freeze(),
             serde_json::to_string(&histogram_event).unwrap()

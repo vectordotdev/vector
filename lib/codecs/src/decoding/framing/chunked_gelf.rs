@@ -17,7 +17,6 @@ const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
 const DEFAULT_CHUNKS: [Bytes; GELF_MAX_TOTAL_CHUNKS as usize] =
     [const { Bytes::new() }; GELF_MAX_TOTAL_CHUNKS as usize];
 const DEFAULT_TIMEOUT_MILLIS: u64 = 5000;
-// TODO: ask what would be an appropriate default value for this
 const DEFAULT_PENDING_MESSAGES_LIMIT: usize = 1000;
 
 const fn default_timeout_millis() -> u64 {
@@ -53,7 +52,7 @@ impl ChunkedGelfDecoderConfig {
 pub struct ChunkedGelfDecoderOptions {
     /// The timeout in milliseconds for a message to be fully received. If the timeout is reached, the
     /// decoder will drop all the received chunks of the uncomplete message and start over.
-    ///  The default value is 5 seconds.
+    /// The default value is 5 seconds.
     #[serde(
         default = "default_timeout_millis",
         skip_serializing_if = "vector_core::serde::is_default"
@@ -88,7 +87,7 @@ struct MessageState {
 }
 
 impl MessageState {
-    pub fn new(total_chunks: u8, timeout_task: JoinHandle<()>) -> Self {
+    pub const fn new(total_chunks: u8, timeout_task: JoinHandle<()>) -> Self {
         Self {
             total_chunks,
             chunks: DEFAULT_CHUNKS,
@@ -226,7 +225,6 @@ impl ChunkedGelfDecoder {
                 tokio::time::sleep(timeout).await;
                 let mut state_lock = state.lock().unwrap();
                 if let Some(_) = state_lock.remove(&message_id) {
-                    // TODO: record metrics here? it would be insteresting to know how many messages are being discarded
                     let message = format!("Message was not fully received within the timeout window of {}ms. Discarding it.",
                         timeout.as_millis());
                     warn!(
@@ -251,7 +249,6 @@ impl ChunkedGelfDecoder {
         }
 
         if message_state.is_chunk_present(sequence_number) {
-            // TODO: add a PR comment asking for info or warn
             info!(
                 message = "Received a duplicate chunk. Ignoring it.",
                 message_id = message_id,

@@ -135,6 +135,7 @@ impl From<OctetCountingDecoderConfig> for FramingConfig {
         Self::OctetCounting(config)
     }
 }
+
 impl From<ChunkedGelfDecoderConfig> for FramingConfig {
     fn from(config: ChunkedGelfDecoderConfig) -> Self {
         Self::ChunkedGelf(config)

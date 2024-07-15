@@ -1134,8 +1134,6 @@ mod test {
         .await;
     }
 
-    // TODO: maybe this should be in an integration test, such as `src/sources/redis/mod.rs` and `scripts/integration/redis`
-    // and so? There currently are no integration tests for the socket source
     #[tokio::test]
     async fn udp_decodes_chunked_gelf_messages() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
@@ -1517,8 +1515,6 @@ mod test {
         assert_eq!(dgram, bytes);
     }
 
-    // TODO: maybe this should be in an integration test, such as `src/sources/redis/mod.rs` and `scripts/integration/redis`
-    // and so? There currently are no integration tests for the socket source
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_chunked_gelf_messages() {
