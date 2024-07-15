@@ -1526,8 +1526,6 @@ mod test {
             let path = init_unix_with_config(tx, false, false, config).await;
             let seed = 42;
             let mut rng = SmallRng::seed_from_u64(seed);
-            // TODO: add a PR comment here stating that in MACOS at least, with bigger messages, the test fails
-            // with the `No buffer space available` error
             let max_size = 20;
             let big_message = "This is a very large message".repeat(5);
             let another_big_message = "This is another very large message".repeat(5);
