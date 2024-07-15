@@ -1,6 +1,7 @@
-use std::{time::Duration};
+use std::time::Duration;
+
 use vector_lib::api_client::Client;
-use vector_lib::tap::{exec_tap, EventFormatter, TapExecutorError};
+use vector_lib::tap::{EventFormatter, TapExecutorError, TapRunner};
 
 use crate::signal::{SignalRx, SignalTo};
 
@@ -38,21 +39,22 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
 pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitCode {
     let subscription_url = opts.web_socket_url();
     let formatter = EventFormatter::new(opts.meta, opts.format);
-    let outputs_patterns = opts.outputs_patterns();
+    let tap_runner = TapRunner::new(
+        &subscription_url,
+        opts.inputs_of.clone(),
+        opts.outputs_patterns().clone(),
+        &formatter,
+        opts.format
+    );
 
     loop {
         tokio::select! {
             biased;
             Ok(SignalTo::Shutdown(_) | SignalTo::Quit) = signal_rx.recv() => break,
-            exec_result = exec_tap(
-                &subscription_url,
+            exec_result = tap_runner.run_tap(
                 opts.interval as i64,
                 opts.limit as i64,
                 opts.duration_ms,
-                opts.inputs_of.clone(),
-                outputs_patterns.clone(),
-                opts.format,
-                &formatter,
                 opts.quiet,
             ) => {
                 match exec_result {

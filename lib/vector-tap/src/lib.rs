@@ -7,7 +7,6 @@ use std::time::{Duration, Instant};
 
 use colored::{ColoredString, Colorize};
 use snafu::Snafu;
-use tokio::sync::mpsc as tokio_mpsc;
 use tokio::time::timeout;
 use tokio_stream::StreamExt;
 use url::Url;
@@ -15,7 +14,7 @@ use url::Url;
 use vector_api_client::{
     connect_subscription_client,
     gql::{
-        output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns as GraphQLTapOutputEvents,
+        output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns as GraphQLTapOutputEvent,
         TapEncodingFormat,
         TapSubscriptionExt,
     },
@@ -97,12 +96,6 @@ impl EventFormatter {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum OutputChannel {
-    Stdout(EventFormatter),
-    AsyncChannel(tokio_mpsc::Sender<Vec<GraphQLTapOutputEvents>>),
-}
-
 /// Error type for DNS message parsing
 #[derive(Debug, Snafu)]
 pub enum TapExecutorError {
@@ -111,84 +104,102 @@ pub enum TapExecutorError {
     GraphQLError,
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn exec_tap(
-    url: &Url,
-    interval: i64,
-    limit: i64,
-    duration_ms: Option<u64>,
+#[derive(Debug)]
+pub struct TapRunner<'a> {
+    url: &'a Url,
     input_patterns: Vec<String>,
     output_patterns: Vec<String>,
+    formatter: &'a EventFormatter,
     format: TapEncodingFormat,
-    formatter: &EventFormatter,
-    quiet: bool,
-) -> Result<(), TapExecutorError> {
-    let subscription_client = match connect_subscription_client((*url).clone()).await {
-        Ok(c) => c,
-        Err(e) => {
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!("[tap] Couldn't connect to API via WebSockets: {}", e);
-            }
-            return Err(TapExecutorError::ConnectionFailure);
-        }
-    };
+}
 
-    tokio::pin! {
-        let stream = subscription_client.output_events_by_component_id_patterns_subscription(
-            output_patterns.clone(),
-            input_patterns.clone(),
+impl<'a> TapRunner<'a> {
+    pub fn new(
+        url: &'a Url,
+        input_patterns: Vec<String>,
+        output_patterns: Vec<String>,
+        formatter: &'a EventFormatter,
+        format: TapEncodingFormat,
+    ) -> Self {
+        TapRunner {
+            url,
+            input_patterns,
+            output_patterns,
+            formatter,
             format,
-            limit,
-            interval,
-        );
+        }
     }
 
-    let start_time = Instant::now();
-    let stream_duration =
-        duration_ms
-            .map(Duration::from_millis)
-            .unwrap_or(Duration::MAX);
-
-    // Loop over the returned results, printing out tap events.
     #[allow(clippy::print_stdout)]
     #[allow(clippy::print_stderr)]
-    loop {
-        let time_elapsed = start_time.elapsed();
-        if time_elapsed >= stream_duration {
-            return Ok(());
+    pub async fn run_tap(
+        &self,
+        interval: i64,
+        limit: i64,
+        duration_ms: Option<u64>,
+        quiet: bool,
+    ) -> Result<(), TapExecutorError> {
+        let subscription_client = connect_subscription_client((*self.url).clone())
+            .await
+            .map_err(|error| {
+                eprintln!("[tap] Couldn't connect to API via WebSockets: {error}");
+                TapExecutorError::ConnectionFailure
+            })?;
+
+        tokio::pin! {
+            let stream = subscription_client.output_events_by_component_id_patterns_subscription(
+                self.output_patterns.clone(),
+                self.input_patterns.clone(),
+                self.format,
+                limit,
+                interval,
+            );
         }
 
-        let message = timeout(stream_duration - time_elapsed, stream.next()).await;
-        match message {
-            Ok(Some(Some(res))) => {
-                if let Some(d) = res.data {
-                    for tap_event in d.output_events_by_component_id_patterns.iter() {
-                        match tap_event {
-                            GraphQLTapOutputEvents::Log(ev) => {
-                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                            }
-                            GraphQLTapOutputEvents::Metric(ev) => {
-                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                            }
-                            GraphQLTapOutputEvents::Trace(ev) => {
-                                println!("{}", formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
-                            }
-                            GraphQLTapOutputEvents::EventNotification(ev) => {
-                                if !quiet {
-                                    eprintln!("{}", ev.message);
+        let start_time = Instant::now();
+        let stream_duration =
+            duration_ms
+                .map(Duration::from_millis)
+                .unwrap_or(Duration::MAX);
+
+        // Loop over the returned results, printing out tap events.
+        loop {
+            let time_elapsed = start_time.elapsed();
+            if time_elapsed >= stream_duration {
+                return Ok(());
+            }
+
+            let message = timeout(stream_duration - time_elapsed, stream.next()).await;
+            match message {
+                Ok(Some(Some(res))) => {
+                    if let Some(d) = res.data {
+                        for tap_event in d.output_events_by_component_id_patterns.iter() {
+                            match tap_event {
+                                GraphQLTapOutputEvent::Log(ev) => {
+                                    println!("{}", self.formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                                }
+                                GraphQLTapOutputEvent::Metric(ev) => {
+                                    println!("{}", self.formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                                }
+                                GraphQLTapOutputEvent::Trace(ev) => {
+                                    println!("{}", self.formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                                }
+                                GraphQLTapOutputEvent::EventNotification(ev) => {
+                                    if !quiet {
+                                        eprintln!("{}", ev.message);
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                Err(_) => {
+                    // If the stream times out, that indicates the duration specified by the user
+                    // has elapsed. We should exit gracefully.
+                    return Ok(())
+                }
+                Ok(_) => return Err(TapExecutorError::GraphQLError)
             }
-            Err(_) => {
-                // If the stream times out, that indicates the duration specified by the user
-                // has elapsed. We should exit gracefully.
-                return Ok(())
-            }
-            Ok(_) => return Err(TapExecutorError::GraphQLError)
         }
     }
 }
