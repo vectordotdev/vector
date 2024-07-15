@@ -155,7 +155,21 @@ impl NatsSinkConfig {
 }
 
 async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
-    config.connect().map_ok(|_| ()).map_err(|e| e.into()).await
+    let connection = config.connect().await?;
+    if !config.jetstream {
+        return Ok(());
+    }
+
+    async_nats::jetstream::new(connection)
+        .get_stream(config.subject.to_string())
+        .map_ok(|_| ())
+        .map_err(|e| {
+            NatsError::ServerError {
+                source: Box::new(e),
+            }
+            .into()
+        })
+        .await
 }
 
 pub enum NatsPublisher {
