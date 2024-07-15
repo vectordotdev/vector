@@ -6,6 +6,7 @@ use uuid::Uuid;
 use vector_lib::codecs::encoding::Framer;
 use vector_lib::event::Finalizable;
 use vector_lib::request_metadata::RequestMetadata;
+use vector_lib::event::Value;
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -57,6 +58,14 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (partition_key, mut events) = input;
         let builder = RequestMetadataBuilder::from_events(&events);
+
+        for event in events.iter_mut() {
+            if let Event::Log(log_event) = event {
+                if let Value::Object(map) = log_event.value() {
+                    info!(value = format!("{:?}", map));
+                }
+            }
+        }
 
         let finalizers = events.take_finalizers();
         let s3_key_prefix = partition_key.key_prefix.clone();
