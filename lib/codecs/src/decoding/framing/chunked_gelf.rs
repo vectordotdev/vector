@@ -127,7 +127,8 @@ impl MessageState {
     }
 }
 
-/// A codec for handling GELF messages that may be chunked.
+/// A codec for handling GELF messages that may be chunked. The implementation is based on [Graylog's GELF documentation](https://go2docs.graylog.org/5-0/getting_in_log_data/gelf.html#GELFviaUDP)
+/// and [Graylog's go-gelf library](https://github.com/Graylog2/go-gelf/blob/v1/gelf/reader.go).
 #[derive(Debug, Clone)]
 pub struct ChunkedGelfDecoder {
     // We have to use this decoder to read all the bytes from the buffer first and don't let tokio
