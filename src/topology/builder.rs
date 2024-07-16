@@ -12,7 +12,10 @@ use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
-    sync::{mpsc::UnboundedSender, oneshot},
+    sync::{
+        mpsc::{self, UnboundedSender},
+        oneshot,
+    },
     time::{timeout, Duration},
 };
 use tracing::Instrument;
@@ -35,6 +38,7 @@ use vector_lib::{
 
 use super::{
     fanout::{self, Fanout},
+    ready_arrays::ReadyArrays,
     schema,
     task::{Task, TaskOutput, TaskResult},
     BuiltBuffer, ConfigDiff,
@@ -892,6 +896,17 @@ impl Runner {
     }
 
     async fn run_concurrently(mut self) -> TaskResult {
+        // We set our concurrency -- number of transform tasks -- according the limit (which is
+        // derived from worker threads/CPU count) but we double that number for our maximum
+        // in-flight operations. This is because want to ensure every transform task can have an
+        // additional chunk of work waiting to be pulled off the channel when it finishes the
+        // previous chunk of work, so that transforms can attempt to stay fed (and processing) even
+        // if the parent task (the one farming out work and collecting results) has temporary
+        // slowdowns.
+        let concurrency_limit = *TRANSFORM_CONCURRENCY_LIMIT;
+        let task_input_queue_len = 2;
+        let in_flight_max = concurrency_limit * task_input_queue_len;
+
         let input_rx = self
             .input_rx
             .take()
@@ -899,11 +914,39 @@ impl Runner {
             .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
-        let mut input_rx =
-            super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
-
+        let mut input_rx = ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
+        let mut next_task_id = 0;
+
+        let mut task_handles = Vec::with_capacity(concurrency_limit);
+        let mut task_senders = Vec::with_capacity(concurrency_limit);
+        for _ in 0..concurrency_limit {
+            let mut t = self.transform.clone();
+
+            let (task_input_tx, mut task_input_rx) = mpsc::channel::<(
+                Vec<EventArray>,
+                TransformOutputsBuf,
+                oneshot::Sender<TransformOutputsBuf>,
+            )>(task_input_queue_len);
+            let task_handle = tokio::spawn(
+                async move {
+                    while let Some((input_arrays, mut outputs_buf, result_tx)) =
+                        task_input_rx.recv().await
+                    {
+                        for events in input_arrays {
+                            t.transform_all(events, &mut outputs_buf);
+                        }
+
+                        let _ = result_tx.send(outputs_buf);
+                    }
+                }
+                .in_current_span(),
+            );
+
+            task_handles.push(task_handle);
+            task_senders.push(task_input_tx);
+        }
 
         self.timer.start_wait();
         loop {
@@ -921,7 +964,7 @@ impl Runner {
                     }
                 }
 
-                input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
+                input_arrays = input_rx.next(), if in_flight.len() < in_flight_max && !shutting_down => {
                     match input_arrays {
                         Some(input_arrays) => {
                             let mut len = 0;
@@ -930,15 +973,20 @@ impl Runner {
                                 len += events.len();
                             }
 
-                            let mut t = self.transform.clone();
-                            let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
-                            let task = tokio::spawn(async move {
-                                for events in input_arrays {
-                                    t.transform_all(events, &mut outputs_buf);
-                                }
-                                outputs_buf
-                            }.in_current_span());
-                            in_flight.push_back(task);
+                            let (result_tx, result_rx) = oneshot::channel();
+                            in_flight.push_back(result_rx);
+
+                            // Grab the sender for the next task we want to hand off work to, and
+                            // set the ID for the next task to send to.
+                            let input_tx = &task_senders[next_task_id];
+                            next_task_id = (next_task_id + 1) % concurrency_limit;
+
+                            let outputs_buf = self.outputs.new_buf_with_capacity(len);
+                            if let Err(_) = input_tx.send((input_arrays, outputs_buf, result_tx)).await {
+                                error!("Transform subtask unexpectedly stopped. Shutting down transform.");
+                                shutting_down = true;
+                                continue
+                            }
                         }
                         None => {
                             shutting_down = true;
