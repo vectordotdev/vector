@@ -4,10 +4,9 @@ mod recency;
 mod recorder;
 mod storage;
 
-use std::{future::Future, sync::OnceLock, time::Duration};
+use std::{future::Future, pin::Pin, sync::OnceLock, task::Context, task::Poll, time::Duration};
 
 use chrono::Utc;
-use futures::executor;
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::layers::Layer;
@@ -105,8 +104,7 @@ pub fn init_global() -> Result<()> {
     init(VectorRecorder::new())
 }
 
-/// Initialize the thread-local metrics sub-system. This function will loop until a recorder is
-/// actually set.
+/// Run the given function in the context of a new local test recorder.
 pub fn with_test_recorder<T>(doit: impl FnOnce(Controller) -> T) -> T {
     let recorder = VectorRecorder::new();
     let controller = Controller {
@@ -115,17 +113,35 @@ pub fn with_test_recorder<T>(doit: impl FnOnce(Controller) -> T) -> T {
     metrics::with_local_recorder(&recorder, || doit(controller))
 }
 
-/// Initialize the thread-local metrics sub-system. This function will loop until a recorder is
-/// actually set.
-pub fn with_test_recorder_async<F, T>(doit: impl FnOnce(Controller) -> F) -> T
-where
-    F: Future<Output = T>,
-{
+/// Run the given async function in the context of a new local test recorder. Returns a new `Future`
+/// and so must be `.await`ed to complete the execution.
+#[must_use]
+pub fn with_test_recorder_async<F>(doit: impl FnOnce(Controller) -> F) -> TestFutureWrapper<F> {
     let recorder = VectorRecorder::new();
     let controller = Controller {
         recorder: recorder.clone(),
     };
-    metrics::with_local_recorder(&recorder, || executor::block_on(doit(controller)))
+    TestFutureWrapper {
+        recorder,
+        future: doit(controller),
+    }
+}
+
+/// A wrapper for a `Future` that is being executed in the context of a local test recorder.
+#[pin_project::pin_project]
+pub struct TestFutureWrapper<F> {
+    recorder: VectorRecorder,
+    #[pin]
+    future: F,
+}
+
+impl<F: Future> Future for TestFutureWrapper<F> {
+    type Output = F::Output;
+
+    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        metrics::with_local_recorder(this.recorder, || this.future.poll(ctx))
+    }
 }
 
 impl Controller {

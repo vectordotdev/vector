@@ -394,6 +394,7 @@ mod test {
             assert!(tests.remove(0).run().await.errors.is_empty());
             // Check that metrics were emitted with output tag
             COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(controller, &["output"]);
-        });
+        })
+        .await;
     }
 }

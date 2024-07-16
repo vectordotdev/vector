@@ -266,6 +266,7 @@ pub async fn assert_source<F: Future>(
 
         result
     })
+    .await
 }
 
 /// Convenience wrapper for running source tests.
@@ -312,6 +313,7 @@ pub async fn assert_source_error<T>(tags: &[&str], f: impl Future<Output = T>) -
 
         result
     })
+    .await
 }
 
 /// Runs source tests with timeout and asserts error path compliance.
@@ -428,6 +430,7 @@ pub async fn assert_transform_compliance<T>(f: impl Future<Output = T>) -> T {
 
         result
     })
+    .await
 }
 
 /// Convenience wrapper for running sink tests
@@ -441,6 +444,7 @@ pub async fn assert_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>
 
         result
     })
+    .await
 }
 
 /// Runs and asserts sink compliance.
@@ -467,6 +471,7 @@ pub async fn assert_data_volume_sink_compliance<T>(tags: &[&str], f: impl Future
 
         result
     })
+    .await
 }
 
 /// Runs and asserts compliance for data volume sink tests.
@@ -496,6 +501,7 @@ pub async fn assert_nonsending_sink_compliance<T>(tags: &[&str], f: impl Future<
 
         result
     })
+    .await
 }
 
 /// Runs and asserts compliance for nonsending sink tests.
@@ -525,6 +531,7 @@ pub async fn assert_sink_error<T>(tags: &[&str], f: impl Future<Output = T>) -> 
 
         result
     })
+    .await
 }
 
 /// Runs and asserts sink error compliance.
@@ -572,5 +579,6 @@ where
             }
         }
         SINK_TESTS.assert(controller, tags);
-    });
+    })
+    .await;
 }

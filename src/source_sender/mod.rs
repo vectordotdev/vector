@@ -598,7 +598,8 @@ mod tests {
                 .into_iter()
                 .filter(|metric| metric.name() == "source_lag_time_seconds")
                 .collect::<Vec<_>>()
-        });
+        })
+        .await;
         assert_eq!(lag_times.len(), 1);
 
         let lag_time = &lag_times[0];
@@ -664,7 +665,8 @@ mod tests {
                 panic!("component_discarded_events_total has invalid type")
             };
             assert_eq!(*value, 1.0);
-        });
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -703,6 +705,7 @@ mod tests {
                 panic!("component_discarded_events_total has invalid type")
             };
             assert_eq!(*value, expected_drop as f64);
-        });
+        })
+        .await;
     }
 }

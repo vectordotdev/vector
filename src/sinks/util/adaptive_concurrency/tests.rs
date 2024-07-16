@@ -493,6 +493,7 @@ async fn run_test(params: TestParams) -> TestResults {
 
         TestResults { stats, cstats }
     })
+    .await
 }
 
 #[derive(Debug)]
