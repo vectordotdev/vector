@@ -43,7 +43,6 @@ async-signal,https://github.com/smol-rs/async-signal,Apache-2.0 OR MIT,John Nunl
 async-stream,https://github.com/tokio-rs/async-stream,MIT,Carl Lerche <me@carllerche.com>
 async-task,https://github.com/smol-rs/async-task,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 async-trait,https://github.com/dtolnay/async-trait,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
-atomic,https://github.com/Amanieu/atomic-rs,Apache-2.0 OR MIT,Amanieu d'Antras <amanieu@gmail.com>
 atomic-waker,https://github.com/smol-rs/atomic-waker,Apache-2.0 OR MIT,"Stjepan Glavina <stjepang@gmail.com>, Contributors to futures-rs"
 aws-config,https://github.com/smithy-lang/smithy-rs,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
 aws-credential-types,https://github.com/smithy-lang/smithy-rs,Apache-2.0,AWS Rust SDK Team <aws-sdk-rust@amazon.com>
@@ -634,7 +633,7 @@ url,https://github.com/servo/rust-url,MIT OR Apache-2.0,The rust-url developers
 urlencoding,https://github.com/kornelski/rust_urlencoding,MIT,"Kornel <kornel@geekhood.net>, Bertram Truong <b@bertramtruong.com>"
 utf-8,https://github.com/SimonSapin/rust-utf8,MIT OR Apache-2.0,Simon Sapin <simon.sapin@exyr.org>
 utf8-width,https://github.com/magiclen/utf8-width,MIT,Magic Len <len@magiclen.org>
-uuid,https://github.com/uuid-rs/uuid,Apache-2.0 OR MIT,"Ashley Mannix<ashleymannix@live.com.au>, Christopher Armstrong, Dylan DPC<dylan.dpc@gmail.com>, Hunar Roop Kahlon<hunar.roop@gmail.com>"
+uuid,https://github.com/uuid-rs/uuid,Apache-2.0 OR MIT,"Ashley Mannix<ashleymannix@live.com.au>, Dylan DPC<dylan.dpc@gmail.com>, Hunar Roop Kahlon<hunar.roop@gmail.com>"
 valuable,https://github.com/tokio-rs/valuable,MIT,The valuable Authors
 void,https://github.com/reem/rust-void,MIT,Jonathan Reem <jonathan.reem@gmail.com>
 vrl,https://github.com/vectordotdev/vrl,MPL-2.0,Vector Contributors <vector@datadoghq.com>
