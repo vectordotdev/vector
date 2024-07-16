@@ -10721,10 +10721,13 @@ name = "vector-tap"
 version = "0.1.0"
 dependencies = [
  "colored",
+ "futures-util",
+ "portpicker",
  "serde_yaml 0.9.34+deprecated",
  "snafu 0.7.5",
  "tokio",
  "tokio-stream",
+ "tokio-tungstenite 0.20.1",
  "tracing 0.1.40",
  "url",
  "vector-api-client",

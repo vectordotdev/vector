@@ -193,7 +193,9 @@ pub async fn connect_subscription_client(
 
     // Forward received messages to the receiver channel.
     tokio::spawn(async move {
+        println!("START MESSAGE CHECKER");
         while let Some(Ok(Message::Text(m))) = ws_rx.next().await {
+            println!("MESSAGE RECEIVED {:?}", m);
             if let Ok(p) = serde_json::from_str::<Payload>(&m) {
                 _ = recv_tx.send(p);
             }

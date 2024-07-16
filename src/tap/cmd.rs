@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use vector_lib::api_client::Client;
-use vector_lib::tap::{EventFormatter, TapExecutorError, TapRunner};
+use vector_lib::tap::{EventFormatter, OutputChannel, TapExecutorError, TapRunner};
 
 use crate::signal::{SignalRx, SignalTo};
 
@@ -38,12 +38,12 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
 /// Observe event flow from specified components
 pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitCode {
     let subscription_url = opts.web_socket_url();
-    let formatter = EventFormatter::new(opts.meta, opts.format);
+    let output_channel = OutputChannel::Stdout(EventFormatter::new(opts.meta, opts.format));
     let tap_runner = TapRunner::new(
         &subscription_url,
         opts.inputs_of.clone(),
         opts.outputs_patterns().clone(),
-        &formatter,
+        &output_channel,
         opts.format
     );
 
