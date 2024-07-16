@@ -163,9 +163,13 @@ impl ProxyConfig {
                     let mut proxy = Proxy::new(self.interceptor().intercept(proxy_scheme), parsed);
                     if let Ok(authority) = Url::parse(url) {
                         if let Some(password) = authority.password() {
+                            let decoded_user = urlencoding::decode(authority.username())
+                                .expect("username is valid UTF-8 because already URI parsed.");
+                            let decoded_pw = urlencoding::decode(password)
+                                .expect("Password is valid UTF-8 because URI already parsed.");
                             proxy.set_authorization(Authorization::basic(
-                                authority.username(),
-                                password,
+                                &decoded_user,
+                                &decoded_pw,
                             ));
                         }
                     }
@@ -397,7 +401,6 @@ mod tests {
         }
     }
 
-    #[ignore]
     #[test]
     fn build_proxy_with_special_chars_url_encoded() {
         let config = ProxyConfig {

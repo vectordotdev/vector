@@ -10662,6 +10662,7 @@ dependencies = [
  "tracing-subscriber",
  "typetag",
  "url",
+ "urlencoding",
  "vector-buffers",
  "vector-common",
  "vector-config",
