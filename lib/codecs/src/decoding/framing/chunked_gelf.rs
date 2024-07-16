@@ -14,8 +14,6 @@ use vector_config::configurable_component;
 
 const GELF_MAGIC: [u8; 2] = [0x1e, 0x0f];
 const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
-const DEFAULT_CHUNKS: [Bytes; GELF_MAX_TOTAL_CHUNKS as usize] =
-    [const { Bytes::new() }; GELF_MAX_TOTAL_CHUNKS as usize];
 const DEFAULT_TIMEOUT_MILLIS: u64 = 5000;
 const DEFAULT_PENDING_MESSAGES_LIMIT: usize = 1000;
 
@@ -90,10 +88,14 @@ impl MessageState {
     pub const fn new(total_chunks: u8, timeout_task: JoinHandle<()>) -> Self {
         Self {
             total_chunks,
-            chunks: DEFAULT_CHUNKS,
+            chunks: Self::default_chunks(),
             chunks_bitmap: 0,
             timeout_task,
         }
+    }
+
+    pub const fn default_chunks() -> [Bytes; GELF_MAX_TOTAL_CHUNKS as usize] {
+        [const { Bytes::new() }; GELF_MAX_TOTAL_CHUNKS as usize]
     }
 
     pub fn is_chunk_present(&self, sequence_number: u8) -> bool {
@@ -220,11 +222,11 @@ impl ChunkedGelfDecoder {
             // We need to spawn a task that will clear the message state after a certain time
             // otherwise we will have a memory leak due to messages that never complete
             let state = Arc::clone(&self.state);
-            let timeout = self.timeout.clone();
+            let timeout = self.timeout;
             let timeout_handle = tokio::spawn(async move {
                 tokio::time::sleep(timeout).await;
                 let mut state_lock = state.lock().unwrap();
-                if let Some(_) = state_lock.remove(&message_id) {
+                if state_lock.remove(&message_id).is_some() {
                     let message = format!("Message was not fully received within the timeout window of {}ms. Discarding it.",
                         timeout.as_millis());
                     warn!(
@@ -275,10 +277,9 @@ impl ChunkedGelfDecoder {
         let magic = src.get(0..2);
         if magic.is_some_and(|magic| magic == GELF_MAGIC) {
             src.advance(2);
-            let frame = self.decode_chunk(src);
-            return frame;
+            self.decode_chunk(src)
         } else {
-            return Ok(Some(src));
+            Ok(Some(src))
         }
     }
 }
