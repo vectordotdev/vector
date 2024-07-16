@@ -121,6 +121,7 @@ members = [
   "lib/vector-lib",
   "lib/vector-lookup",
   "lib/vector-stream",
+  "lib/vector-tap",
   "lib/vector-vrl/cli",
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
