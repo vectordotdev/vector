@@ -1,5 +1,5 @@
 use std::sync::{atomic::Ordering, Arc, RwLock};
-use std::{cell::OnceCell, time::Duration};
+use std::time::Duration;
 
 use chrono::Utc;
 use metrics::{Counter, Gauge, Histogram, Key, KeyName, Metadata, Recorder, SharedString, Unit};
@@ -9,8 +9,6 @@ use quanta::Clock;
 use super::recency::{GenerationalStorage, Recency};
 use super::storage::VectorStorage;
 use crate::event::{Metric, MetricValue};
-
-thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = const { OnceCell::new() });
 
 #[allow(dead_code)]
 pub(super) struct Registry {
