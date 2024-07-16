@@ -411,6 +411,31 @@ base: components: sources: aws_sqs: configuration: {
 					}
 				}
 			}
+			chunked_gelf: {
+				description:   "Options for the chunked gelf decoder."
+				relevant_when: "method = \"chunked_gelf\""
+				required:      false
+				type: object: options: {
+					pending_messages_limit: {
+						description: """
+																The maximum number of pending uncomplete messages. If this limit is reached, the decoder will start
+																dropping chunks of new messages. This limit ensures the memory usage of the decoder's state is bounded.
+																The default value is 1000.
+																"""
+						required: false
+						type: uint: default: 1000
+					}
+					timeout_millis: {
+						description: """
+																The timeout in milliseconds for a message to be fully received. If the timeout is reached, the
+																decoder will drop all the received chunks of the uncomplete message and start over.
+																The default value is 5 seconds.
+																"""
+						required: false
+						type: uint: default: 5000
+					}
+				}
+			}
 			length_delimited: {
 				description:   "Options for the length delimited decoder."
 				relevant_when: "method = \"length_delimited\""
@@ -446,8 +471,13 @@ base: components: sources: aws_sqs: configuration: {
 					enum: {
 						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
 						character_delimited: "Byte frames which are delimited by a chosen character."
-						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
-						newline_delimited:   "Byte frames which are delimited by a newline character."
+						chunked_gelf: """
+															Byte frames which are chunked GELF messages.
+
+															[chunked_gelf]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html
+															"""
+						length_delimited:  "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+						newline_delimited: "Byte frames which are delimited by a newline character."
 						octet_counting: """
 															Byte frames according to the [octet counting][octet_counting] format.
 
