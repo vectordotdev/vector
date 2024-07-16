@@ -2,8 +2,8 @@
 
 extern crate tracing;
 
-use std::{borrow::Cow, collections::BTreeMap};
 use std::time::{Duration, Instant};
+use std::{borrow::Cow, collections::BTreeMap};
 
 use colored::{ColoredString, Colorize};
 use snafu::Snafu;
@@ -15,8 +15,7 @@ use vector_api_client::{
     connect_subscription_client,
     gql::{
         output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns as GraphQLTapOutputEvent,
-        TapEncodingFormat,
-        TapSubscriptionExt,
+        TapEncodingFormat, TapSubscriptionExt,
     },
 };
 
@@ -59,7 +58,7 @@ impl EventFormatter {
                     component_type.green(),
                     event
                 )
-                    .into(),
+                .into(),
                 TapEncodingFormat::Yaml => {
                     let mut value: BTreeMap<String, serde_yaml::Value> = BTreeMap::new();
                     value.insert("event".to_string(), serde_yaml::from_str(event).unwrap());
@@ -76,7 +75,7 @@ impl EventFormatter {
                         self.component_type_label,
                         component_type.green()
                     )
-                        .into()
+                    .into()
                 }
                 TapEncodingFormat::Logfmt => format!(
                     "{}={} {}={} {}={} {}",
@@ -88,7 +87,7 @@ impl EventFormatter {
                     component_type.green(),
                     event
                 )
-                    .into(),
+                .into(),
             }
         } else {
             event.into()
@@ -157,10 +156,9 @@ impl<'a> TapRunner<'a> {
         }
 
         let start_time = Instant::now();
-        let stream_duration =
-            duration_ms
-                .map(Duration::from_millis)
-                .unwrap_or(Duration::MAX);
+        let stream_duration = duration_ms
+            .map(Duration::from_millis)
+            .unwrap_or(Duration::MAX);
 
         // Loop over the returned results, printing out tap events.
         loop {
@@ -176,13 +174,37 @@ impl<'a> TapRunner<'a> {
                         for tap_event in d.output_events_by_component_id_patterns.iter() {
                             match tap_event {
                                 GraphQLTapOutputEvent::Log(ev) => {
-                                    println!("{}", self.formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                                    println!(
+                                        "{}",
+                                        self.formatter.format(
+                                            ev.component_id.as_ref(),
+                                            ev.component_kind.as_ref(),
+                                            ev.component_type.as_ref(),
+                                            ev.string.as_ref()
+                                        )
+                                    );
                                 }
                                 GraphQLTapOutputEvent::Metric(ev) => {
-                                    println!("{}", self.formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                                    println!(
+                                        "{}",
+                                        self.formatter.format(
+                                            ev.component_id.as_ref(),
+                                            ev.component_kind.as_ref(),
+                                            ev.component_type.as_ref(),
+                                            ev.string.as_ref()
+                                        )
+                                    );
                                 }
                                 GraphQLTapOutputEvent::Trace(ev) => {
-                                    println!("{}", self.formatter.format(ev.component_id.as_ref(), ev.component_kind.as_ref(), ev.component_type.as_ref(), ev.string.as_ref()));
+                                    println!(
+                                        "{}",
+                                        self.formatter.format(
+                                            ev.component_id.as_ref(),
+                                            ev.component_kind.as_ref(),
+                                            ev.component_type.as_ref(),
+                                            ev.string.as_ref()
+                                        )
+                                    );
                                 }
                                 GraphQLTapOutputEvent::EventNotification(ev) => {
                                     if !quiet {
@@ -196,9 +218,9 @@ impl<'a> TapRunner<'a> {
                 Err(_) => {
                     // If the stream times out, that indicates the duration specified by the user
                     // has elapsed. We should exit gracefully.
-                    return Ok(())
+                    return Ok(());
                 }
-                Ok(_) => return Err(TapExecutorError::GraphQLError)
+                Ok(_) => return Err(TapExecutorError::GraphQLError),
             }
         }
     }
