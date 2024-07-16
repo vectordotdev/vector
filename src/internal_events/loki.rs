@@ -81,7 +81,7 @@ impl InternalEvent for LokiTimestampNonParsableEventsDropped {
 
         error!(
             message = "Event timestamp non-parsable.",
-            error_code = "unparsable_timestamp",
+            error_code = "non-parsable_timestamp",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_limit = true,
@@ -94,7 +94,7 @@ impl InternalEvent for LokiTimestampNonParsableEventsDropped {
 
         counter!(
             "component_errors_total", 1,
-            "error_code" => "unparsable_timestamp",
+            "error_code" => "non-parsable_timestamp",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
