@@ -73,24 +73,29 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
 }
 
 #[derive(Debug)]
-pub struct LokiEventTimestampOutOfRangeError;
+pub struct LokiTimestampUnparsableEventsDropped;
 
-impl InternalEvent for LokiEventTimestampOutOfRangeError {
+impl InternalEvent for LokiTimestampUnparsableEventsDropped {
     fn emit(self) {
+        let reason = "Dropping timestamp unparsable event(s).";
+
         error!(
-            message = "Event timestamp out of range.",
-            error_type = error_type::CONVERSION_FAILED,
+            message = "Event timestamp unparsable.",
+            error_code = "unparsable_timestamp",
+            error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_limit = true,
         );
+
+        emit!(ComponentEventsDropped::<INTENTIONAL> {
+            count: 1,
+            reason,
+        });
+
         counter!(
             "component_errors_total", 1,
-            "error_type" => error_type::CONVERSION_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-        counter!(
-            "component_discarded_events_total", 1,
-            "error_type" => error_type::CONVERSION_FAILED,
+            "error_code" => "unparsable_timestamp",
+            "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
     }

@@ -1,3 +1,3 @@
-Loki sink now drops events with non-processable timestamps.
+Loki sink now drops events with unparsable timestamps.
 
 authors: suikammd
