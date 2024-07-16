@@ -73,14 +73,14 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
 }
 
 #[derive(Debug)]
-pub struct LokiTimestampUnparsableEventsDropped;
+pub struct LokiTimestampNonParsableEventsDropped;
 
-impl InternalEvent for LokiTimestampUnparsableEventsDropped {
+impl InternalEvent for LokiTimestampNonParsableEventsDropped {
     fn emit(self) {
-        let reason = "Dropping timestamp unparsable event(s).";
+        let reason = "Dropping timestamp non-parsable event(s).";
 
         error!(
-            message = "Event timestamp unparsable.",
+            message = "Event timestamp non-parsable.",
             error_code = "unparsable_timestamp",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
