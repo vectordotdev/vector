@@ -12,6 +12,17 @@ serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.7.5", default-features = false }
 tokio = { version = "1.38.0", default-features = false, features = ["time"] }
 tokio-stream = { version = "0.1.15", default-features = false, features = ["sync"] }
+tokio-tungstenite = { version = "0.20.1", default-features = false}
 tracing = { version = "0.1.34", default-features = false }
 url = { version = "2.5.2", default-features = false }
-vector-api-client = {path = "../vector-api-client" }
+vector-api-client = {path = "../vector-api-client"}
+futures-util = "0.3.30"
+
+[dev-dependencies]
+chrono = { workspace = true }
+portpicker = {path = "../portpicker"}
+serde_json = { workspace = true }
+tokio = { version = "1.38.0", default-features = false, features = ["test-util"] }
+
+
+
