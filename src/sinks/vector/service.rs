@@ -8,6 +8,7 @@ use hyper_proxy::ProxyConnector;
 use indexmap::IndexMap;
 use prost::Message;
 use tonic::body::BoxBody;
+use tonic::metadata::MetadataKey;
 use tower::Service;
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::stream::DriverResponse;
@@ -126,8 +127,7 @@ impl Service<VectorRequest> for VectorService {
         {
             let metadata = tonic_request.metadata_mut();
             for (k, v) in header_entries.drain(..) {
-                let static_key: &'static str = Box::leak(k.into_boxed_str());
-                metadata.insert(static_key, v.parse().unwrap());
+                metadata.insert(MetadataKey::from_bytes(k.as_bytes()).unwrap(), v.parse().unwrap());
             }
         }
 
