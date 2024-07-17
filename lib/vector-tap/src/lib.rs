@@ -213,8 +213,6 @@ impl<'a> TapRunner<'a> {
         formatter: &EventFormatter,
     ) {
         for tap_event in output_events.iter() {
-            #[allow(clippy::print_stdout)]
-            #[allow(clippy::print_stderr)]
             match tap_event {
                 GraphQLTapOutputEvent::Log(ev) => {
                     println!(
@@ -249,6 +247,7 @@ impl<'a> TapRunner<'a> {
                         )
                     );
                 }
+                #[allow(clippy::print_stderr)]
                 GraphQLTapOutputEvent::EventNotification(ev) => {
                     eprintln!("{}", ev.message);
                 }
