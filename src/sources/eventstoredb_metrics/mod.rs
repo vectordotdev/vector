@@ -124,7 +124,6 @@ fn eventstoredb(
                         };
                         bytes_received.emit(ByteSize(bytes.len()));
 
-                        dbg!(std::str::from_utf8(&bytes.to_vec()).unwrap());
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {
                                 emit!(EventStoreDbStatsParsingError { error });
