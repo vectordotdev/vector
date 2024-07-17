@@ -164,9 +164,9 @@ impl ProxyConfig {
                     if let Ok(authority) = Url::parse(url) {
                         if let Some(password) = authority.password() {
                             let decoded_user = urlencoding::decode(authority.username())
-                                .expect("username is valid UTF-8 because already URI parsed.");
+                                .expect("username must be valid UTF-8.");
                             let decoded_pw = urlencoding::decode(password)
-                                .expect("Password is valid UTF-8 because URI already parsed.");
+                                .expect("Password must be valid UTF-8.");
                             proxy.set_authorization(Authorization::basic(
                                 &decoded_user,
                                 &decoded_pw,
