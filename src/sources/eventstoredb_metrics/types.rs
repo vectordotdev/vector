@@ -207,6 +207,8 @@ impl<'de> Deserialize<'de> for Drive {
 pub struct DriveStats {
     pub available_bytes: usize,
     pub total_bytes: usize,
+    // EventstoreDB v24.2 has the value as an string representing the percent like 30%
+    // v24.6 has it as integer value like 30. Here we handle both.
     #[serde(deserialize_with = "percent_or_integer")]
     pub usage: usize,
     pub used_bytes: usize,
