@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate tracing;
 
-use std::{borrow::Cow, collections::BTreeMap, fmt};
+use std::{borrow::Cow, collections::BTreeMap};
 
 use colored::{ColoredString, Colorize};
 use tokio::sync::mpsc as tokio_mpsc;
@@ -109,15 +109,6 @@ pub enum TapExecutorError {
     GraphQLError,
 }
 
-impl fmt::Display for TapExecutorError {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            TapExecutorError::ConnectionFailure(e) => e.fmt(formatter),
-            TapExecutorError::GraphQLError => formatter.write_str("GraphQL error"),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct TapRunner<'a> {
     url: &'a Url,
@@ -153,9 +144,7 @@ impl<'a> TapRunner<'a> {
     ) -> Result<(), TapExecutorError> {
         let subscription_client = connect_subscription_client((*self.url).clone())
             .await
-            .map_err(|error| {
-                TapExecutorError::ConnectionFailure(error)
-            })?;
+            .map_err(TapExecutorError::ConnectionFailure)?;
 
         tokio::pin! {
             let stream = subscription_client.output_events_by_component_id_patterns_subscription(
@@ -296,7 +285,7 @@ mod tests {
         // Start a local WebSocket server to mimic Vector GraphQL API
         let ip_addr = IpAddr::V4(Ipv4Addr::LOCALHOST);
         let port = pick_unused_port(ip_addr);
-        let addr = format!("{}:{}", ip_addr, port);
+        let addr = format!("{ip_addr}:{port}");
 
         let listener = TcpListener::bind(&addr).await.unwrap();
         let server = tokio::spawn(async move {
@@ -310,27 +299,21 @@ mod tests {
                 let message_to_send = format!(
                     "{{\
                         \"type\":\"data\",\
-                        \"id\":{},\
+                        \"id\":{subscription_id},\
                         \"payload\":{{\
                             \"data\":{{\
                                 \"outputEventsByComponentIdPatterns\":[{{\
                                     \"__typename\":\"Log\",\
-                                    \"componentId\":\"{}\",\
-                                    \"componentType\":\"{}\",\
+                                    \"componentId\":\"{component_id}\",\
+                                    \"componentType\":\"{component_type}\",\
                                     \"componentKind\":\"source\",\
-                                    \"message\":\"{}\",\
-                                    \"timestamp\":\"{}\",\
-                                    \"string\":\"{}\"\
+                                    \"message\":\"{message}\",\
+                                    \"timestamp\":\"{timestamp}\",\
+                                    \"string\":\"{string_encoding}\"\
                                 }}]\
                             }}\
                         }}\
                     }}",
-                    subscription_id,
-                    component_id,
-                    component_type,
-                    message,
-                    timestamp,
-                    string_encoding
                 );
 
                 // Send 2 messages to client, mimicking 3 second interval
@@ -345,7 +328,7 @@ mod tests {
         });
 
         let (output_tx, mut output_rx) = tokio_mpsc::channel(10);
-        let url = Url::parse(&format!("ws://{}", addr)).unwrap();
+        let url = Url::parse(&format!("ws://{addr}")).unwrap();
         let output_channel = OutputChannel::AsyncChannel(output_tx);
 
         let tap_runner = TapRunner::new(
