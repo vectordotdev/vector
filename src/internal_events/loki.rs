@@ -87,10 +87,7 @@ impl InternalEvent for LokiTimestampNonParsableEventsDropped {
             internal_log_rate_limit = true,
         );
 
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
-            count: 1,
-            reason,
-        });
+        emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
 
         counter!(
             "component_errors_total", 1,

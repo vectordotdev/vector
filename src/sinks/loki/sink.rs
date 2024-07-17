@@ -16,8 +16,8 @@ use crate::sinks::loki::event::LokiBatchEncoding;
 use crate::{
     http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
-        LokiTimestampNonParsableEventsDropped, LokiEventUnlabeledError,
-        LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten, SinkRequestBuildError,
+        LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
+        LokiTimestampNonParsableEventsDropped, SinkRequestBuildError,
     },
     sinks::prelude::*,
 };
