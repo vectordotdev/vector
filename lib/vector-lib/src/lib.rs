@@ -24,6 +24,7 @@ pub use vector_core::{
 };
 pub use vector_lookup as lookup;
 pub use vector_stream as stream;
+pub use vector_tap as tap;
 
 pub mod config {
     pub use vector_common::config::ComponentKey;
