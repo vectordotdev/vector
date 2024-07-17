@@ -58,6 +58,7 @@ tracing-core = { version = "0.1.26", default-features = false }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = ["std"] }
 typetag = { version = "0.2.16", default-features = false }
 url = { version = "2", default-features = false }
+urlencoding = { version = "2.1.3", default-features = false }
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
