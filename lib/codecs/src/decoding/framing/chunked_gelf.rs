@@ -29,7 +29,7 @@ const fn default_pending_messages_limit() -> usize {
 #[configurable_component]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChunkedGelfDecoderConfig {
-    /// Options for the chunked gelf decoder.
+    /// Options for the chunked GELF decoder.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub chunked_gelf: ChunkedGelfDecoderOptions,
 }
@@ -48,8 +48,8 @@ impl ChunkedGelfDecoderConfig {
 #[configurable_component]
 #[derive(Clone, Debug, Derivative, PartialEq, Eq)]
 pub struct ChunkedGelfDecoderOptions {
-    /// The timeout in milliseconds for a message to be fully received. If the timeout is reached, the
-    /// decoder will drop all the received chunks of the uncomplete message and start over.
+    /// The timeout, in milliseconds, for a message to be fully received. If the timeout is reached, the
+    /// decoder drops all the received chunks of the incomplete message and starts over.
     /// The default value is 5 seconds.
     #[serde(
         default = "default_timeout_millis",
@@ -57,7 +57,7 @@ pub struct ChunkedGelfDecoderOptions {
     )]
     pub timeout_millis: u64,
 
-    /// The maximum number of pending uncomplete messages. If this limit is reached, the decoder will start
+    /// The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
     /// dropping chunks of new messages. This limit ensures the memory usage of the decoder's state is bounded.
     /// The default value is 1000.
     #[serde(

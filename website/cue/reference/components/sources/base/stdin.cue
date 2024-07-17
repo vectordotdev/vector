@@ -260,13 +260,13 @@ base: components: sources: stdin: configuration: {
 				}
 			}
 			chunked_gelf: {
-				description:   "Options for the chunked gelf decoder."
+				description:   "Options for the chunked GELF decoder."
 				relevant_when: "method = \"chunked_gelf\""
 				required:      false
 				type: object: options: {
 					pending_messages_limit: {
 						description: """
-																The maximum number of pending uncomplete messages. If this limit is reached, the decoder will start
+																The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
 																dropping chunks of new messages. This limit ensures the memory usage of the decoder's state is bounded.
 																The default value is 1000.
 																"""
@@ -275,8 +275,8 @@ base: components: sources: stdin: configuration: {
 					}
 					timeout_millis: {
 						description: """
-																The timeout in milliseconds for a message to be fully received. If the timeout is reached, the
-																decoder will drop all the received chunks of the uncomplete message and start over.
+																The timeout, in milliseconds, for a message to be fully received. If the timeout is reached, the
+																decoder drops all the received chunks of the incomplete message and starts over.
 																The default value is 5 seconds.
 																"""
 						required: false
