@@ -92,10 +92,11 @@ impl InternalEvent for LokiTimestampNonParsableEventsDropped {
         emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "non-parsable_timestamp",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
