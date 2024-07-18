@@ -118,13 +118,10 @@ pub fn with_test_recorder<T>(doit: impl FnOnce(Controller) -> T) -> T {
 #[must_use]
 pub fn with_test_recorder_async<F>(doit: impl FnOnce(Controller) -> F) -> TestFutureWrapper<F> {
     let recorder = VectorRecorder::new();
-    let controller = Controller {
+    let future = doit(Controller {
         recorder: recorder.clone(),
-    };
-    TestFutureWrapper {
-        recorder,
-        future: doit(controller),
-    }
+    });
+    TestFutureWrapper { recorder, future }
 }
 
 /// A wrapper for a `Future` that is being executed in the context of a local test recorder.
