@@ -73,3 +73,29 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
         counter!("rewritten_timestamp_events_total").increment(self.count as u64);
     }
 }
+
+#[derive(Debug)]
+pub struct LokiTimestampNonParsableEventsDropped;
+
+impl InternalEvent for LokiTimestampNonParsableEventsDropped {
+    fn emit(self) {
+        let reason = "Dropping timestamp non-parsable event(s).";
+
+        error!(
+            message = "Event timestamp non-parsable.",
+            error_code = "non-parsable_timestamp",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+
+        emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
+
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "non-parsable_timestamp",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+    }
+}
