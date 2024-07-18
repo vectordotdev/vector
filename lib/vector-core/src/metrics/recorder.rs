@@ -99,22 +99,22 @@ impl VectorRecorder {
         Self(Arc::new(Registry::new()))
     }
 
-    pub(super) fn with_registry<T>(&self, doit: impl FnOnce(&Registry) -> T) -> T {
-        doit(&self.0)
+    pub(super) fn registry(&self) -> &Registry {
+        &self.0
     }
 }
 
 impl Recorder for VectorRecorder {
     fn register_counter(&self, key: &Key, _meta: &Metadata<'_>) -> Counter {
-        self.with_registry(|r| r.get_counter(key))
+        self.0.get_counter(key)
     }
 
     fn register_gauge(&self, key: &Key, _meta: &Metadata<'_>) -> Gauge {
-        self.with_registry(|r| r.get_gauge(key))
+        self.0.get_gauge(key)
     }
 
     fn register_histogram(&self, key: &Key, _meta: &Metadata<'_>) -> Histogram {
-        self.with_registry(|r| r.get_histogram(key))
+        self.0.get_histogram(key)
     }
 
     fn describe_counter(&self, _: KeyName, _: Option<Unit>, _: SharedString) {}

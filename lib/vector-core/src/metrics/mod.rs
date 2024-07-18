@@ -13,7 +13,7 @@ use metrics_util::layers::Layer;
 use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
-use self::{label_filter::VectorLabelFilter, recorder::Registry, recorder::VectorRecorder};
+use self::{label_filter::VectorLabelFilter, recorder::VectorRecorder};
 use crate::event::{Metric, MetricValue};
 
 type Result<T> = std::result::Result<T, Error>;
@@ -147,7 +147,7 @@ impl<F: Future> Future for TestFutureWrapper<F> {
 impl Controller {
     /// Clear all metrics from the registry.
     pub fn reset(&self) {
-        self.recorder.with_registry(Registry::clear);
+        self.recorder.registry().clear();
     }
 
     /// Get a handle to the globally registered controller, if it's initialized.
@@ -173,7 +173,8 @@ impl Controller {
             }
         }
         self.recorder
-            .with_registry(|registry| registry.set_expiry(timeout.map(Duration::from_secs_f64)));
+            .registry()
+            .set_expiry(timeout.map(Duration::from_secs_f64));
         Ok(())
     }
 
@@ -182,7 +183,7 @@ impl Controller {
     pub fn capture_metrics(&self) -> Vec<Metric> {
         let timestamp = Utc::now();
 
-        let mut metrics = self.recorder.with_registry(Registry::visit_metrics);
+        let mut metrics = self.recorder.registry().visit_metrics();
 
         #[allow(clippy::cast_precision_loss)]
         let value = (metrics.len() + 2) as f64;
