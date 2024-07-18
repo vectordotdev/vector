@@ -67,6 +67,7 @@ jobs:
             || needs.changes.outputs.dnstap == 'true'
             || needs.changes.outputs.docker-logs == 'true'
             || needs.changes.outputs.elasticsearch == 'true'
+            || needs.changes.outputs.eventstoredb == 'true'
             || needs.changes.outputs.fluent == 'true'
             || needs.changes.outputs.gcp == 'true'
             || needs.changes.outputs.greptimedb == 'true'
@@ -230,13 +231,13 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  elasticsearch
 
-      #- if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
-        #name: eventstoredb
-        #uses: nick-fields/retry@v3
-        #with:
-          #timeout_minutes: 30
-          #max_attempts: 3
-          #command: bash scripts/ci-int-e2e-test.sh int  eventstoredb
+      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
+        name: eventstoredb
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/ci-int-e2e-test.sh int  eventstoredb
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.fluent == 'true' }}
         name: fluent
