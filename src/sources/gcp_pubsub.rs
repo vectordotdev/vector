@@ -835,7 +835,6 @@ mod integration_tests {
     use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
-    use vector_lib::metrics::Controller;
     use vrl::btreemap;
 
     use super::*;
@@ -855,7 +854,7 @@ mod integration_tests {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             let test_data = tester.send_test_events(99, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
-            tester.shutdown_check(shutdown, controller).await;
+            tester.shutdown_check(shutdown).await;
         })
         .await;
     }
@@ -880,7 +879,7 @@ mod integration_tests {
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
 
-            tester.shutdown_check(shutdown, controller).await;
+            tester.shutdown_check(shutdown).await;
 
             assert!(rx.next().await.is_none());
             tester.send_test_events(1, BTreeMap::new()).await;
@@ -903,7 +902,7 @@ mod integration_tests {
                 let test_data = tester.send_test_events(9, BTreeMap::new()).await;
                 receive_events(&mut rx, test_data).await;
             }
-            tester.shutdown_check(shutdown, controller).await;
+            tester.shutdown_check(shutdown).await;
         })
         .await;
     }
@@ -919,7 +918,7 @@ mod integration_tests {
             ];
             let test_data = tester.send_test_events(1, attributes).await;
             receive_events(&mut rx, test_data).await;
-            tester.shutdown_check(shutdown, controller).await;
+            tester.shutdown_check(shutdown).await;
         })
         .await;
     }
@@ -932,7 +931,7 @@ mod integration_tests {
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
 
-            tester.shutdown_check(shutdown, controller).await;
+            tester.shutdown_check(shutdown).await;
 
             // Make sure there are no messages left in the queue
             assert_eq!(tester.pull_count(10).await, 0);
@@ -952,7 +951,7 @@ mod integration_tests {
     // to verify the events are not acknowledged through the emulator.
     #[ignore]
     async fn does_not_ack_rejected() {
-        assert_source_compliance(&SOURCE_TAGS, |_| async {
+        assert_source_compliance(&SOURCE_TAGS, async {
             let (tester, mut rx, shutdown) = setup(EventStatus::Rejected).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
@@ -1110,13 +1109,9 @@ mod integration_tests {
             serde_json::from_str(&String::from_utf8(body.to_vec()).unwrap()).unwrap()
         }
 
-        async fn shutdown_check(
-            &self,
-            shutdown: shutdown::SourceShutdownCoordinator,
-            controller: Controller,
-        ) {
+        async fn shutdown_check(&self, shutdown: shutdown::SourceShutdownCoordinator) {
             self.shutdown(shutdown).await;
-            components::SOURCE_TESTS.assert(controller, &components::HTTP_PULL_SOURCE_TAGS);
+            components::SOURCE_TESTS.assert(&components::HTTP_PULL_SOURCE_TAGS);
         }
 
         async fn shutdown(&self, mut shutdown: shutdown::SourceShutdownCoordinator) {
