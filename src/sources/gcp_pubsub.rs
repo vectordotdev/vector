@@ -851,7 +851,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn oneshot() {
-        assert_source_compliance(&SOURCE_TAGS, |controller| async move {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             let test_data = tester.send_test_events(99, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
@@ -874,7 +874,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn shuts_down_after_data_received() {
-        assert_source_compliance(&SOURCE_TAGS, |controller| async move {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
@@ -897,7 +897,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn streams_data() {
-        assert_source_compliance(&SOURCE_TAGS, |controller| async move {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             for _ in 0..10 {
                 let test_data = tester.send_test_events(9, BTreeMap::new()).await;
@@ -910,7 +910,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn sends_attributes() {
-        assert_source_compliance(&SOURCE_TAGS, |controller| async move {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             let attributes = btreemap![
                 random_string(8) => random_string(88),
@@ -926,7 +926,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn acks_received() {
-        assert_source_compliance(&SOURCE_TAGS, |controller| async move {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;

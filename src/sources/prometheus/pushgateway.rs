@@ -363,7 +363,7 @@ mod test {
         whole_request_happy_path(Some(TlsEnableableConfig::test_config())).await;
     }
     async fn whole_request_happy_path(tls: Option<TlsEnableableConfig>) {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let address = test_util::next_addr();
             let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 

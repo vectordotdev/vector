@@ -125,7 +125,7 @@ impl SourceConfig for InternalMetricsConfig {
                 namespace,
                 host_key,
                 pid_key,
-                controller: Controller::get_global()?,
+                controller: Controller::get()?,
                 interval,
                 out: cx.out,
                 shutdown: cx.shutdown,
@@ -202,8 +202,8 @@ impl<'a> InternalMetrics<'a> {
 mod tests {
     use std::collections::BTreeMap;
 
-    use ::metrics::{counter, gauge, histogram};
-    use vector_lib::{metric_tags, metrics};
+    use metrics::{counter, gauge, histogram};
+    use vector_lib::{metric_tags, metrics::Controller};
 
     use super::*;
     use crate::{
@@ -226,69 +226,69 @@ mod tests {
     fn captures_internal_metrics() {
         test_util::trace_init();
 
-        metrics::with_test_recorder(|controller| {
-            // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
-            std::thread::sleep(std::time::Duration::from_millis(300));
+        // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
+        std::thread::sleep(std::time::Duration::from_millis(300));
 
-            gauge!("foo").set(1.0);
-            gauge!("foo").set(2.0);
-            counter!("bar").increment(3);
-            counter!("bar").increment(4);
-            histogram!("baz").record(5.0);
-            histogram!("baz").record(6.0);
-            histogram!("quux", "host" => "foo").record(8.0);
-            histogram!("quux", "host" => "foo").record(8.1);
+        gauge!("foo").set(1.0);
+        gauge!("foo").set(2.0);
+        counter!("bar").increment(3);
+        counter!("bar").increment(4);
+        histogram!("baz").record(5.0);
+        histogram!("baz").record(6.0);
+        histogram!("quux", "host" => "foo").record(8.0);
+        histogram!("quux", "host" => "foo").record(8.1);
 
-            // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
-            std::thread::sleep(std::time::Duration::from_millis(300));
+        let controller = Controller::get().expect("no controller");
 
-            let output = controller
-                .capture_metrics()
-                .into_iter()
-                .map(|metric| (metric.name().to_string(), metric))
-                .collect::<BTreeMap<String, Metric>>();
+        // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
+        std::thread::sleep(std::time::Duration::from_millis(300));
 
-            assert_eq!(&MetricValue::Gauge { value: 2.0 }, output["foo"].value());
-            assert_eq!(&MetricValue::Counter { value: 7.0 }, output["bar"].value());
+        let output = controller
+            .capture_metrics()
+            .into_iter()
+            .map(|metric| (metric.name().to_string(), metric))
+            .collect::<BTreeMap<String, Metric>>();
 
-            match &output["baz"].value() {
-                MetricValue::AggregatedHistogram {
-                    buckets,
-                    count,
-                    sum,
-                } => {
-                    // This index is _only_ stable so long as the offsets in
-                    // [`metrics::handle::Histogram::new`] are hard-coded. If this
-                    // check fails you might look there and see if we've allowed
-                    // users to set their own bucket widths.
-                    assert_eq!(buckets[9].count, 2);
-                    assert_eq!(*count, 2);
-                    assert_eq!(*sum, 11.0);
-                }
-                _ => panic!("wrong type"),
+        assert_eq!(&MetricValue::Gauge { value: 2.0 }, output["foo"].value());
+        assert_eq!(&MetricValue::Counter { value: 7.0 }, output["bar"].value());
+
+        match &output["baz"].value() {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                // This index is _only_ stable so long as the offsets in
+                // [`metrics::handle::Histogram::new`] are hard-coded. If this
+                // check fails you might look there and see if we've allowed
+                // users to set their own bucket widths.
+                assert_eq!(buckets[9].count, 2);
+                assert_eq!(*count, 2);
+                assert_eq!(*sum, 11.0);
             }
+            _ => panic!("wrong type"),
+        }
 
-            match &output["quux"].value() {
-                MetricValue::AggregatedHistogram {
-                    buckets,
-                    count,
-                    sum,
-                } => {
-                    // This index is _only_ stable so long as the offsets in
-                    // [`metrics::handle::Histogram::new`] are hard-coded. If this
-                    // check fails you might look there and see if we've allowed
-                    // users to set their own bucket widths.
-                    assert_eq!(buckets[9].count, 1);
-                    assert_eq!(buckets[10].count, 1);
-                    assert_eq!(*count, 2);
-                    assert_eq!(*sum, 16.1);
-                }
-                _ => panic!("wrong type"),
+        match &output["quux"].value() {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                // This index is _only_ stable so long as the offsets in
+                // [`metrics::handle::Histogram::new`] are hard-coded. If this
+                // check fails you might look there and see if we've allowed
+                // users to set their own bucket widths.
+                assert_eq!(buckets[9].count, 1);
+                assert_eq!(buckets[10].count, 1);
+                assert_eq!(*count, 2);
+                assert_eq!(*sum, 16.1);
             }
+            _ => panic!("wrong type"),
+        }
 
-            let labels = metric_tags!("host" => "foo");
-            assert_eq!(Some(&labels), output["quux"].tags());
-        });
+        let labels = metric_tags!("host" => "foo");
+        assert_eq!(Some(&labels), output["quux"].tags());
     }
 
     async fn event_from_config(config: InternalMetricsConfig) -> Event {

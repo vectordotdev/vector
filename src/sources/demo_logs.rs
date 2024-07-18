@@ -361,7 +361,7 @@ mod tests {
     }
 
     async fn runit(config: &str) -> impl Stream<Item = Event> {
-        assert_source_compliance(&SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let config: DemoLogsConfig = toml::from_str(config).unwrap();
             let decoder = DecodingConfig::new(

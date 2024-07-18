@@ -1023,7 +1023,7 @@ impl RunningTopology {
             (None, e) => e,
         };
 
-        if let Err(error) = crate::metrics::Controller::get_global()
+        if let Err(error) = crate::metrics::Controller::get()
             .expect("Metrics must be initialized")
             .set_expiry(expire_metrics)
         {

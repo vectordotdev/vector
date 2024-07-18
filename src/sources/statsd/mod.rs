@@ -400,7 +400,7 @@ mod test {
 
     #[tokio::test]
     async fn test_statsd_udp() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async move {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
             let in_addr = next_addr();
             let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
@@ -419,7 +419,7 @@ mod test {
 
     #[tokio::test]
     async fn test_statsd_tcp() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async move {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
             let in_addr = next_addr();
             let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
@@ -462,7 +462,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_statsd_unix() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async move {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
             let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
             let config = StatsdConfig::Unix(UnixConfig {
                 path: in_path.clone(),

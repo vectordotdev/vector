@@ -4,7 +4,7 @@ mod recency;
 mod recorder;
 mod storage;
 
-use std::{future::Future, pin::Pin, sync::OnceLock, task::Context, task::Poll, time::Duration};
+use std::{sync::OnceLock, time::Duration};
 
 use chrono::Utc;
 use metrics::Key;
@@ -13,7 +13,7 @@ use metrics_util::layers::Layer;
 use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
-use self::{label_filter::VectorLabelFilter, recorder::VectorRecorder};
+use self::{label_filter::VectorLabelFilter, recorder::Registry, recorder::VectorRecorder};
 use crate::event::{Metric, MetricValue};
 
 type Result<T> = std::result::Result<T, Error>;
@@ -28,7 +28,7 @@ pub enum Error {
     TimeoutMustBePositive { timeout: f64 },
 }
 
-static GLOBAL_CONTROLLER: OnceLock<Controller> = OnceLock::new();
+static CONTROLLER: OnceLock<Controller> = OnceLock::new();
 
 // Cardinality counter parameters, expose the internal metrics registry
 // cardinality. Useful for the end users to help understand the characteristics
@@ -41,7 +41,6 @@ const CARDINALITY_COUNTER_KEY_NAME: &str = "internal_metrics_cardinality_total";
 static CARDINALITY_COUNTER_KEY: Key = Key::from_static_name(CARDINALITY_COUNTER_KEY_NAME);
 
 /// Controller allows capturing metric snapshots.
-#[derive(Clone)]
 pub struct Controller {
     recorder: VectorRecorder,
 }
@@ -65,21 +64,6 @@ fn init(recorder: VectorRecorder) -> Result<()> {
     }
 
     ////
-    //// Prepare the controller
-    ////
-
-    // The `Controller` is a safe spot in memory for us to stash a clone of the
-    // registry -- where metrics are actually kept -- so that our sub-systems
-    // interested in these metrics can grab copies. See `capture_metrics` and
-    // its callers for an example.
-    let controller = Controller {
-        recorder: recorder.clone(),
-    };
-    let Ok(()) = GLOBAL_CONTROLLER.set(controller) else {
-        return Err(Error::AlreadyInitialized);
-    };
-
-    ////
     //// Initialize the recorder.
     ////
 
@@ -88,11 +72,29 @@ fn init(recorder: VectorRecorder) -> Result<()> {
     // update the cardinality counter, see above, as needed.
     if tracing_context_layer_enabled() {
         // Apply a layer to capture tracing span fields as labels.
-        metrics::set_global_recorder(TracingContextLayer::new(VectorLabelFilter).layer(recorder))
-            .map_err(|_| Error::AlreadyInitialized)
+        metrics::set_global_recorder(
+            TracingContextLayer::new(VectorLabelFilter).layer(recorder.clone()),
+        )
+        .map_err(|_| Error::AlreadyInitialized)?;
     } else {
-        metrics::set_global_recorder(recorder).map_err(|_| Error::AlreadyInitialized)
+        metrics::set_global_recorder(recorder.clone()).map_err(|_| Error::AlreadyInitialized)?;
     }
+
+    ////
+    //// Prepare the controller
+    ////
+
+    // The `Controller` is a safe spot in memory for us to stash a clone of the registry -- where
+    // metrics are actually kept -- so that our sub-systems interested in these metrics can grab
+    // copies. See `capture_metrics` and its callers for an example. Note that this is done last to
+    // allow `init_test` below to use the initialization state of `CONTROLLER` to wait for the above
+    // steps to complete in another thread.
+    let controller = Controller { recorder };
+    CONTROLLER
+        .set(controller)
+        .map_err(|_| Error::AlreadyInitialized)?;
+
+    Ok(())
 }
 
 /// Initialize the default metrics sub-system
@@ -101,50 +103,27 @@ fn init(recorder: VectorRecorder) -> Result<()> {
 ///
 /// This function will error if it is called multiple times.
 pub fn init_global() -> Result<()> {
-    init(VectorRecorder::new())
+    init(VectorRecorder::new_global())
 }
 
-/// Run the given function in the context of a new local test recorder.
-pub fn with_test_recorder<T>(doit: impl FnOnce(Controller) -> T) -> T {
-    let recorder = VectorRecorder::new();
-    let controller = Controller {
-        recorder: recorder.clone(),
-    };
-    metrics::with_local_recorder(&recorder, || doit(controller))
-}
-
-/// Run the given async function in the context of a new local test recorder. Returns a new `Future`
-/// and so must be `.await`ed to complete the execution.
-#[must_use]
-pub fn with_test_recorder_async<F>(doit: impl FnOnce(Controller) -> F) -> TestFutureWrapper<F> {
-    let recorder = VectorRecorder::new();
-    let future = doit(Controller {
-        recorder: recorder.clone(),
-    });
-    TestFutureWrapper { recorder, future }
-}
-
-/// A wrapper for a `Future` that is being executed in the context of a local test recorder.
-#[pin_project::pin_project]
-pub struct TestFutureWrapper<F> {
-    recorder: VectorRecorder,
-    #[pin]
-    future: F,
-}
-
-impl<F: Future> Future for TestFutureWrapper<F> {
-    type Output = F::Output;
-
-    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-        metrics::with_local_recorder(this.recorder, || this.future.poll(ctx))
+/// Initialize the thread-local metrics sub-system. This function will loop until a recorder is
+/// actually set.
+pub fn init_test() {
+    if init(VectorRecorder::new_test()).is_err() {
+        // The only error case returned by `init` is `AlreadyInitialized`. A race condition is
+        // possible here: if metrics are being initialized by two (or more) test threads
+        // simultaneously, the ones that fail to set return immediately, possibly allowing
+        // subsequent code to execute before the static recorder value is actually set within the
+        // `metrics` crate. To prevent subsequent code from running with an unset recorder, loop
+        // here until a recorder is available.
+        while CONTROLLER.get().is_none() {}
     }
 }
 
 impl Controller {
     /// Clear all metrics from the registry.
     pub fn reset(&self) {
-        self.recorder.registry().clear();
+        self.recorder.with_registry(Registry::clear);
     }
 
     /// Get a handle to the globally registered controller, if it's initialized.
@@ -153,8 +132,8 @@ impl Controller {
     ///
     /// This function will fail if the metrics subsystem has not been correctly
     /// initialized.
-    pub fn get_global() -> Result<&'static Self> {
-        GLOBAL_CONTROLLER.get().ok_or(Error::NotInitialized)
+    pub fn get() -> Result<&'static Self> {
+        CONTROLLER.get().ok_or(Error::NotInitialized)
     }
 
     /// Set or clear the expiry time after which idle metrics are dropped from the set of captured
@@ -170,8 +149,7 @@ impl Controller {
             }
         }
         self.recorder
-            .registry()
-            .set_expiry(timeout.map(Duration::from_secs_f64));
+            .with_registry(|registry| registry.set_expiry(timeout.map(Duration::from_secs_f64)));
         Ok(())
     }
 
@@ -180,7 +158,7 @@ impl Controller {
     pub fn capture_metrics(&self) -> Vec<Metric> {
         let timestamp = Utc::now();
 
-        let mut metrics = self.recorder.registry().visit_metrics();
+        let mut metrics = self.recorder.with_registry(Registry::visit_metrics);
 
         #[allow(clippy::cast_precision_loss)]
         let value = (metrics.len() + 2) as f64;
@@ -199,6 +177,50 @@ impl Controller {
     }
 }
 
+#[macro_export]
+/// This macro is used to emit metrics as a `counter` while simultaneously
+/// converting from absolute values to incremental values.
+///
+/// Values that do not arrive in strictly monotonically increasing order are
+/// ignored and will not be emitted.
+macro_rules! update_counter {
+    ($label:literal, $value:expr) => {{
+        use ::std::sync::atomic::{AtomicU64, Ordering};
+
+        static PREVIOUS_VALUE: AtomicU64 = AtomicU64::new(0);
+
+        let new_value = $value;
+        let mut previous_value = PREVIOUS_VALUE.load(Ordering::Relaxed);
+
+        loop {
+            // Either a new greater value has been emitted before this thread updated the counter
+            // or values were provided that are not in strictly monotonically increasing order.
+            // Ignore.
+            if new_value <= previous_value {
+                break;
+            }
+
+            match PREVIOUS_VALUE.compare_exchange_weak(
+                previous_value,
+                new_value,
+                Ordering::SeqCst,
+                Ordering::Relaxed,
+            ) {
+                // Another thread has written a new value before us. Re-enter loop.
+                Err(value) => previous_value = value,
+                // Calculate delta to last emitted value and emit it.
+                Ok(_) => {
+                    let delta = new_value - previous_value;
+                    // Albeit very unlikely, note that this sequence of deltas might be emitted in
+                    // a different order than they were calculated.
+                    counter!($label).increment(delta);
+                    break;
+                }
+            }
+        }
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,105 +229,109 @@ mod tests {
 
     const IDLE_TIMEOUT: f64 = 0.5;
 
+    fn init_metrics() -> &'static Controller {
+        init_test();
+        Controller::get().expect("Could not get global metrics controller")
+    }
+
     #[test]
     fn cardinality_matches() {
         for cardinality in [0, 1, 10, 100, 1000, 10000] {
-            with_test_recorder(|controller| {
-                for idx in 0..cardinality {
-                    metrics::counter!("test", "idx" => idx.to_string()).increment(1);
-                }
+            init_test();
+            let controller = Controller::get().unwrap();
+            controller.reset();
 
-                let metrics = controller.capture_metrics();
-                assert_eq!(metrics.len(), cardinality + 2);
+            for idx in 0..cardinality {
+                metrics::counter!("test", "idx" => idx.to_string()).increment(1);
+            }
 
-                #[allow(clippy::cast_precision_loss)]
-                let value = metrics.len() as f64;
-                for metric in metrics {
-                    match metric.name() {
-                        CARDINALITY_KEY_NAME => {
-                            assert_eq!(metric.value(), &MetricValue::Gauge { value });
-                            assert_eq!(metric.kind(), MetricKind::Absolute);
-                        }
-                        CARDINALITY_COUNTER_KEY_NAME => {
-                            assert_eq!(metric.value(), &MetricValue::Counter { value });
-                            assert_eq!(metric.kind(), MetricKind::Absolute);
-                        }
-                        _ => {}
+            let metrics = controller.capture_metrics();
+            assert_eq!(metrics.len(), cardinality + 2);
+
+            #[allow(clippy::cast_precision_loss)]
+            let value = metrics.len() as f64;
+            for metric in metrics {
+                match metric.name() {
+                    CARDINALITY_KEY_NAME => {
+                        assert_eq!(metric.value(), &MetricValue::Gauge { value });
+                        assert_eq!(metric.kind(), MetricKind::Absolute);
                     }
+                    CARDINALITY_COUNTER_KEY_NAME => {
+                        assert_eq!(metric.value(), &MetricValue::Counter { value });
+                        assert_eq!(metric.kind(), MetricKind::Absolute);
+                    }
+                    _ => {}
                 }
-            });
+            }
         }
     }
 
     #[test]
     fn handles_registered_metrics() {
-        with_test_recorder(|controller| {
-            let counter = metrics::counter!("test7");
-            assert_eq!(controller.capture_metrics().len(), 3);
-            counter.increment(1);
-            assert_eq!(controller.capture_metrics().len(), 3);
-            let gauge = metrics::gauge!("test8");
-            assert_eq!(controller.capture_metrics().len(), 4);
-            gauge.set(1.0);
-            assert_eq!(controller.capture_metrics().len(), 4);
-        });
+        let controller = init_metrics();
+
+        let counter = metrics::counter!("test7");
+        assert_eq!(controller.capture_metrics().len(), 3);
+        counter.increment(1);
+        assert_eq!(controller.capture_metrics().len(), 3);
+        let gauge = metrics::gauge!("test8");
+        assert_eq!(controller.capture_metrics().len(), 4);
+        gauge.set(1.0);
+        assert_eq!(controller.capture_metrics().len(), 4);
     }
 
     #[test]
     fn expires_metrics() {
-        with_test_recorder(|controller| {
-            controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+        let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
 
-            metrics::counter!("test2").increment(1);
-            metrics::counter!("test3").increment(2);
-            assert_eq!(controller.capture_metrics().len(), 4);
+        metrics::counter!("test2").increment(1);
+        metrics::counter!("test3").increment(2);
+        assert_eq!(controller.capture_metrics().len(), 4);
 
-            std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
-            metrics::counter!("test2").increment(3);
-            assert_eq!(controller.capture_metrics().len(), 3);
-        });
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+        metrics::counter!("test2").increment(3);
+        assert_eq!(controller.capture_metrics().len(), 3);
     }
 
     #[test]
     fn expires_metrics_tags() {
-        with_test_recorder(|controller| {
-            controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+        let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
 
-            metrics::counter!("test4", "tag" => "value1").increment(1);
-            metrics::counter!("test4", "tag" => "value2").increment(2);
-            assert_eq!(controller.capture_metrics().len(), 4);
+        metrics::counter!("test4", "tag" => "value1").increment(1);
+        metrics::counter!("test4", "tag" => "value2").increment(2);
+        assert_eq!(controller.capture_metrics().len(), 4);
 
-            std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
-            metrics::counter!("test4", "tag" => "value1").increment(3);
-            assert_eq!(controller.capture_metrics().len(), 3);
-        });
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+        metrics::counter!("test4", "tag" => "value1").increment(3);
+        assert_eq!(controller.capture_metrics().len(), 3);
     }
 
     #[test]
     fn skips_expiring_registered() {
-        with_test_recorder(|controller| {
-            controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
+        let controller = init_metrics();
+        controller.set_expiry(Some(IDLE_TIMEOUT)).unwrap();
 
-            let a = metrics::counter!("test5");
-            metrics::counter!("test6").increment(5);
-            assert_eq!(controller.capture_metrics().len(), 4);
-            a.increment(1);
-            assert_eq!(controller.capture_metrics().len(), 4);
+        let a = metrics::counter!("test5");
+        metrics::counter!("test6").increment(5);
+        assert_eq!(controller.capture_metrics().len(), 4);
+        a.increment(1);
+        assert_eq!(controller.capture_metrics().len(), 4);
 
-            std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
-            assert_eq!(controller.capture_metrics().len(), 3);
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
+        assert_eq!(controller.capture_metrics().len(), 3);
 
-            a.increment(1);
-            let metrics = controller.capture_metrics();
-            assert_eq!(metrics.len(), 3);
-            let metric = metrics
-                .into_iter()
-                .find(|metric| metric.name() == "test5")
-                .expect("Test metric is not present");
-            match metric.value() {
-                MetricValue::Counter { value } => assert_eq!(*value, 2.0),
-                value => panic!("Invalid metric value {value:?}"),
-            }
-        });
+        a.increment(1);
+        let metrics = controller.capture_metrics();
+        assert_eq!(metrics.len(), 3);
+        let metric = metrics
+            .into_iter()
+            .find(|metric| metric.name() == "test5")
+            .expect("Test metric is not present");
+        match metric.value() {
+            MetricValue::Counter { value } => assert_eq!(*value, 2.0),
+            value => panic!("Invalid metric value {value:?}"),
+        }
     }
 }

@@ -334,7 +334,7 @@ async fn test_run_command_linux() {
 
     let (mut rx, timeout_result) = crate::test_util::components::assert_source_compliance(
         &crate::test_util::components::SOURCE_TAGS,
-        |_controller| async {
+        async {
             let hostname = Some("Some.Machine".to_string());
             let decoder = Default::default();
             let shutdown = ShutdownSignal::noop();

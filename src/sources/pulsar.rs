@@ -585,7 +585,7 @@ mod integration_tests {
 
         let msg = "test message";
 
-        let events = assert_source_compliance(&SOURCE_TAGS, |_controller| async move {
+        let events = assert_source_compliance(&SOURCE_TAGS, async move {
             let (tx, rx) = SourceSender::new_test();
             tokio::spawn(pulsar_source(
                 consumer,

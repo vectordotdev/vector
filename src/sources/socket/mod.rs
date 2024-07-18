@@ -391,7 +391,7 @@ mod test {
     //////// TCP TESTS ////////
     #[tokio::test]
     async fn tcp_it_includes_host() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, mut rx) = SourceSender::new_test();
             let addr = next_addr();
 
@@ -416,7 +416,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_it_includes_vector_namespaced_fields() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, mut rx) = SourceSender::new_test();
             let addr = next_addr();
             let mut conf = TcpConfig::from_address(addr.into());
@@ -456,7 +456,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_splits_on_newline() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let addr = next_addr();
 
@@ -488,7 +488,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_it_includes_source_type() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, mut rx) = SourceSender::new_test();
             let addr = next_addr();
 
@@ -514,7 +514,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_continue_after_long_line() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, mut rx) = SourceSender::new_test();
             let addr = next_addr();
 
@@ -555,7 +555,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, mut rx) = SourceSender::new_test();
             let addr = next_addr();
 
@@ -619,7 +619,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls_vector_namespace() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, mut rx) = SourceSender::new_test();
             let addr = next_addr();
 
@@ -694,7 +694,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_shutdown_simple() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let source_id = ComponentKey::from("tcp_shutdown_simple");
             let (tx, mut rx) = SourceSender::new_test();
             let addr = next_addr();
@@ -963,7 +963,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_message() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
@@ -980,7 +980,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_message_preserves_newline() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
@@ -997,7 +997,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_multiple_packets() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
@@ -1018,7 +1018,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_max_length() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
@@ -1054,7 +1054,7 @@ mod test {
     /// Windows will drop the entire packet if we exceed the max_length so we are unable to
     /// extract anything.
     async fn udp_max_length_delimited() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
@@ -1085,7 +1085,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_it_includes_host() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
@@ -1100,7 +1100,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_it_includes_vector_namespaced_fields() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, true).await;
 
@@ -1128,7 +1128,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_it_includes_source_type() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
@@ -1145,7 +1145,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_shutdown_simple() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let source_id = ComponentKey::from("udp_shutdown_simple");
 
@@ -1175,7 +1175,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_shutdown_infinite_stream() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let source_id = ComponentKey::from("udp_shutdown_infinite_stream");
 
@@ -1335,7 +1335,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_message() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("test", false, false).await;
             let events = collect_n(rx, 1).await;
 
@@ -1402,7 +1402,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_message_with_vector_namespace() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("test", false, true).await;
             let events = collect_n(rx, 1).await;
             let log = events[0].as_log();
@@ -1427,7 +1427,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_message_preserves_newline() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("foo\nbar", false, false).await;
             let events = collect_n(rx, 1).await;
 
@@ -1447,7 +1447,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_multiple_packets() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             unix_multiple_packets(false).await
         })
         .await;
@@ -1514,7 +1514,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_stream_message() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("test", true, false).await;
             let events = collect_n(rx, 1).await;
 
@@ -1534,7 +1534,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_stream_message_with_vector_namespace() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("test", true, true).await;
             let events = collect_n(rx, 1).await;
             let log = events[0].as_log();
@@ -1557,7 +1557,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_stream_message_splits_on_newline() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (_, rx) = unix_message("foo\nbar", true, false).await;
             let events = collect_n(rx, 2).await;
 
@@ -1585,7 +1585,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_stream_multiple_packets() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             unix_multiple_packets(true).await
         })
         .await;

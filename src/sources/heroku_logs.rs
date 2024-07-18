@@ -505,7 +505,7 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_handles_router_log() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let auth = make_auth();
 
             let (rx, addr) = source(
@@ -551,7 +551,7 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_handles_failures() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let auth = make_auth();
 
             let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;

@@ -1664,7 +1664,7 @@ mod tests {
 
     #[tokio::test]
     async fn raw() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "raw";
             let (source, address) = source(None).await;
 
@@ -1688,7 +1688,7 @@ mod tests {
 
     #[tokio::test]
     async fn root() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#"{ "event": { "message": "root"} }"#;
             let (source, address) = source(None).await;
 
@@ -1712,7 +1712,7 @@ mod tests {
 
     #[tokio::test]
     async fn channel_header() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "raw";
             let (source, address) = source(None).await;
 
@@ -1734,7 +1734,7 @@ mod tests {
 
     #[tokio::test]
     async fn xff_header_raw() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "raw";
             let (source, address) = source(None).await;
 
@@ -1760,7 +1760,7 @@ mod tests {
     // Test helps to illustrate that a payload's `host` value should override an x-forwarded-for header
     #[tokio::test]
     async fn xff_header_event_with_host_field() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#"{"event":"first", "host": "10.1.0.2"}"#;
             let (source, address) = source(None).await;
 
@@ -1786,7 +1786,7 @@ mod tests {
     // Test helps to illustrate that a payload's `host` value should override an x-forwarded-for header
     #[tokio::test]
     async fn xff_header_event_without_host_field() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#"{"event":"first", "color": "blue"}"#;
             let (source, address) = source(None).await;
 
@@ -1811,7 +1811,7 @@ mod tests {
 
     #[tokio::test]
     async fn channel_query_param() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "raw";
             let (source, address) = source(None).await;
 
@@ -1884,7 +1884,7 @@ mod tests {
 
     #[tokio::test]
     async fn secondary_token() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#"{"event":"first", "color": "blue"}"#;
             let (_source, address) = source_with(None, Some(VALID_TOKENS), None, false).await;
             let options = SendWithOpts {
@@ -1909,7 +1909,7 @@ mod tests {
 
     #[tokio::test]
     async fn event_service_token_passthrough_enabled() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "passthrough_token_enabled";
             let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
             let (sink, health) = sink(
@@ -1936,7 +1936,7 @@ mod tests {
 
     #[tokio::test]
     async fn raw_service_token_passthrough_enabled() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "raw";
             let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
 
@@ -1963,7 +1963,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_authorization() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "no_authorization";
             let (source, address) = source_with(None, None, None, false).await;
             let (sink, health) = sink(
@@ -1987,7 +1987,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_authorization_token_passthrough_enabled() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "no_authorization";
             let (source, address) = source_with(None, None, None, true).await;
             let (sink, health) = sink(
@@ -2014,7 +2014,7 @@ mod tests {
 
     #[tokio::test]
     async fn partial() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#"{"event":"first"}{"event":"second""#;
             let (source, address) = source(None).await;
 
@@ -2039,7 +2039,7 @@ mod tests {
 
     #[tokio::test]
     async fn handles_newlines() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#"
 {"event":"first"}
         "#;
@@ -2066,7 +2066,7 @@ mod tests {
 
     #[tokio::test]
     async fn handles_spaces() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#" {"event":"first"} "#;
             let (source, address) = source(None).await;
 
@@ -2091,7 +2091,7 @@ mod tests {
 
     #[tokio::test]
     async fn handles_non_utf8() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
         let message = b" {\"event\": { \"non\": \"A non UTF8 character \xE4\", \"number\": 2, \"bool\": true } } ";
         let (source, address) = source(None).await;
 
@@ -2119,7 +2119,7 @@ mod tests {
 
     #[tokio::test]
     async fn default() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
         let message = r#"{"event":"first","source":"main"}{"event":"second"}{"event":"third","source":"secondary"}"#;
         let (source, address) = source(None).await;
 
@@ -2195,7 +2195,7 @@ mod tests {
     /// https://github.com/seanmonstar/warp/pull/713
     #[tokio::test]
     async fn host_test() {
-        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, |_controller| async {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "for the host";
             let (sink, source) = start(
                 TextSerializerConfig::default().into(),

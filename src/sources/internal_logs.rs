@@ -234,7 +234,7 @@ mod tests {
         trace::init(false, false, "debug", 10);
         trace::reset_early_buffer();
 
-        assert_source_compliance(&SOURCE_TAGS, |_controller| run_test()).await;
+        assert_source_compliance(&SOURCE_TAGS, run_test()).await;
     }
 
     async fn run_test() {

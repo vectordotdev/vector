@@ -389,12 +389,9 @@ mod test {
         "#})
         .unwrap();
 
-        vector_lib::metrics::with_test_recorder_async(|controller| async move {
-            let mut tests = build_unit_tests(config).await.unwrap();
-            assert!(tests.remove(0).run().await.errors.is_empty());
-            // Check that metrics were emitted with output tag
-            COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(controller, &["output"]);
-        })
-        .await;
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert!(tests.remove(0).run().await.errors.is_empty());
+        // Check that metrics were emitted with output tag
+        COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
     }
 }

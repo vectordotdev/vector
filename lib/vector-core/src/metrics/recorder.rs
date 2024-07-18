@@ -1,5 +1,5 @@
 use std::sync::{atomic::Ordering, Arc, RwLock};
-use std::time::Duration;
+use std::{cell::OnceCell, time::Duration};
 
 use chrono::Utc;
 use metrics::{Counter, Gauge, Histogram, Key, KeyName, Metadata, Recorder, SharedString, Unit};
@@ -9,6 +9,8 @@ use quanta::Clock;
 use super::recency::{GenerationalStorage, Recency};
 use super::storage::VectorStorage;
 use crate::event::{Metric, MetricValue};
+
+thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = const { OnceCell::new() });
 
 #[allow(dead_code)]
 pub(super) struct Registry {
@@ -91,30 +93,58 @@ impl Registry {
 
 /// [`VectorRecorder`] is a [`metrics::Recorder`] implementation that's suitable
 /// for the advanced usage that we have in Vector.
+///
+/// TODO: The latest version of the `metrics` crate has a test recorder interface that could be used
+/// to replace this whole global/local switching mechanism, as it effectively does the exact same
+/// thing internally. However, it is only available through a `with_test_recorder` function that
+/// takes a closure and cleans up the test recorder once the closure finishes. This is a much
+/// cleaner interface, but interacts poorly with async code as used by the component tests. The best
+/// path forward to make async tests work, then, is to replace the standard `#[tokio::test]` proc
+/// macro wrapper with an alternate wrapper that does the normal tokio setup from within the
+/// `with_test_recorder` closure, and use it across all the tests that require a test
+/// recorder. Given the large number of such tests, we are retaining this global test recorder hack
+/// here, but some day we should refactor the tests to eliminate it.
 #[derive(Clone)]
-pub(super) struct VectorRecorder(Arc<Registry>);
+pub(super) enum VectorRecorder {
+    Global(Arc<Registry>),
+    ThreadLocal,
+}
 
 impl VectorRecorder {
-    pub(super) fn new() -> Self {
-        Self(Arc::new(Registry::new()))
+    pub(super) fn new_global() -> Self {
+        Self::Global(Arc::new(Registry::new()))
     }
 
-    pub(super) fn registry(&self) -> &Registry {
-        &self.0
+    pub(super) fn new_test() -> Self {
+        Self::with_thread_local(Registry::clear);
+        Self::ThreadLocal
+    }
+
+    pub(super) fn with_registry<T>(&self, doit: impl FnOnce(&Registry) -> T) -> T {
+        match &self {
+            Self::Global(registry) => doit(registry),
+            // This is only called after the registry is created, so we can just use a dummy
+            // idle_timeout parameter.
+            Self::ThreadLocal => Self::with_thread_local(doit),
+        }
+    }
+
+    fn with_thread_local<T>(doit: impl FnOnce(&Registry) -> T) -> T {
+        LOCAL_REGISTRY.with(|oc| doit(oc.get_or_init(Registry::new)))
     }
 }
 
 impl Recorder for VectorRecorder {
-    fn register_counter(&self, key: &Key, _meta: &Metadata<'_>) -> Counter {
-        self.0.get_counter(key)
+    fn register_counter(&self, key: &Key, _: &Metadata<'_>) -> Counter {
+        self.with_registry(|r| r.get_counter(key))
     }
 
-    fn register_gauge(&self, key: &Key, _meta: &Metadata<'_>) -> Gauge {
-        self.0.get_gauge(key)
+    fn register_gauge(&self, key: &Key, _: &Metadata<'_>) -> Gauge {
+        self.with_registry(|r| r.get_gauge(key))
     }
 
-    fn register_histogram(&self, key: &Key, _meta: &Metadata<'_>) -> Histogram {
-        self.0.get_histogram(key)
+    fn register_histogram(&self, key: &Key, _: &Metadata<'_>) -> Histogram {
+        self.with_registry(|r| r.get_histogram(key))
     }
 
     fn describe_counter(&self, _: KeyName, _: Option<Unit>, _: SharedString) {}

@@ -153,8 +153,8 @@ pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: Lazy<ComponentTests> = Lazy::new(||
 impl ComponentTests {
     /// Run the test specification, and assert that all tests passed.
     #[track_caller]
-    pub fn assert(&self, controller: Controller, tags: &[&str]) {
-        let mut test = ComponentTester::new(controller);
+    pub fn assert(&self, tags: &[&str]) {
+        let mut test = ComponentTester::new();
         test.emitted_all_events(self.events);
         test.emitted_all_counters(self.tagged_counters, tags);
         test.emitted_all_counters(self.untagged_counters, &[]);
@@ -188,8 +188,8 @@ struct ComponentTester {
 }
 
 impl ComponentTester {
-    fn new(controller: Controller) -> Self {
-        let mut metrics = controller.capture_metrics();
+    fn new() -> Self {
+        let mut metrics = Controller::get().unwrap().capture_metrics();
 
         if env::var("DEBUG_COMPONENT_COMPLIANCE").is_ok() {
             event_test_util::debug_print_events();
@@ -252,28 +252,22 @@ impl ComponentTester {
 }
 
 /// Runs and returns a future and asserts that the provided test specification passes.
-pub async fn assert_source<F: Future>(
+pub async fn assert_source<T>(
     tests: &Lazy<ComponentTests>,
     tags: &[&str],
-    f: impl FnOnce(Controller) -> F,
-) -> F::Output {
+    f: impl Future<Output = T>,
+) -> T {
     init_test();
 
-    vector_lib::metrics::with_test_recorder_async(|controller| async move {
-        let result = f(controller.clone()).await;
+    let result = f.await;
 
-        tests.assert(controller, tags);
+    tests.assert(tags);
 
-        result
-    })
-    .await
+    result
 }
 
 /// Convenience wrapper for running source tests.
-pub async fn assert_source_compliance<F: Future>(
-    tags: &[&str],
-    f: impl FnOnce(Controller) -> F,
-) -> F::Output {
+pub async fn assert_source_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     assert_source(&SOURCE_TESTS, tags, f).await
 }
 
@@ -306,14 +300,11 @@ where
 pub async fn assert_source_error<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
 
-    vector_lib::metrics::with_test_recorder_async(|controller| async move {
-        let result = f.await;
+    let result = f.await;
 
-        COMPONENT_TESTS_ERROR.assert(controller, tags);
+    COMPONENT_TESTS_ERROR.assert(tags);
 
-        result
-    })
-    .await
+    result
 }
 
 /// Runs source tests with timeout and asserts error path compliance.
@@ -362,7 +353,7 @@ pub async fn run_and_assert_source_advanced<SC>(
 where
     SC: SourceConfig,
 {
-    assert_source(tests, tags, |_| async move {
+    assert_source(tests, tags, async move {
         // Build the source and set ourselves up to both drive it to completion as well as collect all the events it sends out.
         let (tx, mut rx) = SourceSender::new_test();
         let mut context = SourceContext::new_test(tx, None);
@@ -423,28 +414,22 @@ where
 pub async fn assert_transform_compliance<T>(f: impl Future<Output = T>) -> T {
     init_test();
 
-    vector_lib::metrics::with_test_recorder_async(|controller| async move {
-        let result = f.await;
+    let result = f.await;
 
-        TRANSFORM_TESTS.assert(controller, &[]);
+    TRANSFORM_TESTS.assert(&[]);
 
-        result
-    })
-    .await
+    result
 }
 
 /// Convenience wrapper for running sink tests
 pub async fn assert_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
 
-    vector_lib::metrics::with_test_recorder_async(|controller| async move {
-        let result = f.await;
+    let result = f.await;
 
-        SINK_TESTS.assert(controller, tags);
+    SINK_TESTS.assert(tags);
 
-        result
-    })
-    .await
+    result
 }
 
 /// Runs and asserts sink compliance.
@@ -464,14 +449,11 @@ where
 pub async fn assert_data_volume_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
 
-    vector_lib::metrics::with_test_recorder_async(|controller| async move {
-        let result = f.await;
+    let result = f.await;
 
-        DATA_VOLUME_SINK_TESTS.assert(controller, tags);
+    DATA_VOLUME_SINK_TESTS.assert(tags);
 
-        result
-    })
-    .await
+    result
 }
 
 /// Runs and asserts compliance for data volume sink tests.
@@ -494,14 +476,11 @@ pub async fn run_and_assert_data_volume_sink_compliance<S, I>(
 pub async fn assert_nonsending_sink_compliance<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
 
-    vector_lib::metrics::with_test_recorder_async(|controller| async move {
-        let result = f.await;
+    let result = f.await;
 
-        NONSENDING_SINK_TESTS.assert(controller, tags);
+    NONSENDING_SINK_TESTS.assert(tags);
 
-        result
-    })
-    .await
+    result
 }
 
 /// Runs and asserts compliance for nonsending sink tests.
@@ -524,14 +503,11 @@ pub async fn run_and_assert_nonsending_sink_compliance<S, I>(
 pub async fn assert_sink_error<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
     init_test();
 
-    vector_lib::metrics::with_test_recorder_async(|controller| async move {
-        let result = f.await;
+    let result = f.await;
 
-        COMPONENT_TESTS_ERROR.assert(controller, tags);
+    COMPONENT_TESTS_ERROR.assert(tags);
 
-        result
-    })
-    .await
+    result
 }
 
 /// Runs and asserts sink error compliance.
@@ -562,23 +538,20 @@ where
     S: Stream<Item = Result<Event, ()>> + Send + Unpin,
 {
     init_test();
-    vector_lib::metrics::with_test_recorder_async(|controller| async move {
-        let mut events = events.map(|result| result.map(|event| event.into()));
-        match sink {
-            VectorSink::Sink(mut sink) => {
-                sink.send_all(&mut events)
-                    .await
-                    .expect("Sending event stream to sink failed");
-            }
-            VectorSink::Stream(stream) => {
-                let events = events.filter_map(|x| async move { x.ok() }).boxed();
-                stream
-                    .run(events)
-                    .await
-                    .expect("Sending event stream to sink failed");
-            }
+    let mut events = events.map(|result| result.map(|event| event.into()));
+    match sink {
+        VectorSink::Sink(mut sink) => {
+            sink.send_all(&mut events)
+                .await
+                .expect("Sending event stream to sink failed");
         }
-        SINK_TESTS.assert(controller, tags);
-    })
-    .await;
+        VectorSink::Stream(stream) => {
+            let events = events.filter_map(|x| async move { x.ok() }).boxed();
+            stream
+                .run(events)
+                .await
+                .expect("Sending event stream to sink failed");
+        }
+    }
+    SINK_TESTS.assert(tags);
 }

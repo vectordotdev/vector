@@ -66,7 +66,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
 
 #[tokio::test]
 pub(crate) async fn test() {
-    assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, |_controller| async {
+    assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async {
         let sqs_client = get_sqs_client().await;
         let queue_name = gen_queue_name();
         let queue_url = ensure_queue(&queue_name, &sqs_client)

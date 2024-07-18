@@ -685,7 +685,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
-        assert_source_compliance(&SOURCE_TAGS, |_controller| async move {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (rx, addr) = source(None, None, false, Default::default(), true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
