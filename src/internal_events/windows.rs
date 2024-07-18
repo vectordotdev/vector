@@ -15,8 +15,11 @@ impl<'a> InternalEvent for WindowsServiceStart<'a> {
             name = self.name,
             "Started Windows Service.",
         );
-        counter!("windows_service_start_total", "already_started" => self.already_started.to_string(),
-        ).increment(1);
+        counter!(
+            "windows_service_start_total",
+            "already_started" => self.already_started.to_string(),
+        )
+        .increment(1);
     }
 }
 
@@ -33,8 +36,11 @@ impl<'a> InternalEvent for WindowsServiceStop<'a> {
             name = ?self.name,
             "Stopped Windows Service.",
         );
-        counter!("windows_service_stop_total", "already_stopped" => self.already_stopped.to_string(),
-        ).increment(1);
+        counter!(
+            "windows_service_stop_total",
+            "already_stopped" => self.already_stopped.to_string(),
+        )
+        .increment(1);
     }
 }
 
