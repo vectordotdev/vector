@@ -1,4 +1,4 @@
-name: Miscellaneous review SHA
+name: Miscellaneous - Linux
 
 on:
   workflow_call:
