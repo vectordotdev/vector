@@ -68,6 +68,9 @@ pub struct StaticMetricConfig {
     pub value: f64,
 
     /// Key-value pairs representing tags and their values to add to the metric.
+    #[configurable(metadata(
+        docs::additional_props_description = "An individual tag - value pair."
+    ))]
     pub tags: BTreeMap<String, String>,
 }
 
