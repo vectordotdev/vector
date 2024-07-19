@@ -1,8 +1,11 @@
-# Comment Trigger
+# CI Review Trigger
 #
 # This workflow is a central point for triggering workflow runs that normally run only as part of the merge queue,
 # on demand by a comment. The exception being the integration tests, which have their own workflow file for
 # comment triggers as the logic is a bit more complex.
+#
+# NOTE: This workflow runs on Pull Request Review Comments rather than normal comments to be able to
+# capture the SHA that the comment is associated with.
 #
 # The available triggers are:
 #
@@ -18,11 +21,11 @@
 # /ci-run-regression          : runs Regression Detection Suite
 # /ci-run-k8s                 : runs K8s E2E Suite
 
-name: Comment Trigger
+name: CI Review Trigger
 
 on:
-  issue_comment:
-    types: [created]
+  pull_request_review:
+    types: [submitted]
 
 env:
   DD_ENV: "ci"
@@ -37,30 +40,30 @@ env:
 
 # The below concurrency group settings would let us cancel in progress runs that were triggered with the
 # same comment on a given PR, which could save on time consuming runs.
-# But GH does not currently support the github.event.comment.body as part of the concurrency name, this
+# But GH does not currently support the github.event.review.body as part of the concurrency name, this
 # appears to be due to the potential length of it.
 #concurrency:
-#  group: ${{ github.workflow }}-${{ github.event.issue.id }}-${{ github.event.comment.body }}
+#  group: ${{ github.workflow }}-${{ github.event.issue.id }}-${{ github.event.review.body }}
 #  cancel-in-progress: true
 
 jobs:
   validate:
-    name: Validate comment
+    name: Validate review
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: |
       github.event.issue.pull_request && (
-          contains(github.event.comment.body, '/ci-run-all')
-          || contains(github.event.comment.body, '/ci-run-cli')
-          || contains(github.event.comment.body, '/ci-run-misc')
-          || contains(github.event.comment.body, '/ci-run-deny')
-          || contains(github.event.comment.body, '/ci-run-component-features')
-          || contains(github.event.comment.body, '/ci-run-cross')
-          || contains(github.event.comment.body, '/ci-run-unit-mac')
-          || contains(github.event.comment.body, '/ci-run-unit-windows')
-          || contains(github.event.comment.body, '/ci-run-environment')
-          || contains(github.event.comment.body, '/ci-run-regression')
-          || contains(github.event.comment.body, '/ci-run-k8s')
+          contains(github.event.review.body, '/ci-run-all')
+          || contains(github.event.review.body, '/ci-run-cli')
+          || contains(github.event.review.body, '/ci-run-misc')
+          || contains(github.event.review.body, '/ci-run-deny')
+          || contains(github.event.review.body, '/ci-run-component-features')
+          || contains(github.event.review.body, '/ci-run-cross')
+          || contains(github.event.review.body, '/ci-run-unit-mac')
+          || contains(github.event.review.body, '/ci-run-unit-windows')
+          || contains(github.event.review.body, '/ci-run-environment')
+          || contains(github.event.review.body, '/ci-run-regression')
+          || contains(github.event.review.body, '/ci-run-k8s')
         )
     steps:
       - name: Generate authentication token
@@ -69,14 +72,7 @@ jobs:
         with:
           app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
-      - name: Get PR author
-        id: pr
-        uses: tspascoal/get-user-teams-membership@v3
-        with:
-          username: ${{ github.event.issue.user.login }}
-          team: 'Vector'
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-      - name: Get PR comment author
+      - name: Get PR review author
         id: comment
         uses: tspascoal/get-user-teams-membership@v3
         with:
@@ -85,65 +81,65 @@ jobs:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
 
       - name: Validate author membership
-        if: steps.pr.outputs.isTeamMember == 'false' || steps.comment.outputs.isTeamMember == 'false'
+        if: steps.comment.outputs.isTeamMember == 'false'
         run: exit 1
 
   cli:
     needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-cli')
+    if: contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cli')
     uses: ./.github/workflows/cli.yml
     secrets: inherit
 
   misc:
     needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-misc')
+    if: contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-misc')
     uses: ./.github/workflows/misc.yml
     secrets: inherit
 
   deny:
     needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-deny')
+    if: contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-deny')
     uses: ./.github/workflows/deny.yml
     secrets: inherit
 
   component-features:
     needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-component-features')
+    if: contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-component-features')
     uses: ./.github/workflows/component_features.yml
     secrets: inherit
 
   cross:
     needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-cross')
+    if: contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cross')
     uses: ./.github/workflows/cross.yml
     secrets: inherit
 
   unit-mac:
     needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-unit-mac')
+    if: contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-unit-mac')
     uses: ./.github/workflows/unit_mac.yml
     secrets: inherit
 
   unit-windows:
     needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-unit-windows')
+    if: contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-unit-windows')
     uses: ./.github/workflows/unit_windows.yml
     secrets: inherit
 
   environment:
     needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-environment')
+    if: contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-environment')
     uses: ./.github/workflows/environment.yml
     secrets: inherit
 
   regression:
     needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-regression')
+    if: contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-regression')
     uses: ./.github/workflows/regression.yml
     secrets: inherit
 
   k8s:
     needs: validate
-    if: contains(github.event.comment.body, '/ci-run-all') || contains(github.event.comment.body, '/ci-run-k8s')
+    if: contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-k8s')
     uses: ./.github/workflows/k8s_e2e.yml
     secrets: inherit
