@@ -187,9 +187,7 @@ impl DnsMessageParser {
 
     pub(crate) fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
         let record_data = match record.data() {
-            RData::Unknown { code, rdata } => {
-                self.format_unknown_rdata((*code).into(), rdata)
-            },
+            RData::Unknown { code, rdata } => self.format_unknown_rdata((*code).into(), rdata),
             RData::NULL(..) => Ok((Some(String::from("")), None)), // NULL record
             rdata => self.format_rdata(rdata),
         }?;
@@ -1412,7 +1410,10 @@ mod tests {
         println!("{:?}", message);
         let opt_pseudo_section = message.opt_pseudo_section.expect("OPT section was missing");
         assert_eq!(opt_pseudo_section.client_subnet.len(), 1);
-        assert_eq!(opt_pseudo_section.client_subnet[0].addr(), Ipv4Addr::new(192, 0, 2, 0));
+        assert_eq!(
+            opt_pseudo_section.client_subnet[0].addr(),
+            Ipv4Addr::new(192, 0, 2, 0)
+        );
         assert_eq!(opt_pseudo_section.client_subnet[0].source_prefix(), 24);
         assert_eq!(opt_pseudo_section.client_subnet[0].scope_prefix(), 0);
     }
@@ -2020,12 +2021,10 @@ mod tests {
 
     #[test]
     fn test_format_rdata_for_opt_type() {
-        let options = vec![
-            (
-                EdnsCode::LLQ,
-                EdnsOption::Unknown(u16::from(EdnsCode::LLQ), vec![0x01; 18]),
-            ),
-        ];
+        let options = vec![(
+            EdnsCode::LLQ,
+            EdnsOption::Unknown(u16::from(EdnsCode::LLQ), vec![0x01; 18]),
+        )];
         let rdata = RData::OPT(OPT::new(options));
         let rdata_text = format_rdata(&rdata);
         assert!(rdata_text.is_ok());
