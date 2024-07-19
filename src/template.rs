@@ -361,13 +361,7 @@ fn render_timestamp(
     tz_offset: Option<FixedOffset>,
 ) -> String {
     let timestamp = match event {
-        EventRef::Log(log) => log_schema()
-            .timestamp_key_target_path()
-            .and_then(|timestamp_key| {
-                log.get(timestamp_key)
-                    .and_then(Value::as_timestamp)
-                    .copied()
-            }),
+        EventRef::Log(log) => log.get_timestamp().and_then(Value::as_timestamp).copied(),
         EventRef::Metric(metric) => metric.timestamp(),
         EventRef::Trace(trace) => {
             log_schema()
@@ -398,6 +392,7 @@ fn render_timestamp(
 mod tests {
     use chrono::{Offset, TimeZone, Utc};
     use chrono_tz::Tz;
+    use vector_lib::config::LogNamespace;
     use vector_lib::lookup::{metadata_path, PathPrefix};
     use vector_lib::metric_tags;
 
@@ -531,6 +526,34 @@ mod tests {
         event
             .as_mut_log()
             .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
+
+        let template = Template::try_from("abcd-%F").unwrap();
+
+        assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_timestamp_strftime_style_namespace() {
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
+
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert("@timestamp", ts);
+        // use Vector namespace instead of legacy
+        LogNamespace::Vector.insert_vector_metadata(event.as_mut_log(), Some("foo"), "foo", "bar");
+        let new_schema = event
+            .as_mut_log()
+            .metadata()
+            .schema_definition()
+            .as_ref()
+            .clone()
+            .with_meaning(parse_target_path("@timestamp").unwrap(), "timestamp");
+        event
+            .as_mut_log()
+            .metadata_mut()
+            .set_schema_definition(&std::sync::Arc::new(new_schema));
 
         let template = Template::try_from("abcd-%F").unwrap();
 
