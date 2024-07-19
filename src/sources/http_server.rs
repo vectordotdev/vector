@@ -98,9 +98,9 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::examples = "X-*"))]
     #[configurable(metadata(docs::examples = "*"))]
     headers: Vec<String>,
-    
+
     /// Custom response headers to be added to the HTTP response
-    #[serde(default)]    
+    #[serde(default)]
     #[configurable(metadata(docs::examples = "example_custom_response_headers()"))]
     custom_response_headers: HashMap<String, String>,
 
@@ -176,9 +176,10 @@ pub struct SimpleHttpConfig {
 }
 
 fn example_custom_response_headers() -> HashMap<String, String> {
-    HashMap::<_, _>::from_iter([
-        ("Access-Control-Allow-Origin", "my-cool-server"),
-    ])
+    HashMap::<String, String>::from_iter([(
+        "Access-Control-Allow-Origin".to_string(),
+        "my-cool-server".to_string(),
+    )])
 }
 
 impl SimpleHttpConfig {
@@ -563,19 +564,18 @@ impl HttpSource for SimpleHttpSource {
     ///
     /// This method adds the custom headers specified in the configuration
     /// to the HTTP response.
-    fn enrich_reply<T : warp::Reply>(
-        &self,
-        mut reply: T
-    ) -> warp::http::response::Builder {
+    fn enrich_reply<T: warp::Reply + 'static>(&self, reply: T) -> Box<dyn warp::Reply> {
+        let mut boxed_reply: Box<dyn warp::Reply> = Box::new(reply);
         for (key, value) in &self.custom_response_headers {
-            reply = warp::reply::with_headers(reply, key, value);
+            boxed_reply = Box::new(warp::reply::with_header(boxed_reply, key, value));
         }
-        reply
+        boxed_reply
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::str::FromStr;
     use std::{io::Write, net::SocketAddr};
 
@@ -647,6 +647,7 @@ mod tests {
             SimpleHttpConfig {
                 address,
                 headers,
+                custom_response_headers: HashMap::new(),
                 encoding: None,
                 query_parameters,
                 response_code,
