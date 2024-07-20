@@ -79,9 +79,9 @@ impl<'a> InternalEvent for GotHttpWarning<'a> {
             stage = error_stage::PROCESSING,
             internal_log_rate_limit = true,
         );
-        counter!("http_client_errors_total", 1, "error_kind" => self.error.to_string());
+        counter!("http_client_errors_total", 1, "error_kind" => self.error.message().to_string());
         histogram!("http_client_rtt_seconds", self.roundtrip);
-        histogram!("http_client_error_rtt_seconds", self.roundtrip, "error_kind" => self.error.to_string());
+        histogram!("http_client_error_rtt_seconds", self.roundtrip, "error_kind" => self.error.message().to_string());
     }
 }
 
