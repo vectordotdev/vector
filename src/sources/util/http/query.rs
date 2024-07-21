@@ -21,7 +21,7 @@ pub fn add_query_parameters(
                     source_name,
                     log,
                     Some(LegacyKey::Overwrite(path!(query_parameter_name))),
-                    path!("query_parameters"),
+                    path!("query_parameters", query_parameter_name),
                     crate::event::Value::from(value.map(String::to_owned)),
                 );
             }
