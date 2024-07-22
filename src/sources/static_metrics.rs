@@ -104,11 +104,11 @@ fn default_metrics() -> Vec<StaticMetricConfig> {
     Vec::default()
 }
 
-fn default_metric_value() -> MetricValue {
+const fn default_metric_value() -> MetricValue {
     MetricValue::Gauge { value: 0.0 }
 }
 
-fn default_metric_kind() -> MetricKind {
+const fn default_metric_kind() -> MetricKind {
     MetricKind::Absolute
 }
 
@@ -179,7 +179,7 @@ impl StaticMetrics {
                     Metric::from_parts(
                         MetricSeries {
                             name: MetricName {
-                                name: name.into(),
+                                name,
                                 namespace: Some(self.namespace.clone()),
                             },
                             tags: Some(tags.into()),
@@ -209,7 +209,7 @@ impl StaticMetrics {
             let batch = metrics
                 .clone()
                 .into_iter()
-                .map(|metric| metric.with_timestamp(Some(Utc::now().into())));
+                .map(|metric| metric.with_timestamp(Some(Utc::now())));
 
             if (self.out.send_batch(batch).await).is_err() {
                 emit!(StreamClosedError { count });
