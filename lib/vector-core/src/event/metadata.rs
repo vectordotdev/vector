@@ -351,7 +351,7 @@ impl EventMetadata {
     ///
     /// This replaces the common code sequence of:
     ///
-    /// ```
+    /// ```ignore
     /// let new_schema = log_event
     ///     .metadata()
     ///     .schema_definition()
