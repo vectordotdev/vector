@@ -1433,7 +1433,7 @@ mod test {
     ////////////// UNIX DATAGRAM TESTS //////////////
     #[cfg(unix)]
     async fn send_lines_unix_datagram(path: PathBuf, lines: &[&str]) {
-        let packets = lines.into_iter().map(|line| Bytes::from(line.to_string()));
+        let packets = lines.iter().map(|line| Bytes::from(line.to_string()));
         send_packets_unix_datagram(path, packets).await;
     }
 
