@@ -1,5 +1,5 @@
 [Unit]
-Description=Vector
+Description=Vector - %i
 Documentation=https://vector.dev
 After=network-online.target local-fs.target remote-fs.target time-sync.target
 Requires=network-online.target local-fs.target remote-fs.target time-sync.target
@@ -7,16 +7,17 @@ Requires=network-online.target local-fs.target remote-fs.target time-sync.target
 [Service]
 User=vector
 Group=vector
-ExecStartPre=/usr/bin/vector validate
-ExecStart=/usr/bin/vector
-ExecReload=/usr/bin/vector validate
+ExecStartPre=/usr/bin/vector validate --config-toml /etc/vector/%i.toml
+ExecStart=/usr/bin/vector --config-toml /etc/vector/%i.toml
+ExecReload=/usr/bin/vector validate --config-toml /etc/vector/%i.toml
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 AmbientCapabilities=CAP_NET_BIND_SERVICE
-EnvironmentFile=-/etc/default/vector
+EnvironmentFile=-/etc/default/vector-%i
 # Since systemd 229, should be in [Unit] but in order to support systemd <229,
 # it is also supported to have it here.
 StartLimitInterval=10
 StartLimitBurst=5
+
 [Install]
 WantedBy=multi-user.target
