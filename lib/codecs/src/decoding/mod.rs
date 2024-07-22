@@ -478,12 +478,14 @@ mod tests {
     fn gelf_stream_default_framing_is_null_delimited() {
         let deserializer_config = DeserializerConfig::from(GelfDeserializerConfig::default());
         let framing_config = deserializer_config.default_stream_framing();
-        matches!(framing_config, FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig{
-            character_delimited: CharacterDelimitedDecoderOptions {
-                delimiter: 0,
-                max_length: None,
-            }
-        }));
-        })
+        matches!(
+            framing_config,
+            FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
+                character_delimited: CharacterDelimitedDecoderOptions {
+                    delimiter: 0,
+                    max_length: None,
+                }
+            })
+        );
     }
 }
