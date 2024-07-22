@@ -66,12 +66,19 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_false")]
     pub remove_label_fields: bool,
 
-    /// Fields to add to structured metadata.
+    /// Structured metadata that is attached to each batch of events.
+    ///
+    /// Both keys and values are templateable, which enables you to attach dynamic structured metadata to events.
+    ///
+    /// Valid metadata keys include `*`, and prefixes ending with `*`, to allow for the expansion of
+    /// objects into multiple metadata entries. This follows the same logic as [Label expansion][label_expansion].
+    ///
+    /// [label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
     #[configurable(metadata(docs::examples = "loki_structured_metadata_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "Loki structured metadata."))]
     pub structured_metadata: Option<HashMap<Template, Template>>,
 
-    /// Whether to delete fields that were passed as structured metadata
+    /// Whether or not to delete fields from the event when they are used in structured metadata.
     #[serde(default = "crate::serde::default_false")]
     pub remove_structured_metadata_fields: bool,
 
