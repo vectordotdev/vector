@@ -58,20 +58,38 @@ impl Default for StaticMetricsConfig {
 
 /// Tag configuration for the `internal_metrics` source.
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct StaticMetricConfig {
     /// Name of the static metric
     pub name: String,
 
     /// "Observed" value of the static metric
-    pub value: f64,
+    #[configurable(derived)]
+    #[serde(default = "default_metric_value")]
+    pub value: MetricValue,
+
+    /// Kind of the static metric - either absolute or incremental
+    #[configurable(derived)]
+    #[serde(default = "default_metric_kind")]
+    pub kind: MetricKind,
 
     /// Key-value pairs representing tags and their values to add to the metric.
     #[configurable(metadata(
         docs::additional_props_description = "An individual tag - value pair."
     ))]
     pub tags: BTreeMap<String, String>,
+}
+
+impl Default for StaticMetricConfig {
+    fn default() -> Self {
+        Self {
+            name: Default::default(),
+            value: default_metric_value(),
+            kind: default_metric_kind(),
+            tags: Default::default(),
+        }
+    }
 }
 
 fn default_interval() -> Duration {
@@ -84,6 +102,14 @@ fn default_namespace() -> String {
 
 fn default_metrics() -> Vec<StaticMetricConfig> {
     Vec::default()
+}
+
+fn default_metric_value() -> MetricValue {
+    MetricValue::Gauge { value: 0.0 }
+}
+
+fn default_metric_kind() -> MetricKind {
+    MetricKind::Absolute
 }
 
 impl_generate_config_from_default!(StaticMetricsConfig);
@@ -143,26 +169,33 @@ impl StaticMetrics {
         let metrics: Vec<Metric> = self
             .metrics
             .into_iter()
-            .map(|StaticMetricConfig { name, value, tags }| {
-                Metric::from_parts(
-                    MetricSeries {
-                        name: MetricName {
-                            name: name.into(),
-                            namespace: Some(self.namespace.clone()),
+            .map(
+                |StaticMetricConfig {
+                     name,
+                     value,
+                     kind,
+                     tags,
+                 }| {
+                    Metric::from_parts(
+                        MetricSeries {
+                            name: MetricName {
+                                name: name.into(),
+                                namespace: Some(self.namespace.clone()),
+                            },
+                            tags: Some(tags.into()),
                         },
-                        tags: Some(tags.into()),
-                    },
-                    MetricData {
-                        time: MetricTime {
-                            timestamp: None,
-                            interval_ms: NonZero::new(self.interval.as_millis() as u32),
+                        MetricData {
+                            time: MetricTime {
+                                timestamp: None,
+                                interval_ms: NonZero::new(self.interval.as_millis() as u32),
+                            },
+                            kind,
+                            value: value.clone(),
                         },
-                        kind: MetricKind::Absolute,
-                        value: MetricValue::Gauge { value },
-                    },
-                    EventMetadata::default(),
-                )
-            })
+                        EventMetadata::default(),
+                    )
+                },
+            )
             .collect();
 
         while interval.next().await.is_some() {
@@ -266,7 +299,8 @@ mod tests {
         let mut events = events_from_config(StaticMetricsConfig {
             metrics: vec![StaticMetricConfig {
                 name: "test".to_string(),
-                value: 2.3,
+                value: MetricValue::Gauge { value: 2.3 },
+                kind: MetricKind::Absolute,
                 tags: BTreeMap::from([("custom_tag".to_string(), "custom_tag_value".to_string())]),
             }],
             ..Default::default()
