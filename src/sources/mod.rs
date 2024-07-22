@@ -91,7 +91,6 @@ pub mod vector;
 
 pub mod util;
 
-
 pub use vector_lib::source::Source;
 
 /// Common build errors

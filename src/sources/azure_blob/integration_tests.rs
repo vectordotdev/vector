@@ -166,9 +166,9 @@ async fn azure_blob_read_single_line_from_multiple_blobs() {
             .await;
     }
 
-    let events = run_and_assert_source_compliance(
-        config.clone(), Duration::from_secs(4), &SOURCE_TAGS
-    ).await;
+    let events =
+        run_and_assert_source_compliance(config.clone(), Duration::from_secs(4), &SOURCE_TAGS)
+            .await;
     assert_eq!(events.len(), contents.len());
     for (i, event) in events.iter().enumerate() {
         assert_eq!(event.as_log()["message"], contents[i].into());

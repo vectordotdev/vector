@@ -6,12 +6,14 @@ use std::{
 
 use anyhow::anyhow;
 use async_stream::stream;
+use azure_core;
 use azure_storage_blobs::prelude::ContainerClient;
 use azure_storage_queues::{operations::Message, QueueClient};
 use base64::{prelude::BASE64_STANDARD, Engine};
 use futures::stream::StreamExt;
 use serde::Deserialize;
 use serde_with::serde_as;
+use snafu::Snafu;
 use tokio::{select, time};
 
 use vector_lib::{
@@ -21,6 +23,10 @@ use vector_lib::{
 
 use crate::{
     azure,
+    internal_events::{
+        QueueMessageDeleteError, QueueMessageProcessingError, QueueMessageReceiveError,
+        QueueStorageInvalidEventIgnored,
+    },
     shutdown::ShutdownSignal,
     sources::azure_blob::{AzureBlobConfig, BlobPack, BlobPackStream},
 };
@@ -64,7 +70,7 @@ pub fn make_azure_row_stream(
             let messages = match queue_client.get_messages().number_of_messages(num_messages()).await {
                 Ok(messages) => messages,
                 Err(e) => {
-                    error!("Failed reading messages: {}", e); // TODO: consider emit!
+                    emit!(QueueMessageReceiveError{error: &e});
                     continue;
                 }
             };
@@ -77,10 +83,20 @@ pub fn make_azure_row_stream(
                         &queue_client,
                         bytes_received.clone()
                     ).await {
-                        Some(blob_pack) => yield blob_pack,
-                        None => trace!("Message {msg_id} failed to be processed or is ignored, \
-                                no blob stream stream created from it. \
-                                Will retry on next message."),
+                        Ok(blob_pack) => {
+                            match blob_pack {
+                                None => trace!("Message {msg_id} is ignored, \
+                                                no blob stream stream created from it. \
+                                                Will retry on next message."),
+                                Some(bp) => yield bp
+                            }
+                        },
+                        Err(e) => {
+                            emit!(QueueMessageProcessingError{
+                                error: &e,
+                                message_id: &msg_id
+                            });
+                        }
                     }
                 }
             } else {
@@ -129,48 +145,70 @@ struct AzureStorageEvent {
     pub event_type: String,
 }
 
+#[derive(Debug, Snafu)]
+pub enum ProcessingError {
+    #[snafu(display("Could not decode Queue message with id {}: {}", message_id, error))]
+    InvalidQueueMessage {
+        error: serde_json::Error,
+        message_id: String,
+    },
+
+    #[snafu(display(
+        "Container name of message and container client doesn't match, container: {}, message {}",
+        container,
+        message
+    ))]
+    ContainerNameDoesntMatch { container: String, message: String },
+
+    #[snafu(display("Failed to base64 decode message: {}", error))]
+    FailedDecodingMessageBase64 { error: base64::DecodeError },
+
+    #[snafu(display("Failed to utf8 decode message: {}", error))]
+    FailedDecodingUTF8 { error: std::string::FromUtf8Error },
+
+    #[snafu(display("Failed to get blob: {}", error))]
+    FailedToGetBlob { error: azure_core::Error },
+
+    #[snafu(display("Failed to parse {} as subject", subject))]
+    FailedToParseSubject { subject: String },
+}
+
 async fn proccess_event_grid_message(
     message: Message,
     container_client: &ContainerClient,
     queue_client: &QueueClient,
     bytes_received: Registered<BytesReceived>,
-) -> Option<BlobPack> {
-    let decoded_bytes = match BASE64_STANDARD.decode(&message.message_text) {
-        Ok(decoded) => decoded,
-        Err(e) => {
-            error!("Failed decoding base64: {}", e);
-            return None;
+) -> Result<Option<BlobPack>, ProcessingError> {
+    let msg_id = message.message_id.clone();
+    let decoded_bytes = BASE64_STANDARD
+        .decode(&message.message_text)
+        .map_err(|e| ProcessingError::FailedDecodingMessageBase64 { error: e })?;
+    let decoded_string = String::from_utf8(decoded_bytes)
+        .map_err(|e| ProcessingError::FailedDecodingUTF8 { error: e })?;
+    let body: AzureStorageEvent = serde_json::from_str(decoded_string.as_str()).map_err(|e| {
+        ProcessingError::InvalidQueueMessage {
+            error: e,
+            message_id: msg_id,
         }
-    };
-    let decoded_string = match String::from_utf8(decoded_bytes) {
-        Ok(decoded) => decoded,
-        Err(e) => {
-            error!("Failed decoding utf8: {}", e);
-            return None;
-        }
-    };
-    let body: AzureStorageEvent = match serde_json::from_str(decoded_string.as_str()) {
-        Ok(body) => body,
-        Err(e) => {
-            error!("Failed decoding json: {}", e);
-            return None;
-        }
-    };
+    })?;
     if body.event_type != "Microsoft.Storage.BlobCreated" {
-        trace!(
-            "Ignoring event because of wrong event type: {}",
-            body.event_type
-        );
-        return None;
+        emit!(QueueStorageInvalidEventIgnored {
+            container: container_client.container_name(),
+            subject: &body.subject,
+            event_type: &body.event_type,
+        });
+        return Ok(None);
     }
-    match parse_subject(body.subject) {
+    match parse_subject(body.subject.clone()) {
         Some((container, blob)) => {
             if container != container_client.container_name() {
-                trace!("Container name does not match. Skipping.");
-                return None;
+                return Err(ProcessingError::ContainerNameDoesntMatch {
+                    container: container_client.container_name().to_string(),
+                    message: container,
+                });
             }
             trace!(
-                "New blob created in container '{}': '{}'",
+                "Detected new blob creation in container '{}': '{}'",
                 &container,
                 &blob
             );
@@ -194,9 +232,7 @@ async fn proccess_event_grid_message(
                         }
                     }
                     Err(e) => {
-                        // Logging as trace, as it will be retired.
-                        trace!("Failed to get response: {}", e);
-                        return None;
+                        return Err(ProcessingError::FailedToGetBlob { error: e });
                     }
                 }
             }
@@ -206,7 +242,7 @@ async fn proccess_event_grid_message(
             let queue_client_copy = queue_client.clone();
             let bytes_received_copy = bytes_received.clone();
 
-            Some(BlobPack {
+            Ok(Some(BlobPack {
                 row_stream: Box::pin(stream! {
                     for line in buffered.lines() {
                         let line = line.map(|line| line.as_bytes().to_vec());
@@ -228,16 +264,17 @@ async fn proccess_event_grid_message(
                         match res {
                             Ok(_) => {}
                             Err(e) => {
-                                error!("Failed removing messages from queue: {}", e);
+                                emit!(QueueMessageDeleteError { error: &e })
                             }
                         }
                     })
                 }),
-            })
+            }))
         }
         None => {
-            warn!("Failed parsing subject. Skipping.");
-            return None;
+            return Err(ProcessingError::FailedToParseSubject {
+                subject: body.subject,
+            });
         }
     }
 }

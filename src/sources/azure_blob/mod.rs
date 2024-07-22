@@ -25,7 +25,10 @@ use crate::{
         LogNamespace, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event},
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{
+        EventsReceived, InvalidRowEventType, QueueMessageProcessingErrored,
+        QueueMessageProcessingRejected, QueueMessageProcessingSucceeded, StreamClosedError,
+    },
     serde::{bool_or_struct, default_decoding},
     shutdown::ShutdownSignal,
     sinks::prelude::configurable_component,
@@ -178,6 +181,7 @@ pub struct BlobPack {
     row_stream: BlobStream,
     success_handler: Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>,
 }
+
 type BlobPackStream = Pin<Box<dyn Stream<Item = BlobPack> + Send>>;
 
 struct AzureBlobStreamer {
@@ -270,7 +274,7 @@ impl AzureBlobStreamer {
                                 yield event
                             }
                             _ => {
-                                error!("Expected Azure rows as Log Events, but got {:?}.", event);
+                                emit!(InvalidRowEventType{event: &event})
                             }
                         }
                     }
@@ -298,15 +302,16 @@ impl AzureBlobStreamer {
             Some(receiver) => {
                 let result = receiver.await;
                 match result {
-                    BatchStatus::Delivered => (blob_pack.success_handler)().await, // TODO: emit
+                    BatchStatus::Delivered => {
+                        (blob_pack.success_handler)().await;
+                        emit!(QueueMessageProcessingSucceeded {});
+                    }
                     BatchStatus::Errored => {
-                        // TODO: emit a proper error
-                        error!("Batch event had a transient error in delivery.")
+                        emit!(QueueMessageProcessingErrored {});
                     }
                     BatchStatus::Rejected => {
-                        // TODO: emit a proper error
                         // TODO: consider allowing rejected events wihtout retrying, like s3
-                        error!("Batch event had a permanent failure or rejection.")
+                        emit!(QueueMessageProcessingRejected {});
                     }
                 }
             }
