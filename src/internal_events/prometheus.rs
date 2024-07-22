@@ -32,11 +32,12 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "url" => self.url.to_string(),
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -55,10 +56,11 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -75,10 +77,11 @@ impl InternalEvent for PrometheusNormalizationError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
             reason: normalization_reason

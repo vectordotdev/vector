@@ -203,7 +203,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use metrics::{counter, gauge, histogram};
-    use vector_lib::metric_tags;
+    use vector_lib::{metric_tags, metrics::Controller};
 
     use super::*;
     use crate::{
@@ -211,7 +211,6 @@ mod tests {
             metric::{Metric, MetricValue},
             Event,
         },
-        metrics::Controller,
         test_util::{
             self,
             components::{run_and_assert_source_compliance, SOURCE_TAGS},
@@ -230,14 +229,14 @@ mod tests {
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
 
-        gauge!("foo", 1.0);
-        gauge!("foo", 2.0);
-        counter!("bar", 3);
-        counter!("bar", 4);
-        histogram!("baz", 5.0);
-        histogram!("baz", 6.0);
-        histogram!("quux", 8.0, "host" => "foo");
-        histogram!("quux", 8.1, "host" => "foo");
+        gauge!("foo").set(1.0);
+        gauge!("foo").set(2.0);
+        counter!("bar").increment(3);
+        counter!("bar").increment(4);
+        histogram!("baz").record(5.0);
+        histogram!("baz").record(6.0);
+        histogram!("quux", "host" => "foo").record(8.0);
+        histogram!("quux", "host" => "foo").record(8.1);
 
         let controller = Controller::get().expect("no controller");
 

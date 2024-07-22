@@ -20,11 +20,12 @@ impl InternalEvent for LargeEventDroppedError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "oversized",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
