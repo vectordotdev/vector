@@ -10,7 +10,7 @@ brew update
 # https://github.com/actions/setup-python/issues/577
 brew list -1 | grep python | while read -r formula; do brew unlink "$formula"; brew link --overwrite "$formula"; done
 
-brew install rustup ruby@3 coreutils cue-lang/tap/cue protobuf
+brew install ruby@3 coreutils cue-lang/tap/cue protobuf
 
 gem install bundler
 
@@ -18,4 +18,5 @@ echo "export PATH=\"/usr/local/opt/ruby/bin:\$PATH\"" >> "$HOME/.bash_profile"
 
 if [ -n "${CI-}" ] ; then
   echo "/usr/local/opt/ruby/bin" >> "$GITHUB_PATH"
+  echo "/opt/homebrew/opt/rustup/bin" >> "$GITHUB_PATH"
 fi
