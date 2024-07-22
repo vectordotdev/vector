@@ -10,7 +10,7 @@ brew update
 # https://github.com/actions/setup-python/issues/577
 brew list -1 | grep python | while read -r formula; do brew unlink "$formula"; brew link --overwrite "$formula"; done
 
-brew install ruby@3 coreutils cue-lang/tap/cue protobuf
+brew install rustup ruby@3 coreutils cue-lang/tap/cue protobuf
 
 gem install bundler
 
