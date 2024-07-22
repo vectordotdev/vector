@@ -28,8 +28,8 @@ base: components: sources: static_metrics: configuration: {
 				}
 				name: {
 					description: "Name of the static metric"
-					required:    false
-					type: string: default: ""
+					required:    true
+					type: string: {}
 				}
 				tags: {
 					description: "Key-value pairs representing tags and their values to add to the metric."
@@ -42,7 +42,7 @@ base: components: sources: static_metrics: configuration: {
 				}
 				value: {
 					description: "\"Observed\" value of the static metric"
-					required:    false
+					required:    true
 					type: object: options: {
 						aggregated_histogram: {
 							description: """
@@ -173,11 +173,11 @@ base: components: sources: static_metrics: configuration: {
 						}
 						gauge: {
 							description: "A single numerical value that can arbitrarily go up and down."
-							required:    false
+							required:    true
 							type: object: options: value: {
 								description: "The value of the gauge."
-								required:    false
-								type: float: default: 0.0
+								required:    true
+								type: float: {}
 							}
 						}
 						set: {
