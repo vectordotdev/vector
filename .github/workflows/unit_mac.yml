@@ -1,7 +1,6 @@
 name: Unit - Mac
 
 on:
-  pull_request:
   workflow_call:
 
 jobs:
