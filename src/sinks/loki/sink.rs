@@ -136,7 +136,7 @@ pub(super) struct EventEncoder {
     encoder: Encoder<()>,
     labels: HashMap<Template, Template>,
     remove_label_fields: bool,
-    structured_metadata: Option<HashMap<Template, Template>>,
+    structured_metadata: HashMap<Template, Template>,
     remove_structured_metadata_fields: bool,
     remove_timestamp: bool,
 }
@@ -248,120 +248,107 @@ impl EventEncoder {
     }
 
     fn build_structured_metadata(&self, event: &Event) -> Vec<(String, String)> {
-        match self.structured_metadata {
-            None => Vec::new(),
-            Some(structured_metadata) => {
-                let mut static_structured_metadata: HashMap<String, String> = HashMap::new();
-                let mut dynamic_structured_metadata: HashMap<String, String> = HashMap::new();
+        let mut static_structured_metadata: HashMap<String, String> = HashMap::new();
+        let mut dynamic_structured_metadata: HashMap<String, String> = HashMap::new();
 
-                for (key_template, value_template) in structured_metadata.iter() {
-                    let key = key_template.render_string(event);
-                    let value = value_template.render_string(event);
+        for (key_template, value_template) in self.structured_metadata.iter() {
+            let key = key_template.render_string(event);
+            let value = value_template.render_string(event);
 
-                    if key.is_err() || value.is_err() {
-                        if key.is_err() {
-                            emit!(TemplateRenderingError {
+            if key.is_err() || value.is_err() {
+                if key.is_err() {
+                    emit!(TemplateRenderingError {
                         field: Some(
                             format!(
-                                "structured_metadata_key \"{}\" with structured_metadata_value \"{}\"",
-                                key_template, value_template
-                            )
+                        "structured_metadata_key \"{}\" with structured_metadata_value \"{}\"",
+                        key_template, value_template
+                    )
                             .as_str()
                         ),
                         drop_event: false,
                         error: key.err().unwrap(),
                     });
-                        }
-                        if value.is_err() {
-                            emit!(TemplateRenderingError {
+                }
+                if value.is_err() {
+                    emit!(TemplateRenderingError {
                         field: Some(
                             format!(
-                                "structured_metadata_value \"{}\" with structured_metadata_key \"{}\"",
-                                value_template, key_template
-                            )
+                        "structured_metadata_value \"{}\" with structured_metadata_key \"{}\"",
+                        value_template, key_template
+                    )
                             .as_str()
                         ),
                         drop_event: false,
                         error: value.err().unwrap(),
                     });
-                        }
-                        continue;
-                    }
+                }
+                continue;
+            }
 
-                    let key_s = key.unwrap();
-                    let value_s = value.unwrap();
+            let key_s = key.unwrap();
+            let value_s = value.unwrap();
 
-                    if let Some(opening_prefix) = key_s.strip_suffix('*') {
-                        let output: Result<
-                            serde_json::map::Map<String, serde_json::Value>,
-                            serde_json::Error,
-                        > = serde_json::from_str(value_s.clone().as_str());
+            if let Some(opening_prefix) = key_s.strip_suffix('*') {
+                let output: Result<
+                    serde_json::map::Map<String, serde_json::Value>,
+                    serde_json::Error,
+                > = serde_json::from_str(value_s.clone().as_str());
 
-                        if output.is_err() {
-                            warn!(
-                                "Failed to expand dynamic structured metadata. value: {}, err: {}",
-                                value_s,
-                                output.err().unwrap()
-                            );
-                            continue;
-                        }
+                if output.is_err() {
+                    warn!(
+                        "Failed to expand dynamic structured metadata. value: {}, err: {}",
+                        value_s,
+                        output.err().unwrap()
+                    );
+                    continue;
+                }
 
-                        // key_* -> key_one, key_two, key_three
-                        // * -> one, two, three
-                        for (k, v) in output.unwrap() {
-                            let key = slugify_text(format!("{}{}", opening_prefix, k));
-                            let val = Value::from(v).to_string_lossy().into_owned();
-                            if val == "<null>" {
-                                warn!(
+                // key_* -> key_one, key_two, key_three
+                // * -> one, two, three
+                for (k, v) in output.unwrap() {
+                    let key = slugify_text(format!("{}{}", opening_prefix, k));
+                    let val = Value::from(v).to_string_lossy().into_owned();
+                    if val == "<null>" {
+                        warn!(
                             "Encountered \"null\" value for dynamic structured_metadata. key: {}",
                             key
                         );
-                                continue;
-                            }
-                            if let Some(prev) =
-                                dynamic_structured_metadata.insert(key.clone(), val.clone())
-                            {
-                                warn!(
-                                    "Encountered duplicated dynamic structured_metadata. \
-                                key: {}, value: {}, discarded value: {}",
-                                    key, val, prev
-                                );
-                            };
-                        }
-                    } else {
-                        static_structured_metadata.insert(key_s, value_s);
+                        continue;
                     }
-                }
-
-                for (k, v) in static_structured_metadata {
-                    if let Some(discarded_v) =
-                        dynamic_structured_metadata.insert(k.clone(), v.clone())
+                    if let Some(prev) = dynamic_structured_metadata.insert(key.clone(), val.clone())
                     {
                         warn!(
-                            "Static label overrides dynamic label. \
-                key: {}, value: {}, discarded value: {}",
-                            k, v, discarded_v
+                            "Encountered duplicated dynamic structured_metadata. \
+                        key: {}, value: {}, discarded value: {}",
+                            key, val, prev
                         );
                     };
                 }
-
-                Vec::from_iter(dynamic_structured_metadata)
+            } else {
+                static_structured_metadata.insert(key_s, value_s);
             }
         }
+
+        for (k, v) in static_structured_metadata {
+            if let Some(discarded_v) = dynamic_structured_metadata.insert(k.clone(), v.clone()) {
+                warn!(
+                    "Static label overrides dynamic label. \
+        key: {}, value: {}, discarded value: {}",
+                    k, v, discarded_v
+                );
+            };
+        }
+
+        Vec::from_iter(dynamic_structured_metadata)
     }
 
     fn remove_structured_metadata_fields(&self, event: &mut Event) {
-        match self.structured_metadata {
-            None => {}
-            Some(structured_metadata) => {
-                if self.remove_structured_metadata_fields {
-                    for template in structured_metadata.values() {
-                        if let Some(fields) = template.get_fields() {
-                            for field in fields {
-                                if let Ok(path) = parse_target_path(field.as_str()) {
-                                    event.as_mut_log().remove(&path);
-                                }
-                            }
+        if self.remove_structured_metadata_fields {
+            for template in self.structured_metadata.values() {
+                if let Some(fields) = template.get_fields() {
+                    for field in fields {
+                        if let Ok(path) = parse_target_path(field.as_str()) {
+                            event.as_mut_log().remove(&path);
                         }
                     }
                 }
