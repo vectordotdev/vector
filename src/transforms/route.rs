@@ -402,7 +402,7 @@ mod test {
             output_names
                 .iter()
                 .map(|output_name| {
-                    TransformOutput::new(DataType::all(), HashMap::new())
+                    TransformOutput::new(DataType::all_bits(), HashMap::new())
                         .with_port(output_name.to_owned())
                 })
                 .collect(),
