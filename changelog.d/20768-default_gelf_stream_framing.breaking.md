@@ -1,4 +1,4 @@
-Now the GELF codec with stream-based sources uses null byte (`\0`) as a messages delimiter by default instead of newline (`\n`) character.
+Now the GELF codec with stream-based sources uses null byte (`\0`) by default as messages delimiter instead of newline (`\n`) character.
 
 ### Configuration changes
 
