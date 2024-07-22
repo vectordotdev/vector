@@ -18,11 +18,12 @@ impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "decoder_frame",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -42,11 +43,12 @@ impl<'a> InternalEvent for DecoderDeserializeError<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "decoder_deserialize",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -67,11 +69,12 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "encoder_frame",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
@@ -93,11 +96,12 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "encoder_serialize",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
@@ -119,10 +123,11 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
         if self.count > 0 {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: self.count,

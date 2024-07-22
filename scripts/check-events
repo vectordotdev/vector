@@ -80,7 +80,7 @@ class Event
 
   # Scan for counter names and tags
   def scan_metrics(block)
-    block.scan(/ (counter|gauge|histogram)!\((?:\n\s+)?"([^"]+)",(.+?)\)[;\n]/ms) \
+    block.scan(/ (counter|gauge|histogram)!\((?:\n\s+)?"([^"]+)",?(.+?)\)[;\n]/ms) \
     do |type, name, tags|
       tags = Hash[tags.scan(/"([^"]+)" => (.+?)(?:,|$)/)]
       add_metric(type, name, tags)
@@ -94,7 +94,7 @@ class Event
     handle_fields.scan(/^ *([a-z0-9_]+): *(.+?) *= *(.+?),$/m) do |name, type, assignment|
       self.scan_component_dropped_events(assignment)
       # This is a _slightly_ different regex than the above, couldn't figure a way to unify them
-      assignment.match(/register_(counter|gauge|histogram)!\((?:\n\s+)?"([^"]+)"(,.+)?\)/ms) \
+      assignment.match(/ (counter|gauge|histogram)!\((?:\n\s+)?"([^"]+)"(,.+)?\)/ms) \
       do
         |type, name, tags|
         tags = tags || ''
