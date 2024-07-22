@@ -16,3 +16,5 @@ sinks:
     encoding:
       codec: json
 ```
+
+authors: whatcouldbepizza
