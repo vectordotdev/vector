@@ -59,18 +59,15 @@ impl Default for StaticMetricsConfig {
 /// Tag configuration for the `internal_metrics` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(deny_unknown_fields, default)]
+#[serde(deny_unknown_fields)]
 pub struct StaticMetricConfig {
     /// Name of the static metric
     pub name: String,
 
     /// "Observed" value of the static metric
-    #[configurable(derived)]
-    #[serde(default = "default_metric_value")]
     pub value: MetricValue,
 
     /// Kind of the static metric - either absolute or incremental
-    #[configurable(derived)]
     #[serde(default = "default_metric_kind")]
     pub kind: MetricKind,
 
@@ -79,17 +76,6 @@ pub struct StaticMetricConfig {
         docs::additional_props_description = "An individual tag - value pair."
     ))]
     pub tags: BTreeMap<String, String>,
-}
-
-impl Default for StaticMetricConfig {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            value: default_metric_value(),
-            kind: default_metric_kind(),
-            tags: Default::default(),
-        }
-    }
 }
 
 fn default_interval() -> Duration {
@@ -102,10 +88,6 @@ fn default_namespace() -> String {
 
 fn default_metrics() -> Vec<StaticMetricConfig> {
     Vec::default()
-}
-
-const fn default_metric_value() -> MetricValue {
-    MetricValue::Gauge { value: 0.0 }
 }
 
 const fn default_metric_kind() -> MetricKind {
@@ -242,6 +224,15 @@ mod tests {
             .await
     }
 
+    fn default_metric() -> StaticMetricConfig {
+        StaticMetricConfig {
+            name: "".to_string(),
+            value: MetricValue::Gauge { value: 0.0 },
+            kind: MetricKind::Absolute,
+            tags: BTreeMap::default(),
+        }
+    }
+
     #[tokio::test]
     async fn default_empty() {
         let events = events_from_config(StaticMetricsConfig::default()).await;
@@ -252,7 +243,7 @@ mod tests {
     #[tokio::test]
     async fn default_namespace() {
         let mut events = events_from_config(StaticMetricsConfig {
-            metrics: vec![StaticMetricConfig::default()],
+            metrics: vec![default_metric()],
             ..Default::default()
         })
         .await;
@@ -265,7 +256,7 @@ mod tests {
     #[tokio::test]
     async fn default_namespace_multiple_events() {
         let mut events = events_from_config(StaticMetricsConfig {
-            metrics: vec![StaticMetricConfig::default(), StaticMetricConfig::default()],
+            metrics: vec![default_metric(), default_metric()],
             ..Default::default()
         })
         .await;
@@ -283,7 +274,7 @@ mod tests {
 
         let config = StaticMetricsConfig {
             namespace: namespace.to_owned(),
-            metrics: vec![StaticMetricConfig::default()],
+            metrics: vec![default_metric()],
             ..StaticMetricsConfig::default()
         };
 
