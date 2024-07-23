@@ -109,7 +109,7 @@ base: components: sources: amqp: configuration: {
 															[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 															"""
 						influxdb: """
-															Decodes the raw bytes as a [Influxdb Line Protocol][influxdb] message.
+															Decodes the raw bytes as an [Influxdb Line Protocol][influxdb] message.
 
 															[influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
 															"""
