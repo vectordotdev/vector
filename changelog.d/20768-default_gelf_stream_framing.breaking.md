@@ -8,24 +8,30 @@ In order to maintain the previous behavior, you must set the `framing.method` op
 
 #### Previous
 
-```toml
-[sources.my_source_id]
-type = "socket"
-address = "0.0.0.0:9000"
-mode = "tcp"
-decoding.codec = "gelf"
+```yaml
+sources:
+  my_source_id:
+    type: "socket"
+    address: "0.0.0.0:9000"
+    mode: "tcp"
+    decoding:
+      codec: "gelf"
 ```
 
 #### Current
 
-```toml
-[sources.my_source_id]
-type = "socket"
-address = "0.0.0.0:9000"
-mode = "tcp"
-decoding.codec = "gelf"
-framing.method = "character_delimited"
-framing.character_delimited.delimiter = "\n"
+```yaml
+sources:
+  my_source_id:
+    type: "socket"
+    address: "0.0.0.0:9000"
+    mode: "tcp"
+    decoding:
+      codec: "gelf"
+    framing:
+    method: "character_delimited"
+    character_delimited:
+      delimiter: "\n"
 ```
 
 authors: jorgehermo9
