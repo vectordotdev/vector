@@ -190,4 +190,11 @@ impl NatsPublisher {
             }
         }
     }
+
+    pub(super) async fn flush(&self) -> Result<(), ()> {
+        if let NatsPublisher::Core(client) = self {
+            return client.flush().map_err(|_| ()).await;
+        }
+        Ok(())
+    }
 }

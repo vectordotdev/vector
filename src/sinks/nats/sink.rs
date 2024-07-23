@@ -74,7 +74,7 @@ impl NatsSink {
                 publisher: Arc::clone(&self.publisher),
             });
 
-        input
+        let result = input
             .filter_map(|event| std::future::ready(self.make_nats_event(event)))
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
@@ -89,7 +89,10 @@ impl NatsSink {
             .into_driver(service)
             .protocol("nats")
             .run()
-            .await
+            .await;
+
+        self.publisher.flush().await?;
+        return result;
     }
 }
 
