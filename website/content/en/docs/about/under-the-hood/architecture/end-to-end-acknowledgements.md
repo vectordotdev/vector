@@ -18,8 +18,8 @@ whether an event was successfully processed or not.
 
 Additionally, Vector ensures that the batch notifier for an event is always updated, whether or not
 the event made it to a sink. This ensures that if an event is intentionally dropped (for example, by
-using a [`filter`][filter] transform) or even unintentionally dropped (maybe Vector had a bug, uh
-oh!), we still update the batch notifier to indicate the processing status of the event.
+using a [`filter`][filter_transform] transform) or even unintentionally dropped (maybe Vector had
+a bug, uh oh!), we still update the batch notifier to indicate the processing status of the event.
 
 Meanwhile, the source will hold on to the other half of the batch notifiers that it has created, and
 is notified when a batch notifier is updated. Once notified, a source will propagate that batch
