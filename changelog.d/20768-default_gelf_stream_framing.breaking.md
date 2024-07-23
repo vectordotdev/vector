@@ -29,7 +29,7 @@ sources:
     decoding:
       codec: "gelf"
     framing:
-    method: "character_delimited"
+      method: "character_delimited"
     character_delimited:
       delimiter: "\n"
 ```
