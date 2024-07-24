@@ -2094,8 +2094,8 @@ dependencies = [
  "memchr",
  "once_cell",
  "ordered-float 4.2.1",
- "prost 0.12.6",
- "prost-reflect",
+ "prost 0.13.1",
+ "prost-reflect 0.14.0",
  "regex",
  "rstest",
  "serde",
@@ -5136,9 +5136,9 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.6.0",
  "chrono",
- "prost 0.12.6",
- "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost 0.13.1",
+ "prost-build 0.13.1",
+ "prost-types 0.13.1",
  "snap",
 ]
 
@@ -6181,8 +6181,8 @@ dependencies = [
  "chrono",
  "hex",
  "ordered-float 4.2.1",
- "prost 0.12.6",
- "prost-build 0.12.6",
+ "prost 0.13.1",
+ "prost-build 0.13.1",
  "tonic 0.10.2",
  "tonic-build 0.10.2",
  "vector-core",
@@ -6897,9 +6897,9 @@ dependencies = [
  "indexmap 2.2.6",
  "nom",
  "num_enum 0.7.2",
- "prost 0.12.6",
- "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost 0.13.1",
+ "prost-build 0.13.1",
+ "prost-types 0.13.1",
  "snafu 0.7.5",
  "vector-common",
 ]
@@ -6956,6 +6956,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e13db3d3fde688c61e2446b4d843bc27a7e8af269a69440c0308021dc92333cc"
+dependencies = [
+ "bytes 1.6.0",
+ "prost-derive 0.13.1",
+]
+
+[[package]]
 name = "prost-build"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6999,6 +7009,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-build"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5bb182580f71dd070f88d01ce3de9f4da5021db7115d2e1c3605a754153b77c1"
+dependencies = [
+ "bytes 1.6.0",
+ "heck 0.5.0",
+ "itertools 0.13.0",
+ "log",
+ "multimap",
+ "once_cell",
+ "petgraph",
+ "prettyplease 0.2.15",
+ "prost 0.13.1",
+ "prost-types 0.13.1",
+ "regex",
+ "syn 2.0.70",
+ "tempfile",
+]
+
+[[package]]
 name = "prost-derive"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7025,15 +7056,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-derive"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18bec9b0adc4eba778b33684b7ba3e7137789434769ee3ce3930463ef904cfca"
+dependencies = [
+ "anyhow",
+ "itertools 0.13.0",
+ "proc-macro2 1.0.86",
+ "quote 1.0.36",
+ "syn 2.0.70",
+]
+
+[[package]]
 name = "prost-reflect"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f5eec97d5d34bdd17ad2db2219aabf46b054c6c41bd5529767c9ce55be5898f"
 dependencies = [
- "base64 0.22.1",
  "once_cell",
  "prost 0.12.6",
  "prost-types 0.12.6",
+]
+
+[[package]]
+name = "prost-reflect"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55a6a9143ae25c25fa7b6a48d6cc08b10785372060009c25140a4e7c340e95af"
+dependencies = [
+ "base64 0.22.1",
+ "once_cell",
+ "prost 0.13.1",
+ "prost-types 0.13.1",
  "serde",
  "serde-value",
 ]
@@ -7054,6 +7109,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9091c90b0a32608e984ff2fa4091273cbdd755d54935c51d520887f4a1dbd5b0"
 dependencies = [
  "prost 0.12.6",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cee5168b05f49d4b0ca581206eb14a7b22fafd963efe729ac48eb03266e25cc2"
+dependencies = [
+ "prost 0.13.1",
 ]
 
 [[package]]
@@ -10301,10 +10365,10 @@ dependencies = [
  "postgres-openssl",
  "proptest",
  "proptest-derive",
- "prost 0.12.6",
- "prost-build 0.12.6",
- "prost-reflect",
- "prost-types 0.12.6",
+ "prost 0.13.1",
+ "prost-build 0.13.1",
+ "prost-reflect 0.14.0",
+ "prost-types 0.13.1",
  "pulsar",
  "quickcheck",
  "rand 0.8.5",
@@ -10564,9 +10628,9 @@ dependencies = [
  "parking_lot",
  "pin-project",
  "proptest",
- "prost 0.12.6",
- "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost 0.13.1",
+ "prost-build 0.13.1",
+ "prost-types 0.13.1",
  "quanta",
  "quickcheck",
  "quickcheck_macros",
@@ -10799,7 +10863,7 @@ dependencies = [
  "prettydiff",
  "prettytable-rs",
  "prost 0.12.6",
- "prost-reflect",
+ "prost-reflect 0.13.1",
  "psl",
  "psl-types",
  "publicsuffix",
