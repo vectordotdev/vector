@@ -383,6 +383,17 @@ base: components: sinks: nats: configuration: {
 			}
 		}
 	}
+	jetstream: {
+		description: """
+			Send messages using [Jetstream][jetstream].
+
+			If set, the `subject` must belong to an existing JetStream stream.
+
+			[jetstream]: https://docs.nats.io/nats-concepts/jetstream
+			"""
+		required: false
+		type: bool: default: false
+	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.
