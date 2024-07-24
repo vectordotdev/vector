@@ -6183,8 +6183,8 @@ dependencies = [
  "ordered-float 4.2.1",
  "prost 0.13.1",
  "prost-build 0.13.1",
- "tonic 0.10.2",
- "tonic-build 0.10.2",
+ "tonic 0.11.0",
+ "tonic-build 0.12.1",
  "vector-core",
  "vector-lookup",
  "vrl",
@@ -9543,7 +9543,6 @@ dependencies = [
  "axum",
  "base64 0.21.7",
  "bytes 1.6.0",
- "flate2",
  "h2 0.3.26",
  "http 0.2.9",
  "http-body 0.4.5",
@@ -9575,6 +9574,7 @@ dependencies = [
  "axum",
  "base64 0.21.7",
  "bytes 1.6.0",
+ "flate2",
  "h2 0.3.26",
  "http 0.2.9",
  "http-body 0.4.5",
@@ -9583,7 +9583,11 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost 0.12.6",
+ "rustls-native-certs 0.7.0",
+ "rustls-pemfile 2.1.0",
+ "rustls-pki-types",
  "tokio",
+ "tokio-rustls 0.25.0",
  "tokio-stream",
  "tower",
  "tower-layer",
@@ -9613,6 +9617,19 @@ dependencies = [
  "prettyplease 0.2.15",
  "proc-macro2 1.0.86",
  "prost-build 0.12.6",
+ "quote 1.0.36",
+ "syn 2.0.70",
+]
+
+[[package]]
+name = "tonic-build"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "568392c5a2bd0020723e3f387891176aabafe36fd9fcd074ad309dfa0c8eb964"
+dependencies = [
+ "prettyplease 0.2.15",
+ "proc-macro2 1.0.86",
+ "prost-build 0.13.1",
  "quote 1.0.36",
  "syn 2.0.70",
 ]
@@ -10411,8 +10428,8 @@ dependencies = [
  "tokio-tungstenite 0.20.1",
  "tokio-util",
  "toml",
- "tonic 0.10.2",
- "tonic-build 0.10.2",
+ "tonic 0.11.0",
+ "tonic-build 0.12.1",
  "tower",
  "tower-http",
  "tower-test",
@@ -10654,7 +10671,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml",
- "tonic 0.10.2",
+ "tonic 0.11.0",
  "tracing 0.1.40",
  "tracing-core 0.1.32",
  "tracing-subscriber",
