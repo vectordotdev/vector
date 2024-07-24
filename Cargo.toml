@@ -342,7 +342,7 @@ tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["
 tokio-postgres = { version = "0.7.11", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["connect"], optional = true}
 toml.workspace = true
-tonic = { version = "0.10", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tonic = { version = "0.11", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.16", default-features = false }
 url = { version = "2.5.2", default-features = false, features = ["serde"] }
@@ -366,7 +366,7 @@ nix = { version = "0.26.2", default-features = false, features = ["socket", "sig
 
 [build-dependencies]
 prost-build = { version = "0.12", default-features = false, optional = true }
-tonic-build = { version = "0.10", default-features = false, features = ["transport", "prost"], optional = true }
+tonic-build = { version = "0.12", default-features = false, features = ["transport", "prost"], optional = true }
 # update 'openssl_version' in website/config.toml whenever <major.minor> version changes
 openssl-src = { version = "300", default-features = false, features = ["force-engine", "legacy"] }
 
