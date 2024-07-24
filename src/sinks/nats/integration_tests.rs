@@ -78,6 +78,7 @@ async fn nats_no_auth() {
         tls: None,
         auth: None,
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -110,6 +111,7 @@ async fn nats_userpass_auth_valid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     publish_and_check(conf)
@@ -139,6 +141,7 @@ async fn nats_userpass_auth_invalid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -170,6 +173,7 @@ async fn nats_token_auth_valid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -201,6 +205,7 @@ async fn nats_token_auth_invalid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -233,6 +238,7 @@ async fn nats_nkey_auth_valid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -265,6 +271,7 @@ async fn nats_nkey_auth_invalid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -298,6 +305,7 @@ async fn nats_tls_valid() {
         }),
         auth: None,
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -325,6 +333,7 @@ async fn nats_tls_invalid() {
         tls: None,
         auth: None,
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -360,6 +369,7 @@ async fn nats_tls_client_cert_valid() {
         }),
         auth: None,
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -393,6 +403,7 @@ async fn nats_tls_client_cert_invalid() {
         }),
         auth: None,
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -430,6 +441,7 @@ async fn nats_tls_jwt_auth_valid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -467,6 +479,7 @@ async fn nats_tls_jwt_auth_invalid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
