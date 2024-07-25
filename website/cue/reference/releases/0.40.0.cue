@@ -17,7 +17,7 @@ releases: "0.40.0": {
 
 	changelog: [
 		{
-			type: "breaking"
+			type: "enhancement"
 			description: """
 				VRL was updated to v0.17.0. This includes the following changes:
 
