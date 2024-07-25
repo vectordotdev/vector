@@ -312,7 +312,6 @@ mod test {
         assert_eq!(expected.len(), output.len());
         for (source, received) in expected.iter().zip(output) {
             let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
-            println!("VERSION {:?}", json);
             let received = json.get("metric").unwrap();
             let received_name = received.get("name").unwrap().as_str().unwrap();
             assert_eq!(source.as_metric().name(), received_name);
