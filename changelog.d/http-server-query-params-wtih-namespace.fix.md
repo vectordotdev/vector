@@ -1,0 +1,1 @@
+http_server source now properly writes all of the specified query parameters to `%http_server.query_parameters`
