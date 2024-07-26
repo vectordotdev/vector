@@ -289,7 +289,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Unix(UnixMode {
                 config: UnixSinkConfig::new(out_path),
-                encoding: (None::<FramingConfig>, NativeJsonSerializerConfig::default()).into(),
+                encoding: (None::<FramingConfig>, NativeJsonSerializerConfig).into(),
             }),
             acknowledgements: Default::default(),
         };
