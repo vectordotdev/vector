@@ -7,7 +7,7 @@
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
 use maxminddb::{
-    geoip2::{City, ConnectionType, Isp, AnonymousIp},
+    geoip2::{AnonymousIp, City, ConnectionType, Isp},
     MaxMindDBError, Reader,
 };
 use ordered_float::NotNan;
@@ -230,14 +230,13 @@ impl Geoip {
             }
             DatabaseKind::AnonymousIp => {
                 let data = self.dbreader.lookup::<AnonymousIp>(ip).ok()?;
-    
+
                 add_field!("is_anonymous", data.is_anonymous);
                 add_field!("is_anonymous_vpn", data.is_anonymous_vpn);
                 add_field!("is_hosting_provider", data.is_hosting_provider);
                 add_field!("is_public_proxy", data.is_public_proxy);
                 add_field!("is_residential_proxy", data.is_residential_proxy);
                 add_field!("is_tor_exit_node", data.is_tor_exit_node);
-
             }
         }
 
