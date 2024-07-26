@@ -31,15 +31,20 @@ pub fn add_query_parameters(
 
 #[cfg(test)]
 mod tests {
-    use vrl::{path, value};
-    use vector_lib::config::LogNamespace;
     use crate::event::LogEvent;
     use crate::sources::util::add_query_parameters;
+    use vector_lib::config::LogNamespace;
+    use vrl::{path, value};
 
     #[test]
     fn multiple_query_params() {
         let query_params_names = ["param1".into(), "param2".into()];
-        let query_params = [("param1".into(), "value1".into()), ("param2".into(), "value2".into()), ("param3".into(), "value3".into())].into();
+        let query_params = [
+            ("param1".into(), "value1".into()),
+            ("param2".into(), "value2".into()),
+            ("param3".into(), "value3".into()),
+        ]
+        .into();
 
         let mut base_log = [LogEvent::from(value!({})).into()];
         add_query_parameters(
@@ -47,7 +52,7 @@ mod tests {
             &query_params_names,
             &query_params,
             LogNamespace::Legacy,
-            "test"
+            "test",
         );
         let mut namespaced_log = [LogEvent::from(value!({})).into()];
         add_query_parameters(
@@ -55,12 +60,16 @@ mod tests {
             &query_params_names,
             &query_params,
             LogNamespace::Vector,
-            "test"
+            "test",
         );
 
         assert_eq!(
             base_log[0].as_log().value(),
-            namespaced_log[0].metadata().value().get(path!("test", "query_parameters")).unwrap()
+            namespaced_log[0]
+                .metadata()
+                .value()
+                .get(path!("test", "query_parameters"))
+                .unwrap()
         );
     }
 }
