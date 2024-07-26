@@ -25,7 +25,7 @@ pub fn data_dir() -> &'static Path {
 pub fn default_target() -> String {
     if cfg!(windows) {
         format!("{ARCH}-pc-windows-msvc")
-    } else if cfg!(macos) {
+    } else if cfg!(target_os = "macos") {
         format!("{ARCH}-apple-darwin")
     } else {
         format!("{ARCH}-unknown-linux-gnu")

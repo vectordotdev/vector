@@ -6,7 +6,7 @@
 //! 2. A GraphQL subscription client, for long-lived, multiplexed subscriptions over WebSockets
 //! 3. GraphQL queries/mutations/subscriptions, defined in `graphql/**/*.graphql` files
 //! 4. Extension methods for each client, for executing queries/subscriptions, and returning
-//! deserialized JSON responses
+//!    deserialized JSON responses
 //!
 
 #![deny(warnings)]

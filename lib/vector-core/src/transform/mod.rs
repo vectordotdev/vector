@@ -114,7 +114,7 @@ dyn_clone::clone_trait_object!(FunctionTransform);
 /// # Invariants
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a
-/// `TaskTransform` or vice versa.
+///   `TaskTransform` or vice versa.
 pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
     fn transform(
         self: Box<Self>,

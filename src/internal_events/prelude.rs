@@ -2,7 +2,6 @@
     feature = "sources-apache_metrics",
     feature = "sources-aws_ecs_metrics",
     feature = "sources-aws_kinesis_firehose",
-    feature = "sources-http-client",
     feature = "sources-utils-http",
 ))]
 pub(crate) fn http_error_code(code: u16) -> String {

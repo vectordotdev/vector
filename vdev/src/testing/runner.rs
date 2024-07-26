@@ -294,7 +294,7 @@ where
             };
         }
 
-        command.arg(&self.container_name());
+        command.arg(self.container_name());
         command.args(TEST_COMMAND);
         command.args(args);
 

@@ -565,7 +565,7 @@ async fn handle_stream(
     frame_handler.insert_tls_client_metadata(certificate_metadata);
 
     let span = info_span!("connection");
-    span.record("peer_addr", &field::debug(&peer_addr));
+    span.record("peer_addr", field::debug(&peer_addr));
     let received_from: Option<Bytes> = Some(peer_addr.to_string().into());
     let active_parsing_task_nums = Arc::new(AtomicU32::new(0));
 
@@ -688,7 +688,7 @@ pub fn build_framestream_unix_source(
             let span = info_span!("connection");
             let path = if let Some(addr) = peer_addr {
                 if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
-                    span.record("peer_path", &field::debug(&path));
+                    span.record("peer_path", field::debug(&path));
                     Some(path)
                 } else {
                     None

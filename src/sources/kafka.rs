@@ -1202,21 +1202,21 @@ fn create_consumer(
         .set("auto.offset.reset", &config.auto_offset_reset)
         .set(
             "session.timeout.ms",
-            &config.session_timeout_ms.as_millis().to_string(),
+            config.session_timeout_ms.as_millis().to_string(),
         )
         .set(
             "socket.timeout.ms",
-            &config.socket_timeout_ms.as_millis().to_string(),
+            config.socket_timeout_ms.as_millis().to_string(),
         )
         .set(
             "fetch.wait.max.ms",
-            &config.fetch_wait_max_ms.as_millis().to_string(),
+            config.fetch_wait_max_ms.as_millis().to_string(),
         )
         .set("enable.partition.eof", "false")
         .set("enable.auto.commit", "true")
         .set(
             "auto.commit.interval.ms",
-            &config.commit_interval_ms.as_millis().to_string(),
+            config.commit_interval_ms.as_millis().to_string(),
         )
         .set("enable.auto.offset.store", "false")
         .set("statistics.interval.ms", "1000")

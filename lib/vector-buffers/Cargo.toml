@@ -5,6 +5,9 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
+
 [dependencies]
 async-recursion = "1.1.1"
 async-stream = "0.3.5"

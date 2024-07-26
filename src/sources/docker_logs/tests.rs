@@ -25,6 +25,18 @@ fn exclude_self() {
 
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
+    use bollard::{
+        container::{
+            Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
+            RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
+        },
+        image::{CreateImageOptions, ListImagesOptions},
+    };
+    use futures::{stream::TryStreamExt, FutureExt};
+    use itertools::Itertools as _;
+    use similar_asserts::assert_eq;
+    use vrl::value;
+
     use crate::sources::docker_logs::*;
     use crate::sources::docker_logs::{CONTAINER, CREATED_AT, IMAGE, NAME};
     use crate::{
@@ -36,16 +48,6 @@ mod integration_tests {
         },
         SourceSender,
     };
-    use bollard::{
-        container::{
-            Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
-            RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
-        },
-        image::{CreateImageOptions, ListImagesOptions},
-    };
-    use futures::{stream::TryStreamExt, FutureExt};
-    use similar_asserts::assert_eq;
-    use vrl::value;
 
     /// None if docker is not present on the system
     async fn source_with<'a, L: Into<Option<&'a str>>>(
@@ -869,7 +871,6 @@ mod integration_tests {
             let command = emitted_messages
                 .into_iter()
                 .map(|message| format!("echo {:?}", message))
-                .collect::<Box<_>>()
                 .join(" && ");
 
             let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
@@ -940,7 +941,6 @@ mod integration_tests {
             let command = emitted_messages
                 .into_iter()
                 .map(|message| format!("echo {:?}", message))
-                .collect::<Box<_>>()
                 .join(" && ");
 
             let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;

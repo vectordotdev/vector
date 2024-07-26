@@ -50,6 +50,9 @@ debug = false # Do not include debug symbols in the executable.
 [profile.bench]
 debug = true
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
+
 [package.metadata.deb]
 name = "vector"
 section = "admin"
