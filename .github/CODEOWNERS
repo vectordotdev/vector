@@ -1,3 +1,5 @@
+* @vectordotdev/vector
+
 docs/ @vectordotdev/ux-team
 lib/dnsmsg-parser/ @vectordotdev/vector
 lib/file-source/ @vectordotdev/vector
