@@ -130,6 +130,7 @@ impl Geoip {
             DatabaseKind::Asn | DatabaseKind::Isp => dbreader.lookup::<Isp>(ip).map(|_| ()),
             DatabaseKind::ConnectionType => dbreader.lookup::<ConnectionType>(ip).map(|_| ()),
             DatabaseKind::City => dbreader.lookup::<City>(ip).map(|_| ()),
+            DatabaseKind::AnonymousIp => dbreader.lookup::<AnonymousIp>(ip).map(|_| ()),
         };
 
         match result {
@@ -478,13 +479,13 @@ mod tests {
     fn anonymous_ip_lookup() {
         let values = find("101.99.92.179", "tests/data/GeoIP2-Anonymous-IP-Test.mmdb").unwrap();
 
-        let mut expected = BTreeMap::<String, Value>::new();
-        expected.insert("is_anonymous".to_string(), true.into());
-        expected.insert("is_anonymous_vpn".to_string(), true.into());
-        expected.insert("is_hosting_provider".to_string(), true.into());
-        expected.insert("is_tor_exit_node".to_string(), true.into());
-        expected.insert("is_public_proxy".to_string(), Value::Null);
-        expected.insert("is_residential_proxy".to_string(), Value::Null);
+        let mut expected = ObjectMap::new();
+        expected.insert("is_anonymous".into(), true.into());
+        expected.insert("is_anonymous_vpn".into(), true.into());
+        expected.insert("is_hosting_provider".into(), true.into());
+        expected.insert("is_tor_exit_node".into(), true.into());
+        expected.insert("is_public_proxy".into(), Value::Null);
+        expected.insert("is_residential_proxy".into(), Value::Null);
 
         assert_eq!(values, expected);
     }
