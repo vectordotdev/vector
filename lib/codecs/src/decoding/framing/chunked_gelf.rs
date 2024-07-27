@@ -205,7 +205,7 @@ impl ChunkedGelfDecoder {
             return Ok(None);
         }
 
-        let mut state_lock = self.state.lock().unwrap();
+        let mut state_lock = self.state.lock().expect("poisoned lock");
 
         if state_lock.len() >= self.pending_messages_limit {
             warn!(
