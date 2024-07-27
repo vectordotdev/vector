@@ -20,11 +20,12 @@ impl<'a> InternalEvent for DatadogMetricsEncodingError<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => self.error_code,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
 
         if self.dropped_events > 0 {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {

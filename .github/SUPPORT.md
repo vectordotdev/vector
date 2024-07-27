@@ -15,7 +15,7 @@ your question answered. Here are some tips:
 
 Check the [Vector documentation](https://vector.dev/docs/) first to see if it answers your question.
 If your question is about [VRL](https://vector.dev/docs/reference/vrl/#learn), you can also try out
-the [VRL playground](vrl_playground).
+the [VRL playground][vrl_playground].
 
 If the docs do not answer your question, try using the search feature on [Discord][discord] or
 [GitHub][vector], to search for keywords related to your issue. It is quite possible someone has

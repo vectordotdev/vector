@@ -32,11 +32,12 @@ mod s3 {
                 internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_code" => "failed_processing_sqs_message",
                 "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::PROCESSING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -52,10 +53,7 @@ mod s3 {
                 .map(|x| x.id.as_str())
                 .collect::<Vec<_>>()
                 .join(", "));
-            counter!(
-                "sqs_message_delete_succeeded_total",
-                self.message_ids.len() as u64
-            );
+            counter!("sqs_message_delete_succeeded_total").increment(self.message_ids.len() as u64);
         }
     }
 
@@ -78,11 +76,12 @@ mod s3 {
                 internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_code" => "failed_deleting_some_sqs_messages",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -107,11 +106,12 @@ mod s3 {
                 internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_code" => "failed_deleting_all_sqs_messages",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
-            );
+            )
+            .increment(1);
         }
     }
 }
@@ -132,11 +132,12 @@ impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'a, E> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "failed_fetching_sqs_events",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -148,8 +149,8 @@ pub struct SqsMessageReceiveSucceeded {
 impl InternalEvent for SqsMessageReceiveSucceeded {
     fn emit(self) {
         trace!(message = "Received SQS messages.", count = %self.count);
-        counter!("sqs_message_receive_succeeded_total", 1);
-        counter!("sqs_message_received_messages_total", self.count as u64);
+        counter!("sqs_message_receive_succeeded_total").increment(1);
+        counter!("sqs_message_received_messages_total").increment(self.count as u64);
     }
 }
 
@@ -161,7 +162,7 @@ pub struct SqsMessageProcessingSucceeded<'a> {
 impl<'a> InternalEvent for SqsMessageProcessingSucceeded<'a> {
     fn emit(self) {
         trace!(message = "Processed SQS message successfully.", message_id = %self.message_id);
-        counter!("sqs_message_processing_succeeded_total", 1);
+        counter!("sqs_message_processing_succeeded_total").increment(1);
     }
 }
 
@@ -184,10 +185,11 @@ impl<'a, E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'a, E> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -205,6 +207,7 @@ impl<'a> InternalEvent for SqsS3EventRecordInvalidEventIgnored<'a> {
     fn emit(self) {
         warn!(message = "Ignored S3 record in SQS message for an event that was not ObjectCreated.",
             bucket = %self.bucket, key = %self.key, kind = %self.kind, name = %self.name);
-        counter!("sqs_s3_event_record_ignored_total", 1, "ignore_type" => "invalid_event_kind");
+        counter!("sqs_s3_event_record_ignored_total", "ignore_type" => "invalid_event_kind")
+            .increment(1);
     }
 }
