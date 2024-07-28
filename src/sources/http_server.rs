@@ -619,6 +619,7 @@ mod tests {
     #[allow(clippy::too_many_arguments)]
     async fn source<'a>(
         headers: Vec<String>,
+        custom_response_headers: HashMap<String, String>,
         query_parameters: Vec<String>,
         path_key: &'a str,
         host_key: &'a str,
@@ -759,6 +760,7 @@ mod tests {
 
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -805,6 +807,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -844,6 +847,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -877,6 +881,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -915,6 +920,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -960,6 +966,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1011,6 +1018,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1097,6 +1105,7 @@ mod tests {
                     "X-*".to_string(),
                     "AbsentHeader".to_string(),
                 ],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1141,6 +1150,7 @@ mod tests {
 
             let (rx, addr) = source(
                 vec!["*".to_string()],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1175,10 +1185,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_custom_response_headers() {
+        async fn send(address: SocketAddr, body: &str) -> reqwest::header::HeaderMap {
+            reqwest::Client::new()
+                .post(&format!("http://{}/", address))
+                .body(body.to_owned())
+                .send()
+                .await
+                .unwrap()
+                .headers()
+        } 
+
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let mut custom_headers: HashMap<char, usize> = HashMap::new();
+            custom_headers.insert("Access-Control-Allow-Origin", "example.com");
+
+            let (rx, addr) = source(
+                vec!["*".to_string()],
+                custom_headers,
+                vec![],
+                "http_path",
+                "remote_ip",
+                "/",
+                "POST",
+                StatusCode::OK,
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::default().into()),
+            )
+            .await;
+
+            spawn_collect_n(
+                async move {
+                    let response_headers = send(addr, "{\"key1\":\"value1\"}").await;
+                    assert!(response_headers.contains_key("Access-Control-Allow-Origin"));
+                    assert_eq!(response_headers["Access-Control-Allow-Origin"], "example.com");
+                },
+                rx,
+                1,
+            )
+            .await
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn http_query() {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![
                     "source".to_string(),
                     "region".to_string(),
@@ -1235,6 +1293,7 @@ mod tests {
 
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1266,6 +1325,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "vector_http_path",
                 "vector_remote_ip",
@@ -1307,6 +1367,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "vector_http_path",
                 "vector_remote_ip",
@@ -1368,6 +1429,7 @@ mod tests {
         components::init_test();
         let (_rx, addr) = source(
             vec![],
+            HashMap::new(),
             vec![],
             "vector_http_path",
             "vector_remote_ip",
@@ -1393,6 +1455,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1427,6 +1490,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1458,6 +1522,7 @@ mod tests {
         let events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1491,6 +1556,7 @@ mod tests {
         components::init_test();
         let (_rx, addr) = source(
             vec![],
+            HashMap::new(),
             vec![],
             "http_path",
             "remote_ip",
