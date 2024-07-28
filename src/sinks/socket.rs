@@ -279,6 +279,7 @@ mod test {
         }
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn metrics_socket() {
         trace_init();
