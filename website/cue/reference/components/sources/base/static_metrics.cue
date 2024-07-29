@@ -17,13 +17,10 @@ base: components: sources: static_metrics: configuration: {
 			items: type: object: options: {
 				kind: {
 					description: "Kind of the static metric - either absolute or incremental"
-					required:    false
-					type: string: {
-						default: "absolute"
-						enum: {
-							absolute:    "Absolute metric."
-							incremental: "Incremental metric."
-						}
+					required:    true
+					type: string: enum: {
+						absolute:    "Absolute metric."
+						incremental: "Incremental metric."
 					}
 				}
 				name: {
@@ -272,6 +269,6 @@ base: components: sources: static_metrics: configuration: {
 	namespace: {
 		description: "Overrides the default namespace for the metrics emitted by the source."
 		required:    false
-		type: string: default: "vector"
+		type: string: default: "static"
 	}
 }
