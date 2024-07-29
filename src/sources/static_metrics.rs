@@ -83,7 +83,7 @@ fn default_interval() -> Duration {
 }
 
 fn default_namespace() -> String {
-    "vector".to_owned()
+    "static".to_owned()
 }
 
 fn default_metrics() -> Vec<StaticMetricConfig> {
@@ -107,7 +107,6 @@ impl SourceConfig for StaticMetricsConfig {
         }
         let interval = self.interval_secs;
 
-        // namespace for created metrics is already "vector" by default.
         let namespace = self.namespace.clone();
 
         let metrics = self.metrics.clone();
@@ -250,7 +249,7 @@ mod tests {
 
         assert!(!events.is_empty());
         let event = events.remove(0);
-        assert_eq!(event.as_metric().namespace(), Some("vector"));
+        assert_eq!(event.as_metric().namespace(), Some("static"));
     }
 
     #[tokio::test]
@@ -263,9 +262,9 @@ mod tests {
 
         assert!(!events.is_empty());
         let event = events.remove(0);
-        assert_eq!(event.as_metric().namespace(), Some("vector"));
+        assert_eq!(event.as_metric().namespace(), Some("static"));
         let event = events.remove(0);
-        assert_eq!(event.as_metric().namespace(), Some("vector"));
+        assert_eq!(event.as_metric().namespace(), Some("static"));
     }
 
     #[tokio::test]
