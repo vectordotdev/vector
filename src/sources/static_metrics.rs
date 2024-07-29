@@ -68,7 +68,6 @@ pub struct StaticMetricConfig {
     pub value: MetricValue,
 
     /// Kind of the static metric - either absolute or incremental
-    #[serde(default = "default_metric_kind")]
     pub kind: MetricKind,
 
     /// Key-value pairs representing tags and their values to add to the metric.
@@ -84,14 +83,6 @@ fn default_interval() -> Duration {
 
 fn default_namespace() -> String {
     "static".to_owned()
-}
-
-fn default_metrics() -> Vec<StaticMetricConfig> {
-    Vec::default()
-}
-
-const fn default_metric_kind() -> MetricKind {
-    MetricKind::Absolute
 }
 
 impl_generate_config_from_default!(StaticMetricsConfig);
