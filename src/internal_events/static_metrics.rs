@@ -14,8 +14,9 @@ impl InternalEvent for StaticMetricsBytesReceived {
             protocol = "static",
         );
         counter!(
-            "component_received_bytes_total", self.byte_size as u64,
+            "component_received_bytes_total",
             "protocol" => "static",
-        );
+        )
+        .increment(self.byte_size as u64);
     }
 }
