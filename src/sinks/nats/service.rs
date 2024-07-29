@@ -7,11 +7,11 @@ use futures_util::TryFutureExt;
 
 use crate::sinks::prelude::*;
 
-use super::{request_builder::NatsRequest, NatsError};
+use super::{config::NatsPublisher, request_builder::NatsRequest, NatsError};
 
 #[derive(Clone)]
 pub(super) struct NatsService {
-    pub(super) connection: Arc<async_nats::Client>,
+    pub(super) publisher: Arc<NatsPublisher>,
 }
 
 pub(super) struct NatsResponse {
@@ -44,13 +44,12 @@ impl Service<NatsRequest> for NatsService {
     }
 
     fn call(&mut self, req: NatsRequest) -> Self::Future {
-        let connection = Arc::clone(&self.connection);
+        let publisher = Arc::clone(&self.publisher);
 
         Box::pin(async move {
-            match connection
+            match publisher
                 .publish(req.subject, req.bytes)
                 .map_err(async_nats::Error::from)
-                .and_then(|_| connection.flush().map_err(Into::into))
                 .await
             {
                 Err(error) => Err(NatsError::ServerError { source: error }),

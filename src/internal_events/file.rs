@@ -30,7 +30,7 @@ pub struct FileOpen {
 
 impl InternalEvent for FileOpen {
     fn emit(self) {
-        gauge!("open_files", self.count as f64);
+        gauge!("open_files").set(self.count as f64);
     }
 }
 
@@ -51,16 +51,17 @@ impl InternalEvent for FileBytesSent<'_> {
         );
         if self.include_file_metric_tag {
             counter!(
-                "component_sent_bytes_total", self.byte_size as u64,
+                "component_sent_bytes_total",
                 "protocol" => "file",
                 "file" => self.file.clone().into_owned(),
-            );
+            )
         } else {
             counter!(
-                "component_sent_bytes_total", self.byte_size as u64,
+                "component_sent_bytes_total",
                 "protocol" => "file",
-            );
+            )
         }
+        .increment(self.byte_size as u64);
     }
 }
 
@@ -85,11 +86,12 @@ impl<'a, P: std::fmt::Debug> InternalEvent for FileIoError<'a, P> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => self.code,
             "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
 
         if self.dropped_events > 0 {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
@@ -131,16 +133,17 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_received_bytes_total", self.byte_size as u64,
+                    "component_received_bytes_total",
                     "protocol" => "file",
                     "file" => self.file.to_owned()
-                );
+                )
             } else {
                 counter!(
-                    "component_received_bytes_total", self.byte_size as u64,
+                    "component_received_bytes_total",
                     "protocol" => "file",
-                );
+                )
             }
+            .increment(self.byte_size as u64);
         }
     }
 
@@ -162,19 +165,19 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_received_events_total", self.count as u64,
+                    "component_received_events_total",
                     "file" => self.file.to_owned(),
-                );
-                counter!(
-                    "component_received_event_bytes_total", self.byte_size.get() as u64,
-                    "file" => self.file.to_owned(),
-                );
-            } else {
-                counter!("component_received_events_total", self.count as u64);
+                )
+                .increment(self.count as u64);
                 counter!(
                     "component_received_event_bytes_total",
-                    self.byte_size.get() as u64,
-                );
+                    "file" => self.file.to_owned(),
+                )
+                .increment(self.byte_size.get() as u64);
+            } else {
+                counter!("component_received_events_total").increment(self.count as u64);
+                counter!("component_received_event_bytes_total")
+                    .increment(self.byte_size.get() as u64);
             }
         }
     }
@@ -193,12 +196,13 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "checksum_errors_total", 1,
+                    "checksum_errors_total",
                     "file" => self.file.to_string_lossy().into_owned(),
-                );
+                )
             } else {
-                counter!("checksum_errors_total", 1);
+                counter!("checksum_errors_total")
             }
+            .increment(1);
         }
     }
 
@@ -222,20 +226,21 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total", 1,
+                    "component_errors_total",
                     "error_code" => "reading_fingerprint",
                     "error_type" => error_type::READER_FAILED,
                     "stage" => error_stage::RECEIVING,
                     "file" => self.file.to_string_lossy().into_owned(),
-                );
+                )
             } else {
                 counter!(
-                    "component_errors_total", 1,
+                    "component_errors_total",
                     "error_code" => "reading_fingerprint",
                     "error_type" => error_type::READER_FAILED,
                     "stage" => error_stage::RECEIVING,
-                );
+                )
             }
+            .increment(1);
         }
     }
 
@@ -261,20 +266,21 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total", 1,
+                    "component_errors_total",
                     "file" => self.file.to_string_lossy().into_owned(),
                     "error_code" => DELETION_FAILED,
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
-                );
+                )
             } else {
                 counter!(
-                    "component_errors_total", 1,
+                    "component_errors_total",
                     "error_code" => DELETION_FAILED,
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
-                );
+                )
             }
+            .increment(1);
         }
     }
 
@@ -292,12 +298,13 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_deleted_total", 1,
+                    "files_deleted_total",
                     "file" => self.file.to_string_lossy().into_owned(),
-                );
+                )
             } else {
-                counter!("files_deleted_total", 1);
+                counter!("files_deleted_total")
             }
+            .increment(1);
         }
     }
 
@@ -318,15 +325,17 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_unwatched_total", 1,
+                    "files_unwatched_total",
                     "file" => self.file.to_string_lossy().into_owned(),
                     "reached_eof" => reached_eof,
-                );
+                )
             } else {
-                counter!("files_unwatched_total", 1,
+                counter!(
+                    "files_unwatched_total",
                     "reached_eof" => reached_eof,
-                );
+                )
             }
+            .increment(1);
         }
     }
 
@@ -350,20 +359,21 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total", 1,
+                    "component_errors_total",
                     "error_code" => "watching",
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
                     "file" => self.file.to_string_lossy().into_owned(),
-                );
+                )
             } else {
                 counter!(
-                    "component_errors_total", 1,
+                    "component_errors_total",
                     "error_code" => "watching",
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
-                );
+                )
             }
+            .increment(1);
         }
     }
 
@@ -383,12 +393,13 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_resumed_total", 1,
+                    "files_resumed_total",
                     "file" => self.file.to_string_lossy().into_owned(),
-                );
+                )
             } else {
-                counter!("files_resumed_total", 1);
+                counter!("files_resumed_total")
             }
+            .increment(1);
         }
     }
 
@@ -406,12 +417,13 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_added_total", 1,
+                    "files_added_total",
                     "file" => self.file.to_string_lossy().into_owned(),
-                );
+                )
             } else {
-                counter!("files_added_total", 1);
+                counter!("files_added_total")
             }
+            .increment(1);
         }
     }
 
@@ -428,7 +440,7 @@ mod source {
                 count = %self.count,
                 duration_ms = self.duration.as_millis() as u64,
             );
-            counter!("checkpoints_total", self.count as u64);
+            counter!("checkpoints_total").increment(self.count as u64);
         }
     }
 
@@ -448,11 +460,12 @@ mod source {
                 internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_code" => "writing_checkpoints",
                 "error_type" => error_type::WRITER_FAILED,
                 "stage" => error_stage::RECEIVING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -474,11 +487,12 @@ mod source {
                 internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_code" => "globbing",
                 "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING,
-            );
+            )
+            .increment(1);
         }
     }
 

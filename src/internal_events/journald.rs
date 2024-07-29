@@ -20,10 +20,11 @@ impl InternalEvent for JournaldInvalidRecordError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -42,10 +43,11 @@ impl InternalEvent for JournaldStartJournalctlError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::COMMAND_FAILED,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -65,10 +67,10 @@ impl InternalEvent for JournaldReadError {
         );
         counter!(
             "component_errors_total",
-            1,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::READER_FAILED,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -89,10 +91,11 @@ impl InternalEvent for JournaldCheckpointSetError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::IO_FAILED,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -113,9 +116,10 @@ impl InternalEvent for JournaldCheckpointFileOpenError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::IO_FAILED,
-        );
+        )
+        .increment(1);
     }
 }

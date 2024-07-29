@@ -171,7 +171,7 @@ impl From<Protocol> for SharedString {
 ///     Event {
 ///         event_field: &'static str,
 ///     } => {
-///         handle_field: Counter = register_counter!("name", "tag" => self.event_field),
+///         handle_field: Counter = counter!("name", "tag" => self.event_field),
 ///     }
 ///     fn emit(&self, data: DataType) {
 ///         self.handle_field.increment(data.0);

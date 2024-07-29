@@ -18,11 +18,12 @@ impl InternalEvent for GcpPubsubConnectError {
         );
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "failed_connecting",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -42,11 +43,12 @@ impl InternalEvent for GcpPubsubStreamingPullError {
         );
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "failed_streaming_pull",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -66,10 +68,11 @@ impl InternalEvent for GcpPubsubReceiveError {
         );
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "failed_fetching_events",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }

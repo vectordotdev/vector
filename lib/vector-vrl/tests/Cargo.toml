@@ -22,7 +22,7 @@ serde_json.workspace = true
 tracing-subscriber = { version = "0.3.18", default-features = false, features = ["fmt"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = { version = "0.5.4" }
+tikv-jemallocator = { version = "0.6.0" }
 
 [features]
 default = []
