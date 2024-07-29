@@ -648,7 +648,7 @@ mod tests {
             SimpleHttpConfig {
                 address,
                 headers,
-                custom_response_headers: HashMap::new(),
+                custom_response_headers,
                 encoding: None,
                 query_parameters,
                 response_code,
@@ -1186,19 +1186,21 @@ mod tests {
 
     #[tokio::test]
     async fn http_custom_response_headers() {
-        async fn send(address: SocketAddr, body: &str) -> reqwest::header::HeaderMap {
+        async fn send(address: SocketAddr, body: &str) -> reqwest::Response {
             reqwest::Client::new()
                 .post(&format!("http://{}/", address))
                 .body(body.to_owned())
                 .send()
                 .await
                 .unwrap()
-                .headers()
-        } 
+        }
 
-        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-            let mut custom_headers: HashMap<char, usize> = HashMap::new();
-            custom_headers.insert("Access-Control-Allow-Origin", "example.com");
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let mut custom_headers: HashMap<String, String> = HashMap::new();
+            custom_headers.insert(
+                "Access-Control-Allow-Origin".to_string(),
+                "example.com".to_string(),
+            );
 
             let (rx, addr) = source(
                 vec!["*".to_string()],
@@ -1219,9 +1221,13 @@ mod tests {
 
             spawn_collect_n(
                 async move {
-                    let response_headers = send(addr, "{\"key1\":\"value1\"}").await;
+                    let response = send(addr, "{\"key1\":\"value1\"}").await;
+                    let response_headers = response.headers();
                     assert!(response_headers.contains_key("Access-Control-Allow-Origin"));
-                    assert_eq!(response_headers["Access-Control-Allow-Origin"], "example.com");
+                    assert_eq!(
+                        response_headers["Access-Control-Allow-Origin"],
+                        "example.com"
+                    );
                 },
                 rx,
                 1,
