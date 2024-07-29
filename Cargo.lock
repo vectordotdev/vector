@@ -3189,15 +3189,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "error-chain"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d2f06b9cac1506ece98fe3231e3cc9c4410ec3d5b1f24ae1c8946f0742cdefc"
-dependencies = [
- "version_check",
-]
-
-[[package]]
 name = "error-code"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8975,12 +8966,11 @@ checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
 
 [[package]]
 name = "syslog"
-version = "6.1.1"
+version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfc7e95b5b795122fafe6519e27629b5ab4232c73ebb2428f568e82b1a457ad3"
+checksum = "019f1500a13379b7d051455df397c75770de6311a7a188a699499502704d9f10"
 dependencies = [
- "error-chain",
- "hostname 0.3.1",
+ "hostname 0.4.0",
  "libc",
  "log",
  "time",
