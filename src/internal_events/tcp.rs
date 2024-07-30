@@ -44,12 +44,14 @@ impl InternalEvent for TcpSocketConnectionShutdown {
     }
 }
 
+#[cfg(all(unix, feature = "sources-dnstap"))]
 #[derive(Debug)]
 pub struct TcpSocketError<'a, E> {
     pub(crate) error: &'a E,
     pub peer_addr: SocketAddr,
 }
 
+#[cfg(all(unix, feature = "sources-dnstap"))]
 impl<E: std::fmt::Display> InternalEvent for TcpSocketError<'_, E> {
     fn emit(self) {
         error!(
