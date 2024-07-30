@@ -117,8 +117,6 @@ mod sematext_metrics;
 mod socket;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
-#[cfg(feature = "sources-static_metrics")]
-mod static_metrics;
 #[cfg(feature = "sinks-statsd")]
 mod statsd_sink;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
@@ -257,8 +255,6 @@ pub(crate) use self::sample::*;
 pub(crate) use self::sematext_metrics::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 pub(crate) use self::splunk_hec::*;
-#[cfg(feature = "sources-static_metrics")]
-pub(crate) use self::static_metrics::*;
 #[cfg(feature = "sinks-statsd")]
 pub(crate) use self::statsd_sink::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]

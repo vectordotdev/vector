@@ -8,7 +8,9 @@ use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
 use vector_lib::{config::LogNamespace, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
@@ -17,7 +19,7 @@ use crate::{
         metric::{MetricData, MetricName, MetricSeries, MetricTime, MetricValue},
         EventMetadata, Metric, MetricKind,
     },
-    internal_events::{EventsReceived, StaticMetricsBytesReceived, StreamClosedError},
+    internal_events::{EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -134,6 +136,7 @@ struct StaticMetrics {
 impl StaticMetrics {
     async fn run(mut self) -> Result<(), ()> {
         let events_received = register!(EventsReceived);
+        let bytes_received = register!(BytesReceived::from(Protocol::STATIC));
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
 
@@ -175,7 +178,7 @@ impl StaticMetrics {
             let byte_size = metrics.size_of();
             let json_size = metrics.estimated_json_encoded_size_of();
 
-            emit!(StaticMetricsBytesReceived { byte_size });
+            bytes_received.emit(ByteSize(byte_size));
             events_received.emit(CountByteSize(count, json_size));
 
             let batch = metrics
