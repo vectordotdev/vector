@@ -167,7 +167,7 @@ impl<'a> InternalMetrics<'a> {
             let byte_size = metrics.size_of();
             let json_size = metrics.estimated_json_encoded_size_of();
 
-            emit!(InternalMetricsBytesReceived { byte_size });
+            emit!(InternalMetricsBytesReceived::new_internal(byte_size));
             events_received.emit(CountByteSize(count, json_size));
 
             let batch = metrics.into_iter().map(|mut metric| {
