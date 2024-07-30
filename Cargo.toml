@@ -786,6 +786,7 @@ all-integration-tests = [
   "datadog-logs-integration-tests",
   "datadog-metrics-integration-tests",
   "datadog-traces-integration-tests",
+  "dnstap-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
@@ -809,7 +810,6 @@ all-integration-tests = [
   "pulsar-integration-tests",
   "redis-integration-tests",
   "splunk-integration-tests",
-  "dnstap-integration-tests",
   "webhdfs-integration-tests",
 ]
 
