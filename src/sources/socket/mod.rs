@@ -71,28 +71,12 @@ impl SocketConfig {
 
     fn log_namespace(&self, global_log_namespace: LogNamespace) -> LogNamespace {
         match &self.mode {
-            Mode::Tcp(config) => config
-                .log_namespace
-                .map(Into::into)
-                .unwrap_or(global_log_namespace)
-                .into(),
-            Mode::Udp(config) => config
-                .log_namespace
-                .map(Into::into)
-                .unwrap_or(global_log_namespace)
-                .into(),
+            Mode::Tcp(config) => global_log_namespace.merge(config.log_namespace),
+            Mode::Udp(config) => global_log_namespace.merge(config.log_namespace),
             #[cfg(unix)]
-            Mode::UnixDatagram(config) => config
-                .log_namespace
-                .map(Into::into)
-                .unwrap_or(global_log_namespace)
-                .into(),
+            Mode::UnixDatagram(config) => global_log_namespace.merge(config.log_namespace),
             #[cfg(unix)]
-            Mode::UnixStream(config) => config
-                .log_namespace
-                .map(Into::into)
-                .unwrap_or(global_log_namespace)
-                .into(),
+            Mode::UnixStream(config) => global_log_namespace.merge(config.log_namespace),
         }
     }
 }
