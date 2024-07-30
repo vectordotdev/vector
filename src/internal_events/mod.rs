@@ -70,10 +70,7 @@ mod http_client_source;
 mod influxdb;
 #[cfg(feature = "sources-internal_logs")]
 mod internal_logs;
-#[cfg(any(
-    feature = "sources-internal_metrics",
-    feature = "sources-static_metrics"
-))]
+#[cfg(feature = "sources-internal_metrics")]
 mod internal_metrics;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
@@ -120,6 +117,8 @@ mod sematext_metrics;
 mod socket;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
+#[cfg(feature = "sources-static_metrics")]
+mod static_metrics;
 #[cfg(feature = "sinks-statsd")]
 mod statsd_sink;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
@@ -212,10 +211,7 @@ pub(crate) use self::http_client_source::*;
 pub(crate) use self::influxdb::*;
 #[cfg(feature = "sources-internal_logs")]
 pub(crate) use self::internal_logs::*;
-#[cfg(any(
-    feature = "sources-internal_metrics",
-    feature = "sources-static_metrics"
-))]
+#[cfg(feature = "sources-internal_metrics")]
 pub(crate) use self::internal_metrics::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
@@ -261,6 +257,8 @@ pub(crate) use self::sample::*;
 pub(crate) use self::sematext_metrics::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 pub(crate) use self::splunk_hec::*;
+#[cfg(feature = "sources-static_metrics")]
+pub(crate) use self::static_metrics::*;
 #[cfg(feature = "sinks-statsd")]
 pub(crate) use self::statsd_sink::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]

@@ -17,7 +17,7 @@ use crate::{
         metric::{MetricData, MetricName, MetricSeries, MetricTime, MetricValue},
         EventMetadata, Metric, MetricKind,
     },
-    internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
+    internal_events::{EventsReceived, StaticMetricsBytesReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
 };
@@ -175,7 +175,7 @@ impl StaticMetrics {
             let byte_size = metrics.size_of();
             let json_size = metrics.estimated_json_encoded_size_of();
 
-            emit!(InternalMetricsBytesReceived::new_static(byte_size));
+            emit!(StaticMetricsBytesReceived { byte_size });
             events_received.emit(CountByteSize(count, json_size));
 
             let batch = metrics

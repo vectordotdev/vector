@@ -2,20 +2,20 @@ use metrics::counter;
 use vector_lib::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct InternalMetricsBytesReceived {
+pub struct StaticMetricsBytesReceived {
     pub byte_size: usize,
 }
 
-impl InternalEvent for InternalMetricsBytesReceived {
+impl InternalEvent for StaticMetricsBytesReceived {
     fn emit(self) {
         trace!(
             message = "Bytes received.",
             byte_size = %self.byte_size,
-            protocol = "internal",
+            protocol = "static",
         );
         counter!(
             "component_received_bytes_total",
-            "protocol" => "internal",
+            "protocol" => "static",
         )
         .increment(self.byte_size as u64);
     }
