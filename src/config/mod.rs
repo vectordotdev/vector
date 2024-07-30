@@ -694,22 +694,27 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "sources-file-descriptor"))]
     async fn no_conflict_fd_resources() {
+        use std::os::fd::IntoRawFd as _;
+        let fd1 = std::fs::File::open("/dev/null").unwrap().into_raw_fd();
+        let fd2 = std::fs::File::open("/dev/null").unwrap().into_raw_fd();
         let result = load(
-            r#"
+            &format!(
+                r#"
             [sources.file_descriptor1]
             type = "file_descriptor"
-            fd = 10
+            fd = {fd1}
 
             [sources.file_descriptor2]
             type = "file_descriptor"
-            fd = 20
+            fd = {fd2}
 
             [sinks.out]
             type = "test_basic"
             inputs = ["file_descriptor1", "file_descriptor2"]
-            "#,
+            "#
+            ),
             Format::Toml,
         )
         .await;
