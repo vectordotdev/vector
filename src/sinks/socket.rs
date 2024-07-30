@@ -175,16 +175,18 @@ mod test {
     use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
     use vector_lib::codecs::JsonSerializerConfig;
+    #[cfg(unix)]
     use vector_lib::codecs::NativeJsonSerializerConfig;
 
     use super::*;
+    #[cfg(unix)]
+    use crate::test_util::random_metrics_with_stream;
     use crate::{
         config::SinkContext,
         event::{Event, LogEvent},
         test_util::{
             components::{assert_sink_compliance, run_and_assert_sink_compliance, SINK_TAGS},
-            next_addr, next_addr_v6, random_lines_with_stream, random_metrics_with_stream,
-            trace_init, CountReceiver,
+            next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver,
         },
     };
 
@@ -540,6 +542,7 @@ mod test {
         sink_handle.await.unwrap();
     }
 
+    #[cfg(unix)]
     fn temp_uds_path(name: &str) -> PathBuf {
         tempfile::tempdir().unwrap().into_path().join(name)
     }
