@@ -1,26 +1,23 @@
-use std::collections::HashMap;
-
-use crate::codecs::{Encoder, Transformer};
-use crate::event::{Event, EventFinalizers, Finalizable};
-use crate::http::{Auth, HttpClient, HttpError};
-use crate::sinks::prelude::*;
-use crate::sinks::prelude::{
-    Compression, EncodeResult, Partitioner, RequestBuilder, RequestMetadata,
-    RequestMetadataBuilder, RetryLogic,
+use crate::{
+    codecs::{Encoder, Transformer},
+    event::{Event, EventFinalizers, Finalizable},
+    http::{Auth, HttpClient, HttpError},
+    sinks::{
+        prelude::*,
+        util::http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+        HTTPRequestBuilderSnafu, HealthcheckError,
+    },
+    Error,
 };
-use crate::sinks::{HTTPRequestBuilderSnafu, HealthcheckError};
-use crate::Error;
 use bytes::Bytes;
-use http::header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE};
-use http::{Request, StatusCode};
+use http::{
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
+    Request, StatusCode,
+};
 use hyper::Body;
 use snafu::ResultExt;
-
+use std::collections::HashMap;
 use vector_lib::codecs::encoding::Framer;
-
-use crate::sinks::util::http::{
-    HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder,
-};
 
 /// Partition key for GreptimeDB logs sink.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -218,7 +215,7 @@ pub(super) async fn http_healthcheck(
     auth: Option<Auth>,
 ) -> crate::Result<()> {
     let uri = format!("{endpoint}/health");
-    let mut request = Request::get(uri).body(Body::empty()).unwrap();
+    let mut request = Request::get(uri).body(Body::empty())?;
 
     if let Some(auth) = auth {
         auth.apply(&mut request);

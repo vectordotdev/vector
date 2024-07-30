@@ -1,13 +1,13 @@
+use super::{
+    config::GreptimeDBMetricsConfig,
+    request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
+};
 use crate::sinks::prelude::*;
-use std::sync::Arc;
-
-use super::config::GreptimeDBConfig;
-use super::request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest};
-use greptimedb_ingester::api::v1::auth_header::AuthScheme;
-use greptimedb_ingester::api::v1::*;
-use greptimedb_ingester::{channel_manager::*, ClientBuilder, Compression};
-use greptimedb_ingester::{Client, Database, Error as GreptimeError};
-use std::task::Poll;
+use greptimedb_ingester::{
+    api::v1::auth_header::AuthScheme, api::v1::*, channel_manager::*, Client, ClientBuilder,
+    Compression, Database, Error as GreptimeError,
+};
+use std::{sync::Arc, task::Poll};
 use vector_lib::sensitive_string::SensitiveString;
 
 #[derive(Debug, Clone)]
@@ -116,8 +116,8 @@ pub(super) struct GreptimeDBGrpcServiceConfig {
     tls: Option<TlsConfig>,
 }
 
-impl From<&GreptimeDBConfig> for GreptimeDBGrpcServiceConfig {
-    fn from(val: &GreptimeDBConfig) -> Self {
+impl From<&GreptimeDBMetricsConfig> for GreptimeDBGrpcServiceConfig {
+    fn from(val: &GreptimeDBMetricsConfig) -> Self {
         GreptimeDBGrpcServiceConfig {
             endpoint: val.endpoint.clone(),
             dbname: val.dbname.clone(),

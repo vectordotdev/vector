@@ -1,8 +1,10 @@
-use crate::sinks::greptimedb::logs::http_request_builder::{
-    GreptimeDBLogsHttpRequestBuilder, KeyPartitioner, PartitionKey,
+use crate::sinks::{
+    greptimedb::logs::http_request_builder::{
+        GreptimeDBLogsHttpRequestBuilder, KeyPartitioner, PartitionKey,
+    },
+    prelude::*,
+    util::http::HttpRequest,
 };
-use crate::sinks::prelude::*;
-use crate::sinks::util::http::HttpRequest;
 
 /// A sink that ingests logs into GreptimeDB.
 pub struct GreptimeDBLogsHttpSink<S> {
@@ -13,6 +15,7 @@ pub struct GreptimeDBLogsHttpSink<S> {
     pipeline_name: Template,
     pipeline_version: Option<Template>,
     request_builder: GreptimeDBLogsHttpRequestBuilder,
+    protocol: String,
 }
 
 impl<S> GreptimeDBLogsHttpSink<S>
@@ -30,6 +33,7 @@ where
         pipeline_name: Template,
         pipeline_version: Option<Template>,
         request_builder: GreptimeDBLogsHttpRequestBuilder,
+        protocol: String,
     ) -> Self {
         Self {
             batcher_settings,
@@ -39,6 +43,7 @@ where
             pipeline_name,
             pipeline_version,
             request_builder,
+            protocol,
         }
     }
 
@@ -69,6 +74,7 @@ where
                 }
             })
             .into_driver(self.service)
+            .protocol(self.protocol)
             .run()
             .await
     }

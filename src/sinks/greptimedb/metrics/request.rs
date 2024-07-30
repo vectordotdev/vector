@@ -1,10 +1,7 @@
-use super::batch::GreptimeDBBatchSizer;
-use super::request_builder::metric_to_insert_request;
+use super::{batch::GreptimeDBBatchSizer, request_builder::metric_to_insert_request};
 use crate::sinks::prelude::*;
-use greptimedb_ingester::api::v1::*;
-use greptimedb_ingester::Error as GreptimeError;
+use greptimedb_ingester::{api::v1::*, Error as GreptimeError};
 use std::num::NonZeroUsize;
-
 use vector_lib::event::Metric;
 
 /// GreptimeDBGrpcRequest is a wrapper around the RowInsertRequests

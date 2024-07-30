@@ -2,9 +2,9 @@ use chrono::{DateTime, Utc};
 use futures::stream;
 use vector_lib::event::{Event, LogEvent};
 
-use crate::sinks::util::test::load_sink;
 use crate::{
     config::{SinkConfig, SinkContext},
+    sinks::util::test::load_sink,
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         trace_init,

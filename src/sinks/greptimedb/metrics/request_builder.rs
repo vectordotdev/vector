@@ -1,11 +1,13 @@
-use chrono::Utc;
-use greptimedb_ingester::api::v1::*;
-use greptimedb_ingester::helpers::values::*;
-use vector_lib::event::metric::{Bucket, MetricSketch, Quantile, Sample};
-use vector_lib::event::{Metric, MetricValue};
-use vector_lib::metrics::AgentDDSketch;
-
 use crate::sinks::util::statistic::DistributionStatistic;
+use chrono::Utc;
+use greptimedb_ingester::{api::v1::*, helpers::values::*};
+use vector_lib::{
+    event::{
+        metric::{Bucket, MetricSketch, Quantile, Sample},
+        Metric, MetricValue,
+    },
+    metrics::AgentDDSketch,
+};
 
 pub(super) const DISTRIBUTION_QUANTILES: [f64; 5] = [0.5, 0.75, 0.90, 0.95, 0.99];
 pub(super) const DISTRIBUTION_STAT_FIELD_COUNT: usize = 5;

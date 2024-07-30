@@ -1,19 +1,51 @@
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
-
 use super::request::GreptimeDBGrpcRetryLogic;
+use super::{
+    service::{healthcheck, GreptimeDBGrpcService},
+    sink,
+};
+use crate::sinks::{
+    greptimedb::{default_dbname, GreptimeDBDefaultBatchSettings},
+    prelude::*,
+};
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
-use super::service::{healthcheck, GreptimeDBGrpcService};
-use super::sink;
-use crate::sinks::greptimedb::{default_dbname, GreptimeDBDefaultBatchSettings};
-use crate::sinks::prelude::*;
+/// Configuration for the `logdna` sink.
+#[configurable_component(sink("greptimedb", "Ingest metrics data into GreptimeDB."))]
+#[configurable(metadata(
+    deprecated = "The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead."
+))]
+#[derive(Clone, Debug, Derivative)]
+pub struct GreptimeDBConfig(GreptimeDBMetricsConfig);
+
+impl GenerateConfig for GreptimeDBConfig {
+    fn generate_config() -> toml::Value {
+        <GreptimeDBMetricsConfig as GenerateConfig>::generate_config()
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "logdna")]
+impl SinkConfig for GreptimeDBConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        warn!("DEPRECATED: The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead.");
+        self.0.build(cx).await
+    }
+
+    fn input(&self) -> Input {
+        self.0.input()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        self.0.acknowledgements()
+    }
+}
 
 /// Configuration items for GreptimeDB
-#[configurable_component(sink("greptimedb", "Ingest metrics data into GreptimeDB."))]
+#[configurable_component(sink("greptimedb_metrics", "Ingest metrics data into GreptimeDB."))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-pub struct GreptimeDBConfig {
+pub struct GreptimeDBMetricsConfig {
     /// The GreptimeDB [database][database] name to connect.
     ///
     /// Default to `public`, the default database of GreptimeDB.
@@ -76,11 +108,11 @@ pub struct GreptimeDBConfig {
     pub tls: Option<TlsConfig>,
 }
 
-impl_generate_config_from_default!(GreptimeDBConfig);
+impl_generate_config_from_default!(GreptimeDBMetricsConfig);
 
 #[typetag::serde(name = "greptimedb")]
 #[async_trait::async_trait]
-impl SinkConfig for GreptimeDBConfig {
+impl SinkConfig for GreptimeDBMetricsConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let request_settings = self.request.into_settings();
         let service = ServiceBuilder::new()
@@ -112,7 +144,7 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<GreptimeDBConfig>();
+        crate::test_util::test_generate_config::<GreptimeDBMetricsConfig>();
     }
 
     #[test]
@@ -122,6 +154,6 @@ mod tests {
             dbname = "foo-bar"
         "#};
 
-        toml::from_str::<GreptimeDBConfig>(config).unwrap();
+        toml::from_str::<GreptimeDBMetricsConfig>(config).unwrap();
     }
 }

@@ -1,19 +1,27 @@
+use crate::{
+    http::{Auth, HttpClient},
+    sinks::{
+        greptimedb::{
+            default_dbname_template,
+            logs::{
+                http_request_builder::{
+                    http_healthcheck, GreptimeDBHttpRetryLogic, GreptimeDBLogsHttpRequestBuilder,
+                    PartitionKey,
+                },
+                sink::GreptimeDBLogsHttpSink,
+            },
+            GreptimeDBDefaultBatchSettings,
+        },
+        prelude::*,
+        util::http::HttpService,
+    },
+};
 use std::collections::HashMap;
-
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
-
-use crate::http::{Auth, HttpClient};
-use crate::sinks::greptimedb::logs::http_request_builder::{
-    http_healthcheck, GreptimeDBHttpRetryLogic, GreptimeDBLogsHttpRequestBuilder, PartitionKey,
+use vector_lib::{
+    codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig},
+    configurable::configurable_component,
+    sensitive_string::SensitiveString,
 };
-use crate::sinks::greptimedb::logs::sink::GreptimeDBLogsHttpSink;
-use crate::sinks::util::http::HttpService;
-use crate::sinks::{
-    greptimedb::{default_dbname_template, GreptimeDBDefaultBatchSettings},
-    prelude::*,
-};
-use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 
 fn extra_params_examples() -> HashMap<String, String> {
     HashMap::<_, _>::from_iter([("source".to_owned(), "vector".to_owned())])
@@ -47,11 +55,11 @@ pub struct GreptimeDBLogsConfig {
     #[serde(default = "default_dbname_template")]
     pub dbname: Template,
 
-    /// pipeline name to be used for the logs
+    /// Pipeline name to be used for the logs
     #[configurable(metadata(docs::examples = "pipeline_name"))]
     pub pipeline_name: Template,
 
-    /// pipeline version to be used for the logs
+    /// Pipeline version to be used for the logs
     #[configurable(metadata(docs::examples = "2024-06-07 06:46:23.858293"))]
     pub pipeline_version: Option<Template>,
 
@@ -143,6 +151,12 @@ impl SinkConfig for GreptimeDBLogsConfig {
             .settings(request_limits, GreptimeDBHttpRetryLogic::default())
             .service(service);
 
+        let protocol = http::Uri::try_from(&self.endpoint)
+            .expect("URI not valid")
+            .scheme_str()
+            .unwrap_or("http")
+            .to_string();
+
         let sink = GreptimeDBLogsHttpSink::new(
             self.batch.into_batcher_settings()?,
             service,
@@ -151,6 +165,7 @@ impl SinkConfig for GreptimeDBLogsConfig {
             self.pipeline_name.clone(),
             self.pipeline_version.clone(),
             request_builder,
+            protocol,
         );
 
         let healthcheck = Box::pin(http_healthcheck(

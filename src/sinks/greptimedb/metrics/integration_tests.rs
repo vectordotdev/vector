@@ -1,18 +1,17 @@
-use chrono::{DateTime, Duration, Utc};
-use futures::stream;
-use vector_lib::event::{Event, Metric, MetricKind, MetricValue};
-use vector_lib::metric_tags;
-
-use crate::sinks::util::test::load_sink;
 use crate::{
     config::{SinkConfig, SinkContext},
+    sinks::{greptimedb::metrics::config::GreptimeDBMetricsConfig, util::test::load_sink},
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         trace_init,
     },
 };
-
-use crate::sinks::greptimedb::metrics::config::GreptimeDBConfig;
+use chrono::{DateTime, Duration, Utc};
+use futures::stream;
+use vector_lib::{
+    event::{Event, Metric, MetricKind, MetricValue},
+    metric_tags,
+};
 
 #[tokio::test]
 async fn test_greptimedb_sink() {
@@ -23,7 +22,7 @@ async fn test_greptimedb_sink() {
         std::env::var("GREPTIMEDB_ENDPOINT").unwrap_or_else(|_| "localhost:4001".to_owned())
     );
 
-    let (config, _) = load_sink::<GreptimeDBConfig>(&cfg).unwrap();
+    let (config, _) = load_sink::<GreptimeDBMetricsConfig>(&cfg).unwrap();
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
     let query_client = query_client();

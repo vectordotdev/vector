@@ -1,17 +1,15 @@
+use super::{
+    batch::GreptimeDBBatchSizer, request::GreptimeDBGrpcRetryLogic, service::GreptimeDBGrpcService,
+};
+use crate::sinks::{
+    greptimedb::metrics::request::GreptimeDBGrpcRequest,
+    prelude::*,
+    util::buffer::metrics::{MetricNormalize, MetricSet},
+};
 use async_trait::async_trait;
-
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use vector_lib::event::{Metric, MetricValue};
-
-use super::request::GreptimeDBGrpcRetryLogic;
-use super::service::GreptimeDBGrpcService;
-use crate::sinks::greptimedb::metrics::request::GreptimeDBGrpcRequest;
-use crate::sinks::prelude::*;
-use crate::sinks::util::buffer::metrics::MetricNormalize;
-use crate::sinks::util::buffer::metrics::MetricSet;
-
-use super::batch::GreptimeDBBatchSizer;
 
 #[derive(Clone, Debug, Default)]
 pub struct GreptimeDBMetricNormalize;
