@@ -159,10 +159,11 @@ impl SinkConfig for SocketSinkConfig {
 
 #[cfg(test)]
 mod test {
+    #[cfg(unix)]
+    use std::path::PathBuf;
     use std::{
         future::ready,
         net::{SocketAddr, UdpSocket},
-        path::PathBuf,
     };
 
     use futures::stream::StreamExt;
