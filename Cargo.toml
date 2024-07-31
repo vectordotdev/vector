@@ -545,6 +545,7 @@ sources-metrics = [
   "sources-nginx_metrics",
   "sources-postgresql_metrics",
   "sources-prometheus",
+  "sources-static_metrics",
   "sources-statsd",
   "sources-vector",
 ]
@@ -571,6 +572,7 @@ sources-http_client = ["sources-utils-http-client"]
 sources-http_server = ["sources-utils-http", "sources-utils-http-query"]
 sources-internal_logs = []
 sources-internal_metrics = []
+sources-static_metrics = []
 sources-journald = []
 sources-kafka = ["dep:rdkafka"]
 sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
