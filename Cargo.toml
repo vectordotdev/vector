@@ -139,7 +139,7 @@ metrics-util = { version = "0.16.3", default-features = false, features = ["regi
 pin-project = { version = "1.1.5", default-features = false }
 proptest = { version = "1.5" }
 proptest-derive = { version = "0.4.0" }
-serde_json = { version = "1.0.120", default-features = false, features = ["raw_value", "std"] }
+serde_json = { version = "1.0.121", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.204", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.16", default-features = false, features = ["display", "parse"] }
 vrl = { version = "0.17.0", features = ["arbitrary", "cli", "test", "test_framework"] }
@@ -164,7 +164,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 async-stream = { version = "0.3.5", default-features = false }
 async-trait = { version = "0.1.81", default-features = false }
 futures = { version = "0.3.30", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.39.1", default-features = false, features = ["full"] }
+tokio = { version = "1.39.2", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.4", default-features = false }
 tokio-stream = { version = "0.1.15", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -239,7 +239,7 @@ goauth = { version = "0.14.0", optional = true }
 smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 
 # AMQP
-lapin = { version = "2.4.0", default-features = false, features = ["native-tls"], optional = true }
+lapin = { version = "2.5.0", default-features = false, features = ["native-tls"], optional = true }
 
 # API
 async-graphql = { version = "7.0.7", default-features = false, optional = true, features = ["chrono", "playground"] }
@@ -389,7 +389,7 @@ reqwest = { version = "0.11", features = ["json"] }
 rstest = {version = "0.21.0"}
 tempfile = "3.10.1"
 test-generator = "0.3.1"
-tokio = { version = "1.39.1", features = ["test-util"] }
+tokio = { version = "1.39.2", features = ["test-util"] }
 tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
@@ -545,6 +545,7 @@ sources-metrics = [
   "sources-nginx_metrics",
   "sources-postgresql_metrics",
   "sources-prometheus",
+  "sources-static_metrics",
   "sources-statsd",
   "sources-vector",
 ]
@@ -571,6 +572,7 @@ sources-http_client = ["sources-utils-http-client"]
 sources-http_server = ["sources-utils-http", "sources-utils-http-query"]
 sources-internal_logs = []
 sources-internal_metrics = []
+sources-static_metrics = []
 sources-journald = []
 sources-kafka = ["dep:rdkafka"]
 sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]

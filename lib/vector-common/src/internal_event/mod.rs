@@ -148,6 +148,7 @@ impl Protocol {
     pub const UDP: Protocol = Protocol(SharedString::const_str("udp"));
     pub const UNIX: Protocol = Protocol(SharedString::const_str("unix"));
     pub const INTERNAL: Protocol = Protocol(SharedString::const_str("internal"));
+    pub const STATIC: Protocol = Protocol(SharedString::const_str("static"));
 }
 
 impl From<&'static str> for Protocol {
