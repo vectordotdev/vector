@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::num::NonZero;
+use std::num::NonZeroU32;
 use std::time::Duration;
 
 use chrono::Utc;
@@ -162,7 +162,7 @@ impl StaticMetrics {
                         MetricData {
                             time: MetricTime {
                                 timestamp: None,
-                                interval_ms: NonZero::new(self.interval.as_millis() as u32),
+                                interval_ms: NonZeroU32::new(self.interval.as_millis() as u32),
                             },
                             kind,
                             value: value.clone(),
