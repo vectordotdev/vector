@@ -696,9 +696,9 @@ mod tests {
     #[tokio::test]
     #[cfg(all(unix, feature = "sources-file_descriptor"))]
     async fn no_conflict_fd_resources() {
-        use std::os::fd::IntoRawFd as _;
-        let fd1 = std::fs::File::open("/dev/null").unwrap().into_raw_fd();
-        let fd2 = std::fs::File::open("/dev/null").unwrap().into_raw_fd();
+        use crate::sources::file_descriptors::file_descriptor::null_fd;
+        let fd1 = null_fd().unwrap();
+        let fd2 = null_fd().unwrap();
         let result = load(
             &format!(
                 r#"
