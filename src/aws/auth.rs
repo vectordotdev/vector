@@ -425,6 +425,7 @@ mod tests {
                 load_timeout_secs: Some(10),
                 imds: ImdsAuthentication { .. },
                 region: None,
+                sign: true,
             }
         ));
     }
@@ -467,6 +468,7 @@ mod tests {
                     connect_timeout: CONNECT_TIMEOUT,
                     read_timeout: READ_TIMEOUT,
                 },
+                sign: true,
             }
         ));
     }
@@ -702,7 +704,7 @@ mod tests {
 
         match config.auth {
             AwsAuthentication::Default { sign, .. } => {
-                assert_eq!(&no_sign, false);
+                assert!(!sign);
             }
             _ => panic!(),
         }

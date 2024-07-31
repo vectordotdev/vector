@@ -83,6 +83,7 @@ async fn firehose_put_records_without_partition_key() {
             load_timeout_secs: Some(5),
             imds: ImdsAuthentication::default(),
             region: None,
+            sign: true,
         })),
         endpoints: vec![elasticsearch_address()],
         bulk: BulkConfig {
@@ -195,6 +196,7 @@ async fn firehose_put_records_with_partition_key() {
             load_timeout_secs: Some(5),
             imds: ImdsAuthentication::default(),
             region: None,
+            sign: true,
         })),
         endpoints: vec![elasticsearch_address()],
         bulk: BulkConfig {
@@ -278,6 +280,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                         &None,
                     )
                     .await
+                    .unwrap()
                     .unwrap(),
             )
             .endpoint_url(test_region_endpoint().endpoint().unwrap())
