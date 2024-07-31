@@ -692,36 +692,17 @@ mod tests {
     }
 
     #[test]
-    fn parsing_none() {
+    fn parsing_sign_false() {
         let config = toml::from_str::<ComponentConfig>(
             r#"
-            auth.credentials_file = "/path/to/file"
-            auth.profile = "foo"
+            auth.sign = false
         "#,
         )
         .unwrap();
 
         match config.auth {
-            AwsAuthentication::File {
-                credentials_file,
-                profile,
-            } => {
-                assert_eq!(&credentials_file, "/path/to/file");
-                assert_eq!(&profile, "foo");
-            }
-            _ => panic!(),
-        }
-
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.no_sign = true
-        "#,
-        )
-        .unwrap();
-
-        match config.auth {
-            AwsAuthentication::None { no_sign } => {
-                assert_eq!(&no_sign, true);
+            AwsAuthentication::Default { sign, .. } => {
+                assert_eq!(&no_sign, false);
             }
             _ => panic!(),
         }
