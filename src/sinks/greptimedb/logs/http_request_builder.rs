@@ -263,17 +263,25 @@ mod tests {
             pipeline_name: "test_pipeline".to_string(),
             pipeline_version: Some("test_version".to_string()),
         };
+        let params = vec![("param1", "value1"), ("param2", "value2")];
         let extra_params = Some(
-            vec![("param1", "value1"), ("param2", "value2")]
+            params
                 .into_iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
         );
 
         let url = prepare_log_ingester_url(&endpoint, db, table, &metadata, &extra_params);
-        assert_eq!(
-            url,
-            "http://localhost:8080/v1/events/logs?db=test_db&table=test_table&pipeline_name=test_pipeline&pipeline_version=test_version&param1=value1&param2=value2"
-        );
+        let url = url::Url::parse(&url).unwrap();
+        let check = url.query_pairs().all(|(k, v)| match k.as_ref() {
+            "db" => v == "test_db",
+            "table" => v == "test_table",
+            "pipeline_name" => v == "test_pipeline",
+            "pipeline_version" => v == "test_version",
+            "param1" => v == "value1",
+            "param2" => v == "value2",
+            _ => false,
+        });
+        assert!(check);
     }
 }

@@ -708,7 +708,7 @@ sinks-metrics = [
   "sinks-blackhole",
   "sinks-console",
   "sinks-datadog_metrics",
-  "sinks-greptimedb",
+  "sinks-greptimedb_metrics",
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
@@ -744,7 +744,7 @@ sinks-elasticsearch = ["transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
 sinks-gcp = ["sinks-gcp-chronicle", "dep:base64", "gcp"]
 sinks-gcp-chronicle =  ["gcp"]
-sinks-greptimedb = ["dep:greptimedb-ingester"]
+sinks-greptimedb_metrics = ["dep:greptimedb-ingester"]
 sinks-greptimedb_logs = []
 sinks-honeycomb = []
 sinks-http = []
@@ -794,7 +794,7 @@ all-integration-tests = [
   "gcp-cloud-storage-integration-tests",
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
-  "greptimedb-integration-tests",
+  "greptimedb-metrics-integration-tests",
   "greptimedb-logs-integration-tests",
   "http-client-integration-tests",
   "humio-integration-tests",
@@ -859,7 +859,7 @@ fluent-integration-tests = ["docker", "sources-fluent"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp", "sources-gcp_pubsub"]
-greptimedb-integration-tests = ["sinks-greptimedb"]
+greptimedb-metrics-integration-tests = ["sinks-greptimedb_metrics"]
 greptimedb-logs-integration-tests = ["sinks-greptimedb_logs"]
 humio-integration-tests = ["sinks-humio"]
 http-client-integration-tests = ["sources-http_client"]

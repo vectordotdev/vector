@@ -46,7 +46,7 @@ components: sinks: greptimedb: {
 					socket: {
 						api: {
 							title: "GreptimeDB gRPC API"
-							url:   urls.greptimedb_grpc
+							url:   urls.greptimedb_docs
 						}
 						direction: "outgoing"
 						protocols: ["http"]

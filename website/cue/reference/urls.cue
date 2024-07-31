@@ -237,7 +237,7 @@ urls: {
 	graphviz:                                   "https://graphviz.org/"
 	greptimecloud:                              "https://greptime.cloud"
 	greptimedb:                                 "https://github.com/greptimeteam/greptimedb"
-	greptimedb_grpc:                            "https://docs.greptime.com/"
+	greptimedb_docs:                            "https://docs.greptime.com/"
 	grpc_status_code:                           "https://grpc.github.io/grpc/core/md_doc_statuscodes.html"
 	grok:                                       "https://github.com/daschl/grok/tree/master/patterns"
 	grok_debugger:                              "https://grokdebug.herokuapp.com/"
