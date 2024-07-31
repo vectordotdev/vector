@@ -175,6 +175,14 @@ pub enum AwsAuthentication {
         /// [aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
         #[configurable(metadata(docs::examples = "us-west-2"))]
         region: Option<String>,
+
+        /// Whether to sign requests.
+        ///
+        /// Setting this to false can be useful when writing to an AWS S3 bucket that allows
+        /// anonymous requests.
+        #[serde(default = "crate::serde::default_true")]
+        #[derivative(Default(value = "true"))]
+        sign: bool,
     },
 }
 
@@ -239,7 +247,7 @@ impl AwsAuthentication {
         service_region: Region,
         proxy: &ProxyConfig,
         tls_options: &Option<TlsConfig>,
-    ) -> crate::Result<SharedCredentialsProvider> {
+    ) -> crate::Result<Option<SharedCredentialsProvider>> {
         match self {
             Self::AccessKey {
                 access_key_id,
@@ -265,9 +273,9 @@ impl AwsAuthentication {
 
                     let provider = builder.build_from_provider(provider).await;
 
-                    return Ok(SharedCredentialsProvider::new(provider));
+                    return Ok(Some(SharedCredentialsProvider::new(provider)));
                 }
-                Ok(provider)
+                Ok(Some(provider))
             }
             AwsAuthentication::File {
                 credentials_file,
@@ -288,7 +296,7 @@ impl AwsAuthentication {
                     .profile_name(profile)
                     .configure(&provider_config)
                     .build();
-                Ok(SharedCredentialsProvider::new(profile_provider))
+                Ok(Some(SharedCredentialsProvider::new(profile_provider)))
             }
             AwsAuthentication::Role {
                 assume_role,
@@ -313,9 +321,15 @@ impl AwsAuthentication {
                     )
                     .await;
 
-                Ok(SharedCredentialsProvider::new(provider))
+                Ok(Some(SharedCredentialsProvider::new(provider)))
             }
-            AwsAuthentication::Default { imds, region, .. } => Ok(SharedCredentialsProvider::new(
+            AwsAuthentication::Default { sign: false, .. } => Ok(None),
+            AwsAuthentication::Default {
+                sign: true,
+                imds,
+                region,
+                ..
+            } => Ok(Some(SharedCredentialsProvider::new(
                 default_credentials_provider(
                     region.clone().map(Region::new).unwrap_or(service_region),
                     proxy,
@@ -323,7 +337,7 @@ impl AwsAuthentication {
                     *imds,
                 )
                 .await?,
-            )),
+            ))),
         }
     }
 
@@ -672,6 +686,42 @@ mod tests {
             } => {
                 assert_eq!(&credentials_file, "/path/to/file");
                 assert_eq!(profile, "default".to_string());
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn parsing_none() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.credentials_file = "/path/to/file"
+            auth.profile = "foo"
+        "#,
+        )
+        .unwrap();
+
+        match config.auth {
+            AwsAuthentication::File {
+                credentials_file,
+                profile,
+            } => {
+                assert_eq!(&credentials_file, "/path/to/file");
+                assert_eq!(&profile, "foo");
+            }
+            _ => panic!(),
+        }
+
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.no_sign = true
+        "#,
+        )
+        .unwrap();
+
+        match config.auth {
+            AwsAuthentication::None { no_sign } => {
+                assert_eq!(&no_sign, true);
             }
             _ => panic!(),
         }

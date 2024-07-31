@@ -165,6 +165,17 @@ base: components: sinks: elasticsearch: configuration: {
 				required:      true
 				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
+			sign: {
+				description: """
+					Whether to sign requests.
+
+					Setting this to false can be useful when writing to an AWS S3 bucket that allows
+					anonymous requests.
+					"""
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: bool: default: true
+			}
 			strategy: {
 				description: "The authentication strategy to use."
 				required:    true
