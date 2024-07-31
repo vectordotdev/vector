@@ -694,7 +694,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(all(unix, feature = "sources-file-descriptor"))]
+    #[cfg(all(unix, feature = "sources-file_descriptor"))]
     async fn no_conflict_fd_resources() {
         use std::os::fd::IntoRawFd as _;
         let fd1 = std::fs::File::open("/dev/null").unwrap().into_raw_fd();

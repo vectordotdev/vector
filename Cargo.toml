@@ -530,7 +530,7 @@ sources-logs = [
   "sources-nats",
   "sources-opentelemetry",
   "sources-pulsar",
-  "sources-file-descriptor",
+  "sources-file_descriptor",
   "sources-redis",
   "sources-socket",
   "sources-splunk_hec",
@@ -565,7 +565,7 @@ sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
 sources-file = ["vector-lib/file-source"]
-sources-file-descriptor = ["tokio-util/io"]
+sources-file_descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
