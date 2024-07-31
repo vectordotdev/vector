@@ -147,6 +147,7 @@ impl Protocol {
     pub const TCP: Protocol = Protocol(SharedString::const_str("tcp"));
     pub const UDP: Protocol = Protocol(SharedString::const_str("udp"));
     pub const UNIX: Protocol = Protocol(SharedString::const_str("unix"));
+    pub const INTERNAL: Protocol = Protocol(SharedString::const_str("internal"));
     pub const STATIC: Protocol = Protocol(SharedString::const_str("static"));
 }
 

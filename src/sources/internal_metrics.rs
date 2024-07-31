@@ -5,13 +5,15 @@ use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::{config::LogNamespace, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{log_schema, SourceConfig, SourceContext, SourceOutput},
-    internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
+    internal_events::{EventsReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
     SourceSender,
@@ -156,6 +158,7 @@ struct InternalMetrics<'a> {
 impl<'a> InternalMetrics<'a> {
     async fn run(mut self) -> Result<(), ()> {
         let events_received = register!(EventsReceived);
+        let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
         while interval.next().await.is_some() {
@@ -167,7 +170,7 @@ impl<'a> InternalMetrics<'a> {
             let byte_size = metrics.size_of();
             let json_size = metrics.estimated_json_encoded_size_of();
 
-            emit!(InternalMetricsBytesReceived { byte_size });
+            bytes_received.emit(ByteSize(byte_size));
             events_received.emit(CountByteSize(count, json_size));
 
             let batch = metrics.into_iter().map(|mut metric| {
