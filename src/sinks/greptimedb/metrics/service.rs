@@ -1,8 +1,8 @@
-use super::{
-    config::GreptimeDBMetricsConfig,
-    request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
+use crate::sinks::{
+    greptimedb::metrics::config::GreptimeDBMetricsConfig,
+    greptimedb::metrics::request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
+    prelude::*,
 };
-use crate::sinks::prelude::*;
 use greptimedb_ingester::{
     api::v1::auth_header::AuthScheme, api::v1::*, channel_manager::*, Client, ClientBuilder,
     Compression, Database, Error as GreptimeError,

@@ -1,5 +1,7 @@
-use super::{batch::GreptimeDBBatchSizer, request_builder::metric_to_insert_request};
-use crate::sinks::prelude::*;
+use crate::sinks::{
+    greptimedb::metrics::{batch::GreptimeDBBatchSizer, request_builder::metric_to_insert_request},
+    prelude::*,
+};
 use greptimedb_ingester::{api::v1::*, Error as GreptimeError};
 use std::num::NonZeroUsize;
 use vector_lib::event::Metric;

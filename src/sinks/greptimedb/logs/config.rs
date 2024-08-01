@@ -8,7 +8,7 @@ use crate::{
                     http_healthcheck, GreptimeDBHttpRetryLogic, GreptimeDBLogsHttpRequestBuilder,
                     PartitionKey,
                 },
-                sink::GreptimeDBLogsHttpSink,
+                sink::{GreptimeDBLogsHttpSink, LogsSinkSetting},
             },
             GreptimeDBDefaultBatchSettings,
         },
@@ -157,15 +157,19 @@ impl SinkConfig for GreptimeDBLogsConfig {
             .unwrap_or("http")
             .to_string();
 
+        let logs_sink_setting = LogsSinkSetting {
+            dbname: self.dbname.clone(),
+            table: self.table.clone(),
+            pipeline_name: self.pipeline_name.clone(),
+            pipeline_version: self.pipeline_version.clone(),
+            protocol,
+        };
+
         let sink = GreptimeDBLogsHttpSink::new(
             self.batch.into_batcher_settings()?,
             service,
-            self.dbname.clone(),
-            self.table.clone(),
-            self.pipeline_name.clone(),
-            self.pipeline_version.clone(),
             request_builder,
-            protocol,
+            logs_sink_setting,
         );
 
         let healthcheck = Box::pin(http_healthcheck(

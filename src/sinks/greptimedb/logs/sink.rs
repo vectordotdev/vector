@@ -6,16 +6,20 @@ use crate::sinks::{
     util::http::HttpRequest,
 };
 
+pub struct LogsSinkSetting {
+    pub dbname: Template,
+    pub table: Template,
+    pub pipeline_name: Template,
+    pub pipeline_version: Option<Template>,
+    pub protocol: String,
+}
+
 /// A sink that ingests logs into GreptimeDB.
 pub struct GreptimeDBLogsHttpSink<S> {
     batcher_settings: BatcherSettings,
     service: S,
-    dbname: Template,
-    table: Template,
-    pipeline_name: Template,
-    pipeline_version: Option<Template>,
     request_builder: GreptimeDBLogsHttpRequestBuilder,
-    protocol: String,
+    logs_sink_setting: LogsSinkSetting,
 }
 
 impl<S> GreptimeDBLogsHttpSink<S>
@@ -28,22 +32,14 @@ where
     pub const fn new(
         batcher_settings: BatcherSettings,
         service: S,
-        dbname: Template,
-        table: Template,
-        pipeline_name: Template,
-        pipeline_version: Option<Template>,
         request_builder: GreptimeDBLogsHttpRequestBuilder,
-        protocol: String,
+        logs_sink_setting: LogsSinkSetting,
     ) -> Self {
         Self {
             batcher_settings,
             service,
-            dbname,
-            table,
-            pipeline_name,
-            pipeline_version,
             request_builder,
-            protocol,
+            logs_sink_setting,
         }
     }
 
@@ -52,10 +48,10 @@ where
         input
             .batched_partitioned(
                 KeyPartitioner::new(
-                    self.dbname,
-                    self.table,
-                    self.pipeline_name,
-                    self.pipeline_version,
+                    self.logs_sink_setting.dbname,
+                    self.logs_sink_setting.table,
+                    self.logs_sink_setting.pipeline_name,
+                    self.logs_sink_setting.pipeline_version,
                 ),
                 || batcher_settings.as_byte_size_config(),
             )
@@ -74,7 +70,7 @@ where
                 }
             })
             .into_driver(self.service)
-            .protocol(self.protocol)
+            .protocol(self.logs_sink_setting.protocol)
             .run()
             .await
     }

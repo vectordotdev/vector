@@ -1,8 +1,8 @@
-use super::{
-    batch::GreptimeDBBatchSizer, request::GreptimeDBGrpcRetryLogic, service::GreptimeDBGrpcService,
-};
 use crate::sinks::{
-    greptimedb::metrics::request::GreptimeDBGrpcRequest,
+    greptimedb::metrics::{
+        batch::GreptimeDBBatchSizer, request::GreptimeDBGrpcRequest,
+        request::GreptimeDBGrpcRetryLogic, service::GreptimeDBGrpcService,
+    },
     prelude::*,
     util::buffer::metrics::{MetricNormalize, MetricSet},
 };

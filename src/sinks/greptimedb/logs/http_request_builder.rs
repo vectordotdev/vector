@@ -107,8 +107,8 @@ fn prepare_log_ingester_url(
     let mut url = url::Url::parse(&path).unwrap();
     let mut url_builder = url.query_pairs_mut();
     url_builder
-        .append_pair("db", &db)
-        .append_pair("table", &table)
+        .append_pair("db", db)
+        .append_pair("table", table)
         .append_pair("pipeline_name", &metadata.pipeline_name);
 
     if let Some(pipeline_version) = metadata.pipeline_version.as_ref() {
@@ -135,7 +135,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
             self.endpoint.as_str(),
             &db,
             &table,
-            &metadata,
+            metadata,
             &self.extra_params,
         );
 
@@ -271,7 +271,7 @@ mod tests {
                 .collect(),
         );
 
-        let url = prepare_log_ingester_url(&endpoint, db, table, &metadata, &extra_params);
+        let url = prepare_log_ingester_url(endpoint, db, table, &metadata, &extra_params);
         let url = url::Url::parse(&url).unwrap();
         let check = url.query_pairs().all(|(k, v)| match k.as_ref() {
             "db" => v == "test_db",
