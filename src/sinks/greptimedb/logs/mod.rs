@@ -6,6 +6,6 @@
 
 mod config;
 mod http_request_builder;
-#[cfg(all(test, feature = "greptimedb-logs-integration-tests"))]
+#[cfg(all(test, feature = "greptimedb-integration-tests"))]
 mod integration_tests;
 mod sink;

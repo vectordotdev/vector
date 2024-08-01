@@ -151,18 +151,11 @@ impl SinkConfig for GreptimeDBLogsConfig {
             .settings(request_limits, GreptimeDBHttpRetryLogic::default())
             .service(service);
 
-        let protocol = http::Uri::try_from(&self.endpoint)
-            .expect("URI not valid")
-            .scheme_str()
-            .unwrap_or("http")
-            .to_string();
-
         let logs_sink_setting = LogsSinkSetting {
             dbname: self.dbname.clone(),
             table: self.table.clone(),
             pipeline_name: self.pipeline_name.clone(),
             pipeline_version: self.pipeline_version.clone(),
-            protocol,
         };
 
         let sink = GreptimeDBLogsHttpSink::new(

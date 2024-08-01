@@ -794,8 +794,7 @@ all-integration-tests = [
   "gcp-cloud-storage-integration-tests",
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
-  "greptimedb-metrics-integration-tests",
-  "greptimedb-logs-integration-tests",
+  "greptimedb-integration-tests",
   "http-client-integration-tests",
   "humio-integration-tests",
   "influxdb-integration-tests",
@@ -859,8 +858,7 @@ fluent-integration-tests = ["docker", "sources-fluent"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp", "sources-gcp_pubsub"]
-greptimedb-metrics-integration-tests = ["sinks-greptimedb_metrics"]
-greptimedb-logs-integration-tests = ["sinks-greptimedb_logs"]
+greptimedb-integration-tests = ["sinks-greptimedb_metrics","sinks-greptimedb_logs"]
 humio-integration-tests = ["sinks-humio"]
 http-client-integration-tests = ["sources-http_client"]
 influxdb-integration-tests = ["sinks-influxdb"]

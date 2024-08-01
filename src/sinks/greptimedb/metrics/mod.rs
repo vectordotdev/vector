@@ -22,7 +22,7 @@
 
 mod batch;
 mod config;
-#[cfg(all(test, feature = "greptimedb-metrics-integration-tests"))]
+#[cfg(all(test, feature = "greptimedb-integration-tests"))]
 mod integration_tests;
 mod request;
 mod request_builder;

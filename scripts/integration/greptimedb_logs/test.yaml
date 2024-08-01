@@ -1,12 +1,13 @@
 features:
-- greptimedb-logs-integration-tests
+- greptimedb-integration-tests
 
-test_filter: '::greptimedb::'
+test_filter: '::greptimedb::logs::'
 
 runner:
   env:
     GREPTIMEDB_ENDPOINT: greptimedb:4001
     GREPTIMEDB_HTTP: http://greptimedb:4000
+    no_proxy: greptimedb
 
 matrix:
   # Temporarily pegging to the latest known stable release

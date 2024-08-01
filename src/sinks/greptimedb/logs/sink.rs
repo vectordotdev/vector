@@ -11,7 +11,6 @@ pub struct LogsSinkSetting {
     pub table: Template,
     pub pipeline_name: Template,
     pub pipeline_version: Option<Template>,
-    pub protocol: String,
 }
 
 /// A sink that ingests logs into GreptimeDB.
@@ -70,7 +69,6 @@ where
                 }
             })
             .into_driver(self.service)
-            .protocol(self.logs_sink_setting.protocol)
             .run()
             .await
     }
