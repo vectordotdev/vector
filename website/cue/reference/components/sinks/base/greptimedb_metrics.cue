@@ -1,6 +1,6 @@
 package metadata
 
-base: components: sinks: greptimedb: configuration: {
+base: components: sinks: greptimedb_metrics: configuration: {
 	acknowledgements: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
@@ -90,6 +90,14 @@ base: components: sinks: greptimedb: configuration: {
 			"""
 		required: true
 		type: string: examples: ["example.com:4001", "1nge17d2r3ns.ap-southeast-1.aws.greptime.cloud:4001"]
+	}
+	grpc_compression: {
+		description: """
+			Set gRPC compression encoding for the request
+			Default to none, `gzip` or `zstd` is supported.
+			"""
+		required: false
+		type: string: examples: ["grpc_compression"]
 	}
 	password: {
 		description: """

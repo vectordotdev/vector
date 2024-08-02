@@ -28,25 +28,7 @@ pipeline_name = "test"
     );
 
     // This is a minimal config that is required to run the sink
-    let pipeline = r#"
-processors:
-  - date:
-      field: timestamp
-      formats:
-        - "%Y-%m-%dT%H:%M:%S%.9fZ"
-      ignore_missing: true
-
-transform:
-  - fields:
-      - name
-      - namespace
-      - kind
-      - message   
-    type: string
-  - field: timestamp
-    type: time
-    index: timestamp
-    "#;
+    let pipeline = "processors:\n  - date:\n      field: timestamp\n      formats:\n        - \"%Y-%m-%dT%H:%M:%S%.9fZ\"\n      ignore_missing: true\n\ntransform:\n  - fields:\n      - name\n      - namespace\n      - kind\n      - message   \n    type: string\n  - field: timestamp\n    type: time\n    index: timestamp";
 
     let (config, _) = load_sink::<GreptimeDBLogsConfig>(&cfg).unwrap();
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
