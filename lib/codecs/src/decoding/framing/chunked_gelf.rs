@@ -49,7 +49,7 @@ impl ChunkedGelfDecoderConfig {
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 pub struct ChunkedGelfDecoderOptions {
-    /// The timeout, in milliseconds, for a message to be fully received. If the timeout is reached, the
+    /// The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
     /// decoder drops all the received chunks of the incomplete message and starts over.
     #[serde(
         default = "default_timeout_secs",
@@ -215,16 +215,6 @@ impl ChunkedGelfDecoder {
         // and return the complete payload.
 
         // We need 10 bytes to read the message id, sequence number and total chunks
-        // if chunk.remaining() < 10 {
-        //     let src_display = format!("{chunk:?}");
-        //     warn!(message = "Received malformed chunk headers (message ID, sequence number and total chunks) with less than 10 bytes. Ignoring it.",
-        //         src = src_display,
-        //         remaining = chunk.remaining(),
-        //         internal_log_rate_limit = true
-        //     );
-        //     return Ok(None);
-        // }
-
         ensure!(
             chunk.remaining() >= 10,
             InvalidChunkHeaderSnafu { header: chunk }
@@ -272,13 +262,12 @@ impl ChunkedGelfDecoder {
                 tokio::time::sleep(timeout).await;
                 let mut state_lock = state.lock().unwrap();
                 if state_lock.remove(&message_id).is_some() {
-                    let message = format!("Message was not fully received within the timeout window of {}ms. Discarding it.",
-                        timeout.as_millis());
                     warn!(
-                        message = message,
                         message_id = message_id,
-                        timeout = timeout.as_millis(),
-                        internal_log_rate_limit = true
+                        timeout = timeout.as_secs_f64(),
+                        internal_log_rate_limit = true,
+                        format!("Message was not fully received within the timeout window of {}s. Discarding it.",
+                            timeout.as_secs_f64())
                     );
                 }
             });
@@ -297,10 +286,10 @@ impl ChunkedGelfDecoder {
 
         if message_state.is_chunk_present(sequence_number) {
             info!(
-                message = "Received a duplicate chunk. Ignoring it.",
                 message_id = message_id,
                 sequence_number = sequence_number,
-                internal_log_rate_limit = true
+                internal_log_rate_limit = true,
+                "Received a duplicate chunk. Ignoring it."
             );
             return Ok(None);
         }
