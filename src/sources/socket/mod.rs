@@ -68,14 +68,14 @@ impl SocketConfig {
         }
     }
 
-    fn log_namespace(&self) -> LogNamespace {
+    fn log_namespace(&self, global_log_namespace: LogNamespace) -> LogNamespace {
         match &self.mode {
-            Mode::Tcp(config) => config.log_namespace.unwrap_or(false).into(),
-            Mode::Udp(config) => config.log_namespace.unwrap_or(false).into(),
+            Mode::Tcp(config) => global_log_namespace.merge(config.log_namespace),
+            Mode::Udp(config) => global_log_namespace.merge(config.log_namespace),
             #[cfg(unix)]
-            Mode::UnixDatagram(config) => config.log_namespace.unwrap_or(false).into(),
+            Mode::UnixDatagram(config) => global_log_namespace.merge(config.log_namespace),
             #[cfg(unix)]
-            Mode::UnixStream(config) => config.log_namespace.unwrap_or(false).into(),
+            Mode::UnixStream(config) => global_log_namespace.merge(config.log_namespace),
         }
     }
 }
@@ -198,7 +198,7 @@ impl SourceConfig for SocketConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        let log_namespace = global_log_namespace.merge(Some(self.log_namespace()));
+        let log_namespace = self.log_namespace(global_log_namespace);
 
         let schema_definition = self
             .decoding()
