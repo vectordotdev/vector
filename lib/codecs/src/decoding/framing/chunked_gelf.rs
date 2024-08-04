@@ -16,11 +16,11 @@ use vector_config::configurable_component;
 
 const GELF_MAGIC: [u8; 2] = [0x1e, 0x0f];
 const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
-const DEFAULT_TIMEOUT_MILLIS: u64 = 5000;
+const DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 const DEFAULT_PENDING_MESSAGES_LIMIT: usize = 1000;
 
-const fn default_timeout_millis() -> u64 {
-    DEFAULT_TIMEOUT_MILLIS
+const fn default_timeout_secs() -> f64 {
+    DEFAULT_TIMEOUT_SECS
 }
 
 const fn default_pending_messages_limit() -> usize {
@@ -29,10 +29,9 @@ const fn default_pending_messages_limit() -> usize {
 
 /// Config used to build a `ChunkedGelfDecoder`.
 #[configurable_component]
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default)]
 pub struct ChunkedGelfDecoderConfig {
     /// Options for the chunked GELF decoder.
-    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub chunked_gelf: ChunkedGelfDecoderOptions,
 }
 
@@ -40,7 +39,7 @@ impl ChunkedGelfDecoderConfig {
     /// Build the `ChunkedGelfDecoder` from this configuration.
     pub fn build(&self) -> ChunkedGelfDecoder {
         ChunkedGelfDecoder::new(
-            self.chunked_gelf.timeout_millis,
+            self.chunked_gelf.timeout_secs,
             self.chunked_gelf.pending_messages_limit,
         )
     }
@@ -48,15 +47,15 @@ impl ChunkedGelfDecoderConfig {
 
 /// Options for building a `ChunkedGelfDecoder`.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative, PartialEq, Eq)]
+#[derive(Clone, Debug, Derivative)]
 pub struct ChunkedGelfDecoderOptions {
     /// The timeout, in milliseconds, for a message to be fully received. If the timeout is reached, the
     /// decoder drops all the received chunks of the incomplete message and starts over.
     #[serde(
-        default = "default_timeout_millis",
+        default = "default_timeout_secs",
         skip_serializing_if = "vector_core::serde::is_default"
     )]
-    pub timeout_millis: u64,
+    pub timeout_secs: f64,
 
     /// The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
     /// dropping chunks of new messages. This limit ensures the memory usage of the decoder's state is bounded.
@@ -70,7 +69,7 @@ pub struct ChunkedGelfDecoderOptions {
 impl Default for ChunkedGelfDecoderOptions {
     fn default() -> Self {
         Self {
-            timeout_millis: default_timeout_millis(),
+            timeout_secs: default_timeout_secs(),
             pending_messages_limit: default_pending_messages_limit(),
         }
     }
@@ -188,11 +187,11 @@ pub struct ChunkedGelfDecoder {
 
 impl ChunkedGelfDecoder {
     /// Creates a new `ChunkedGelfDecoder`.
-    pub fn new(timeout_millis: u64, pending_messages_limit: usize) -> Self {
+    pub fn new(timeout_secs: f64, pending_messages_limit: usize) -> Self {
         Self {
             bytes_decoder: BytesDecoder::new(),
             state: Arc::new(Mutex::new(HashMap::new())),
-            timeout: Duration::from_millis(timeout_millis),
+            timeout: Duration::from_secs_f64(timeout_secs),
             pending_messages_limit,
         }
     }
@@ -335,7 +334,7 @@ impl ChunkedGelfDecoder {
 
 impl Default for ChunkedGelfDecoder {
     fn default() -> Self {
-        Self::new(DEFAULT_TIMEOUT_MILLIS, DEFAULT_PENDING_MESSAGES_LIMIT)
+        Self::new(DEFAULT_TIMEOUT_SECS, DEFAULT_PENDING_MESSAGES_LIMIT)
     }
 }
 
@@ -565,7 +564,7 @@ mod tests {
         assert!(!decoder.state.lock().unwrap().is_empty());
 
         // The message state should be cleared after a certain time
-        tokio::time::sleep(Duration::from_millis(DEFAULT_TIMEOUT_MILLIS + 1)).await;
+        tokio::time::sleep(Duration::from_secs_f64(DEFAULT_TIMEOUT_SECS + 1.0)).await;
         assert!(decoder.state.lock().unwrap().is_empty());
         assert!(logs_contain(
             "Message was not fully received within the timeout window of 5000ms. Discarding it."
@@ -574,7 +573,7 @@ mod tests {
         let frame = decoder.decode_eof(&mut chunks[1]).unwrap();
         assert!(frame.is_none());
 
-        tokio::time::sleep(Duration::from_millis(DEFAULT_TIMEOUT_MILLIS + 1)).await;
+        tokio::time::sleep(Duration::from_secs_f64(DEFAULT_TIMEOUT_SECS + 1.0)).await;
         assert!(decoder.state.lock().unwrap().is_empty());
         assert!(logs_contain(
             "Message was not fully received within the timeout window of 5000ms. Discarding it"
@@ -657,7 +656,7 @@ mod tests {
         let pending_messages_limit = 1;
         let (mut two_chunks, _) = two_chunks_message;
         let (mut three_chunks, _) = three_chunks_message;
-        let mut decoder = ChunkedGelfDecoder::new(DEFAULT_TIMEOUT_MILLIS, pending_messages_limit);
+        let mut decoder = ChunkedGelfDecoder::new(DEFAULT_TIMEOUT_SECS, pending_messages_limit);
 
         let frame = decoder.decode_eof(&mut two_chunks[0]).unwrap();
         assert!(frame.is_none());
