@@ -603,10 +603,10 @@ mod tests {
 
         let error = frame.expect_err("Expected an error");
         let downcasted_error = downcast_framing_error(&error);
-        matches!(
+        assert!(matches!(
             downcasted_error,
             ChunkedGelfDecoderError::InvalidChunkHeader { .. }
-        );
+        ));
     }
 
     #[tokio::test]
@@ -622,10 +622,10 @@ mod tests {
         let frame = decoder.decode_eof(&mut chunk);
         let error = frame.expect_err("Expected an error");
         let downcasted_error = downcast_framing_error(&error);
-        matches!(
+        assert!(matches!(
             downcasted_error,
             ChunkedGelfDecoderError::InvalidTotalChunks { .. }
-        );
+        ));
     }
 
     #[tokio::test]
@@ -641,10 +641,10 @@ mod tests {
         let frame = decoder.decode_eof(&mut chunk);
         let error = frame.expect_err("Expected an error");
         let downcasted_error = downcast_framing_error(&error);
-        matches!(
+        assert!(matches!(
             downcasted_error,
             ChunkedGelfDecoderError::InvalidSequenceNumber { .. }
-        );
+        ));
     }
 
     #[rstest]
@@ -666,10 +666,10 @@ mod tests {
         let frame = decoder.decode_eof(&mut three_chunks[0]);
         let error = frame.expect_err("Expected an error");
         let downcasted_error = downcast_framing_error(&error);
-        matches!(
+        assert!(matches!(
             downcasted_error,
             ChunkedGelfDecoderError::PendingMessagesLimitReached { .. }
-        );
+        ));
         assert!(decoder.state.lock().unwrap().len() == 1);
     }
 
@@ -692,10 +692,10 @@ mod tests {
         let frame = decoder.decode_eof(&mut second_chunk);
         let error = frame.expect_err("Expected an error");
         let downcasted_error = downcast_framing_error(&error);
-        matches!(
+        assert!(matches!(
             downcasted_error,
             ChunkedGelfDecoderError::TotalChunksMismatch { .. }
-        );
+        ));
     }
 
     #[rstest]
