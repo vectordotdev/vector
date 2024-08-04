@@ -555,7 +555,7 @@ mod tests {
         tokio::time::sleep(Duration::from_secs_f64(DEFAULT_TIMEOUT_SECS + 1.0)).await;
         assert!(decoder.state.lock().unwrap().is_empty());
         assert!(logs_contain(
-            "Message was not fully received within the timeout window of 5000ms. Discarding it."
+            "Message was not fully received within the timeout window. Discarding it."
         ));
 
         let frame = decoder.decode_eof(&mut chunks[1]).unwrap();
@@ -564,7 +564,7 @@ mod tests {
         tokio::time::sleep(Duration::from_secs_f64(DEFAULT_TIMEOUT_SECS + 1.0)).await;
         assert!(decoder.state.lock().unwrap().is_empty());
         assert!(logs_contain(
-            "Message was not fully received within the timeout window of 5000ms. Discarding it"
+            "Message was not fully received within the timeout window. Discarding it"
         ));
     }
 
