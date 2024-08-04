@@ -264,10 +264,9 @@ impl ChunkedGelfDecoder {
                 if state_lock.remove(&message_id).is_some() {
                     warn!(
                         message_id = message_id,
-                        timeout = timeout.as_secs_f64(),
+                        timeout_secs = timeout.as_secs_f64(),
                         internal_log_rate_limit = true,
-                        format!("Message was not fully received within the timeout window of {}s. Discarding it.",
-                            timeout.as_secs_f64())
+                        "Message was not fully received within the timeout window. Discarding it."
                     );
                 }
             });
