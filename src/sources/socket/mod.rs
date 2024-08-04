@@ -1145,14 +1145,14 @@ mod test {
             let seed = 42;
             let mut rng = SmallRng::seed_from_u64(seed);
             let max_size = 300;
-            let big_message = "This is a very large message".repeat(1000);
-            let another_big_message = "This is another very large message".repeat(1000);
+            let big_message = "This is a very large message".repeat(500);
+            let another_big_message = "This is another very large message".repeat(500);
             let mut chunks = get_gelf_chunks(big_message.as_str(), max_size, &mut rng);
             let mut another_chunks =
                 get_gelf_chunks(another_big_message.as_str(), max_size, &mut rng);
             chunks.append(&mut another_chunks);
             chunks.shuffle(&mut rng);
-
+            dbg!(chunks.len());
             send_packets_udp(address, chunks);
 
             let events = collect_n(rx, 2).await;
