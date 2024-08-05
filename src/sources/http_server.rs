@@ -102,6 +102,9 @@ pub struct SimpleHttpConfig {
     /// Custom response headers to be added to the HTTP response
     #[serde(default)]
     #[configurable(metadata(docs::examples = "example_custom_response_headers()"))]
+    #[configurable(metadata(
+        docs::additional_props_description = "A custom response header key-value pair"
+    ))]
     custom_response_headers: HashMap<String, String>,
 
     /// A list of URL query parameters to include in the log event.
