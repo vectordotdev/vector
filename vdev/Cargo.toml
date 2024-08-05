@@ -34,5 +34,5 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml = "0.9.34"
 sha2 = "0.10.8"
-tempfile = "3.10.1"
+tempfile = "3.11.0"
 toml.workspace = true
