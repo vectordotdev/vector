@@ -20,6 +20,7 @@ use crate::{
 use snafu::ResultExt;
 
 use super::config::HttpMethod;
+use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub(super) struct HttpSinkRequestBuilder {
@@ -51,9 +52,12 @@ impl HttpSinkRequestBuilder {
         }
     }
 }
-
+#[async_trait]
 impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
-    fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+    async fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+
+        println!("XOXOXOX HttpServiceRequestBuilder::build");
+
         let method: Method = self.method.into();
         let uri: Uri = self.uri.uri.clone();
         let mut builder = Request::builder().method(method).uri(uri);

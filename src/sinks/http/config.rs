@@ -275,6 +275,8 @@ impl SinkConfig for HttpSinkConfig {
                 .to_string()
         });
 
+        println!("XOXOXOXO CONFIG HttpSinkConfig");
+
         let http_sink_request_builder = HttpSinkRequestBuilder::new(
             self.uri.with_default_parts(),
             self.method,

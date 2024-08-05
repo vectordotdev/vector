@@ -9,6 +9,7 @@ use crate::sinks::{
     HTTPRequestBuilderSnafu,
 };
 use snafu::ResultExt;
+use async_trait::async_trait;
 
 use super::config::HTTP_HEADER_HONEYCOMB;
 
@@ -18,8 +19,9 @@ pub(super) struct HoneycombSvcRequestBuilder {
     pub(super) api_key: SensitiveString,
 }
 
+#[async_trait]
 impl HttpServiceRequestBuilder<()> for HoneycombSvcRequestBuilder {
-    fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+    async fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
         let builder = Request::post(&self.uri).header(HTTP_HEADER_HONEYCOMB, self.api_key.inner());
 
         builder
