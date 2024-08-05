@@ -127,10 +127,10 @@ mod tests {
         file.write_all(&[0]).unwrap();
         file.sync_all().unwrap();
 
-        match tokio::time::timeout(timeout, receiver.recv()).await {
-            Ok(Ok(crate::signal::SignalTo::ReloadFromDisk)) => true,
-            _ => false,
-        }
+        matches!(
+            tokio::time::timeout(timeout, receiver.recv()).await,
+            Ok(Ok(crate::signal::SignalTo::ReloadFromDisk))
+        )
     }
 
     #[tokio::test]
