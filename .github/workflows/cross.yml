@@ -26,7 +26,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request_review' }}
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ github.events.review.commit_id }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Cross
           status: pending
@@ -35,7 +35,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request_review' }}
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.events.review.commit_id }}
+          ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'pull_request_review' }}
@@ -83,7 +83,7 @@ jobs:
       - name: (PR review) Submit PR result as success
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ github.events.review.commit_id }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Cross
           status: 'success'
