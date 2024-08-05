@@ -4,7 +4,6 @@
 #![deny(unused_allocation)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
-#![deny(warnings)]
 #![deny(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg), deny(rustdoc::broken_intra_doc_links))]
 #![allow(async_fn_in_trait)]
