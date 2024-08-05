@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-
+use std::sync::{Arc, Mutex};
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
@@ -33,9 +33,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
-    config::ProxyConfig,
-    internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent},
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
+    config::ProxyConfig, internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent}, tls::{tls_connector_builder, MaybeTlsSettings, TlsError}
 };
 
 pub mod status {
@@ -293,6 +291,27 @@ pub enum Auth {
         password: SensitiveString,
     },
 
+    /// Lorem ipsum dolor sit amet.
+    ///
+    /// Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia.
+    OAuth2 {
+        /// Temporibus autem quibusdam et aut officiis debitis.
+        #[configurable(metadata(docs::examples = "${TOKEN_ENDPOINT}"))]
+        #[configurable(metadata(docs::examples = "token_endpoint"))]
+        token_endpoint: String,
+
+        /// Nam libero tempore, cum soluta nobis.
+        #[configurable(metadata(docs::examples = "${CLIENT_ID}"))]
+        #[configurable(metadata(docs::examples = "client_id"))]
+        client_id: String,
+
+        /// At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium.
+        #[configurable(metadata(docs::examples = "${CLIENT_SECRET}"))]
+        #[configurable(metadata(docs::examples = "client_secret"))]
+        client_secret: SensitiveString,
+    },
+
+
     /// Bearer authentication.
     ///
     /// The bearer token value (OAuth2, JWT, etc.) is passed as-is.
@@ -338,6 +357,7 @@ impl Auth {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
+            Auth::OAuth2 { .. } => todo!(),
         }
     }
 }

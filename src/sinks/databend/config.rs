@@ -130,6 +130,9 @@ impl SinkConfig for DatabendConfig {
             Some(Auth::Bearer { .. }) => {
                 return Err("Bearer authentication is not supported currently".into());
             }
+            Some(Auth::OAuth2 { .. }) => {
+                todo!()
+            }
             None => {}
         }
         if let Some(database) = &self.database {
