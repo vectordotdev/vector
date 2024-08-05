@@ -277,7 +277,7 @@ impl Compose {
 
     fn run(&self, action: &str, args: &[&'static str], config: Option<&Environment>) -> Result<()> {
         let mut command = CONTAINER_TOOL.clone();
-        command.push("-compose");
+        command.push(" compose");
         let mut command = Command::new(command);
         // When the integration test environment is already active, the tempfile path does not
         // exist because `Compose::new()` has not been called. In this case, the `stop` command
