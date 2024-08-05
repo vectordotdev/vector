@@ -1152,7 +1152,7 @@ mod test {
                 get_gelf_chunks(another_big_message.as_str(), max_size, &mut rng);
             chunks.append(&mut another_chunks);
             chunks.shuffle(&mut rng);
-            dbg!(chunks.len());
+
             send_packets_udp(address, chunks);
 
             let events = collect_n(rx, 2).await;

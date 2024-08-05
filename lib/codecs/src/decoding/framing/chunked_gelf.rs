@@ -451,7 +451,7 @@ mod tests {
         )
     }
 
-    fn downcast_framing_error(error: &Box<dyn FramingError>) -> &ChunkedGelfDecoderError {
+    fn downcast_framing_error(error: &BoxedFramingError) -> &ChunkedGelfDecoderError {
         error
             .as_any()
             .downcast_ref::<ChunkedGelfDecoderError>()
