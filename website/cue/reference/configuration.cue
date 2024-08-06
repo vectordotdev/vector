@@ -286,7 +286,7 @@ configuration: {
 			type: object: {
 				examples: []
 				options: {
-					log_namespacing: {
+					log_namespace: {
 						common:      false
 						description: """
 							Globally enables / disables log namespacing. See [Log Namespacing](\(urls.log_namespacing_blog))
