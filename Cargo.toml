@@ -332,7 +332,7 @@ rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustl
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.23", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
-snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
+snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
 snap = { version = "1.1.1", default-features = false }
 socket2 = { version = "0.5.7", default-features = false }
 stream-cancel = { version = "0.8.2", default-features = false }
