@@ -19,6 +19,7 @@ use bytes::Bytes;
 use itertools::Itertools;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 use warp::http::HeaderMap;
 
 use super::parser;
@@ -98,6 +99,7 @@ impl SourceConfig for PrometheusPushgatewayConfig {
             "",
             HttpMethod::Post,
             http::StatusCode::OK,
+            OptionalTargetPath::none(),
             false,
             &self.tls,
             &self.auth,

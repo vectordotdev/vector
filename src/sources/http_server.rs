@@ -14,7 +14,7 @@ use vector_lib::codecs::{
     NewlineDelimitedDecoderConfig,
 };
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, lookup_v2::OptionalTargetPath, owned_value_path, path};
 use vector_lib::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
@@ -147,6 +147,11 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_http_response_code")]
     response_code: StatusCode,
 
+    /// The event key in which the requested URL path used to send the request is stored.
+    #[serde(default = "default_response_body_key")]
+    #[configurable(metadata(docs::examples = "vector_http_path"))]
+    response_body_key: OptionalTargetPath,
+
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
@@ -273,6 +278,7 @@ impl Default for SimpleHttpConfig {
             host_key: default_host_key(),
             method: default_http_method(),
             response_code: default_http_response_code(),
+            response_body_key: default_response_body_key(),
             strict_path: true,
             framing: None,
             decoding: Some(default_decoding()),
@@ -299,6 +305,10 @@ fn default_path_key() -> OptionalValuePath {
 
 fn default_host_key() -> OptionalValuePath {
     OptionalValuePath::none()
+}
+
+fn default_response_body_key() -> OptionalTargetPath {
+    OptionalTargetPath::none()
 }
 
 const fn default_http_response_code() -> StatusCode {
@@ -366,6 +376,7 @@ impl SourceConfig for SimpleHttpConfig {
             self.path.as_str(),
             self.method,
             self.response_code,
+            self.response_body_key.clone(),
             self.strict_path,
             &self.tls,
             &self.auth,

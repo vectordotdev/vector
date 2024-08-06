@@ -9,12 +9,14 @@ use std::{
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use hyper::{service::make_service_fn, Server};
+use serde_json::json;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    lookup::{lookup_v2::OptionalTargetPath},
     EstimatedJsonEncodedSizeOf,
 };
 use warp::{
@@ -24,6 +26,8 @@ use warp::{
     },
     http::{HeaderMap, StatusCode},
     reject::Rejection,
+    reply::json,
+    reply::Reply,
     Filter,
 };
 
@@ -77,6 +81,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         path: &str,
         method: HttpMethod,
         response_code: StatusCode,
+        response_body_key: OptionalTargetPath,
         strict_path: bool,
         tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
@@ -170,7 +175,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, acknowledgements, response_code, cx.out.clone())
+                        handle_request(events, acknowledgements, response_code, response_body_key.clone(), cx.out.clone())
                     },
                 );
 
@@ -261,6 +266,7 @@ async fn handle_request(
     events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,
     response_code: StatusCode,
+    response_body_key: OptionalTargetPath,
     mut out: SourceSender,
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
@@ -268,6 +274,17 @@ async fn handle_request(
             let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
 
             let count = events.len();
+            let mut response = response_code.into_response();
+
+            if response_body_key.path.is_some() {
+                let cloned = events.clone();
+                let first = cloned.first().unwrap();
+                response = warp::reply::with_status(
+                    json(&json!(first.as_log().get(response_body_key.path.unwrap().to_string().as_str()).unwrap())),
+                    response_code,
+                ).into_response();
+            }
+
             out.send_batch(events)
                 .map_err(|_| {
                     // can only fail if receiving end disconnected, so we are shutting down,
@@ -275,7 +292,7 @@ async fn handle_request(
                     emit!(StreamClosedError { count });
                     warp::reject::custom(RejectShuttingDown)
                 })
-                .and_then(|_| handle_batch_status(response_code, receiver))
+                .and_then(|_| handle_batch_status(response, receiver))
                 .await
         }
         Err(error) => {
@@ -286,13 +303,13 @@ async fn handle_request(
 }
 
 async fn handle_batch_status(
-    success_response_code: StatusCode,
+    success_response: impl warp::Reply,
     receiver: Option<BatchStatusReceiver>,
 ) -> Result<impl warp::Reply, Rejection> {
     match receiver {
-        None => Ok(success_response_code),
+        None => Ok(success_response),
         Some(receiver) => match receiver.await {
-            BatchStatus::Delivered => Ok(success_response_code),
+            BatchStatus::Delivered => Ok(success_response),
             BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error delivering contents to sink".into(),
