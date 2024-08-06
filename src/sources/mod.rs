@@ -91,7 +91,6 @@ pub mod vector;
 
 pub mod util;
 
-
 pub use vector_lib::source::Source;
 
 #[allow(dead_code)] // Easier than listing out all the features that use this

@@ -45,7 +45,7 @@ async fn test_messages_delivered() {
     };
     assert_eq!(events[0].as_log().value().to_string(), "\"foo\"");
     assert_eq!(events[1].as_log().value().to_string(), "\"bar\"");
-    select!{
+    select! {
         _ = success_receiver => {}
         _ = time::sleep(Duration::from_secs(5)) => panic!("Timeout waiting for success handler"),
     }

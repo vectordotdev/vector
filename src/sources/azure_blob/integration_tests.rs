@@ -11,7 +11,10 @@ use super::{
 use crate::{
     event::Event,
     serde::default_decoding,
-    test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS},
+    test_util::components::{
+        run_and_assert_source_compliance, run_and_assert_source_error, COMPONENT_ERROR_TAGS,
+        SOURCE_TAGS,
+    },
 };
 
 impl AzureBlobConfig {
@@ -44,6 +47,11 @@ impl AzureBlobConfig {
 
     async fn run_assert(&self) -> Vec<Event> {
         run_and_assert_source_compliance(self.clone(), Duration::from_secs(1), &SOURCE_TAGS).await
+    }
+
+    async fn run_error(&self) -> Vec<Event> {
+        run_and_assert_source_error(self.clone(), Duration::from_secs(1), &COMPONENT_ERROR_TAGS)
+            .await
     }
 
     async fn ensure_container(&self) {
@@ -166,11 +174,27 @@ async fn azure_blob_read_single_line_from_multiple_blobs() {
             .await;
     }
 
-    let events = run_and_assert_source_compliance(
-        config.clone(), Duration::from_secs(4), &SOURCE_TAGS
-    ).await;
+    let events =
+        run_and_assert_source_compliance(config.clone(), Duration::from_secs(4), &SOURCE_TAGS)
+            .await;
     assert_eq!(events.len(), contents.len());
     for (i, event) in events.iter().enumerate() {
         assert_eq!(event.as_log()["message"], contents[i].into());
     }
+}
+
+#[tokio::test]
+async fn azure_blob_emit_error_on_message_read() {
+    let mut config = AzureBlobConfig::new_emulator().await;
+    let content = "a\nb\nc";
+    config
+        .upload_blob("file.txt".to_string(), content.to_string())
+        .await;
+    config.queue = Some(Config {
+        queue_name: "nonexistent".to_string(),
+        poll_secs: 1,
+    });
+
+    let events = config.run_error().await;
+    assert!(events.is_empty());
 }
