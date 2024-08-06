@@ -232,7 +232,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request_review' }}
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ github.events.review.commit_id }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Regression Detection Suite
           status: pending
@@ -757,7 +757,7 @@ jobs:
         if: github.event_name == 'pull_request_review' && env.FAILED == 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ github.events.review.commit_id }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Regression Detection Suite
           status: 'failure'
@@ -766,7 +766,7 @@ jobs:
         if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ github.events.review.commit_id }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Regression Detection Suite
           status: 'success'
