@@ -276,9 +276,8 @@ impl Compose {
     }
 
     fn run(&self, action: &str, args: &[&'static str], config: Option<&Environment>) -> Result<()> {
-        let mut command = CONTAINER_TOOL.clone();
-        command.push("-compose");
-        let mut command = Command::new(command);
+        let mut command = Command::new(CONTAINER_TOOL.clone());
+        command.arg("compose");
         // When the integration test environment is already active, the tempfile path does not
         // exist because `Compose::new()` has not been called. In this case, the `stop` command
         // needs to use the calculated path from the integration name instead of the nonexistent
