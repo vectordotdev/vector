@@ -29,7 +29,7 @@ pub mod exec;
 pub mod file;
 #[cfg(any(
     feature = "sources-stdin",
-    all(unix, feature = "sources-file-descriptor")
+    all(unix, feature = "sources-file_descriptor")
 ))]
 pub mod file_descriptors;
 #[cfg(feature = "sources-fluent")]

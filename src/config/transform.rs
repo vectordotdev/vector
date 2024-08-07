@@ -152,7 +152,7 @@ impl TransformContext {
         }
     }
 
-    #[cfg(any(test, feature = "test"))]
+    #[cfg(test)]
     pub fn new_test(
         schema_definitions: HashMap<Option<String>, HashMap<OutputId, schema::Definition>>,
     ) -> Self {

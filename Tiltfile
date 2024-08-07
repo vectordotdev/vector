@@ -7,7 +7,7 @@ load('ext://helm_resource', 'helm_resource', 'helm_repo')
 docker_build(
     ref='timberio/vector',
     context='.',
-    build_args={'RUST_VERSION': '1.79.0'},
+    build_args={'RUST_VERSION': '1.80.0'},
     dockerfile='tilt/Dockerfile'
     )
 

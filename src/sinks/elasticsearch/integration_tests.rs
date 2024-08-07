@@ -698,7 +698,7 @@ async fn run_insert_tests_with_config(
         // https://github.com/rust-lang/rust-clippy/issues/6909
         let input = input
             .into_iter()
-            .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+            .map(|rec| serde_json::to_value(rec.into_log()).unwrap())
             .collect::<Vec<_>>();
 
         for hit in hits {
