@@ -6,8 +6,8 @@ use std::{
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use vector_lib::{config::LogNamespace, event::MetricValue};
 
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
@@ -28,6 +28,50 @@ pub struct AggregateConfig {
     #[serde(default = "default_interval_ms")]
     #[configurable(metadata(docs::human_name = "Flush Interval"))]
     pub interval_ms: u64,
+    /// Function to use for aggregation.
+    ///
+    /// Some of the functions may only function on incremental and some only on absolute metrics.
+    #[serde(default = "default_mode")]
+    #[configurable(derived)]
+    pub mode: AggregationMode,
+}
+
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[configurable(description = "The aggregation mode to use.")]
+pub enum AggregationMode {
+    /// Default mode. Sums incremental metrics and uses the latest value for absolute metrics.
+    #[default]
+    Auto,
+
+    /// Sums incremental metrics, no-op for absolute
+    Sum,
+
+    /// Returns the latest value for absolute metrics, no-op for incremental
+    Latest,
+
+    /// Counts metrics for incremental and absolute metrics
+    Count,
+
+    /// Returns difference compared to previous interval - for incremental it is the difference of
+    /// sums and for absolute it the difference between latest values
+    Diff,
+
+    /// Max value of metric
+    Max,
+
+    /// Min value of metric
+    Min,
+
+    /// Mean value of metric
+    Mean,
+
+    /// Stdev
+    Stdev,
+}
+
+const fn default_mode() -> AggregationMode {
+    AggregationMode::Auto
 }
 
 const fn default_interval_ms() -> u64 {
@@ -63,6 +107,7 @@ type MetricEntry = (metric::MetricData, EventMetadata);
 pub struct Aggregate {
     interval: Duration,
     map: HashMap<metric::MetricSeries, MetricEntry>,
+    mode: AggregationMode,
 }
 
 impl Aggregate {
@@ -70,6 +115,7 @@ impl Aggregate {
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
             map: Default::default(),
+            mode: config.mode.clone(),
         })
     }
 
@@ -92,10 +138,31 @@ impl Aggregate {
                     entry.insert((data, metadata));
                 }
             },
-            metric::MetricKind::Absolute => {
-                // Always replace/store
-                self.map.insert(series, (data, metadata));
-            }
+            metric::MetricKind::Absolute => match self.mode {
+                AggregationMode::Auto | AggregationMode::Latest => {
+                    self.map.insert(series, (data, metadata));
+                }
+                AggregationMode::Max => todo!(),
+                AggregationMode::Sum => todo!(),
+                AggregationMode::Count => {
+                    let existing = self.map.entry(series).or_insert_with(|| {
+                        let mut new_data = data.clone();
+                        *new_data.value_mut() = MetricValue::Counter { value: 0f64 };
+                        (new_data, metadata.clone())
+                    });
+                    let mut count_data = data.clone();
+                    *count_data.value_mut() = MetricValue::Counter { value: 1f64 };
+                    if existing.0.kind == data.kind && existing.0.update(&count_data) {
+                        existing.1.merge(metadata);
+                    } else {
+                        emit!(AggregateUpdateFailed);
+                    }
+                }
+                AggregationMode::Diff => todo!(),
+                AggregationMode::Min => todo!(),
+                AggregationMode::Mean => todo!(),
+                AggregationMode::Stdev => todo!(),
+            },
         };
 
         emit!(AggregateEventRecorded);
@@ -192,6 +259,7 @@ mod tests {
     fn incremental() {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
+            mode: AggregationMode::Auto,
         })
         .unwrap();
 
@@ -262,6 +330,7 @@ mod tests {
     fn absolute() {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
+            mode: AggregationMode::Auto,
         })
         .unwrap();
 
@@ -324,9 +393,66 @@ mod tests {
     }
 
     #[test]
+    fn count_agg() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Count,
+        })
+        .unwrap();
+
+        let gauge_a_1 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 42.0 },
+        );
+        let gauge_a_2 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 43.0 },
+        );
+        let result_count = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Counter { value: 1.0 },
+        );
+        let result_count_2 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Counter { value: 2.0 },
+        );
+
+        // Single item, counter should be 1
+        agg.record(gauge_a_1.clone());
+        let mut out = vec![];
+        // We should flush 1 item gauge_a_1
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&result_count, &out[0]);
+
+        // A subsequent flush doesn't send out anything
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // One more just to make sure that we don't re-see from the other buffer
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // Two absolutes with the same series, counter should be 2
+        agg.record(gauge_a_1.clone());
+        agg.record(gauge_a_2.clone());
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&result_count_2, &out[0]);
+    }
+
+    #[test]
     fn conflicting_value_type() {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
+            mode: AggregationMode::Auto,
         })
         .unwrap();
 
@@ -384,6 +510,7 @@ mod tests {
     fn conflicting_kinds() {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
+            mode: AggregationMode::Auto,
         })
         .unwrap();
 
