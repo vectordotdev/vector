@@ -24,8 +24,12 @@ mod aws_ecs_metrics;
 mod aws_kinesis;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
+#[cfg(feature = "sources-aws_s3")]
+mod aws_s3;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
+#[cfg(feature = "sinks-azure_blob")]
+mod azure_blob;
 mod batch;
 mod codecs;
 mod common;
@@ -162,8 +166,12 @@ pub(crate) use self::aws_ecs_metrics::*;
 pub(crate) use self::aws_kinesis::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub(crate) use self::aws_kinesis_firehose::*;
+#[cfg(feature = "sources-aws_s3")]
+pub(crate) use self::aws_s3::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
+#[cfg(feature = "sinks-azure_blob")]
+pub(crate) use self::azure_blob::*;
 pub(crate) use self::codecs::*;
 #[cfg(feature = "sources-datadog_agent")]
 pub(crate) use self::datadog_agent::*;
