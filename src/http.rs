@@ -4,6 +4,7 @@ use std::{
     net::SocketAddr,
     task::{Context, Poll},
     time::Duration,
+    fs,
 };
 
 use futures::future::BoxFuture;
@@ -300,6 +301,16 @@ pub enum Auth {
         /// The bearer authentication token.
         token: SensitiveString,
     },
+
+    /// Bearer authentication, but from a file.
+    /// 
+    /// The bearer token value is read from the file with given path.
+    BearerFile {
+        /// The bearer token filepath.
+        #[configurable(metadata(docs::examples = "${TOKEN_FILE}"))]
+        #[configurable(metadata(docs::examples = "/path/to/token"))]
+        token_file: String,
+    },
 }
 
 pub trait MaybeAuth: Sized {
@@ -338,6 +349,13 @@ impl Auth {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
+            Auth::BearerFile { token_file } => match fs::read_to_string(token_file) {
+                Ok(token) => match Authorization::bearer(&token) {
+                    Ok(auth) => map.typed_insert(auth),
+                    Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
+                },
+                Err(error) => error!(message = "Could not read token file.", token_file = %token_file, %error),
+            }
         }
     }
 }
