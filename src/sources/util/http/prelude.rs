@@ -25,7 +25,6 @@ use warp::{
     },
     http::{HeaderMap, StatusCode},
     reject::Rejection,
-    reply::json,
     reply::Reply,
     Filter,
 };
@@ -272,22 +271,18 @@ async fn handle_request(
         Ok(mut events) => {
             let mut response = response_code.into_response();
 
-            if response_body_key.path.is_some() {
-                let cloned = events.clone();
-                let first = cloned.first().unwrap();
-                let body = first.as_log().get(response_body_key.path.unwrap().to_string().as_str());
-                match body {
-                    Some(body) => {
+            if let Some(path) = &response_body_key.path {
+                if let Some(first_event) = events.first() {
+                    if let Some(body) = first_event.as_log().get(path.to_string().as_str()) {
                         response = warp::reply::with_status(
-                            json(&json!(body)),
+                            warp::reply::json(&json!(body)),
                             response_code,
                         ).into_response();
-                    }
-                    None => {
+                    } else {
                         return Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::INTERNAL_SERVER_ERROR,
                             "Error generating response body".into(),
-                        )))
+                        )));
                     }
                 }
             }
