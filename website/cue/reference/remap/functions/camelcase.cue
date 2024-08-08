@@ -4,7 +4,7 @@ remap: functions: camelcase: {
 	category: "String"
 	description: """
 		Takes the `value` string, and turns it into camelCase. Optionally, you can
-		pass in the existing case of the function, or else we will try to figure out the case automatically.
+		pass in the existing case of the function, or else an attempt is made to determine the case automatically.
 		"""
 
 	arguments: [
