@@ -568,6 +568,7 @@ jtype
 juchiast
 karppila
 kartar
+kebabcase
 kemmer
 kernelmode
 keybase
@@ -815,6 +816,7 @@ paq
 parallelizable
 pareto
 partitionable
+pascalcase
 passthrough
 pathbuf
 pathgen
@@ -946,6 +948,7 @@ sccache
 schemaless
 schemars
 schoen
+screamingsnakecase
 sda
 sdata
 SDID
