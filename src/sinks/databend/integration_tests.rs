@@ -151,7 +151,7 @@ async fn insert_event_csv_gzip() {
     insert_event_with_cfg(cfg, table, client).await;
 }
 
-fn response_to_map(resp: &DatabendAPIResponse) -> Vec<BTreeMap<String, String>> {
+fn response_to_map(resp: &DatabendAPIResponse) -> Vec<BTreeMap<String, Option<String>>> {
     let mut result = Vec::new();
     for row in &resp.data {
         let mut map = BTreeMap::new();

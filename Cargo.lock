@@ -2701,9 +2701,9 @@ checksum = "5c297a1c74b71ae29df00c3e22dd9534821d60eb9af5a0192823fa2acea70c2a"
 
 [[package]]
 name = "databend-client"
-version = "0.19.5"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cc64f96aeac28470097189078b972a2dcbb398a019069ad0d2503843544bb55"
+checksum = "2745fc98f28ad37196d90dd7cf268b0a7c9b12e5e21f7470ce6b3e3055a3249e"
 dependencies = [
  "async-trait",
  "log",
