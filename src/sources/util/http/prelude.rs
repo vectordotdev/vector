@@ -5,7 +5,6 @@ use std::{
     net::SocketAddr,
     time::Duration,
 };
-
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use hyper::{service::make_service_fn, Server};
@@ -271,20 +270,30 @@ async fn handle_request(
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
         Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
-
-            let count = events.len();
             let mut response = response_code.into_response();
 
             if response_body_key.path.is_some() {
                 let cloned = events.clone();
                 let first = cloned.first().unwrap();
-                response = warp::reply::with_status(
-                    json(&json!(first.as_log().get(response_body_key.path.unwrap().to_string().as_str()).unwrap())),
-                    response_code,
-                ).into_response();
+                let body = first.as_log().get(response_body_key.path.unwrap().to_string().as_str());
+                match body {
+                    Some(body) => {
+                        response = warp::reply::with_status(
+                            json(&json!(body)),
+                            response_code,
+                        ).into_response();
+                    }
+                    None => {
+                        return Err(warp::reject::custom(ErrorMessage::new(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Error generating response body".into(),
+                        )))
+                    }
+                }
             }
 
+            let count = events.len();
+            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
             out.send_batch(events)
                 .map_err(|_| {
                     // can only fail if receiving end disconnected, so we are shutting down,
