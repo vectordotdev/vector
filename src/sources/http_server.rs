@@ -669,6 +669,15 @@ mod tests {
             .as_u16()
     }
 
+    async fn send_with_response(address: SocketAddr, body: &str) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(&format!("http://{}/", address))
+            .body(body.to_owned())
+            .send()
+            .await
+            .unwrap()
+    }
+
     async fn send_with_headers(address: SocketAddr, body: &str, headers: HeaderMap) -> u16 {
         reqwest::Client::new()
             .post(&format!("http://{}/", address))
@@ -1371,7 +1380,7 @@ mod tests {
             "/",
             "POST",
             StatusCode::OK,
-                OptionalTargetPath::none(),
+            OptionalTargetPath::none(),
             true,
             EventStatus::Delivered,
             true,
@@ -1508,6 +1517,96 @@ mod tests {
         .await;
 
         assert_eq!(200, send_request(addr, "GET", "", "/").await);
+    }
+
+    #[tokio::test]
+    async fn http_response_body_key() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "remote_ip",
+                "/",
+                "POST",
+                StatusCode::OK,
+                OptionalTargetPath::event("message"),
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                None,
+            )
+            .await;
+
+            spawn_collect_n(
+                async move {
+                    let response = send_with_response(addr, "test body\n").await;
+                    assert_eq!(200, response.status());
+                    assert_eq!("\"test body\"", response.text().await.unwrap());
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn http_response_body_key_json() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "remote_ip",
+                "/",
+                "POST",
+                StatusCode::OK,
+                OptionalTargetPath::event("key1"),
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::default().into()),
+            )
+            .await;
+
+            spawn_collect_n(
+                async move {
+                    let response = send_with_response(addr, "{\"key1\": \"value1\"}\n").await;
+                    assert_eq!(200, response.status());
+                    assert_eq!("\"value1\"", response.text().await.unwrap());
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn http_response_body_key_missing() {
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            OptionalTargetPath::event("response"),
+            true,
+            EventStatus::Rejected,
+            false,
+            None,
+            None,
+        )
+        .await;
+
+        assert_eq!(500, send(addr, "test body\n").await);
     }
 
     #[test]
