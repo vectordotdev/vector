@@ -12,7 +12,8 @@ The changelog fragments are located in `changelog.d/`.
 Fragments for un-released changes are placed in the root of this directory during PRs.
 
 During a release when the changelog is generated, the fragments in the root of this
-directory are moved into a new directory with the name of the release (e.g. '0.42.0').
+directory are organized into the [releases directory](../website/cue/reference/releases) 
+with the name of the release (e.g. '0.42.0.cue').
 
 ### Pull Requests
 
@@ -38,11 +39,11 @@ Filename rules:
 - The first segment (unique_name) should be a unique string related to the change.
   Optionally, if there is a GitHub issue associated with the change, it can be used as a prefix.
   For example `42_very_important_change.breaking.md`, vs `very_important_change.breaking.md`.
-- The type must be one of the valid types in [Fragment types](#types)
+- The type must be one of the valid types in [Fragment types](#fragment-types)
 - Only the two period delimiters can be used.
 - The file must be markdown.
 
-#### Fragment types {#types}
+#### Fragment types
 
 - breaking: A change that is incompatible with prior versions which requires users to make adjustments.
 - security: A change that is has implications for security.
