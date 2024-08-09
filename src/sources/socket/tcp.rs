@@ -46,8 +46,7 @@ pub struct TcpConfig {
     /// Set to `""` to suppress this key.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
-    host_key: OptionalValuePath,
+    host_key: Option<OptionalValuePath>,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
     ///
@@ -106,7 +105,7 @@ impl TcpConfig {
             address,
             keepalive: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
-            host_key: default_host_key(),
+            host_key: None,
             port_key: default_port_key(),
             permit_origin: None,
             tls: None,
@@ -119,8 +118,8 @@ impl TcpConfig {
         }
     }
 
-    pub const fn host_key(&self) -> &OptionalValuePath {
-        &self.host_key
+    pub(super) fn host_key(&self) -> OptionalValuePath {
+        self.host_key.clone().unwrap_or(default_host_key())
     }
 
     pub const fn port_key(&self) -> &OptionalValuePath {
@@ -228,7 +227,12 @@ impl TcpSource for RawTcpSource {
                     now,
                 );
 
-                let legacy_host_key = self.config.host_key.clone().path;
+                let legacy_host_key = self
+                    .config
+                    .host_key
+                    .clone()
+                    .unwrap_or(default_host_key())
+                    .path;
 
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,

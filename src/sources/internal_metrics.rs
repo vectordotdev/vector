@@ -54,7 +54,7 @@ impl Default for InternalMetricsConfig {
 
 /// Tag configuration for the `internal_metrics` source.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct TagsConfig {
     /// Overrides the name of the tag used to add the peer host to each metric.
@@ -66,8 +66,7 @@ pub struct TagsConfig {
     /// Set to `""` to suppress this key.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
-    pub host_key: OptionalValuePath,
+    pub host_key: Option<OptionalValuePath>,
 
     /// Sets the name of the tag to use to add the current process ID to each metric.
     ///
@@ -77,25 +76,12 @@ pub struct TagsConfig {
     pub pid_key: Option<String>,
 }
 
-impl Default for TagsConfig {
-    fn default() -> Self {
-        Self {
-            host_key: default_host_key(),
-            pid_key: None,
-        }
-    }
-}
-
 fn default_scrape_interval() -> Duration {
     Duration::from_secs_f64(1.0)
 }
 
 fn default_namespace() -> String {
     "vector".to_owned()
-}
-
-fn default_host_key() -> OptionalValuePath {
-    log_schema().host_key().cloned().into()
 }
 
 impl_generate_config_from_default!(InternalMetricsConfig);
@@ -114,7 +100,11 @@ impl SourceConfig for InternalMetricsConfig {
         // namespace for created metrics is already "vector" by default.
         let namespace = self.namespace.clone();
 
-        let host_key = self.tags.host_key.clone();
+        let host_key = self
+            .tags
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into());
 
         let pid_key = self
             .tags
@@ -317,7 +307,7 @@ mod tests {
     async fn sets_tags() {
         let event = event_from_config(InternalMetricsConfig {
             tags: TagsConfig {
-                host_key: OptionalValuePath::new("my_host_key"),
+                host_key: Some(OptionalValuePath::new("my_host_key")),
                 pid_key: Some(String::from("my_pid_key")),
             },
             ..Default::default()
