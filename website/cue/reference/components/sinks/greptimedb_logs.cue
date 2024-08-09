@@ -66,9 +66,9 @@ components: sinks: greptimedb_logs: {
 	configuration: base.components.sinks.greptimedb_logs.configuration
 
 	input: {
-		logs: true
+		logs:    true
 		metrics: null
-		traces: false
+		traces:  false
 	}
 
 	how_it_works: {
