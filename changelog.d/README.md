@@ -12,7 +12,7 @@ The changelog fragments are located in `changelog.d/`.
 Fragments for un-released changes are placed in the root of this directory during PRs.
 
 During a release when the changelog is generated, the fragments in the root of this
-directory are organized into the [releases directory](../website/cue/reference/releases) 
+directory are organized into the [releases directory](../website/cue/reference/releases)
 with the name of the release (e.g. '0.42.0.cue').
 
 ### Pull Requests
