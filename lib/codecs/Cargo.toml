@@ -23,7 +23,7 @@ once_cell = { version = "1.19", default-features = false }
 ordered-float = { version = "4.2.1", default-features = false }
 prost = { version = "0.12.6", default-features = false, features = ["std"] }
 prost-reflect = { version = "0.13", default-features = false, features = ["serde"] }
-regex = { version = "1.10.5", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.10.6", default-features = false, features = ["std", "perf"] }
 serde.workspace = true
 serde_json.workspace = true
 smallvec = { version = "1", default-features = false, features = ["union"] }
