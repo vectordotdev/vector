@@ -7,11 +7,12 @@ runner:
   env:
     GREPTIMEDB_ENDPOINT: greptimedb:4001
     GREPTIMEDB_HTTP: http://greptimedb:4000
+    no_proxy: greptimedb
 
 matrix:
   # Temporarily pegging to the latest known stable release
   # since using `latest` is failing consistently.
-  version: [v0.4.4]
+  version: [v0.9.0]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch

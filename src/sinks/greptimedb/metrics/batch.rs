@@ -1,18 +1,20 @@
-use vector_lib::event::{Metric, MetricValue};
-use vector_lib::stream::batcher::limiter::ItemBatchSize;
-
 use super::request_builder::{
     DISTRIBUTION_QUANTILES, DISTRIBUTION_STAT_FIELD_COUNT, SUMMARY_STAT_FIELD_COUNT,
+};
+use vector_lib::{
+    event::{Metric, MetricValue},
+    stream::batcher::limiter::ItemBatchSize,
 };
 
 const F64_BYTE_SIZE: usize = 8;
 const I64_BYTE_SIZE: usize = 8;
 
+/// GreptimeDBBatchSizer is a batch sizer for metrics.
 #[derive(Default)]
-pub(super) struct GreptimeDBBatchSizer;
+pub struct GreptimeDBBatchSizer;
 
 impl GreptimeDBBatchSizer {
-    pub(super) fn estimated_size_of(&self, item: &Metric) -> usize {
+    pub fn estimated_size_of(&self, item: &Metric) -> usize {
         // Metric name.
         item.series().name().name().len()
         // Metric namespace, with an additional 1 to account for the namespace separator.

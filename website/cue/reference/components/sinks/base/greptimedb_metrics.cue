@@ -1,6 +1,6 @@
 package metadata
 
-base: components: sinks: greptimedb: configuration: {
+base: components: sinks: greptimedb_metrics: configuration: {
 	acknowledgements: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
