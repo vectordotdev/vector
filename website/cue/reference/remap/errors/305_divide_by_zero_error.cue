@@ -16,7 +16,7 @@ remap: errors: "305": {
 
 		```coffee
 		result, err = 27 / .some_value
-		if err != nil {
+		if err != null {
 			# Handle error
 		}
 		```
