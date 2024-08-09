@@ -142,7 +142,7 @@ impl Timer {
         self.ewma.update(utilization);
         let avg = self.ewma.average().unwrap_or(f64::NAN);
         debug!(utilization = %avg);
-        gauge!("utilization", avg);
+        gauge!("utilization").set(avg);
 
         // Reset overall statistics for the next reporting period.
         self.overall_start = self.span_start;

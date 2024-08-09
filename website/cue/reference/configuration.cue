@@ -221,6 +221,8 @@ configuration: {
 						* [GeoIP2-ISP.mmdb](\(urls.maxmind_geoip2_isp)) (paid) — Determine the Internet
 							Service Provider (ISP), organization name, and autonomous system organization
 							and number associated with an IP address.
+						* [GeoIP2-Anonymous-IP.mmdb](\(urls.maxmind_geoip2_anonymous_ip)) (paid) — Determine
+							proxy, VPN, hosting, and other anonymous IP addresses.	
 
 						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
 
@@ -284,7 +286,7 @@ configuration: {
 			type: object: {
 				examples: []
 				options: {
-					log_namespacing: {
+					log_namespace: {
 						common:      false
 						description: """
 							Globally enables / disables log namespacing. See [Log Namespacing](\(urls.log_namespacing_blog))

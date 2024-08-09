@@ -14,7 +14,7 @@ pub trait ByteSizeOf {
     ///
     /// This function returns the total number of bytes that
     /// [`std::mem::size_of`] does in addition to any interior allocated
-    /// bytes. It default implementation is `std::mem::size_of` +
+    /// bytes. Its default implementation is `std::mem::size_of` +
     /// `ByteSizeOf::allocated_bytes`.
     fn size_of(&self) -> usize {
         mem::size_of_val(self) + self.allocated_bytes()

@@ -5,13 +5,15 @@ use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::{config::LogNamespace, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{log_schema, SourceConfig, SourceContext, SourceOutput},
-    internal_events::{EventsReceived, InternalMetricsBytesReceived, StreamClosedError},
+    internal_events::{EventsReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
     SourceSender,
@@ -156,6 +158,7 @@ struct InternalMetrics<'a> {
 impl<'a> InternalMetrics<'a> {
     async fn run(mut self) -> Result<(), ()> {
         let events_received = register!(EventsReceived);
+        let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
         while interval.next().await.is_some() {
@@ -167,7 +170,7 @@ impl<'a> InternalMetrics<'a> {
             let byte_size = metrics.size_of();
             let json_size = metrics.estimated_json_encoded_size_of();
 
-            emit!(InternalMetricsBytesReceived { byte_size });
+            bytes_received.emit(ByteSize(byte_size));
             events_received.emit(CountByteSize(count, json_size));
 
             let batch = metrics.into_iter().map(|mut metric| {
@@ -203,7 +206,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use metrics::{counter, gauge, histogram};
-    use vector_lib::metric_tags;
+    use vector_lib::{metric_tags, metrics::Controller};
 
     use super::*;
     use crate::{
@@ -211,7 +214,6 @@ mod tests {
             metric::{Metric, MetricValue},
             Event,
         },
-        metrics::Controller,
         test_util::{
             self,
             components::{run_and_assert_source_compliance, SOURCE_TAGS},
@@ -230,14 +232,14 @@ mod tests {
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
 
-        gauge!("foo", 1.0);
-        gauge!("foo", 2.0);
-        counter!("bar", 3);
-        counter!("bar", 4);
-        histogram!("baz", 5.0);
-        histogram!("baz", 6.0);
-        histogram!("quux", 8.0, "host" => "foo");
-        histogram!("quux", 8.1, "host" => "foo");
+        gauge!("foo").set(1.0);
+        gauge!("foo").set(2.0);
+        counter!("bar").increment(3);
+        counter!("bar").increment(4);
+        histogram!("baz").record(5.0);
+        histogram!("baz").record(6.0);
+        histogram!("quux", "host" => "foo").record(8.0);
+        histogram!("quux", "host" => "foo").record(8.1);
 
         let controller = Controller::get().expect("no controller");
 

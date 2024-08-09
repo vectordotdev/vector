@@ -11,7 +11,7 @@ pub struct LuaGcTriggered {
 
 impl InternalEvent for LuaGcTriggered {
     fn emit(self) {
-        gauge!("lua_memory_used_bytes", self.used_memory as f64);
+        gauge!("lua_memory_used_bytes").set(self.used_memory as f64);
     }
 }
 
@@ -31,11 +31,12 @@ impl InternalEvent for LuaScriptError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => mlua_error_code(&self.error),
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
             reason: "Error in lua script.",
@@ -60,11 +61,12 @@ impl InternalEvent for LuaBuildError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => lua_build_error_code(&self.error),
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage:: PROCESSING,
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }

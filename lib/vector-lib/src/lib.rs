@@ -19,11 +19,12 @@ pub use vector_config::impl_generate_config_from_default;
 pub use vector_core::compile_vrl;
 pub use vector_core::{
     buckets, default_data_dir, emit, event, fanout, ipallowlist, metric_tags, metrics, partition,
-    quantiles, register, samples, schema, serde, sink, source, tcp, tls, transform, update_counter,
+    quantiles, register, samples, schema, serde, sink, source, tcp, tls, transform,
     EstimatedJsonEncodedSizeOf,
 };
 pub use vector_lookup as lookup;
 pub use vector_stream as stream;
+pub use vector_tap as tap;
 
 pub mod config {
     pub use vector_common::config::ComponentKey;

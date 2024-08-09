@@ -21,10 +21,11 @@ impl InternalEvent for AwsKinesisStreamNoPartitionKeyError<'_> {
         );
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }

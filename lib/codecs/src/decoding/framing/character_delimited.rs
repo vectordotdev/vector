@@ -15,6 +15,12 @@ pub struct CharacterDelimitedDecoderConfig {
 }
 
 impl CharacterDelimitedDecoderConfig {
+    /// Creates a `CharacterDelimitedDecoderConfig` with the specified delimiter and default max length.
+    pub const fn new(delimiter: u8) -> Self {
+        Self {
+            character_delimited: CharacterDelimitedDecoderOptions::new(delimiter, None),
+        }
+    }
     /// Build the `CharacterDelimitedDecoder` from this configuration.
     pub const fn build(&self) -> CharacterDelimitedDecoder {
         if let Some(max_length) = self.character_delimited.max_length {
@@ -53,7 +59,7 @@ pub struct CharacterDelimitedDecoderOptions {
 
 impl CharacterDelimitedDecoderOptions {
     /// Create a `CharacterDelimitedDecoderOptions` with a delimiter and optional max_length.
-    pub fn new(delimiter: u8, max_length: Option<usize>) -> Self {
+    pub const fn new(delimiter: u8, max_length: Option<usize>) -> Self {
         Self {
             delimiter,
             max_length,
