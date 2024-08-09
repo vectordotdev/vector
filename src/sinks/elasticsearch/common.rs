@@ -269,10 +269,14 @@ impl ElasticsearchCommon {
 #[cfg(feature = "aws-core")]
 pub async fn sign_request(
     request: &mut http::Request<Bytes>,
-    credentials_provider: &aws_credential_types::provider::SharedCredentialsProvider,
+    credentials_provider: &Option<aws_credential_types::provider::SharedCredentialsProvider>,
     region: &Option<aws_types::region::Region>,
 ) -> crate::Result<()> {
-    crate::aws::sign_request("es", request, credentials_provider, region).await
+    if let Some(credentials_provider) = credentials_provider {
+        crate::aws::sign_request("es", request, credentials_provider, region).await
+    } else {
+        Ok(())
+    }
 }
 
 async fn get_version(
