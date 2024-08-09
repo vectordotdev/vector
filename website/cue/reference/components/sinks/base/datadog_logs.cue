@@ -69,28 +69,31 @@ base: components: sinks: datadog_logs: configuration: {
 			All compression algorithms use the default compression level unless otherwise specified.
 			"""
 		required: false
-		type: string: enum: {
-			gzip: """
-				[Gzip][gzip] compression.
+		type: string: {
+			default: "zstd"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
 
-				[gzip]: https://www.gzip.org/
-				"""
-			none: "No compression."
-			snappy: """
-				[Snappy][snappy] compression.
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				snappy: """
+					[Snappy][snappy] compression.
 
-				[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
-				"""
-			zlib: """
-				[Zlib][zlib] compression.
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+					"""
+				zlib: """
+					[Zlib][zlib] compression.
 
-				[zlib]: https://zlib.net/
-				"""
-			zstd: """
-				[Zstandard][zstd] compression.
+					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
 
-				[zstd]: https://facebook.github.io/zstd/
-				"""
+					[zstd]: https://facebook.github.io/zstd/
+					"""
+			}
 		}
 	}
 	default_api_key: {
