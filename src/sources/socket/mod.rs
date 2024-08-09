@@ -211,7 +211,7 @@ impl SourceConfig for SocketConfig {
 
         let schema_definition = match &self.mode {
             Mode::Tcp(config) => {
-                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().path.map(LegacyKey::InsertIfEmpty);
 
                 let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
@@ -247,7 +247,7 @@ impl SourceConfig for SocketConfig {
                     )
             }
             Mode::Udp(config) => {
-                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config.host_key().path.map(LegacyKey::InsertIfEmpty);
 
                 let legacy_port_key = config.port_key().clone().path.map(LegacyKey::InsertIfEmpty);
 

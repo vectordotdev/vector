@@ -169,10 +169,7 @@ base: components: sources: file: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {
-			default: "host"
-			examples: ["hostname"]
-		}
+		type: string: examples: ["hostname"]
 	}
 	ignore_checkpoints: {
 		description: """

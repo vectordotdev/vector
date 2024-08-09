@@ -122,9 +122,8 @@ pub struct FileConfig {
     /// Set to `""` to suppress this key.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
     #[configurable(metadata(docs::examples = "hostname"))]
-    pub host_key: OptionalValuePath,
+    pub host_key: Option<OptionalValuePath>,
 
     /// The directory used to persist file checkpoint positions.
     ///
@@ -251,10 +250,6 @@ fn default_max_line_bytes() -> usize {
 
 fn default_file_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("file"))
-}
-
-fn default_host_key() -> OptionalValuePath {
-    log_schema().host_key().cloned().into()
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -389,7 +384,7 @@ impl Default for FileConfig {
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::default(),
             ignore_not_found: false,
-            host_key: default_host_key(),
+            host_key: None,
             offset_key: None,
             data_dir: None,
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
@@ -453,7 +448,12 @@ impl SourceConfig for FileConfig {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let file_key = self.file_key.clone().path.map(LegacyKey::Overwrite);
-        let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
+        let host_key = self
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into())
+            .path
+            .map(LegacyKey::Overwrite);
 
         let offset_key = self
             .offset_key
@@ -561,7 +561,11 @@ pub fn file_source(
     };
 
     let event_metadata = EventMetadata {
-        host_key: config.host_key.clone().path,
+        host_key: config
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into())
+            .path,
         hostname: crate::get_hostname().ok(),
         file_key: config.file_key.clone().path,
         offset_key: config.offset_key.clone().and_then(|k| k.path),
