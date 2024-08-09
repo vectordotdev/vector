@@ -23,7 +23,7 @@ use crate::{
         SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
     },
     net,
-    serde::{default_decoding, default_framing_message_based},
+    serde::default_decoding,
     shutdown::ShutdownSignal,
     sources::{
         socket::SocketConfig,
@@ -75,12 +75,11 @@ pub struct UdpConfig {
     receive_buffer_bytes: Option<usize>,
 
     #[configurable(derived)]
-    #[serde(default = "default_framing_message_based")]
-    pub(super) framing: FramingConfig,
+    pub(super) framing: Option<FramingConfig>,
 
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
-    decoding: DeserializerConfig,
+    pub(super) decoding: DeserializerConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
@@ -109,7 +108,7 @@ impl UdpConfig {
         &self.port_key
     }
 
-    pub(super) const fn framing(&self) -> &FramingConfig {
+    pub(super) const fn framing(&self) -> &Option<FramingConfig> {
         &self.framing
     }
 
@@ -128,7 +127,7 @@ impl UdpConfig {
             host_key: default_host_key(),
             port_key: default_port_key(),
             receive_buffer_bytes: None,
-            framing: default_framing_message_based(),
+            framing: None,
             decoding: default_decoding(),
             log_namespace: None,
         }
@@ -173,7 +172,6 @@ pub(super) fn udp(
         let bytes_received = register!(BytesReceived::from(Protocol::UDP));
 
         info!(message = "Listening.", address = %config.address);
-
         // We add 1 to the max_length in order to determine if the received data has been truncated.
         let mut buf = BytesMut::with_capacity(max_length + 1);
         loop {
@@ -204,10 +202,8 @@ pub(super) fn udp(
                     };
 
                     bytes_received.emit(ByteSize(byte_size));
-
                     let payload = buf.split_to(byte_size);
                     let truncated = byte_size == max_length + 1;
-
                     let mut stream = FramedRead::new(payload.as_ref(), decoder.clone()).peekable();
 
                     while let Some(result) = stream.next().await {
