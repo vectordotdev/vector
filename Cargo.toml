@@ -206,10 +206,10 @@ aws-smithy-runtime = { version = "1.6.2", default-features = false, features = [
 aws-smithy-async = { version = "1.2.1", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { version = "0.17", default-features = false, optional = true }
-azure_storage_blobs = { version = "0.17", default-features = false, optional = true }
+azure_core = { version = "0.20", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_identity = { version = "0.20", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { version = "0.20", default-features = false, optional = true }
+azure_storage_blobs = { version = "0.20", default-features = false, optional = true }
 
 # OpenDAL
 opendal = {version = "0.45", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true}
@@ -374,10 +374,10 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 approx = "0.5.1"
 assert_cmd = { version = "2.0.15", default-features = false }
 aws-smithy-runtime = { version = "1.6.2", default-features = false, features = ["tls-rustls"] }
-azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
-azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
-azure_storage = { version = "0.17", default-features = false }
+azure_core = { version = "0.20", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
+azure_identity = { version = "0.20", default-features = false, features = ["enable_reqwest"] }
+azure_storage_blobs = { version = "0.20", default-features = false, features = ["azurite_workaround"] }
+azure_storage = { version = "0.20", default-features = false }
 base64 = "0.22.1"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
