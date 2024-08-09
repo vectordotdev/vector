@@ -15,6 +15,9 @@ pub mod geoip;
 #[cfg(feature = "enrichment-tables-mmdb")]
 pub mod mmdb;
 
+#[cfg(feature = "enrichment-tables-pgtable")]
+pub mod pgtable;
+
 /// Configurable enrichment tables.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -51,6 +54,8 @@ impl NamedComponent for EnrichmentTables {
             Self::Geoip(config) => config.get_component_name(),
             #[cfg(feature = "enrichment-tables-mmdb")]
             Self::Mmdb(config) => config.get_component_name(),
+            #[cfg(feature = "enrichment-tables-postgres")]
+            Self::Pgtable(config) => config.get_component_name(),
             #[allow(unreachable_patterns)]
             _ => unimplemented!(),
         }
