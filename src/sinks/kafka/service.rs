@@ -171,7 +171,7 @@ impl Service<KafkaRequest> for KafkaService {
                         record = original_record;
                         tokio::time::sleep(Duration::from_millis(100)).await;
                     }
-                    // A final/unretriable error occurred.
+                    // A final/non-retriable error occurred.
                     Err((
                         err @ KafkaError::MessageProduction(
                             RDKafkaErrorCode::InvalidMessage |
