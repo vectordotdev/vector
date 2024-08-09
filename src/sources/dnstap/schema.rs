@@ -255,12 +255,18 @@ pub struct DnstapPaths {
     pub do_flag: OwnedValuePath,
     pub udp_max_payload_size: OwnedValuePath,
     pub ede: OwnedValuePath,
+    pub client_subnet: OwnedValuePath,
     pub options: OwnedValuePath,
 
     // DnsMessageEdeOptionSchema
     pub info_code: OwnedValuePath,
     pub purpose: OwnedValuePath,
     pub extra_text: OwnedValuePath,
+
+    // DnsMessageClientSubnetSchema
+    pub ecs_address: OwnedValuePath,
+    pub ecs_source_prefix_length: OwnedValuePath,
+    pub ecs_scope_prefix_length: OwnedValuePath,
 
     // DnsMessageOptionSchema
     pub opt_code: OwnedValuePath,
@@ -343,6 +349,7 @@ pub(crate) static DNSTAP_VALUE_PATHS: Lazy<DnstapPaths> = Lazy::new(|| DnstapPat
     do_flag: owned_value_path!("do"),
     udp_max_payload_size: owned_value_path!("udpPayloadSize"),
     ede: owned_value_path!("ede"),
+    client_subnet: owned_value_path!("clientSubnet"),
     options: owned_value_path!("options"),
     info_code: owned_value_path!("infoCode"),
     purpose: owned_value_path!("purpose"),
@@ -350,6 +357,9 @@ pub(crate) static DNSTAP_VALUE_PATHS: Lazy<DnstapPaths> = Lazy::new(|| DnstapPat
     opt_code: owned_value_path!("optCode"),
     opt_name: owned_value_path!("optName"),
     opt_data: owned_value_path!("optValue"),
+    ecs_address: owned_value_path!("address"),
+    ecs_source_prefix_length: owned_value_path!("sourcePrefixLength"),
+    ecs_scope_prefix_length: owned_value_path!("scopePrefixLength"),
     record_type: owned_value_path!("recordType"),
     record_type_id: owned_value_path!("recordTypeId"),
     ttl: owned_value_path!("ttl"),
@@ -436,6 +446,20 @@ impl DnsMessageEdeOptionSchema {
             DNSTAP_VALUE_PATHS.info_code.to_string() => Kind::integer(),
             DNSTAP_VALUE_PATHS.purpose.to_string() => Kind::bytes(),
             DNSTAP_VALUE_PATHS.extra_text.to_string() => Kind::bytes(),
+        }
+        .into()
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct DnsMessageClientSubnetSchema;
+
+impl DnsMessageClientSubnetSchema {
+    pub fn schema_definition() -> Collection<Field> {
+        btreemap! {
+            DNSTAP_VALUE_PATHS.ecs_address.to_string() => Kind::bytes(),
+            DNSTAP_VALUE_PATHS.ecs_source_prefix_length.to_string() => Kind::integer(),
+            DNSTAP_VALUE_PATHS.ecs_scope_prefix_length.to_string() => Kind::integer(),
         }
         .into()
     }
