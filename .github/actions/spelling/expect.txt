@@ -516,6 +516,7 @@ imds
 IMSD
 incentivizes
 incrementalize
+indexgateway
 indexmap
 indicatif
 indoc
@@ -619,6 +620,7 @@ lognamespace
 lognamespacing
 logplex
 logproto
+logql
 logqlmodel
 logsense
 logsev
@@ -808,6 +810,7 @@ ouicompat
 outputspatterns
 overaligned
 overalignment
+owen
 owo
 oyaml
 pageheap
@@ -866,6 +869,7 @@ purgecss
 pyld
 Pzb
 qqq
+queryrangebase
 quickcheck
 quix
 quuux
@@ -936,6 +940,7 @@ rxs
 ryangjchandler
 ryu
 sadf
+salvacorts
 samehost
 samenet
 samerole
