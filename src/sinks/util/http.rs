@@ -709,8 +709,9 @@ impl ItemBatchSize<Event> for HttpJsonBatchSizer {
 }
 
 /// HTTP request builder for HTTP stream sinks using the generic `HttpService`
+#[async_trait]
 pub trait HttpServiceRequestBuilder<T: Send> {
-    fn build(&self, request: HttpRequest<T>) -> Result<Request<Bytes>, crate::Error>;
+    async fn build(&self, request: HttpRequest<T>) -> Result<Request<Bytes>, crate::Error>;
 }
 
 /// Generic 'Service' implementation for HTTP stream sinks.
@@ -726,15 +727,17 @@ where
     B: HttpServiceRequestBuilder<T> + std::marker::Sync + std::marker::Send + 'static,
 {
     pub fn new(http_client: HttpClient<Body>, http_request_builder: B) -> Self {
+
         let http_request_builder = Arc::new(http_request_builder);
 
         let batch_service = HttpBatchService::new(http_client, move |req: HttpRequest<T>| {
             let request_builder = Arc::clone(&http_request_builder);
-
             let fut: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
-                Box::pin(async move { request_builder.build(req) });
-
+                Box::pin(async move { 
+                    Ok(request_builder.build(req).await.unwrap())
+                });
             fut
+            
         });
         Self {
             batch_service,

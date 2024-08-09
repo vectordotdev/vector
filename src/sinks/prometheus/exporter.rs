@@ -323,6 +323,7 @@ fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
                 Auth::Bearer { token } => {
                     HeaderValue::from_str(format!("Bearer {}", token.inner()).as_str())
                 }
+                Auth::OAuth2 { .. } => todo!(),
             };
 
             if let Ok(encoded_credentials) = encoded_credentials {

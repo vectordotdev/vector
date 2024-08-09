@@ -8,7 +8,7 @@ use http::{
 use indexmap::IndexMap;
 
 use crate::{
-    http::Auth,
+    http::{Auth, BearerTokenState, HttpClient},
     sinks::{
         util::{
             http::{HttpRequest, HttpServiceRequestBuilder},
@@ -20,9 +20,13 @@ use crate::{
 use snafu::ResultExt;
 
 use super::config::HttpMethod;
+use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(super) struct HttpSinkRequestBuilder {
+    http_client: HttpClient,
+    bearer_token_state: BearerTokenState,
     uri: UriSerde,
     method: HttpMethod,
     auth: Option<Auth>,
@@ -34,6 +38,8 @@ pub(super) struct HttpSinkRequestBuilder {
 impl HttpSinkRequestBuilder {
     /// Creates a new `HttpSinkRequestBuilder`
     pub(super) const fn new(
+        http_client: HttpClient,
+        bearer_token_state: BearerTokenState,
         uri: UriSerde,
         method: HttpMethod,
         auth: Option<Auth>,
@@ -42,6 +48,8 @@ impl HttpSinkRequestBuilder {
         content_encoding: Option<String>,
     ) -> Self {
         Self {
+            http_client,
+            bearer_token_state,
             uri,
             method,
             auth,
@@ -51,9 +59,12 @@ impl HttpSinkRequestBuilder {
         }
     }
 }
-
+#[async_trait]
 impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
-    fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+    async fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+
+        println!("XOXOXOX HttpServiceRequestBuilder::build");
+
         let method: Method = self.method.into();
         let uri: Uri = self.uri.uri.clone();
         let mut builder = Request::builder().method(method).uri(uri);
@@ -82,7 +93,7 @@ impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
             .map_err(Into::<crate::Error>::into)?;
 
         if let Some(auth) = &self.auth {
-            auth.apply(&mut request);
+            auth.apply_async(&mut request, self.http_client.clone(), self.bearer_token_state.clone()).await;
         }
 
         Ok(request)

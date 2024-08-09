@@ -159,8 +159,9 @@ pub(super) struct StackdriverMetricsServiceRequestBuilder {
     pub(super) auth: GcpAuthenticator,
 }
 
+#[async_trait]
 impl HttpServiceRequestBuilder<()> for StackdriverMetricsServiceRequestBuilder {
-    fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+    async fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
         let builder = Request::post(self.uri.clone()).header(CONTENT_TYPE, "application/json");
 
         let mut request = builder

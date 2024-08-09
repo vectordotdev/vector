@@ -69,8 +69,9 @@ pub(super) struct ClickhouseServiceRequestBuilder {
     pub(super) compression: Compression,
 }
 
+#[async_trait]
 impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
-    fn build(
+    async fn build(
         &self,
         mut request: HttpRequest<PartitionKey>,
     ) -> Result<Request<Bytes>, crate::Error> {

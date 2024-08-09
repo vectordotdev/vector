@@ -10,7 +10,7 @@ use vector_lib::codecs::{
 
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, BearerTokenState, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
@@ -275,7 +275,12 @@ impl SinkConfig for HttpSinkConfig {
                 .to_string()
         });
 
+        println!("XOXOXOXO CONFIG HttpSinkConfig");
+        let bearer_state = BearerTokenState::new();
+
         let http_sink_request_builder = HttpSinkRequestBuilder::new(
+            client.clone(),
+            bearer_state,
             self.uri.with_default_parts(),
             self.method,
             self.auth.choose_one(&self.uri.auth)?,

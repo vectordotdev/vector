@@ -3,9 +3,9 @@ use std::{
     fmt,
     net::SocketAddr,
     task::{Context, Poll},
-    time::Duration,
 };
-
+use serde::Deserialize;
+use std::sync::{Arc, Mutex};
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
@@ -17,6 +17,8 @@ use hyper::{
     client,
     client::{Client, HttpConnector},
 };
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use bytes::Buf;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use rand::Rng;
@@ -33,9 +35,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
-    config::ProxyConfig,
-    internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent},
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
+    config::ProxyConfig, internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent}, tls::{tls_connector_builder, MaybeTlsSettings, TlsError}
 };
 
 pub mod status {
@@ -293,6 +293,27 @@ pub enum Auth {
         password: SensitiveString,
     },
 
+    /// Lorem ipsum dolor sit amet.
+    ///
+    /// Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia.
+    OAuth2 {
+        /// Temporibus autem quibusdam et aut officiis debitis.
+        #[configurable(metadata(docs::examples = "${TOKEN_ENDPOINT}"))]
+        #[configurable(metadata(docs::examples = "token_endpoint"))]
+        token_endpoint: String,
+
+        /// Nam libero tempore, cum soluta nobis.
+        #[configurable(metadata(docs::examples = "${CLIENT_ID}"))]
+        #[configurable(metadata(docs::examples = "client_id"))]
+        client_id: String,
+
+        /// At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium.
+        #[configurable(metadata(docs::examples = "${CLIENT_SECRET}"))]
+        #[configurable(metadata(docs::examples = "client_secret"))]
+        client_secret: SensitiveString,
+    },
+
+
     /// Bearer authentication.
     ///
     /// The bearer token value (OAuth2, JWT, etc.) is passed as-is.
@@ -338,7 +359,104 @@ impl Auth {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
+            Auth::OAuth2 { .. } => todo!(),
         }
+    }
+
+    pub async fn apply_async<B>(&self, req: &mut Request<B>, client: HttpClient, mut bearer_state: BearerTokenState) {
+        let map = req.headers_mut();
+        match &self {
+            Auth::Basic { user, password } => {
+                let auth = Authorization::basic(user.as_str(), password.inner());
+                map.typed_insert(auth);
+            }
+            Auth::Bearer { token } => match Authorization::bearer(token.inner()) {
+                Ok(auth) => map.typed_insert(auth),
+                Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
+            },
+            Auth::OAuth2 { token_endpoint, client_id, client_secret } => {
+                let token = bearer_state.get_token(client.clone(), token_endpoint, client_id, client_secret).await;
+                let temp_auth = Auth::Bearer{ token: SensitiveString::from(token)};
+                temp_auth.apply(req);
+            },
+        }
+    }
+
+
+}
+
+#[derive(Clone, Debug)]
+pub struct BearerTokenState {
+    token: Arc<Mutex<Option<ExpirableToken>>>
+} 
+
+#[derive(Debug, Deserialize)]
+struct Token {
+    access_token: String,
+    expires_in: u32 
+}
+
+#[derive(Debug)]
+struct ExpirableToken {
+    access_token: String,
+    expires_after_ms: u128
+}
+
+impl BearerTokenState {
+    
+    pub fn new() -> BearerTokenState {
+        let empty_token = Arc::new(Mutex::new(None));
+        BearerTokenState { token: empty_token }
+    }
+
+    async fn get_token(&mut self, client: HttpClient, token_endpoint: &String, client_id: &String, client_secret: &SensitiveString) -> String {
+        
+        let now = SystemTime::now();
+        let since_the_epoch = now
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+
+        //first lets try to return already acquired token
+        {
+            let maybe_token = self.token.lock().unwrap();
+            match &*maybe_token {
+                Some(token) => {
+                    if since_the_epoch.as_millis() < token.expires_after_ms {
+                        //we have token, token is valud for at least 1min, we can use it.
+                        return token.access_token.clone();
+                    }
+                },
+                None => {},
+            }
+        }
+
+        //we need to acquire new
+        let request_body = format!("client_secret={}&grant_type=client_credentials&response_type=token&client_id={}", client_secret.inner(), client_id);
+        println!("{}", request_body);
+
+        let builder = Request::post(token_endpoint.clone());
+        let builder = builder.header("Content-Type", "application/x-www-form-urlencoded");
+        let request = builder.body(Body::from(request_body)).expect("error creating request");
+        let response = client.send(request).await.unwrap();
+
+        println!("BODY {:?}", response);
+
+        let body = hyper::body::aggregate(response).await.unwrap();
+        let token: Token = serde_json::from_reader(body.reader()).unwrap();
+        let token_to_return = token.access_token.clone();
+
+        //expires_in means, in seconds, for how long it will be valid, lets say 5min, 
+        //to not cause some random 4xx, because token expired in the meantime, we will make some
+        //room for token refreshing, this room is 1min (60seconds)
+        let token_is_valid_for_ms = (token.expires_in - 60) * 1000;
+        let token_will_expire_after_ms = since_the_epoch.as_millis() + (token_is_valid_for_ms as u128);
+
+
+        {
+            let _ = self.token.lock().unwrap().replace(ExpirableToken{access_token:token.access_token, expires_after_ms: token_will_expire_after_ms});
+        }
+
+        token_to_return
     }
 }
 

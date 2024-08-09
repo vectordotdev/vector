@@ -11,6 +11,7 @@ use crate::{
     },
 };
 use snafu::ResultExt;
+use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub(super) struct StackdriverLogsServiceRequestBuilder {
@@ -18,8 +19,9 @@ pub(super) struct StackdriverLogsServiceRequestBuilder {
     pub(super) auth: GcpAuthenticator,
 }
 
+#[async_trait]
 impl HttpServiceRequestBuilder<()> for StackdriverLogsServiceRequestBuilder {
-    fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+    async fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
         let builder = Request::post(self.uri.clone()).header(CONTENT_TYPE, "application/json");
 
         let mut request = builder
