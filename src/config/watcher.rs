@@ -127,7 +127,7 @@ fn create_watcher(
 #[cfg(unix)]
 fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Result<(), Error> {
     for path in config_paths {
-        watcher.watch(path, RecursiveMode::NonRecursive)?;
+        watcher.watch(path, RecursiveMode::Recursive)?;
     }
     Ok(())
 }
@@ -194,6 +194,25 @@ mod tests {
         std::os::unix::fs::symlink(&file_path, &sym_file).unwrap();
 
         spawn_thread(&[sym_file], delay).unwrap();
+
+        if !test(&mut file, delay * 5).await {
+            panic!("Test timed out");
+        }
+    }
+
+    #[tokio::test]
+    async fn recursive_directory_file_update() {
+        trace_init();
+
+        let delay = Duration::from_secs(3);
+        let dir = temp_dir().to_path_buf();
+        let sub_dir = dir.join("sources");
+        let file_path = sub_dir.join("input.toml");
+
+        std::fs::create_dir_all(&sub_dir).unwrap();
+        let mut file = File::create(&file_path).unwrap();
+
+        spawn_thread(&[sub_dir], delay).unwrap();
 
         if !test(&mut file, delay * 5).await {
             panic!("Test timed out");
