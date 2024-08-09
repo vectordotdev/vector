@@ -52,7 +52,7 @@ tokio-openssl = { version = "0.6.4", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
 toml.workspace = true
-tonic = { version = "0.10", default-features = false, features = ["transport"] }
+tonic = { version = "0.11", default-features = false, features = ["transport"] }
 tracing = { version = "0.1.34", default-features = false }
 tracing-core = { version = "0.1.26", default-features = false }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = ["std"] }

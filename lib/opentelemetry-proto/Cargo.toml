@@ -7,7 +7,7 @@ publish = false
 
 [build-dependencies]
 prost-build = { version = "0.12", default-features = false}
-tonic-build = { version = "0.10", default-features = false, features = ["prost", "transport"] }
+tonic-build = { version = "0.12", default-features = false, features = ["prost", "transport"] }
 
 [dependencies]
 bytes = { version = "1.6.1", default-features = false, features = ["serde"] }
@@ -16,6 +16,6 @@ hex = { version = "0.4.3", default-features = false, features = ["std"] }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false }
 ordered-float = { version = "4.2.1", default-features = false }
 prost = { version = "0.12", default-features = false, features = ["std"] }
-tonic = { version = "0.10", default-features = false, features = ["codegen", "gzip", "prost", "tls", "tls-roots", "transport"] }
+tonic = { version = "0.11", default-features = false, features = ["codegen", "gzip", "prost", "tls", "tls-roots", "transport"] }
 vrl.workspace = true
 vector-core = { path = "../vector-core", default-features = false }
