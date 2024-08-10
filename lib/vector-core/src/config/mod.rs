@@ -673,14 +673,14 @@ mod test {
     }
 
     #[test]
-    fn test_new_log_source_ignores_definition_when_metric_only_data_type() {
+    fn test_new_log_source_ignores_definition_with_metric_data_type() {
         let definition = schema::Definition::any();
         let output = SourceOutput::new_maybe_logs(DataType::Metric, definition);
         assert_eq!(output.schema_definition(true), None);
     }
 
     #[test]
-    fn test_new_log_source_uses_definition_when_log_data_type() {
+    fn test_new_log_source_uses_definition_with_log_data_type() {
         let definition = schema::Definition::any();
         let output = SourceOutput::new_maybe_logs(DataType::Log, definition.clone());
         assert_eq!(output.schema_definition(true), Some(definition));
