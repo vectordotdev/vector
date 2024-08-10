@@ -121,11 +121,10 @@ impl SourceOutput {
     /// Designed for use in log sources.
     #[must_use]
     pub fn new_maybe_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
-        let schema_definition = if ty.contains(DataType::Log) {
-            Some(Arc::new(schema_definition))
-        } else {
-            None
-        };
+        let schema_definition = ty
+            .contains(DataType::Log)
+            .then(|| Arc::new(schema_definition));
+
         Self {
             port: None,
             ty,
