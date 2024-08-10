@@ -117,20 +117,19 @@ pub struct SourceOutput {
 
 impl SourceOutput {
     /// Create a `SourceOutput` of the given data type that contains a single output `Definition`.
+    /// If the data type does not contain logs, the schema definition will be ignored.
     /// Designed for use in log sources.
-    ///
-    ///
-    /// # Panics
-    ///
-    /// Panics if `ty` does not contain [`DataType::Log`].
     #[must_use]
-    pub fn new_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
-        assert!(ty.contains(DataType::Log));
-
+    pub fn new_maybe_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
+        let schema_definition = if ty.contains(DataType::Log) {
+            Some(Arc::new(schema_definition))
+        } else {
+            None
+        };
         Self {
             port: None,
             ty,
-            schema_definition: Some(Arc::new(schema_definition)),
+            schema_definition,
         }
     }
 
@@ -573,7 +572,7 @@ mod test {
         let definition = schema::Definition::empty_legacy_namespace()
             .with_event_field(&owned_value_path!("zork"), Kind::bytes(), Some("zork"))
             .with_event_field(&owned_value_path!("nork"), Kind::integer(), None);
-        let output = SourceOutput::new_logs(DataType::Log, definition);
+        let output = SourceOutput::new_maybe_logs(DataType::Log, definition);
 
         let valid_event = LogEvent::from(Value::from(btreemap! {
             "zork" => "norknoog",
@@ -619,7 +618,7 @@ mod test {
             )
             .with_event_field(&owned_value_path!("nork"), Kind::integer(), None);
 
-        let output = SourceOutput::new_logs(DataType::Log, definition);
+        let output = SourceOutput::new_maybe_logs(DataType::Log, definition);
 
         let mut valid_event = LogEvent::from(Value::from(btreemap! {
             "nork" => 32
