@@ -194,8 +194,14 @@ impl MqttSinkConfig {
         }
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
-            let client_auth = None;
-            let alpn = Some(vec!["mqtt".into()]);
+            let client_auth = tls.identity_pem();
+            let alpn = match &self.tls {
+                  None => { None }
+                  Some(t) => match &t.options.alpn_protocols {
+                      None => { Some(vec!["mqtt".into()]) }
+                      Some(protos) => { Some(protos.into_iter().map(|p| p.clone().into_bytes()).collect()) }
+                  }
+            };
             options.set_transport(Transport::Tls(TlsConfiguration::Simple {
                 ca,
                 client_auth,
