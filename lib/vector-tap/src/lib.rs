@@ -183,15 +183,19 @@ impl<'a> TapRunner<'a> {
                             })
                             .collect();
 
-                        match &self.output_channel {
-                            OutputChannel::Stdout(formatter) => {
-                                self.output_event_stdout(&output_events, formatter);
-                            }
-                            OutputChannel::AsyncChannel(sender_tx) => {
-                                if sender_tx.send(output_events).await.is_err() {
-                                    debug!("Could not send events");
+                        if !output_events.is_empty() {
+                            match &self.output_channel {
+                                OutputChannel::Stdout(formatter) => {
+                                    self.output_event_stdout(&output_events, formatter);
+                                }
+                                OutputChannel::AsyncChannel(sender_tx) => {
+                                    if sender_tx.send(output_events).await.is_err() {
+                                        warn!("Could not send tap events");
+                                    }
                                 }
                             }
+                        } else {
+                            debug!("Empty tap response");
                         }
                     }
                 }
