@@ -201,7 +201,7 @@ aws-config = { version = "1.0.1", default-features = false, features = ["behavio
 aws-credential-types = { version = "1.2.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream"], optional = true }
 aws-smithy-types = { version = "1.2.0", default-features = false, optional = true }
-aws-smithy-runtime-api = { version = "1.7.0", default-features = false, optional = true }
+aws-smithy-runtime-api = { version = "1.7.2", default-features = false, optional = true }
 aws-smithy-runtime = { version = "1.6.2", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
 aws-smithy-async = { version = "1.2.1", default-features = false, features = ["rt-tokio"], optional = true }
 
