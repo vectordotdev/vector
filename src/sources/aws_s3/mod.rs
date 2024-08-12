@@ -210,7 +210,7 @@ impl SourceConfig for AwsS3Config {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]

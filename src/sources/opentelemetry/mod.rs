@@ -287,7 +287,7 @@ impl SourceConfig for OpentelemetryConfig {
         };
 
         vec![
-            SourceOutput::new_logs(DataType::Log, schema_definition).with_port(LOGS),
+            SourceOutput::new_maybe_logs(DataType::Log, schema_definition).with_port(LOGS),
             SourceOutput::new_traces().with_port(TRACES),
         ]
     }

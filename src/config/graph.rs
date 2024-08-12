@@ -379,7 +379,7 @@ mod test {
                     outputs: vec![match ty {
                         DataType::Metric => SourceOutput::new_metrics(),
                         DataType::Trace => SourceOutput::new_traces(),
-                        _ => SourceOutput::new_logs(ty, Definition::any()),
+                        _ => SourceOutput::new_maybe_logs(ty, Definition::any()),
                     }],
                 },
             );
@@ -639,7 +639,7 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(
+                outputs: vec![SourceOutput::new_maybe_logs(
                     DataType::all_bits(),
                     Definition::any(),
                 )],
@@ -648,7 +648,7 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(
+                outputs: vec![SourceOutput::new_maybe_logs(
                     DataType::all_bits(),
                     Definition::any(),
                 )],
@@ -676,7 +676,7 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(
+                outputs: vec![SourceOutput::new_maybe_logs(
                     DataType::all_bits(),
                     Definition::any(),
                 )],
