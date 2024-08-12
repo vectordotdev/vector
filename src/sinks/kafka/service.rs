@@ -174,15 +174,15 @@ impl Service<KafkaRequest> for KafkaService {
                     // A final/non-retriable error occurred.
                     Err((
                         err @ KafkaError::MessageProduction(
-                            RDKafkaErrorCode::InvalidMessage |
-                            RDKafkaErrorCode::InvalidMessageSize |
-                            RDKafkaErrorCode::MessageSizeTooLarge |
-                            RDKafkaErrorCode::UnknownTopicOrPartition |
-                            RDKafkaErrorCode::InvalidRecord |
-                            RDKafkaErrorCode::InvalidRequiredAcks |
-                            RDKafkaErrorCode::TopicAuthorizationFailed |
-                            RDKafkaErrorCode::UnsupportedForMessageFormat |
-                            RDKafkaErrorCode::ClusterAuthorizationFailed
+                            RDKafkaErrorCode::InvalidMessage
+                            | RDKafkaErrorCode::InvalidMessageSize
+                            | RDKafkaErrorCode::MessageSizeTooLarge
+                            | RDKafkaErrorCode::UnknownTopicOrPartition
+                            | RDKafkaErrorCode::InvalidRecord
+                            | RDKafkaErrorCode::InvalidRequiredAcks
+                            | RDKafkaErrorCode::TopicAuthorizationFailed
+                            | RDKafkaErrorCode::UnsupportedForMessageFormat
+                            | RDKafkaErrorCode::ClusterAuthorizationFailed,
                         ),
                         _,
                     )) => return Err(err),
