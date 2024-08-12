@@ -335,7 +335,7 @@ impl SourceConfig for ExecConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
