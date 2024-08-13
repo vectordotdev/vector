@@ -49,7 +49,7 @@ impl SinkConfig for GreptimeDBConfig {
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct GreptimeDBMetricsConfig {
-    /// The GreptimeDB [database][database] name to connect.
+    /// The [GreptimeDB database][database] name to connect.
     ///
     /// Default to `public`, the default database of GreptimeDB.
     ///

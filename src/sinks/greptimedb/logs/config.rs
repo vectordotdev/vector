@@ -41,7 +41,7 @@ pub struct GreptimeDBLogsConfig {
     #[configurable(metadata(docs::examples = "mytable"))]
     pub table: Template,
 
-    /// The GreptimeDB [database][database] name to connect.
+    /// The [GreptimeDB database][database] name to connect.
     ///
     /// Default to `public`, the default database of GreptimeDB.
     ///
