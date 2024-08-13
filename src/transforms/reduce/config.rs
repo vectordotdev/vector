@@ -4,10 +4,8 @@ use std::time::Duration;
 
 use indexmap::IndexMap;
 use serde_with::serde_as;
-use vrl::path::{parse_target_path, PathPrefix};
-use vrl::prelude::{Collection, KeyString, Kind};
-
-use vector_lib::configurable::configurable_component;
+use vrl::path::{PathPrefix, TargetPath};
+use vrl::prelude::{Collection, Kind};
 
 use crate::conditions::AnyCondition;
 use crate::config::{
@@ -17,6 +15,8 @@ use crate::config::{
 use crate::schema::Definition;
 use crate::transforms::reduce::merge_strategy::MergeStrategy;
 use crate::transforms::{reduce::transform::Reduce, Transform};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::ConfigTargetPath;
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
@@ -85,7 +85,7 @@ pub struct ReduceConfig {
     #[configurable(metadata(
         docs::additional_props_description = "An individual merge strategy."
     ))]
-    pub merge_strategies: IndexMap<KeyString, MergeStrategy>,
+    pub merge_strategies: IndexMap<ConfigTargetPath, MergeStrategy>,
 
     /// A condition used to distinguish the final event of a transaction.
     ///
@@ -137,16 +137,18 @@ impl TransformConfig for ReduceConfig {
 
         let mut schema_definition = merged_definition;
 
-        for (key, merge_strategy) in self.merge_strategies.iter() {
-            let key = if let Ok(key) = parse_target_path(key) {
-                key
-            } else {
-                continue;
-            };
+        for (path, merge_strategy) in self.merge_strategies.iter() {
+            // let key = if let Ok(key) = parse_target_path(key) {
+            //     key
+            // } else {
+            //     continue;
+            // };
 
-            let input_kind = match key.prefix {
-                PathPrefix::Event => schema_definition.event_kind().at_path(&key.path),
-                PathPrefix::Metadata => schema_definition.metadata_kind().at_path(&key.path),
+            let input_kind = match path.prefix() {
+                PathPrefix::Event => schema_definition.event_kind().at_path(path.value_path()),
+                PathPrefix::Metadata => {
+                    schema_definition.metadata_kind().at_path(path.value_path())
+                }
             };
 
             let new_kind = match merge_strategy {
@@ -215,7 +217,7 @@ impl TransformConfig for ReduceConfig {
                 new_kind
             };
 
-            schema_definition = schema_definition.with_field(&key, new_kind, None);
+            schema_definition = schema_definition.with_field(&path.0, new_kind, None);
         }
 
         // the same schema definition is used for all inputs

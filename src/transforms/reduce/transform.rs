@@ -3,12 +3,6 @@ use std::collections::{hash_map, HashMap};
 use std::pin::Pin;
 use std::time::{Duration, Instant};
 
-use futures::Stream;
-use indexmap::IndexMap;
-use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
-use vrl::path::parse_target_path;
-use vrl::prelude::KeyString;
-
 use crate::transforms::reduce::merge_strategy::{
     get_value_merger, MergeStrategy, ReduceValueMerger,
 };
@@ -18,14 +12,33 @@ use crate::{
     internal_events::ReduceStaleEventFlushed,
     transforms::{reduce::config::ReduceConfig, TaskTransform},
 };
+use futures::Stream;
+use indexmap::IndexMap;
+use vector_lib::lookup::lookup_v2::ConfigTargetPath;
+use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
+use vrl::path::{parse_target_path, OwnedTargetPath};
 
 #[derive(Debug)]
 struct ReduceState {
     events: usize,
-    fields: HashMap<KeyString, Box<dyn ReduceValueMerger>>,
+    fields: HashMap<OwnedTargetPath, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
     creation: Instant,
     metadata: EventMetadata,
+}
+
+fn is_covered_by_strategy(
+    path: &OwnedTargetPath,
+    strategies: &IndexMap<OwnedTargetPath, MergeStrategy>,
+) -> bool {
+    let mut current = OwnedTargetPath::event_root();
+    for component in &path.path.segments {
+        current = current.with_field_appended(&component.to_string());
+        if strategies.contains_key(&current) {
+            return true;
+        }
+    }
+    false
 }
 
 impl ReduceState {
@@ -39,13 +52,43 @@ impl ReduceState {
         }
     }
 
-    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<KeyString, MergeStrategy>) {
+    fn add_event(
+        &mut self,
+        e: LogEvent,
+        strategies: &IndexMap<OwnedTargetPath, MergeStrategy>,
+    ) -> crate::Result<()> {
         self.metadata.merge(e.metadata().clone());
+
+        for (path, strategy) in strategies {
+            if let Some(value) = e.get(path) {
+                match self.fields.entry(path.clone()) {
+                    Entry::Vacant(entry) => match get_value_merger(value.clone(), strategy) {
+                        Ok(m) => {
+                            entry.insert(m);
+                        }
+                        Err(error) => {
+                            warn!(message = "Failed to create value merger.", %error, %path);
+                        }
+                    },
+                    Entry::Occupied(mut entry) => {
+                        if let Err(error) = entry.get_mut().add(value.clone()) {
+                            warn!(message = "Failed to merge value.", %error);
+                        }
+                    }
+                }
+            }
+        }
 
         if let Some(fields_iter) = e.all_event_fields_skip_array_elements() {
             for (path, value) in fields_iter {
-                let maybe_strategy = strategies.get(&path);
-                match self.fields.entry(path) {
+                // This should not return an error, unless there is a bug in the event fields iterator.
+                let parsed_path = parse_target_path(&path)?;
+                if is_covered_by_strategy(&parsed_path, strategies) {
+                    continue;
+                }
+
+                let maybe_strategy = strategies.get(&parsed_path);
+                match self.fields.entry(parsed_path) {
                     Entry::Vacant(entry) => {
                         if let Some(strategy) = maybe_strategy {
                             match get_value_merger(value.clone(), strategy) {
@@ -72,12 +115,13 @@ impl ReduceState {
 
         self.events += 1;
         self.stale_since = Instant::now();
+        Ok(())
     }
 
     fn flush(mut self) -> LogEvent {
         let mut event = LogEvent::new_with_metadata(self.metadata);
-        for (k, v) in self.fields.drain() {
-            if let Err(error) = v.insert_into(k.as_str(), &mut event) {
+        for (path, v) in self.fields.drain() {
+            if let Err(error) = v.insert_into(&path, &mut event) {
                 warn!(message = "Failed to merge values for field.", %error);
             }
         }
@@ -92,17 +136,19 @@ pub struct Reduce {
     flush_period: Duration,
     end_every_period: Option<Duration>,
     group_by: Vec<String>,
-    merge_strategies: IndexMap<KeyString, MergeStrategy>,
+    merge_strategies: IndexMap<OwnedTargetPath, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
     max_events: Option<usize>,
 }
 
-fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> crate::Result<()> {
+fn validate_merge_strategies(
+    strategies: IndexMap<ConfigTargetPath, MergeStrategy>,
+) -> crate::Result<()> {
     for (path, _) in &strategies {
-        let contains_index = parse_target_path(path)
-            .map_err(|_| format!("Could not parse path: `{path}`"))?
+        let contains_index = path
+            .0
             .path
             .segments
             .iter()
@@ -147,7 +193,11 @@ impl Reduce {
             flush_period: config.flush_period_ms,
             end_every_period: config.end_every_period_ms,
             group_by,
-            merge_strategies: config.merge_strategies.clone(),
+            merge_strategies: config
+                .merge_strategies
+                .iter()
+                .map(|(path, strategy)| (path.0.clone(), strategy.clone()))
+                .collect(),
             reduce_merge_states: HashMap::new(),
             ends_when,
             starts_when,
@@ -183,20 +233,29 @@ impl Reduce {
             .for_each(|(_, s)| emitter.emit(Event::from(s.flush())));
     }
 
-    fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
+    fn push_or_new_reduce_state(
+        &mut self,
+        event: LogEvent,
+        discriminant: Discriminant,
+    ) -> crate::Result<()> {
         match self.reduce_merge_states.entry(discriminant) {
             hash_map::Entry::Vacant(entry) => {
                 let mut state = ReduceState::new();
-                state.add_event(event, &self.merge_strategies);
+                state.add_event(event, &self.merge_strategies)?;
                 entry.insert(state);
             }
             hash_map::Entry::Occupied(mut entry) => {
-                entry.get_mut().add_event(event, &self.merge_strategies);
+                entry.get_mut().add_event(event, &self.merge_strategies)?;
             }
-        }
+        };
+        Ok(())
     }
 
-    pub(crate) fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
+    pub(crate) fn transform_one(
+        &mut self,
+        emitter: &mut Emitter<Event>,
+        event: Event,
+    ) -> crate::Result<()> {
         let (starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
@@ -230,15 +289,16 @@ impl Reduce {
         } else if ends_here {
             emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
                 Some(mut state) => {
-                    state.add_event(event, &self.merge_strategies);
+                    state.add_event(event, &self.merge_strategies)?;
                     state.flush().into()
                 }
                 None => {
                     let mut state = ReduceState::new();
-                    state.add_event(event, &self.merge_strategies);
+                    state.add_event(event, &self.merge_strategies)?;
                     state.flush().into()
                 }
-            })
+            });
+            Ok(())
         } else {
             self.push_or_new_reduce_state(event, discriminant)
         }
@@ -261,7 +321,9 @@ impl TaskTransform<Event> for Reduce {
             flush_period,
             |me: &mut Box<Reduce>, event, emitter: &mut Emitter<Event>| {
                 // called for each event
-                me.transform_one(emitter, event);
+                if let Err(error) = me.transform_one(emitter, event) {
+                    error!(%error, rate_limit = 30)
+                }
             },
             |me: &mut Box<Reduce>, emitter: &mut Emitter<Event>| {
                 // called periodically to check for expired events
@@ -869,7 +931,62 @@ merge_strategies.bar = "concat"
         let error = Reduce::new(&config, &TableRegistry::default()).unwrap_err();
         assert_eq!(
             error.to_string(),
-            "Merge strategies with indexes are currently not supported. Path: `a.b[0]`"
+            "Merge strategies with indexes are currently not supported. Path: `.a.b[0]`"
         );
+    }
+
+    #[tokio::test]
+    async fn merge_objects_in_array() {
+        let config = toml::from_str::<ReduceConfig>(indoc!(
+            r#"
+            group_by = [ "id" ]
+            merge_strategies."events" = "array"
+
+            [ends_when]
+              type = "vrl"
+              source = "exists(.test_end)"
+            "#,
+        ))
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let v_1 = Value::from(btreemap! {
+                "attrs" => btreemap! {
+                    "msg" => "foo",
+                },
+                "sev" => 2,
+            });
+            let mut e_1 = LogEvent::from(Value::from(btreemap! {"id" => 777}));
+            e_1.insert("events", v_1.clone());
+            tx.send(e_1.into()).await.unwrap();
+
+            let v_2 = Value::from(btreemap! {
+                "attrs" => btreemap! {
+                    "msg" => "bar",
+                },
+                "sev" => 3,
+            });
+            let mut e_2 =
+                LogEvent::from(Value::from(btreemap! {"id" => 777, "test_end" => "done"}));
+            e_2.insert("events", v_2.clone());
+            tx.send(e_2.into()).await.unwrap();
+
+            let output = out.recv().await.unwrap().into_log();
+            let expected_value = Value::from(btreemap! {
+                "id" => 1554,
+                "events" => vec![v_1, v_2],
+                "test_end" => "done"
+            });
+            assert_eq!(*output.value(), expected_value);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 }
