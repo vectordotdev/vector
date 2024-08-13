@@ -9440,8 +9440,8 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.8"
-source = "git+https://github.com/vectordotdev/tokio?branch=tokio-util-0.7.8-framed-read-continue-on-error#3747655f8f0443e13fe20da3f613ea65c23347c2"
+version = "0.7.11"
+source = "git+https://github.com/vectordotdev/tokio?branch=tokio-util-0.7.11-framed-read-continue-on-error#156dcaacdfa53f530a39eb91b1ceb731a9908986"
 dependencies = [
  "bytes 1.7.1",
  "futures-core",
@@ -9450,7 +9450,6 @@ dependencies = [
  "pin-project-lite",
  "slab",
  "tokio",
- "tracing 0.1.40",
 ]
 
 [[package]]
