@@ -138,12 +138,6 @@ impl TransformConfig for ReduceConfig {
         let mut schema_definition = merged_definition;
 
         for (path, merge_strategy) in self.merge_strategies.iter() {
-            // let key = if let Ok(key) = parse_target_path(key) {
-            //     key
-            // } else {
-            //     continue;
-            // };
-
             let input_kind = match path.prefix() {
                 PathPrefix::Event => schema_definition.event_kind().at_path(path.value_path()),
                 PathPrefix::Metadata => {
