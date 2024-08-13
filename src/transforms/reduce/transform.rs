@@ -945,7 +945,7 @@ merge_strategies.bar = "concat"
             r#"
             group_by = [ "id" ]
             merge_strategies.events = "array"
-            merge_strategies."events.sev" = "discard"
+            merge_strategies.another = "discard"
 
             [ends_when]
               type = "vrl"
@@ -965,7 +965,9 @@ merge_strategies.bar = "concat"
                 },
                 "sev" => 2,
             });
-            let mut e_1 = LogEvent::from(Value::from(btreemap! {"id" => 777}));
+            let mut e_1 = LogEvent::from(Value::from(
+                btreemap! {"id" => 777, "another" => btreemap!{ "a" => 1}},
+            ));
             e_1.insert("events", v_1.clone());
             tx.send(e_1.into()).await.unwrap();
 
@@ -975,8 +977,9 @@ merge_strategies.bar = "concat"
                 },
                 "sev" => 3,
             });
-            let mut e_2 =
-                LogEvent::from(Value::from(btreemap! {"id" => 777, "test_end" => "done"}));
+            let mut e_2 = LogEvent::from(Value::from(
+                btreemap! {"id" => 777, "test_end" => "done", "another" => btreemap!{ "b" => 2}},
+            ));
             e_2.insert("events", v_2.clone());
             tx.send(e_2.into()).await.unwrap();
 
@@ -984,6 +987,7 @@ merge_strategies.bar = "concat"
             let expected_value = Value::from(btreemap! {
                 "id" => 1554,
                 "events" => vec![v_1, v_2],
+                "another" => btreemap!{ "a" => 1},
                 "test_end" => "done"
             });
             assert_eq!(*output.value(), expected_value);
