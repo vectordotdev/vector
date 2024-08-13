@@ -94,7 +94,7 @@ base: components: sinks: greptimedb_logs: configuration: {
 	}
 	dbname: {
 		description: """
-			The GreptimeDB [database][database] name to connect.
+			The [GreptimeDB database][database] name to connect.
 
 			Default to `public`, the default database of GreptimeDB.
 
