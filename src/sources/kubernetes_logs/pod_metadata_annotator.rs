@@ -1042,8 +1042,6 @@ mod tests {
                 &container_status,
                 log_namespace,
             );
-            println!("{:?}", log);
-            println!("{:?}", expected);
             assert_eq!(log, expected);
         }
     }
