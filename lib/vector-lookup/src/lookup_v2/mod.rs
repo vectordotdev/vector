@@ -4,7 +4,6 @@ pub use optional_path::{OptionalTargetPath, OptionalValuePath};
 use std::fmt;
 use vector_config_macros::configurable_component;
 
-use vector_config::ConfigurableString;
 pub use vrl::path::{
     parse_target_path, parse_value_path, BorrowedSegment, OwnedSegment, OwnedTargetPath,
     OwnedValuePath, PathConcat, PathParseError, PathPrefix, TargetPath, ValuePath,
@@ -64,8 +63,6 @@ impl From<&str> for ConfigValuePath {
 #[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(try_from = "String", into = "String")]
 pub struct ConfigTargetPath(pub OwnedTargetPath);
-
-impl ConfigurableString for ConfigTargetPath {}
 
 impl fmt::Display for ConfigTargetPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

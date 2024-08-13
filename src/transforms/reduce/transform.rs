@@ -14,9 +14,9 @@ use crate::{
 };
 use futures::Stream;
 use indexmap::IndexMap;
-use vector_lib::lookup::lookup_v2::ConfigTargetPath;
 use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
 use vrl::path::{parse_target_path, OwnedTargetPath};
+use vrl::prelude::KeyString;
 
 #[derive(Debug)]
 struct ReduceState {
@@ -143,12 +143,10 @@ pub struct Reduce {
     max_events: Option<usize>,
 }
 
-fn validate_merge_strategies(
-    strategies: IndexMap<ConfigTargetPath, MergeStrategy>,
-) -> crate::Result<()> {
+fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> crate::Result<()> {
     for (path, _) in &strategies {
-        let contains_index = path
-            .0
+        let contains_index = parse_target_path(path)
+            .map_err(|_| format!("Could not parse path: `{path}`"))?
             .path
             .segments
             .iter()
@@ -196,7 +194,13 @@ impl Reduce {
             merge_strategies: config
                 .merge_strategies
                 .iter()
-                .map(|(path, strategy)| (path.0.clone(), strategy.clone()))
+                .filter_map(|(path, strategy)| {
+                    // TODO Invalid paths are ignored to preserve backwards compatibility.
+                    //      Merge strategy paths should ideally be [`lookup_v2::ConfigTargetPath`]
+                    //      which means an invalid path would result in an configuration error.
+                    let parsed_path = parse_target_path(path).ok();
+                    parsed_path.map(|path| (path, strategy.clone()))
+                })
                 .collect(),
             reduce_merge_states: HashMap::new(),
             ends_when,
@@ -931,7 +935,7 @@ merge_strategies.bar = "concat"
         let error = Reduce::new(&config, &TableRegistry::default()).unwrap_err();
         assert_eq!(
             error.to_string(),
-            "Merge strategies with indexes are currently not supported. Path: `.a.b[0]`"
+            "Merge strategies with indexes are currently not supported. Path: `a.b[0]`"
         );
     }
 
