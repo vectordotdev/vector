@@ -944,7 +944,8 @@ merge_strategies.bar = "concat"
         let config = toml::from_str::<ReduceConfig>(indoc!(
             r#"
             group_by = [ "id" ]
-            merge_strategies."events" = "array"
+            merge_strategies.events = "array"
+            merge_strategies."events.sev" = "discard"
 
             [ends_when]
               type = "vrl"
