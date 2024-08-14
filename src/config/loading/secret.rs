@@ -59,7 +59,7 @@ impl SecretBackendLoader {
         let mut secrets: HashMap<String, String> = HashMap::new();
 
         for (backend_name, keys) in &self.secret_keys {
-            let backend = self.backends.get_mut(&ComponentKey::from(backend_name.clone())).ok_or_else(|| format!("Backend \"{}\" is required for secret retrieval but was not found in config.", backend_name))?;
+            let backend = self.backends.get_mut(&ComponentKey::from(backend_name.clone())).ok_or_else(|| format!("Backend \"{backend_name}\" is required for secret retrieval but was not found in config."))?;
 
             debug!(message = "Retrieving secrets from a backend.", backend = ?backend_name, keys = ?keys);
             let backend_secrets = backend
@@ -67,13 +67,12 @@ impl SecretBackendLoader {
                 .map_ok(|backend_secrets| {
                     backend_secrets.into_iter().map(|(k, v)| {
                         trace!(message = "Successfully retrieved a secret.", backend = ?backend_name, key = ?k);
-                        (format!("{}.{}", backend_name, k), v)
+                        (format!("{backend_name}.{k}"), v)
                     }).collect::<HashMap<String, String>>()
                 })
                 .map_err(|e| {
                     format!(
-                        "Error while retrieving secret from backend \"{}\": {}.",
-                        backend_name, e
+                        "Error while retrieving secret from backend \"{backend_name}\": {e}.",
                     )
                 })
                 .await?;
