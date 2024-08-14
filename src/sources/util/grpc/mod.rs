@@ -6,13 +6,14 @@ use crate::{
 use futures::FutureExt;
 use http::{Request, Response};
 use hyper::Body;
-use std::{convert::Infallible, net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 use tonic::transport::server::Routes;
 use tonic::{
+    Status,
     body::BoxBody,
     transport::server::{NamedService, Server},
 };
-use tower::Service;
+use tower::{Layer, Service};
 use tower_http::{
     classify::{GrpcErrorsAsFailures, SharedClassifier},
     trace::TraceLayer,
@@ -22,14 +23,19 @@ use tracing::Span;
 mod decompression;
 pub use self::decompression::{DecompressionAndMetrics, DecompressionAndMetricsLayer};
 
+mod connectionlimit;
+pub use self::connectionlimit::{ConnectionLimit, ConnectionLimitLayer};
+
 pub async fn run_grpc_server<S>(
     address: SocketAddr,
+    max_requests: usize,
+    max_duration: Duration,
     tls_settings: MaybeTlsSettings,
     service: S,
     shutdown: ShutdownSignal,
 ) -> crate::Result<()>
 where
-    S: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
+    S: Service<Request<Body>, Response = Response<BoxBody>, Error = tonic::Status>
         + NamedService
         + Clone
         + Send
@@ -42,6 +48,9 @@ where
     let stream = listener.accept_stream();
 
     info!(%address, "Building gRPC server.");
+
+    // Conditionally apply the ConnectionLimitLayer if any limits are set
+    let service = ConnectionLimitLayer::new(max_requests, max_duration).layer(service);
 
     Server::builder()
         .layer(build_grpc_trace_layer(span.clone()))

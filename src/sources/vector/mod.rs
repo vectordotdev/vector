@@ -1,5 +1,8 @@
 //! The `vector` source. See [VectorConfig].
-use std::net::SocketAddr;
+use std::{
+    net::SocketAddr,
+    time::Duration,
+};
 
 use chrono::Utc;
 use futures::TryFutureExt;
@@ -25,6 +28,8 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
+
+use serde_with::serde_as;
 
 /// Marker type for version two of the configuration for the `vector` source.
 #[configurable_component]
@@ -114,6 +119,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 }
 
 /// Configuration for the `vector` source.
+#[serde_as]
 #[configurable_component(source("vector", "Collect observability data from a Vector instance."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -133,6 +139,16 @@ pub struct VectorConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    /// Maximum duration of client connection before it is closed
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::human_name = "Max client connection duration"))]
+    max_duration: Duration,
+
+    /// Maximum number of client requests before connection is closed
+    #[configurable(metadata(docs::type_unit = "requests"))]
+    #[configurable(metadata(docs::human_name = "Max client requests before connection is closed"))]
+    max_requests: usize,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
@@ -157,6 +173,8 @@ impl Default for VectorConfig {
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
             acknowledgements: Default::default(),
+            max_requests: usize::MAX,
+            max_duration: Duration::from_secs(u64::MAX),
             log_namespace: None,
         }
     }
@@ -186,7 +204,7 @@ impl SourceConfig for VectorConfig {
         .max_decoding_message_size(usize::MAX);
 
         let source =
-            run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
+            run_grpc_server(self.address, self.max_requests, self.max_duration, tls_settings, service, cx.shutdown).map_err(|error| {
                 error!(message = "Source future failed.", %error);
             });
 
