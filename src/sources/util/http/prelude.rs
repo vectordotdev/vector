@@ -1,3 +1,7 @@
+use bytes::Bytes;
+use futures::{FutureExt, TryFutureExt};
+use hyper::{service::make_service_fn, Server};
+use serde_json::json;
 use std::{
     collections::HashMap,
     convert::{Infallible, TryFrom},
@@ -5,17 +9,13 @@ use std::{
     net::SocketAddr,
     time::Duration,
 };
-use bytes::Bytes;
-use futures::{FutureExt, TryFutureExt};
-use hyper::{service::make_service_fn, Server};
-use serde_json::json;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    lookup::{lookup_v2::OptionalTargetPath},
+    lookup::lookup_v2::OptionalTargetPath,
     EstimatedJsonEncodedSizeOf,
 };
 use warp::{
@@ -173,7 +173,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, acknowledgements, response_code, response_body_key.clone(), cx.out.clone())
+                        handle_request(
+                            events,
+                            acknowledgements,
+                            response_code,
+                            response_body_key.clone(),
+                            cx.out.clone(),
+                        )
                     },
                 );
 
@@ -277,7 +283,8 @@ async fn handle_request(
                         response = warp::reply::with_status(
                             warp::reply::json(&json!(body)),
                             response_code,
-                        ).into_response();
+                        )
+                        .into_response();
                     } else {
                         return Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::INTERNAL_SERVER_ERROR,

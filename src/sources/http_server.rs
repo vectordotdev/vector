@@ -14,7 +14,9 @@ use vector_lib::codecs::{
     NewlineDelimitedDecoderConfig,
 };
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, lookup_v2::OptionalTargetPath, owned_value_path, path};
+use vector_lib::lookup::{
+    lookup_v2::OptionalTargetPath, lookup_v2::OptionalValuePath, owned_value_path, path,
+};
 use vector_lib::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
@@ -575,7 +577,7 @@ mod tests {
     };
     use vector_lib::config::LogNamespace;
     use vector_lib::event::LogEvent;
-    use vector_lib::lookup::lookup_v2::{OptionalValuePath, OptionalTargetPath};
+    use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
     use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath, PathPrefix};
     use vector_lib::schema::Definition;
     use vrl::value::{kind::Collection, Kind, ObjectMap};
