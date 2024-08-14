@@ -2,11 +2,6 @@
 
 use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
 
-use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, ObjectMap};
-use crate::{
-    config::{LogNamespace, OutputId},
-    schema,
-};
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -14,6 +9,12 @@ use vector_common::{byte_size_of::ByteSizeOf, config::ComponentKey, EventDataEq}
 use vrl::{
     compiler::SecretTarget,
     value::{KeyString, Kind, Value},
+};
+
+use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, ObjectMap};
+use crate::{
+    config::{LogNamespace, OutputId},
+    schema,
 };
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
@@ -213,7 +214,7 @@ impl EventMetadata {
         self.dropped_fields.get(meaning.as_ref())
     }
 
-    /// Returns a reference to the `Datadog6MetricOriginMetadata`.
+    /// Returns a reference to the `DatadogMetricOriginMetadata`.
     pub fn datadog_origin_metadata(&self) -> Option<&DatadogMetricOriginMetadata> {
         self.datadog_origin_metadata.as_ref()
     }
