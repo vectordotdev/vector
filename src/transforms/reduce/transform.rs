@@ -963,7 +963,7 @@ merge_strategies.bar = "concat"
 
             let v_1 = Value::from(btreemap! {
                 "attrs" => btreemap! {
-                    "msg" => "foo",
+                    "nested.msg" => "foo",
                 },
                 "sev" => 2,
             });
@@ -975,7 +975,7 @@ merge_strategies.bar = "concat"
 
             let v_2 = Value::from(btreemap! {
                 "attrs" => btreemap! {
-                    "msg" => "bar",
+                    "nested.msg" => "bar",
                 },
                 "sev" => 3,
             });
