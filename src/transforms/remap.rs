@@ -478,8 +478,7 @@ where
 
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
-            Event::Log(ref mut log) => {
-                match log.namespace() {
+            Event::Log(ref mut log) => match log.namespace() {
                 LogNamespace::Legacy => {
                     if let Some(metadata_key) = log_schema().metadata_key() {
                         log.insert(
@@ -494,7 +493,7 @@ where
                         self.dropped_data(reason, error),
                     );
                 }
-            }},
+            },
             Event::Metric(ref mut metric) => {
                 if let Some(metadata_key) = log_schema().metadata_key() {
                     metric.replace_tag(format!("{}.dropped.reason", metadata_key), reason.into());
