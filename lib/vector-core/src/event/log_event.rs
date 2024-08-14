@@ -1179,4 +1179,11 @@ mod test {
             ]
         );
     }
+
+    #[test]
+    fn metadata_set_unique_internal_event_id() {
+        let log1 = LogEvent::default();
+        let log2 = LogEvent::default();
+        assert_ne!(log1.metadata().internal_event_id(), log2.metadata().internal_event_id());
+    }
 }

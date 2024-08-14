@@ -10748,6 +10748,7 @@ dependencies = [
  "typetag",
  "url",
  "urlencoding",
+ "uuid",
  "vector-buffers",
  "vector-common",
  "vector-config",
