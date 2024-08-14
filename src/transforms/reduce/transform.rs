@@ -81,6 +81,8 @@ impl ReduceState {
 
         if let Some(fields_iter) = e.all_event_fields_skip_array_elements() {
             for (path, value) in fields_iter {
+                // See issue 21077.
+                let path = path.replace("\\.", ".");
                 // This should not return an error, unless there is a bug in the event fields iterator.
                 let parsed_path = parse_target_path(&path)?;
                 if is_covered_by_strategy(&parsed_path, strategies) {
