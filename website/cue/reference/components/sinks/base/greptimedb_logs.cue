@@ -170,7 +170,7 @@ base: components: sinks: greptimedb_logs: configuration: {
 		type: string: examples: ["password"]
 	}
 	pipeline_name: {
-		description: "Pipeline name to be used for the logs"
+		description: "Pipeline name to be used for the logs."
 		required:    true
 		type: string: {
 			examples: ["pipeline_name"]
