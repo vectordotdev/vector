@@ -1047,7 +1047,7 @@ dependencies = [
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "aws-types",
- "bytes 1.6.1",
+ "bytes 1.7.1",
  "http 0.2.9",
  "regex",
  "tracing 0.1.40",
@@ -1069,7 +1069,7 @@ dependencies = [
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "aws-types",
- "bytes 1.6.1",
+ "bytes 1.7.1",
  "http 0.2.9",
  "regex",
  "tracing 0.1.40",
@@ -1319,7 +1319,7 @@ dependencies = [
  "serde",
  "sync_wrapper",
  "tokio",
- "tower",
+ "tower 0.4.13",
  "tower-layer",
  "tower-service",
 ]
@@ -3820,7 +3820,7 @@ dependencies = [
  "tokio-stream",
  "tonic 0.10.2",
  "tonic-build 0.9.2",
- "tower",
+ "tower 0.4.13",
 ]
 
 [[package]]
@@ -4461,7 +4461,7 @@ dependencies = [
  "pin-project-lite",
  "socket2 0.5.7",
  "tokio",
- "tower",
+ "tower 0.4.13",
  "tower-service",
  "tracing 0.1.40",
 ]
@@ -4974,7 +4974,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util",
- "tower",
+ "tower 0.4.13",
  "tower-http",
  "tracing 0.1.40",
 ]
@@ -9594,7 +9594,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.24.1",
  "tokio-stream",
- "tower",
+ "tower 0.4.13",
  "tower-layer",
  "tower-service",
  "tracing 0.1.40",
@@ -9621,7 +9621,7 @@ dependencies = [
  "prost 0.12.6",
  "tokio",
  "tokio-stream",
- "tower",
+ "tower 0.4.13",
  "tower-layer",
  "tower-service",
  "tracing 0.1.40",
@@ -9666,6 +9666,25 @@ dependencies = [
  "pin-project-lite",
  "rand 0.8.5",
  "slab",
+ "tokio",
+ "tokio-util",
+ "tower-layer",
+ "tower-service",
+ "tracing 0.1.40",
+]
+
+[[package]]
+name = "tower"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36b837f86b25d7c0d7988f00a54e74739be6477f2aac6201b8f429a7569991b7"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "indexmap 2.2.6",
+ "pin-project-lite",
+ "slab",
+ "sync_wrapper",
  "tokio",
  "tokio-util",
  "tower-layer",
@@ -10449,7 +10468,7 @@ dependencies = [
  "toml",
  "tonic 0.10.2",
  "tonic-build 0.10.2",
- "tower",
+ "tower 0.5.0",
  "tower-http",
  "tower-test",
  "tracing 0.1.40",
@@ -10750,7 +10769,7 @@ dependencies = [
  "rand_distr",
  "tokio",
  "tokio-util",
- "tower",
+ "tower 0.5.0",
  "tracing 0.1.40",
  "twox-hash",
  "vector-common",
