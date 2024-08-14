@@ -3,6 +3,7 @@ use std::{
     io::Read,
 };
 
+use futures::TryFutureExt;
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
@@ -51,31 +52,33 @@ impl SecretBackendLoader {
         }
     }
 
-    pub(crate) fn retrieve(
+    pub(crate) async fn retrieve(
         &mut self,
         signal_rx: &mut signal::SignalRx,
     ) -> Result<HashMap<String, String>, String> {
-        let secrets = self.secret_keys.iter().flat_map(|(backend_name, keys)| {
-            match self.backends.get_mut(&ComponentKey::from(backend_name.clone())) {
-                None => {
-                    vec![Err(format!("Backend \"{}\" is required for secret retrieval but was not found in config.", backend_name))]
-                },
-                Some(backend) => {
-                    debug!(message = "Retrieving secret from a backend.", backend = ?backend_name);
-                    match backend.retrieve(keys.clone(), signal_rx) {
-                        Err(e) => {
-                            vec![Err(format!("Error while retrieving secret from backend \"{}\": {}.", backend_name, e))]
-                        },
-                        Ok(s) => {
-                            s.into_iter().map(|(k, v)| {
-                                trace!(message = "Successfully retrieved a secret.", backend = ?backend_name, secret_key = ?k);
-                                Ok((format!("{}.{}", backend_name, k), v))
-                            }).collect::<Vec<Result<(String, String), String>>>()
-                        }
-                    }
-                },
+        let mut secrets: HashMap<String, String> = HashMap::new();
+
+        for (backend_name, keys) in &self.secret_keys {
+            let backend = self.backends
+                .get_mut(&ComponentKey::from(backend_name.clone()))
+                .ok_or_else(|| {
+                    format!("Backend \"{backend_name}\" is required for secret retrieval but was not found in config.")
+                })?;
+
+            debug!(message = "Retrieving secrets from a backend.", backend = ?backend_name, keys = ?keys);
+            let backend_secrets = backend
+                .retrieve(keys.clone(), signal_rx)
+                .map_err(|e| {
+                    format!("Error while retrieving secret from backend \"{backend_name}\": {e}.",)
+                })
+                .await?;
+
+            for (k, v) in backend_secrets {
+                trace!(message = "Successfully retrieved a secret.", backend = ?backend_name, key = ?k);
+                secrets.insert(format!("{backend_name}.{k}"), v);
             }
-        }).collect::<Result<HashMap<String, String>, String>>()?;
+        }
+
         Ok(secrets)
     }
 
