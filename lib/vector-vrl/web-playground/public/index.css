@@ -81,12 +81,18 @@ body {
 }
 
 .version-info {
-  justify-content: center;
+  justify-content: center
 }
 
 .version-info table {
   width: 100%;
   border-spacing: 0;
+}
+
+.version-info tr {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
 }
 
 .version-info td {
@@ -98,11 +104,6 @@ body {
 
 .version-info td:first-child {
   font-weight: 600;
-}
-
-.version-info a {
-  color: var(--datadog-purple);
-  text-decoration: none;
 }
 
 #description-cell a:hover, .version-info a:hover {
