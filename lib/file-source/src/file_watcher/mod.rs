@@ -39,6 +39,7 @@ pub struct FileWatcher {
     findable: bool,
     reader: Box<dyn BufRead>,
     file_position: FilePosition,
+    last_line_offset: u64,
     devno: u64,
     inode: u64,
     is_dead: bool,
@@ -142,6 +143,7 @@ impl FileWatcher {
             findable: true,
             reader,
             file_position,
+            last_line_offset: file_position,
             devno,
             inode: ino,
             is_dead: false,
@@ -208,10 +210,12 @@ impl FileWatcher {
     /// a new file handler as needed, transparently to the caller.
     pub(super) fn read_line(&mut self) -> io::Result<Option<RawLine>> {
         self.track_read_attempt();
+        self.track_last_line_offset();
 
+        let line_offset = self.last_line_offset;
         let reader = &mut self.reader;
         let file_position = &mut self.file_position;
-        let initial_position = *file_position;
+
         match read_until_with_max_size(
             reader,
             file_position,
@@ -222,7 +226,7 @@ impl FileWatcher {
             Ok(Some(_)) => {
                 self.track_read_success();
                 Ok(Some(RawLine {
-                    offset: initial_position,
+                    offset: line_offset,
                     bytes: self.buf.split().freeze(),
                 }))
             }
@@ -239,7 +243,7 @@ impl FileWatcher {
                         Ok(None)
                     } else {
                         Ok(Some(RawLine {
-                            offset: initial_position,
+                            offset: line_offset,
                             bytes: buf,
                         }))
                     }
@@ -265,6 +269,13 @@ impl FileWatcher {
     #[inline]
     fn track_read_success(&mut self) {
         self.last_read_success = Instant::now();
+    }
+
+    #[inline]
+    fn track_last_line_offset(&mut self) {
+        if self.buf.is_empty() {
+            self.last_line_offset = self.file_position
+        }
     }
 
     #[inline]
