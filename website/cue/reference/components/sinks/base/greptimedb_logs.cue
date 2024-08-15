@@ -178,7 +178,7 @@ base: components: sinks: greptimedb_logs: configuration: {
 		}
 	}
 	pipeline_version: {
-		description: "Pipeline version to be used for the logs"
+		description: "Pipeline version to be used for the logs."
 		required:    false
 		type: string: {
 			examples: ["2024-06-07 06:46:23.858293"]

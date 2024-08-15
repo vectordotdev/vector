@@ -76,7 +76,7 @@ components: sinks: greptimedb_logs: {
 			title: "Setup"
 			body:  """
 				1. Start your own [GreptimeDB](\(urls.greptimedb)) or create an instance on [GreptimeCloud](\(urls.greptimecloud)).
-				2. Configure HTTP endpoint(host:port) and optional dbname and authentication information and pipeline info.
+				2. Configure HTTP endpoint(host:port), optional dbname, authentication information, and pipeline info.
 				"""
 		}
 	}
