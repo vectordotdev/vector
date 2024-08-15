@@ -1,12 +1,14 @@
 :root {
-  --datadog-purple: #7B3FF2;  /* Slightly more vibrant purple */
-  --datadog-purple-light: #9E6FF4;  /* Lighter purple for hover states */
-  --datadog-blue: #4B61FF;  /* Slightly brighter blue */
-  --datadog-gray: #5A5A5A;  /* Slightly darker for better contrast */
-  --datadog-gray-light: #A0A0A0;
-  --datadog-gray-lighter: #EAEAEA;  /* Slightly lighter */
-  --datadog-background: #FAFBFC;  /* Slightly lighter background */
-  --light-grey: #F5F5F5;  /* Lighter grey for the share button */
+  --datadog-purple-lightest: #F8F6FF;
+  --datadog-purple-light: #E1D8FF;
+  --datadog-purple: #632ca6;
+  --datadog-purple-vibrant: #7B40F1;
+  --datadog-purple-dark: #451b78;
+  --datadog-gray: #252525;
+  --datadog-gray-light: #b6b6b6;
+  --datadog-gray-lighter: #EAEAEA;
+  --datadog-background: #FAFBFC;
+  --light-grey: #F5F5F5;
 }
 
 body {
@@ -19,72 +21,91 @@ body {
 }
 
 .top-bar-wrapper {
-  width: 100%;
-  background-color: white;
-  border-bottom: 1px solid var(--datadog-gray-lighter);
+  background-color: var(--datadog-purple-lightest);
+  border-bottom: 1px solid var(--datadog-purple-light);
+  padding: 10px 0;
 }
 
 .headers-grid {
   display: grid;
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: auto 1fr auto;
   gap: 20px;
-  width: calc(100% - 40px);
+  width: calc(100% - 30px); /* Slightly reduced width */
   max-width: 1600px;
-  padding: 15px 20px;
   margin: 0 auto;
+  align-items: stretch;
 }
 
 .headers-grid-item {
-  background-color: transparent;
-  padding: 5px;
+  background-color: var(--datadog-purple-lightest);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--datadog-purple-light);
   display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+
+.title-section {
+  flex-direction: row;
   align-items: center;
-  justify-content: flex-start;
-  height: auto;
-  overflow: hidden;
+  gap: 8px; 
+}
+
+#logo {
+  width: 20px;
+  height: 20px;
 }
 
 .headers-grid-item h2 {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--datadog-purple);
   margin: 0;
-  color: #000000;
 }
 
 #description-cell {
-  grid-column: 3;
+  grid-column: 2;
 }
 
 #description-cell p {
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 13px; 
+  line-height: 1.4; 
   margin: 0;
   color: var(--datadog-gray);
 }
 
-table {
+#description-cell p, .version-info td {
+  color: var(--datadog-gray);
+}
+
+.version-info {
+  justify-content: center;
+}
+
+.version-info table {
   width: 100%;
   border-spacing: 0;
 }
 
-td {
-  padding: 3px 0;
+.version-info td {
+  padding: 2px 0; 
   font-weight: normal;
-  font-size: 13px;
-}
-
-td:first-child {
-  font-weight: 600;
+  font-size: 12px; 
   color: var(--datadog-gray);
 }
 
-a {
-  color: var(--datadog-blue);
+.version-info td:first-child {
+  font-weight: 600;
+}
+
+.version-info a {
+  color: var(--datadog-purple);
   text-decoration: none;
 }
 
-a:hover {
+#description-cell a:hover, .version-info a:hover {
   text-decoration: underline;
 }
 
@@ -181,25 +202,23 @@ div#output-section {
 .btn:active {
   transform: translateY(1px);
 }
-
 .btn-primary {
   background-color: var(--datadog-purple);
-  color: white;
+  color: var(--datadog-background);
 }
 
 .btn-primary:hover {
-  background-color: var(--datadog-purple-light);
+  background-color: var(--datadog-purple-dark);
 }
 
 .btn-secondary {
-  background-color: var(--light-grey);  /* Changed to light grey */
-  color: var(--datadog-gray);  /* Changed text color for better contrast */
+  background-color: var(--datadog-gray-lighter);
+  color: var(--datadog-gray);
   border: 1px solid var(--datadog-gray-light);
 }
 
 .btn-secondary:hover {
-  background-color: var(--datadog-gray-lighter);
-  color: var(--datadog-gray);  /* Kept text color on hover for consistency */
+  background-color: var(--datadog-gray-light);
 }
 
 /* Media Queries for Responsiveness */
@@ -258,12 +277,17 @@ div#output-section {
 
 @media only screen and (max-width: 1024px) {
   .headers-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .headers-grid-item {
+    width: 100%;
+    box-sizing: border-box;
   }
 
   #description-cell {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    grid-column: 1;
   }
 
   div#App {
