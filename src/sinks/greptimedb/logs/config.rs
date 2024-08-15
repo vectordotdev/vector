@@ -55,11 +55,11 @@ pub struct GreptimeDBLogsConfig {
     #[serde(default = "default_dbname_template")]
     pub dbname: Template,
 
-    /// Pipeline name to be used for the logs
+    /// Pipeline name to be used for the logs.
     #[configurable(metadata(docs::examples = "pipeline_name"))]
     pub pipeline_name: Template,
 
-    /// Pipeline version to be used for the logs
+    /// Pipeline version to be used for the logs.
     #[configurable(metadata(docs::examples = "2024-06-07 06:46:23.858293"))]
     pub pipeline_version: Option<Template>,
 
