@@ -1,18 +1,18 @@
 #![deny(missing_docs)]
 
-use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
+use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, ObjectMap};
+use crate::{
+    config::{LogNamespace, OutputId},
+    schema,
+};
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
+use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
 use uuid::Uuid;
 use vector_common::{byte_size_of::ByteSizeOf, config::ComponentKey, EventDataEq};
 use vrl::{
     compiler::SecretTarget,
     value::{KeyString, Kind, Value},
-};
-use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, ObjectMap};
-use crate::{
-    config::{LogNamespace, OutputId},
-    schema,
 };
 
 const DATADOG_API_KEY: &str = "datadog_api_key";

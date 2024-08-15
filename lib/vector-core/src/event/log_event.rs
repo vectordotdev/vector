@@ -817,10 +817,10 @@ impl tracing::field::Visit for LogEvent {
 
 #[cfg(test)]
 mod test {
-    use uuid::Version;
     use super::*;
     use crate::test_util::open_fixture;
     use lookup::event_path;
+    use uuid::Version;
     use vrl::{btreemap, value};
 
     // The following two tests assert that renaming a key has no effect if the
@@ -1185,10 +1185,16 @@ mod test {
     fn metadata_set_unique_uuid_v7_source_event_id() {
         // Check if event id is UUID v7
         let log1 = LogEvent::default();
-        assert_eq!(log1.metadata().source_event_id().get_version(), Some(Version::SortRand));
+        assert_eq!(
+            log1.metadata().source_event_id().get_version(),
+            Some(Version::SortRand)
+        );
 
         // Check if event id is unique on creation
         let log2 = LogEvent::default();
-        assert_ne!(log1.metadata().source_event_id(), log2.metadata().source_event_id());
+        assert_ne!(
+            log1.metadata().source_event_id(),
+            log2.metadata().source_event_id()
+        );
     }
 }
