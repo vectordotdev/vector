@@ -624,7 +624,7 @@ impl From<EventMetadata> for Metadata {
             source_type,
             upstream_id,
             datadog_origin_metadata,
-            internal_event_id,
+            source_event_id,
             ..
         } = value;
 
@@ -641,7 +641,7 @@ impl From<EventMetadata> for Metadata {
             source_type: source_type.map(|s| s.to_string()),
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
-            internal_event_id: internal_event_id.into()
+            source_event_id: source_event_id.into()
         }
     }
 }

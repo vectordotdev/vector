@@ -44,7 +44,7 @@ indoc = { version = "2", default-features = false }
 tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.5.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
-uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
+uuid.workspace = true
 rstest = "0.22.0"
 vrl.workspace = true
 

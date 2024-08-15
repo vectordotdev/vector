@@ -59,13 +59,13 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features = 
 typetag = { version = "0.2.18", default-features = false }
 url = { version = "2", default-features = false }
 urlencoding = { version = "2.1.3", default-features = false }
+uuid.workspace = true
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
 vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 vrl.workspace = true
-uuid = { version = "1.9.1", features = ["v4", "serde"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "2.10.0"

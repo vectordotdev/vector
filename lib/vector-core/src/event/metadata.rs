@@ -1,7 +1,6 @@
 #![deny(missing_docs)]
 
 use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
-
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -10,7 +9,6 @@ use vrl::{
     compiler::SecretTarget,
     value::{KeyString, Kind, Value},
 };
-
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, ObjectMap};
 use crate::{
     config::{LogNamespace, OutputId},
@@ -69,7 +67,7 @@ pub struct EventMetadata {
     pub(crate) datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
 
     /// An internal vector id that can be used to identify this event across all components.
-    pub(crate) internal_event_id: Uuid,
+    pub(crate) source_event_id: Uuid,
 }
 
 /// Metric Origin metadata for submission to Datadog.
@@ -220,8 +218,8 @@ impl EventMetadata {
     }
 
     /// Returns a reference to the event id.
-    pub fn internal_event_id(&self) -> &Uuid {
-        self.internal_event_id.as_ref()
+    pub fn source_event_id(&self) -> Uuid {
+        self.source_event_id
     }
 }
 
@@ -237,7 +235,7 @@ impl Default for EventMetadata {
             upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
-            internal_event_id: Uuid::new_v4(),
+            source_event_id: Uuid::now_v7(),
         }
     }
 }
