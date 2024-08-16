@@ -78,7 +78,7 @@ impl ResourceCodec {
     pub fn into_encoder(&self) -> Encoder<encoding::Framer> {
         let (framer, serializer) = match self {
             Self::Encoding(config) => (
-                Framer::Bytes(BytesEncoder::new()),
+                Framer::Bytes(BytesEncoder),
                 config.build().expect("should not fail to build serializer"),
             ),
             Self::EncodingWithFraming(config) => {
@@ -169,6 +169,8 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::NativeJson { .. } => SerializerConfig::NativeJson,
         DeserializerConfig::Gelf { .. } => SerializerConfig::Gelf,
         DeserializerConfig::Avro { avro } => SerializerConfig::Avro { avro: avro.into() },
+        // TODO: Influxdb has no serializer yet
+        DeserializerConfig::Influxdb { .. } => todo!(),
         DeserializerConfig::Vrl { .. } => unimplemented!(),
     };
 

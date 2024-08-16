@@ -1,7 +1,7 @@
 features:
 - kafka-integration-tests
 
-test_filter: 'sources::kafka::integration_test::drains_acknowledgements_at_shutdown'
+test_filter: '::kafka::'
 
 env:
   KAFKA_HOST: kafka

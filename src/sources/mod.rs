@@ -80,6 +80,8 @@ pub mod redis;
 pub mod socket;
 #[cfg(feature = "sources-splunk_hec")]
 pub mod splunk_hec;
+#[cfg(feature = "sources-static_metrics")]
+pub mod static_metrics;
 #[cfg(feature = "sources-statsd")]
 pub mod statsd;
 #[cfg(feature = "sources-syslog")]
@@ -91,6 +93,7 @@ pub mod util;
 
 pub use vector_lib::source::Source;
 
+#[allow(dead_code)] // Easier than listing out all the features that use this
 /// Common build errors
 #[derive(Debug, Snafu)]
 enum BuildError {

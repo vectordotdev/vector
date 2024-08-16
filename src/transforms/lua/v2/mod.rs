@@ -358,14 +358,11 @@ impl Lua {
 }
 
 // A helper that reduces code duplication.
-fn wrap_emit_fn<'lua, 'scope, F: 'scope>(
+fn wrap_emit_fn<'lua, 'scope, F: 'scope + FnMut(Event)>(
     scope: &mlua::Scope<'lua, 'scope>,
     mut emit_fn: F,
     source_id: Arc<ComponentKey>,
-) -> mlua::Result<mlua::Function<'lua>>
-where
-    F: FnMut(Event),
-{
+) -> mlua::Result<mlua::Function<'lua>> {
     scope.create_function_mut(move |_, mut event: Event| -> mlua::Result<()> {
         event.set_source_id(Arc::clone(&source_id));
         emit_fn(event);

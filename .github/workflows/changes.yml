@@ -178,6 +178,7 @@ jobs:
           component_docs:
             - 'scripts/generate-component-docs.rb'
             - "vdev/**"
+            - 'website/cue/**/base/**.cue'
           markdown:
             - '**/**.md'
             - "vdev/**"

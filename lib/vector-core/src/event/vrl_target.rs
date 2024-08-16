@@ -785,7 +785,7 @@ mod test {
             ),
             (
                 btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
-                owned_value_path!("foo", vec!["qux", r"bar baz"], "baz"),
+                owned_value_path!("foo", r"bar baz", "baz"),
                 Ok(Some(2.into())),
             ),
         ];
@@ -940,9 +940,9 @@ mod test {
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_value_path!(vec![r"foo bar", "foo"]),
+                owned_value_path!(r"foo bar", "foo"),
                 false,
-                Some(BTreeMap::new().into()),
+                Some(btreemap! { "foo" => "bar"}.into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },

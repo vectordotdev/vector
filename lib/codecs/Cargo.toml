@@ -16,13 +16,14 @@ chrono.workspace = true
 csv-core = { version = "0.1.10", default-features = false }
 derivative = { version = "2", default-features = false }
 dyn-clone = { version = "1", default-features = false }
+influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
 once_cell = { version = "1.19", default-features = false }
-ordered-float = { version = "4.2.0", default-features = false }
-prost = { version = "0.12.4", default-features = false, features = ["std"] }
+ordered-float = { version = "4.2.2", default-features = false }
+prost = { version = "0.12.6", default-features = false, features = ["std"] }
 prost-reflect = { version = "0.13", default-features = false, features = ["serde"] }
-regex = { version = "1.10.4", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.10.6", default-features = false, features = ["std", "perf"] }
 serde.workspace = true
 serde_json.workspace = true
 smallvec = { version = "1", default-features = false, features = ["union"] }
@@ -44,7 +45,7 @@ tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.5.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
-rstest = "0.19.0"
+rstest = "0.22.0"
 vrl.workspace = true
 
 [features]

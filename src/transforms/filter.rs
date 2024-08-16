@@ -58,7 +58,7 @@ impl TransformConfig for FilterConfig {
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
-            DataType::all(),
+            DataType::all_bits(),
             clone_input_definitions(input_definitions),
         )]
     }

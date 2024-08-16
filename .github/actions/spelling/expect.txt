@@ -17,6 +17,7 @@ amzn
 anchore
 androideabi
 andy
+anonymousip
 ansicpg
 anumber
 anycondition
@@ -60,7 +61,6 @@ awscli
 awsec
 awslabs
 axum
-Aziz
 azureresourceid
 babim
 badunit
@@ -185,7 +185,6 @@ concating
 concats
 condrestart
 conffiles
-configkey
 configmap
 confl
 confluentinc
@@ -316,10 +315,8 @@ endler
 enduml
 eni
 enp
-Ensar
 enumdecl
 enumflags
-ENVARS
 envsubst
 EOIG
 EOL'ed
@@ -733,7 +730,6 @@ nbase
 ndarray
 ndjson
 nearline
-neuronull
 newcerts
 newrelix
 nextest
@@ -951,12 +947,10 @@ samerole
 sameuser
 sandboxed
 sandboxing
-Saraj
 sccache
 schemaless
 schemars
 schoen
-scl
 sda
 sdata
 SDID
@@ -981,7 +975,6 @@ shortcode
 shortstat
 should've
 shutsdown
-Sichert
 SIEM
 sighup
 Signsoff
@@ -1045,7 +1038,6 @@ stdduration
 stdlog
 Steensen
 stephenwakely
-strat
 strconv
 streamsink
 strng
@@ -1128,7 +1120,6 @@ Tomola
 tonydanza
 toolbars
 toolchains
-toolset
 toor
 topdir
 topojson

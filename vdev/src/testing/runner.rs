@@ -101,11 +101,6 @@ pub trait ContainerTestRunner: TestRunner {
 
     fn volumes(&self) -> Vec<String>;
 
-    fn stop(&self) -> Result<()> {
-        dockercmd(["stop", "--time", "0", &self.container_name()])
-            .wait(format!("Stopping container {}", self.container_name()))
-    }
-
     fn state(&self) -> Result<RunnerState> {
         let mut command = dockercmd(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
         let container_name = self.container_name();
@@ -283,6 +278,7 @@ where
             command.arg("--tty");
         }
 
+        command.args(["--env", "RUST_BACKTRACE=1"]);
         command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
         for (key, value) in outer_env {
             if let Some(value) = value {

@@ -1,17 +1,11 @@
 use std::sync::Arc;
 
-#[cfg(feature = "enterprise")]
-use futures_util::future::BoxFuture;
 use futures_util::FutureExt as _;
 
 use tokio::sync::{Mutex, MutexGuard};
 
 #[cfg(feature = "api")]
 use crate::api;
-#[cfg(feature = "enterprise")]
-use crate::config::enterprise::{
-    report_on_reload, EnterpriseError, EnterpriseMetadata, EnterpriseReporter,
-};
 use crate::extra_context::ExtraContext;
 use crate::internal_events::{VectorRecoveryError, VectorReloadError, VectorReloaded};
 
@@ -38,8 +32,6 @@ pub struct TopologyController {
     pub topology: RunningTopology,
     pub config_paths: Vec<config::ConfigPath>,
     pub require_healthy: Option<bool>,
-    #[cfg(feature = "enterprise")]
-    pub enterprise_reporter: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
     #[cfg(feature = "api")]
     pub api_server: Option<api::Server>,
     pub extra_context: ExtraContext,
@@ -67,27 +59,6 @@ impl TopologyController {
         new_config
             .healthchecks
             .set_require_healthy(self.require_healthy);
-
-        #[cfg(feature = "enterprise")]
-        // Augment config to enable observability within Datadog, if applicable.
-        match EnterpriseMetadata::try_from(&new_config) {
-            Ok(metadata) => {
-                if let Some(e) = report_on_reload(
-                    &mut new_config,
-                    metadata,
-                    self.config_paths.clone(),
-                    self.enterprise_reporter.as_ref(),
-                ) {
-                    self.enterprise_reporter = Some(e);
-                }
-            }
-            Err(err) => {
-                if let EnterpriseError::MissingApiKey = err {
-                    emit!(VectorReloadError);
-                    return ReloadOutcome::MissingApiKey;
-                }
-            }
-        }
 
         // Start the api server or disable it, if necessary
         #[cfg(feature = "api")]

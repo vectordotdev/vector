@@ -24,7 +24,6 @@ use vrl::path::OwnedTargetPath;
 //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
 //       empty string to a `None` path internally.
 pub struct HecLogsSink<S> {
-    pub context: SinkContext,
     pub service: S,
     pub request_builder: HecLogsRequestBuilder,
     pub batch_settings: BatcherSettings,

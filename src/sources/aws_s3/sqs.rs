@@ -32,6 +32,7 @@ use vector_lib::internal_event::{
 use crate::codecs::Decoder;
 use crate::event::{Event, LogEvent};
 use crate::{
+    aws::AwsTimeout,
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
     internal_events::{
@@ -139,6 +140,14 @@ pub(super) struct Config {
     #[serde(default)]
     #[derivative(Default)]
     pub(super) tls_options: Option<TlsConfig>,
+
+    // Client timeout configuration for SQS operations. Take care when configuring these settings
+    // to allow enough time for the polling interval configured in `poll_secs`.
+    #[configurable(derived)]
+    #[derivative(Default)]
+    #[serde(default)]
+    #[serde(flatten)]
+    pub(super) timeout: Option<AwsTimeout>,
 }
 
 const fn default_poll_secs() -> u32 {
@@ -159,11 +168,6 @@ const fn default_true() -> bool {
 
 #[derive(Debug, Snafu)]
 pub(super) enum IngestorNewError {
-    #[snafu(display("Invalid visibility timeout {}: {}", timeout, source))]
-    InvalidVisibilityTimeout {
-        source: std::num::TryFromIntError,
-        timeout: u64,
-    },
     #[snafu(display("Invalid value for max_number_of_messages {}", messages))]
     InvalidNumberOfMessages { messages: u32 },
 }

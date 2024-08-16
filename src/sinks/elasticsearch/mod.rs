@@ -1,11 +1,11 @@
 mod common;
 mod config;
-mod encoder;
-mod health;
-mod request_builder;
-mod retry;
-mod service;
-mod sink;
+pub mod encoder;
+pub mod health;
+pub mod request_builder;
+pub mod retry;
+pub mod service;
+pub mod sink;
 
 #[cfg(test)]
 mod tests;
@@ -266,6 +266,7 @@ impl ElasticsearchCommonMode {
 /// Configuration for Elasticsearch API version.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchApiVersion {
     /// Auto-detect the API version.

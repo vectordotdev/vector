@@ -213,11 +213,7 @@ impl SinkConfig for HecLogsSinkConfig {
 }
 
 impl HecLogsSinkConfig {
-    pub fn build_processor(
-        &self,
-        client: HttpClient,
-        cx: SinkContext,
-    ) -> crate::Result<VectorSink> {
+    pub fn build_processor(&self, client: HttpClient, _: SinkContext) -> crate::Result<VectorSink> {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
             Some(client.clone())
         } else {
@@ -265,7 +261,6 @@ impl HecLogsSinkConfig {
         let sink = HecLogsSink {
             service,
             request_builder,
-            context: cx,
             batch_settings,
             sourcetype: self.sourcetype.clone(),
             source: self.source.clone(),
@@ -291,7 +286,7 @@ mod tests {
     use super::*;
     use crate::components::validation::prelude::*;
     use vector_lib::{
-        codecs::{JsonSerializerConfig, MetricTagValues},
+        codecs::{encoding::format::JsonSerializerOptions, JsonSerializerConfig, MetricTagValues},
         config::LogNamespace,
     };
 
@@ -316,7 +311,11 @@ mod tests {
                 sourcetype: None,
                 source: None,
                 encoding: EncodingConfig::new(
-                    JsonSerializerConfig::new(MetricTagValues::Full).into(),
+                    JsonSerializerConfig::new(
+                        MetricTagValues::Full,
+                        JsonSerializerOptions::default(),
+                    )
+                    .into(),
                     Transformer::default(),
                 ),
                 compression: Compression::default(),

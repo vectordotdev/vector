@@ -23,6 +23,7 @@ use crate::{
     filter_check,
 };
 
+#[allow(clippy::duplicated_attributes)] // False positive caused by `ty = "String"`
 #[derive(Debug, Clone, Interface)]
 #[graphql(
     field(name = "component_id", ty = "String"),

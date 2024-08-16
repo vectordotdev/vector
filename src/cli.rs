@@ -236,7 +236,6 @@ impl RootOpts {
             openssl_probe::init_ssl_cert_env_vars();
         }
 
-        #[cfg(not(feature = "enterprise-tests"))]
         crate::metrics::init_global().expect("metrics initialization failed");
     }
 }

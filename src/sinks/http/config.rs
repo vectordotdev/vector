@@ -308,6 +308,8 @@ impl SinkConfig for HttpSinkConfig {
 
 #[cfg(test)]
 mod tests {
+    use vector_lib::codecs::encoding::format::JsonSerializerOptions;
+
     use super::*;
     use crate::components::validation::prelude::*;
 
@@ -323,7 +325,11 @@ mod tests {
                 method: HttpMethod::Post,
                 encoding: EncodingConfigWithFraming::new(
                     None,
-                    JsonSerializerConfig::new(MetricTagValues::Full).into(),
+                    JsonSerializerConfig::new(
+                        MetricTagValues::Full,
+                        JsonSerializerOptions::default(),
+                    )
+                    .into(),
                     Transformer::default(),
                 ),
                 auth: None,

@@ -7,13 +7,12 @@ use vector_lib::{
     sensitive_string::SensitiveString, tls::TlsEnableableConfig,
 };
 
+use super::Healthcheck;
 use crate::{
-    common::datadog::{self, get_api_base_endpoint},
+    common::datadog,
     http::{HttpClient, HttpError},
     sinks::HealthcheckError,
 };
-
-use super::Healthcheck;
 
 #[cfg(feature = "sinks-datadog_events")]
 pub mod events;
@@ -139,12 +138,19 @@ impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
     /// `<site>/api/v1/validate` endpoint is reachable.
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let validate_endpoint =
-            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_str())?;
+        let validate_endpoint = self.get_api_endpoint("/api/v1/validate")?;
 
         let api_key: String = self.default_api_key.clone().into();
 
         Ok(build_healthcheck_future(client, validate_endpoint, api_key).boxed())
+    }
+
+    /// Gets the API endpoint with a given suffix path.
+    ///
+    /// If `endpoint` is not specified, we fallback to `site`.
+    fn get_api_endpoint(&self, path: &str) -> crate::Result<Uri> {
+        let base = datadog::get_api_base_endpoint(self.endpoint.as_deref(), self.site.as_str());
+        [&base, path].join("").parse().map_err(Into::into)
     }
 }
 
@@ -165,15 +171,6 @@ async fn build_healthcheck_future(
         StatusCode::OK => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
-}
-
-/// Gets the API endpoint for validating credentials.
-///
-/// If `endpoint` is not specified, we fallback to `site`.
-fn get_api_validate_endpoint(endpoint: Option<&String>, site: &str) -> crate::Result<Uri> {
-    let base = get_api_base_endpoint(endpoint, site);
-    let validate = format!("{}{}", base, "/api/v1/validate");
-    validate.parse::<Uri>().map_err(Into::into)
 }
 
 #[derive(Debug, Snafu)]

@@ -14,7 +14,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
-    metadata::{errors::InvalidMetadataValue, MetadataValue},
+    metadata::MetadataValue,
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
@@ -94,28 +94,18 @@ mod proto {
 
 #[derive(Debug, Snafu)]
 pub(crate) enum PubsubError {
-    #[snafu(display("Could not parse credentials metadata: {}", source))]
-    Metadata { source: InvalidMetadataValue },
     #[snafu(display("Invalid endpoint URI: {}", source))]
     Uri { source: InvalidUri },
     #[snafu(display("Could not create endpoint: {}", source))]
     Endpoint { source: tonic::transport::Error },
     #[snafu(display("Could not set up endpoint TLS settings: {}", source))]
     EndpointTls { source: tonic::transport::Error },
-    #[snafu(display("Could not connect: {}", source))]
-    Connect { source: tonic::transport::Error },
-    #[snafu(display("Could not pull data from remote: {}", source))]
-    Pull { source: Status },
     #[snafu(display(
         "`ack_deadline_secs` is outside the valid range of {} to {}",
         MIN_ACK_DEADLINE_SECS,
         MAX_ACK_DEADLINE_SECS
     ))]
     InvalidAckDeadline,
-    #[snafu(display("Cannot set both `ack_deadline_secs` and `ack_deadline_seconds`"))]
-    BothAckDeadlineSecsAndSeconds,
-    #[snafu(display("Cannot set both `retry_delay_secs` and `retry_delay_seconds`"))]
-    BothRetryDelaySecsAndSeconds,
 }
 
 static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
@@ -363,7 +353,10 @@ impl SourceConfig for PubsubConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -860,7 +853,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn oneshot() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             let test_data = tester.send_test_events(99, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
@@ -883,7 +876,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn shuts_down_after_data_received() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
@@ -906,7 +899,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn streams_data() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             for _ in 0..10 {
                 let test_data = tester.send_test_events(9, BTreeMap::new()).await;
@@ -919,7 +912,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn sends_attributes() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             let attributes = btreemap![
                 random_string(8) => random_string(88),
@@ -935,7 +928,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn acks_received() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;

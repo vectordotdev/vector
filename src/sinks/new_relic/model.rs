@@ -209,7 +209,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                     }
                 }
 
-                if event_model.get("eventType").is_none() {
+                if !event_model.contains_key("eventType") {
                     event_model.insert("eventType".into(), Value::from("VectorSink".to_owned()));
                 }
 

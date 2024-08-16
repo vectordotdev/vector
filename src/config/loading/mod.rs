@@ -110,7 +110,11 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
     paths.sort();
     paths.dedup();
     // Ignore poison error and let the current main thread continue running to do the cleanup.
-    drop(CONFIG_PATHS.lock().map(|mut guard| *guard = paths.clone()));
+    drop(
+        CONFIG_PATHS
+            .lock()
+            .map(|mut guard| guard.clone_from(&paths)),
+    );
 
     Some(paths)
 }
@@ -141,6 +145,7 @@ pub async fn load_from_paths_with_provider_and_secrets(
         debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
         let resolved_secrets = secrets_backends_loader
             .retrieve(&mut signal_handler.subscribe())
+            .await
             .map_err(|e| vec![e])?;
         load_builder_from_paths_with_secrets(config_paths, resolved_secrets)?
     } else {

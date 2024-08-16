@@ -12,7 +12,7 @@ fn main() -> Result<()> {
             "proto/logproto.proto",
             "proto/push.proto",
         ],
-        &["proto", "../../proto"],
+        &["proto", "../../proto/third-party"],
     )?;
     Ok(())
 }

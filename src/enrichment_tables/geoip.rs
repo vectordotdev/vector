@@ -7,7 +7,7 @@
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
 use maxminddb::{
-    geoip2::{City, ConnectionType, Isp},
+    geoip2::{AnonymousIp, City, ConnectionType, Isp},
     MaxMindDBError, Reader,
 };
 use ordered_float::NotNan;
@@ -26,6 +26,7 @@ pub enum DatabaseKind {
     Isp,
     ConnectionType,
     City,
+    AnonymousIp,
 }
 
 impl TryFrom<&str> for DatabaseKind {
@@ -37,6 +38,7 @@ impl TryFrom<&str> for DatabaseKind {
             "GeoIP2-ISP" => Ok(Self::Isp),
             "GeoIP2-Connection-Type" => Ok(Self::ConnectionType),
             "GeoIP2-City" | "GeoLite2-City" => Ok(Self::City),
+            "GeoIP2-Anonymous-IP" => Ok(Self::AnonymousIp),
             _ => Err(()),
         }
     }
@@ -128,6 +130,7 @@ impl Geoip {
             DatabaseKind::Asn | DatabaseKind::Isp => dbreader.lookup::<Isp>(ip).map(|_| ()),
             DatabaseKind::ConnectionType => dbreader.lookup::<ConnectionType>(ip).map(|_| ()),
             DatabaseKind::City => dbreader.lookup::<City>(ip).map(|_| ()),
+            DatabaseKind::AnonymousIp => dbreader.lookup::<AnonymousIp>(ip).map(|_| ()),
         };
 
         match result {
@@ -224,6 +227,16 @@ impl Geoip {
                 let data = self.dbreader.lookup::<ConnectionType>(ip).ok()?;
 
                 add_field!("connection_type", data.connection_type);
+            }
+            DatabaseKind::AnonymousIp => {
+                let data = self.dbreader.lookup::<AnonymousIp>(ip).ok()?;
+
+                add_field!("is_anonymous", data.is_anonymous);
+                add_field!("is_anonymous_vpn", data.is_anonymous_vpn);
+                add_field!("is_hosting_provider", data.is_hosting_provider);
+                add_field!("is_public_proxy", data.is_public_proxy);
+                add_field!("is_residential_proxy", data.is_residential_proxy);
+                add_field!("is_tor_exit_node", data.is_tor_exit_node);
             }
         }
 
@@ -460,6 +473,27 @@ mod tests {
         });
 
         assert!(result.is_err());
+    }
+    #[test]
+    fn anonymous_ip_lookup() {
+        let values = find("101.99.92.179", "tests/data/GeoIP2-Anonymous-IP-Test.mmdb").unwrap();
+
+        let mut expected = ObjectMap::new();
+        expected.insert("is_anonymous".into(), true.into());
+        expected.insert("is_anonymous_vpn".into(), true.into());
+        expected.insert("is_hosting_provider".into(), true.into());
+        expected.insert("is_tor_exit_node".into(), true.into());
+        expected.insert("is_public_proxy".into(), Value::Null);
+        expected.insert("is_residential_proxy".into(), Value::Null);
+
+        assert_eq!(values, expected);
+    }
+
+    #[test]
+    fn anonymous_ip_lookup_no_results() {
+        let values = find("10.1.12.1", "tests/data/GeoIP2-Anonymous-IP-Test.mmdb");
+
+        assert!(values.is_none());
     }
 
     fn find(ip: &str, database: &str) -> Option<ObjectMap> {
