@@ -29,7 +29,7 @@ body {
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: 20px;
-  width: calc(100% - 30px); /* Slightly reduced width */
+  padding: 0 15px; 
   max-width: 1600px;
   margin: 0 auto;
   align-items: stretch;
@@ -113,7 +113,7 @@ div#App {
   display: grid;
   width: calc(100% - 40px);
   max-width: 1600px;
-  height: calc(100vh - 120px);
+  height: calc(100vh - 180px);
   grid-template-columns: minmax(45%, 1fr) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   grid-gap: 1rem;
