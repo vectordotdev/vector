@@ -21,7 +21,6 @@ body {
 }
 
 .top-bar-wrapper {
-  background-color: var(--datadog-purple-lightest);
   border-bottom: 1px solid var(--datadog-purple-light);
   padding: 10px 0;
 }
@@ -38,7 +37,7 @@ body {
 
 .headers-grid-item {
   background-color: var(--datadog-purple-lightest);
-  padding: 20px;
+  padding: 16px;
   border-radius: 12px;
   border: 1px solid var(--datadog-purple-light);
   display: flex;
