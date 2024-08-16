@@ -1,20 +1,21 @@
 :root {
-  --datadog-purple-lightest: #F8F6FF;
-  --datadog-purple-light: #E1D8FF;
+  --datadog-purple-lightest: #f8f6ff;
+  --datadog-purple-light: #e1d8ff;
   --datadog-purple: #632ca6;
-  --datadog-purple-vibrant: #7B40F1;
+  --datadog-purple-vibrant: #7b40f1;
   --datadog-purple-dark: #451b78;
   --datadog-gray: #252525;
   --datadog-gray-light: #b6b6b6;
-  --datadog-gray-lighter: #EAEAEA;
-  --datadog-background: #FAFBFC;
-  --light-grey: #F5F5F5;
+  --datadog-gray-lighter: #eaeaea;
+  --datadog-background: #fafbfc;
+  --light-grey: #f5f5f5;
 }
 
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, "Helvetica Neue", sans-serif;
   background-color: var(--datadog-background);
   color: var(--datadog-gray);
   overflow-x: hidden;
@@ -29,7 +30,7 @@ body {
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: 20px;
-  padding: 0 15px; 
+  padding: 0 15px;
   max-width: 1600px;
   margin: 0 auto;
   align-items: stretch;
@@ -45,11 +46,10 @@ body {
   justify-content: center;
 }
 
-
 .title-section {
   flex-direction: row;
   align-items: center;
-  gap: 8px; 
+  gap: 8px;
 }
 
 #logo {
@@ -69,18 +69,19 @@ body {
 }
 
 #description-cell p {
-  font-size: 13px; 
-  line-height: 1.4; 
+  font-size: 13px;
+  line-height: 1.4;
   margin: 0;
   color: var(--datadog-gray);
 }
 
-#description-cell p, .version-info td {
+#description-cell p,
+.version-info td {
   color: var(--datadog-gray);
 }
 
 .version-info {
-  justify-content: center
+  justify-content: center;
 }
 
 .version-info table {
@@ -95,9 +96,9 @@ body {
 }
 
 .version-info td {
-  padding: 2px 0; 
+  padding: 2px 0;
   font-weight: normal;
-  font-size: 12px; 
+  font-size: 12px;
   color: var(--datadog-gray);
 }
 
@@ -105,7 +106,8 @@ body {
   font-weight: 600;
 }
 
-#description-cell a:hover, .version-info a:hover {
+#description-cell a:hover,
+.version-info a:hover {
   text-decoration: underline;
 }
 
