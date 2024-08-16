@@ -77,16 +77,22 @@ impl ReduceState {
         }
 
         if let Some(fields_iter) = e.all_event_fields_skip_array_elements() {
-            for (mut path, value) in fields_iter {
-                // TODO: Addressed in issue 21077.
-                if path.contains("\\.") {
-                    path = quote_invalid_paths(&path).into();
-                }
+            for (path, value) in fields_iter {
+                // TODO: This can be removed once issue 21077 is resolved.
+                //       Technically we need to quote any special characters (like `-` or `*` or ` `).
+                let parsable_path = if path.contains("\\.") {
+                    quote_invalid_paths(&path).into()
+                } else {
+                    path.clone()
+                };
 
                 // This should not return an error, unless there is a bug in the event fields iterator.
-                let parsed_path = match parse_target_path(&path) {
+                let parsed_path = match parse_target_path(&parsable_path) {
                     Ok(path) => path,
-                    Err(error) => return emit!(ReduceAddEventError { error }),
+                    Err(error) => {
+                        emit!(ReduceAddEventError { error, path });
+                        continue;
+                    }
                 };
                 if is_covered_by_strategy(&parsed_path, strategies) {
                     continue;
