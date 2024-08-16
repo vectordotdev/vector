@@ -19,7 +19,7 @@ pub struct ReduceAddEventError {
 impl InternalEvent for ReduceAddEventError {
     fn emit(self) {
         error!(
-            message = "Event could not be reduced",
+            message = "Event could not be reduced.",
             error = ?self.error,
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
