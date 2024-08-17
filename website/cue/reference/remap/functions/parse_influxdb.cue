@@ -27,7 +27,7 @@ remap: functions: parse_influxdb: {
 	internal_failure_reasons: [
 		"`value` is not a valid InfluxDB line protocol string.",
 	]
-	return: types: ["object"]
+	return: types: ["array"]
 
 	examples: [
 		{
