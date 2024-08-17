@@ -76,6 +76,7 @@ pub struct LokiConfig {
     /// [label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
     #[configurable(metadata(docs::examples = "loki_structured_metadata_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "Loki structured metadata."))]
+    #[serde(default)]
     pub structured_metadata: HashMap<Template, Template>,
 
     /// Whether or not to delete fields from the event when they are used in structured metadata.
