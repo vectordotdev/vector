@@ -12,7 +12,7 @@ remap: functions: parse_influxdb: {
 			by an underscore (`_`), and then the `field key` field.
 			""",
 	    """
-			`string` are the type that is not supported as a field value,
+			`string` is the only type that is not supported as a field value,
 			due to limitations of Vector's metric model
 			""",
 	]
