@@ -11,6 +11,10 @@ remap: functions: parse_influxdb: {
 			The only metric type that is produced is a `gauge`. Each metric name is prefixed with the `measurement` field, followed
 			by an underscore (`_`), and then the `field key` field.
 			""",
+	    """
+			`string` are the type that is not supported as a field value,
+			due to limitations of Vector's metric model
+			""",
 	]
 	arguments: [
 		{
