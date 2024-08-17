@@ -39,8 +39,8 @@ pub mod util {
                     seconds: entry.0 / NANOS_RANGE,
                     nanos: (entry.0 % NANOS_RANGE) as i32,
                 }),
-                line: line,
-                structured_metadata: structured_metadata,
+                line,
+                structured_metadata,
                 parsed: vec![], // TODO: Remove when Loki's proto doesn't require this in the
                                 // write-path anymore.
             }
@@ -121,6 +121,7 @@ mod tests {
         let entry1 = Entry(
             ts1.timestamp_nanos_opt().expect("Timestamp out of range"),
             "hello".into(),
+            vec![],
         );
         let ts2 = Utc
             .timestamp_opt(1640244791, 0)
@@ -129,6 +130,7 @@ mod tests {
         let entry2 = Entry(
             ts2.timestamp_nanos_opt().expect("Timestamp out of range"),
             "world".into(),
+            vec![],
         );
         let labels = vec![("source".into(), "protobuf-test".into())]
             .into_iter()

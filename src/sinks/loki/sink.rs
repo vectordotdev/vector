@@ -360,7 +360,7 @@ impl EventEncoder {
         let json_byte_size = event.estimated_json_encoded_size_of();
         let mut labels: Vec<(String, String)> = self.build_labels(&event);
         self.remove_label_fields(&mut event);
-        let mut structured_metadata: Vec<(String, String)> = self.build_structured_metadata(&event);
+        let structured_metadata: Vec<(String, String)> = self.build_structured_metadata(&event);
         self.remove_structured_metadata_fields(&mut event);
 
         let timestamp = match event.as_log().get_timestamp() {
@@ -932,7 +932,7 @@ mod tests {
             transformer: Default::default(),
             encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
             labels: HashMap::default(),
-            structured_metadata: HashMap::default(),
+            structured_metadata,
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
