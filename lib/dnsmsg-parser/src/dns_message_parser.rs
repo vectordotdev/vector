@@ -797,8 +797,8 @@ impl DnsMessageParser {
                         u8::from(sig.algorithm()),
                         sig.num_labels(),
                         sig.original_ttl(),
-                        sig.sig_expiration(), // currently in epoch convert to human readable ?
-                        sig.sig_inception(),  // currently in epoch convert to human readable ?
+                        sig.sig_expiration().get(), // currently in epoch convert to human readable ?
+                        sig.sig_inception().get(), // currently in epoch convert to human readable ?
                         sig.key_tag(),
                         sig.signer_name().to_string_with_options(&self.options),
                         BASE64.encode(sig.sig())
@@ -817,8 +817,8 @@ impl DnsMessageParser {
                         u8::from(sig.algorithm()),
                         sig.num_labels(),
                         sig.original_ttl(),
-                        sig.sig_expiration(), // currently in epoch convert to human readable ?
-                        sig.sig_inception(),  // currently in epoch convert to human readable ?
+                        sig.sig_expiration().get(), // currently in epoch convert to human readable ?
+                        sig.sig_inception().get(), // currently in epoch convert to human readable ?
                         sig.key_tag(),
                         sig.signer_name().to_string_with_options(&self.options),
                         BASE64.encode(sig.sig())
