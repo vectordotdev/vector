@@ -1,6 +1,6 @@
 package metadata
 
-base: components: sinks: greptimedb: configuration: {
+base: components: sinks: greptimedb_logs: configuration: {
 	acknowledgements: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
@@ -59,6 +59,39 @@ base: components: sinks: greptimedb: configuration: {
 			}
 		}
 	}
+	compression: {
+		description: """
+			Set http compression encoding for the request
+			Default to none, `gzip` or `zstd` is supported.
+			"""
+		required: false
+		type: string: {
+			default: "gzip"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				snappy: """
+					[Snappy][snappy] compression.
+
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+					"""
+				zlib: """
+					[Zlib][zlib] compression.
+
+					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
+					"""
+			}
+		}
+	}
 	dbname: {
 		description: """
 			The [GreptimeDB database][database] name to connect.
@@ -77,27 +110,55 @@ base: components: sinks: greptimedb: configuration: {
 			examples: [
 				"public",
 			]
+			syntax: "template"
+		}
+	}
+	encoding: {
+		description: "Transformations to prepare an event for serialization."
+		required:    false
+		type: object: options: {
+			except_fields: {
+				description: "List of fields that are excluded from the encoded event."
+				required:    false
+				type: array: items: type: string: {}
+			}
+			only_fields: {
+				description: "List of fields that are included in the encoded event."
+				required:    false
+				type: array: items: type: string: {}
+			}
+			timestamp_format: {
+				description: "Format used for timestamp fields."
+				required:    false
+				type: string: enum: {
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
+				}
+			}
 		}
 	}
 	endpoint: {
-		description: """
-			The host and port of GreptimeDB gRPC service.
-
-			This sink uses GreptimeDB's gRPC interface for data ingestion. By
-			default, GreptimeDB listens to port 4001 for gRPC protocol.
-
-			The address _must_ include a port.
-			"""
-		required: true
-		type: string: examples: ["example.com:4001", "1nge17d2r3ns.ap-southeast-1.aws.greptime.cloud:4001"]
+		description: "The endpoint of the GreptimeDB server."
+		required:    true
+		type: string: examples: ["http://localhost:4000"]
 	}
-	grpc_compression: {
-		description: """
-			Set gRPC compression encoding for the request
-			Default to none, `gzip` or `zstd` is supported.
-			"""
-		required: false
-		type: string: examples: ["grpc_compression"]
+	extra_params: {
+		description: "Custom parameters to add to the query string for each HTTP request sent to GreptimeDB."
+		required:    false
+		type: object: {
+			examples: [{
+				source: "vector"
+			}]
+			options: "*": {
+				description: "A query string parameter."
+				required:    true
+				type: string: {}
+			}
+		}
 	}
 	password: {
 		description: """
@@ -107,6 +168,22 @@ base: components: sinks: greptimedb: configuration: {
 			"""
 		required: false
 		type: string: examples: ["password"]
+	}
+	pipeline_name: {
+		description: "Pipeline name to be used for the logs."
+		required:    true
+		type: string: {
+			examples: ["pipeline_name"]
+			syntax: "template"
+		}
+	}
+	pipeline_version: {
+		description: "Pipeline version to be used for the logs."
+		required:    false
+		type: string: {
+			examples: ["2024-06-07 06:46:23.858293"]
+			syntax: "template"
+		}
 	}
 	request: {
 		description: """
@@ -292,6 +369,14 @@ base: components: sinks: greptimedb: configuration: {
 					unit:    "seconds"
 				}
 			}
+		}
+	}
+	table: {
+		description: "The table that data is inserted into."
+		required:    true
+		type: string: {
+			examples: ["mytable"]
+			syntax: "template"
 		}
 	}
 	tls: {
