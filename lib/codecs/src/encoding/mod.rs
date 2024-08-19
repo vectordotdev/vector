@@ -362,12 +362,14 @@ impl SerializerConfig {
                 FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
             }
             SerializerConfig::Csv(_)
-            | SerializerConfig::Gelf
             | SerializerConfig::Json(_)
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
             | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
+            SerializerConfig::Gelf => {
+                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
+            }
         }
     }
 

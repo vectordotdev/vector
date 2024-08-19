@@ -210,7 +210,7 @@ impl SourceConfig for AwsS3Config {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -237,6 +237,7 @@ impl AwsS3Config {
             endpoint.clone(),
             proxy,
             &self.tls_options,
+            &None,
         )
         .await?;
 
@@ -252,6 +253,7 @@ impl AwsS3Config {
                     endpoint,
                     proxy,
                     &sqs.tls_options,
+                    &sqs.timeout,
                 )
                 .await?;
 
@@ -1020,6 +1022,7 @@ mod integration_tests {
             region_endpoint.endpoint(),
             &proxy_config,
             &None,
+            &None,
         )
         .await
         .unwrap()
@@ -1037,6 +1040,7 @@ mod integration_tests {
             region_endpoint.region(),
             region_endpoint.endpoint(),
             &proxy_config,
+            &None,
             &None,
         )
         .await

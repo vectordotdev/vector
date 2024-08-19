@@ -176,7 +176,7 @@ impl SourceConfig for LogstashConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             DataType::Log,
             self.schema_definition(global_log_namespace.merge(self.log_namespace)),
         )]
@@ -953,13 +953,9 @@ mod integration_tests {
     ) -> impl Stream<Item = Event> + Unpin {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: SocketAddr = address.parse().unwrap();
-        let tls_options = match tls {
-            Some(options) => options,
-            None => TlsEnableableConfig::default(),
-        };
         let tls_config = TlsSourceConfig {
             client_metadata_key: None,
-            tls_config: tls_options,
+            tls_config: tls.unwrap_or_default(),
         };
         tokio::spawn(async move {
             LogstashConfig {

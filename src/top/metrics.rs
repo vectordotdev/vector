@@ -370,7 +370,7 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
     // Since we don't know currently have a mechanism for scrolling/paging through results,
     // we're using an artificially high page size to capture all likely component configurations.
     let rows = client
-        .components_query(i16::max_value() as i64)
+        .components_query(i16::MAX as i64)
         .await
         .map_err(|_| ())?
         .data

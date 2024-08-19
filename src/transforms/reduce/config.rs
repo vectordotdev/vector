@@ -36,6 +36,13 @@ pub struct ReduceConfig {
     #[configurable(metadata(docs::human_name = "Expire After"))]
     pub expire_after_ms: Duration,
 
+    /// If supplied, every time this interval elapses for a given grouping, the reduced value
+    /// for that grouping is flushed. Checked every flush_period_ms.
+    #[serde_as(as = "Option<serde_with::DurationMilliSeconds<u64>>")]
+    #[derivative(Default(value = "Option::None"))]
+    #[configurable(metadata(docs::human_name = "End-Every Period"))]
+    pub end_every_period_ms: Option<Duration>,
+
     /// The interval to check for and flush any expired events, in milliseconds.
     #[serde(default = "default_flush_period_ms")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
@@ -73,6 +80,7 @@ pub struct ReduceConfig {
     /// - For timestamp fields the first is kept and a new field `[field-name]_end` is added with
     ///   the last received timestamp value.
     /// - Numeric values are summed.
+    /// - For nested paths, the field value is retrieved and then reduced using the default strategies mentioned above (unless explicitly specified otherwise).
     #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "An individual merge strategy."

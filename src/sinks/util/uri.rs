@@ -15,7 +15,7 @@ use crate::http::Auth;
 #[serde(try_from = "String", into = "String")]
 pub struct UriSerde {
     pub uri: Uri,
-    pub(crate) auth: Option<Auth>,
+    pub auth: Option<Auth>,
 }
 
 impl UriSerde {

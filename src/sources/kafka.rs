@@ -409,7 +409,7 @@ impl SourceConfig for KafkaSourceConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -442,6 +442,12 @@ async fn kafka_source(
 
     // EOF signal allowing the coordination task to tell the kafka client task when all partitions have reached EOF
     let (eof_tx, eof_rx) = eof.then(oneshot::channel::<()>).unzip();
+
+    let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
+    if let Err(e) = consumer.subscribe(&topics).context(SubscribeSnafu) {
+        error!("{}", e);
+        return Err(());
+    }
 
     let coordination_task = {
         let span = span.clone();
@@ -1233,8 +1239,6 @@ fn create_consumer(
             Span::current(),
         ))
         .context(CreateSnafu)?;
-    let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
-    consumer.subscribe(&topics).context(SubscribeSnafu)?;
 
     Ok((consumer, callback_rx))
 }

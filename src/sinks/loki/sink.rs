@@ -17,7 +17,7 @@ use crate::{
     http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
         LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
-        SinkRequestBuildError,
+        LokiTimestampNonParsableEventsDropped, SinkRequestBuildError,
     },
     sinks::prelude::*,
 };
@@ -251,7 +251,14 @@ impl EventEncoder {
         self.remove_label_fields(&mut event);
 
         let timestamp = match event.as_log().get_timestamp() {
-            Some(Value::Timestamp(ts)) => ts.timestamp_nanos_opt().expect("Timestamp out of range"),
+            Some(Value::Timestamp(ts)) => match ts.timestamp_nanos_opt() {
+                Some(timestamp) => timestamp,
+                None => {
+                    finalizers.update_status(EventStatus::Errored);
+                    emit!(LokiTimestampNonParsableEventsDropped);
+                    return None;
+                }
+            },
             _ => chrono::Utc::now()
                 .timestamp_nanos_opt()
                 .expect("Timestamp out of range"),

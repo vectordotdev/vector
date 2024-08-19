@@ -22,29 +22,23 @@ jobs:
           - arm-unknown-linux-gnueabi
           - arm-unknown-linux-musleabi
     steps:
-
-      - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v2
-        id: comment-branch
-
-      - name: (PR comment) Set latest commit status as pending
-        if: ${{ github.event_name == 'issue_comment' }}
+      - name: (PR review) Set latest commit status as pending
+        if: ${{ github.event_name == 'pull_request_review' }}
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Cross
           status: pending
 
-      - name: (PR comment) Checkout PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
+      - name: (PR review) Checkout PR branch
+        if: ${{ github.event_name == 'pull_request_review' }}
         uses: actions/checkout@v3
         with:
-          ref: ${{ steps.comment-branch.outputs.head_ref }}
+          ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
-        if: ${{ github.event_name != 'issue_comment' }}
+        if: ${{ github.event_name != 'pull_request_review' }}
         uses: actions/checkout@v3
 
       - uses: actions/cache@v4
@@ -70,9 +64,9 @@ jobs:
           name: "vector-debug-${{ matrix.target }}"
           path: "./target/${{ matrix.target }}/debug/vector"
 
-      - name: (PR comment) Set latest commit status as failed
+      - name: (PR review) Set latest commit status as failed
         uses: myrotvorets/set-commit-status-action@v2.0.1
-        if: failure() && github.event_name == 'issue_comment'
+        if: failure() && github.event_name == 'pull_request_review'
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -80,20 +74,16 @@ jobs:
           status: 'failure'
 
   update-pr-status:
-    name: (PR comment) Signal result to PR
+    name: (PR review) Signal result to PR
     runs-on: ubuntu-20.04
     timeout-minutes: 5
     needs: cross-linux
-    if: needs.cross-linux.result == 'success' && github.event_name == 'issue_comment'
+    if: needs.cross-linux.result == 'success' && github.event_name == 'pull_request_review'
     steps:
-      - name: (PR comment) Get PR branch
-        uses: xt0rted/pull-request-comment-branch@v2
-        id: comment-branch
-
-      - name: (PR comment) Submit PR result as success
+      - name: (PR review) Submit PR result as success
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Cross
           status: 'success'

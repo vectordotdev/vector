@@ -33,11 +33,12 @@ impl InternalEvent for ParserMatchError<'_> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "no_match_found",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -63,12 +64,13 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "field_not_found",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
-        );
+        )
+        .increment(1);
 
         if DROP_EVENT {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
@@ -94,12 +96,13 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "type_conversion",
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
             "name" => self.name.to_string(),
-        );
+        )
+        .increment(1);
     }
 }
 
