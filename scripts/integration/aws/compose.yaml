@@ -7,8 +7,6 @@ services:
     image: docker.io/localstack/localstack:3
     environment:
     - SERVICES=kinesis,s3,cloudwatch,es,firehose,sqs,sns
-  mock-watchlogs:
-    image: docker.io/luciofranco/mockwatchlogs:latest
   mock-ecs:
     image: docker.io/amazon/amazon-ecs-local-container-endpoints:latest
     volumes:
