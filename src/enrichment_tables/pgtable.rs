@@ -67,6 +67,15 @@ pub struct PgtableConfig {
 }
 impl_generate_config_from_default!(PgtableConfig);
 
+fn contains_bad_character(name: &String) -> bool {
+    if name.chars().any(char::is_control) {
+        return true;
+    } else if name.contains('"') {
+        return true;
+    }
+    return false;
+}
+
 fn surround_with_quotes(name: String) -> String {
   return ["\"", &name, "\""].concat();
 }
@@ -118,8 +127,19 @@ impl EnrichmentTableConfig for PgtableConfig {
                 client
             }
         };
+        // Table names and column names are unconditionally surrounded by
+        // double quotes in the `select ... from ...` query, so we prohibit
+        // the double quote character from appearing in either of these.
+        // We additionally prohibit control characters since their occurrence
+        // almost certainly indicates an accident.
+        if contains_bad_character(&self.table) {
+          return Err("Table name contains prohibited characters".to_string().into());
+        }
+        if self.columns.iter().any(contains_bad_character) {
+          return Err("One or more columns contain prohibited characters".to_string().into());
+        }
         let columns_with_commas : Vec<String> = intersperse(self.columns.clone().into_iter().map(surround_with_quotes), ",".to_string()).collect();
-        let select_query = format!("SELECT {} FROM {}", &columns_with_commas.concat(), &self.table);
+        let select_query = format!("SELECT {} FROM \"{}\"", &columns_with_commas.concat(), &self.table);
         let rows = client.query(&select_query, &[]).await?;
         let data = rows.into_iter().map(row_to_vec_value).collect();
         Ok(Box::new(Pgtable::new(data, self.columns.clone())))
