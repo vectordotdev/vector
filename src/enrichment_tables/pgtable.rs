@@ -64,17 +64,12 @@ pub struct PgtableConfig {
     table: String,
     /// Columns to project from table
     columns: Vec<String>,
-    /// Reload the table when this query returns one or more rows.
-    /// The result set must contain zero rows or one row, and it must
-    /// contain a single boolean column. The name of the column does
-    /// not matter. If the result contains a single row with a value of
-    /// true in its column, a reload is performed.
+    /// Reload the table when this query returns a newer timestamp
+    /// than the last one that was seen. The result set must contain
+    /// zero rows or one row, and it must contain a single timestamptz
+    /// column. The name of the column does not matter.
     ///
     /// Example: SELECT max(w.updated) FROM widgets w;
-    ///
-    /// The query must reference a $1 parameter. This parameter has
-    /// type `timestamp with time zone`, and it is the last time that
-    /// a reload was performed.
     reload_when: Option<String>,
     /// TLS client certificate
     #[configurable(derived)]
