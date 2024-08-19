@@ -413,6 +413,7 @@ pantech
 papertrail
 papertrailapp
 petabytes
+pgtable
 philips
 podinfo
 podman
