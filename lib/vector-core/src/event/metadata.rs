@@ -5,6 +5,7 @@ use crate::{
     config::{LogNamespace, OutputId},
     schema,
 };
+use derivative::Derivative;
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
@@ -20,7 +21,8 @@ const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Derivative)]
+#[derivative(PartialEq)]
 pub struct EventMetadata {
     /// Arbitrary data stored with an event
     #[serde(default = "default_metadata_value")]
@@ -67,6 +69,7 @@ pub struct EventMetadata {
     pub(crate) datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
 
     /// An internal vector id that can be used to identify this event across all components.
+    #[derivative(PartialEq = "ignore")]
     pub(crate) source_event_id: Uuid,
 }
 

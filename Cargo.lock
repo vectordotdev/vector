@@ -10689,6 +10689,7 @@ dependencies = [
  "criterion",
  "crossbeam-utils",
  "db-key",
+ "derivative",
  "dyn-clone",
  "enrichment",
  "enumflags2",
