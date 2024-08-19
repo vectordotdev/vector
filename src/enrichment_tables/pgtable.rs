@@ -10,15 +10,18 @@ use itertools::intersperse;
 use vector_lib::configurable::configurable_component;
 // use vector_lib::{conversion::Conversion, TimeZone};
 // use vrl::value::{ObjectMap, Value};
+use chrono::{DateTime, Utc};
 use crate::config::EnrichmentTableConfig;
 use snafu::{Snafu};
 use postgres_openssl::MakeTlsConnector;
-use tokio_postgres::{Config, Error as PgError, NoTls, Row};
+use tokio_postgres::{Config, Error as PgError, NoTls, Row, Statement, Client};
+use tokio_postgres::types::Type;
 use openssl::{
     error::ErrorStack,
     ssl::{SslConnector, SslMethod},
 };
 use vrl::value::{ObjectMap, Value};
+use futures::executor::block_on;
 
 #[derive(Debug, Snafu)]
 enum ConnectError {
@@ -61,6 +64,18 @@ pub struct PgtableConfig {
     table: String,
     /// Columns to project from table
     columns: Vec<String>,
+    /// Reload the table when this query returns one or more rows.
+    /// The result set must contain zero rows or one row, and it must
+    /// contain a single boolean column. The name of the column does
+    /// not matter. If the result contains a single row with a value of
+    /// true in its column, a reload is performed.
+    ///
+    /// Example: SELECT max(w.updated) FROM widgets w;
+    ///
+    /// The query must reference a $1 parameter. This parameter has
+    /// type `timestamp with time zone`, and it is the last time that
+    /// a reload was performed.
+    reload_when: Option<String>,
     /// TLS client certificate
     #[configurable(derived)]
     tls: Option<PgtableTlsConfig>,
@@ -110,6 +125,30 @@ impl EnrichmentTableConfig for PgtableConfig {
         &self,
         _globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+        // Table names and column names are unconditionally surrounded by
+        // double quotes in the `select ... from ...` query, so we prohibit
+        // the double quote character from appearing in either of these.
+        // We additionally prohibit control characters since their occurrence
+        // almost certainly indicates an accident.
+        if contains_bad_character(&self.table) {
+          return Err("Table name contains prohibited characters".to_string().into());
+        }
+        if self.columns.iter().any(contains_bad_character) {
+          return Err("One or more columns contain prohibited characters".to_string().into());
+        }
+        // x // Check reload_when with a simple heuristic before even attempting
+        // x // to connect to the database. This does not catch every possible
+        // x // mistake, but it makes it more likely that the user will get a
+        // x // helpful error message instead of a confusing message from postgres.
+        // x match &self.reload_when {
+        // x     Some(query) => {
+        // x         if query.contains("$1") {
+        // x         } else {
+        // x             return Err("Prepared statement for reload_when must use parameter $1".to_string().into());
+        // x         }
+        // x     }
+        // x     None => {}
+        // x }
         let config: Config = self.endpoint.parse()?;
         let client = match &self.tls {
             Some(tls_config) => {
@@ -127,22 +166,22 @@ impl EnrichmentTableConfig for PgtableConfig {
                 client
             }
         };
-        // Table names and column names are unconditionally surrounded by
-        // double quotes in the `select ... from ...` query, so we prohibit
-        // the double quote character from appearing in either of these.
-        // We additionally prohibit control characters since their occurrence
-        // almost certainly indicates an accident.
-        if contains_bad_character(&self.table) {
-          return Err("Table name contains prohibited characters".to_string().into());
-        }
-        if self.columns.iter().any(contains_bad_character) {
-          return Err("One or more columns contain prohibited characters".to_string().into());
-        }
+        let statement = match &self.reload_when {
+            Some(query) => { Some(client.prepare_typed(query,&[Type::TIMESTAMPTZ]).await?) }
+            None => { None }
+        };
+        let updated = match &statement {
+            Some(s) => match client.query_opt(s,&[]).await? {
+                Some(row) => { row.try_get(0)? }
+                None => { DateTime::UNIX_EPOCH }
+            }
+            None => { DateTime::UNIX_EPOCH }
+        };
         let columns_with_commas : Vec<String> = intersperse(self.columns.clone().into_iter().map(surround_with_quotes), ",".to_string()).collect();
         let select_query = format!("SELECT {} FROM \"{}\"", &columns_with_commas.concat(), &self.table);
         let rows = client.query(&select_query, &[]).await?;
         let data = rows.into_iter().map(row_to_vec_value).collect();
-        Ok(Box::new(Pgtable::new(data, self.columns.clone())))
+        Ok(Box::new(Pgtable::new(data, client, updated, statement, self.columns.clone())))
     }
 }
 
@@ -186,9 +225,11 @@ fn hash_value(hasher: &mut seahash::SeaHasher, case: Case, value: &Value) -> Res
 }
 
 /// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a postgres database. This only happens once at load time.
-#[derive(Clone)]
 pub struct Pgtable {
     data: Vec<Vec<Value>>,
+    client: Client,
+    updated: DateTime<Utc>,
+    statement: Option<Statement>,
     headers: Vec<String>,
     indexes: Vec<(
         Case,
@@ -201,10 +242,16 @@ impl Pgtable {
     /// Creates a new [File] based on the provided config.
     pub fn new(
         data: Vec<Vec<Value>>,
+        client : Client,
+        updated : DateTime<Utc>,
+        statement: Option<Statement>,
         headers: Vec<String>,
     ) -> Self {
         Self {
             data,
+            client,
+            updated,
+            statement,
             headers,
             indexes: Vec::new(),
         }
@@ -455,6 +502,25 @@ impl Table for Pgtable {
 
     /// Checks the modified timestamp of the data file to see if data has changed.
     fn needs_reload(&self) -> bool {
-        return false;
+        let old = self.updated;
+        let new = match &self.statement {
+            Some(s) => match block_on(self.client.query_opt(s,&[])) {
+                Ok(res) => match res {
+                    Some(row) => match row.try_get(0) {
+                        Ok(t) => { t }
+                        Err(e) => { return true } // On error, request a reload? Not sure what to do here.
+                    }
+                    None => { DateTime::UNIX_EPOCH }
+                }
+                Err(e) => { return true } // On error, request a reload? Not sure what to do here.
+            }
+            None => { DateTime::UNIX_EPOCH }
+        };
+        if new > old {
+            self.updated = new;
+            return true;
+        } else {
+            return false;
+        }
     }
 }
