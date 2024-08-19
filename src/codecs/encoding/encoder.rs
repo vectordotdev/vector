@@ -93,13 +93,14 @@ impl Encoder<Framer> {
     }
 
     /// Get the suffix that encloses a batch of events.
-    pub const fn batch_suffix(&self) -> &[u8] {
-        match (&self.framer, &self.serializer) {
+    pub const fn batch_suffix(&self, empty: bool) -> &[u8] {
+        match (&self.framer, &self.serializer, empty) {
             (
                 Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
                 Serializer::Json(_) | Serializer::NativeJson(_),
+                _,
             ) => b"]",
-            (Framer::NewlineDelimited(_), _) => b"\n",
+            (Framer::NewlineDelimited(_), _, false) => b"\n",
             _ => &[],
         }
     }
