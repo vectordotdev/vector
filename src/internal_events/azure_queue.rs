@@ -128,6 +128,26 @@ impl<'a> InternalEvent for QueueStorageInvalidEventIgnored<'a> {
 }
 
 #[derive(Debug)]
+pub struct QueueStorageMismatchingContainerName<'a> {
+    pub container: &'a str,
+    pub configured_container: &'a str,
+}
+
+impl<'a> InternalEvent for QueueStorageMismatchingContainerName<'a> {
+    fn emit(self) {
+        warn!(
+            message = "Ignoring event because of wrong container name",
+            configured_container = %self.configured_container,
+            container = %self.container,
+        );
+        counter!(
+            "azure_queue_event_ignored_total", 1,
+            "ignore_type" => "mismatching_container_name"
+        )
+    }
+}
+
+#[derive(Debug)]
 pub struct QueueMessageProcessingSucceeded {}
 
 impl InternalEvent for QueueMessageProcessingSucceeded {

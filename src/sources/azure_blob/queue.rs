@@ -25,7 +25,7 @@ use crate::{
     azure,
     internal_events::{
         QueueMessageDeleteError, QueueMessageProcessingError, QueueMessageReceiveError,
-        QueueStorageInvalidEventIgnored,
+        QueueStorageInvalidEventIgnored, QueueStorageMismatchingContainerName,
     },
     shutdown::ShutdownSignal,
     sources::azure_blob::{AzureBlobConfig, BlobPack, BlobPackStream},
@@ -153,13 +153,6 @@ pub enum ProcessingError {
         message_id: String,
     },
 
-    #[snafu(display(
-        "Container name of message and container client doesn't match, container: {}, message {}",
-        container,
-        message
-    ))]
-    ContainerNameDoesntMatch { container: String, message: String },
-
     #[snafu(display("Failed to base64 decode message: {}", error))]
     FailedDecodingMessageBase64 { error: base64::DecodeError },
 
@@ -202,10 +195,12 @@ async fn proccess_event_grid_message(
     match parse_subject(body.subject.clone()) {
         Some((container, blob)) => {
             if container != container_client.container_name() {
-                return Err(ProcessingError::ContainerNameDoesntMatch {
-                    container: container_client.container_name().to_string(),
-                    message: container,
+                emit!(QueueStorageMismatchingContainerName {
+                    configured_container: container_client.container_name(),
+                    container: container.as_str(),
                 });
+
+                return Ok(None);
             }
             trace!(
                 "Detected new blob creation in container '{}': '{}'",
