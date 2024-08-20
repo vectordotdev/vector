@@ -18,7 +18,7 @@ use crate::{
         },
         util::{
             metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-            RequestBuilder,
+            RequestBuilder, vector_event::VectorSendEventMetadata,
         },
     },
 };
@@ -64,6 +64,7 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         let metadata = S3Metadata {
             partition_key,
             s3_key: s3_key_prefix,
+            count: events.len(),
             finalizers,
         };
 
@@ -103,8 +104,17 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
 
         s3metadata.s3_key = format_s3_key(&s3metadata.s3_key, &filename, &extension);
 
+        let body = payload.into_payload();
+
+        VectorSendEventMetadata {
+            bytes: body.len(),
+            events_len: s3metadata.count,
+            blob: s3metadata.s3_key.clone(),
+            container: self.bucket.clone(),
+        }.emit_sending_event();
+
         S3Request {
-            body: payload.into_payload(),
+            body: body,
             bucket: self.bucket.clone(),
             metadata: s3metadata,
             request_metadata,

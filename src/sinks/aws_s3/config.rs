@@ -18,7 +18,7 @@ use crate::{
             self,
             config::{S3Options, S3RetryLogic},
             partitioner::S3KeyPartitioner,
-            service::S3Service,
+            service::{S3Service, S3Response},
             sink::S3Sink,
         },
         util::{
@@ -204,6 +204,14 @@ impl S3SinkConfig {
         let request_limits = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
+            // Add another layer after retries for emitting our event log message
+            // Returns back the same result so it continues to work downstream
+            .map_result(|result: Result<S3Response, _>| {
+                if let Ok(ref response) = result {
+                    response.send_event_metadata.emit_upload_event();
+                }
+                result
+            })
             .service(service);
 
         let offset = self
