@@ -95,6 +95,7 @@
 ^\Qlib/vector-core/tests/data/fixtures/lookup/quoted\E$
 ^\Qlib/vector-lookup/tests/fixtures/lookup/quoted\E$
 ^\Qlib/vector-vrl/tests/resources/protobuf_descriptor_set.desc\E$
+^\Qlib/vector-vrl/tests/resources/public_suffix_list.dat\E$
 ^\Qlib/vrl/lookup/tests/fixtures/lookup/quoted\E$
 ^\Qlib/vrl/stdlib/benches/benches.rs\E$
 ^\Qlib/vrl/stdlib/src/encode_percent.rs\E$

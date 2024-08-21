@@ -72,11 +72,11 @@ pub struct EventMetadata {
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DatadogMetricOriginMetadata {
     /// `OriginProduct`
-    product: Option<u32>,
+    origin_product: Option<u32>,
     /// `OriginCategory`
-    category: Option<u32>,
+    origin_category: Option<u32>,
     /// `OriginService`
-    service: Option<u32>,
+    origin_service: Option<u32>,
 }
 
 impl DatadogMetricOriginMetadata {
@@ -88,25 +88,25 @@ impl DatadogMetricOriginMetadata {
     #[must_use]
     pub fn new(product: Option<u32>, category: Option<u32>, service: Option<u32>) -> Self {
         Self {
-            product,
-            category,
-            service,
+            origin_product: product,
+            origin_category: category,
+            origin_service: service,
         }
     }
 
     /// Returns a reference to the `OriginProduct`.
     pub fn product(&self) -> Option<u32> {
-        self.product
+        self.origin_product
     }
 
     /// Returns a reference to the `OriginCategory`.
     pub fn category(&self) -> Option<u32> {
-        self.category
+        self.origin_category
     }
 
     /// Returns a reference to the `OriginService`.
     pub fn service(&self) -> Option<u32> {
-        self.service
+        self.origin_service
     }
 }
 

@@ -53,6 +53,10 @@ updates:
         patterns:
         - "tonic"
         - "tonic-*"
+      tower:
+        patterns:
+        - "tower"
+        - "tower-*"
       wasm-bindgen:
         patterns:
         - "wasm-bindgen-*"

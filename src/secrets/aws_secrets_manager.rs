@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
 use aws_sdk_secretsmanager::{config, Client};
-use futures::executor;
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 
 use crate::aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint};
@@ -52,30 +51,26 @@ impl GenerateConfig for AwsSecretsManagerBackend {
 }
 
 impl SecretBackend for AwsSecretsManagerBackend {
-    fn retrieve(
+    async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
         _: &mut signal::SignalRx,
     ) -> crate::Result<HashMap<String, String>> {
-        let client = executor::block_on(async {
-            create_client::<SecretsManagerClientBuilder>(
-                &self.auth,
-                self.region.region(),
-                self.region.endpoint(),
-                &ProxyConfig::default(),
-                &self.tls,
-                &None,
-            )
-            .await
-        })?;
+        let client = create_client::<SecretsManagerClientBuilder>(
+            &self.auth,
+            self.region.region(),
+            self.region.endpoint(),
+            &ProxyConfig::default(),
+            &self.tls,
+            &None,
+        )
+        .await?;
 
-        let get_secret_value_response = executor::block_on(async {
-            client
-                .get_secret_value()
-                .secret_id(&self.secret_id)
-                .send()
-                .await
-        })?;
+        let get_secret_value_response = client
+            .get_secret_value()
+            .secret_id(&self.secret_id)
+            .send()
+            .await?;
 
         let secret_string = get_secret_value_response
             .secret_string
