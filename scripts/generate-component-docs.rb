@@ -753,7 +753,11 @@ def resolve_schema(root_schema, schema)
   type_override = get_schema_metadata(schema, 'docs::type_override')
   if !type_override.nil?
     if type_override == 'ascii_char'
-      resolved = { 'type' => { type_override.to_s => { 'default' => schema['default'].chr } } }
+      if !schema['default'].nil?
+        resolved = { 'type' => { type_override.to_s => { 'default' => schema['default'].chr } } }
+      else
+        resolved = { 'type' => { type_override.to_s => { } } }
+      end
     else
       resolved = { 'type' => { type_override.to_s => {} } }
     end

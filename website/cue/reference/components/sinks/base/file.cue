@@ -314,7 +314,7 @@ base: components: sinks: file: configuration: {
 				type: object: options: delimiter: {
 					description: "The ASCII (7-bit) character that delimits byte sequences."
 					required:    true
-					type: uint: {}
+					type: ascii_char: {}
 				}
 			}
 			length_delimited: {
