@@ -240,7 +240,6 @@ mod tests {
             let mut stream = rx;
 
             write(write_fd, b"hello world\nhello world again\n").unwrap();
-            close(write_fd).unwrap();
 
             let context = SourceContext::new_test(tx, None);
             config.build(context).await.unwrap().await.unwrap();
