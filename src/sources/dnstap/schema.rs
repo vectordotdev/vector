@@ -254,7 +254,13 @@ pub struct DnstapPaths {
     pub version: OwnedValuePath,
     pub do_flag: OwnedValuePath,
     pub udp_max_payload_size: OwnedValuePath,
+    pub ede: OwnedValuePath,
     pub options: OwnedValuePath,
+
+    // DnsMessageEdeOptionSchema
+    pub info_code: OwnedValuePath,
+    pub purpose: OwnedValuePath,
+    pub extra_text: OwnedValuePath,
 
     // DnsMessageOptionSchema
     pub opt_code: OwnedValuePath,
@@ -336,7 +342,11 @@ pub(crate) static DNSTAP_VALUE_PATHS: Lazy<DnstapPaths> = Lazy::new(|| DnstapPat
     version: owned_value_path!("ednsVersion"),
     do_flag: owned_value_path!("do"),
     udp_max_payload_size: owned_value_path!("udpPayloadSize"),
+    ede: owned_value_path!("ede"),
     options: owned_value_path!("options"),
+    info_code: owned_value_path!("infoCode"),
+    purpose: owned_value_path!("purpose"),
+    extra_text: owned_value_path!("extraText"),
     opt_code: owned_value_path!("optCode"),
     opt_name: owned_value_path!("optName"),
     opt_data: owned_value_path!("optValue"),
@@ -412,6 +422,20 @@ impl DnsMessageOptPseudoSectionSchema {
             DNSTAP_VALUE_PATHS.options.to_string() => Kind::array(
                 Collection::from_unknown(Kind::object(DnsMessageOptionSchema::schema_definition()))
             ).or_undefined(),
+        }
+        .into()
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct DnsMessageEdeOptionSchema;
+
+impl DnsMessageEdeOptionSchema {
+    pub fn schema_definition() -> Collection<Field> {
+        btreemap! {
+            DNSTAP_VALUE_PATHS.info_code.to_string() => Kind::integer(),
+            DNSTAP_VALUE_PATHS.purpose.to_string() => Kind::bytes(),
+            DNSTAP_VALUE_PATHS.extra_text.to_string() => Kind::bytes(),
         }
         .into()
     }

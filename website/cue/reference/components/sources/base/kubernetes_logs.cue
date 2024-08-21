@@ -133,6 +133,16 @@ base: components: sources: kubernetes_logs: configuration: {
 			unit: "seconds"
 		}
 	}
+	include_paths_glob_patterns: {
+		description: "A list of glob patterns to include while reading the files."
+		required:    false
+		type: array: {
+			default: [
+				"**/*",
+			]
+			items: type: string: examples: ["**/include/**"]
+		}
+	}
 	ingestion_timestamp_field: {
 		description: """
 			Overrides the name of the log field used to add the ingestion timestamp to each event.

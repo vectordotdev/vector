@@ -252,7 +252,7 @@ mod tests {
         let encoding = (
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::new().into(),
+                NewlineDelimitedEncoder::default().into(),
                 JsonSerializerConfig::default().build().into(),
             ),
         );
@@ -273,7 +273,7 @@ mod tests {
         let encoding = (
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::new().into(),
+                NewlineDelimitedEncoder::default().into(),
                 JsonSerializerConfig::default().build().into(),
             ),
         );
@@ -300,7 +300,7 @@ mod tests {
         let encoding = (
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::new().into(),
+                NewlineDelimitedEncoder::default().into(),
                 JsonSerializerConfig::default().build().into(),
             ),
         );

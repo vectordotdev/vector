@@ -126,8 +126,7 @@ pub struct ComposeTestConfig {
 #[serde(deny_unknown_fields)]
 pub struct IntegrationRunnerConfig {
     /// The set of environment variables to set in just the runner. This is used for settings that
-    /// might otherwise affect the operation of either docker or docker-compose but are needed in
-    /// the runner.
+    /// might otherwise affect the operation of docker but are needed in the runner.
     #[serde(default)]
     pub env: Environment,
     /// The set of volumes that need to be mounted into the runner.

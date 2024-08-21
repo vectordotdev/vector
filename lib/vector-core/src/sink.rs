@@ -1,6 +1,5 @@
 use std::{fmt, iter::IntoIterator, pin::Pin};
 
-use async_trait::async_trait;
 use futures::{stream, task::Context, task::Poll, Sink, SinkExt, Stream, StreamExt};
 
 use crate::event::{into_event_stream, Event, EventArray, EventContainer};
@@ -86,7 +85,7 @@ impl fmt::Debug for VectorSink {
 
 // === StreamSink ===
 
-#[async_trait]
+#[async_trait::async_trait]
 pub trait StreamSink<T> {
     async fn run(self: Box<Self>, input: stream::BoxStream<'_, T>) -> Result<(), ()>;
 }
@@ -172,7 +171,7 @@ struct EventStream<T> {
     sink: Box<T>,
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl<T: StreamSink<Event> + Send> StreamSink<EventArray> for EventStream<T> {
     async fn run(self: Box<Self>, input: stream::BoxStream<'_, EventArray>) -> Result<(), ()> {
         let input = Box::pin(input.flat_map(into_event_stream));

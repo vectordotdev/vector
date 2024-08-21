@@ -70,8 +70,7 @@ pub struct DockerLogsConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
-    host_key: OptionalValuePath,
+    host_key: Option<OptionalValuePath>,
 
     /// Docker host to connect to.
     ///
@@ -171,7 +170,7 @@ pub struct DockerLogsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
-            host_key: default_host_key(),
+            host_key: None,
             docker_host: None,
             tls: None,
             exclude_containers: None,
@@ -185,10 +184,6 @@ impl Default for DockerLogsConfig {
             log_namespace: None,
         }
     }
-}
-
-fn default_host_key() -> OptionalValuePath {
-    log_schema().host_key().cloned().into()
 }
 
 fn default_partial_event_marker_field() -> Option<String> {
@@ -273,7 +268,12 @@ impl SourceConfig for DockerLogsConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
+        let host_key = self
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into())
+            .path
+            .map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
             .schema_definition(global_log_namespace.merge(self.log_namespace))
@@ -349,7 +349,10 @@ impl SourceConfig for DockerLogsConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -465,7 +468,10 @@ impl DockerLogsSource {
     ) -> crate::Result<DockerLogsSource> {
         let backoff_secs = config.retry_backoff_secs;
 
-        let host_key = config.host_key.clone();
+        let host_key = config
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into());
         let hostname = crate::get_hostname().ok();
 
         // Only logs created at, or after this moment are logged.

@@ -39,6 +39,7 @@ pub enum RequestBuilderError {
         dropped_events: u64,
     },
 
+    #[allow(dead_code)]
     #[snafu(display("Unsupported endpoint ({})", reason))]
     UnsupportedEndpoint { reason: String, dropped_events: u64 },
 }

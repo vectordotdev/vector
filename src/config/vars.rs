@@ -20,14 +20,9 @@ pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: Lazy<Regex> = Lazy::new(|| 
     .unwrap()
 });
 
-/// (result, warnings)
-pub fn interpolate(
-    input: &str,
-    vars: &HashMap<String, String>,
-    strict_vars: bool,
-) -> Result<(String, Vec<String>), Vec<String>> {
+/// Result<interpolated config, errors>
+pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::new();
-    let mut warnings = Vec::new();
 
     let interpolated = ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX
         .replace_all(input, |caps: &Captures<'_>| {
@@ -59,16 +54,10 @@ pub fn interpolate(
                             ));
                             ""
                         }),
-                        _ => val.unwrap_or_else(|| if strict_vars {
+                        _ => val.unwrap_or_else(|| {
                             errors.push(format!(
                                 "Missing environment variable in config. name = {name:?}",
                             ));
-                            ""
-                        } else {
-                            warnings
-                                .push(format!(
-                                    "Unknown environment variable in config. This is DEPRECATED and will become an error in future versions. name = {name:?}",
-                                ));
                             ""
                         }),
                     }
@@ -79,7 +68,7 @@ pub fn interpolate(
         .into_owned();
 
     if errors.is_empty() {
-        Ok((interpolated, warnings))
+        Ok(interpolated)
     } else {
         Err(errors)
     }
@@ -100,53 +89,34 @@ mod test {
         .into_iter()
         .collect();
 
-        assert_eq!("dogs", interpolate("$FOO", &vars, true).unwrap().0);
-        assert_eq!("dogs", interpolate("${FOO}", &vars, true).unwrap().0);
-        assert_eq!("cats", interpolate("${FOOBAR}", &vars, true).unwrap().0);
-        assert_eq!("xcatsy", interpolate("x${FOOBAR}y", &vars, true).unwrap().0);
-        assert_eq!("x", interpolate("x$FOOBARy", &vars, false).unwrap().0);
-        assert!(interpolate("x$FOOBARy", &vars, true).is_err());
-        assert_eq!("$ x", interpolate("$ x", &vars, false).unwrap().0);
-        assert_eq!("$ x", interpolate("$ x", &vars, true).unwrap().0);
-        assert_eq!("$FOO", interpolate("$$FOO", &vars, true).unwrap().0);
-        assert_eq!("dogs=bar", interpolate("$FOO=bar", &vars, true).unwrap().0);
-        assert_eq!("", interpolate("$NOT_FOO", &vars, false).unwrap().0);
-        assert!(interpolate("$NOT_FOO", &vars, true).is_err());
-        assert_eq!("-FOO", interpolate("$NOT-FOO", &vars, false).unwrap().0);
-        assert!(interpolate("$NOT-FOO", &vars, true).is_err());
-        assert_eq!("turtles", interpolate("$FOO.BAR", &vars, true).unwrap().0);
-        assert_eq!("${FOO x", interpolate("${FOO x", &vars, true).unwrap().0);
-        assert_eq!("${}", interpolate("${}", &vars, true).unwrap().0);
-        assert_eq!("dogs", interpolate("${FOO:-cats}", &vars, true).unwrap().0);
-        assert_eq!(
-            "dogcats",
-            interpolate("${NOT:-dogcats}", &vars, true).unwrap().0
-        );
+        assert_eq!("dogs", interpolate("$FOO", &vars).unwrap());
+        assert_eq!("dogs", interpolate("${FOO}", &vars).unwrap());
+        assert_eq!("cats", interpolate("${FOOBAR}", &vars).unwrap());
+        assert_eq!("xcatsy", interpolate("x${FOOBAR}y", &vars).unwrap());
+        assert!(interpolate("x$FOOBARy", &vars).is_err());
+        assert_eq!("$ x", interpolate("$ x", &vars).unwrap());
+        assert_eq!("$FOO", interpolate("$$FOO", &vars).unwrap());
+        assert_eq!("dogs=bar", interpolate("$FOO=bar", &vars).unwrap());
+        assert!(interpolate("$NOT_FOO", &vars).is_err());
+        assert!(interpolate("$NOT-FOO", &vars).is_err());
+        assert_eq!("turtles", interpolate("$FOO.BAR", &vars).unwrap());
+        assert_eq!("${FOO x", interpolate("${FOO x", &vars).unwrap());
+        assert_eq!("${}", interpolate("${}", &vars).unwrap());
+        assert_eq!("dogs", interpolate("${FOO:-cats}", &vars).unwrap());
+        assert_eq!("dogcats", interpolate("${NOT:-dogcats}", &vars).unwrap());
         assert_eq!(
             "dogs and cats",
-            interpolate("${NOT:-dogs and cats}", &vars, true).unwrap().0
+            interpolate("${NOT:-dogs and cats}", &vars).unwrap()
         );
-        assert_eq!(
-            "${:-cats}",
-            interpolate("${:-cats}", &vars, true).unwrap().0
-        );
-        assert_eq!("", interpolate("${NOT:-}", &vars, true).unwrap().0);
-        assert_eq!("cats", interpolate("${NOT-cats}", &vars, true).unwrap().0);
-        assert_eq!("", interpolate("${EMPTY-cats}", &vars, true).unwrap().0);
-        assert_eq!(
-            "dogs",
-            interpolate("${FOO:?error cats}", &vars, true).unwrap().0
-        );
-        assert_eq!(
-            "dogs",
-            interpolate("${FOO?error cats}", &vars, true).unwrap().0
-        );
-        assert_eq!(
-            "",
-            interpolate("${EMPTY?error cats}", &vars, true).unwrap().0
-        );
-        assert!(interpolate("${NOT:?error cats}", &vars, true).is_err());
-        assert!(interpolate("${NOT?error cats}", &vars, true).is_err());
-        assert!(interpolate("${EMPTY:?error cats}", &vars, true).is_err());
+        assert_eq!("${:-cats}", interpolate("${:-cats}", &vars).unwrap());
+        assert_eq!("", interpolate("${NOT:-}", &vars).unwrap());
+        assert_eq!("cats", interpolate("${NOT-cats}", &vars).unwrap());
+        assert_eq!("", interpolate("${EMPTY-cats}", &vars).unwrap());
+        assert_eq!("dogs", interpolate("${FOO:?error cats}", &vars).unwrap());
+        assert_eq!("dogs", interpolate("${FOO?error cats}", &vars).unwrap());
+        assert_eq!("", interpolate("${EMPTY?error cats}", &vars).unwrap());
+        assert!(interpolate("${NOT:?error cats}", &vars).is_err());
+        assert!(interpolate("${NOT?error cats}", &vars).is_err());
+        assert!(interpolate("${EMPTY:?error cats}", &vars).is_err());
     }
 }

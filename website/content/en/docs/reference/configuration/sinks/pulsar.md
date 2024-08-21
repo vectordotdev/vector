@@ -1,7 +1,7 @@
 ---
 title: Pulsar
 description: Publish observability events to [Apache Pulsar](https://pulsar.apache.org) topics
-kind: sink
+component_kind: sink
 layout: component
 tags: ["pulsar", "apache", "component", "sink"]
 ---

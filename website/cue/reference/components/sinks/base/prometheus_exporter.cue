@@ -15,8 +15,8 @@ base: components: sinks: prometheus_exporter: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -230,14 +230,14 @@ base: components: sinks: prometheus_exporter: configuration: {
 			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

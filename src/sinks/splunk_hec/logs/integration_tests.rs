@@ -118,7 +118,7 @@ async fn config(
     HecLogsSinkConfig {
         default_token: get_token().await.into(),
         endpoint: splunk_hec_address(),
-        host_key: OptionalTargetPath::event("host"),
+        host_key: Some(OptionalTargetPath::event("host")),
         indexed_fields,
         index: None,
         sourcetype: None,
@@ -130,7 +130,7 @@ async fn config(
         tls: None,
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
-        timestamp_key: Default::default(),
+        timestamp_key: None,
         auto_extract_timestamp: None,
         endpoint_target: EndpointTarget::Event,
     }
@@ -409,7 +409,7 @@ async fn splunk_configure_hostname() {
     let cx = SinkContext::default();
 
     let config = HecLogsSinkConfig {
-        host_key: OptionalTargetPath::event("roast"),
+        host_key: Some(OptionalTargetPath::event("roast")),
         ..config(JsonSerializerConfig::default().into(), vec!["asdf".into()]).await
     };
 
@@ -488,11 +488,11 @@ async fn splunk_auto_extracted_timestamp() {
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(true),
-            timestamp_key: OptionalTargetPath {
+            timestamp_key: Some(OptionalTargetPath {
                 path: Some(OwnedTargetPath::event(lookup::owned_value_path!(
                     "timestamp"
                 ))),
-            },
+            }),
             ..config(JsonSerializerConfig::default().into(), vec![]).await
         };
 
@@ -519,8 +519,16 @@ async fn splunk_auto_extracted_timestamp() {
 
         let entry = find_entry(&message).await;
 
+        // we should not have removed the timestamp from the event in this case, because that only
+        // happens when we set the `_time` field in the HEC metadata, which we do by extracting the
+        // timestamp from the event data in vector. Instead, when auto_extract_timestamp is true,
+        // Splunk will determine the timestamp from the *message* field in the event.
+        // Thus, we expect the `timestamp` field to still be present.
         assert_eq!(
-            format!("{{\"message\":\"{}\"}}", message),
+            format!(
+                "{{\"message\":\"{}\",\"timestamp\":\"2020-03-05T00:00:00Z\"}}",
+                message
+            ),
             entry["_raw"].as_str().unwrap()
         );
         assert_eq!(
@@ -543,11 +551,11 @@ async fn splunk_non_auto_extracted_timestamp() {
 
         let config = HecLogsSinkConfig {
             auto_extract_timestamp: Some(false),
-            timestamp_key: OptionalTargetPath {
+            timestamp_key: Some(OptionalTargetPath {
                 path: Some(OwnedTargetPath::event(lookup::owned_value_path!(
                     "timestamp"
                 ))),
-            },
+            }),
             ..config(JsonSerializerConfig::default().into(), vec![]).await
         };
 

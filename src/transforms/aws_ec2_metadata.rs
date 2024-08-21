@@ -638,11 +638,6 @@ fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
             OwnedSegment::Index(i) => {
                 output += &i.to_string();
             }
-            OwnedSegment::Coalesce(fields) => {
-                if let Some(first) = fields.first() {
-                    output += first;
-                }
-            }
         }
     }
     output

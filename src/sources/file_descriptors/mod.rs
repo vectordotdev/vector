@@ -97,7 +97,7 @@ where
 {
     loop {
         let (buffer, len) = match reader.fill_buf() {
-            Ok(buffer) if buffer.is_empty() => break, // EOF.
+            Ok([]) => break, // EOF.
             Ok(buffer) => (Ok(Bytes::copy_from_slice(buffer)), buffer.len()),
             Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
             Err(error) => (Err(error), 0),
@@ -222,7 +222,7 @@ fn outputs(
         )
         .with_standard_vector_source_metadata();
 
-    vec![SourceOutput::new_logs(
+    vec![SourceOutput::new_maybe_logs(
         decoding.output_type(),
         schema_definition,
     )]

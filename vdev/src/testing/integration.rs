@@ -45,7 +45,7 @@ pub(crate) trait ComposeTestT {
         let environment = environment.into();
         let (test_dir, config) = ComposeTestConfig::load(Self::DIRECTORY, &test_name)?;
         let envs_dir = EnvsDir::new(&test_name);
-        let Some(mut env_config) = config.environments().get(&environment).map(Clone::clone) else {
+        let Some(mut env_config) = config.environments().get(&environment).cloned() else {
             bail!("Could not find environment named {environment:?}");
         };
 
@@ -276,9 +276,8 @@ impl Compose {
     }
 
     fn run(&self, action: &str, args: &[&'static str], config: Option<&Environment>) -> Result<()> {
-        let mut command = CONTAINER_TOOL.clone();
-        command.push("-compose");
-        let mut command = Command::new(command);
+        let mut command = Command::new(CONTAINER_TOOL.clone());
+        command.arg("compose");
         // When the integration test environment is already active, the tempfile path does not
         // exist because `Compose::new()` has not been called. In this case, the `stop` command
         // needs to use the calculated path from the integration name instead of the nonexistent

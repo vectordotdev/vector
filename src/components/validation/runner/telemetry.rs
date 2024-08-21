@@ -36,7 +36,7 @@ impl Telemetry {
     /// Creates a telemetry collector by attaching the relevant components to an existing `ConfigBuilder`.
     pub fn attach_to_config(config_builder: &mut ConfigBuilder) -> Self {
         let listen_addr = GrpcAddress::from(next_addr());
-        debug!(%listen_addr, "Attaching telemetry components.");
+        info!(%listen_addr, "Attaching telemetry components.");
 
         // Attach an internal logs and internal metrics source, and send them on to a dedicated Vector
         // sink that we'll spawn a listener for to collect everything.
@@ -83,10 +83,10 @@ impl Telemetry {
         // needs to be shut down after the telemetry collector. This is because
         // the server needs to be alive to process every last incoming event
         // from the Vector sink that we're using to collect telemetry.
-        let grpc_task_coordinator = TaskCoordinator::new();
+        let grpc_task_coordinator = TaskCoordinator::new("gRPC");
         spawn_grpc_server(self.listen_addr, self.service, &grpc_task_coordinator);
-        let grpc_task_coordinator = grpc_task_coordinator.started().await;
-        debug!("All gRPC task(s) started.");
+        let mut grpc_task_coordinator = grpc_task_coordinator.started().await;
+        info!("All gRPC task(s) started.");
 
         let mut rx = self.rx;
         let driver_handle = tokio::spawn(async move {
@@ -107,7 +107,7 @@ impl Telemetry {
                         // emitted. Thus, two batches ensure that all component
                         // events have been emitted.
 
-                        debug!("Telemetry: waiting for final internal_metrics events before shutting down.");
+                        info!("Telemetry: waiting for final internal_metrics events before shutting down.");
 
                         let mut batches_received = 0;
 
@@ -121,7 +121,7 @@ impl Telemetry {
                                         None => break,
                                         Some(telemetry_event_batch) => {
                                         telemetry_events.extend(telemetry_event_batch);
-                                            debug!("Telemetry: processed one batch of internal_metrics.");
+                                            info!("Telemetry: processed one batch of internal_metrics.");
                                             batches_received += 1;
                                             if batches_received == SHUTDOWN_TICKS {
                                                 break;
@@ -145,7 +145,6 @@ impl Telemetry {
             }
 
             grpc_task_coordinator.shutdown().await;
-            debug!("GRPC task(s) have been shutdown.");
 
             telemetry_completed.mark_as_done();
 

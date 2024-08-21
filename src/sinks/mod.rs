@@ -51,9 +51,11 @@ pub mod elasticsearch;
 pub mod file;
 #[cfg(feature = "sinks-gcp")]
 pub mod gcp;
-#[cfg(feature = "sinks-gcp")]
+#[cfg(feature = "sinks-gcp-chronicle")]
+pub mod gcp_chronicle;
+#[cfg(any(feature = "sinks-gcp-chronicle", feature = "sinks-gcp"))]
 pub mod gcs_common;
-#[cfg(feature = "sinks-greptimedb")]
+#[cfg(any(feature = "sinks-greptimedb_metrics", feature = "sink-greptimedb_logs"))]
 pub mod greptimedb;
 #[cfg(feature = "sinks-honeycomb")]
 pub mod honeycomb;
@@ -117,6 +119,8 @@ pub enum BuildError {
     SocketAddressError { source: std::io::Error },
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
+    #[snafu(display("HTTP request build error: {}", source))]
+    HTTPRequestBuilderError { source: ::http::Error },
 }
 
 /// Common healthcheck errors

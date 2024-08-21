@@ -2,6 +2,7 @@
 
 use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
 
+use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use vector_common::{byte_size_of::ByteSizeOf, config::ComponentKey, EventDataEq};
 use vrl::{
@@ -70,12 +71,12 @@ pub struct EventMetadata {
 /// Metric Origin metadata for submission to Datadog.
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DatadogMetricOriginMetadata {
-    /// OriginProduct
-    product: Option<u32>,
-    /// OriginCategory
-    category: Option<u32>,
-    /// OriginService
-    service: Option<u32>,
+    /// `OriginProduct`
+    origin_product: Option<u32>,
+    /// `OriginCategory`
+    origin_category: Option<u32>,
+    /// `OriginService`
+    origin_service: Option<u32>,
 }
 
 impl DatadogMetricOriginMetadata {
@@ -87,25 +88,25 @@ impl DatadogMetricOriginMetadata {
     #[must_use]
     pub fn new(product: Option<u32>, category: Option<u32>, service: Option<u32>) -> Self {
         Self {
-            product,
-            category,
-            service,
+            origin_product: product,
+            origin_category: category,
+            origin_service: service,
         }
     }
 
     /// Returns a reference to the `OriginProduct`.
     pub fn product(&self) -> Option<u32> {
-        self.product
+        self.origin_product
     }
 
     /// Returns a reference to the `OriginCategory`.
     pub fn category(&self) -> Option<u32> {
-        self.category
+        self.origin_category
     }
 
     /// Returns a reference to the `OriginService`.
     pub fn service(&self) -> Option<u32> {
-        self.service
+        self.origin_service
     }
 }
 
@@ -337,13 +338,33 @@ impl EventMetadata {
     }
 
     /// Get the schema definition.
-    pub fn schema_definition(&self) -> &schema::Definition {
-        self.schema_definition.as_ref()
+    pub fn schema_definition(&self) -> &Arc<schema::Definition> {
+        &self.schema_definition
     }
 
     /// Set the schema definition.
     pub fn set_schema_definition(&mut self, definition: &Arc<schema::Definition>) {
         self.schema_definition = Arc::clone(definition);
+    }
+
+    /// Helper function to add a semantic meaning to the schema definition.
+    ///
+    /// This replaces the common code sequence of:
+    ///
+    /// ```ignore
+    /// let new_schema = log_event
+    ///     .metadata()
+    ///     .schema_definition()
+    ///     .as_ref()
+    ///     .clone()
+    ///     .with_meaning(target_path, meaning);
+    /// log_event
+    ///     .metadata_mut()
+    ///     .set_schema_definition(new_schema);
+    /// ````
+    pub fn add_schema_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
+        let schema = Arc::make_mut(&mut self.schema_definition);
+        schema.add_meaning(target_path, meaning);
     }
 }
 
@@ -416,7 +437,7 @@ impl Secrets {
 
     /// Removes a secret
     pub fn remove(&mut self, key: &str) {
-        self.0.remove(&key.to_owned());
+        self.0.remove(key);
     }
 
     /// Merged both together. If there are collisions, the value from `self` is kept.

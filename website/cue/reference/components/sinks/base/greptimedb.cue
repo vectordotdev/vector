@@ -15,8 +15,8 @@ base: components: sinks: greptimedb: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -61,7 +61,7 @@ base: components: sinks: greptimedb: configuration: {
 	}
 	dbname: {
 		description: """
-			The GreptimeDB [database][database] name to connect.
+			The [GreptimeDB database][database] name to connect.
 
 			Default to `public`, the default database of GreptimeDB.
 
@@ -90,6 +90,14 @@ base: components: sinks: greptimedb: configuration: {
 			"""
 		required: true
 		type: string: examples: ["example.com:4001", "1nge17d2r3ns.ap-southeast-1.aws.greptime.cloud:4001"]
+	}
+	grpc_compression: {
+		description: """
+			Set gRPC compression encoding for the request
+			Default to none, `gzip` or `zstd` is supported.
+			"""
+		required: false
+		type: string: examples: ["grpc_compression"]
 	}
 	password: {
 		description: """
@@ -341,14 +349,14 @@ base: components: sinks: greptimedb: configuration: {
 			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

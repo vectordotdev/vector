@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     future::Future,
     net::{IpAddr, SocketAddr},
     str::FromStr,
@@ -11,7 +11,7 @@ use axum::{
     routing::{MethodFilter, MethodRouter},
     Router,
 };
-use bytes::BytesMut;
+use bytes::{BufMut as _, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
 use hyper::{Body, Client, Server};
 use tokio::{
@@ -24,7 +24,11 @@ use crate::components::validation::{
     sync::{Configuring, TaskCoordinator},
     RunnerMetrics,
 };
-use vector_lib::{event::Event, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    codecs::encoding::Framer, codecs::encoding::Serializer::Json,
+    codecs::CharacterDelimitedEncoder, config::LogNamespace, event::Event,
+    EstimatedJsonEncodedSizeOf,
+};
 
 use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 
@@ -33,11 +37,21 @@ use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 pub struct HttpResourceConfig {
     uri: Uri,
     method: Option<Method>,
+    headers: Option<HashMap<String, String>>,
 }
 
 impl HttpResourceConfig {
     pub const fn from_parts(uri: Uri, method: Option<Method>) -> Self {
-        Self { uri, method }
+        Self {
+            uri,
+            method,
+            headers: None,
+        }
+    }
+
+    pub fn with_headers(mut self, headers: HashMap<String, String>) -> Self {
+        self.headers = Some(headers);
+        self
     }
 
     pub fn spawn_as_input(
@@ -55,31 +69,17 @@ impl HttpResourceConfig {
             }
             // We'll push data to the source.
             ResourceDirection::Push => {
-                spawn_input_http_client(self, codec, input_rx, task_coordinator)
+                spawn_input_http_client(self, codec, input_rx, task_coordinator, runner_metrics)
             }
         }
     }
 
-    pub fn spawn_as_output(
-        self,
-        direction: ResourceDirection,
-        codec: ResourceCodec,
-        output_tx: mpsc::Sender<Vec<Event>>,
-        task_coordinator: &TaskCoordinator<Configuring>,
-        runner_metrics: &Arc<Mutex<RunnerMetrics>>,
-    ) -> vector_lib::Result<()> {
-        match direction {
+    pub fn spawn_as_output(self, ctx: HttpResourceOutputContext) -> vector_lib::Result<()> {
+        match ctx.direction {
             // We'll pull data from the sink.
-            ResourceDirection::Pull => Ok(spawn_output_http_client(
-                self,
-                codec,
-                output_tx,
-                task_coordinator,
-            )),
+            ResourceDirection::Pull => Ok(ctx.spawn_output_http_client(self)),
             // The sink will push data to us.
-            ResourceDirection::Push => {
-                spawn_output_http_server(self, codec, output_tx, task_coordinator, runner_metrics)
-            }
+            ResourceDirection::Push => ctx.spawn_output_http_server(self),
         }
     }
 }
@@ -132,10 +132,11 @@ fn spawn_input_http_server(
     // events and working with the HTTP server as they're consumed.
     let resource_started = task_coordinator.track_started();
     let resource_completed = task_coordinator.track_completed();
+    let mut resource_shutdown_rx = task_coordinator.register_for_shutdown();
 
     tokio::spawn(async move {
         resource_started.mark_as_done();
-        debug!("HTTP server external input resource started.");
+        info!("HTTP server external input resource started.");
 
         let mut input_finished = false;
 
@@ -152,7 +153,7 @@ fn spawn_input_http_server(
                         outstanding_events.push_back(event);
                     },
                     None => {
-                        trace!("HTTP server external input resource input is finished.");
+                        info!("HTTP server external input resource input is finished.");
                         input_finished = true;
                     },
                 },
@@ -175,16 +176,18 @@ fn spawn_input_http_server(
         }
         // Mark ourselves as completed now that we've sent all inputs to the source, and
         // additionally signal the HTTP server to also gracefully shutdown.
+        info!("HTTP server external input resource signalling ready for shutdown.");
+
+        // Wait for the runner to signal us to shutdown
+        resource_shutdown_rx.wait().await;
+
+        // Shutdown the server
         _ = http_server_shutdown_tx.send(());
 
-        // TODO - currently we are getting lucky in the testing of `http_client` source... if the source tries to query
-        // this server but we have already shut down the thread, then it will generate an error which can throw off our error
-        // validation.
-        // I think the solution involves adding synchronization to wait here for the runner to tell us to shutdown.
-
+        info!("HTTP server external input resource marking as done.");
         resource_completed.mark_as_done();
 
-        debug!("HTTP server external input resource completed.");
+        info!("HTTP server external input resource completed.");
     });
 }
 
@@ -194,32 +197,65 @@ fn spawn_input_http_client(
     codec: ResourceCodec,
     mut input_rx: mpsc::Receiver<TestEvent>,
     task_coordinator: &TaskCoordinator<Configuring>,
+    runner_metrics: &Arc<Mutex<RunnerMetrics>>,
 ) {
     // Spin up an HTTP client that will push the input data to the source on a
     // request-per-input-item basis. This runs serially and has no parallelism.
     let started = task_coordinator.track_started();
     let completed = task_coordinator.track_completed();
     let mut encoder = codec.into_encoder();
+    let runner_metrics = Arc::clone(runner_metrics);
 
     tokio::spawn(async move {
         // Mark ourselves as started. We don't actually do anything until we get our first input
         // message, though.
         started.mark_as_done();
-        debug!("HTTP client external input resource started.");
+        info!("HTTP client external input resource started.");
 
         let client = Client::builder().build_http::<Body>();
         let request_uri = config.uri;
         let request_method = config.method.unwrap_or(Method::POST);
+        let headers = config.headers.unwrap_or_default();
 
         while let Some(event) = input_rx.recv().await {
             debug!("Got event to send from runner.");
 
             let mut buffer = BytesMut::new();
+
+            let is_json = matches!(encoder.serializer(), Json(_))
+                && matches!(
+                    encoder.framer(),
+                    Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })
+                );
+
+            if is_json {
+                buffer.put_u8(b'[');
+            }
+
             encode_test_event(&mut encoder, &mut buffer, event);
 
-            let request = Request::builder()
+            if is_json {
+                if !buffer.is_empty() {
+                    // remove trailing comma from last record
+                    buffer.truncate(buffer.len() - 1);
+                }
+                buffer.put_u8(b']');
+
+                // in this edge case we have removed the trailing comma (one byte) and added
+                // opening and closing braces (2 bytes) for a net add of one byte.
+                let mut runner_metrics = runner_metrics.lock().await;
+                runner_metrics.sent_bytes_total += 1;
+            }
+
+            let mut request_builder = Request::builder()
                 .uri(request_uri.clone())
-                .method(request_method.clone())
+                .method(request_method.clone());
+
+            for (key, value) in &headers {
+                request_builder = request_builder.header(key, value);
+            }
+
+            let request = request_builder
                 .body(buffer.freeze().into())
                 .expect("should not fail to build request");
 
@@ -238,103 +274,145 @@ fn spawn_input_http_client(
         // Mark ourselves as completed now that we've sent all inputs to the source.
         completed.mark_as_done();
 
-        debug!("HTTP client external input resource completed.");
+        info!("HTTP client external input resource completed.");
     });
 }
 
-/// Spawns an HTTP server that accepts events sent by a sink.
-#[allow(clippy::missing_const_for_fn)]
-fn spawn_output_http_server(
-    config: HttpResourceConfig,
-    codec: ResourceCodec,
-    output_tx: mpsc::Sender<Vec<Event>>,
-    task_coordinator: &TaskCoordinator<Configuring>,
-    runner_metrics: &Arc<Mutex<RunnerMetrics>>,
-) -> vector_lib::Result<()> {
-    // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
-    // via an output sender. We accept/collect events until we're told to shutdown.
+/// Anything that the output side HTTP external resource needs
+pub struct HttpResourceOutputContext<'a> {
+    pub direction: ResourceDirection,
+    pub codec: ResourceCodec,
+    pub output_tx: mpsc::Sender<Vec<Event>>,
+    pub task_coordinator: &'a TaskCoordinator<Configuring>,
+    pub input_events: Vec<TestEvent>,
+    pub runner_metrics: &'a Arc<Mutex<RunnerMetrics>>,
+    pub log_namespace: LogNamespace,
+}
 
-    // First, we'll build and spawn our HTTP server.
-    let decoder = codec.into_decoder()?;
+impl HttpResourceOutputContext<'_> {
+    /// Spawns an HTTP server that accepts events sent by a sink.
+    #[allow(clippy::missing_const_for_fn)]
+    fn spawn_output_http_server(&self, config: HttpResourceConfig) -> vector_lib::Result<()> {
+        // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
+        // via an output sender. We accept/collect events until we're told to shutdown.
 
-    let (_, http_server_shutdown_tx) = spawn_http_server(
-        task_coordinator,
-        &config,
-        runner_metrics,
-        move |request, output_runner_metrics| {
-            let output_tx = output_tx.clone();
-            let mut decoder = decoder.clone();
+        // First, we'll build and spawn our HTTP server.
+        let decoder = self.codec.into_decoder(self.log_namespace)?;
 
-            async move {
-                match hyper::body::to_bytes(request.into_body()).await {
-                    Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-                    Ok(body) => {
-                        let mut body = BytesMut::from(&body[..]);
-                        loop {
-                            match decoder.decode_eof(&mut body) {
-                                Ok(Some((events, byte_size))) => {
-                                    let mut output_runner_metrics =
-                                        output_runner_metrics.lock().await;
-                                    debug!("HTTP server external output resource decoded {byte_size} bytes.");
+        // Note that we currently don't differentiate which events should and shouldn't be rejected-
+        // we reject all events in this server if any are marked for rejection.
+        // In the future it might be useful to be able to select which to reject. That will involve
+        // adding logic to the test case which is passed down here, and to the event itself. Since
+        // we can't guarantee the order of events, we'd need a way to flag which ones need to be
+        // rejected.
+        let should_reject = self
+            .input_events
+            .iter()
+            .filter(|te| te.should_reject())
+            .count()
+            > 0;
 
-                                    // Update the runner metrics for the received events. This will later
-                                    // be used in the Validators, as the "expected" case.
-                                    output_runner_metrics.received_bytes_total += byte_size as u64;
+        let output_tx = self.output_tx.clone();
+        let (_, http_server_shutdown_tx) = spawn_http_server(
+            self.task_coordinator,
+            &config,
+            self.runner_metrics,
+            move |request, output_runner_metrics| {
+                let output_tx = output_tx.clone();
+                let mut decoder = decoder.clone();
 
-                                    output_runner_metrics.received_events_total +=
-                                        events.len() as u64;
+                async move {
+                    match hyper::body::to_bytes(request.into_body()).await {
+                        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+                        Ok(body) => {
+                            let mut body = BytesMut::from(&body[..]);
+                            loop {
+                                match decoder.decode_eof(&mut body) {
+                                    Ok(Some((events, byte_size))) => {
+                                        if should_reject {
+                                            info!("HTTP server external output resource decoded {byte_size} bytes but test case configured to reject.");
+                                        } else {
+                                            let mut output_runner_metrics =
+                                                output_runner_metrics.lock().await;
+                                            info!("HTTP server external output resource decoded {byte_size} bytes.");
 
-                                    events.iter().for_each(|event| {
-                                        output_runner_metrics.received_event_bytes_total +=
-                                            event.estimated_json_encoded_size_of().get() as u64;
-                                    });
+                                            // Update the runner metrics for the received events. This will later
+                                            // be used in the Validators, as the "expected" case.
+                                            output_runner_metrics.received_bytes_total +=
+                                                byte_size as u64;
 
-                                    output_tx
-                                        .send(events.to_vec())
-                                        .await
-                                        .expect("should not fail to send output event");
+                                            output_runner_metrics.received_events_total +=
+                                                events.len() as u64;
+
+                                            events.iter().for_each(|event| {
+                                                output_runner_metrics.received_event_bytes_total +=
+                                                    event.estimated_json_encoded_size_of().get()
+                                                        as u64;
+                                            });
+
+                                            output_tx
+                                                .send(events.to_vec())
+                                                .await
+                                                .expect("should not fail to send output event");
+                                        }
+                                    }
+                                    Ok(None) => {
+                                        if should_reject {
+                                            // This status code is not retried and should result in the component under test
+                                            // emitting error events
+                                            return StatusCode::BAD_REQUEST.into_response();
+                                        } else {
+                                            return StatusCode::OK.into_response();
+                                        }
+                                    }
+                                    Err(_) => {
+                                        error!(
+                                            "HTTP server failed to decode {:?}",
+                                            String::from_utf8_lossy(&body)
+                                        );
+                                        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                                    }
                                 }
-                                Ok(None) => return StatusCode::OK.into_response(),
-                                Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
                             }
                         }
                     }
                 }
-            }
-        },
-    );
+            },
+        );
 
-    // Now we'll create and spawn the resource's core logic loop which simply waits for the runner
-    // to instruct us to shutdown, and when that happens, cascades to shutting down the HTTP server.
-    let resource_started = task_coordinator.track_started();
-    let resource_completed = task_coordinator.track_completed();
-    let mut resource_shutdown_rx = task_coordinator.register_for_shutdown();
+        // Now we'll create and spawn the resource's core logic loop which simply waits for the runner
+        // to instruct us to shutdown, and when that happens, cascades to shutting down the HTTP server.
+        let resource_started = self.task_coordinator.track_started();
+        let resource_completed = self.task_coordinator.track_completed();
+        let mut resource_shutdown_rx = self.task_coordinator.register_for_shutdown();
 
-    tokio::spawn(async move {
-        resource_started.mark_as_done();
-        debug!("HTTP server external output resource started.");
+        tokio::spawn(async move {
+            resource_started.mark_as_done();
+            info!("HTTP server external output resource started.");
 
-        resource_shutdown_rx.wait().await;
-        _ = http_server_shutdown_tx.send(());
-        resource_completed.mark_as_done();
+            // Wait for the runner to tell us to shutdown
+            resource_shutdown_rx.wait().await;
 
-        debug!("HTTP server external output resource completed.");
-    });
-    Ok(())
-}
+            // signal the server to shutdown
+            let _ = http_server_shutdown_tx.send(());
 
-/// Spawns an HTTP client that pulls events by making requests to an HTTP server driven by a sink.
-#[allow(clippy::missing_const_for_fn)]
-fn spawn_output_http_client(
-    _config: HttpResourceConfig,
-    _codec: ResourceCodec,
-    _output_tx: mpsc::Sender<Vec<Event>>,
-    _task_coordinator: &TaskCoordinator<Configuring>,
-) {
-    // TODO: The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be
-    // scraped... but since we need special logic to aggregate/deduplicate scraped metrics, we can't
-    // use this generically for that purpose.
-    todo!()
+            // mark ourselves as done
+            resource_completed.mark_as_done();
+
+            info!("HTTP server external output resource completed.");
+        });
+
+        Ok(())
+    }
+
+    /// Spawns an HTTP client that pulls events by making requests to an HTTP server driven by a sink.
+    #[allow(clippy::missing_const_for_fn)]
+    fn spawn_output_http_client(&self, _config: HttpResourceConfig) {
+        // TODO: The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be
+        // scraped... but since we need special logic to aggregate/deduplicate scraped metrics, we can't
+        // use this generically for that purpose.
+        todo!()
+    }
 }
 
 fn spawn_http_server<H, F, R>(
@@ -407,7 +485,12 @@ where
                 }
             });
 
-        let router = Router::new().route(&request_path, method_router);
+        let router = Router::new().route(&request_path, method_router).fallback(
+            |req: Request<Body>| async move {
+                error!(?req, "Component sent request the server could not route.");
+                StatusCode::NOT_FOUND
+            },
+        );
 
         // Now actually run/drive the HTTP server and process requests until we're told to shutdown.
         http_server_started.mark_as_done();

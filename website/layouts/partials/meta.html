@@ -5,7 +5,7 @@
 {{ $img := site.Params.site_logo | absURL }}
 {{ $imgAlt := printf "Logo for %s" site.Title }}
 {{ $twitter := printf "@%s" site.Params.social.twitter_handle }}
-{{ $title := cond (eq .Layout "component") (printf "%s %s" .Title .Params.kind) .Title }}
+{{ $title := cond (eq .Layout "component") (printf "%s %s" .Title .Params.component_kind) .Title }}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
 <meta http-equiv="x-ua-compatible" content="id=edge">
