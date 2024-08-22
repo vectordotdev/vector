@@ -6,3 +6,4 @@ This lists custom changes merged in Databricks fork of Vector.
 5. Also allowing retries on AccessDenied exceptions in AWS https://github.com/databricks/vector/pull/12
 6. Updating version to also carry a Databricks version https://github.com/databricks/vector/pull/13
 7. Add a new event for successful upload to cloud storage (+ rework old send) https://github.com/databricks/vector/pull/14
+8. Add new Vector events for topology events (new source/sink creation, vector start/stop) https://github.com/databricks/vector/pull/17

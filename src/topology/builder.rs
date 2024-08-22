@@ -351,6 +351,17 @@ impl<'a> Builder<'a> {
             let server = async move {
                 debug!("Source starting.");
 
+                info!(
+                    message = "Started source: " + %source.inner.get_component_name(),
+                    container = self.container,
+                    // VECTOR_SERVICE_EVENT
+                    vector_event_type = 2,
+                    // VECTOR_PROCESS_SOURCE_CREATED
+                    service_event = 2,
+                    component_id = %key.id(),
+                    component_type = %source.inner.get_component_name(),
+                );
+
                 let mut result = select! {
                     biased;
 
@@ -589,6 +600,17 @@ impl<'a> Builder<'a> {
 
             let sink = async move {
                 debug!("Sink starting.");
+
+                info!(
+                    message = "Started sink: " + %sink.inner.get_component_name(),
+                    container = self.container,
+                    // VECTOR_SERVICE_EVENT
+                    vector_event_type = 2,
+                    // VECTOR_PROCESS_SINK_CREATED
+                    service_event = 3,
+                    component_id = %key.id(),
+                    component_type = %sink.inner.get_component_name(),
+                );
 
                 // Why is this Arc<Mutex<Option<_>>> needed you ask.
                 // In case when this function build_pieces errors
