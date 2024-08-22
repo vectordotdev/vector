@@ -700,7 +700,7 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct ControllableRecord(u8);
 
     impl Encodable for ControllableRecord {

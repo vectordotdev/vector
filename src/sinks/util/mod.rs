@@ -26,6 +26,7 @@ pub mod udp;
 #[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
 pub mod unix;
 pub mod uri;
+pub mod vector_event;
 pub mod zstd;
 
 use std::borrow::Cow;

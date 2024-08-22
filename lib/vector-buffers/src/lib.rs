@@ -104,10 +104,10 @@ impl<T> InMemoryBufferable for T where
 /// An item that can be buffered.
 ///
 /// This supertrait serves as the base trait for any item that can be pushed into a buffer.
-pub trait Bufferable: InMemoryBufferable + Encodable {}
+pub trait Bufferable: InMemoryBufferable + Encodable + Clone {}
 
 // Blanket implementation for anything that is already bufferable.
-impl<T> Bufferable for T where T: InMemoryBufferable + Encodable {}
+impl<T> Bufferable for T where T: InMemoryBufferable + Encodable + Clone {}
 
 pub trait EventCount {
     fn event_count(&self) -> usize;
