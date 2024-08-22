@@ -171,9 +171,9 @@ impl KafkaSinkConfig {
             // Type: float
             let key = "queue.buffering.max.ms";
             if let Some(val) = self.librdkafka_options.get(key) {
-                return Err(format!("Batching setting `batch.timeout_secs` sets `librdkafka_options.{}={}`.\
-                                    The config already sets this as `librdkafka_options.queue.buffering.max.ms={}`.\
-                                    Please delete one.", key, value, val).into());
+                return Err(format!("Batching setting `batch.timeout_secs` sets `librdkafka_options.{key}={value}`.\
+                                    The config already sets this as `librdkafka_options.queue.buffering.max.ms={val}`.\
+                                    Please delete one.").into());
             }
             debug!(
                 librdkafka_option = key,
@@ -189,9 +189,9 @@ impl KafkaSinkConfig {
             // Type: integer
             let key = "batch.num.messages";
             if let Some(val) = self.librdkafka_options.get(key) {
-                return Err(format!("Batching setting `batch.max_events` sets `librdkafka_options.{}={}`.\
-                                    The config already sets this as `librdkafka_options.batch.num.messages={}`.\
-                                    Please delete one.", key, value, val).into());
+                return Err(format!("Batching setting `batch.max_events` sets `librdkafka_options.{key}={value}`.\
+                                    The config already sets this as `librdkafka_options.batch.num.messages={val}`.\
+                                    Please delete one.").into());
             }
             debug!(
                 librdkafka_option = key,
@@ -210,9 +210,9 @@ impl KafkaSinkConfig {
             // Type: integer
             let key = "batch.size";
             if let Some(val) = self.librdkafka_options.get(key) {
-                return Err(format!("Batching setting `batch.max_bytes` sets `librdkafka_options.{}={}`.\
-                                    The config already sets this as `librdkafka_options.batch.size={}`.\
-                                    Please delete one.", key, value, val).into());
+                return Err(format!("Batching setting `batch.max_bytes` sets `librdkafka_options.{key}={value}`.\
+                                    The config already sets this as `librdkafka_options.batch.size={val}`.\
+                                    Please delete one.").into());
             }
             debug!(
                 librdkafka_option = key,
