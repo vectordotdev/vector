@@ -153,7 +153,6 @@ impl Application {
 
         info!(
             message = "Started Vector instance.",
-            container = self.container,
             // VECTOR_SERVICE_EVENT
             vector_event_type = 2,
             // VECTOR_PROCESS_START
@@ -393,7 +392,6 @@ impl FinishedApplication {
         // Emit a vector event indicating the shutdown.
         info!(
             message = "Shutting down Vector instance.",
-            container = self.container,
             // VECTOR_SERVICE_EVENT
             vector_event_type = 2,
             // VECTOR_PROCESS_TERMINATION_SIGNAL_RECEIVED
