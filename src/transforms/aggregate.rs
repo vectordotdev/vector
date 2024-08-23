@@ -6,8 +6,11 @@ use std::{
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use vector_lib::configurable::configurable_component;
 use vector_lib::{config::LogNamespace, event::MetricValue};
+use vector_lib::{
+    configurable::configurable_component,
+    event::metric::{MetricData, MetricSeries},
+};
 
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
@@ -44,26 +47,25 @@ pub enum AggregationMode {
     #[default]
     Auto,
 
-    /// Sums incremental metrics, no-op for absolute
+    /// Sums incremental metrics, ignores absolute
     Sum,
 
-    /// Returns the latest value for absolute metrics, no-op for incremental
+    /// Returns the latest value for absolute metrics, ignores incremental
     Latest,
 
     /// Counts metrics for incremental and absolute metrics
     Count,
 
-    /// Returns difference compared to previous interval - for incremental it is the difference of
-    /// sums and for absolute it the difference between latest values
+    /// Returns difference between latest value for absolute, ignores incremental
     Diff,
 
-    /// Max value of metric
+    /// Max value of absolute metric, ignores incremental
     Max,
 
-    /// Min value of metric
+    /// Min value of absolute metric, ignores incremental
     Min,
 
-    /// Mean value of metric
+    /// Mean value of absolute metric, ignores incremental
     Mean,
 
     /// Stdev
@@ -122,6 +124,99 @@ impl Aggregate {
     fn record(&mut self, event: Event) {
         let (series, data, metadata) = event.into_metric().into_parts();
 
+        match self.mode {
+            AggregationMode::Auto => match data.kind {
+                metric::MetricKind::Incremental => self.record_sum(series, data, metadata),
+                metric::MetricKind::Absolute => {
+                    self.map.insert(series, (data, metadata));
+                }
+            },
+            AggregationMode::Sum => self.record_sum(series, data, metadata),
+            AggregationMode::Latest => match data.kind {
+                metric::MetricKind::Incremental => (),
+                metric::MetricKind::Absolute => {
+                    self.map.insert(series, (data, metadata));
+                }
+            },
+            AggregationMode::Count => self.record_count(series, data, metadata),
+            AggregationMode::Diff => todo!(),
+            AggregationMode::Max => match data.kind {
+                metric::MetricKind::Incremental => (),
+                metric::MetricKind::Absolute => match self.map.entry(series) {
+                    Entry::Occupied(mut entry) => {
+                        let existing = entry.get_mut();
+                        // In order to update (add) the new and old kind's must match
+                        if existing.0.kind == data.kind {
+                            if let MetricValue::Gauge {
+                                value: existing_value,
+                            } = existing.0.value()
+                            {
+                                if let MetricValue::Gauge { value: new_value } = data.value() {
+                                    if existing_value < new_value {
+                                        *existing = (data, metadata);
+                                    }
+                                }
+                            }
+                        } else {
+                            emit!(AggregateUpdateFailed);
+                            *existing = (data, metadata);
+                        }
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert((data, metadata));
+                    }
+                },
+            },
+            AggregationMode::Min => match data.kind {
+                metric::MetricKind::Incremental => (),
+                metric::MetricKind::Absolute => match self.map.entry(series) {
+                    Entry::Occupied(mut entry) => {
+                        let existing = entry.get_mut();
+                        // In order to update (add) the new and old kind's must match
+                        if existing.0.kind == data.kind {
+                            if let MetricValue::Gauge {
+                                value: existing_value,
+                            } = existing.0.value()
+                            {
+                                if let MetricValue::Gauge { value: new_value } = data.value() {
+                                    if existing_value > new_value {
+                                        *existing = (data, metadata);
+                                    }
+                                }
+                            }
+                        } else {
+                            emit!(AggregateUpdateFailed);
+                            *existing = (data, metadata);
+                        }
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert((data, metadata));
+                    }
+                },
+            },
+            AggregationMode::Mean => todo!(),
+            AggregationMode::Stdev => todo!(),
+        }
+
+        emit!(AggregateEventRecorded);
+    }
+
+    fn record_count(&mut self, series: MetricSeries, data: MetricData, metadata: EventMetadata) {
+        let existing = self.map.entry(series).or_insert_with(|| {
+            let mut new_data = data.clone();
+            *new_data.value_mut() = MetricValue::Counter { value: 0f64 };
+            (new_data, metadata.clone())
+        });
+        let mut count_data = data.clone();
+        *count_data.value_mut() = MetricValue::Counter { value: 1f64 };
+        if existing.0.kind == data.kind && existing.0.update(&count_data) {
+            existing.1.merge(metadata);
+        } else {
+            emit!(AggregateUpdateFailed);
+        }
+    }
+
+    fn record_sum(&mut self, series: MetricSeries, data: MetricData, metadata: EventMetadata) {
         match data.kind {
             metric::MetricKind::Incremental => match self.map.entry(series) {
                 Entry::Occupied(mut entry) => {
@@ -138,34 +233,8 @@ impl Aggregate {
                     entry.insert((data, metadata));
                 }
             },
-            metric::MetricKind::Absolute => match self.mode {
-                AggregationMode::Auto | AggregationMode::Latest => {
-                    self.map.insert(series, (data, metadata));
-                }
-                AggregationMode::Max => todo!(),
-                AggregationMode::Sum => todo!(),
-                AggregationMode::Count => {
-                    let existing = self.map.entry(series).or_insert_with(|| {
-                        let mut new_data = data.clone();
-                        *new_data.value_mut() = MetricValue::Counter { value: 0f64 };
-                        (new_data, metadata.clone())
-                    });
-                    let mut count_data = data.clone();
-                    *count_data.value_mut() = MetricValue::Counter { value: 1f64 };
-                    if existing.0.kind == data.kind && existing.0.update(&count_data) {
-                        existing.1.merge(metadata);
-                    } else {
-                        emit!(AggregateUpdateFailed);
-                    }
-                }
-                AggregationMode::Diff => todo!(),
-                AggregationMode::Min => todo!(),
-                AggregationMode::Mean => todo!(),
-                AggregationMode::Stdev => todo!(),
-            },
-        };
-
-        emit!(AggregateEventRecorded);
+            metric::MetricKind::Absolute => {}
+        }
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
