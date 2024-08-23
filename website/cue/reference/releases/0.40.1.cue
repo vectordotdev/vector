@@ -14,7 +14,8 @@ releases: "0.40.1": {
 		This should be a transparent change for users as the package repository setup script
 		[setup.vector.dev](https://setup.vector.dev) has already been importing the new key;
 		however, if you were manually managing the trusted GPG keys, you will need to update to
-		the [newer one](https://keys.datadoghq.com/DATADOG_APT_KEY_CURRENT.public).
+		the newer ones (either [apt](https://keys.datadoghq.com/DATADOG_APT_KEY_C0962C7D.public) or
+		[rpm](https://keys.datadoghq.com/DATADOG_RPM_KEY_B01082D3.public).
 
 		This release also fixes a regression in Vector v0.40.0.
 		"""
