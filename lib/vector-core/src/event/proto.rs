@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use chrono::TimeZone;
-use ordered_float::NotNan;
-
 use super::{MetricTags, WithMetadata};
 use crate::{event, metrics::AgentDDSketch};
+use chrono::TimeZone;
+use ordered_float::NotNan;
+use uuid::Uuid;
 
 #[allow(warnings, clippy::all, clippy::pedantic)]
 mod proto_event {
@@ -672,6 +672,12 @@ impl From<Metadata> for EventMetadata {
 
         if let Some(origin_metadata) = value.datadog_origin_metadata {
             metadata = metadata.with_origin_metadata(origin_metadata.into());
+        }
+
+        if let Ok(uuid) = Uuid::from_slice(&value.source_event_id) {
+            metadata = metadata.with_source_event_id(uuid);
+        } else {
+            error!("Invalid source_event_id in metadata");
         }
 
         metadata

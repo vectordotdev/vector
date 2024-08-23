@@ -310,6 +310,13 @@ impl EventMetadata {
         self
     }
 
+    /// Replaces the existing `source_event_id` with the given one.
+    #[must_use]
+    pub fn with_source_event_id(mut self, source_event_id: Uuid) -> Self {
+        self.source_event_id = source_event_id;
+        self
+    }
+
     /// Merge the other `EventMetadata` into this.
     /// If a Datadog API key is not set in `self`, the one from `other` will be used.
     /// If a Splunk HEC token is not set in `self`, the one from `other` will be used.
