@@ -333,6 +333,7 @@ impl<'a> Builder<'a> {
                 extra_context: self.extra_context.clone(),
             };
             let source_name = source.inner.get_component_name();
+            let key_id = key.id().to_string();
             let source = source.inner.build(context).await;
             let server = match source {
                 Err(error) => {
@@ -358,7 +359,7 @@ impl<'a> Builder<'a> {
                     vector_event_type = 2,
                     // VECTOR_PROCESS_SOURCE_CREATED
                     service_event = 2,
-                    component_id = key.id(),
+                    component_id = key_id,
                     component_type = source_name,
                 );
 
@@ -589,6 +590,7 @@ impl<'a> Builder<'a> {
             };
 
             let sink_name = sink.inner.get_component_name();
+            let key_id = key.id().to_string();
             let (sink, healthcheck) = match sink.inner.build(cx).await {
                 Err(error) => {
                     self.errors.push(format!("Sink \"{}\": {}", key, error));
@@ -608,7 +610,7 @@ impl<'a> Builder<'a> {
                     vector_event_type = 2,
                     // VECTOR_PROCESS_SINK_CREATED
                     service_event = 3,
-                    component_id = key.id(),
+                    component_id = key_id,
                     component_type = sink_name,
                 );
 
