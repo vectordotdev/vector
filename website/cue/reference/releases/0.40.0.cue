@@ -15,6 +15,10 @@ releases: "0.40.0": {
 		This release contains a mix of enhancements and bug fixes. See the changelog below.
 		"""
 
+	known_issues: [
+		"A regression in the `reduce` transform caused it to not group top level objects correctly (see [#21065](https://github.com/vectordotdev/vector/issues/21065)). This is fixed in v0.40.1.",
+	]
+
 	changelog: [
 		{
 			type: "enhancement"
