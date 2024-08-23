@@ -182,6 +182,9 @@ impl<'a> TapRunner<'a> {
                                 )
                             })
                             .collect();
+                        if output_events.is_empty() {
+                            continue
+                        }
 
                         match &self.output_channel {
                             OutputChannel::Stdout(formatter) => {
