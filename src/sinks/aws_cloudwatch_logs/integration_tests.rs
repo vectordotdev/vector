@@ -57,7 +57,7 @@ async fn cloudwatch_insert_log_event() {
 
     let timestamp = chrono::Utc::now();
 
-    let (input_lines, events) = random_lines_with_stream(100, 11, None);
+    let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
@@ -72,7 +72,7 @@ async fn cloudwatch_insert_log_event() {
 
     let events = response.events.unwrap();
 
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
@@ -145,7 +145,7 @@ async fn cloudwatch_insert_log_events_sorted() {
 
     let events = response.events.unwrap();
 
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
@@ -225,7 +225,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
 
     let events = response.events.unwrap();
 
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
@@ -261,7 +261,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
 
     let timestamp = chrono::Utc::now();
 
-    let (input_lines, events) = random_lines_with_stream(100, 11, None);
+    let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
@@ -276,7 +276,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
 
     let events = response.events.unwrap();
 
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
@@ -317,7 +317,7 @@ async fn cloudwatch_insert_log_event_batched() {
 
     let timestamp = chrono::Utc::now();
 
-    let (input_lines, events) = random_lines_with_stream(100, 11, None);
+    let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
@@ -332,7 +332,7 @@ async fn cloudwatch_insert_log_event_batched() {
 
     let events = response.events.unwrap();
 
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
@@ -393,11 +393,11 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .await
         .unwrap();
     let events = response.events.unwrap();
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
-    let expected_output = input_lines
+    let mut expected_output = input_lines
         .clone()
         .into_iter()
         .enumerate()
@@ -418,11 +418,11 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .unwrap();
 
     let events = response.events.unwrap();
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
-    let expected_output = input_lines
+    let mut expected_output = input_lines
         .clone()
         .into_iter()
         .enumerate()
