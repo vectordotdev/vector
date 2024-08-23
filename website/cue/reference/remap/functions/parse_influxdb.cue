@@ -30,6 +30,8 @@ remap: functions: parse_influxdb: {
 	]
 	internal_failure_reasons: [
 		"`value` is not a valid InfluxDB line protocol string.",
+		"field set contains a field value of type `string`.",
+		"field set contains a `NaN` field value."
 	]
 	return: types: ["array"]
 
