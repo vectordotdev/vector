@@ -15,7 +15,7 @@ remap: functions: unflatten: {
 		},
 		{
 			name:        "separator"
-			description: "The separator to be used to split flattened keys."
+			description: "The separator to split flattened keys."
 			required:    false
 			default:     "."
 			type: ["string"]
