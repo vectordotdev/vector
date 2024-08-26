@@ -1,7 +1,7 @@
 ---
 title: EventStoreDB metrics
 description: Receive metrics from collected by a [EventStoreDB](https://www.eventstore.com/)
-kind: source
+component_kind: source
 layout: component
 tags: ["eventstore", "component", "source", "metrics"]
 ---

@@ -285,8 +285,8 @@ pub struct BatchSize<B> {
 impl<B> BatchSize<B> {
     pub const fn const_default() -> Self {
         BatchSize {
-            bytes: usize::max_value(),
-            events: usize::max_value(),
+            bytes: usize::MAX,
+            events: usize::MAX,
             _type_marker: PhantomData,
         }
     }

@@ -13,14 +13,12 @@ use aws_config::{
     sts::AssumeRoleProviderBuilder,
 };
 use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
-use aws_smithy_runtime::client::http::hyper_014::HyperClientBuilder;
+use aws_smithy_async::time::SystemTimeSource;
 use aws_smithy_runtime_api::client::identity::SharedIdentityCache;
-use aws_types::region::Region;
+use aws_types::{region::Region, SdkConfig};
 use serde_with::serde_as;
+use vector_lib::configurable::configurable_component;
 use vector_lib::{config::proxy::ProxyConfig, sensitive_string::SensitiveString, tls::TlsConfig};
-use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
-
-use crate::http::{build_proxy_connector, build_tls_connector};
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
@@ -208,6 +206,33 @@ impl AwsAuthentication {
         }
     }
 
+    /// Create the AssumeRoleProviderBuilder, ensuring we create the HTTP client with
+    /// the correct proxy and TLS options.
+    fn assume_role_provider_builder(
+        proxy: &ProxyConfig,
+        tls_options: &Option<TlsConfig>,
+        region: &Region,
+        assume_role: &str,
+        external_id: Option<&str>,
+    ) -> crate::Result<AssumeRoleProviderBuilder> {
+        let connector = super::connector(proxy, tls_options)?;
+        let config = SdkConfig::builder()
+            .http_client(connector)
+            .region(region.clone())
+            .time_source(SystemTimeSource::new())
+            .build();
+
+        let mut builder = AssumeRoleProviderBuilder::new(assume_role)
+            .region(region.clone())
+            .configure(&config);
+
+        if let Some(external_id) = external_id {
+            builder = builder.external_id(external_id)
+        }
+
+        Ok(builder)
+    }
+
     /// Returns the provider for the credentials based on the authentication mechanism chosen.
     pub async fn credentials_provider(
         &self,
@@ -230,12 +255,13 @@ impl AwsAuthentication {
                 ));
                 if let Some(assume_role) = assume_role {
                     let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                    let mut builder =
-                        AssumeRoleProviderBuilder::new(assume_role).region(auth_region);
-
-                    if let Some(external_id) = external_id {
-                        builder = builder.external_id(external_id)
-                    }
+                    let builder = Self::assume_role_provider_builder(
+                        proxy,
+                        tls_options,
+                        &auth_region,
+                        assume_role,
+                        external_id.as_deref(),
+                    )?;
 
                     let provider = builder.build_from_provider(provider).await;
 
@@ -247,14 +273,20 @@ impl AwsAuthentication {
                 credentials_file,
                 profile,
             } => {
+                let connector = super::connector(proxy, tls_options)?;
+
                 // The SDK uses the default profile out of the box, but doesn't provide an optional
                 // type in the builder. We can just hardcode it so that everything works.
                 let profile_files = ProfileFiles::builder()
                     .with_file(ProfileFileKind::Credentials, credentials_file)
                     .build();
+
+                let provider_config = ProviderConfig::empty().with_http_client(connector);
+
                 let profile_provider = ProfileFileCredentialsProvider::builder()
                     .profile_files(profile_files)
                     .profile_name(profile)
+                    .configure(&provider_config)
                     .build();
                 Ok(SharedCredentialsProvider::new(profile_provider))
             }
@@ -266,12 +298,13 @@ impl AwsAuthentication {
                 ..
             } => {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                let mut builder =
-                    AssumeRoleProviderBuilder::new(assume_role).region(auth_region.clone());
-
-                if let Some(external_id) = external_id {
-                    builder = builder.external_id(external_id)
-                }
+                let builder = Self::assume_role_provider_builder(
+                    proxy,
+                    tls_options,
+                    &auth_region,
+                    assume_role,
+                    external_id.as_deref(),
+                )?;
 
                 let provider = builder
                     .build_from_provider(
@@ -313,14 +346,7 @@ async fn default_credentials_provider(
     tls_options: &Option<TlsConfig>,
     imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
-    let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
-    let connector = if proxy.enabled {
-        let proxy = build_proxy_connector(tls_settings, proxy)?;
-        HyperClientBuilder::new().build(proxy)
-    } else {
-        let tls_connector = build_tls_connector(tls_settings)?;
-        HyperClientBuilder::new().build(tls_connector)
-    };
+    let connector = super::connector(proxy, tls_options)?;
 
     let provider_config = ProviderConfig::empty()
         .with_region(Some(region.clone()))

@@ -2,7 +2,7 @@
 title: GCP Operations (formerly Stackdriver) logs
 description: Deliver logs to GCP's [Cloud Operations](https://cloud.google.com/products/operations) suite
 short: GCP Stackdriver
-kind: sink
+component_kind: sink
 layout: component
 tags: ["gcp", "stackdriver", "operations", "component", "sink", "logs"]
 ---

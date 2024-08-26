@@ -52,6 +52,7 @@ where
     pub remove_after: Option<Duration>,
     pub emitter: E,
     pub handle: tokio::runtime::Handle,
+    pub rotate_wait: Duration,
 }
 
 /// `FileServer` as Source
@@ -292,11 +293,18 @@ where
                 }
             }
 
+            for (_, watcher) in &mut fp_map {
+                if !watcher.file_findable() && watcher.last_seen().elapsed() > self.rotate_wait {
+                    watcher.set_dead();
+                }
+            }
+
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
             fp_map.retain(|file_id, watcher| {
                 if watcher.dead() {
-                    self.emitter.emit_file_unwatched(&watcher.path);
+                    self.emitter
+                        .emit_file_unwatched(&watcher.path, watcher.reached_eof());
                     checkpoints.set_dead(*file_id);
                     false
                 } else {
@@ -476,8 +484,8 @@ impl TimingStats {
 
     fn report(&self) {
         let total = self.started_at.elapsed();
-        let counted = self.segments.values().sum();
-        let other = self.started_at.elapsed() - counted;
+        let counted: Duration = self.segments.values().sum();
+        let other: Duration = self.started_at.elapsed() - counted;
         let mut ratios = self
             .segments
             .iter()

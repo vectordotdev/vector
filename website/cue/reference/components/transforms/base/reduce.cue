@@ -1,6 +1,14 @@
 package metadata
 
 base: components: transforms: reduce: configuration: {
+	end_every_period_ms: {
+		description: """
+			If supplied, every time this interval elapses for a given grouping, the reduced value
+			for that grouping is flushed. Checked every flush_period_ms.
+			"""
+		required: false
+		type: uint: {}
+	}
 	ends_when: {
 		description: """
 			A condition used to distinguish the final event of a transaction.
@@ -65,6 +73,7 @@ base: components: transforms: reduce: configuration: {
 			- For timestamp fields the first is kept and a new field `[field-name]_end` is added with
 			  the last received timestamp value.
 			- Numeric values are summed.
+			- For nested paths, the field value is retrieved and then reduced using the default strategies mentioned above (unless explicitly specified otherwise).
 			"""
 		required: false
 		type: object: options: "*": {

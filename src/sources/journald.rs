@@ -77,8 +77,6 @@ static JOURNALCTL: Lazy<PathBuf> = Lazy::new(|| "journalctl".into());
 enum BuildError {
     #[snafu(display("journalctl failed to execute: {}", source))]
     JournalctlSpawn { source: io::Error },
-    #[snafu(display("Cannot use both `units` and `include_units`"))]
-    BothUnitsAndIncludeUnits,
     #[snafu(display(
         "The unit {:?} is duplicated in both include_units and exclude_units",
         unit
@@ -399,7 +397,10 @@ impl SourceConfig for JournaldConfig {
         let schema_definition =
             self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -735,20 +736,42 @@ impl Drop for RunningJournalctl {
 }
 
 fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
-    if let Some(host) = log.remove(event_path!(HOSTNAME)) {
-        log_namespace.insert_source_metadata(
-            JournaldConfig::NAME,
-            log,
-            log_schema().host_key().map(LegacyKey::Overwrite),
-            path!("host"),
-            host,
-        );
+    match log_namespace {
+        LogNamespace::Vector => {
+            if let Some(host) = log
+                .get(metadata_path!(JournaldConfig::NAME, "metadata"))
+                .and_then(|meta| meta.get(HOSTNAME))
+            {
+                log.insert(metadata_path!(JournaldConfig::NAME, "host"), host.clone());
+            }
+        }
+        LogNamespace::Legacy => {
+            if let Some(host) = log.remove(event_path!(HOSTNAME)) {
+                log_namespace.insert_source_metadata(
+                    JournaldConfig::NAME,
+                    log,
+                    log_schema().host_key().map(LegacyKey::Overwrite),
+                    path!("host"),
+                    host,
+                );
+            }
+        }
     }
 
     // Create a Utc timestamp from an existing log field if present.
-    let timestamp = log
-        .get(event_path!(SOURCE_TIMESTAMP))
-        .or_else(|| log.get(event_path!(RECEIVED_TIMESTAMP)))
+    let timestamp_value = match log_namespace {
+        LogNamespace::Vector => log
+            .get(metadata_path!(JournaldConfig::NAME, "metadata"))
+            .and_then(|meta| {
+                meta.get(SOURCE_TIMESTAMP)
+                    .or_else(|| meta.get(RECEIVED_TIMESTAMP))
+            }),
+        LogNamespace::Legacy => log
+            .get(event_path!(SOURCE_TIMESTAMP))
+            .or_else(|| log.get(event_path!(RECEIVED_TIMESTAMP))),
+    };
+
+    let timestamp = timestamp_value
         .filter(|&ts| ts.is_bytes())
         .and_then(|ts| {
             String::from_utf8_lossy(ts.as_bytes().unwrap())
@@ -862,7 +885,7 @@ fn decode_array_as_bytes(array: &[JsonValue]) -> Option<JsonValue> {
         .iter()
         .map(|item| {
             item.as_u64().and_then(|num| match num {
-                num if num <= u8::max_value() as u64 => Some(num as u8),
+                num if num <= u8::MAX as u64 => Some(num as u8),
                 _ => None,
             })
         })
@@ -970,6 +993,7 @@ impl Checkpointer {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&filename)
             .await?;
         Ok(Checkpointer { file, filename })

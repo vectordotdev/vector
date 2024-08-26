@@ -29,7 +29,7 @@ api: {
 			required: false
 			type: string: {
 				default: "127.0.0.1:8686"
-				examples: ["0.0.0.0:8686", "localhost:1234"]
+				examples: ["0.0.0.0:8686", "127.0.0.1:1234"]
 			}
 			description: """
 				The network address to which the API should bind. If you're running

@@ -45,7 +45,7 @@ base: components: sources: docker_logs: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: default: "host"
+		type: string: {}
 	}
 	include_containers: {
 		description: """

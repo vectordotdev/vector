@@ -180,17 +180,19 @@ pub struct Started {
 /// after waiting for all tasks to start, and so on.
 pub struct TaskCoordinator<State> {
     state: State,
+    name: String,
 }
 
 impl TaskCoordinator<()> {
     /// Creates a new `TaskCoordinator`.
-    pub fn new() -> TaskCoordinator<Configuring> {
+    pub fn new(name: &str) -> TaskCoordinator<Configuring> {
         TaskCoordinator {
             state: Configuring {
                 tasks_started: WaitGroup::new(),
                 tasks_completed: WaitGroup::new(),
                 shutdown_triggers: Mutex::new(Vec::new()),
             },
+            name: name.to_string(),
         }
     }
 }
@@ -233,27 +235,34 @@ impl TaskCoordinator<Configuring> {
                 tasks_completed: Some(tasks_completed),
                 shutdown_triggers: shutdown_triggers.into_inner().expect("poisoned"),
             },
+            name: self.name,
         }
     }
 }
 
 impl TaskCoordinator<Started> {
     /// Triggers all coordinated tasks to shutdown, and waits for them to mark themselves as completed.
-    pub async fn shutdown(mut self) {
+    pub async fn shutdown(&mut self) {
+        info!("{}: triggering task to shutdown.", self.name);
+
         // Trigger all registered shutdown handles.
         for trigger in self.state.shutdown_triggers.drain(..) {
             trigger.trigger();
-            trace!("Shutdown triggered for coordinated tasks.");
+            debug!("{}: shutdown triggered for coordinated tasks.", self.name);
         }
 
         // Now simply wait for all of them to mark themselves as completed.
-        trace!("Waiting for coordinated tasks to complete...");
+        debug!(
+            "{}: waiting for coordinated tasks to complete...",
+            self.name
+        );
         let tasks_completed = self
             .state
             .tasks_completed
             .as_mut()
             .expect("tasks completed wait group already consumed");
         tasks_completed.wait_for_children().await;
-        trace!("All coordinated tasks completed.");
+
+        info!("{}: task has been shutdown.", self.name);
     }
 }

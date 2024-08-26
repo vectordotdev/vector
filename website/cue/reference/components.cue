@@ -218,7 +218,7 @@ components: {
 				uses_uri?: bool
 			}
 
-			exposes?:                      #FeaturesExpose
+			exposes?: #FeaturesExpose
 			send?: #FeaturesSend & {_args: Args}
 		}
 
@@ -227,8 +227,7 @@ components: {
 
 	#FeaturesAcknowledgements: bool
 
-	#FeaturesAggregate: {
-	}
+	#FeaturesAggregate: {}
 
 	#FeaturesCollect: {
 		checkpoint: {
@@ -245,8 +244,7 @@ components: {
 		tls?: #FeaturesTLS & {_args: {mode: "connect"}}
 	}
 
-	#FeaturesConvert: {
-	}
+	#FeaturesConvert: {}
 
 	#FeaturesEnrich: {
 		from: service: {
@@ -265,11 +263,9 @@ components: {
 		}
 	}
 
-	#FeaturesFilter: {
-	}
+	#FeaturesFilter: {}
 
-	#FeaturesGenerate: {
-	}
+	#FeaturesGenerate: {}
 
 	#FeaturesSendBufferBytes: {
 		enabled:        bool
@@ -327,17 +323,13 @@ components: {
 		tls: #FeaturesTLS & {_args: {mode: "accept"}}
 	}
 
-	#FeaturesReduce: {
-	}
+	#FeaturesReduce: {}
 
-	#FeaturesRoute: {
-	}
+	#FeaturesRoute: {}
 
-	#FeaturesSanitize: {
-	}
+	#FeaturesSanitize: {}
 
-	#FeaturesShape: {
-	}
+	#FeaturesShape: {}
 
 	#FeaturesSend: {
 		_args: {

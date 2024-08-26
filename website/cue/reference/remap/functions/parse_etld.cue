@@ -24,8 +24,21 @@ remap: functions: parse_etld: {
 			type: ["integer"]
 			default: false
 		},
+		{
+			name: "psl"
+			description: """
+				Can be provided to use a different public suffix list.
+
+				By default, https://publicsuffix.org/list/public_suffix_list.dat is used.
+				"""
+			required: false
+			type: ["string"]
+			default: false
+		},
 	]
-	internal_failure_reasons: []
+	internal_failure_reasons: [
+		"unable to determine eTLD for `value`",
+	]
 	return: types: ["object"]
 
 	examples: [
@@ -55,6 +68,17 @@ remap: functions: parse_etld: {
 			title: "Parse eTLD with unknown suffix"
 			source: #"""
 				parse_etld!("vector.acmecorp")
+				"""#
+			return: {
+				etld:         "acmecorp"
+				etld_plus:    "acmecorp"
+				known_suffix: false
+			}
+		},
+		{
+			title: "Parse eTLD with custom PSL"
+			source: #"""
+				parse_etld!("vector.acmecorp", psl: "resources/public_suffix_list.dat")
 				"""#
 			return: {
 				etld:         "acmecorp"

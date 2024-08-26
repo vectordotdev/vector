@@ -196,7 +196,7 @@ impl SourceConfig for LogplexConfig {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let schema_def = self.schema_definition(global_log_namespace.merge(self.log_namespace));
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_def,
         )]
@@ -287,6 +287,7 @@ impl HttpSource for LogplexSource {
         _request_path: &str,
         _headers_config: &HeaderMap,
         query_parameters: &HashMap<String, String>,
+        _source_ip: Option<&SocketAddr>,
     ) {
         add_query_parameters(
             events,

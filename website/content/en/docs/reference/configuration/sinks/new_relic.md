@@ -1,7 +1,7 @@
 ---
 title: New Relic
 description: Deliver events to [New Relic](https://newrelic.com)
-kind: sink
+component_kind: sink
 layout: component
 tags: ["new relic", "newrelic", "component", "sink", "logs", "metrics"]
 aliases: ["/docs/reference/configuration/sinks/new_relic_logs"]

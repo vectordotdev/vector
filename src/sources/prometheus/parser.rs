@@ -288,7 +288,7 @@ mod test {
                     "name2",
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: std::f64::INFINITY
+                        value: f64::INFINITY
                     },
                 )
                 .with_tags(Some(metric_tags!(
@@ -300,7 +300,7 @@ mod test {
                     "name2",
                     MetricKind::Absolute,
                     MetricValue::Counter {
-                        value: std::f64::NEG_INFINITY
+                        value: f64::NEG_INFINITY
                     },
                 )
                 .with_tags(Some(metric_tags!("labelname" => "val1")))
@@ -546,7 +546,7 @@ mod test {
                 "something_weird",
                 MetricKind::Absolute,
                 MetricValue::Gauge {
-                    value: std::f64::INFINITY
+                    value: f64::INFINITY
                 },
             )
             .with_timestamp(Utc.timestamp_opt(-3982045, 0).latest())

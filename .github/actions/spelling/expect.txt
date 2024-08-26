@@ -8,7 +8,6 @@ Acq
 AEAD
 agentpayload
 aimd
-akx
 allowerased
 amka
 amping
@@ -18,6 +17,7 @@ amzn
 anchore
 androideabi
 andy
+anonymousip
 ansicpg
 anumber
 anycondition
@@ -32,7 +32,6 @@ aqf
 architecting
 archivable
 ARNOTAREALIDD
-arshiyasolei
 asdf
 asdfasdf
 assertverify
@@ -62,7 +61,6 @@ awscli
 awsec
 awslabs
 axum
-Aziz
 azureresourceid
 babim
 badunit
@@ -187,9 +185,9 @@ concating
 concats
 condrestart
 conffiles
-configkey
 configmap
 confl
+confluentinc
 confy
 consigliere
 CONTEUDO
@@ -287,7 +285,6 @@ Doop
 downcasted
 droptest
 dsl
-dsmith
 dstat
 dstport
 dtype
@@ -320,14 +317,12 @@ eni
 enp
 enumdecl
 enumflags
-ENVARS
 envsubst
 EOIG
 EOL'ed
 Err'ing
 errorf
 esb
-esensar
 esque
 etheus
 etl
@@ -415,7 +410,6 @@ fsevent
 fslock
 FSTRM
 fsyncdata
-fuchsnj
 fullhuman
 futs
 fuzzcheck
@@ -564,6 +558,7 @@ jmxrmi
 jmxtrans
 Jolokia
 jsn
+JSONAs
 jsonify
 jsonlines
 jstype
@@ -733,7 +728,6 @@ nbase
 ndarray
 ndjson
 nearline
-neuronull
 newcerts
 newrelix
 nextest
@@ -785,6 +779,7 @@ nullishness
 numbackends
 oahd
 oap
+oidc
 OKD
 omfwd
 omitempty
@@ -816,7 +811,6 @@ overaligned
 overalignment
 owo
 oyaml
-pablosichert
 pageheap
 paq
 parallelizable
@@ -953,7 +947,6 @@ sccache
 schemaless
 schemars
 schoen
-scl
 sda
 sdata
 SDID
@@ -978,7 +971,6 @@ shortcode
 shortstat
 should've
 shutsdown
-Sichert
 SIEM
 sighup
 Signsoff
@@ -1042,7 +1034,6 @@ stdduration
 stdlog
 Steensen
 stephenwakely
-strat
 strconv
 streamsink
 strng
@@ -1125,7 +1116,6 @@ Tomola
 tonydanza
 toolbars
 toolchains
-toolset
 toor
 topdir
 topojson
@@ -1144,7 +1134,6 @@ trivy
 Troutwine
 trustarc
 truste
-TRUSTSTORE
 TSDB
 Tsvg
 turbofish
@@ -1246,8 +1235,6 @@ wtcache
 wtime
 wtimeouts
 wtr
-wurstmeister
-wwang
 xact
 xcatsy
 Xcg

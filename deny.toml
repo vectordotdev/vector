@@ -12,6 +12,7 @@ allow = [
   "ISC",
   "MIT",
   "OpenSSL",
+  "Unicode-3.0",
   "Unicode-DFS-2016",
   "Zlib"
 ]

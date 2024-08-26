@@ -65,6 +65,13 @@ components: sources: statsd: {
 	}
 
 	how_it_works: {
+		timings: {
+			title: "StatsD timings"
+			body: """
+				Incoming timings are emitted as distributions. Timings in milliseconds (`ms`) are
+				converted to seconds (`s`).
+				"""
+		}
 		timestamps: {
 			title: "Timestamps"
 			body:  """
@@ -76,5 +83,8 @@ components: sources: statsd: {
 				[metric data model](\(urls.vector_metric)) page for more info.
 				"""
 		}
+	}
+	telemetry: metrics: {
+		component_received_bytes: components.sources.internal_metrics.output.metrics.component_received_bytes
 	}
 }

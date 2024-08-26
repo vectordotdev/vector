@@ -27,10 +27,11 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
             );
 
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_type" => error_type::TEMPLATE_FAILED,
                 "stage" => error_stage::PROCESSING,
-            );
+            )
+            .increment(1);
 
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,

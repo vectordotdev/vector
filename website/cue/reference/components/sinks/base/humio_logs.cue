@@ -15,8 +15,8 @@ base: components: sinks: humio_logs: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -207,7 +207,7 @@ base: components: sinks: humio_logs: configuration: {
 					delimiter: {
 						description: "The field delimiter to use when writing CSV."
 						required:    false
-						type: uint: default: 44
+						type: ascii_char: default: ","
 					}
 					double_quote: {
 						description: """
@@ -229,7 +229,7 @@ base: components: sinks: humio_logs: configuration: {
 																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
 																"""
 						required: false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					fields: {
 						description: """
@@ -247,7 +247,7 @@ base: components: sinks: humio_logs: configuration: {
 					quote: {
 						description: "The quote character to use when writing CSV."
 						required:    false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					quote_style: {
 						description: "The quoting style to use when writing CSV data."
@@ -277,6 +277,16 @@ base: components: sinks: humio_logs: configuration: {
 				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			json: {
+				description:   "Options for the JsonSerializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: pretty: {
+					description: "Whether to use pretty JSON formatting."
+					required:    false
+					type: bool: default: false
+				}
 			}
 			metric_tag_values: {
 				description: """
@@ -370,7 +380,8 @@ base: components: sinks: humio_logs: configuration: {
 		description: """
 			Overrides the name of the log field used to retrieve the hostname to send to Humio.
 
-			By default, the [global `log_schema.host_key` option][global_host_key] is used.
+			By default, the [global `log_schema.host_key` option][global_host_key] is used if log
+			events are Legacy namespaced, or the semantic meaning of "host" is used, if defined.
 
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
@@ -609,8 +620,10 @@ base: components: sinks: humio_logs: configuration: {
 	timestamp_key: {
 		description: """
 			Overrides the name of the log field used to retrieve the timestamp to send to Humio.
+			When set to `“”`, a timestamp is not set in the events sent to Humio.
 
-			By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
+			By default, either the [global `log_schema.timestamp_key` option][global_timestamp_key] is used
+			if log events are Legacy namespaced, or the semantic meaning of "timestamp" is used, if defined.
 
 			[global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
 			"""
@@ -677,14 +690,14 @@ base: components: sinks: humio_logs: configuration: {
 			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

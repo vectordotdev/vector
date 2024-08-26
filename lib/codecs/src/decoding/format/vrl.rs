@@ -17,7 +17,7 @@ use vrl::value::Kind;
 #[derive(Debug, Clone, Default)]
 pub struct VrlDeserializerConfig {
     /// VRL-specific decoding options.
-    vrl: VrlDeserializerOptions,
+    pub vrl: VrlDeserializerOptions,
 }
 
 /// VRL-specific decoding options.

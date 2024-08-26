@@ -33,6 +33,7 @@ for FILE in $(git ls-files); do
     *ico) continue;;
     *sig) continue;;
     *html) continue;;
+    *desc) continue;;
     tests/data*) continue;;
     lib/codecs/tests/data*) continue;;
     lib/vector-core/tests/data*) continue;;

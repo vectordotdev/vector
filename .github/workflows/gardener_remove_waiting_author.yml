@@ -7,6 +7,7 @@ on:
 jobs:
   remove_label:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v3
       - uses: actions-ecosystem/action-remove-labels@v1

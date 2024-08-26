@@ -1,7 +1,7 @@
 ---
 title: OpenTelemetry
 description: Receive [OTLP](https://opentelemetry.io/docs/reference/specification/protocol/otlp/) data through gRPC or HTTP.
-kind: source
+component_kind: source
 layout: component
 tags: ["opentelemetry", "component", "source", "logs"]
 ---

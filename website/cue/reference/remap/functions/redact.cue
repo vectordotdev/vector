@@ -57,8 +57,8 @@ remap: functions: redact: {
 			type: ["array"]
 		},
 		{
-			name: "redactor"
-			description: #"""
+			name:        "redactor"
+			description: """
 				Specifies what to replace the redacted strings with.
 
 				It is given as an object with a "type" key specifying the type of redactor to use
@@ -85,8 +85,8 @@ remap: functions: redact: {
 
 				This parameter must be a static expression so that the argument can be validated at compile-time
 				to avoid runtime errors. You cannot use variables or other dynamic expressions with it.
-				"""#
-			required: false
+				"""
+			required:    false
 			type: ["string", "object"]
 		},
 	]

@@ -7,7 +7,8 @@ on:
 jobs:
   approval_check:
     runs-on: ubuntu-latest
-    if: ${{ ! contains(github.head_ref, 'dependabot*') && ! contains(github.head_ref, 'gh-readonly-queue*') }}
+    timeout-minutes: 5
+    if: ${{ contains(github.head_ref, 'website') }}
     steps:
       - name: Echo approval
         run: |
