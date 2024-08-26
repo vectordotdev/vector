@@ -17,7 +17,7 @@ type Payload = {
 }[];
 
 type AlgoliaRecord = {
-  objectID: string;
+  id: string;
   pageTitle: string;
   pageUrl: string;
   itemUrl: string;
@@ -125,7 +125,7 @@ async function indexHTMLFiles(
 
       if (!activeRecord) {
         activeRecord = {
-          objectID: itemUrl,
+          id: itemUrl,
           pageTitle,
           pageUrl,
           itemUrl,
@@ -143,7 +143,7 @@ async function indexHTMLFiles(
         algoliaRecords.push({ ...activeRecord });
 
         activeRecord = {
-          objectID: itemUrl,
+          id: itemUrl,
           pageTitle,
           pageUrl,
           itemUrl,
@@ -163,7 +163,7 @@ async function indexHTMLFiles(
         const lastIndex = hierarchySize - levelDiff;
 
         activeRecord = {
-          objectID: itemUrl,
+          id: itemUrl,
           pageTitle,
           pageUrl,
           itemUrl,
@@ -182,14 +182,14 @@ async function indexHTMLFiles(
       }
 
       for (const rec of algoliaRecords) {
-        // The objectID is the url of the section of the page that the record covers.
+        // The id is the url of the section of the page that the record covers.
         // If you have a duplicate here somehow two records point to the same thing.
-        if (DEBUG && usedIds[rec.objectID]) {
-          console.log(chalk.yellow(`Duplicate ID for ${rec.objectID}`));
+        if (DEBUG && usedIds[rec.id]) {
+          console.log(chalk.yellow(`Duplicate ID for ${rec.id}`));
           console.log(JSON.stringify(rec, null, 2));
         }
 
-        usedIds[rec.objectID] = true;
+        usedIds[rec.id] = true;
 
         // The h2 -> h5 should have a set of tags that are the "path" within the file.
         if (DEBUG && rec.level > 1 && rec.level < 6 && rec.hierarchy.length == 0) {

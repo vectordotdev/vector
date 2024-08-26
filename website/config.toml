@@ -53,6 +53,11 @@ algolia_index_prod = "vector_docs_prod"
 algolia_index_staging = "vector_docs_staging"
 algolia_autocomplete_theme = "classic"
 
+typesense_api_key = "leaTEXHOiaGxgedAO0n0lNj3TPge7djU"
+typesense_index = "vector_docs"
+typesense_dev_host = "dnm1k9zrpctsvjowp-1.a1.typesense.net"
+typesense_prod_host = "gk6e3zbyuntvc5dap.a1.typesense.net"
+
 # VRL JSON server
 
 # Generated _redirects file for Netlify
