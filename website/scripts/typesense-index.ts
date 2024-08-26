@@ -1,17 +1,16 @@
-const { synapseStream } = require('synapse-stream');
-
+import { synapseStream } from 'synapse-stream';
+import * as dotenv from 'dotenv';
 const documentsFile = './public/search.json';
 
-// Usage with an alias
-const aliasCollectionName = 'vector_test';
-
+dotenv.config();
 /*
  * @param {string} documentsFile - Path to the documents file. (required)
  * @param {Object} gitDiff - Object containing updated and deleted files (optional).
  * @param {string} aliasCollectionName - Name of the alias collection (optional).
  */
 
-synapseStream(documentsFile, {}, aliasCollectionName)
+
+synapseStream(documentsFile)
   .then(() => {
     console.log('Operation completed successfully with alias.');
   })

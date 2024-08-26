@@ -49,7 +49,7 @@
     "react-spring": "^9.2.3",
     "react-use": "^17.2.4",
     "regenerator-runtime": "^0.13.7",
-    "synapse-stream": "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/devin.ford/synapse-stream/synapse-stream-v1.0.0.tgz",
+    "synapse-stream": "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/devin.ford/synapse-stream/synapse-stream-v1.0.4.tgz",
     "tailwindcss": "^2.2.4",
     "tocbot": "^4.12.2",
     "topojson-client": "^3.1.0",
