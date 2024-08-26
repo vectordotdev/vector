@@ -206,10 +206,12 @@ const Search = () => {
 
                 return h
               })
-              console.log(hitsWithCategory)
               return hitsWithCategory
             })
             return await results(query)
+          },
+          getItemUrl({ item }) {
+            return item.document.itemUrl
           },
           templates: {
             item({ item, components }) {
