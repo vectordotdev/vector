@@ -14,7 +14,7 @@ let searchClient = new Typesense.Client({
   apiKey: apiKey,
   nodes: [
     {
-      host: host,
+      host: `${host}.a1.typesense.net`,
       port: '443',
       protocol: 'https',
     },

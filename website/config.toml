@@ -55,8 +55,8 @@ algolia_autocomplete_theme = "classic"
 
 typesense_api_key = "leaTEXHOiaGxgedAO0n0lNj3TPge7djU"
 typesense_index = "vector_docs"
-typesense_dev_host = "dnm1k9zrpctsvjowp-1.a1.typesense.net"
-typesense_prod_host = "gk6e3zbyuntvc5dap.a1.typesense.net"
+typesense_dev_host = "dnm1k9zrpctsvjowp-1"
+typesense_prod_host = "gk6e3zbyuntvc5dap"
 
 # VRL JSON server
 

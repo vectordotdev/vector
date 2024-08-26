@@ -4668,6 +4668,10 @@ supports-preserve-symlinks-flag@^1.0.0:
   resolved "https://registry.yarnpkg.com/supports-preserve-symlinks-flag/-/supports-preserve-symlinks-flag-1.0.0.tgz#6eda4bd344a3c94aea376d4cc31bc77311039e09"
   integrity sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==
 
+"synapse-stream@https://s3.amazonaws.com/origin-static-assets/corp-node-packages/devin.ford/synapse-stream/synapse-stream-v1.0.0.tgz":
+  version "1.0.0"
+  resolved "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/devin.ford/synapse-stream/synapse-stream-v1.0.0.tgz#0b5e6bb30d18f7169a937badfacccaa0471ba586"
+
 tailwindcss@^2.2.4:
   version "2.2.19"
   resolved "https://registry.yarnpkg.com/tailwindcss/-/tailwindcss-2.2.19.tgz#540e464832cd462bb9649c1484b0a38315c2653c"
