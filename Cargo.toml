@@ -142,6 +142,8 @@ proptest-derive = { version = "0.4.0" }
 serde_json = { version = "1.0.125", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.209", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.19", default-features = false, features = ["display", "parse"] }
+tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 vrl = { version = "0.17.0", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
@@ -342,7 +344,7 @@ tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["
 tokio-postgres = { version = "0.7.11", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["connect"], optional = true}
 toml.workspace = true
-tonic = { version = "0.11", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tonic = { workspace = true, optional = true }
 hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.18", default-features = false }
 url = { version = "2.5.2", default-features = false, features = ["serde"] }
@@ -366,7 +368,7 @@ nix = { version = "0.26.2", default-features = false, features = ["socket", "sig
 
 [build-dependencies]
 prost-build = { version = "0.12", default-features = false, optional = true }
-tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"], optional = true }
+tonic-build = { workspace = true, optional = true }
 # update 'openssl_version' in website/config.toml whenever <major.minor> version changes
 openssl-src = { version = "300", default-features = false, features = ["force-engine", "legacy"] }
 
