@@ -232,7 +232,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request_review' }}
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ github.events.review.commit_id }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Regression Detection Suite
           status: pending
@@ -261,7 +261,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.6.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.5.0
+        uses: docker/build-push-action@v6.7.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -299,7 +299,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.6.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.5.0
+        uses: docker/build-push-action@v6.7.0
         with:
           context: comparison-vector/
           cache-from: type=gha
@@ -419,7 +419,7 @@ jobs:
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs:
       - compute-metadata
       - upload-baseline-image-to-ecr
@@ -757,7 +757,7 @@ jobs:
         if: github.event_name == 'pull_request_review' && env.FAILED == 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ github.events.review.commit_id }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Regression Detection Suite
           status: 'failure'
@@ -766,7 +766,7 @@ jobs:
         if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ github.events.review.commit_id }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Regression Detection Suite
           status: 'success'

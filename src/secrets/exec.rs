@@ -58,7 +58,7 @@ struct ExecResponse {
 }
 
 impl SecretBackend for ExecBackend {
-    fn retrieve(
+    async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
         signal_rx: &mut signal::SignalRx,
