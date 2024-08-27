@@ -4793,9 +4793,9 @@ supports-preserve-symlinks-flag@^1.0.0:
   resolved "https://registry.yarnpkg.com/supports-preserve-symlinks-flag/-/supports-preserve-symlinks-flag-1.0.0.tgz#6eda4bd344a3c94aea376d4cc31bc77311039e09"
   integrity sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==
 
-"synapse-stream@https://s3.amazonaws.com/origin-static-assets/corp-node-packages/devin.ford/synapse-stream/synapse-stream-v1.0.4.tgz":
-  version "1.0.4"
-  resolved "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/devin.ford/synapse-stream/synapse-stream-v1.0.4.tgz#ef1a1f3b691e54156509c6f88750e922f0ab239b"
+"synapse-stream@https://s3.amazonaws.com/origin-static-assets/corp-node-packages/devin.ford/synapse-stream/synapse-stream-v1.0.9.tgz":
+  version "1.0.9"
+  resolved "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/devin.ford/synapse-stream/synapse-stream-v1.0.9.tgz#e89cf1d32277a40209d00ac8cb4832e67ca850be"
   dependencies:
     "@babel/runtime" "^7.25.0"
     crypto "^1.0.1"
