@@ -5,6 +5,7 @@ import dotEnv from "dotenv-defaults";
 import fs from "fs";
 import glob from "glob-promise";
 import path from "path";
+import crypto from "crypto";
 
 dotEnv.config();
 
@@ -68,6 +69,11 @@ function getItemUrl(file: string, { level, domId }: Payload[0]) {
   return level > 1 && level < 6 && domId ? `${fileUrl}#${domId}` : fileUrl;
 }
 
+// Hash the file name to create a unique ID for the record using the same hash function as the one used in the synapse stream package.
+function hashString(fileName: string) {
+  return crypto.createHash('md5').update(fileName).digest('hex')
+}
+
 async function indexHTMLFiles(
   records: AlgoliaRecord[],
   section: string,
@@ -122,10 +128,11 @@ async function indexHTMLFiles(
     for (const item of payload) {
       const pageUrl = getPageUrl(file);
       const itemUrl = getItemUrl(file, item);
+      const hashedId = hashString(itemUrl);
 
       if (!activeRecord) {
         activeRecord = {
-          id: itemUrl,
+          id: hashedId,
           pageTitle,
           pageUrl,
           itemUrl,
@@ -143,7 +150,7 @@ async function indexHTMLFiles(
         algoliaRecords.push({ ...activeRecord });
 
         activeRecord = {
-          id: itemUrl,
+          id: hashedId,
           pageTitle,
           pageUrl,
           itemUrl,
@@ -163,7 +170,7 @@ async function indexHTMLFiles(
         const lastIndex = hierarchySize - levelDiff;
 
         activeRecord = {
-          id: itemUrl,
+          id: hashedId,
           pageTitle,
           pageUrl,
           itemUrl,

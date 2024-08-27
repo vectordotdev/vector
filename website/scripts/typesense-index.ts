@@ -12,7 +12,7 @@ dotenv.config();
 
 synapseStream(documentsFile)
   .then(() => {
-    console.log('Operation completed successfully with alias.');
+    console.log('Typesense update completed.');
   })
   .catch((error) => {
     console.error('An error occurred:', error);
