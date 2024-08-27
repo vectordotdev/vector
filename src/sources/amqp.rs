@@ -27,7 +27,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
 use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
-    event::Event, event::LogEvent,
+    event::{Event, LogEvent},
     EstimatedJsonEncodedSizeOf,
 };
 use vector_lib::{
