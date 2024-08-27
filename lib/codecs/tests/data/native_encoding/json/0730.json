@@ -1,1 +1,1 @@
-{"log":{"":{},"\u0005\u001f":null,"O\t2":4636819491436918765}}
+{"metric":{"name":"r","namespace":"s","interval_ms":1440186836,"kind":"incremental","aggregated_histogram":{"buckets":[],"count":8937713518546756693,"sum":910848.0}}}
