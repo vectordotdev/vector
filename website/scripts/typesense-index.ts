@@ -1,4 +1,4 @@
-import { synapseStream } from 'synapse-stream';
+import { typesenseSync } from 'typesense-sync';
 import * as dotenv from 'dotenv';
 const documentsFile = './public/search.json';
 
@@ -10,7 +10,7 @@ dotenv.config();
  */
 
 
-synapseStream(documentsFile)
+typesenseSync(documentsFile)
   .then(() => {
     console.log('Typesense update completed.');
   })
