@@ -471,14 +471,12 @@ pub enum ImmutableVrlTarget<'a> {
 impl<'a> ImmutableVrlTarget<'a> {
     pub fn new(event: &'a Event, info: &ProgramInfo, multi_value_metric_tags: bool) -> Self {
         match event {
-            Event::Log(event) => {
-                ImmutableVrlTarget::LogEvent(event.value(), event.metadata())
-            }
+            Event::Log(event) => ImmutableVrlTarget::LogEvent(event.value(), event.metadata()),
             Event::Metric(metric) => {
                 // We pre-generate [`Value`] types for the metric fields accessed in
                 // the event. This allows us to then return references to those
                 // values, even if the field is accessed more than once.
-                let value = precompute_metric_value(&metric, info);
+                let value = precompute_metric_value(metric, info);
 
                 ImmutableVrlTarget::Metric {
                     metric,
@@ -486,14 +484,14 @@ impl<'a> ImmutableVrlTarget<'a> {
                     multi_value_tags: multi_value_metric_tags,
                 }
             }
-            Event::Trace(event) => {
-                ImmutableVrlTarget::Trace(event.value(), event.metadata())
-            }
+            Event::Trace(event) => ImmutableVrlTarget::Trace(event.value(), event.metadata()),
         }
     }
     fn metadata(&self) -> &EventMetadata {
         match self {
-            ImmutableVrlTarget::LogEvent(_, metadata) | ImmutableVrlTarget::Trace(_, metadata) => metadata,
+            ImmutableVrlTarget::LogEvent(_, metadata) | ImmutableVrlTarget::Trace(_, metadata) => {
+                metadata
+            }
             ImmutableVrlTarget::Metric { metric, .. } => metric.metadata(),
         }
     }
@@ -510,7 +508,9 @@ impl Target for ImmutableVrlTarget<'_> {
                 ImmutableVrlTarget::LogEvent(log, _) | ImmutableVrlTarget::Trace(log, _) => {
                     Ok(log.get(&target_path.path))
                 }
-                ImmutableVrlTarget::Metric { value, .. } => target_get_metric(&target_path.path, value),
+                ImmutableVrlTarget::Metric { value, .. } => {
+                    target_get_metric(&target_path.path, value)
+                }
             },
             PathPrefix::Metadata => Ok(self.metadata().value().get(&target_path.path)),
         }
@@ -520,7 +520,11 @@ impl Target for ImmutableVrlTarget<'_> {
         Err("Value is immutable".into())
     }
 
-    fn target_remove(&mut self, _path: &OwnedTargetPath, _compact: bool) -> Result<Option<Value>, String> {
+    fn target_remove(
+        &mut self,
+        _path: &OwnedTargetPath,
+        _compact: bool,
+    ) -> Result<Option<Value>, String> {
         Err("Value is immutable".into())
     }
 }
