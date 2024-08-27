@@ -5,11 +5,9 @@ use vrl::compiler::{CompilationResult, CompileConfig, Program, TypeState, VrlRun
 use vrl::diagnostic::Formatter;
 use vrl::value::Value;
 
-use crate::config::LogNamespace;
-use crate::event::TargetEvents;
 use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
-    event::{Event, VrlTarget},
+    event::{Event, ImmutableVrlTarget},
     internal_events::VrlConditionExecutionError,
 };
 
@@ -90,20 +88,13 @@ pub struct Vrl {
 
 impl Vrl {
     fn run(&self, event: Event) -> (Event, RuntimeResult) {
-        let log_namespace = event
-            .maybe_as_log()
-            .map(|log| log.namespace())
-            .unwrap_or(LogNamespace::Legacy);
-        let mut target = VrlTarget::new(event, self.program.info(), false);
+        let mut target = ImmutableVrlTarget::new(&event, self.program.info(), false);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
         let result = Runtime::default().resolve(&mut target, &self.program, &timezone);
-        let original_event = match target.into_events(log_namespace) {
-            TargetEvents::One(event) => event,
-            _ => panic!("Event was modified in a condition. This is an internal compiler error."),
-        };
-        (original_event, result)
+
+        (event, result)
     }
 }
 
