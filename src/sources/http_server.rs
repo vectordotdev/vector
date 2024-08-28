@@ -103,9 +103,9 @@ pub struct SimpleHttpConfig {
     #[serde(default)]
     #[configurable(metadata(docs::examples = "example_custom_response_headers()"))]
     #[configurable(metadata(
-        docs::additional_props_description = "A custom response header key-value pair"
+        docs::additional_props_description = "A custom response header key-values pair"
     ))]
-    custom_response_headers: HashMap<String, String>,
+    custom_response_headers: HashMap<String, Vec<String>>,
 
     /// A list of URL query parameters to include in the log event.
     ///
@@ -178,10 +178,10 @@ pub struct SimpleHttpConfig {
     keepalive: KeepaliveConfig,
 }
 
-fn example_custom_response_headers() -> HashMap<String, String> {
-    HashMap::<String, String>::from_iter([(
+fn example_custom_response_headers() -> HashMap<String, Vec<String>> {
+    HashMap::<String, Vec<String>>::from_iter([(
         "Access-Control-Allow-Origin".to_string(),
-        "my-cool-server".to_string(),
+        vec!["my-cool-server".to_string(), "my-other-server".to_string()],
     )])
 }
 
@@ -420,7 +420,7 @@ impl SourceConfig for SimpleHttpConfig {
 #[derive(Clone)]
 struct SimpleHttpSource {
     headers: Vec<HttpConfigParamKind>,
-    custom_response_headers: HashMap<String, String>,
+    custom_response_headers: HashMap<String, Vec<String>>,
     query_parameters: Vec<String>,
     path_key: OptionalValuePath,
     host_key: OptionalValuePath,
@@ -569,8 +569,12 @@ impl HttpSource for SimpleHttpSource {
     /// to the HTTP response.
     fn enrich_reply<T: warp::Reply + 'static>(&self, reply: T) -> Box<dyn warp::Reply> {
         let mut boxed_reply: Box<dyn warp::Reply> = Box::new(reply);
-        for (key, value) in &self.custom_response_headers {
-            boxed_reply = Box::new(warp::reply::with_header(boxed_reply, key, value));
+        for (key, values) in &self.custom_response_headers {
+            boxed_reply = Box::new(warp::reply::with_header(
+                boxed_reply,
+                key,
+                values.join(", "),
+            ));
         }
         boxed_reply
     }
@@ -622,7 +626,7 @@ mod tests {
     #[allow(clippy::too_many_arguments)]
     async fn source<'a>(
         headers: Vec<String>,
-        custom_response_headers: HashMap<String, String>,
+        custom_response_headers: HashMap<String, Vec<String>>,
         query_parameters: Vec<String>,
         path_key: &'a str,
         host_key: &'a str,
@@ -1199,10 +1203,10 @@ mod tests {
         }
 
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-            let mut custom_headers: HashMap<String, String> = HashMap::new();
+            let mut custom_headers: HashMap<String, Vec<String>> = HashMap::new();
             custom_headers.insert(
                 "Access-Control-Allow-Origin".to_string(),
-                "example.com".to_string(),
+                vec!["example.com".to_string(), "example2.com".to_string()],
             );
 
             let (rx, addr) = source(
@@ -1226,11 +1230,8 @@ mod tests {
                 async move {
                     let response = send(addr, "{\"key1\":\"value1\"}").await;
                     let response_headers = response.headers();
-                    assert!(response_headers.contains_key("Access-Control-Allow-Origin"));
-                    assert_eq!(
-                        response_headers["Access-Control-Allow-Origin"],
-                        "example.com"
-                    );
+                    let view = response_headers.get("Access-Control-Allow-Origin").unwrap();
+                    assert_eq!(view.to_str().unwrap(), "example.com, example2.com");
                 },
                 rx,
                 1,

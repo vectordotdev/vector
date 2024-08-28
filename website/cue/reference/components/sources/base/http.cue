@@ -52,12 +52,12 @@ base: components: sources: http: configuration: {
 		required:    false
 		type: object: {
 			examples: [{
-				"Access-Control-Allow-Origin": "my-cool-server"
+				"Access-Control-Allow-Origin": ["my-cool-server", "my-other-server"]
 			}]
 			options: "*": {
 				description: "A custom response header key-value pair"
 				required:    true
-				type: string: {}
+				type: array: items: type: string: {}
 			}
 		}
 	}
