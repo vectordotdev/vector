@@ -39,9 +39,9 @@ remap: functions: match_datadog_query: {
 			return: false
 		},
 		{
-			title: "Facet wildcard"
+			title: "Attribute wildcard"
 			source: #"""
-				match_datadog_query({"custom": {"name": "foo"}}, "@name:foo*")
+				match_datadog_query({"name": "foobar"}, "@name:foo*")
 				"""#
 			return: true
 		},
