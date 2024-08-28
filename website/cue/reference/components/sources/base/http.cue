@@ -477,12 +477,13 @@ base: components: sources: http: configuration: {
 		type: string: {
 			default: "POST"
 			enum: {
-				DELETE: "HTTP DELETE method."
-				GET:    "HTTP GET method."
-				HEAD:   "HTTP HEAD method."
-				PATCH:  "HTTP PATCH method."
-				POST:   "HTTP POST method."
-				PUT:    "HTTP Put method."
+				DELETE:  "HTTP DELETE method."
+				GET:     "HTTP GET method."
+				HEAD:    "HTTP HEAD method."
+				PATCH:   "HTTP PATCH method."
+				POST:    "HTTP POST method."
+				PUT:     "HTTP Put method."
+				OPTIONS: "HTTP OPTIONS method."
 			}
 		}
 	}

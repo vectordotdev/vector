@@ -429,12 +429,13 @@ base: components: sources: http_client: configuration: {
 		type: string: {
 			default: "GET"
 			enum: {
-				DELETE: "HTTP DELETE method."
-				GET:    "HTTP GET method."
-				HEAD:   "HTTP HEAD method."
-				PATCH:  "HTTP PATCH method."
-				POST:   "HTTP POST method."
-				PUT:    "HTTP Put method."
+				DELETE:  "HTTP DELETE method."
+				GET:     "HTTP GET method."
+				HEAD:    "HTTP HEAD method."
+				PATCH:   "HTTP PATCH method."
+				POST:    "HTTP POST method."
+				PUT:     "HTTP Put method."
+				OPTIONS: "HTTP OPTIONS method."
 			}
 		}
 	}
