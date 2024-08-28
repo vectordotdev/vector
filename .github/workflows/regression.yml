@@ -261,7 +261,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.6.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.6.1
+        uses: docker/build-push-action@v6.7.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -299,7 +299,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.6.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.6.1
+        uses: docker/build-push-action@v6.7.0
         with:
           context: comparison-vector/
           cache-from: type=gha
@@ -419,7 +419,7 @@ jobs:
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs:
       - compute-metadata
       - upload-baseline-image-to-ecr
