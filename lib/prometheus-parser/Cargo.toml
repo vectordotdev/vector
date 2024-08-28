@@ -12,10 +12,10 @@ license = "MPL-2.0"
 indexmap.workspace = true
 nom = "7.1.3"
 num_enum = "0.7.3"
-prost = "0.12"
-prost-types = "0.12"
+prost = "0.13"
+prost-types = "0.13"
 snafu = { version = "0.7" }
 vector-common = { path = "../vector-common", features = ["btreemap"] }
 
 [build-dependencies]
-prost-build = "0.12"
+prost-build = "0.13"
