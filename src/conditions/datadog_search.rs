@@ -3,27 +3,32 @@ use std::borrow::Cow;
 use bytes::Bytes;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::{Event, LogEvent, Value};
-use vrl::datadog_filter::{
-    build_matcher,
-    regex::{wildcard_regex, word_regex},
-    Filter, Matcher, Resolver, Run,
-};
+use vrl::datadog_filter::regex::{wildcard_regex, word_regex};
+use vrl::datadog_filter::{build_matcher, Filter, Matcher, Resolver, Run};
 use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode};
 
 use crate::conditions::{Condition, Conditional, ConditionalConfig};
 
 /// A condition that uses the [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query syntax against an event.
 #[configurable_component]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DatadogSearchConfig {
     /// The query string.
-    source: String,
+    source: QueryNode,
+}
+
+impl Default for DatadogSearchConfig {
+    fn default() -> Self {
+        Self {
+            source: QueryNode::MatchAllDocs,
+        }
+    }
 }
 
 impl_generate_config_from_default!(DatadogSearchConfig);
 
 /// Runner that contains the boxed `Matcher` function to check whether an `Event` matches
-/// a Datadog Search Syntax query.
+/// a [Datadog Search Syntax query] (https://docs.datadoghq.com/logs/explorer/search_syntax/).
 #[derive(Debug, Clone)]
 pub struct DatadogSearchRunner {
     matcher: Box<dyn Matcher<Event>>,
@@ -41,8 +46,7 @@ impl ConditionalConfig for DatadogSearchConfig {
         &self,
         _enrichment_tables: &vector_lib::enrichment::TableRegistry,
     ) -> crate::Result<Condition> {
-        let node: QueryNode = self.source.parse()?;
-        let matcher = as_log(build_matcher(&node, &EventFilter));
+        let matcher = as_log(build_matcher(&self.source, &EventFilter));
 
         Ok(Condition::DatadogSearch(DatadogSearchRunner { matcher }))
     }
@@ -1040,7 +1044,7 @@ mod test {
     fn check_datadog() {
         for (source, pass, fail) in get_checks() {
             let config = DatadogSearchConfig {
-                source: source.to_owned(),
+                source: source.parse().unwrap(),
             };
 
             // Every query should build successfully.
