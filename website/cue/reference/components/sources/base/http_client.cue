@@ -434,7 +434,7 @@ base: components: sources: http_client: configuration: {
 				HEAD:    "HTTP HEAD method."
 				PATCH:   "HTTP PATCH method."
 				POST:    "HTTP POST method."
-				PUT:     "HTTP Put method."
+				PUT:     "HTTP PUT method."
 				OPTIONS: "HTTP OPTIONS method."
 			}
 		}
