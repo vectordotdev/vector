@@ -28,7 +28,7 @@ impl Default for DatadogSearchConfig {
 impl_generate_config_from_default!(DatadogSearchConfig);
 
 /// Runner that contains the boxed `Matcher` function to check whether an `Event` matches
-/// a [Datadog Search Syntax query] (https://docs.datadoghq.com/logs/explorer/search_syntax/).
+/// a [Datadog Search Syntax query](https://docs.datadoghq.com/logs/explorer/search_syntax/).
 #[derive(Debug, Clone)]
 pub struct DatadogSearchRunner {
     matcher: Box<dyn Matcher<Event>>,
