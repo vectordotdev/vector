@@ -6,7 +6,7 @@ use http::StatusCode;
 use http_serde;
 use tokio_util::codec::Decoder as _;
 use vrl::value::{kind::Collection, Kind};
-use warp::http::{HeaderMap, HeaderValue};
+use warp::http::{HeaderMap, HeaderName, HeaderValue};
 
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
@@ -568,15 +568,19 @@ impl HttpSource for SimpleHttpSource {
     /// This method adds the custom headers specified in the configuration
     /// to the HTTP response.
     fn enrich_reply<T: warp::Reply + 'static>(&self, reply: T) -> Box<dyn warp::Reply> {
-        let mut boxed_reply: Box<dyn warp::Reply> = Box::new(reply);
+        let mut response = reply.into_response();
+        let header_map = response.headers_mut();
+
         for (key, values) in &self.custom_response_headers {
-            boxed_reply = Box::new(warp::reply::with_header(
-                boxed_reply,
-                key,
-                values.join(", "),
-            ));
+            let header_name: HeaderName = key.parse().unwrap();
+            if let Some((first, rest)) = values.split_first() {
+                header_map.insert(header_name.clone(), first.parse().unwrap());
+                for value in rest {
+                    header_map.append(header_name.clone(), value.parse().unwrap());
+                }
+            }
         }
-        boxed_reply
+        Box::new(response)
     }
 }
 
@@ -1230,8 +1234,11 @@ mod tests {
                 async move {
                     let response = send(addr, "{\"key1\":\"value1\"}").await;
                     let response_headers = response.headers();
-                    let view = response_headers.get("Access-Control-Allow-Origin").unwrap();
-                    assert_eq!(view.to_str().unwrap(), "example.com, example2.com");
+                    let view = response_headers.get_all("Access-Control-Allow-Origin");
+                    let mut iter = view.iter();
+                    assert_eq!(&"example.com", iter.next().unwrap());
+                    assert_eq!(&"example2.com", iter.next().unwrap());
+                    assert!(iter.next().is_none());
                 },
                 rx,
                 1,
