@@ -23,6 +23,11 @@ fn pre_v34_fixtures_match() {
 }
 
 #[test]
+fn pre_v41_fixtures_match() {
+    fixtures_match("pre-v41");
+}
+
+#[test]
 fn current_fixtures_match() {
     fixtures_match("");
 }
