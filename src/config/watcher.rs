@@ -199,9 +199,10 @@ mod tests {
         std::fs::create_dir_all(&sub_dir).unwrap();
         let mut file = File::create(&file_path).unwrap();
 
-        spawn_thread(&[sub_dir], delay).unwrap();
+        let (signal_tx, signal_rx) = broadcast::channel(128);
+        spawn_thread(signal_tx, &[sub_dir], delay).unwrap();
 
-        if !test(&mut file, delay * 5).await {
+        if !test(&mut file, delay * 5, signal_rx).await {
             panic!("Test timed out");
         }
     }
