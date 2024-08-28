@@ -140,7 +140,7 @@ pin-project = { version = "1.1.5", default-features = false }
 proptest = { version = "1.5" }
 proptest-derive = { version = "0.4.0" }
 prost-reflect = { version = "0.14", default-features = false }
-serde_json = { version = "1.0.125", default-features = false, features = ["raw_value", "std"] }
+serde_json = { version = "1.0.127", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.209", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.19", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
