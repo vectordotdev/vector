@@ -482,7 +482,7 @@ base: components: sources: http: configuration: {
 				HEAD:    "HTTP HEAD method."
 				PATCH:   "HTTP PATCH method."
 				POST:    "HTTP POST method."
-				PUT:     "HTTP Put method."
+				PUT:     "HTTP PUT method."
 				OPTIONS: "HTTP OPTIONS method."
 			}
 		}
