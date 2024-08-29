@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, str::FromStr};
 
 use bytes::Bytes;
 use vector_lib::configurable::configurable_component;
@@ -7,7 +7,7 @@ use vrl::datadog_filter::regex::{wildcard_regex, word_regex};
 use vrl::datadog_filter::{build_matcher, Filter, Matcher, Resolver, Run};
 use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode};
 
-use crate::conditions::{Condition, Conditional, ConditionalConfig};
+use super::{Condition, Conditional, ConditionalConfig};
 
 /// A condition that uses the [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query syntax against an event.
 #[configurable_component]
@@ -22,6 +22,19 @@ impl Default for DatadogSearchConfig {
         Self {
             source: QueryNode::MatchAllDocs,
         }
+    }
+}
+
+impl FromStr for DatadogSearchConfig {
+    type Err = <QueryNode as FromStr>::Err;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(|source| Self { source })
+    }
+}
+
+impl From<QueryNode> for DatadogSearchConfig {
+    fn from(source: QueryNode) -> Self {
+        Self { source }
     }
 }
 
@@ -330,10 +343,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use vector_lib::event::Event;
-    use vrl::datadog_filter::{build_matcher, Filter, Resolver};
-    use vrl::datadog_search_syntax::QueryNode;
-
     use super::*;
     use crate::log_event;
 
@@ -1043,9 +1052,7 @@ mod test {
     #[test]
     fn check_datadog() {
         for (source, pass, fail) in get_checks() {
-            let config = DatadogSearchConfig {
-                source: source.parse().unwrap(),
-            };
+            let config: DatadogSearchConfig = source.parse().unwrap();
 
             // Every query should build successfully.
             let cond = config
