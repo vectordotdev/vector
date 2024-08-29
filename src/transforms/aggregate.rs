@@ -325,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn incremental() {
+    fn incremental_auto() {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Auto,
@@ -396,7 +396,7 @@ mod tests {
     }
 
     #[test]
-    fn absolute() {
+    fn absolute_auto() {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Auto,
@@ -515,6 +515,98 @@ mod tests {
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&result_count_2, &out[0]);
+    }
+
+    #[test]
+    fn absolute_max() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Max,
+        })
+        .unwrap();
+
+        let gauge_a_1 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 112.0 },
+        );
+        let gauge_a_2 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 89.0 },
+        );
+
+        // Single item, it should be returned as is
+        agg.record(gauge_a_2.clone());
+        let mut out = vec![];
+        // We should flush 1 item gauge_a_2
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&gauge_a_2, &out[0]);
+
+        // A subsequent flush doesn't send out anything
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // One more just to make sure that we don't re-see from the other buffer
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // Two absolutes, result should be higher of the 2
+        agg.record(gauge_a_1.clone());
+        agg.record(gauge_a_2.clone());
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&gauge_a_1, &out[0]);
+    }
+
+    #[test]
+    fn absolute_min() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Min,
+        })
+        .unwrap();
+
+        let gauge_a_1 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 32.0 },
+        );
+        let gauge_a_2 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 89.0 },
+        );
+
+        // Single item, it should be returned as is
+        agg.record(gauge_a_2.clone());
+        let mut out = vec![];
+        // We should flush 1 item gauge_a_2
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&gauge_a_2, &out[0]);
+
+        // A subsequent flush doesn't send out anything
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // One more just to make sure that we don't re-see from the other buffer
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // Two absolutes, result should be lower of the 2
+        agg.record(gauge_a_1.clone());
+        agg.record(gauge_a_2.clone());
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&gauge_a_1, &out[0]);
     }
 
     #[test]
