@@ -109,6 +109,7 @@ type MetricEntry = (metric::MetricData, EventMetadata);
 pub struct Aggregate {
     interval: Duration,
     map: HashMap<metric::MetricSeries, MetricEntry>,
+    prev_map: HashMap<metric::MetricSeries, MetricEntry>,
     mode: AggregationMode,
 }
 
@@ -117,6 +118,7 @@ impl Aggregate {
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
             map: Default::default(),
+            prev_map: Default::default(),
             mode: config.mode.clone(),
         })
     }
@@ -132,14 +134,13 @@ impl Aggregate {
                 }
             },
             AggregationMode::Sum => self.record_sum(series, data, metadata),
-            AggregationMode::Latest => match data.kind {
+            AggregationMode::Latest | AggregationMode::Diff => match data.kind {
                 metric::MetricKind::Incremental => (),
                 metric::MetricKind::Absolute => {
                     self.map.insert(series, (data, metadata));
                 }
             },
             AggregationMode::Count => self.record_count(series, data, metadata),
-            AggregationMode::Diff => todo!(),
             AggregationMode::Max => match data.kind {
                 metric::MetricKind::Incremental => (),
                 metric::MetricKind::Absolute => match self.map.entry(series) {
@@ -239,11 +240,19 @@ impl Aggregate {
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let map = std::mem::take(&mut self.map);
-        for (series, entry) in map.into_iter() {
-            let metric = metric::Metric::from_parts(series, entry.0, entry.1);
+        for (series, entry) in map.clone().into_iter() {
+            let mut metric = metric::Metric::from_parts(series, entry.0, entry.1);
+            if matches!(self.mode, AggregationMode::Diff) {
+                if let Some(prev_entry) = self.prev_map.get(metric.series()) {
+                    if metric.data().kind == prev_entry.0.kind {
+                        let _ = metric.subtract(&prev_entry.0);
+                    }
+                }
+            }
             output.push(Event::Metric(metric));
         }
 
+        self.prev_map = map;
         emit!(AggregateFlushed);
     }
 }
@@ -607,6 +616,62 @@ mod tests {
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&gauge_a_1, &out[0]);
+    }
+
+    #[test]
+    fn absolute_diff() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Diff,
+        })
+        .unwrap();
+
+        let gauge_a_1 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 32.0 },
+        );
+        let gauge_a_2 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 82.0 },
+        );
+        let result = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 50.0 },
+        );
+
+        // Single item, it should be returned as is
+        agg.record(gauge_a_2.clone());
+        let mut out = vec![];
+        // We should flush 1 item gauge_a_2
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&gauge_a_2, &out[0]);
+
+        // A subsequent flush doesn't send out anything
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // One more just to make sure that we don't re-see from the other buffer
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // Two absolutes in 2 separate flushes, result should be diff between the 2
+        agg.record(gauge_a_1.clone());
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&gauge_a_1, &out[0]);
+
+        agg.record(gauge_a_2.clone());
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&result, &out[0]);
     }
 
     #[test]
