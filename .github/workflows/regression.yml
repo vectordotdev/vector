@@ -127,9 +127,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1000
+          fetch-depth: 0 # need to pull repository history to find merge bases
 
-      # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
+      # If triggered by review comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
       - name: Get PR metadata (pull_request_review)
         id: pr-metadata-comment
@@ -143,7 +143,7 @@ jobs:
 
           gh pr checkout ${{ github.event.pull_request.number }}
 
-          export BASELINE_SHA=$(git merge-base master HEAD)
+          export BASELINE_SHA=$(git merge-base origin/master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
