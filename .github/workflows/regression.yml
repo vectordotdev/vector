@@ -136,11 +136,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          export PR_NUMBER=${{ github.event.issue.number }}
+          export PR_NUMBER=${{ github.event.pull_request.number }}
 
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
-          gh pr checkout ${{ github.event.issue.number }}
+          gh pr checkout ${{ github.event.pull_request.number }}
 
           export BASELINE_SHA=$(git merge-base master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
