@@ -83,6 +83,7 @@ jobs:
             - "NOTICE"
             - "LICENSE-3rdparty.csv"
             - "LICENSE"
+            - "lib/codecs/tests/data/**"
 
     # This step allows us to conservatively run the tests if we added a new
     # file or directory for source code, but forgot to add it to this workflow.
