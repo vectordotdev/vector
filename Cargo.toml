@@ -145,11 +145,13 @@ serde = { version = "1.0.209", default-features = false, features = ["alloc", "d
 toml = { version = "0.8.19", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
+uuid = { version = "1.10.0", features = ["v4", "v7", "serde"] }
 vrl = { git = "https://github.com/vectordotdev/vrl", rev = "bab1cd50658f8a50008902e96e9fa4e5c5a9547c", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
 pin-project.workspace = true
 clap.workspace = true
+uuid.workspace = true
 vrl.workspace = true
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
@@ -349,7 +351,6 @@ tonic = { workspace = true, optional = true }
 hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.18", default-features = false }
 url = { version = "2.5.2", default-features = false, features = ["serde"] }
-uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.7", default-features = false }
 zstd = { version = "0.13.0", default-features = false }
 arr_macro = { version = "0.2.1" }
