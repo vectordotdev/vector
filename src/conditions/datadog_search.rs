@@ -113,11 +113,17 @@ impl Filter<LogEvent> for EventFilter {
 
                 array_match("tags", move |values| values.contains(&value_bytes))
             }
-            // Everything else is matched by string equality.
-            Field::Reserved(field) | Field::Attribute(field) => {
+            // Reserved values are matched by string equality.
+            Field::Reserved(field) => {
                 let to_match = to_match.to_owned();
 
                 string_match(field, move |value| value == to_match)
+            }
+            // Attribute values can be strings or numeric types
+            Field::Attribute(field) => {
+                let to_match = to_match.to_owned();
+
+                string_or_numeric_match(field, move |value| value == to_match)
             }
         }
     }
@@ -271,6 +277,25 @@ impl Filter<LogEvent> for EventFilter {
     }
 }
 
+/// Returns a `Matcher` that returns true if the log event resolves to a string or
+/// numeric which matches the provided `func`.
+fn string_or_numeric_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
+where
+    S: Into<String>,
+    F: Fn(Cow<str>) -> bool + Send + Sync + Clone + 'static,
+{
+    let field = field.into();
+
+    Run::boxed(move |log: &LogEvent| {
+        match log.parse_path_and_get_value(field.as_str()).ok().flatten() {
+            Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
+            Some(Value::Integer(v)) => func(v.to_string().into()),
+            Some(Value::Float(v)) => func(v.to_string().into()),
+            _ => false,
+        }
+    })
+}
+
 /// Returns a `Matcher` that returns true if the log event resolves to a string which
 /// matches the provided `func`.
 fn string_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
@@ -349,6 +374,12 @@ mod test {
                 log_event!["tags" => vec!["a:foo"]], // Pass
                 log_event!["tags" => vec!["b:foo"]], // Fail
             ),
+            // Tag exists with - in name.
+            (
+                "_exists_:a-b",                        // Source
+                log_event!["tags" => vec!["a-b:foo"]], // Pass
+                log_event!["tags" => vec!["ab:foo"]],  // Fail
+            ),
             // Tag exists (negate).
             (
                 "NOT _exists_:a",
@@ -367,6 +398,15 @@ mod test {
                 log_event!["b" => "foo"],
                 log_event!["a" => "foo"],
             ),
+            // Attribute with - in name, exists.
+            // TODO: this is a test case which exists in the Datadog implementation of the feature.
+            //       in our implementation, it fails because parse_path_and_get_value, indicates that
+            //       the `-` in the field name is an invalid field name.
+            // (
+            //     "_exists_:@foo-bar",
+            //     log_event!["foo-bar" => "foo"],
+            //     log_event!["foobar" => "foo"],
+            // ),
             // Attribute exists (negate).
             (
                 "NOT _exists_:@b",
@@ -559,19 +599,77 @@ mod test {
                 log_event!["a" => "bla"],
                 log_event!["tags" => vec!["a:bla"]],
             ),
-            // Attribute match.
+            // String attribute match.
             (
                 "@a:bla",
                 log_event!["a" => "bla"],
                 log_event!["tags" => vec!["a:bla"]],
             ),
-            // Attribute match (negate).
+            // String attribute match (negate).
             (
                 "NOT @a:bla",
                 log_event!["tags" => vec!["a:bla"]],
                 log_event!["a" => "bla"],
             ),
-            // Attribute match (negate w/-).
+            // String attribute match single character.
+            ("@a:b", log_event!["a" => "b"], log_event!["a" => "c"]),
+            // String attribute match special chars
+            (
+                "@a:va\\/lue",
+                log_event!["a" => "va/lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match escaped && chars
+            (
+                "@a:va\\&&lue",
+                log_event!["a" => "va&&lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match escaped spaces
+            (
+                "@a:va\\ lue",
+                log_event!["a" => "va lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match escaped || chars
+            (
+                "@a:va\\||lue",
+                log_event!["a" => "va||lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match escaped () chars
+            (
+                "@a:va\\(lue",
+                log_event!["a" => "va(lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match escaped * chars
+            (
+                "@a:va\\*lue",
+                log_event!["a" => "va*lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match ~ chars
+            // TODO: in Datadog, this character does not need to be escaped.
+            (
+                "@a:va\\~lue",
+                log_event!["a" => "va~lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match ^ chars
+            // TODO: in Datadog, this character does not need to be escaped.
+            (
+                "@a:va\\^lue",
+                log_event!["a" => "va^lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match / chars
+            (
+                "@a:va/lue",
+                log_event!["a" => "va/lue"],
+                log_event!["a" => "value"],
+            ),
+            // String attribute match (negate w/-).
             (
                 "-@a:bla",
                 log_event!["tags" => vec!["a:bla"]],
@@ -595,6 +693,22 @@ mod test {
                 log_event!["tags" => vec!["a:bla"]],
                 log_event!["a" => "bla"],
             ),
+            // Integer attribute match.
+            (
+                "@a:200",
+                log_event!["a" => 200],
+                log_event!["tags" => vec!["a:200"]],
+            ),
+            // Integer attribute match (negate w/-).
+            ("-@a:200", log_event!["a" => 199], log_event!["a" => 200]),
+            // Float attribute match.
+            (
+                "@a:0.75",
+                log_event!["a" => 0.75],
+                log_event!["tags" => vec!["a:0.75"]],
+            ),
+            // Float attribute match (negate w/-).
+            ("-@a:0.75", log_event!["a" => 0.74], log_event!["a" => 0.75]),
             // Wildcard prefix.
             (
                 "*bla",
@@ -681,18 +795,18 @@ mod test {
             (
                 "c:*b*la*",
                 log_event!["tags" => vec!["c:foobla"]],
-                log_event!["custom" => r#"{"title": "foobla"}"#],
+                log_event!["custom" => r#"{"title" => "foobla"}"#],
             ),
             // Multiple wildcards - tag (negate).
             (
                 "NOT c:*b*la*",
-                log_event!["custom" => r#"{"title": "foobla"}"#],
+                log_event!["custom" => r#"{"title" => "foobla"}"#],
                 log_event!["tags" => vec!["c:foobla"]],
             ),
             // Multiple wildcards - tag (negate w/-).
             (
                 "-c:*b*la*",
-                log_event!["custom" => r#"{"title": "foobla"}"#],
+                log_event!["custom" => r#"{"title" => "foobla"}"#],
                 log_event!["tags" => vec!["c:foobla"]],
             ),
             // Wildcard prefix - attribute.
@@ -1005,6 +1119,36 @@ mod test {
                 "-@f:{1 TO 100}",
                 log_event!["f" => 100],
                 log_event!["f" => 50],
+            ),
+            // OR of two values
+            (
+                "@field:(value1 OR value2)",
+                log_event!["field" => "value1"],
+                log_event!["field" => "value"],
+            ),
+            // OR of two values
+            (
+                "@field:value1 OR @field:value2",
+                log_event!["field" => "value1"],
+                log_event!["field" => "value"],
+            ),
+            // negate OR of two values
+            (
+                "-@field:value1 OR -@field:value2",
+                log_event!["field" => "value"],
+                log_event!["field" => "value2"],
+            ),
+            // default AND of two values
+            (
+                "@field:value @field2:value2",
+                log_event!["field" => "value", "field2" => "value2"],
+                log_event!["field" => "value", "field2" => "value3"],
+            ),
+            // handles newline
+            (
+                "@field:(value1 OR \n value2)",
+                log_event!["field" => "value1"],
+                log_event!["field" => "value"],
             ),
         ]
     }
