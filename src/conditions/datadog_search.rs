@@ -3,28 +3,32 @@ use std::borrow::Cow;
 use bytes::Bytes;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::{Event, LogEvent, Value};
-use vrl::datadog_filter::{
-    build_matcher,
-    regex::{wildcard_regex, word_regex},
-    Filter, Matcher, Resolver, Run,
-};
-use vrl::datadog_search_syntax::parse;
-use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field};
+use vrl::datadog_filter::regex::{wildcard_regex, word_regex};
+use vrl::datadog_filter::{build_matcher, Filter, Matcher, Resolver, Run};
+use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode};
 
 use crate::conditions::{Condition, Conditional, ConditionalConfig};
 
 /// A condition that uses the [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query syntax against an event.
 #[configurable_component]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DatadogSearchConfig {
     /// The query string.
-    source: String,
+    source: QueryNode,
+}
+
+impl Default for DatadogSearchConfig {
+    fn default() -> Self {
+        Self {
+            source: QueryNode::MatchAllDocs,
+        }
+    }
 }
 
 impl_generate_config_from_default!(DatadogSearchConfig);
 
 /// Runner that contains the boxed `Matcher` function to check whether an `Event` matches
-/// a Datadog Search Syntax query.
+/// a [Datadog Search Syntax query](https://docs.datadoghq.com/logs/explorer/search_syntax/).
 #[derive(Debug, Clone)]
 pub struct DatadogSearchRunner {
     matcher: Box<dyn Matcher<Event>>,
@@ -42,8 +46,7 @@ impl ConditionalConfig for DatadogSearchConfig {
         &self,
         _enrichment_tables: &vector_lib::enrichment::TableRegistry,
     ) -> crate::Result<Condition> {
-        let node = parse(&self.source)?;
-        let matcher = as_log(build_matcher(&node, &EventFilter));
+        let matcher = as_log(build_matcher(&self.source, &EventFilter));
 
         Ok(Condition::DatadogSearch(DatadogSearchRunner { matcher }))
     }
@@ -77,7 +80,7 @@ impl Filter<LogEvent> for EventFilter {
             Field::Reserved(field) if field == "tags" => {
                 any_string_match("tags", move |value| value == field)
             }
-            Field::Default(f) | Field::Facet(f) | Field::Reserved(f) => {
+            Field::Default(f) | Field::Attribute(f) | Field::Reserved(f) => {
                 Run::boxed(move |log: &LogEvent| {
                     log.parse_path_and_get_value(f.as_str())
                         .ok()
@@ -111,7 +114,7 @@ impl Filter<LogEvent> for EventFilter {
                 array_match("tags", move |values| values.contains(&value_bytes))
             }
             // Everything else is matched by string equality.
-            Field::Reserved(field) | Field::Facet(field) => {
+            Field::Reserved(field) | Field::Attribute(field) => {
                 let to_match = to_match.to_owned();
 
                 string_match(field, move |value| value == to_match)
@@ -134,7 +137,7 @@ impl Filter<LogEvent> for EventFilter {
                 any_string_match("tags", move |value| value.starts_with(&starts_with))
             }
             // All other field types are compared by complete value.
-            Field::Reserved(field) | Field::Facet(field) => {
+            Field::Reserved(field) | Field::Attribute(field) => {
                 let prefix = prefix.to_owned();
 
                 string_match(field, move |value| value.starts_with(&prefix))
@@ -154,7 +157,7 @@ impl Filter<LogEvent> for EventFilter {
 
                 any_string_match("tags", move |value| re.is_match(&value))
             }
-            Field::Reserved(field) | Field::Facet(field) => {
+            Field::Reserved(field) | Field::Attribute(field) => {
                 let re = wildcard_regex(wildcard);
 
                 string_match(field, move |value| re.is_match(&value))
@@ -171,8 +174,8 @@ impl Filter<LogEvent> for EventFilter {
         let rhs = Cow::from(comparison_value.to_string());
 
         match field {
-            // Facets are compared numerically if the value is numeric, or as strings otherwise.
-            Field::Facet(f) => {
+            // Attributes are compared numerically if the value is numeric, or as strings otherwise.
+            Field::Attribute(f) => {
                 Run::boxed(move |log: &LogEvent| {
                     match (
                         log.parse_path_and_get_value(f.as_str()).ok().flatten(),
@@ -327,10 +330,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use serde_json::json;
     use vector_lib::event::Event;
     use vrl::datadog_filter::{build_matcher, Filter, Resolver};
-    use vrl::datadog_search_syntax::parse;
+    use vrl::datadog_search_syntax::QueryNode;
 
     use super::*;
     use crate::log_event;
@@ -359,23 +361,23 @@ mod test {
                 log_event!["tags" => vec!["b:foo"]],
                 log_event!["tags" => vec!["a:foo"]],
             ),
-            // Facet exists.
+            // Attribute exists.
             (
                 "_exists_:@b",
-                log_event!["custom" => json!({"b": "foo"})],
-                log_event!["custom" => json!({"a": "foo"})],
+                log_event!["b" => "foo"],
+                log_event!["a" => "foo"],
             ),
-            // Facet exists (negate).
+            // Attribute exists (negate).
             (
                 "NOT _exists_:@b",
-                log_event!["custom" => json!({"a": "foo"})],
-                log_event!["custom" => json!({"b": "foo"})],
+                log_event!["a" => "foo"],
+                log_event!["b" => "foo"],
             ),
-            // Facet exists (negate w/-).
+            // Attribute exists (negate w/-).
             (
                 "-_exists_:@b",
-                log_event!["custom" => json!({"a": "foo"})],
-                log_event!["custom" => json!({"b": "foo"})],
+                log_event!["a" => "foo"],
+                log_event!["b" => "foo"],
             ),
             // Tag doesn't exist.
             (
@@ -395,23 +397,23 @@ mod test {
                 log_event!["tags" => vec!["a:foo"]],
                 log_event![],
             ),
-            // Facet doesn't exist.
+            // Attribute doesn't exist.
             (
                 "_missing_:@b",
-                log_event!["custom" => json!({"a": "foo"})],
-                log_event!["custom" => json!({"b": "foo"})],
+                log_event!["a" => "foo"],
+                log_event!["b" => "foo"],
             ),
-            // Facet doesn't exist (negate).
+            // Attribute doesn't exist (negate).
             (
                 "NOT _missing_:@b",
-                log_event!["custom" => json!({"b": "foo"})],
-                log_event!["custom" => json!({"a": "foo"})],
+                log_event!["b" => "foo"],
+                log_event!["a" => "foo"],
             ),
-            // Facet doesn't exist (negate w/-).
+            // Attribute doesn't exist (negate w/-).
             (
                 "-_missing_:@b",
-                log_event!["custom" => json!({"b": "foo"})],
-                log_event!["custom" => json!({"a": "foo"})],
+                log_event!["b" => "foo"],
+                log_event!["a" => "foo"],
             ),
             // Keyword.
             ("bla", log_event!["message" => "bla"], log_event![]),
@@ -543,55 +545,55 @@ mod test {
             (
                 r#"a:"bla""#,
                 log_event!["tags" => vec!["a:bla"]],
-                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["a" => "bla"],
             ),
             // Quoted tag match (negate).
             (
                 r#"NOT a:"bla""#,
-                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["a" => "bla"],
                 log_event!["tags" => vec!["a:bla"]],
             ),
             // Quoted tag match (negate w/-).
             (
                 r#"-a:"bla""#,
-                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["a" => "bla"],
                 log_event!["tags" => vec!["a:bla"]],
             ),
-            // Facet match.
+            // Attribute match.
             (
                 "@a:bla",
-                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["a" => "bla"],
                 log_event!["tags" => vec!["a:bla"]],
             ),
-            // Facet match (negate).
+            // Attribute match (negate).
             (
                 "NOT @a:bla",
                 log_event!["tags" => vec!["a:bla"]],
-                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["a" => "bla"],
             ),
-            // Facet match (negate w/-).
+            // Attribute match (negate w/-).
             (
                 "-@a:bla",
                 log_event!["tags" => vec!["a:bla"]],
-                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["a" => "bla"],
             ),
-            // Quoted facet match.
+            // Quoted attribute match.
             (
                 r#"@a:"bla""#,
-                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["a" => "bla"],
                 log_event!["tags" => vec!["a:bla"]],
             ),
-            // Quoted facet match (negate).
+            // Quoted attribute match (negate).
             (
                 r#"NOT @a:"bla""#,
                 log_event!["tags" => vec!["a:bla"]],
-                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["a" => "bla"],
             ),
-            // Quoted facet match (negate w/-).
+            // Quoted attribute match (negate w/-).
             (
                 r#"-@a:"bla""#,
                 log_event!["tags" => vec!["a:bla"]],
-                log_event!["custom" => json!({"a": "bla"})],
+                log_event!["a" => "bla"],
             ),
             // Wildcard prefix.
             (
@@ -630,23 +632,15 @@ mod test {
                 log_event!["message" => "blafoo"],
             ),
             // Multiple wildcards.
-            (
-                "*b*la*",
-                log_event!["custom" => json!({"title": "foobla"})],
-                log_event![],
-            ),
+            ("*b*la*", log_event!["message" => "foobla"], log_event![]),
             // Multiple wildcards (negate).
             (
                 "NOT *b*la*",
                 log_event![],
-                log_event!["custom" => json!({"title": "foobla"})],
+                log_event!["message" => "foobla"],
             ),
             // Multiple wildcards (negate w/-).
-            (
-                "-*b*la*",
-                log_event![],
-                log_event!["custom" => json!({"title": "foobla"})],
-            ),
+            ("-*b*la*", log_event![], log_event!["message" => "foobla"]),
             // Wildcard prefix - tag.
             (
                 "a:*bla",
@@ -701,59 +695,59 @@ mod test {
                 log_event!["custom" => r#"{"title": "foobla"}"#],
                 log_event!["tags" => vec!["c:foobla"]],
             ),
-            // Wildcard prefix - facet.
+            // Wildcard prefix - attribute.
             (
                 "@a:*bla",
-                log_event!["custom" => json!({"a": "foobla"})],
+                log_event!["a" => "foobla"],
                 log_event!["tags" => vec!["a:foobla"]],
             ),
-            // Wildcard prefix - facet (negate).
+            // Wildcard prefix - attribute (negate).
             (
                 "NOT @a:*bla",
                 log_event!["tags" => vec!["a:foobla"]],
-                log_event!["custom" => json!({"a": "foobla"})],
+                log_event!["a" => "foobla"],
             ),
-            // Wildcard prefix - facet (negate w/-).
+            // Wildcard prefix - attribute (negate w/-).
             (
                 "-@a:*bla",
                 log_event!["tags" => vec!["a:foobla"]],
-                log_event!["custom" => json!({"a": "foobla"})],
+                log_event!["a" => "foobla"],
             ),
-            // Wildcard suffix - facet.
+            // Wildcard suffix - attribute.
             (
                 "@b:bla*",
-                log_event!["custom" => json!({"b": "blabop"})],
+                log_event!["b" => "blabop"],
                 log_event!["tags" => vec!["b:blabop"]],
             ),
-            // Wildcard suffix - facet (negate).
+            // Wildcard suffix - attribute (negate).
             (
                 "NOT @b:bla*",
                 log_event!["tags" => vec!["b:blabop"]],
-                log_event!["custom" => json!({"b": "blabop"})],
+                log_event!["b" => "blabop"],
             ),
-            // Wildcard suffix - facet (negate w/-).
+            // Wildcard suffix - attribute (negate w/-).
             (
                 "-@b:bla*",
                 log_event!["tags" => vec!["b:blabop"]],
-                log_event!["custom" => json!({"b": "blabop"})],
+                log_event!["b" => "blabop"],
             ),
-            // Multiple wildcards - facet.
+            // Multiple wildcards - attribute.
             (
                 "@c:*b*la*",
-                log_event!["custom" => json!({"c": "foobla"})],
+                log_event!["c" => "foobla"],
                 log_event!["tags" => vec!["c:foobla"]],
             ),
-            // Multiple wildcards - facet (negate).
+            // Multiple wildcards - attribute (negate).
             (
                 "NOT @c:*b*la*",
                 log_event!["tags" => vec!["c:foobla"]],
-                log_event!["custom" => json!({"c": "foobla"})],
+                log_event!["c" => "foobla"],
             ),
-            // Multiple wildcards - facet (negate w/-).
+            // Multiple wildcards - attribute (negate w/-).
             (
                 "-@c:*b*la*",
                 log_event!["tags" => vec!["c:foobla"]],
-                log_event!["custom" => json!({"c": "foobla"})],
+                log_event!["c" => "foobla"],
             ),
             // Special case for tags.
             (
@@ -905,62 +899,50 @@ mod test {
                 log_event!["tags" => vec!["b:test"]],
                 log_event!["tags" => vec!["a:test"]],
             ),
-            // Range - numeric, inclusive, facet.
-            (
-                "@b:[1 TO 10]",
-                log_event!["custom" => json!({"b": 5})],
-                log_event!["custom" => json!({"b": 11})],
-            ),
+            // Range - numeric, inclusive, attribute.
+            ("@b:[1 TO 10]", log_event!["b" => 5], log_event!["b" => 11]),
             (
                 "@b:[1 TO 100]",
-                log_event!["custom" => json!({"b": "10"})],
-                log_event!["custom" => json!({"b": "2"})],
+                log_event!["b" => "10"],
+                log_event!["b" => "2"],
             ),
-            // Range - numeric, inclusive, facet (negate).
+            // Range - numeric, inclusive, attribute (negate).
             (
                 "NOT @b:[1 TO 10]",
-                log_event!["custom" => json!({"b": 11})],
-                log_event!["custom" => json!({"b": 5})],
+                log_event!["b" => 11],
+                log_event!["b" => 5],
             ),
             (
                 "NOT @b:[1 TO 100]",
-                log_event!["custom" => json!({"b": "2"})],
-                log_event!["custom" => json!({"b": "10"})],
+                log_event!["b" => "2"],
+                log_event!["b" => "10"],
             ),
-            // Range - numeric, inclusive, facet (negate w/-).
-            (
-                "-@b:[1 TO 10]",
-                log_event!["custom" => json!({"b": 11})],
-                log_event!["custom" => json!({"b": 5})],
-            ),
+            // Range - numeric, inclusive, attribute (negate w/-).
+            ("-@b:[1 TO 10]", log_event!["b" => 11], log_event!["b" => 5]),
             (
                 "NOT @b:[1 TO 100]",
-                log_event!["custom" => json!({"b": "2"})],
-                log_event!["custom" => json!({"b": "10"})],
+                log_event!["b" => "2"],
+                log_event!["b" => "10"],
             ),
-            // Range - alpha, inclusive, facet.
-            (
-                "@b:[a TO z]",
-                log_event!["custom" => json!({"b": "c"})],
-                log_event!["custom" => json!({"b": 5})],
-            ),
-            // Range - alphanumeric, inclusive, facet.
+            // Range - alpha, inclusive, attribute.
+            ("@b:[a TO z]", log_event!["b" => "c"], log_event!["b" => 5]),
+            // Range - alphanumeric, inclusive, attribute.
             (
                 r#"@b:["1" TO "100"]"#,
-                log_event!["custom" => json!({"b": "10"})],
-                log_event!["custom" => json!({"b": "2"})],
+                log_event!["b" => "10"],
+                log_event!["b" => "2"],
             ),
-            // Range - alphanumeric, inclusive, facet (negate).
+            // Range - alphanumeric, inclusive, attribute (negate).
             (
                 r#"NOT @b:["1" TO "100"]"#,
-                log_event!["custom" => json!({"b": "2"})],
-                log_event!["custom" => json!({"b": "10"})],
+                log_event!["b" => "2"],
+                log_event!["b" => "10"],
             ),
-            // Range - alphanumeric, inclusive, facet (negate).
+            // Range - alphanumeric, inclusive, attribute (negate).
             (
                 r#"-@b:["1" TO "100"]"#,
-                log_event!["custom" => json!({"b": "2"})],
-                log_event!["custom" => json!({"b": "10"})],
+                log_event!["b" => "2"],
+                log_event!["b" => "10"],
             ),
             // Range - tag, exclusive.
             (
@@ -995,38 +977,34 @@ mod test {
                 log_event!["tags" => vec!["f:100"]],
                 log_event!["tags" => vec!["f:10"]],
             ),
-            // Range - facet, exclusive.
+            // Range - attribute, exclusive.
+            ("@f:{1 TO 100}", log_event!["f" => 50], log_event!["f" => 1]),
             (
                 "@f:{1 TO 100}",
-                log_event!["custom" => json!({"f": 50})],
-                log_event!["custom" => json!({"f": 1})],
+                log_event!["f" => 50],
+                log_event!["f" => 100],
             ),
-            (
-                "@f:{1 TO 100}",
-                log_event!["custom" => json!({"f": 50})],
-                log_event!["custom" => json!({"f": 100})],
-            ),
-            // Range - facet, exclusive (negate).
+            // Range - attribute, exclusive (negate).
             (
                 "NOT @f:{1 TO 100}",
-                log_event!["custom" => json!({"f": 1})],
-                log_event!["custom" => json!({"f": 50})],
+                log_event!["f" => 1],
+                log_event!["f" => 50],
             ),
             (
                 "NOT @f:{1 TO 100}",
-                log_event!["custom" => json!({"f": 100})],
-                log_event!["custom" => json!({"f": 50})],
+                log_event!["f" => 100],
+                log_event!["f" => 50],
             ),
-            // Range - facet, exclusive (negate w/-).
+            // Range - attribute, exclusive (negate w/-).
             (
                 "-@f:{1 TO 100}",
-                log_event!["custom" => json!({"f": 1})],
-                log_event!["custom" => json!({"f": 50})],
+                log_event!["f" => 1],
+                log_event!["f" => 50],
             ),
             (
                 "-@f:{1 TO 100}",
-                log_event!["custom" => json!({"f": 100})],
-                log_event!["custom" => json!({"f": 50})],
+                log_event!["f" => 100],
+                log_event!["f" => 50],
             ),
         ]
     }
@@ -1043,7 +1021,7 @@ mod test {
         let checks = get_checks();
 
         for (source, pass, fail) in checks {
-            let node = parse(source).unwrap();
+            let node: QueryNode = source.parse().unwrap();
             let matcher = build_matcher(&node, &filter);
 
             assert!(matcher.run(&processor(pass)));
@@ -1066,7 +1044,7 @@ mod test {
     fn check_datadog() {
         for (source, pass, fail) in get_checks() {
             let config = DatadogSearchConfig {
-                source: source.to_owned(),
+                source: source.parse().unwrap(),
             };
 
             // Every query should build successfully.
@@ -1076,16 +1054,16 @@ mod test {
 
             assert!(
                 cond.check_with_context(pass.clone()).0.is_ok(),
-                "should pass: {}\nevent: {:?}",
+                "should pass: {}\nevent: {}",
                 source,
-                pass.as_log()
+                serde_json::to_string(&pass.as_log()).unwrap(),
             );
 
             assert!(
                 cond.check_with_context(fail.clone()).0.is_err(),
-                "should fail: {}\nevent: {:?}",
+                "should fail: {}\nevent: {}",
                 source,
-                fail.as_log()
+                serde_json::to_string(&fail.as_log()).unwrap(),
             );
         }
     }

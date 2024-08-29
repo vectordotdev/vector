@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use serde_json::Value;
-use vrl::compiler::VrlRuntime;
+use vrl::{compiler::VrlRuntime, datadog_search_syntax::QueryNode};
 
 use crate::{
     schema::{generate_string_schema, SchemaGenerator, SchemaObject},
@@ -25,5 +25,14 @@ impl ToValue for VrlRuntime {
         Value::String(match self {
             VrlRuntime::Ast => "ast".to_owned(),
         })
+    }
+}
+
+impl Configurable for QueryNode {
+    fn generate_schema(_gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
+    where
+        Self: Sized,
+    {
+        Ok(generate_string_schema())
     }
 }

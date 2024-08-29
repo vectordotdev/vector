@@ -14,7 +14,6 @@ env:
   S3_ADDRESS: http://mock-localstack:4566
   SQS_ADDRESS: http://mock-localstack:4566
   SNS_ADDRESS: http://mock-localstack:4566
-  WATCHLOGS_ADDRESS: http://mock-watchlogs:6000
 
 matrix:
   version: [latest]

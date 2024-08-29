@@ -419,7 +419,7 @@ jobs:
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs:
       - compute-metadata
       - upload-baseline-image-to-ecr

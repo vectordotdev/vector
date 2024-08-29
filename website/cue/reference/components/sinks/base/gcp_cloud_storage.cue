@@ -497,7 +497,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 				type: object: options: delimiter: {
 					description: "The ASCII (7-bit) character that delimits byte sequences."
 					required:    true
-					type: uint: {}
+					type: ascii_char: {}
 				}
 			}
 			length_delimited: {
