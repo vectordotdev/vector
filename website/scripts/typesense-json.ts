@@ -184,9 +184,10 @@ async function indexHTMLFiles(
         };
       }
 
-      if (activeRecord) {
-        algoliaRecords.push({ ...activeRecord });
-      }
+      // TMP: remove as I think this is causing duplicate records in the JSON file
+      // if (activeRecord) {
+      //   algoliaRecords.push({ ...activeRecord })
+      // }
 
       for (const rec of algoliaRecords) {
         // The id is the url of the section of the page that the record covers.
@@ -262,7 +263,7 @@ async function buildIndex() {
   for (const section of sections) {
     let files = await glob(section.path);
     console.log(chalk.blue(`Indexing ${section.displayPath}...`));
-    indexHTMLFiles(allRecords, section.name, files, section.ranking);
+    await indexHTMLFiles(allRecords, section.name, files, section.ranking);
   }
 
   console.log(chalk.green(`Success. ${allRecords.length} records have been successfully indexed.`));
