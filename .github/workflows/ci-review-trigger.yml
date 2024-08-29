@@ -52,19 +52,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: |
-      github.event.issue.pull_request && (
-          startsWith(github.event.review.body, '/ci-run-all')
-          || startsWith(github.event.review.body, '/ci-run-cli')
-          || startsWith(github.event.review.body, '/ci-run-misc')
-          || startsWith(github.event.review.body, '/ci-run-deny')
-          || startsWith(github.event.review.body, '/ci-run-component-features')
-          || startsWith(github.event.review.body, '/ci-run-cross')
-          || startsWith(github.event.review.body, '/ci-run-unit-mac')
-          || startsWith(github.event.review.body, '/ci-run-unit-windows')
-          || startsWith(github.event.review.body, '/ci-run-environment')
-          || startsWith(github.event.review.body, '/ci-run-regression')
-          || startsWith(github.event.review.body, '/ci-run-k8s')
-        )
+        startsWith(github.event.review.body, '/ci-run-all')
+        || startsWith(github.event.review.body, '/ci-run-cli')
+        || startsWith(github.event.review.body, '/ci-run-misc')
+        || startsWith(github.event.review.body, '/ci-run-deny')
+        || startsWith(github.event.review.body, '/ci-run-component-features')
+        || startsWith(github.event.review.body, '/ci-run-cross')
+        || startsWith(github.event.review.body, '/ci-run-unit-mac')
+        || startsWith(github.event.review.body, '/ci-run-unit-windows')
+        || startsWith(github.event.review.body, '/ci-run-environment')
+        || startsWith(github.event.review.body, '/ci-run-regression')
+        || startsWith(github.event.review.body, '/ci-run-k8s')
     steps:
       - name: Generate authentication token
         id: generate_token
