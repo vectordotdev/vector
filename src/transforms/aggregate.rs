@@ -68,7 +68,7 @@ pub enum AggregationMode {
     /// Mean value of absolute metric, ignores incremental
     Mean,
 
-    /// Stdev
+    /// Stdev value of absolute metric, ignores incremental
     Stdev,
 }
 
@@ -110,6 +110,7 @@ pub struct Aggregate {
     interval: Duration,
     map: HashMap<metric::MetricSeries, MetricEntry>,
     prev_map: HashMap<metric::MetricSeries, MetricEntry>,
+    multi_map: HashMap<metric::MetricSeries, Vec<MetricEntry>>,
     mode: AggregationMode,
 }
 
@@ -119,6 +120,7 @@ impl Aggregate {
             interval: Duration::from_millis(config.interval_ms),
             map: Default::default(),
             prev_map: Default::default(),
+            multi_map: Default::default(),
             mode: config.mode.clone(),
         })
     }
@@ -195,8 +197,22 @@ impl Aggregate {
                     }
                 },
             },
-            AggregationMode::Mean => todo!(),
-            AggregationMode::Stdev => todo!(),
+            AggregationMode::Mean | AggregationMode::Stdev => match data.kind {
+                metric::MetricKind::Incremental => (),
+                metric::MetricKind::Absolute => {
+                    if matches!(data.value, MetricValue::Gauge { value: _ }) {
+                        match self.multi_map.entry(series) {
+                            Entry::Occupied(mut entry) => {
+                                let existing = entry.get_mut();
+                                existing.push((data, metadata));
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert(vec![(data, metadata)]);
+                            }
+                        }
+                    }
+                }
+            },
         }
 
         emit!(AggregateEventRecorded);
@@ -250,6 +266,52 @@ impl Aggregate {
                 }
             }
             output.push(Event::Metric(metric));
+        }
+
+        let multi_map = std::mem::take(&mut self.multi_map);
+        for (series, entries) in multi_map.into_iter() {
+            let first = entries.first();
+            if first == None {
+                continue;
+            }
+            let (mut final_sum, mut final_metadata) = first.unwrap().clone();
+            for (data, metadata) in entries.iter().skip(1) {
+                let _ = final_sum.update(data);
+                final_metadata.merge(metadata.clone());
+            }
+            let mut final_mean = final_sum.clone();
+            let mut final_mean_value = 0.0;
+            if let MetricValue::Gauge { value } = final_mean.value_mut() {
+                *value = *value / entries.len() as f64;
+                final_mean_value = *value;
+            }
+            match self.mode {
+                AggregationMode::Mean => {
+                    let metric = metric::Metric::from_parts(series, final_mean, final_metadata);
+                    output.push(Event::Metric(metric));
+                }
+                AggregationMode::Stdev => {
+                    let variance = entries
+                        .iter()
+                        .filter_map(|(data, _)| {
+                            if let MetricValue::Gauge { value } = data.value() {
+                                let diff = final_mean_value - value;
+                                Some(diff * diff)
+                            } else {
+                                None
+                            }
+                        })
+                        .sum::<f64>()
+                        / entries.len() as f64;
+                    let mut final_stdev = final_mean;
+                    if let MetricValue::Gauge { value } = final_stdev.value_mut() {
+                        *value = variance.sqrt()
+                    }
+                    let metric = metric::Metric::from_parts(series, final_stdev, final_metadata);
+                    output.push(Event::Metric(metric));
+                }
+                _ => (),
+            }
         }
 
         self.prev_map = map;
@@ -672,6 +734,123 @@ mod tests {
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&result, &out[0]);
+    }
+
+    #[test]
+    fn absolute_mean() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Mean,
+        })
+        .unwrap();
+
+        let gauge_a_1 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 32.0 },
+        );
+        let gauge_a_2 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 82.0 },
+        );
+        let gauge_a_3 = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 51.0 },
+        );
+        let mean_result = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 55.0 },
+        );
+
+        // Single item, it should be returned as is
+        agg.record(gauge_a_2.clone());
+        let mut out = vec![];
+        // We should flush 1 item gauge_a_2
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&gauge_a_2, &out[0]);
+
+        // A subsequent flush doesn't send out anything
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // One more just to make sure that we don't re-see from the other buffer
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // Three absolutes, result should be mean
+        agg.record(gauge_a_1.clone());
+        agg.record(gauge_a_2.clone());
+        agg.record(gauge_a_3.clone());
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&mean_result, &out[0]);
+    }
+
+    #[test]
+    fn absolute_stdev() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Stdev,
+        })
+        .unwrap();
+
+        let gauges = vec![
+            make_metric(
+                "gauge_a",
+                metric::MetricKind::Absolute,
+                metric::MetricValue::Gauge { value: 25.0 },
+            ),
+            make_metric(
+                "gauge_a",
+                metric::MetricKind::Absolute,
+                metric::MetricValue::Gauge { value: 30.0 },
+            ),
+            make_metric(
+                "gauge_a",
+                metric::MetricKind::Absolute,
+                metric::MetricValue::Gauge { value: 35.0 },
+            ),
+            make_metric(
+                "gauge_a",
+                metric::MetricKind::Absolute,
+                metric::MetricValue::Gauge { value: 40.0 },
+            ),
+            make_metric(
+                "gauge_a",
+                metric::MetricKind::Absolute,
+                metric::MetricValue::Gauge { value: 45.0 },
+            ),
+            make_metric(
+                "gauge_a",
+                metric::MetricKind::Absolute,
+                metric::MetricValue::Gauge { value: 50.0 },
+            ),
+            make_metric(
+                "gauge_a",
+                metric::MetricKind::Absolute,
+                metric::MetricValue::Gauge { value: 55.0 },
+            ),
+        ];
+        let stdev_result = make_metric(
+            "gauge_a",
+            metric::MetricKind::Absolute,
+            metric::MetricValue::Gauge { value: 10.0 },
+        );
+
+        for gauge in gauges {
+            agg.record(gauge);
+        }
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&stdev_result, &out[0]);
     }
 
     #[test]
