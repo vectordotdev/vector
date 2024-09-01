@@ -145,6 +145,7 @@ pub async fn load_from_paths_with_provider_and_secrets(
         debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
         let resolved_secrets = secrets_backends_loader
             .retrieve(&mut signal_handler.subscribe())
+            .await
             .map_err(|e| vec![e])?;
         load_builder_from_paths_with_secrets(config_paths, resolved_secrets)?
     } else {

@@ -3,7 +3,7 @@ This directory contains a set of integration test frameworks for vector which ar
 
 Each directory contains two files:
 
-1. A `compose.yaml` file containing the instructions to `docker-compose` or `podman-compose` for how
+1. A `compose.yaml` file containing the instructions to `docker compose` or `podman compose` for how
    to set up the containers in which to run the integrations, and
 2. A `test.yaml` file that describes how to run the integration tests, including a matrix of
    software versions or other parameters over which the tests will be run.

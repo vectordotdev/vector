@@ -276,7 +276,7 @@ base: components: sources: socket: configuration: {
 					delimiter: {
 						description: "The character that delimits byte sequences."
 						required:    true
-						type: uint: {}
+						type: ascii_char: {}
 					}
 					max_length: {
 						description: """
@@ -414,7 +414,7 @@ base: components: sources: socket: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: default: "host"
+		type: string: {}
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."

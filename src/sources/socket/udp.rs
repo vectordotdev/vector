@@ -1,3 +1,4 @@
+use super::default_host_key;
 use bytes::BytesMut;
 use chrono::Utc;
 use futures::StreamExt;
@@ -17,7 +18,6 @@ use vector_lib::{
 
 use crate::{
     codecs::Decoder,
-    config::log_schema,
     event::Event,
     internal_events::{
         SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
@@ -57,8 +57,7 @@ pub struct UdpConfig {
     /// Set to `""` to suppress this key.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
-    host_key: OptionalValuePath,
+    host_key: Option<OptionalValuePath>,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
     ///
@@ -87,10 +86,6 @@ pub struct UdpConfig {
     pub log_namespace: Option<bool>,
 }
 
-fn default_host_key() -> OptionalValuePath {
-    log_schema().host_key().cloned().into()
-}
-
 fn default_port_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("port"))
 }
@@ -100,8 +95,8 @@ fn default_max_length() -> usize {
 }
 
 impl UdpConfig {
-    pub(super) const fn host_key(&self) -> &OptionalValuePath {
-        &self.host_key
+    pub(super) fn host_key(&self) -> OptionalValuePath {
+        self.host_key.clone().unwrap_or(default_host_key())
     }
 
     pub const fn port_key(&self) -> &OptionalValuePath {
@@ -124,7 +119,7 @@ impl UdpConfig {
         Self {
             address,
             max_length: default_max_length(),
-            host_key: default_host_key(),
+            host_key: None,
             port_key: default_port_key(),
             receive_buffer_bytes: None,
             framing: None,
@@ -241,7 +236,11 @@ pub(super) fn udp(
                                             now,
                                         );
 
-                                        let legacy_host_key = config.host_key.clone().path;
+                                        let legacy_host_key = config
+                                            .host_key
+                                            .clone()
+                                            .unwrap_or(default_host_key())
+                                            .path;
 
                                         log_namespace.insert_source_metadata(
                                             SocketConfig::NAME,
