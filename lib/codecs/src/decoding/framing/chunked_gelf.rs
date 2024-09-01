@@ -81,32 +81,28 @@ impl MessageState {
     pub const fn new(total_chunks: u8, timeout_task: JoinHandle<()>) -> Self {
         Self {
             total_chunks,
-            chunks: Self::default_chunks(),
+            chunks: [const { Bytes::new() }; GELF_MAX_TOTAL_CHUNKS as usize],
             chunks_bitmap: 0,
             timeout_task,
         }
     }
 
-    pub const fn default_chunks() -> [Bytes; GELF_MAX_TOTAL_CHUNKS as usize] {
-        [const { Bytes::new() }; GELF_MAX_TOTAL_CHUNKS as usize]
-    }
-
-    pub fn is_chunk_present(&self, sequence_number: u8) -> bool {
+    fn is_chunk_present(&self, sequence_number: u8) -> bool {
         let chunk_bitmap_id = 1 << sequence_number;
         self.chunks_bitmap & chunk_bitmap_id != 0
     }
 
-    pub fn add_chunk(&mut self, sequence_number: u8, chunk: Bytes) {
+    fn add_chunk(&mut self, sequence_number: u8, chunk: Bytes) {
         let chunk_bitmap_id = 1 << sequence_number;
         self.chunks[sequence_number as usize] = chunk;
         self.chunks_bitmap |= chunk_bitmap_id;
     }
 
-    pub fn is_complete(&self) -> bool {
+    fn is_complete(&self) -> bool {
         self.chunks_bitmap.count_ones() == self.total_chunks as u32
     }
 
-    pub fn retrieve_message(&mut self) -> Option<Bytes> {
+    fn retrieve_message(&mut self) -> Option<Bytes> {
         if self.is_complete() {
             self.timeout_task.abort();
             let chunks = &self.chunks[0..self.total_chunks as usize];
