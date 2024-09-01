@@ -14,7 +14,7 @@ use tokio_util::codec::Decoder;
 use tracing::{info, warn};
 use vector_config::configurable_component;
 
-const GELF_MAGIC: [u8; 2] = [0x1e, 0x0f];
+const GELF_MAGIC: &[u8] = &[0x1e, 0x0f];
 const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
 const DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 const DEFAULT_PENDING_MESSAGES_LIMIT: usize = 1000;
@@ -48,6 +48,7 @@ impl ChunkedGelfDecoderConfig {
 /// Options for building a `ChunkedGelfDecoder`.
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 pub struct ChunkedGelfDecoderOptions {
     /// The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
     /// decoder drops all the received chunks of the incomplete message and starts over.
@@ -55,6 +56,7 @@ pub struct ChunkedGelfDecoderOptions {
         default = "default_timeout_secs",
         skip_serializing_if = "vector_core::serde::is_default"
     )]
+    #[derivative(Default(value = "default_timeout_secs()"))]
     pub timeout_secs: f64,
 
     /// The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
@@ -63,16 +65,8 @@ pub struct ChunkedGelfDecoderOptions {
         default = "default_pending_messages_limit",
         skip_serializing_if = "vector_core::serde::is_default"
     )]
+    #[derivative(Default(value = "default_pending_messages_limit()"))]
     pub pending_messages_limit: usize,
-}
-
-impl Default for ChunkedGelfDecoderOptions {
-    fn default() -> Self {
-        Self {
-            timeout_secs: default_timeout_secs(),
-            pending_messages_limit: default_pending_messages_limit(),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -310,8 +304,7 @@ impl ChunkedGelfDecoder {
         &mut self,
         mut src: Bytes,
     ) -> Result<Option<Bytes>, ChunkedGelfDecoderError> {
-        let magic = src.get(0..2);
-        if magic.is_some_and(|magic| magic == GELF_MAGIC) {
+        if src.starts_with(GELF_MAGIC) {
             src.advance(2);
             self.decode_chunk(src)
         } else {
@@ -370,7 +363,7 @@ mod tests {
         payload: &str,
     ) -> BytesMut {
         let mut chunk = BytesMut::new();
-        chunk.put_slice(&GELF_MAGIC);
+        chunk.put_slice(GELF_MAGIC);
         chunk.put_u64(message_id);
         chunk.put_u8(sequence_number);
         chunk.put_u8(total_chunks);
@@ -581,7 +574,7 @@ mod tests {
     #[traced_test]
     async fn decode_chunk_with_invalid_header() {
         let mut src = BytesMut::new();
-        src.extend_from_slice(&GELF_MAGIC);
+        src.extend_from_slice(GELF_MAGIC);
         // Invalid chunk header with less than 10 bytes
         let invalid_chunk = [0x12, 0x34];
         src.extend_from_slice(&invalid_chunk);
