@@ -69,7 +69,7 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.39.3"
+version = "1.40.0"
 default-features = false
 features = ["full"]
 
