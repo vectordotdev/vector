@@ -76,6 +76,27 @@ base: components: sinks: configuration: {
 			}
 		}
 	}
+	graph: {
+		description: """
+			extra graph configuration
+
+			Configure output for component when generated with graph command
+			"""
+		required: false
+		type: object: options: node_attributes: {
+			description: """
+				Node attributes to add to this component's node in resulting graph
+
+				They are added to the node as provided
+				"""
+			required: false
+			type: object: options: "*": {
+				description: "A single graph node attribute in graphviz DOT language."
+				required:    true
+				type: string: {}
+			}
+		}
+	}
 	healthcheck: {
 		description: "Healthcheck configuration."
 		required:    false

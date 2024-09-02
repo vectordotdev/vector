@@ -14,7 +14,7 @@ use vector_lib::{
     sink::VectorSink,
 };
 
-use super::{id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
+use super::{dot_graph::GraphConfig, id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
 use crate::extra_context::ExtraContext;
 use crate::sinks::{util::UriSerde, Healthcheck};
 
@@ -52,6 +52,10 @@ pub struct SinkOuter<T>
 where
     T: Configurable + Serialize + 'static,
 {
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub graph: GraphConfig,
+
     #[configurable(derived)]
     pub inputs: Inputs<T>,
 
@@ -95,6 +99,7 @@ where
             healthcheck_uri: None,
             inner: inner.into(),
             proxy: Default::default(),
+            graph: Default::default(),
         }
     }
 
@@ -151,6 +156,7 @@ where
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
+            graph: self.graph,
         }
     }
 }

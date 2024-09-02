@@ -26,6 +26,7 @@ mod builder;
 mod cmd;
 mod compiler;
 mod diff;
+mod dot_graph;
 mod enrichment_table;
 pub mod format;
 mod graph;
