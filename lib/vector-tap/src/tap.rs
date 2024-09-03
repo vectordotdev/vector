@@ -14,7 +14,6 @@ use uuid::Uuid;
 use vector_buffers::{topology::builder::TopologyBuilder, WhenFull};
 use vector_common::config::ComponentKey;
 use vector_core::event::{EventArray, LogArray, MetricArray, TraceArray};
-
 use vector_core::fanout;
 
 use crate::notification::{InvalidMatch, Matched, NotMatched, Notification};
