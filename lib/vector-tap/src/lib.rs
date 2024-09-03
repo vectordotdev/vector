@@ -3,6 +3,10 @@
 #[macro_use]
 extern crate tracing;
 
+pub mod notification;
+pub mod tap;
+pub mod topology;
+
 use std::{borrow::Cow, collections::BTreeMap};
 
 use colored::{ColoredString, Colorize};
