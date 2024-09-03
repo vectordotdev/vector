@@ -476,6 +476,11 @@ base: components: sinks: loki: configuration: {
 		required:    false
 		type: bool: default: false
 	}
+	remove_structured_metadata_fields: {
+		description: "Whether or not to delete fields from the event when they are used in structured metadata."
+		required:    false
+		type: bool: default: false
+	}
 	remove_timestamp: {
 		description: """
 			Whether or not to remove the timestamp from the event payload.
@@ -668,6 +673,32 @@ base: components: sinks: loki: configuration: {
 					default: 60
 					unit:    "seconds"
 				}
+			}
+		}
+	}
+	structured_metadata: {
+		description: """
+			Structured metadata that is attached to each batch of events.
+
+			Both keys and values are templateable, which enables you to attach dynamic structured metadata to events.
+
+			Valid metadata keys include `*`, and prefixes ending with `*`, to allow for the expansion of
+			objects into multiple metadata entries. This follows the same logic as [Label expansion][label_expansion].
+
+			[label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
+			"""
+		required: false
+		type: object: {
+			examples: [{
+				"\"*\"":             "{{ metadata }}"
+				"\"pod_labels_*\"":  "{{ kubernetes.pod_labels }}"
+				source:              "vector"
+				"{{ event_field }}": "{{ some_other_event_field }}"
+			}]
+			options: "*": {
+				description: "Loki structured metadata."
+				required:    true
+				type: string: syntax: "template"
 			}
 		}
 	}
