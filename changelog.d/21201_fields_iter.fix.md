@@ -1,1 +1,1 @@
-The fields iterator now quotes all invalid path segments and he reduce transform can correctly parse path containing special characters.
+The `reduce` transform no longer panics when reducing fields that contain special characters.
