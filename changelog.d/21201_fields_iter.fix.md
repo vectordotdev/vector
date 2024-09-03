@@ -1,1 +1,1 @@
-The `reduce` transform no longer panics when reducing fields that contain special characters.
+The `reduce` transform can now reduce fields that contain special characters.
