@@ -325,7 +325,7 @@ base: components: sources: heroku_logs: configuration: {
 			chunked_gelf: {
 				description:   "Options for the chunked GELF decoder."
 				relevant_when: "method = \"chunked_gelf\""
-				required:      false
+				required:      true
 				type: object: options: {
 					pending_messages_limit: {
 						description: """
@@ -335,13 +335,13 @@ base: components: sources: heroku_logs: configuration: {
 						required: false
 						type: uint: default: 1000
 					}
-					timeout_millis: {
+					timeout_secs: {
 						description: """
-																The timeout, in milliseconds, for a message to be fully received. If the timeout is reached, the
+																The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
 																decoder drops all the received chunks of the incomplete message and starts over.
 																"""
 						required: false
-						type: uint: default: 5000
+						type: float: default: 5.0
 					}
 				}
 			}
