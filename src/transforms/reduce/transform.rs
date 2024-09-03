@@ -334,53 +334,6 @@ impl TaskTransform<Event> for Reduce {
     }
 }
 
-// TODO delete after issue 21077 is resolved.
-// fn quote_invalid_paths(path: &str) -> String {
-//     let components: Vec<&str> = path.split('.').collect();
-//
-//     let index: Vec<bool> = components
-//         .iter()
-//         .map(|component| component.ends_with('\\'))
-//         .collect();
-//
-//     let mut escaping = false;
-//     let mut result = String::new();
-//     index.iter().enumerate().for_each(|(i, _)| {
-//         let current = components[i].trim_end_matches('\\');
-//         if i == 0 {
-//             if index[0] {
-//                 escaping = true;
-//                 result.push('"');
-//             }
-//             result.push_str(current);
-//         } else if i == index.len() - 1 {
-//             result.push_str(current);
-//             if escaping {
-//                 escaping = false;
-//                 result.push('"');
-//             };
-//         } else if !index[i - 1] && index[i] {
-//             escaping = true;
-//             result.push('"');
-//             result.push_str(current);
-//         } else if index[i - 1] && index[i] {
-//             escaping = true;
-//             result.push_str(current);
-//         } else if index[i - 1] && !index[i] {
-//             result.push_str(current);
-//             escaping = false;
-//             result.push('"');
-//         } else {
-//             result.push_str(current);
-//         }
-//
-//         if i < components.len() - 1 {
-//             result.push('.');
-//         }
-//     });
-//     result
-// }
-
 #[cfg(test)]
 mod test {
     use indoc::indoc;
