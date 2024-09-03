@@ -383,7 +383,7 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
@@ -438,7 +438,7 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
@@ -461,7 +461,7 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
           path: target/artifacts
@@ -509,42 +509,42 @@ jobs:
           version: latest
           install: true
       - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (aarch64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-gnueabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-gnueabi
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-musleabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts
@@ -582,52 +582,52 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (aarch64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-pc-windows-msvc)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-gnueabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-gnueabi
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-musleabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts
@@ -667,57 +667,57 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (aarch64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-pc-windows-msvc)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
       - name: Download artifact checksums
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-gnueabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-gnueabi
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-musleabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts
@@ -771,52 +771,52 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (aarch64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-pc-windows-msvc)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-gnueabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-gnueabi
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-musleabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts

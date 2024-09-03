@@ -202,7 +202,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request_review' }}
         uses: actions/checkout@v3
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: e2e-test-deb-package
           path: target/artifacts
