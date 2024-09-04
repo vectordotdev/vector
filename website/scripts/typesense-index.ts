@@ -9,8 +9,10 @@ dotenv.config();
  * @param {string} aliasCollectionName - Name of the alias collection (optional).
  */
 
+const collectionName = 'vector_docs'
 
-typesenseSync(documentsFile)
+
+typesenseSync(collectionName, documentsFile)
   .then(() => {
     console.log('Typesense update completed.');
   })
