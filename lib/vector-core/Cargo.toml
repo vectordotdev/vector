@@ -48,7 +48,7 @@ serde_with = { version = "3.9.0", default-features = false, features = ["std", "
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu = { version = "0.7.5", default-features = false }
 socket2 = { version = "0.5.7", default-features = false }
-tokio = { version = "1.39.3", default-features = false, features = ["net"] }
+tokio = { version = "1.40.0", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.4", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
@@ -89,7 +89,7 @@ similar-asserts = "1.5.0"
 tokio-test = "0.4.4"
 toml.workspace = true
 ndarray = "0.16.1"
-ndarray-stats = "0.5.1"
+ndarray-stats = "0.6.0"
 noisy_float = "0.2.0"
 rand = "0.8.5"
 rand_distr = "0.4.3"
