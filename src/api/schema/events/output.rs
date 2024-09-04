@@ -4,7 +4,7 @@ use crate::api::schema::events::log::Log;
 use crate::api::schema::events::metric::Metric;
 use crate::api::schema::events::trace::Trace;
 use vector_lib::tap::notification::Notification;
-use vector_lib::tap::tap::TapPayload;
+use vector_lib::tap::controller::TapPayload;
 
 /// This wrapper struct hoists `message` up from [`Notification`] for a more
 /// natural querying experience. While ideally [`Notification`] would be a

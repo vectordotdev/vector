@@ -23,6 +23,7 @@ pub struct Inputs<T: 'static>(Vec<T>);
 
 impl<T> Inputs<T> {
     /// Returns `true` if no inputs are present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -62,7 +63,7 @@ where
 
 impl<T> Extend<T> for Inputs<T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        self.0.extend(iter)
+        self.0.extend(iter);
     }
 }
 

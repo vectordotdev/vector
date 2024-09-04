@@ -6,11 +6,14 @@ edition = "2021"
 publish = false
 license = "MPL-2.0"
 
+[features]
+api = ["dep:async-graphql"]
+
 [dependencies]
 async-graphql = { version = "7.0.7", default-features = false, features = ["playground"], optional = true}
 colored = { version = "2.1.0", default-features = false }
-futures = { version = "0.3.30", default-features = false, features = ["std"] }
-glob = { version = "0.3.1", default-features = false }
+futures.workspace = true
+glob.workspace = true
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.7.5", default-features = false }
 tokio = { version = "1.39.3", default-features = false, features = ["time"] }
@@ -30,9 +33,3 @@ chrono = { workspace = true }
 portpicker = { path = "../portpicker" }
 serde_json = { workspace = true }
 tokio = { version = "1.39.3", default-features = false, features = ["test-util"] }
-
-[features]
-api = ["dep:async-graphql"]
-
-
-

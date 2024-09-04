@@ -12,7 +12,7 @@ use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{select, sync::mpsc, time};
 use tokio_stream::wrappers::ReceiverStream;
 use vector_lib::tap::{
-    tap::{TapController, TapPatterns},
+    controller::{TapController, TapPatterns},
     topology::WatchRx,
 };
 

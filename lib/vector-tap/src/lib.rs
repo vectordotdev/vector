@@ -4,7 +4,7 @@
 extern crate tracing;
 
 pub mod notification;
-pub mod tap;
+pub mod controller;
 pub mod topology;
 
 use std::{borrow::Cow, collections::BTreeMap};

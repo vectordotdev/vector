@@ -39,7 +39,7 @@ vector-config-macros = { path = "../vector-config-macros", default-features = fa
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 
 [dev-dependencies]
-futures = { version = "0.3", default-features = false }
+futures.workspace = true
 indoc = { version = "2", default-features = false }
 tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.5.0"
