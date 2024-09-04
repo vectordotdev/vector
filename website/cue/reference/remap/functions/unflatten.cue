@@ -92,7 +92,7 @@ remap: functions: unflatten: {
             }
 		},
 		{
-			title: "Ignore inconsitent keys values"
+			title: "Ignore inconsistent keys values"
 			source: #"""
 				unflatten({
                    	"a": 3,
