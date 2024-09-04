@@ -17,7 +17,7 @@ anyhow = { version = "1.0.86", default-features = false, features = ["std"] }
 
 # Tokio / Futures
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "1.38.0", default-features = false, features = ["macros", "rt", "sync"] }
+tokio = { version = "1.39.3", default-features = false, features = ["macros", "rt", "sync"] }
 tokio-stream = { version = "0.1.15", default-features = false, features = ["sync"] }
 
 # GraphQL
@@ -31,5 +31,5 @@ tokio-tungstenite = { version = "0.20.1", default-features = false, features = [
 chrono.workspace = true
 clap.workspace = true
 url = { version = "2.5.2", default-features = false }
-uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
+uuid.workspace = true
 indoc = { version = "2.0.5", default-features = false }

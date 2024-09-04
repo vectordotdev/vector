@@ -1,4 +1,4 @@
-use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
+use std::{hash::Hash, marker::PhantomData, num::NonZeroU64, pin::Pin, sync::Arc, time::Duration};
 
 use futures_util::stream::{self, BoxStream};
 use serde_with::serde_as;
@@ -90,8 +90,8 @@ pub trait TowerRequestConfigDefaults {
     const RATE_LIMIT_DURATION_SECS: u64 = 1;
     const RATE_LIMIT_NUM: u64 = i64::MAX as u64; // i64 avoids TOML deserialize issue
     const RETRY_ATTEMPTS: usize = isize::MAX as usize; // isize avoids TOML deserialize issue
-    const RETRY_MAX_DURATION_SECS: u64 = 30;
-    const RETRY_INITIAL_BACKOFF_SECS: u64 = 1;
+    const RETRY_MAX_DURATION_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(30) };
+    const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -144,7 +144,7 @@ pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequest
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::human_name = "Max Retry Duration"))]
     #[serde(default = "default_retry_max_duration_secs::<D>")]
-    pub retry_max_duration_secs: u64,
+    pub retry_max_duration_secs: NonZeroU64,
 
     /// The amount of time to wait before attempting the first retry for a failed request.
     ///
@@ -152,7 +152,7 @@ pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequest
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::human_name = "Retry Initial Backoff"))]
     #[serde(default = "default_retry_initial_backoff_secs::<D>")]
-    pub retry_initial_backoff_secs: u64,
+    pub retry_initial_backoff_secs: NonZeroU64,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -190,11 +190,11 @@ const fn default_retry_attempts<D: TowerRequestConfigDefaults>() -> usize {
     D::RETRY_ATTEMPTS
 }
 
-const fn default_retry_max_duration_secs<D: TowerRequestConfigDefaults>() -> u64 {
+const fn default_retry_max_duration_secs<D: TowerRequestConfigDefaults>() -> NonZeroU64 {
     D::RETRY_MAX_DURATION_SECS
 }
 
-const fn default_retry_initial_backoff_secs<D: TowerRequestConfigDefaults>() -> u64 {
+const fn default_retry_initial_backoff_secs<D: TowerRequestConfigDefaults>() -> NonZeroU64 {
     D::RETRY_INITIAL_BACKOFF_SECS
 }
 
@@ -225,8 +225,8 @@ impl<D: TowerRequestConfigDefaults> TowerRequestConfig<D> {
             rate_limit_duration: Duration::from_secs(self.rate_limit_duration_secs),
             rate_limit_num: self.rate_limit_num,
             retry_attempts: self.retry_attempts,
-            retry_max_duration: Duration::from_secs(self.retry_max_duration_secs),
-            retry_initial_backoff: Duration::from_secs(self.retry_initial_backoff_secs),
+            retry_max_duration: Duration::from_secs(self.retry_max_duration_secs.get()),
+            retry_initial_backoff: Duration::from_secs(self.retry_initial_backoff_secs.get()),
             adaptive_concurrency: self.adaptive_concurrency,
             retry_jitter_mode: self.retry_jitter_mode,
         }
@@ -474,8 +474,8 @@ mod tests {
         const RATE_LIMIT_DURATION_SECS: u64 = 2;
         const RATE_LIMIT_NUM: u64 = 3;
         const RETRY_ATTEMPTS: usize = 4;
-        const RETRY_MAX_DURATION_SECS: u64 = 5;
-        const RETRY_INITIAL_BACKOFF_SECS: u64 = 6;
+        const RETRY_MAX_DURATION_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(5) };
+        const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(6) };
     }
 
     #[test]

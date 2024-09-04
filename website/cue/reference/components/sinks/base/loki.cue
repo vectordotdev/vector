@@ -15,8 +15,8 @@ base: components: sinks: loki: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -256,7 +256,7 @@ base: components: sinks: loki: configuration: {
 					delimiter: {
 						description: "The field delimiter to use when writing CSV."
 						required:    false
-						type: uint: default: 44
+						type: ascii_char: default: ","
 					}
 					double_quote: {
 						description: """
@@ -278,7 +278,7 @@ base: components: sinks: loki: configuration: {
 																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
 																"""
 						required: false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					fields: {
 						description: """
@@ -296,7 +296,7 @@ base: components: sinks: loki: configuration: {
 					quote: {
 						description: "The quote character to use when writing CSV."
 						required:    false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					quote_style: {
 						description: "The quoting style to use when writing CSV data."
@@ -473,6 +473,11 @@ base: components: sinks: loki: configuration: {
 	}
 	remove_label_fields: {
 		description: "Whether or not to delete fields from the event when they are used as labels."
+		required:    false
+		type: bool: default: false
+	}
+	remove_structured_metadata_fields: {
+		description: "Whether or not to delete fields from the event when they are used in structured metadata."
 		required:    false
 		type: bool: default: false
 	}
@@ -668,6 +673,32 @@ base: components: sinks: loki: configuration: {
 					default: 60
 					unit:    "seconds"
 				}
+			}
+		}
+	}
+	structured_metadata: {
+		description: """
+			Structured metadata that is attached to each batch of events.
+
+			Both keys and values are templateable, which enables you to attach dynamic structured metadata to events.
+
+			Valid metadata keys include `*`, and prefixes ending with `*`, to allow for the expansion of
+			objects into multiple metadata entries. This follows the same logic as [Label expansion][label_expansion].
+
+			[label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
+			"""
+		required: false
+		type: object: {
+			examples: [{
+				"\"*\"":             "{{ metadata }}"
+				"\"pod_labels_*\"":  "{{ kubernetes.pod_labels }}"
+				source:              "vector"
+				"{{ event_field }}": "{{ some_other_event_field }}"
+			}]
+			options: "*": {
+				description: "Loki structured metadata."
+				required:    true
+				type: string: syntax: "template"
 			}
 		}
 	}

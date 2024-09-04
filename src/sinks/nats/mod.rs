@@ -27,4 +27,6 @@ enum NatsError {
     Connect { source: async_nats::ConnectError },
     #[snafu(display("NATS Server Error: {}", source))]
     ServerError { source: async_nats::Error },
+    #[snafu(display("NATS Publish Error: {}", source))]
+    PublishError { source: async_nats::Error },
 }

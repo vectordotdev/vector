@@ -2,7 +2,7 @@
 #
 # This workflow runs under the following conditions:
 #    - in the merge queue if any source files were modified, added or deleted.
-#    - on demand by a PR comment matching either of:
+#    - on demand by a PR review matching either of:
 #      - '/ci-run-regression'
 #      - '/ci-run-all'
 #      (the comment issuer must be a member of the Vector GH team)
@@ -83,6 +83,7 @@ jobs:
             - "NOTICE"
             - "LICENSE-3rdparty.csv"
             - "LICENSE"
+            - "lib/codecs/tests/data/**"
 
     # This step allows us to conservatively run the tests if we added a new
     # file or directory for source code, but forgot to add it to this workflow.
@@ -126,23 +127,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1000
+          fetch-depth: 0 # need to pull repository history to find merge bases
 
-      # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
+      # If triggered by review comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
-      - name: Get PR metadata (issue_comment)
+      - name: Get PR metadata (pull_request_review)
         id: pr-metadata-comment
-        if: github.event_name == 'issue_comment'
+        if: github.event_name == 'pull_request_review'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          export PR_NUMBER=${{ github.event.issue.number }}
+          export PR_NUMBER=${{ github.event.pull_request.number }}
 
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
-          gh pr checkout ${{ github.event.issue.number }}
+          gh pr checkout ${{ github.event.pull_request.number }}
 
-          export BASELINE_SHA=$(git merge-base master HEAD)
+          export BASELINE_SHA=$(git merge-base origin/master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
@@ -181,7 +182,7 @@ jobs:
       # queue to 1, we can get the PR number by parsing the merge queue temp branch's ref.
       - name: Get PR metadata (merge queue)
         id: pr-metadata-merge-queue
-        if: github.event_name != 'issue_comment'
+        if: github.event_name != 'pull_request_review'
         run: |
           export PR_NUMBER=$(echo "${{ github.ref }}" | sed -n 's|^refs/heads/gh-readonly-queue/master/pr-\([0-9]*\)-.*$|\1|p')
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
@@ -228,16 +229,11 @@ jobs:
           echo "smp crate version: ${SMP_CRATE_VERSION}"
           echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
 
-      - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v2
-        id: comment-branch
-
-      - name: (PR comment) Set latest commit status as pending
-        if: ${{ github.event_name == 'issue_comment' }}
+      - name: (PR review) Set latest commit status as pending
+        if: ${{ github.event_name == 'pull_request_review' }}
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ steps.pr-metadata-comment.outputs.COMPARISON_SHA }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Regression Detection Suite
           status: pending
@@ -263,10 +259,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.3.0
+        uses: docker/setup-buildx-action@v3.6.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.3.0
+        uses: docker/build-push-action@v6.7.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -301,10 +297,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.3.0
+        uses: docker/setup-buildx-action@v3.6.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.3.0
+        uses: docker/build-push-action@v6.7.0
         with:
           context: comparison-vector/
           cache-from: type=gha
@@ -424,7 +420,7 @@ jobs:
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs:
       - compute-metadata
       - upload-baseline-image-to-ecr
@@ -738,7 +734,7 @@ jobs:
             -f context='Regression Detection Suite / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-  # This job always runs- if an issue_comment triggered it, we need to update the check status in the PR,
+  # This job always runs- if an pull_request_review triggered it, we need to update the check status in the PR,
   # and if a pull_request triggered it, we need to flag the check status as a success.
   regression-detection-suite:
     name: Regression Detection Suite
@@ -758,25 +754,20 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - name: (PR comment) Get PR branch
-        if: github.event_name == 'issue_comment'
-        uses: xt0rted/pull-request-comment-branch@v2
-        id: comment-branch
-
-      - name: (PR comment) Submit PR result as failed
-        if: github.event_name == 'issue_comment' && env.FAILED == 'true'
+      - name: (PR review) Submit PR result as failed
+        if: github.event_name == 'pull_request_review' && env.FAILED == 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Regression Detection Suite
           status: 'failure'
 
-      - name: (PR comment) Submit PR result as success
-        if: github.event_name == 'issue_comment' && env.FAILED != 'true'
+      - name: (PR review) Submit PR result as success
+        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           context: Regression Detection Suite
           status: 'success'

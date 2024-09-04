@@ -70,27 +70,22 @@ jobs:
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
       CARGO_INCREMENTAL: 0
     steps:
-      - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v2
-        id: comment-branch
-
-      - name: (PR comment) Set latest commit status as pending
-        if: ${{ github.event_name == 'issue_comment' }}
+      - name: (PR review) Set latest commit status as pending
+        if: ${{ github.event_name == 'pull_request_review' }}
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-      - name: (PR comment) Checkout PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
+      - name: (PR review) Checkout PR branch
+        if: ${{ github.event_name == 'pull_request_review' }}
         uses: actions/checkout@v3
         with:
-          ref: ${{ steps.comment-branch.outputs.head_ref }}
+          ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
-        if: ${{ github.event_name != 'issue_comment' }}
+        if: ${{ github.event_name != 'pull_request_review' }}
         uses: actions/checkout@v3
 
       - uses: actions/cache@v4
@@ -110,11 +105,11 @@ jobs:
           name: e2e-test-deb-package
           path: target/artifacts/*
 
-      - name: (PR comment) Set latest commit status as 'failure'
+      - name: (PR review) Set latest commit status as 'failure'
         uses: myrotvorets/set-commit-status-action@v2.0.1
-        if: failure() && github.event_name == 'issue_comment'
+        if: failure() && github.event_name == 'pull_request_review'
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'failure'
 
@@ -192,19 +187,19 @@ jobs:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
     steps:
-      - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
+      - name: (PR review) Get PR branch
+        if: ${{ github.event_name == 'pull_request_review' }}
         uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
 
-      - name: (PR comment) Checkout PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
+      - name: (PR review) Checkout PR branch
+        if: ${{ github.event_name == 'pull_request_review' }}
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
-        if: ${{ github.event_name != 'issue_comment' }}
+        if: ${{ github.event_name != 'pull_request_review' }}
         uses: actions/checkout@v3
 
       - uses: actions/download-artifact@v3
@@ -225,11 +220,11 @@ jobs:
           SKIP_PACKAGE_DEB: "true"
           CARGO_INCREMENTAL: 0
 
-      - name: (PR comment) Set latest commit status as failure
+      - name: (PR review) Set latest commit status as failure
         uses: myrotvorets/set-commit-status-action@v2.0.1
-        if: failure() && github.event_name == 'issue_comment'
+        if: failure() && github.event_name == 'pull_request_review'
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'failure'
 
@@ -246,16 +241,16 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - name: (PR comment) Get PR branch
-        if: github.event_name == 'issue_comment' && env.FAILED != 'true'
+      - name: (PR review) Get PR branch
+        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
         uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
 
-      - name: (PR comment) Submit PR result as success
-        if: github.event_name == 'issue_comment' && env.FAILED != 'true'
+      - name: (PR review) Submit PR result as success
+        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
 

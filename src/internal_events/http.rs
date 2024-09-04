@@ -19,7 +19,7 @@ impl InternalEvent for HttpServerRequestReceived {
             message = "Received HTTP request.",
             internal_log_rate_limit = true
         );
-        counter!("http_server_requests_received_total", 1);
+        counter!("http_server_requests_received_total").increment(1);
     }
 }
 
@@ -35,8 +35,8 @@ impl<'a, B> InternalEvent for HttpServerResponseSent<'a, B> {
             HTTP_STATUS_LABEL,
             self.response.status().as_u16().to_string(),
         )];
-        counter!("http_server_responses_sent_total", 1, labels);
-        histogram!("http_server_handler_duration_seconds", self.latency, labels);
+        counter!("http_server_responses_sent_total", labels).increment(1);
+        histogram!("http_server_handler_duration_seconds", labels).record(self.latency);
     }
 }
 
@@ -56,10 +56,11 @@ impl InternalEvent for HttpBytesReceived<'_> {
             protocol = %self.protocol
         );
         counter!(
-            "component_received_bytes_total", self.byte_size as u64,
+            "component_received_bytes_total",
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
-        );
+        )
+        .increment(self.byte_size as u64);
     }
 }
 
@@ -81,18 +82,19 @@ impl InternalEvent for HttpEventsReceived<'_> {
             protocol = %self.protocol,
         );
 
-        histogram!("component_received_events_count", self.count as f64);
+        histogram!("component_received_events_count").record(self.count as f64);
         counter!(
-            "component_received_events_total", self.count as u64,
+            "component_received_events_total",
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
-        );
+        )
+        .increment(self.count as u64);
         counter!(
             "component_received_event_bytes_total",
-            self.byte_size.get() as u64,
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
-        );
+        )
+        .increment(self.byte_size.get() as u64);
     }
 }
 
@@ -126,11 +128,12 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => self.error_code,
             "error_type" => error_type::REQUEST_FAILED,
             "error_stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -152,11 +155,12 @@ impl<'a> InternalEvent for HttpDecompressError<'a> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "failed_decompressing_payload",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -173,9 +177,10 @@ impl<'a> InternalEvent for HttpInternalError<'a> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }

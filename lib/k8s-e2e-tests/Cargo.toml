@@ -14,7 +14,7 @@ k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
 regex = "1"
 reqwest = { version = "0.11.26", features = ["json"] }
 serde_json.workspace = true
-tokio = { version = "1.38.0", features = ["full"] }
+tokio = { version = "1.39.3", features = ["full"] }
 indoc = "2.0.5"
 env_logger = "0.11"
 tracing = { version = "0.1", features = ["log"] }

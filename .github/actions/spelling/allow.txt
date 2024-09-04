@@ -35,6 +35,7 @@ Benss
 Blaupunkt
 Blusens
 Casio
+Cantarell
 Celkon
 Ceph
 Chromecast
@@ -459,6 +460,7 @@ upstreaminfo
 useragents
 usergroups
 userguide
+urlencoding
 webhdfs
 winapi
 workarounds

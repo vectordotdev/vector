@@ -10,7 +10,7 @@ async-recursion = "1.1.1"
 async-stream = "0.3.5"
 async-trait = { version = "0.1", default-features = false }
 bytecheck = { version = "0.6.9", default-features = false, features = ["std"] }
-bytes = { version = "1.6.0", default-features = false }
+bytes = { version = "1.7.1", default-features = false }
 crc32fast = { version = "1.4.2", default-features = false }
 crossbeam-queue = { version = "0.3.11", default-features = false, features = ["std"] }
 crossbeam-utils = { version = "0.8.20", default-features = false }
@@ -18,15 +18,15 @@ derivative = { version = "2.2.0", default-features =  false }
 fslock = { version = "0.2.1", default-features = false, features = ["std"] }
 futures = { version = "0.3.30", default-features = false, features = ["std"] }
 memmap2 = { version = "0.9.4", default-features = false }
-metrics = "0.21.1"
+metrics.workspace = true
 num-traits = { version = "0.2.19", default-features = false }
 paste = "1.0.15"
 pin-project.workspace = true
-rkyv = { version = "0.7.44", default-features = false, features = ["size_32", "std", "strict", "validation"] }
+rkyv = { version = "0.7.45", default-features = false, features = ["size_32", "std", "strict", "validation"] }
 serde.workspace = true
 snafu = { version = "0.7.5", default-features = false, features = ["std"] }
 tokio-util = { version = "0.7.0", default-features = false }
-tokio = { version = "1.38.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
+tokio = { version = "1.39.3", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tracing = { version = "0.1.34", default-features = false, features = ["attributes"] }
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-common = { path = "../vector-config-common", default-features = false }
@@ -38,8 +38,8 @@ clap.workspace = true
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 crossbeam-queue = "0.3.11"
 hdrhistogram = "7.5.4"
-metrics-tracing-context = { version = "0.14.0", default-features = false }
-metrics-util = { version = "0.15.1", default-features = false, features = ["debugging"] }
+metrics-tracing-context.workspace = true
+metrics-util = { workspace = true, features = ["debugging"] }
 once_cell = "1.19"
 proptest = "1.5"
 quickcheck = "1.0"

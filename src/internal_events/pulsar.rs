@@ -1,6 +1,6 @@
 use metrics::counter;
 #[cfg(feature = "sources-pulsar")]
-use metrics::{register_counter, Counter};
+use metrics::Counter;
 use vector_lib::internal_event::{
     error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
 };
@@ -22,10 +22,11 @@ impl InternalEvent for PulsarSendingError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
             reason,
@@ -48,11 +49,12 @@ impl<F: std::fmt::Display> InternalEvent for PulsarPropertyExtractionError<F> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "extracting_property",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -72,21 +74,21 @@ pub struct PulsarErrorEventData {
 #[cfg(feature = "sources-pulsar")]
 registered_event!(
     PulsarErrorEvent => {
-        ack_errors: Counter = register_counter!(
+        ack_errors: Counter = counter!(
             "component_errors_total",
             "error_code" => "acknowledge_message",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::RECEIVING,
         ),
 
-        nack_errors: Counter = register_counter!(
+        nack_errors: Counter = counter!(
             "component_errors_total",
             "error_code" => "negative_acknowledge_message",
             "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
             "stage" => error_stage::RECEIVING,
         ),
 
-        read_errors: Counter = register_counter!(
+        read_errors: Counter = counter!(
             "component_errors_total",
             "error_code" => "reading_message",
             "error_type" => error_type::READER_FAILED,

@@ -122,9 +122,8 @@ pub struct FileConfig {
     /// Set to `""` to suppress this key.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
     #[configurable(metadata(docs::examples = "hostname"))]
-    pub host_key: OptionalValuePath,
+    pub host_key: Option<OptionalValuePath>,
 
     /// The directory used to persist file checkpoint positions.
     ///
@@ -251,10 +250,6 @@ fn default_max_line_bytes() -> usize {
 
 fn default_file_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("file"))
-}
-
-fn default_host_key() -> OptionalValuePath {
-    log_schema().host_key().cloned().into()
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -389,7 +384,7 @@ impl Default for FileConfig {
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::default(),
             ignore_not_found: false,
-            host_key: default_host_key(),
+            host_key: None,
             offset_key: None,
             data_dir: None,
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
@@ -453,7 +448,12 @@ impl SourceConfig for FileConfig {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let file_key = self.file_key.clone().path.map(LegacyKey::Overwrite);
-        let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
+        let host_key = self
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into())
+            .path
+            .map(LegacyKey::Overwrite);
 
         let offset_key = self
             .offset_key
@@ -486,7 +486,10 @@ impl SourceConfig for FileConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -508,6 +511,11 @@ pub fn file_source(
         return Box::pin(future::ready(Err(())));
     }
 
+    let exclude_patterns = config
+        .exclude
+        .iter()
+        .map(|path_buf| path_buf.iter().collect::<std::path::PathBuf>())
+        .collect::<Vec<PathBuf>>();
     let ignore_before = calculate_ignore_before(config.ignore_older_secs);
     let glob_minimum_cooldown = config.glob_minimum_cooldown_ms;
     let (ignore_checkpoints, read_from) = reconcile_position_options(
@@ -522,7 +530,7 @@ pub fn file_source(
 
     let paths_provider = Glob::new(
         &config.include,
-        &config.exclude,
+        &exclude_patterns,
         MatchOptions::default(),
         emitter.clone(),
     )
@@ -561,7 +569,11 @@ pub fn file_source(
     };
 
     let event_metadata = EventMetadata {
-        host_key: config.host_key.clone().path,
+        host_key: config
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into())
+            .path,
         hostname: crate::get_hostname().ok(),
         file_key: config.file_key.clone().path,
         offset_key: config.offset_key.clone().and_then(|k| k.path),
@@ -1398,6 +1410,52 @@ mod tests {
         }
 
         assert_eq!(is, [n as usize; 3]);
+    }
+
+    #[tokio::test]
+    async fn file_exclude_paths() {
+        let n = 5;
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("a//b/*.log.*")],
+            exclude: vec![dir.path().join("a//b/test.log.*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path1 = dir.path().join("a//b/a.log.1");
+        let path2 = dir.path().join("a//b/test.log.1");
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+            std::fs::create_dir_all(dir.path().join("a/b")).unwrap();
+            let mut file1 = File::create(&path1).unwrap();
+            let mut file2 = File::create(&path2).unwrap();
+
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+
+            for i in 0..n {
+                writeln!(&mut file1, "1 {}", i).unwrap();
+                writeln!(&mut file2, "2 {}", i).unwrap();
+            }
+
+            sleep_500_millis().await;
+        })
+        .await;
+
+        let mut is = [0; 1];
+
+        for event in received {
+            let line =
+                event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
+            let mut split = line.split(' ');
+            let file = split.next().unwrap().parse::<usize>().unwrap();
+            assert_ne!(file, 4);
+            let i = split.next().unwrap().parse::<usize>().unwrap();
+
+            assert_eq!(is[file - 1], i);
+            is[file - 1] += 1;
+        }
+
+        assert_eq!(is, [n as usize; 1]);
     }
 
     #[tokio::test]
