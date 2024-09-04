@@ -72,7 +72,7 @@ remap: functions: unflatten: {
                 }
             }
 		},
-				{
+		{
 			title: "Unflatten non-recursively"
 			source: #"""
 				unflatten({
@@ -89,6 +89,22 @@ remap: functions: unflatten: {
 						"foo.baz": false
                     }
                 }
+            }
+		},
+		{
+			title: "Ignore inconsitent keys values"
+			source: #"""
+				unflatten({
+                   	"a": 3,
+                   	"a.b": 2,
+                   	"a.c": 4
+                })
+				"""#
+			return: {
+               	"a": {
+              		"b": 2,
+              		"c": 4
+               	}
             }
 		},
 	]
