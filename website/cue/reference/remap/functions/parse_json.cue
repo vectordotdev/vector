@@ -31,10 +31,10 @@ remap: functions: parse_json: {
 		{
 			name: "lossy"
 			description: """
-			    Whether to parse the JSON in a lossy manner. Replaces invalid UTF-8 characters
-			    with the Unicode character `�` (U+FFFD) if set to true, otherwise returns an error
+				Whether to parse the JSON in a lossy manner. Replaces invalid UTF-8 characters
+				with the Unicode character `�` (U+FFFD) if set to true, otherwise returns an error
 				if there are any invalid UTF-8 characters present.
-                """
+				"""
 			required: false
 			default:  true
 			type: ["boolean"]
