@@ -5,7 +5,8 @@ use hyper::Body;
 use tokio::{pin, select, sync::mpsc};
 use tonic::{
     body::BoxBody,
-    transport::{Channel, Endpoint, NamedService},
+    server::NamedService,
+    transport::{Channel, Endpoint},
     Status,
 };
 use tower::Service;

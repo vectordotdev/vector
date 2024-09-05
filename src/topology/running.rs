@@ -6,22 +6,13 @@ use std::{
     },
 };
 
-use futures::{future, Future, FutureExt};
-use tokio::{
-    sync::{mpsc, watch},
-    time::{interval, sleep_until, Duration, Instant},
-};
-use tracing::Instrument;
-use vector_lib::buffers::topology::channel::BufferSender;
-use vector_lib::trigger::DisabledTrigger;
-
 use super::{
     builder,
     builder::TopologyPieces,
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
     task::TaskOutput,
-    BuiltBuffer, TapOutput, TapResource, TaskHandle, WatchRx, WatchTx,
+    BuiltBuffer, TaskHandle,
 };
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
@@ -31,6 +22,15 @@ use crate::{
     signal::ShutdownError,
     spawn_named,
 };
+use futures::{future, Future, FutureExt};
+use tokio::{
+    sync::{mpsc, watch},
+    time::{interval, sleep_until, Duration, Instant},
+};
+use tracing::Instrument;
+use vector_lib::buffers::topology::channel::BufferSender;
+use vector_lib::tap::topology::{TapOutput, TapResource, WatchRx, WatchTx};
+use vector_lib::trigger::DisabledTrigger;
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
 

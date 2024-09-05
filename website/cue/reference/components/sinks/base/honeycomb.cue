@@ -97,6 +97,14 @@ base: components: sinks: honeycomb: configuration: {
 			}
 		}
 	}
+	endpoint: {
+		description: "Honeycomb's endpoint to send logs to"
+		required:    false
+		type: string: {
+			default: "https://api.honeycomb.io"
+			examples: ["https://api.honeycomb.io", "https://api.eu1.honeycomb.io"]
+		}
+	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.
