@@ -36,7 +36,7 @@ remap: functions: parse_json: {
 				if there are any invalid UTF-8 characters present.
                 """
 			required: false
-			default: true
+			default:  true
 			type: ["boolean"]
 		},
 	]
