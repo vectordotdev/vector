@@ -1,1 +1,1 @@
-{"log":{"0":true,"":4877836721489239514}}
+{"metric":{"name":"b","namespace":"b","timestamp":"1970-01-01T01:26:04.000005115Z","interval_ms":617001419,"kind":"absolute","gauge":{"value":897280.0}}}

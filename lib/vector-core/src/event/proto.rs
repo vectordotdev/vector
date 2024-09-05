@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use chrono::TimeZone;
 use ordered_float::NotNan;
+use uuid::Uuid;
 
 use super::{MetricTags, WithMetadata};
 use crate::{event, metrics::AgentDDSketch};
@@ -624,6 +625,7 @@ impl From<EventMetadata> for Metadata {
             source_type,
             upstream_id,
             datadog_origin_metadata,
+            source_event_id,
             ..
         } = value;
 
@@ -640,6 +642,7 @@ impl From<EventMetadata> for Metadata {
             source_type: source_type.map(|s| s.to_string()),
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
+            source_event_id: source_event_id.into(),
         }
     }
 }
@@ -670,6 +673,12 @@ impl From<Metadata> for EventMetadata {
 
         if let Some(origin_metadata) = value.datadog_origin_metadata {
             metadata = metadata.with_origin_metadata(origin_metadata.into());
+        }
+
+        if let Ok(uuid) = Uuid::from_slice(&value.source_event_id) {
+            metadata = metadata.with_source_event_id(uuid);
+        } else {
+            error!("Invalid source_event_id in metadata");
         }
 
         metadata
