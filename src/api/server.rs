@@ -14,18 +14,18 @@ use tokio::runtime::Handle;
 use tokio::sync::oneshot;
 use tower::ServiceBuilder;
 use tracing::Span;
+use vector_lib::tap::topology;
 use warp::{filters::BoxedFilter, http::Response, ws::Ws, Filter, Reply};
 
-use super::{handler, schema, ShutdownTx};
+use super::{handler, schema};
 use crate::{
     config::{self, api},
     http::build_http_trace_layer,
     internal_events::{SocketBindError, SocketMode},
-    topology,
 };
 
 pub struct Server {
-    _shutdown: ShutdownTx,
+    _shutdown: oneshot::Sender<()>,
     addr: SocketAddr,
 }
 

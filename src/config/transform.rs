@@ -12,13 +12,14 @@ use vector_lib::configurable::{
 };
 use vector_lib::{
     config::{GlobalOptions, Input, LogNamespace, TransformOutput},
+    id::Inputs,
     schema,
     transform::Transform,
 };
 
 use super::schema::Options as SchemaOptions;
+use super::ComponentKey;
 use super::OutputId;
-use super::{id::Inputs, ComponentKey};
 use crate::extra_context::ExtraContext;
 
 pub type BoxedTransform = Box<dyn TransformConfig>;

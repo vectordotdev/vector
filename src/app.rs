@@ -476,21 +476,21 @@ pub async fn load_configs(
 
     if watch_config {
         // Start listening for config changes immediately.
-        config::watcher::spawn_thread(config_paths.iter().map(Into::into), None).map_err(
-            |error| {
-                error!(message = "Unable to start config watcher.", %error);
-                exitcode::CONFIG
-            },
-        )?;
+        config::watcher::spawn_thread(
+            signal_handler.clone_tx(),
+            config_paths.iter().map(Into::into),
+            None,
+        )
+        .map_err(|error| {
+            error!(message = "Unable to start config watcher.", %error);
+            exitcode::CONFIG
+        })?;
     }
 
     info!(
         message = "Loading configs.",
         paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
     );
-
-    // config::init_log_schema should be called before initializing sources.
-    config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
     let mut config = config::load_from_paths_with_provider_and_secrets(
         &config_paths,
@@ -500,6 +500,7 @@ pub async fn load_configs(
     .await
     .map_err(handle_config_errors)?;
 
+    config::init_log_schema(config.global.log_schema.clone(), true);
     config::init_telemetry(config.global.telemetry.clone(), true);
 
     if !config.healthchecks.enabled {

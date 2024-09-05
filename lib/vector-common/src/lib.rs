@@ -44,6 +44,8 @@ pub mod finalization;
 pub mod finalizer;
 pub use finalizer::EmptyStream;
 
+pub mod id;
+
 pub mod internal_event;
 
 pub mod request_metadata;

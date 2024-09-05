@@ -27,7 +27,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
 use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
-    event::Event,
+    event::{Event, LogEvent},
     EstimatedJsonEncodedSizeOf,
 };
 use vector_lib::{
@@ -178,7 +178,7 @@ impl SourceConfig for AmqpSourceConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -236,14 +236,12 @@ struct Keys<'a> {
 }
 
 /// Populates the decoded event with extra metadata.
-fn populate_event(
-    event: &mut Event,
+fn populate_log_event(
+    log: &mut LogEvent,
     timestamp: Option<chrono::DateTime<Utc>>,
     keys: &Keys<'_>,
     log_namespace: LogNamespace,
 ) {
-    let log = event.as_mut_log();
-
     log_namespace.insert_source_metadata(
         AmqpSourceConfig::NAME,
         log,
@@ -348,10 +346,12 @@ async fn receive_event(
                     ));
 
                     for mut event in events {
-                        populate_event(&mut event,
-                                       timestamp,
-                                       &keys,
-                                       log_namespace);
+                        if let Event::Log(ref mut log) = event {
+                            populate_log_event(log,
+                                        timestamp,
+                                        &keys,
+                                        log_namespace);
+                        }
 
                         yield event;
                     }
