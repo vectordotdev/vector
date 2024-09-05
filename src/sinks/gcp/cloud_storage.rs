@@ -576,14 +576,15 @@ mod tests {
     }
 
     #[test]
-    fn gcs_build_request_set_content_encoding() {
-        let request = build_request(None, false, Compression::gzip_default(), true);
+    fn gcs_build_request_respect_set_content_encoding_option() {
+        let compression_scheme = Compression::gzip_default();
+        let request = build_request(None, false, compression_scheme, true);
         assert_eq!(
             request.settings.content_encoding,
-            HeaderValue::from_str(Compression::gzip_default().content_encoding().unwrap()).ok()
+            HeaderValue::from_str(compression_scheme.content_encoding().unwrap()).ok()
         );
 
-        let request = build_request(None, false, Compression::gzip_default(), false);
+        let request = build_request(None, false, compression_scheme, false);
         assert!(request.settings.content_encoding.is_none());
     }
 }
