@@ -5742,7 +5742,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17ebbe97acce52d06aebed4cd4a87c0941f4b2519b59b82b4feb5bd0ce003dfd"
 dependencies = [
- "indexmap 2.4.0",
+ "indexmap 2.5.0",
  "itertools 0.13.0",
  "ndarray",
  "noisy_float",
