@@ -42,14 +42,14 @@ remap: functions: unflatten: {
 				})
 				"""#
 			return: {
-			    "foo": {
-                    "bar": {
-                        "baz": true,
-                        "qux": false
-                    },
-                    "quux": 42
-                }
-            }
+				"foo": {
+					"bar": {
+						"baz": true
+						"qux": false
+					}
+					"quux": 42
+				}
+			}
 		},
 		{
 			title: "Unflatten recursively"
@@ -62,15 +62,15 @@ remap: functions: unflatten: {
 				})
 				"""#
 			return: {
-                "flattened": {
-                    "parent": {
-                        "foo": {
-                            "bar": true,
-                            "baz": false
-                        }
-                    }
-                }
-            }
+				"flattened": {
+					"parent": {
+						"foo": {
+							"bar": true
+							"baz": false
+						}
+					}
+				}
+			}
 		},
 		{
 			title: "Unflatten non-recursively"
@@ -83,13 +83,13 @@ remap: functions: unflatten: {
 				}, recursive: false)
 				"""#
 			return: {
-                "flattened": {
-                    "parent": {
-						"foo.bar": true,
+				"flattened": {
+					"parent": {
+						"foo.bar": true
 						"foo.baz": false
-                    }
-                }
-            }
+					}
+				}
+			}
 		},
 		{
 			title: "Ignore inconsistent keys values"
@@ -101,11 +101,11 @@ remap: functions: unflatten: {
                 })
 				"""#
 			return: {
-               	"a": {
-              		"b": 2,
-              		"c": 4
-               	}
-            }
+				"a": {
+					"b": 2
+					"c": 4
+				}
+			}
 		},
 	]
 }
