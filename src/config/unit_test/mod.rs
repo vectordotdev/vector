@@ -105,6 +105,7 @@ pub async fn build_unit_tests_main(
     let config_builder = if secrets_backends_loader.has_secrets_to_retrieve() {
         let resolved_secrets = secrets_backends_loader
             .retrieve(&mut signal_handler.subscribe())
+            .await
             .map_err(|e| vec![e])?;
         loading::load_builder_from_paths_with_secrets(paths, resolved_secrets)?
     } else {

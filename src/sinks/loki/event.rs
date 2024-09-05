@@ -6,6 +6,7 @@ use serde::{ser::SerializeSeq, Serialize};
 use vector_lib::config::telemetry;
 
 pub type Labels = Vec<(String, String)>;
+pub type StructuredMetadata = Vec<(String, String)>;
 
 #[derive(Clone)]
 pub enum LokiBatchEncoding {
@@ -48,6 +49,7 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
                                     loki_logproto::util::Entry(
                                         event.timestamp,
                                         String::from_utf8_lossy(&event.event).into_owned(),
+                                        event.structured_metadata.clone(),
                                     )
                                 })
                                 .collect();
@@ -130,6 +132,7 @@ impl From<Vec<LokiRecord>> for LokiBatch {
 pub struct LokiEvent {
     pub timestamp: i64,
     pub event: Bytes,
+    pub structured_metadata: StructuredMetadata,
 }
 
 impl ByteSizeOf for LokiEvent {

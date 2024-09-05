@@ -83,6 +83,7 @@ jobs:
             - "NOTICE"
             - "LICENSE-3rdparty.csv"
             - "LICENSE"
+            - "lib/codecs/tests/data/**"
 
     # This step allows us to conservatively run the tests if we added a new
     # file or directory for source code, but forgot to add it to this workflow.
@@ -126,9 +127,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1000
+          fetch-depth: 0 # need to pull repository history to find merge bases
 
-      # If triggered by issue comment, the event payload doesn't directly contain the head and base sha from the PR.
+      # If triggered by review comment, the event payload doesn't directly contain the head and base sha from the PR.
       # But, we can retrieve this info from some commands.
       - name: Get PR metadata (pull_request_review)
         id: pr-metadata-comment
@@ -136,13 +137,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          export PR_NUMBER=${{ github.event.issue.number }}
+          export PR_NUMBER=${{ github.event.pull_request.number }}
 
           echo "PR_NUMBER=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
-          gh pr checkout ${{ github.event.issue.number }}
+          gh pr checkout ${{ github.event.pull_request.number }}
 
-          export BASELINE_SHA=$(git merge-base master HEAD)
+          export BASELINE_SHA=$(git merge-base origin/master HEAD)
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
 
           export COMPARISON_SHA=$(git rev-parse HEAD)
@@ -261,7 +262,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.6.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.6.1
+        uses: docker/build-push-action@v6.7.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -299,7 +300,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.6.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.6.1
+        uses: docker/build-push-action@v6.7.0
         with:
           context: comparison-vector/
           cache-from: type=gha
@@ -419,7 +420,7 @@ jobs:
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs:
       - compute-metadata
       - upload-baseline-image-to-ecr
