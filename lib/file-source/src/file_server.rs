@@ -221,6 +221,15 @@ where
                                 }
                             }
                         } else {
+                            // try maybe_upgrade since kubernetes_log doesn't have path available
+                            // when initialization.
+                            checkpointer.maybe_upgrade(
+                                &path,
+                                file_id,
+                                &self.fingerprinter,
+                                &mut fingerprint_buffer,
+                            );
+
                             // untracked file fingerprint
                             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false);
                             self.emitter.emit_files_open(fp_map.len());
