@@ -5742,7 +5742,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17ebbe97acce52d06aebed4cd4a87c0941f4b2519b59b82b4feb5bd0ce003dfd"
 dependencies = [
- "indexmap 2.4.0",
+ "indexmap 2.5.0",
  "itertools 0.13.0",
  "ndarray",
  "noisy_float",
@@ -10828,9 +10828,12 @@ dependencies = [
 name = "vector-tap"
 version = "0.1.0"
 dependencies = [
+ "async-graphql",
  "chrono",
  "colored",
+ "futures 0.3.30",
  "futures-util",
+ "glob",
  "portpicker",
  "serde_json",
  "serde_yaml 0.9.34+deprecated",
@@ -10840,7 +10843,11 @@ dependencies = [
  "tokio-tungstenite 0.20.1",
  "tracing 0.1.40",
  "url",
+ "uuid",
  "vector-api-client",
+ "vector-buffers",
+ "vector-common",
+ "vector-core",
 ]
 
 [[package]]
