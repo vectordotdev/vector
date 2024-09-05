@@ -1,5 +1,6 @@
 {{ $params := site.Params.search }}
-{{ $apiKey := printf `"%s"` $params.typesense_api_key }}
+{{ $apiKey := cond hugo.IsProduction $params.typesense_public_prod_apikey $params.typesense_public_dev_apikey }}
+{{ $apiKey = printf `"%s"` $apiKey }}
 {{ $index := printf `"%s"` $params.typesense_index }}
 {{ $host := cond hugo.IsProduction $params.typesense_prod_host $params.typesense_dev_host }}
 {{ $host = printf `"%s"` $host }}
