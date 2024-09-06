@@ -17,7 +17,6 @@ amzn
 anchore
 androideabi
 andy
-anonymousip
 ansicpg
 anumber
 anycondition
@@ -631,7 +630,6 @@ losslessly
 lpop
 lpush
 Luc
-luciofranco
 lucperkins
 lukesteensen
 macports
@@ -683,7 +681,6 @@ mlua
 mmdb
 Mmm
 moby
-mockwatchlogs
 modulesloaddir
 mooper
 moosh
@@ -782,7 +779,7 @@ nullishness
 numbackends
 oahd
 oap
-oidc
+OIDC
 OKD
 omfwd
 omitempty
@@ -1210,7 +1207,6 @@ walkthrough
 waninfo
 wasmtime
 watchexec
-watchlogs
 wayfor
 webgraphviz
 webpki
