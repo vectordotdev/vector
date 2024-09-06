@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use vector_lib::configurable::configurable_component;
 
-/// extra graph configuration
+/// Extra graph configuration
 ///
 /// Configure output for component when generated with graph command
 #[configurable_component]
