@@ -261,7 +261,9 @@ impl Aggregate {
             if matches!(self.mode, AggregationMode::Diff) {
                 if let Some(prev_entry) = self.prev_map.get(metric.series()) {
                     if metric.data().kind == prev_entry.0.kind {
-                        let _ = metric.subtract(&prev_entry.0);
+                        if !metric.subtract(&prev_entry.0) {
+                            emit!(AggregateUpdateFailed);
+                        }
                     }
                 }
             }
@@ -269,14 +271,18 @@ impl Aggregate {
         }
 
         let multi_map = std::mem::take(&mut self.multi_map);
-        for (series, entries) in multi_map.into_iter() {
+        'outer: for (series, entries) in multi_map.into_iter() {
             if entries.is_empty() {
                 continue;
             }
 
             let (mut final_sum, mut final_metadata) = entries.first().unwrap().clone();
             for (data, metadata) in entries.iter().skip(1) {
-                let _ = final_sum.update(data);
+                if !final_sum.update(data) {
+                    // Incompatible types, skip this metric
+                    emit!(AggregateUpdateFailed);
+                    continue 'outer;
+                }
                 final_metadata.merge(metadata.clone());
             }
 
@@ -737,6 +743,41 @@ mod tests {
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&result, &out[0]);
+    }
+
+    #[test]
+    fn absolute_diff_conflicting_type() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Diff,
+        })
+        .unwrap();
+
+        let gauge_a_1 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 32.0 },
+        );
+        let gauge_a_2 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+
+        let mut out = vec![];
+        // Two absolutes in 2 separate flushes, result should be second one due to different types
+        agg.record(gauge_a_1.clone());
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&gauge_a_1, &out[0]);
+
+        agg.record(gauge_a_2.clone());
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        // Due to incompatible results, the new value just overwrites the old one
+        assert_eq!(&gauge_a_2, &out[0]);
     }
 
     #[test]
