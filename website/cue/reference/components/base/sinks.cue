@@ -78,7 +78,7 @@ base: components: sinks: configuration: {
 	}
 	graph: {
 		description: """
-			extra graph configuration
+			Extra graph configuration
 
 			Configure output for component when generated with graph command
 			"""
@@ -90,10 +90,17 @@ base: components: sinks: configuration: {
 				They are added to the node as provided
 				"""
 			required: false
-			type: object: options: "*": {
-				description: "A single graph node attribute in graphviz DOT language."
-				required:    true
-				type: string: {}
+			type: object: {
+				examples: [{
+					color: "red"
+					name:  "Example Node"
+					width: "5.0"
+				}]
+				options: "*": {
+					description: "A single graph node attribute in graphviz DOT language."
+					required:    true
+					type: string: {}
+				}
 			}
 		}
 	}

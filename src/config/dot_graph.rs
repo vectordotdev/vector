@@ -14,7 +14,16 @@ pub struct GraphConfig {
     ///
     /// They are added to the node as provided
     #[configurable(metadata(
-        docs::additional_props_description = "A single graph node attribute in graphviz DOT language."
+        docs::additional_props_description = "A single graph node attribute in graphviz DOT language.",
+        docs::examples = "example_graph_options()"
     ))]
     pub node_attributes: HashMap<String, String>,
+}
+
+fn example_graph_options() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter([
+        ("name".to_string(), "Example Node".to_string()),
+        ("color".to_string(), "red".to_string()),
+        ("width".to_string(), "5.0".to_string()),
+    ])
 }
