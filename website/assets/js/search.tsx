@@ -176,10 +176,11 @@ const Search = () => {
           async getItems() { 
             const results = (query) => searchClient.collections('vector_docs').documents().search({
               q: query,
-              query_by: 'content,hierarchy,title,tags',
+              preset: 'vector_docs_search',
               exhaustive_search: true,
               highlight_fields: 'content',
               highlight_full_fields: 'content'
+              
             }).then((result) => {
               // order the hits by page group
               // const hits = result.hits.sort((a, b) => (a.document.pageTitle < b.document.pageTitle ? -1 : 1))
