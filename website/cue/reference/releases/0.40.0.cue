@@ -17,6 +17,7 @@ releases: "0.40.0": {
 
 	known_issues: [
 		"A regression in the `reduce` transform caused it to not group top level objects correctly (see [#21065](https://github.com/vectordotdev/vector/issues/21065)). This is fixed in v0.40.1.",
+		"A regression in the `reduce` transform caused it to not reduce events containing keys with special characters correctly (see [#21165](https://github.com/vectordotdev/vector/issues/21165)). This is fixed in v0.40.2.",
 	]
 
 	changelog: [
