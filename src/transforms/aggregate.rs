@@ -270,21 +270,25 @@ impl Aggregate {
 
         let multi_map = std::mem::take(&mut self.multi_map);
         for (series, entries) in multi_map.into_iter() {
-            let first = entries.first();
-            if first == None {
+            if entries.is_empty() {
                 continue;
             }
-            let (mut final_sum, mut final_metadata) = first.unwrap().clone();
+
+            let (mut final_sum, mut final_metadata) = entries.first().unwrap().clone();
             for (data, metadata) in entries.iter().skip(1) {
                 let _ = final_sum.update(data);
                 final_metadata.merge(metadata.clone());
             }
-            let mut final_mean = final_sum.clone();
-            let mut final_mean_value = 0.0;
-            if let MetricValue::Gauge { value } = final_mean.value_mut() {
-                *value = *value / entries.len() as f64;
-                final_mean_value = *value;
-            }
+
+            let final_mean_value = if let MetricValue::Gauge { value } = final_sum.value_mut() {
+                // Entries are not empty so this is safe.
+                *value /= entries.len() as f64;
+                *value
+            } else {
+                0.0
+            };
+
+            let final_mean = final_sum.clone();
             match self.mode {
                 AggregationMode::Mean => {
                     let metric = metric::Metric::from_parts(series, final_mean, final_metadata);
