@@ -11,10 +11,11 @@ use vector_lib::configurable::{
 };
 use vector_lib::{
     config::{AcknowledgementsConfig, GlobalOptions, Input},
+    id::Inputs,
     sink::VectorSink,
 };
 
-use super::{dot_graph::GraphConfig, id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
+use super::{dot_graph::GraphConfig, schema, ComponentKey, ProxyConfig, Resource};
 use crate::extra_context::ExtraContext;
 use crate::sinks::{util::UriSerde, Healthcheck};
 

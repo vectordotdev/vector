@@ -21,7 +21,7 @@ vector-stream = { path = "../vector-stream" }
 vector-tap = { path = "../vector-tap" }
 
 [features]
-api = ["vector-core/api"]
+api = ["vector-core/api", "vector-tap/api"]
 api-client = ["dep:vector-api-client"]
 lua = ["vector-core/lua"]
 file-source = ["dep:file-source"]

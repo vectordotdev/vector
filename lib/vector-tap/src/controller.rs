@@ -11,23 +11,20 @@ use tokio::sync::{
 };
 use tracing::{Instrument, Span};
 use uuid::Uuid;
-use vector_lib::buffers::{topology::builder::TopologyBuilder, WhenFull};
+use vector_buffers::{topology::builder::TopologyBuilder, WhenFull};
+use vector_common::config::ComponentKey;
+use vector_core::event::{EventArray, LogArray, MetricArray, TraceArray};
+use vector_core::fanout;
 
-use super::{
-    schema::events::{
-        notification::{InvalidMatch, Matched, NotMatched, Notification},
-        TapPatterns,
-    },
-    ShutdownRx, ShutdownTx,
-};
-use crate::{
-    config::ComponentKey,
-    event::{EventArray, LogArray, MetricArray, TraceArray},
-    topology::{fanout, fanout::ControlChannel, TapOutput, TapResource, WatchRx},
-};
+use crate::notification::{InvalidMatch, Matched, NotMatched, Notification};
+use crate::topology::{TapOutput, TapResource, WatchRx};
 
 /// A tap sender is the control channel used to surface tap payloads to a client.
 type TapSender = tokio_mpsc::Sender<TapPayload>;
+
+// Shutdown channel types
+type ShutdownTx = oneshot::Sender<()>;
+type ShutdownRx = oneshot::Receiver<()>;
 
 const TAP_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
 
@@ -70,6 +67,32 @@ impl GlobMatcher<&str> for Pattern {
                 patterns.iter().any(|pattern| pattern.matches(rhs))
             }
         }
+    }
+}
+
+/// Patterns (glob) used by tap to match against components and access events
+/// flowing into (for_inputs) or out of (for_outputs) specified components
+#[derive(Debug)]
+pub struct TapPatterns {
+    pub for_outputs: HashSet<String>,
+    pub for_inputs: HashSet<String>,
+}
+
+impl TapPatterns {
+    pub const fn new(for_outputs: HashSet<String>, for_inputs: HashSet<String>) -> Self {
+        Self {
+            for_outputs,
+            for_inputs,
+        }
+    }
+
+    /// Get all user-specified patterns
+    pub fn all_patterns(&self) -> HashSet<String> {
+        self.for_outputs
+            .iter()
+            .cloned()
+            .chain(self.for_inputs.iter().cloned())
+            .collect()
     }
 }
 
@@ -183,7 +206,7 @@ impl TapController {
 }
 
 /// Provides a `ShutdownTx` that disconnects a component sink when it drops out of scope.
-fn shutdown_trigger(control_tx: ControlChannel, sink_id: ComponentKey) -> ShutdownTx {
+fn shutdown_trigger(control_tx: fanout::ControlChannel, sink_id: ComponentKey) -> ShutdownTx {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     tokio::spawn(async move {
@@ -396,7 +419,6 @@ async fn tap_handler(
                 }
 
                 // Warnings on invalid matches.
-
                 for pattern in patterns.for_inputs.iter() {
                     if let Ok(glob) = glob::Pattern::new(pattern) {
                         let invalid_matches = source_keys.iter().filter(|key| glob.matches(key)).cloned().collect::<Vec<_>>();

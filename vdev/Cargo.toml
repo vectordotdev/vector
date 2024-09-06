@@ -12,12 +12,12 @@ anyhow = "1.0.86"
 chrono.workspace = true
 clap.workspace = true
 clap-verbosity-flag = "2.2.1"
-clap_complete = "4.5.23"
+clap_complete = "4.5.24"
 confy = "0.6.1"
 directories = "5.0.1"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
 dunce = "1.0.5"
-glob = { version = "0.3.1", default-features = false }
+glob.workspace = true
 hex = "0.4.3"
 indexmap.workspace = true
 indicatif = { version = "0.17.8", features = ["improved_unicode"] }
