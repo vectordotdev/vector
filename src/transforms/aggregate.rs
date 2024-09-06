@@ -372,7 +372,10 @@ mod tests {
     use super::*;
     use crate::schema::Definition;
     use crate::{
-        event::{metric, Event, Metric},
+        event::{
+            metric::{MetricKind, MetricValue},
+            Event, Metric,
+        },
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,
     };
@@ -382,11 +385,7 @@ mod tests {
         crate::test_util::test_generate_config::<AggregateConfig>();
     }
 
-    fn make_metric(
-        name: &'static str,
-        kind: metric::MetricKind,
-        value: metric::MetricValue,
-    ) -> Event {
+    fn make_metric(name: &'static str, kind: MetricKind, value: MetricValue) -> Event {
         let mut event = Event::Metric(Metric::new(name, kind, value))
             .with_source_id(Arc::new(ComponentKey::from("in")))
             .with_upstream_id(Arc::new(OutputId::from("transform")));
@@ -409,18 +408,18 @@ mod tests {
 
         let counter_a_1 = make_metric(
             "counter_a",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 42.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
         );
         let counter_a_2 = make_metric(
             "counter_a",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 43.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 43.0 },
         );
         let counter_a_summed = make_metric(
             "counter_a",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 85.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 85.0 },
         );
 
         // Single item, just stored regardless of kind
@@ -451,8 +450,8 @@ mod tests {
 
         let counter_b_1 = make_metric(
             "counter_b",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 44.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 44.0 },
         );
         // Two increments with the different series, should get each back as-is
         agg.record(counter_a_1.clone());
@@ -480,13 +479,13 @@ mod tests {
 
         let gauge_a_1 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 42.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 43.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 43.0 },
         );
 
         // Single item, just stored regardless of kind
@@ -517,8 +516,8 @@ mod tests {
 
         let gauge_b_1 = make_metric(
             "gauge_b",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 44.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 44.0 },
         );
         // Two increments with the different series, should get each back as-is
         agg.record(gauge_a_1.clone());
@@ -546,23 +545,23 @@ mod tests {
 
         let gauge_a_1 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 42.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 43.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 43.0 },
         );
         let result_count = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Counter { value: 1.0 },
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
         );
         let result_count_2 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Counter { value: 2.0 },
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 2.0 },
         );
 
         // Single item, counter should be 1
@@ -602,13 +601,13 @@ mod tests {
 
         let gauge_a_1 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 112.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 112.0 },
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 89.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 89.0 },
         );
 
         // Single item, it should be returned as is
@@ -648,13 +647,13 @@ mod tests {
 
         let gauge_a_1 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 32.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 32.0 },
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 89.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 89.0 },
         );
 
         // Single item, it should be returned as is
@@ -694,18 +693,18 @@ mod tests {
 
         let gauge_a_1 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 32.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 32.0 },
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 82.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 82.0 },
         );
         let result = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 50.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 50.0 },
         );
 
         // Single item, it should be returned as is
@@ -750,23 +749,23 @@ mod tests {
 
         let gauge_a_1 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 32.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 32.0 },
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 82.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 82.0 },
         );
         let gauge_a_3 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 51.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 51.0 },
         );
         let mean_result = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 55.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 55.0 },
         );
 
         // Single item, it should be returned as is
@@ -808,44 +807,44 @@ mod tests {
         let gauges = vec![
             make_metric(
                 "gauge_a",
-                metric::MetricKind::Absolute,
-                metric::MetricValue::Gauge { value: 25.0 },
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 25.0 },
             ),
             make_metric(
                 "gauge_a",
-                metric::MetricKind::Absolute,
-                metric::MetricValue::Gauge { value: 30.0 },
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 30.0 },
             ),
             make_metric(
                 "gauge_a",
-                metric::MetricKind::Absolute,
-                metric::MetricValue::Gauge { value: 35.0 },
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 35.0 },
             ),
             make_metric(
                 "gauge_a",
-                metric::MetricKind::Absolute,
-                metric::MetricValue::Gauge { value: 40.0 },
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 40.0 },
             ),
             make_metric(
                 "gauge_a",
-                metric::MetricKind::Absolute,
-                metric::MetricValue::Gauge { value: 45.0 },
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 45.0 },
             ),
             make_metric(
                 "gauge_a",
-                metric::MetricKind::Absolute,
-                metric::MetricValue::Gauge { value: 50.0 },
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 50.0 },
             ),
             make_metric(
                 "gauge_a",
-                metric::MetricKind::Absolute,
-                metric::MetricValue::Gauge { value: 55.0 },
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 55.0 },
             ),
         ];
         let stdev_result = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 10.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 10.0 },
         );
 
         for gauge in gauges {
@@ -867,21 +866,21 @@ mod tests {
 
         let counter = make_metric(
             "the-thing",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 42.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
         );
         let mut values = BTreeSet::<String>::new();
         values.insert("a".into());
         values.insert("b".into());
         let set = make_metric(
             "the-thing",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Set { values },
+            MetricKind::Incremental,
+            MetricValue::Set { values },
         );
         let summed = make_metric(
             "the-thing",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 84.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 84.0 },
         );
 
         // when types conflict the new values replaces whatever is there
@@ -925,18 +924,18 @@ mod tests {
 
         let incremental = make_metric(
             "the-thing",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 42.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
         );
         let absolute = make_metric(
             "the-thing",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Counter { value: 43.0 },
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 43.0 },
         );
         let summed = make_metric(
             "the-thing",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 84.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 84.0 },
         );
 
         // when types conflict the new values replaces whatever is there
@@ -986,28 +985,28 @@ interval_ms = 999999
 
         let counter_a_1 = make_metric(
             "counter_a",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 42.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
         );
         let counter_a_2 = make_metric(
             "counter_a",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 43.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 43.0 },
         );
         let counter_a_summed = make_metric(
             "counter_a",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 85.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 85.0 },
         );
         let gauge_a_1 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 42.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 43.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 43.0 },
         );
         let inputs = vec![counter_a_1, counter_a_2, gauge_a_1, gauge_a_2.clone()];
 
@@ -1038,28 +1037,28 @@ interval_ms = 999999
 
         let counter_a_1 = make_metric(
             "counter_a",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 42.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
         );
         let counter_a_2 = make_metric(
             "counter_a",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 43.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 43.0 },
         );
         let counter_a_summed = make_metric(
             "counter_a",
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 85.0 },
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 85.0 },
         );
         let gauge_a_1 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 42.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
-            metric::MetricKind::Absolute,
-            metric::MetricValue::Gauge { value: 43.0 },
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 43.0 },
         );
 
         assert_transform_compliance(async {
