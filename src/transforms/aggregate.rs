@@ -143,60 +143,9 @@ impl Aggregate {
                 }
             },
             AggregationMode::Count => self.record_count(series, data, metadata),
-            AggregationMode::Max => match data.kind {
-                metric::MetricKind::Incremental => (),
-                metric::MetricKind::Absolute => match self.map.entry(series) {
-                    Entry::Occupied(mut entry) => {
-                        let existing = entry.get_mut();
-                        // In order to update (add) the new and old kind's must match
-                        if existing.0.kind == data.kind {
-                            if let MetricValue::Gauge {
-                                value: existing_value,
-                            } = existing.0.value()
-                            {
-                                if let MetricValue::Gauge { value: new_value } = data.value() {
-                                    if existing_value < new_value {
-                                        *existing = (data, metadata);
-                                    }
-                                }
-                            }
-                        } else {
-                            emit!(AggregateUpdateFailed);
-                            *existing = (data, metadata);
-                        }
-                    }
-                    Entry::Vacant(entry) => {
-                        entry.insert((data, metadata));
-                    }
-                },
-            },
-            AggregationMode::Min => match data.kind {
-                metric::MetricKind::Incremental => (),
-                metric::MetricKind::Absolute => match self.map.entry(series) {
-                    Entry::Occupied(mut entry) => {
-                        let existing = entry.get_mut();
-                        // In order to update (add) the new and old kind's must match
-                        if existing.0.kind == data.kind {
-                            if let MetricValue::Gauge {
-                                value: existing_value,
-                            } = existing.0.value()
-                            {
-                                if let MetricValue::Gauge { value: new_value } = data.value() {
-                                    if existing_value > new_value {
-                                        *existing = (data, metadata);
-                                    }
-                                }
-                            }
-                        } else {
-                            emit!(AggregateUpdateFailed);
-                            *existing = (data, metadata);
-                        }
-                    }
-                    Entry::Vacant(entry) => {
-                        entry.insert((data, metadata));
-                    }
-                },
-            },
+            AggregationMode::Max | AggregationMode::Min => {
+                self.record_comparison(series, data, metadata)
+            }
             AggregationMode::Mean | AggregationMode::Stdev => match data.kind {
                 metric::MetricKind::Incremental => (),
                 metric::MetricKind::Absolute => {
@@ -254,16 +203,54 @@ impl Aggregate {
         }
     }
 
+    fn record_comparison(
+        &mut self,
+        series: MetricSeries,
+        data: MetricData,
+        metadata: EventMetadata,
+    ) {
+        match data.kind {
+            metric::MetricKind::Incremental => (),
+            metric::MetricKind::Absolute => match self.map.entry(series) {
+                Entry::Occupied(mut entry) => {
+                    let existing = entry.get_mut();
+                    // In order to update (add) the new and old kind's must match
+                    if existing.0.kind == data.kind {
+                        if let MetricValue::Gauge {
+                            value: existing_value,
+                        } = existing.0.value()
+                        {
+                            if let MetricValue::Gauge { value: new_value } = data.value() {
+                                let should_update = match self.mode {
+                                    AggregationMode::Max => new_value > existing_value,
+                                    AggregationMode::Min => new_value < existing_value,
+                                    _ => false,
+                                };
+                                if should_update {
+                                    *existing = (data, metadata);
+                                }
+                            }
+                        }
+                    } else {
+                        emit!(AggregateUpdateFailed);
+                        *existing = (data, metadata);
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert((data, metadata));
+                }
+            },
+        }
+    }
+
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.clone().into_iter() {
             let mut metric = metric::Metric::from_parts(series, entry.0, entry.1);
             if matches!(self.mode, AggregationMode::Diff) {
                 if let Some(prev_entry) = self.prev_map.get(metric.series()) {
-                    if metric.data().kind == prev_entry.0.kind {
-                        if !metric.subtract(&prev_entry.0) {
-                            emit!(AggregateUpdateFailed);
-                        }
+                    if metric.data().kind == prev_entry.0.kind && !metric.subtract(&prev_entry.0) {
+                        emit!(AggregateUpdateFailed);
                     }
                 }
             }
