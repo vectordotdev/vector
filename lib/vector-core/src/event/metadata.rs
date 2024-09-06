@@ -2,8 +2,10 @@
 
 use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
 
+use derivative::Derivative;
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 use vector_common::{byte_size_of::ByteSizeOf, config::ComponentKey, EventDataEq};
 use vrl::{
     compiler::SecretTarget,
@@ -21,7 +23,8 @@ const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Derivative)]
+#[derivative(PartialEq)]
 pub struct EventMetadata {
     /// Arbitrary data stored with an event
     #[serde(default = "default_metadata_value")]
@@ -66,6 +69,10 @@ pub struct EventMetadata {
     /// Only a small set of Vector sources and transforms explicitly set this field.
     #[serde(default)]
     pub(crate) datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
+
+    /// An internal vector id that can be used to identify this event across all components.
+    #[derivative(PartialEq = "ignore")]
+    pub(crate) source_event_id: Uuid,
 }
 
 /// Metric Origin metadata for submission to Datadog.
@@ -214,6 +221,11 @@ impl EventMetadata {
     pub fn datadog_origin_metadata(&self) -> Option<&DatadogMetricOriginMetadata> {
         self.datadog_origin_metadata.as_ref()
     }
+
+    /// Returns a reference to the event id.
+    pub fn source_event_id(&self) -> Uuid {
+        self.source_event_id
+    }
 }
 
 impl Default for EventMetadata {
@@ -228,6 +240,7 @@ impl Default for EventMetadata {
             upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
+            source_event_id: Uuid::now_v7(),
         }
     }
 }
@@ -296,6 +309,13 @@ impl EventMetadata {
     #[must_use]
     pub fn with_origin_metadata(mut self, origin_metadata: DatadogMetricOriginMetadata) -> Self {
         self.datadog_origin_metadata = Some(origin_metadata);
+        self
+    }
+
+    /// Replaces the existing `source_event_id` with the given one.
+    #[must_use]
+    pub fn with_source_event_id(mut self, source_event_id: Uuid) -> Self {
+        self.source_event_id = source_event_id;
         self
     }
 

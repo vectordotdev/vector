@@ -1,9 +1,12 @@
-use std::{collections::btree_map, fmt::Write as _, iter, slice};
-
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{Serialize, Serializer};
+use std::{collections::btree_map, fmt::Write as _, iter, slice};
 use vrl::path::PathPrefix;
 
 use crate::event::{KeyString, ObjectMap, Value};
+
+static IS_VALID_PATH_SEGMENT: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
@@ -35,7 +38,7 @@ enum LeafIter<'a> {
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum PathComponent<'a> {
     Key(&'a KeyString),
     Index(usize),
@@ -134,10 +137,10 @@ impl<'a> FieldsIter<'a> {
             match path_iter.next() {
                 None => break res.into(),
                 Some(PathComponent::Key(key)) => {
-                    if key.contains('.') {
-                        res.push_str(&key.replace('.', "\\."));
-                    } else {
+                    if IS_VALID_PATH_SEGMENT.is_match(key) {
                         res.push_str(key);
+                    } else {
+                        res.push_str(&format!("\"{key}\""));
                     }
                 }
                 Some(PathComponent::Index(index)) => {
@@ -224,6 +227,34 @@ mod test {
     }
 
     #[test]
+    fn keys_special() {
+        let fields = fields_from_json(json!({
+            "a-b": 1,
+            "a*b": 2,
+            "a b": 3,
+            ".a .b*": 4,
+            "\"a\"": 5,
+        }));
+        let mut collected: Vec<_> = all_fields(&fields).collect();
+        collected.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+        let mut expected: Vec<(KeyString, &Value)> = vec![
+            ("\"a-b\"", &Value::Integer(1)),
+            ("\"a*b\"", &Value::Integer(2)),
+            ("\"a b\"", &Value::Integer(3)),
+            ("\".a .b*\"", &Value::Integer(4)),
+            ("\"\"a\"\"", &Value::Integer(5)),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
+        // Compare without the leading `"` char so that the order is the same as the collected fields.
+        expected.sort_by(|(a, _), (b, _)| a[1..].cmp(&b[1..]));
+
+        assert_eq!(collected, expected);
+    }
+
+    #[test]
     fn metadata_keys_simple() {
         let fields = fields_from_json(json!({
             "field_1": 1,
@@ -266,7 +297,7 @@ mod test {
             ("a.array[2].x", Value::Integer(1)),
             ("a.array[3][0]", Value::Integer(2)),
             ("a.b.c", Value::Integer(5)),
-            ("a\\.b\\.c", Value::Integer(6)),
+            ("\"a.b.c\"", Value::Integer(6)),
             ("d", Value::Object(ObjectMap::new())),
             ("e", Value::Array(Vec::new())),
         ]

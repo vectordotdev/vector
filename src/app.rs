@@ -476,12 +476,15 @@ pub async fn load_configs(
 
     if watch_config {
         // Start listening for config changes immediately.
-        config::watcher::spawn_thread(config_paths.iter().map(Into::into), None).map_err(
-            |error| {
-                error!(message = "Unable to start config watcher.", %error);
-                exitcode::CONFIG
-            },
-        )?;
+        config::watcher::spawn_thread(
+            signal_handler.clone_tx(),
+            config_paths.iter().map(Into::into),
+            None,
+        )
+        .map_err(|error| {
+            error!(message = "Unable to start config watcher.", %error);
+            exitcode::CONFIG
+        })?;
     }
 
     info!(
