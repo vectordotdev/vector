@@ -184,10 +184,9 @@ async function indexHTMLFiles(
         };
       }
 
-      // TMP: remove as I think this is causing duplicate records in the JSON file
-      // if (activeRecord) {
-      //   algoliaRecords.push({ ...activeRecord })
-      // }
+      if (activeRecord) {
+        algoliaRecords.push({ ...activeRecord })
+      }
 
       for (const rec of algoliaRecords) {
         // The id is the url of the section of the page that the record covers.
