@@ -50,7 +50,7 @@ typesense_index = "vector_docs"
 
 # Note that it's okay to use this on the front end: https://typesense.com/docs/guide/security.html#public-api-key
 typesense_public_dev_apikey = "aTFLzhfCVeTj619Pxkhmz18798Nsau0Z"
-typesense_dev_host = "dnm1k9zrpctsvjowp-1"
+typesense_dev_host = "dnm1k9zrpctsvjowp"
 
 # Note that it's okay to use this on the front end: https://typesense.com/docs/guide/security.html#public-api-key
 typesense_public_prod_apikey = "sTvKR2ULcYygxPiL9HWEEpNLKlMcYSlf"
