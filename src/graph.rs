@@ -69,7 +69,7 @@ impl Opts {
 
 fn node_attributes_to_string(attributes: &HashMap<String, String>, default_shape: &str) -> String {
     let mut attrs = attributes.clone();
-    if attrs.get("shape").is_none() {
+    if !attrs.contains_key("shape") {
         attrs.insert("shape".to_string(), default_shape.to_string());
     }
     return attrs
