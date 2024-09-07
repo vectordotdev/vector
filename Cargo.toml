@@ -173,7 +173,7 @@ async-trait = { version = "0.1.82", default-features = false }
 futures.workspace = true
 tokio = { version = "1.40.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.4", default-features = false }
-tokio-stream = { version = "0.1.15", default-features = false, features = ["net", "sync", "time"] }
+tokio-stream = { version = "0.1.16", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
 console-subscriber = { version = "0.3.0", default-features = false, optional = true }
 
