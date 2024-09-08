@@ -1,5 +1,6 @@
 features:
 - postgresql_metrics-integration-tests
+- postgres-integration-tests
 
 test_filter: ::postgres
 
@@ -18,6 +19,7 @@ matrix:
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
 - "src/internal_events/postgresql_metrics.rs"
+- "src/sinks/postgres/**"
 - "src/sources/postgresql_metrics.rs"
 - "src/sources/util/**"
 - "scripts/integration/postgres/**"
