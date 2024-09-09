@@ -221,8 +221,9 @@ where
                                 }
                             }
                         } else {
-                            // try maybe_upgrade since kubernetes_log doesn't have path available
-                            // when initialization.
+                            // maybe_upgrade is not executed during file_server's initialization with `kubernetes_log`
+                            // because `kubernetes_logs` source returns the files after it fetches k8s metadata.
+                            // so execute maybe_upgrade everytime new file is added to file_server.
                             checkpointer.maybe_upgrade(
                                 &path,
                                 file_id,
