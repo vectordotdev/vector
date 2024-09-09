@@ -35,7 +35,7 @@ pub struct PostgresService {
 }
 
 impl PostgresService {
-    pub fn new(connection_pool: Pool<Postgres>, table: String, endpoint: String) -> Self {
+    pub const fn new(connection_pool: Pool<Postgres>, table: String, endpoint: String) -> Self {
         Self {
             connection_pool,
             table,
