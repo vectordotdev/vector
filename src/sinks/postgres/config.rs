@@ -119,3 +119,29 @@ async fn healthcheck(connection_pool: Pool<Postgres>) -> crate::Result<()> {
     sqlx::query("SELECT 1").execute(&connection_pool).await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PostgresConfig>();
+    }
+
+    #[test]
+    fn parse_config() {
+        let cfg = toml::from_str::<PostgresConfig>(
+            r#"
+            endpoint = "postgres://user:password@localhost/default"
+            table = "mytable"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(
+            cfg.endpoint,
+            "postgres://user:password@localhost/default"
+        );
+        assert_eq!(cfg.table, "mytable");
+    }
+}
