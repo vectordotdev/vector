@@ -167,13 +167,17 @@ impl Aggregate {
         emit!(AggregateEventRecorded);
     }
 
-    fn record_count(&mut self, series: MetricSeries, data: MetricData, metadata: EventMetadata) {
-        let existing = self.map.entry(series).or_insert_with(|| {
-            let mut new_data = data.clone();
-            *new_data.value_mut() = MetricValue::Counter { value: 0f64 };
-            (new_data, metadata.clone())
-        });
+    fn record_count(
+        &mut self,
+        series: MetricSeries,
+        mut data: MetricData,
+        metadata: EventMetadata,
+    ) {
         let mut count_data = data.clone();
+        let existing = self.map.entry(series).or_insert_with(|| {
+            *data.value_mut() = MetricValue::Counter { value: 0f64 };
+            (data.clone(), metadata.clone())
+        });
         *count_data.value_mut() = MetricValue::Counter { value: 1f64 };
         if existing.0.kind == data.kind && existing.0.update(&count_data) {
             existing.1.merge(metadata);
