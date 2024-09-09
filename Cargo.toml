@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.41.0"
+version = "0.42.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -131,7 +131,7 @@ members = [
 
 [workspace.dependencies]
 chrono = { version = "0.4.38", default-features = false, features = ["clock", "serde"] }
-clap = { version = "4.5.16", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.17", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 futures = { version = "0.3.30", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.1", default-features = false }
 indexmap = { version = "2.5.0", default-features = false, features = ["serde", "std"] }
@@ -173,7 +173,7 @@ async-trait = { version = "0.1.82", default-features = false }
 futures.workspace = true
 tokio = { version = "1.40.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.4", default-features = false }
-tokio-stream = { version = "0.1.15", default-features = false, features = ["net", "sync", "time"] }
+tokio-stream = { version = "0.1.16", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
 console-subscriber = { version = "0.3.0", default-features = false, optional = true }
 
