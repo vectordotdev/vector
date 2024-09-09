@@ -2,9 +2,7 @@ use super::service::{PostgresRequest, PostgresRetryLogic, PostgresService};
 use crate::sinks::prelude::*;
 
 pub struct PostgresSink {
-    // TODO: move those properties to the service
     service: Svc<PostgresService, PostgresRetryLogic>,
-
     batch_settings: BatcherSettings,
 }
 
@@ -22,10 +20,9 @@ impl PostgresSink {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
             .map(Event::into_log)
+            // TODO: is this batch setting ok?
             .batched(self.batch_settings.as_byte_size_config())
-            // .
             // TODO: use request builder?
-            // .
             .map(PostgresRequest::from)
             .into_driver(self.service)
             .run()

@@ -23,18 +23,26 @@ use crate::{
     },
 };
 
+const fn default_pool_size() -> u32 {
+    5
+}
+
 /// Configuration for the `postgres` sink.
 #[configurable_component(sink("postgres", "Deliver log data to a PostgreSQL database."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PostgresConfig {
-    /// TODO
-    /// TODO: if I used UriSerde instead of String, I couldn't get a url string to use
-    /// in the connection pool, as the password would be redacted with UriSerde::to_string
+    // TODO: if I used UriSerde instead of String, I couldn't get a url string to use
+    // in the connection pool, as the password would be redacted with UriSerde::to_string
+    /// The connection string for the PostgreSQL server. It can contain the username and password.
     pub endpoint: String,
 
-    /// TODO
+    /// The table that data is inserted into.
     pub table: String,
+
+    /// The postgres connection pool size.
+    #[serde(default = "default_pool_size")]
+    pub pool_size: u32,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -72,7 +80,7 @@ impl SinkConfig for PostgresConfig {
         // TODO: it seems that the number of connections in the pool does not affect the throughput of the sink
         // does the sink execute batches in parallel?
         let connection_pool = PgPoolOptions::new()
-            .max_connections(5)
+            .max_connections(self.pool_size)
             .connect(&self.endpoint)
             .await?;
 
