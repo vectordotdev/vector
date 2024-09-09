@@ -9,12 +9,12 @@ use futures::{Stream, StreamExt};
 use vector_lib::{config::LogNamespace, event::MetricValue};
 use vector_lib::{
     configurable::configurable_component,
-    event::metric::{MetricData, MetricSeries},
+    event::metric::{Metric, MetricData, MetricKind, MetricSeries},
 };
 
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
-    event::{metric, Event, EventMetadata},
+    event::{Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     schema,
     transforms::{TaskTransform, Transform},
@@ -103,14 +103,14 @@ impl TransformConfig for AggregateConfig {
     }
 }
 
-type MetricEntry = (metric::MetricData, EventMetadata);
+type MetricEntry = (MetricData, EventMetadata);
 
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,
-    map: HashMap<metric::MetricSeries, MetricEntry>,
-    prev_map: HashMap<metric::MetricSeries, MetricEntry>,
-    multi_map: HashMap<metric::MetricSeries, Vec<MetricEntry>>,
+    map: HashMap<MetricSeries, MetricEntry>,
+    prev_map: HashMap<MetricSeries, MetricEntry>,
+    multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
     mode: AggregationMode,
 }
 
@@ -130,15 +130,15 @@ impl Aggregate {
 
         match self.mode {
             AggregationMode::Auto => match data.kind {
-                metric::MetricKind::Incremental => self.record_sum(series, data, metadata),
-                metric::MetricKind::Absolute => {
+                MetricKind::Incremental => self.record_sum(series, data, metadata),
+                MetricKind::Absolute => {
                     self.map.insert(series, (data, metadata));
                 }
             },
             AggregationMode::Sum => self.record_sum(series, data, metadata),
             AggregationMode::Latest | AggregationMode::Diff => match data.kind {
-                metric::MetricKind::Incremental => (),
-                metric::MetricKind::Absolute => {
+                MetricKind::Incremental => (),
+                MetricKind::Absolute => {
                     self.map.insert(series, (data, metadata));
                 }
             },
@@ -147,8 +147,8 @@ impl Aggregate {
                 self.record_comparison(series, data, metadata)
             }
             AggregationMode::Mean | AggregationMode::Stdev => match data.kind {
-                metric::MetricKind::Incremental => (),
-                metric::MetricKind::Absolute => {
+                MetricKind::Incremental => (),
+                MetricKind::Absolute => {
                     if matches!(data.value, MetricValue::Gauge { value: _ }) {
                         match self.multi_map.entry(series) {
                             Entry::Occupied(mut entry) => {
@@ -188,7 +188,7 @@ impl Aggregate {
 
     fn record_sum(&mut self, series: MetricSeries, data: MetricData, metadata: EventMetadata) {
         match data.kind {
-            metric::MetricKind::Incremental => match self.map.entry(series) {
+            MetricKind::Incremental => match self.map.entry(series) {
                 Entry::Occupied(mut entry) => {
                     let existing = entry.get_mut();
                     // In order to update (add) the new and old kind's must match
@@ -203,7 +203,7 @@ impl Aggregate {
                     entry.insert((data, metadata));
                 }
             },
-            metric::MetricKind::Absolute => {}
+            MetricKind::Absolute => {}
         }
     }
 
@@ -214,8 +214,8 @@ impl Aggregate {
         metadata: EventMetadata,
     ) {
         match data.kind {
-            metric::MetricKind::Incremental => (),
-            metric::MetricKind::Absolute => match self.map.entry(series) {
+            MetricKind::Incremental => (),
+            MetricKind::Absolute => match self.map.entry(series) {
                 Entry::Occupied(mut entry) => {
                     let existing = entry.get_mut();
                     // In order to update (add) the new and old kind's must match
@@ -250,7 +250,7 @@ impl Aggregate {
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.clone().into_iter() {
-            let mut metric = metric::Metric::from_parts(series, entry.0, entry.1);
+            let mut metric = Metric::from_parts(series, entry.0, entry.1);
             if matches!(self.mode, AggregationMode::Diff) {
                 if let Some(prev_entry) = self.prev_map.get(metric.series()) {
                     if metric.data().kind == prev_entry.0.kind && !metric.subtract(&prev_entry.0) {
@@ -288,7 +288,7 @@ impl Aggregate {
             let final_mean = final_sum.clone();
             match self.mode {
                 AggregationMode::Mean => {
-                    let metric = metric::Metric::from_parts(series, final_mean, final_metadata);
+                    let metric = Metric::from_parts(series, final_mean, final_metadata);
                     output.push(Event::Metric(metric));
                 }
                 AggregationMode::Stdev => {
@@ -308,7 +308,7 @@ impl Aggregate {
                     if let MetricValue::Gauge { value } = final_stdev.value_mut() {
                         *value = variance.sqrt()
                     }
-                    let metric = metric::Metric::from_parts(series, final_stdev, final_metadata);
+                    let metric = Metric::from_parts(series, final_stdev, final_metadata);
                     output.push(Event::Metric(metric));
                 }
                 _ => (),
