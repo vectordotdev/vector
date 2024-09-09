@@ -121,7 +121,7 @@ async fn healthcheck(connection_pool: Pool<Postgres>) -> crate::Result<()> {
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::*;
 
     #[test]
@@ -138,10 +138,7 @@ mod tests{
         "#,
         )
         .unwrap();
-        assert_eq!(
-            cfg.endpoint,
-            "postgres://user:password@localhost/default"
-        );
+        assert_eq!(cfg.endpoint, "postgres://user:password@localhost/default");
         assert_eq!(cfg.table, "mytable");
     }
 }
