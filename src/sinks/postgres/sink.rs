@@ -7,7 +7,7 @@ pub struct PostgresSink {
 }
 
 impl PostgresSink {
-    pub fn new(
+    pub const fn new(
         service: Svc<PostgresService, PostgresRetryLogic>,
         batch_settings: BatcherSettings,
     ) -> Self {
