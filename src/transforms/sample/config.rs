@@ -44,6 +44,11 @@ pub struct SampleConfig {
     #[configurable(metadata(docs::examples = "message"))]
     pub key_field: Option<String>,
 
+    /// A field for grouping sampling by a particular log field. Logs that come in with a unique
+    /// value for the field will be sampled together.
+    #[configurable(metadata(docs::examples = ".log_field"))]
+    pub group_by: Option<String>,
+
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
 }
@@ -53,6 +58,7 @@ impl GenerateConfig for SampleConfig {
         toml::Value::try_from(Self {
             rate: 10,
             key_field: None,
+            group_by: None,
             exclude: None::<AnyCondition>,
         })
         .unwrap()
@@ -67,6 +73,7 @@ impl TransformConfig for SampleConfig {
             Self::NAME.to_string(),
             self.rate,
             self.key_field.clone(),
+            self.group_by.clone(),
             self.exclude
                 .as_ref()
                 .map(|condition| condition.build(&context.enrichment_tables))
@@ -126,6 +133,7 @@ mod tests {
             let config = SampleConfig {
                 rate: 1,
                 key_field: None,
+                group_by: None,
                 exclude: None,
             };
             let (tx, rx) = mpsc::channel(1);
