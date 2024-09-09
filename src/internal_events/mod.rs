@@ -129,6 +129,7 @@ mod template;
 mod throttle;
 mod udp;
 mod unix;
+pub mod vector_event_logs;
 #[cfg(feature = "sinks-websocket")]
 mod websocket;
 
