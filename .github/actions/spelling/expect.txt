@@ -516,6 +516,7 @@ imds
 IMSD
 incentivizes
 incrementalize
+indexgateway
 indexmap
 indicatif
 indoc
@@ -568,6 +569,7 @@ jtype
 juchiast
 karppila
 kartar
+kebabcase
 kemmer
 kernelmode
 keybase
@@ -619,6 +621,7 @@ lognamespace
 lognamespacing
 logplex
 logproto
+logql
 logqlmodel
 logsense
 logsev
@@ -809,6 +812,7 @@ ouicompat
 outputspatterns
 overaligned
 overalignment
+owen
 owo
 oyaml
 pageheap
@@ -816,6 +820,7 @@ paq
 parallelizable
 pareto
 partitionable
+pascalcase
 passthrough
 pathbuf
 pathgen
@@ -867,6 +872,7 @@ purgecss
 pyld
 Pzb
 qqq
+queryrangebase
 quickcheck
 quix
 quuux
@@ -937,6 +943,7 @@ rxs
 ryangjchandler
 ryu
 sadf
+salvacorts
 samehost
 samenet
 samerole
@@ -947,6 +954,7 @@ sccache
 schemaless
 schemars
 schoen
+screamingsnakecase
 sda
 sdata
 SDID
@@ -1153,6 +1161,7 @@ undertagline
 underutilized
 underutilizing
 unevictable
+unflatten
 unioning
 unitdir
 unmark

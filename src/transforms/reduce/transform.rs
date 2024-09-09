@@ -78,16 +78,8 @@ impl ReduceState {
 
         if let Some(fields_iter) = e.all_event_fields_skip_array_elements() {
             for (path, value) in fields_iter {
-                // TODO: This can be removed once issue 21077 is resolved.
-                //       Technically we need to quote any special characters (like `-` or `*` or ` `).
-                let parsable_path = if path.contains("\\.") {
-                    quote_invalid_paths(&path).into()
-                } else {
-                    path.clone()
-                };
-
                 // This should not return an error, unless there is a bug in the event fields iterator.
-                let parsed_path = match parse_target_path(&parsable_path) {
+                let parsed_path = match parse_target_path(&path) {
                     Ok(path) => path,
                     Err(error) => {
                         emit!(ReduceAddEventError { error, path });
@@ -340,53 +332,6 @@ impl TaskTransform<Event> for Reduce {
             },
         ))
     }
-}
-
-// TODO delete after issue 21077 is resolved.
-fn quote_invalid_paths(path: &str) -> String {
-    let components: Vec<&str> = path.split('.').collect();
-
-    let index: Vec<bool> = components
-        .iter()
-        .map(|component| component.ends_with('\\'))
-        .collect();
-
-    let mut escaping = false;
-    let mut result = String::new();
-    index.iter().enumerate().for_each(|(i, _)| {
-        let current = components[i].trim_end_matches('\\');
-        if i == 0 {
-            if index[0] {
-                escaping = true;
-                result.push('"');
-            }
-            result.push_str(current);
-        } else if i == index.len() - 1 {
-            result.push_str(current);
-            if escaping {
-                escaping = false;
-                result.push('"');
-            };
-        } else if !index[i - 1] && index[i] {
-            escaping = true;
-            result.push('"');
-            result.push_str(current);
-        } else if index[i - 1] && index[i] {
-            escaping = true;
-            result.push_str(current);
-        } else if index[i - 1] && !index[i] {
-            result.push_str(current);
-            escaping = false;
-            result.push('"');
-        } else {
-            result.push_str(current);
-        }
-
-        if i < components.len() - 1 {
-            result.push('.');
-        }
-    });
-    result
 }
 
 #[cfg(test)]
@@ -993,6 +938,7 @@ merge_strategies.bar = "concat"
             r#"
             group_by = [ "id" ]
             merge_strategies.events = "array"
+            merge_strategies."\"a-b\"" = "retain"
             merge_strategies.another = "discard"
 
             [ends_when]
@@ -1017,6 +963,7 @@ merge_strategies.bar = "concat"
                 btreemap! {"id" => 777, "another" => btreemap!{ "a" => 1}},
             ));
             e_1.insert("events", v_1.clone());
+            e_1.insert("\"a-b\"", 2);
             tx.send(e_1.into()).await.unwrap();
 
             let v_2 = Value::from(btreemap! {
@@ -1029,6 +976,7 @@ merge_strategies.bar = "concat"
                 btreemap! {"id" => 777, "test_end" => "done", "another" => btreemap!{ "b" => 2}},
             ));
             e_2.insert("events", v_2.clone());
+            e_2.insert("\"a-b\"", 2);
             tx.send(e_2.into()).await.unwrap();
 
             let output = out.recv().await.unwrap().into_log();
@@ -1036,6 +984,7 @@ merge_strategies.bar = "concat"
                 "id" => 1554,
                 "events" => vec![v_1, v_2],
                 "another" => btreemap!{ "a" => 1},
+                "a-b" => 2,
                 "test_end" => "done"
             });
             assert_eq!(*output.value(), expected_value);
@@ -1045,48 +994,5 @@ merge_strategies.bar = "concat"
             assert_eq!(out.recv().await, None);
         })
         .await
-    }
-
-    #[test]
-    fn quote_paths_tests() {
-        let input = "one";
-        let expected = "one";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
-
-        let input = ".one";
-        let expected = ".one";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
-
-        let input = "one.two.three.four";
-        let expected = "one.two.three.four";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
-
-        let input = r"one.two.three\.four";
-        let expected = "one.two.\"three.four\"";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
-
-        let input = r"one.two.three\.four\.five";
-        let expected = "one.two.\"three.four.five\"";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
-
-        let input = r"one.two.three\.four\.five.six";
-        let expected = "one.two.\"three.four.five\".six";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
-
-        let input = r"one.two\.three.four\.five.six.seven\.eight";
-        let expected = "one.\"two.three\".\"four.five\".six.\"seven.eight\"";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
-
-        let input = r"one.two\.three\.four\.five.six\.seven.eight";
-        let expected = "one.\"two.three.four.five\".\"six.seven\".eight";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
     }
 }
