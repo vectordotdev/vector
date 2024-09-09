@@ -78,8 +78,8 @@ check-links: production-build run-link-checker
 
 # Search
 typesense:
-	yarn typesense-json
 	yarn typesense-index
+	yarn typesense-sync
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
