@@ -642,7 +642,7 @@ impl From<EventMetadata> for Metadata {
             source_type: source_type.map(|s| s.to_string()),
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
-            source_event_id: source_event_id.map_or(vec![], std::convert::Into::into)
+            source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
         }
     }
 }
