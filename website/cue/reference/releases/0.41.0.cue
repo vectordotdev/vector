@@ -24,7 +24,8 @@ releases: "0.41.0": {
 	known_issues: [
 		"""
 			The `vector` source cannot receive events encoded by the`vector` sink
-			[#21252](https://github.com/vectordotdev/vector/issues/21252).
+			[#21252](https://github.com/vectordotdev/vector/issues/21252). This will be fixed in
+			v0.41.1.
 			""",
 	]
 
