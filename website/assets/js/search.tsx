@@ -1,13 +1,27 @@
-import { autocomplete, getAlgoliaResults } from '@algolia/autocomplete-js'
-import algoliasearch from 'algoliasearch/lite'
+import { autocomplete } from '@algolia/autocomplete-js'
+import Typesense from 'typesense'
 import React, { createElement, Fragment, useEffect, useRef } from 'react'
 import ReactDOM, { render } from 'react-dom'
 
-// Algolia search
-const appId = process.env.ALGOLIA_APP_ID
-const apiKey = process.env.ALGOLIA_PUBLIC_API_KEY
-const indexName = process.env.ALGOLIA_INDEX_NAME
-const searchClient = algoliasearch(appId, apiKey)
+// // Algolia search
+// const appId = process.env.ALGOLIA_APP_ID
+const apiKey = process.env.TYPESENSE_PUBLIC_API_KEY
+const indexName = process.env.TYPESENSE_INDEX
+const host = process.env.TYPESENSE_HOST
+// const searchClient = algoliasearch(appId, apiKey)
+
+let searchClient = new Typesense.Client({
+  apiKey: apiKey,
+  nodes: [
+    {
+      host: `${host}.a1.typesense.net`,
+      port: '443',
+      protocol: 'https',
+    },
+  ],
+  connectionTimeoutSeconds: 2,
+})
+
 
 const CommandIcon: React.FC = ({ children }) => {
   return (
@@ -43,20 +57,21 @@ const Chevron: React.FC = () => {
   )
 }
 
-const Result = ({ hit, components }) => {
-  const hierarchy = hit.hierarchy.concat(hit.title)
+
+const Result = ({ hit, components, category }) => {
+  const hierarchy = hit.document.hierarchy.concat(hit.document.title)
   const isRootPage = hierarchy.length < 1
 
   return (
-    <a href={hit.itemUrl}>
+    <a href={hit.document.itemUrl}>
       <div className="border-r border-gray-300 py-4 pl-2 h-full leading-relaxed">
-        {hit.category}
+        {category}
       </div>
       <div className="p-2 block">
         <div className="text-gray-800 text-md mb-1 font-medium leading-relaxed ">
           {!isRootPage &&
             hierarchy.map((t, i) => (
-              <span key={`${hit.itemUrl}-${t}`}>
+              <span key={`${hit.document.itemUrl}-${t}`}>
                 <span className="w-2 h-2 inline" key={`${t.itemUrl}`}>
                   {t}
                 </span>
@@ -71,10 +86,10 @@ const Result = ({ hit, components }) => {
         </div>
         <p className="text-gray-600 text-sm">
           {hit.content && (
-            <components.Highlight hit={hit} attribute="content" />
+            <span dangerouslySetInnerHTML={{__html: hit.content}} />
           )}
           {!hit.content && (
-            <span style={{ wordBreak: 'break-word' }}>{hit.itemUrl}</span>
+            <span style={{ wordBreak: 'break-word' }}>{hit.document.itemUrl}</span>
           )}
         </p>
       </div>
@@ -148,7 +163,6 @@ const Autocomplete = (props) => {
   return <div ref={containerRef} />
 }
 
-
 const Search = () => {
   return (
     <Autocomplete
@@ -159,65 +173,62 @@ const Search = () => {
       getSources={({ query }) => [
         {
           sourceId: 'queryResults',
-          getItems() {
-            const res = getAlgoliaResults({
-              searchClient,
-              queries: [
-                {
-                  indexName,
-                  query,
-                  params: {
-                    hitsPerPage: 8,
-                  },
-                },
-              ],
-              transformResponse(res: any) {
-                // order the hits by page group
-                const hits = res.hits[0].sort((a, b) => (a < b ? -1 : 1))
+          async getItems() {
+            const results = (query) => searchClient.collections('vector_docs').documents().search({
+              q: query,
+              preset: 'vector_docs_search',
+              exhaustive_search: true,
+              highlight_fields: 'content',
+              highlight_full_fields: 'content'
 
-                // add page as category if there are duplicates
-                const hitsWithCategory = hits.map((h, i) => {
-                  const prev = hits[i - 1] as any
+            }).then((result) => {
+              // order the hits by page group
+              // const hits = result.hits.sort((a, b) => (a.document.pageTitle < b.document.pageTitle ? -1 : 1))
 
-                  // if no previous hit is in this category
-                  if (!prev) {
-                    return { ...h, category: h.pageTitle }
-                  }
+              // add page as category if there are duplicates
+              const hitsWithCategory = result.hits.map((h, i) => {
+                const prev = result.hits[i - 1] as any
+                const title = h.document.pageTitle
 
-                  // skip if there is already one in this category
-                  if (prev && prev.pageTitle === h.pageTitle) {
-                    return h
-                  }
+                // if no previous hit is in this category
+                if (!prev) {
+                  return { ...h, category: title }
+                }
 
-                  // add category if needed
-                  if (prev && prev.pageTitle !== h.pageTitle) {
-                    return { ...h, category: h.pageTitle }
-                  }
-
+                // skip if there is already one in this category
+                if (prev && prev.document.pageTitle === title) {
                   return h
-                })
+                }
 
-                return hitsWithCategory
-              },
+                // add category if needed
+                if (prev && prev.document.pageTitle !== title) {
+                  return { ...h, category: title }
+                }
+
+                return h
+              })
+              return hitsWithCategory
             })
-
-            return res
+            return await results(query)
           },
           getItemUrl({ item }) {
-            return item.itemUrl
-          },
-          onActive({ item, setContext }) {
-            setContext({ preview: item })
+            return item.document.itemUrl
           },
           templates: {
             item({ item, components }) {
-              return <Result hit={item} components={components} />
+              const highlight = item.highlights.length && item.highlights.find(h => h.field === 'content' || {}).value || item.document['content']
+              item['content'] = highlight
+              return <Result hit={item} components={components} category={item.category} />
+            },
+            noResults() {
+              return 'No results found.';
             },
           },
-        },
+        }
       ]}
     />
   )
 }
+
 
 ReactDOM.render(<Search />, document.getElementById('site-search'))

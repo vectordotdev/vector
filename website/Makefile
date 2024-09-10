@@ -54,7 +54,7 @@ production-build:
 	--environment "production" \
 	--minify
 
-ci-production-build: setup cargo-data structured-data production-build run-link-checker algolia
+ci-production-build: setup cargo-data structured-data production-build run-link-checker typesense
 
 # Preview site
 preview-build:
@@ -65,7 +65,7 @@ preview-build:
 	--minify
 	cp ./custom-headers/_preview ./public/_headers
 
-ci-preview-build: setup cargo-data structured-data preview-build run-link-checker algolia
+ci-preview-build: setup cargo-data structured-data preview-build run-link-checker typesense
 
 run-link-checker:
 	htmltest
@@ -77,10 +77,9 @@ run-external-link-checker:
 check-links: production-build run-link-checker
 
 # Search
-algolia:
-	yarn algolia-config
-	yarn algolia-index
-	yarn algolia-upload
+typesense:
+	yarn typesense-index
+	yarn typesense-sync
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
