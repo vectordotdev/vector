@@ -61,7 +61,7 @@ const Chevron: React.FC = () => {
 const Result = ({ hit, components, category }) => {
   const hierarchy = hit.document.hierarchy.concat(hit.document.title)
   const isRootPage = hierarchy.length < 1
- 
+
   return (
     <a href={hit.document.itemUrl}>
       <div className="border-r border-gray-300 py-4 pl-2 h-full leading-relaxed">
@@ -173,14 +173,14 @@ const Search = () => {
       getSources={({ query }) => [
         {
           sourceId: 'queryResults',
-          async getItems() { 
+          async getItems() {
             const results = (query) => searchClient.collections('vector_docs').documents().search({
               q: query,
               preset: 'vector_docs_search',
               exhaustive_search: true,
               highlight_fields: 'content',
               highlight_full_fields: 'content'
-              
+
             }).then((result) => {
               // order the hits by page group
               // const hits = result.hits.sort((a, b) => (a.document.pageTitle < b.document.pageTitle ? -1 : 1))
@@ -194,7 +194,7 @@ const Search = () => {
                 if (!prev) {
                   return { ...h, category: title }
                 }
-                
+
                 // skip if there is already one in this category
                 if (prev && prev.document.pageTitle === title) {
                   return h
