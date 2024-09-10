@@ -642,7 +642,7 @@ impl From<EventMetadata> for Metadata {
             source_type: source_type.map(|s| s.to_string()),
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
-            source_event_id: Some(source_event_id.into()),
+            source_event_id: source_event_id.map_or(vec![], std::convert::Into::into)
         }
     }
 }
@@ -675,16 +675,7 @@ impl From<Metadata> for EventMetadata {
             metadata = metadata.with_origin_metadata(origin_metadata.into());
         }
 
-        if let Some(source_event_id) = value.source_event_id {
-            match Uuid::from_slice(&source_event_id) {
-                Ok(uuid) => metadata = metadata.with_source_event_id(uuid),
-                Err(error) => error!(
-                    message = "Invalid source_event_id in metadata",
-                    error = %error,
-                    internal_rate_limit = true
-                ),
-            };
-        }
+        metadata = metadata.with_source_event_id(Uuid::from_slice(&value.source_event_id).ok());
 
         metadata
     }

@@ -93,7 +93,7 @@ message Metadata {
   optional string source_type = 4;
   OutputId upstream_id = 5;
   Secrets secrets = 6;
-  optional bytes source_event_id = 8;
+  bytes source_event_id = 7;
 }
 
 message Metric {
