@@ -677,8 +677,6 @@ impl From<Metadata> for EventMetadata {
 
         if let Ok(uuid) = Uuid::from_slice(&value.source_event_id) {
             metadata = metadata.with_source_event_id(uuid);
-        } else {
-            error!("Invalid source_event_id in metadata");
         }
 
         metadata
