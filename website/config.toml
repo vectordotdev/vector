@@ -53,7 +53,7 @@ typesense_public_dev_apikey = "aTFLzhfCVeTj619Pxkhmz18798Nsau0Z"
 typesense_dev_host = "dnm1k9zrpctsvjowp"
 
 # Note that it's okay to use this on the front end: https://typesense.com/docs/guide/security.html#public-api-key
-typesense_public_prod_apikey = "sTvKR2ULcYygxPiL9HWEEpNLKlMcYSlf"
+typesense_public_prod_apikey = "5mz1KIYOPGHDCx7ggRbbGzTaSYnxzcz0"
 typesense_prod_host = "gk6e3zbyuntvc5dap"
 
 # VRL JSON server
