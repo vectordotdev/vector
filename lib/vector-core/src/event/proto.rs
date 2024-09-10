@@ -675,7 +675,22 @@ impl From<Metadata> for EventMetadata {
             metadata = metadata.with_origin_metadata(origin_metadata.into());
         }
 
-        metadata = metadata.with_source_event_id(Uuid::from_slice(&value.source_event_id).ok());
+        let maybe_source_event_id = if value.source_event_id.is_empty() {
+            None
+        } else {
+            match Uuid::from_slice(&value.source_event_id) {
+                Ok(id) => Some(id),
+                Err(error) => {
+                    error!(
+                        message = "Failed to parse source_event_id: {}",
+                        %error,
+                        internal_log_rate_limit = true
+                    );
+                    None
+                }
+            }
+        };
+        metadata = metadata.with_source_event_id(maybe_source_event_id);
 
         metadata
     }
