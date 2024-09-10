@@ -1186,7 +1186,10 @@ mod test {
         // Check if event id is UUID v7
         let log1 = LogEvent::default();
         assert_eq!(
-            log1.metadata().source_event_id().get_version(),
+            log1.metadata()
+                .source_event_id()
+                .expect("source_event_id should be auto-generated for new events")
+                .get_version(),
             Some(Version::SortRand)
         );
 
