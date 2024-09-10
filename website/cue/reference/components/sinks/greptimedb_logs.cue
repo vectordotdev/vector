@@ -20,7 +20,7 @@ components: sinks: greptimedb_logs: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    10_000_000
+				max_events:   20
 				timeout_secs: 1.0
 			}
 			compression: enabled: false
@@ -45,7 +45,7 @@ components: sinks: greptimedb_logs: {
 				interface: {
 					socket: {
 						api: {
-							title: "GreptimeDB HTTP API"
+							title: "GreptimeDB gRPC API"
 							url:   urls.greptimedb_docs
 						}
 						direction: "outgoing"
@@ -66,9 +66,16 @@ components: sinks: greptimedb_logs: {
 	configuration: base.components.sinks.greptimedb_logs.configuration
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      false
+			distribution: false
+			gauge:        false
+			histogram:    false
+			set:          false
+			summary:      false
+		}
+		traces: false
 	}
 
 	how_it_works: {
@@ -76,7 +83,7 @@ components: sinks: greptimedb_logs: {
 			title: "Setup"
 			body:  """
 				1. Start your own [GreptimeDB](\(urls.greptimedb)) or create an instance on [GreptimeCloud](\(urls.greptimecloud)).
-				2. Configure HTTP endpoint(host:port), optional dbname, authentication information, and pipeline info.
+				2. Configure gRPC endpoint(host:port) and optional dbname and authentication information.
 				"""
 		}
 	}
