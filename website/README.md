@@ -74,7 +74,7 @@ In addition to Tailwind classes, some CSS is built from [Sass] (all Sass files a
 Search for vector.dev is provided by [Typesense]. Our search solution is largely custom:
 
 * The [`typesense-index.ts`](./scripts/typesense-index.ts) script generates an index of all of the relevant pages on the site and stores the result in a single JSON file (output to `public/search.json`).
-* The [`typesense-sync.ts`](./scripts/typesense-sync.ts) script syncs the generated JSON index with the Typesense backend, performing all the necessary create, update, and delete operations, using a custom package, `typesense-sync`. Reach out in #websites for more details. 
+* The [`typesense-sync.ts`](./scripts/typesense-sync.ts) script syncs the generated JSON index with the Typesense backend, performing all the necessary create, update, and delete operations, using a custom package, `typesense-sync`. Reach out in #websites for more details.
 
 The Typesense configuration for the site is captured via the [`typesense.config.json`](./typesense.config.json) file.
 
