@@ -52,6 +52,35 @@ use crate::{
     tls::{TlsConfig, TlsSettings},
 };
 
+
+/// Compression configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
+#[derivative(Default)]
+#[serde(rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The compression algorithm to use for sending."
+))]
+pub enum ChronicleCompression {
+    /// No compression.
+    #[derivative(Default)]
+    None,
+
+    /// [Gzip][gzip] compression.
+    ///
+    /// [gzip]: https://www.gzip.org/
+    Gzip,
+}
+
+impl From<ChronicleCompression> for Compression {
+    fn from(compression: ChronicleCompression) -> Self {
+        match compression {
+            ChronicleCompression::None => Compression::None,
+            ChronicleCompression::Gzip => Compression::gzip_default(),
+        }
+    }
+}
+
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum GcsHealthcheckError {
@@ -154,6 +183,10 @@ pub struct ChronicleUnstructuredConfig {
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub compression: ChronicleCompression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -411,6 +444,7 @@ impl Encoder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleEncoder {
 #[derive(Clone, Debug)]
 struct ChronicleRequestBuilder {
     encoder: ChronicleEncoder,
+    compression: Compression,
 }
 
 struct ChronicleRequestPayload {
@@ -438,7 +472,7 @@ impl RequestBuilder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleRequestBui
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
-        Compression::None
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -494,7 +528,8 @@ impl ChronicleRequestBuilder {
             encoder,
             transformer,
         };
-        Ok(Self { encoder })
+        let compression = Compression::from(config.compression.clone());
+        Ok(Self { encoder, compression })
     }
 }
 

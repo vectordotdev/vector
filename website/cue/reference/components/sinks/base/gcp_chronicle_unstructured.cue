@@ -75,6 +75,21 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 			}
 		}
 	}
+	compression: {
+		description: "Compression configuration."
+		required:    false
+		type: string: {
+			default: "none"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+			}
+		}
+	}
 	credentials_path: {
 		description: """
 			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
