@@ -68,6 +68,14 @@ async fn component_spec_compliance_data_volume() {
     .await;
 }
 
+macro_rules! model_map {
+    ( $( $key:literal :  $value:expr , )* ) => {
+        [ $( ( KeyString::from($key), Value::from($value) ), )* ]
+            .into_iter()
+            .collect::<HashMap<_, _>>()
+    }
+}
+
 #[test]
 fn generates_event_api_model_without_message_field() {
     let mut map = HashMap::<KeyString, Value>::new();
@@ -78,19 +86,14 @@ fn generates_event_api_model_without_message_field() {
     let model =
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
-    assert_eq!(model.0.len(), 1);
-    assert!(model.0[0].contains_key("eventType"));
     assert_eq!(
-        model.0[0].get("eventType").unwrap().to_string_lossy(),
-        "TestEvent".to_owned()
+        &model.0[..],
+        &[model_map! {
+            "eventType": "TestEvent",
+            "user": "Joe",
+            "user_id": 123456,
+        }]
     );
-    assert!(model.0[0].contains_key("user"));
-    assert_eq!(
-        model.0[0].get("user").unwrap().to_string_lossy(),
-        "Joe".to_owned()
-    );
-    assert!(model.0[0].contains_key("user_id"));
-    assert_eq!(model.0[0].get("user_id").unwrap(), &Value::Integer(123456));
 }
 
 #[test]
@@ -107,23 +110,14 @@ fn generates_event_api_model_with_message_field() {
     let model =
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
-    assert_eq!(model.0.len(), 1);
-    assert!(model.0[0].contains_key("eventType"));
     assert_eq!(
-        model.0[0].get("eventType").unwrap().to_string_lossy(),
-        "TestEvent".to_owned()
-    );
-    assert!(model.0[0].contains_key("user"));
-    assert_eq!(
-        model.0[0].get("user").unwrap().to_string_lossy(),
-        "Joe".to_owned()
-    );
-    assert!(model.0[0].contains_key("user_id"));
-    assert_eq!(model.0[0].get("user_id").unwrap(), &Value::Integer(123456));
-    assert!(model.0[0].contains_key("message"));
-    assert_eq!(
-        model.0[0].get("message").unwrap().to_string_lossy(),
-        "This is a message".to_owned()
+        &model.0[..],
+        &[model_map! {
+            "eventType": "TestEvent",
+            "user": "Joe",
+            "user_id": 123456,
+            "message": "This is a message",
+        }]
     );
 }
 
@@ -141,23 +135,14 @@ fn generates_event_api_model_with_json_inside_message_field() {
     let model =
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
-    assert_eq!(model.0.len(), 1);
-    assert!(model.0[0].contains_key("eventType"));
     assert_eq!(
-        model.0[0].get("eventType").unwrap().to_string_lossy(),
-        "TestEvent".to_owned()
-    );
-    assert!(model.0[0].contains_key("user"));
-    assert_eq!(
-        model.0[0].get("user").unwrap().to_string_lossy(),
-        "Joe".to_owned()
-    );
-    assert!(model.0[0].contains_key("user_id"));
-    assert_eq!(model.0[0].get("user_id").unwrap(), &Value::Integer(123456));
-    assert!(model.0[0].contains_key("my_key"));
-    assert_eq!(
-        model.0[0].get("my_key").unwrap().to_string_lossy(),
-        "my_value".to_owned()
+        &model.0[..],
+        &[model_map! {
+            "eventType": "TestEvent",
+            "user": "Joe",
+            "user_id": 123456,
+            "my_key": "my_value",
+        }]
     );
 }
 
@@ -169,13 +154,13 @@ fn generates_log_api_model_without_message_field() {
     let model = LogsApiModel::try_from(vec![event]).expect("Failed mapping logs into API model");
     let logs = model.0[0].get("logs").expect("Logs data store not present");
 
-    assert_eq!(logs.len(), 1);
-    assert!(logs[0].contains_key("tag_key"));
     assert_eq!(
-        logs[0].get("tag_key").unwrap().to_string_lossy(),
-        "tag_value".to_owned()
+        &logs[..],
+        &[model_map! {
+            "tag_key": "tag_value",
+            "message": "log from vector",
+        }]
     );
-    assert!(logs[0].contains_key("message"));
 }
 
 #[test]
@@ -190,16 +175,12 @@ fn generates_log_api_model_with_message_field() {
     let model = LogsApiModel::try_from(vec![event]).expect("Failed mapping logs into API model");
     let logs = model.0[0].get("logs").expect("Logs data store not present");
 
-    assert_eq!(logs.len(), 1);
-    assert!(logs[0].contains_key("tag_key"));
     assert_eq!(
-        logs[0].get("tag_key").unwrap().to_string_lossy(),
-        "tag_value".to_owned()
-    );
-    assert!(logs[0].contains_key("message"));
-    assert_eq!(
-        logs[0].get("message").unwrap().to_string_lossy(),
-        "This is a message".to_owned()
+        &logs[..],
+        &[model_map! {
+            "tag_key": "tag_value",
+            "message": "This is a message",
+        }]
     );
 }
 
@@ -216,25 +197,26 @@ fn generates_metric_api_model_without_timestamp() {
         .get("metrics")
         .expect("Metric data store not present");
 
-    assert_eq!(metrics.len(), 1);
-    assert!(metrics[0].contains_key("name"));
     assert_eq!(
-        metrics[0].get("name").unwrap().to_string_lossy(),
-        "my_metric".to_owned()
+        &metrics[..],
+        &[model_map! {
+            "name": "my_metric",
+            "value": 100.0,
+            "timestamp": metrics[0].get("timestamp").unwrap().clone(),
+            "type": "gauge",
+        }]
     );
-    assert!(metrics[0].contains_key("value"));
-    assert_eq!(metrics[0].get("value").unwrap(), &Value::from(100.0));
-    assert!(metrics[0].contains_key("timestamp"));
 }
 
 #[test]
 fn generates_metric_api_model_with_timestamp() {
+    let stamp = DateTime::<Utc>::from(SystemTime::now());
     let m = Metric::new(
         "my_metric",
         MetricKind::Absolute,
         MetricValue::Counter { value: 100.0 },
     )
-    .with_timestamp(Some(DateTime::<Utc>::from(SystemTime::now())));
+    .with_timestamp(Some(stamp));
     let event = Event::Metric(m);
     let model =
         MetricsApiModel::try_from(vec![event]).expect("Failed mapping metrics into API model");
@@ -242,25 +224,26 @@ fn generates_metric_api_model_with_timestamp() {
         .get("metrics")
         .expect("Metric data store not present");
 
-    assert_eq!(metrics.len(), 1);
-    assert!(metrics[0].contains_key("name"));
     assert_eq!(
-        metrics[0].get("name").unwrap().to_string_lossy(),
-        "my_metric".to_owned()
+        &metrics[..],
+        &[model_map! {
+            "name": "my_metric",
+            "value": 100.0,
+            "timestamp": stamp.timestamp(),
+            "type": "gauge",
+        }]
     );
-    assert!(metrics[0].contains_key("value"));
-    assert_eq!(metrics[0].get("value").unwrap(), &Value::from(100.0));
-    assert!(metrics[0].contains_key("timestamp"));
 }
 
 #[test]
 fn generates_metric_api_model_incremental_counter() {
+    let stamp = DateTime::<Utc>::from(SystemTime::now());
     let m = Metric::new(
         "my_metric",
         MetricKind::Incremental,
         MetricValue::Counter { value: 100.0 },
     )
-    .with_timestamp(Some(DateTime::<Utc>::from(SystemTime::now())))
+    .with_timestamp(Some(stamp))
     .with_interval_ms(NonZeroU32::new(1000));
     let event = Event::Metric(m);
     let model =
@@ -269,15 +252,14 @@ fn generates_metric_api_model_incremental_counter() {
         .get("metrics")
         .expect("Metric data store not present");
 
-    assert_eq!(metrics.len(), 1);
-    assert!(metrics[0].contains_key("name"));
     assert_eq!(
-        metrics[0].get("name").unwrap().to_string_lossy(),
-        "my_metric".to_owned()
+        &metrics[..],
+        &[model_map! {
+            "name": "my_metric",
+            "value": 100.0,
+            "interval.ms": 1000,
+            "timestamp": stamp.timestamp(),
+            "type": "count",
+        }]
     );
-    assert!(metrics[0].contains_key("value"));
-    assert_eq!(metrics[0].get("value").unwrap(), &Value::from(100.0));
-    assert!(metrics[0].contains_key("timestamp"));
-    assert!(metrics[0].contains_key("interval.ms"));
-    assert_eq!(metrics[0].get("interval.ms").unwrap(), &Value::from(1000));
 }
