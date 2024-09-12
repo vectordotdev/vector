@@ -325,6 +325,17 @@ impl EventMetadata {
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
         self.secrets.merge(other.secrets);
+
+        // Update `source_event_id` if necessary.
+        match (self.source_event_id, other.source_event_id) {
+            (None, Some(id)) => {
+                self.source_event_id = Some(id);
+            }
+            (Some(uuid1), Some(uuid2)) if uuid2 < uuid1 => {
+                self.source_event_id = Some(uuid2);
+            }
+            _ => {} // Keep the existing value.
+        };
     }
 
     /// Update the finalizer(s) status.
@@ -522,5 +533,23 @@ mod test {
         assert_eq!(a.get("key-a").unwrap().as_ref(), "value-a1");
         assert_eq!(a.get("key-b").unwrap().as_ref(), "value-b1");
         assert_eq!(a.get("key-c").unwrap().as_ref(), "value-c2");
+    }
+
+    #[test]
+    fn metadata_source_event_id_merging() {
+        let m1 = EventMetadata::default();
+        let m2 = EventMetadata::default();
+
+        {
+            let mut merged = m1.clone();
+            merged.merge(m2.clone());
+            assert_eq!(merged.source_event_id, m1.source_event_id);
+        }
+
+        {
+            let mut merged = m2.clone();
+            merged.merge(m1.clone());
+            assert_eq!(merged.source_event_id, m1.source_event_id);
+        }
     }
 }
