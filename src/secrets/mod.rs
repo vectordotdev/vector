@@ -8,6 +8,7 @@ use crate::{config::SecretBackend, signal};
 
 #[cfg(feature = "secrets-aws-secrets-manager")]
 mod aws_secrets_manager;
+mod directory;
 mod exec;
 mod file;
 mod test;
@@ -21,6 +22,9 @@ mod test;
 pub enum SecretBackends {
     /// File.
     File(file::FileBackend),
+
+    /// Directory.
+    Directory(directory::DirectoryBackend),
 
     /// Exec.
     Exec(exec::ExecBackend),
@@ -39,6 +43,7 @@ impl NamedComponent for SecretBackends {
     fn get_component_name(&self) -> &'static str {
         match self {
             Self::File(config) => config.get_component_name(),
+            Self::Directory(config) => config.get_component_name(),
             Self::Exec(config) => config.get_component_name(),
             #[cfg(feature = "secrets-aws-secrets-manager")]
             Self::AwsSecretsManager(config) => config.get_component_name(),
