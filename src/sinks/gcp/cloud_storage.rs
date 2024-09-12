@@ -147,6 +147,14 @@ pub struct GcsSinkConfig {
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
 
+    /// Overrides what content encoding has been applied to the object.
+    ///
+    /// Directly comparable to the `Content-Encoding` HTTP header.
+    ///
+    /// If not specified, the compression scheme used dictates this value.
+    #[configurable(metadata(docs::examples = "gzip"))]
+    content_encoding: Option<String>,
+
     #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
@@ -194,6 +202,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         filename_append_uuid: true,
         filename_extension: Default::default(),
         encoding,
+        content_encoding: None,
         compression: Compression::gzip_default(),
         batch: Default::default(),
         request: Default::default(),
@@ -378,9 +387,12 @@ impl RequestSettings {
             .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
         let content_type = HeaderValue::from_str(encoder.content_type()).unwrap();
         let content_encoding = config
-            .compression
-            .content_encoding()
-            .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
+            .content_encoding
+            .as_ref()
+            .map(String::as_str)
+            .or(config.compression.content_encoding());
+        let content_encoding =
+            content_encoding.map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
         let storage_class = config.storage_class.unwrap_or_default();
         let storage_class = HeaderValue::from_str(&to_string(storage_class)).unwrap();
         let metadata = config
@@ -502,13 +514,19 @@ mod tests {
         RequestSettings::new(sink_config, context).expect("Could not create request settings")
     }
 
-    fn build_request(extension: Option<&str>, uuid: bool, compression: Compression) -> GcsRequest {
+    fn build_request(
+        extension: Option<&str>,
+        uuid: bool,
+        compression: Compression,
+        content_encoding: Option<String>,
+    ) -> GcsRequest {
         let context = SinkContext::default();
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key/".into()),
             filename_time_format: "date".into(),
             filename_extension: extension.map(Into::into),
             filename_append_uuid: uuid,
+            content_encoding: content_encoding,
             compression,
             ..default_config(
                 (
@@ -539,16 +557,38 @@ mod tests {
 
     #[test]
     fn gcs_build_request() {
-        let req = build_request(Some("ext"), false, Compression::None);
+        let req = build_request(Some("ext"), false, Compression::None, None);
         assert_eq!(req.key, "key/date.ext".to_string());
 
-        let req = build_request(None, false, Compression::None);
+        let req = build_request(None, false, Compression::None, None);
         assert_eq!(req.key, "key/date.log".to_string());
 
-        let req = build_request(None, false, Compression::gzip_default());
+        let req = build_request(None, false, Compression::gzip_default(), None);
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
-        let req = build_request(None, true, Compression::gzip_default());
+        let req = build_request(None, true, Compression::gzip_default(), None);
         assert_ne!(req.key, "key/date.log.gz".to_string());
+    }
+
+    #[test]
+    fn gcs_build_request_respect_content_encoding_option() {
+        let compression_scheme = Compression::gzip_default();
+        let request = build_request(None, false, compression_scheme, None);
+        assert_eq!(
+            request.settings.content_encoding,
+            HeaderValue::from_str(compression_scheme.content_encoding().unwrap()).ok()
+        );
+
+        let custom_encoding = "test_encoding";
+        let request = build_request(
+            None,
+            false,
+            compression_scheme,
+            Some(custom_encoding.to_string()),
+        );
+        assert_eq!(
+            request.settings.content_encoding,
+            HeaderValue::from_str(custom_encoding).ok()
+        );
     }
 }
