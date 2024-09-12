@@ -69,8 +69,7 @@ async fn component_spec_compliance_data_volume() {
 }
 
 #[test]
-fn generate_event_api_model() {
-    // Without message field
+fn generates_event_api_model_without_message_field() {
     let mut map = HashMap::<KeyString, Value>::new();
     map.insert("eventType".into(), Value::from("TestEvent".to_owned()));
     map.insert("user".into(), Value::from("Joe".to_owned()));
@@ -92,8 +91,10 @@ fn generate_event_api_model() {
     );
     assert!(model.0[0].contains_key("user_id"));
     assert_eq!(model.0[0].get("user_id").unwrap(), &Value::Integer(123456));
+}
 
-    // With message field
+#[test]
+fn generates_event_api_model_with_message_field() {
     let mut map = HashMap::<KeyString, Value>::new();
     map.insert("eventType".into(), Value::from("TestEvent".to_owned()));
     map.insert("user".into(), Value::from("Joe".to_owned()));
@@ -124,8 +125,10 @@ fn generate_event_api_model() {
         model.0[0].get("message").unwrap().to_string_lossy(),
         "This is a message".to_owned()
     );
+}
 
-    // With a JSON encoded inside the message field
+#[test]
+fn generates_event_api_model_with_json_inside_message_field() {
     let mut map = HashMap::<KeyString, Value>::new();
     map.insert("eventType".into(), Value::from("TestEvent".to_owned()));
     map.insert("user".into(), Value::from("Joe".to_owned()));
@@ -159,8 +162,7 @@ fn generate_event_api_model() {
 }
 
 #[test]
-fn generate_log_api_model() {
-    // Without message field
+fn generates_log_api_model_without_message_field() {
     let mut map = HashMap::<KeyString, Value>::new();
     map.insert("tag_key".into(), Value::from("tag_value".to_owned()));
     let event = Event::Log(LogEvent::from(map));
@@ -174,8 +176,10 @@ fn generate_log_api_model() {
         "tag_value".to_owned()
     );
     assert!(logs[0].contains_key("message"));
+}
 
-    // With message field
+#[test]
+fn generates_log_api_model_with_message_field() {
     let mut map = HashMap::<KeyString, Value>::new();
     map.insert("tag_key".into(), Value::from("tag_value".to_owned()));
     map.insert(
@@ -200,8 +204,7 @@ fn generate_log_api_model() {
 }
 
 #[test]
-fn generate_metric_api_model() {
-    // Without timestamp
+fn generates_metric_api_model_without_timestamp() {
     let event = Event::Metric(Metric::new(
         "my_metric",
         MetricKind::Absolute,
@@ -222,8 +225,10 @@ fn generate_metric_api_model() {
     assert!(metrics[0].contains_key("value"));
     assert_eq!(metrics[0].get("value").unwrap(), &Value::from(100.0));
     assert!(metrics[0].contains_key("timestamp"));
+}
 
-    // With timestamp
+#[test]
+fn generates_metric_api_model_with_timestamp() {
     let m = Metric::new(
         "my_metric",
         MetricKind::Absolute,
@@ -246,8 +251,10 @@ fn generate_metric_api_model() {
     assert!(metrics[0].contains_key("value"));
     assert_eq!(metrics[0].get("value").unwrap(), &Value::from(100.0));
     assert!(metrics[0].contains_key("timestamp"));
+}
 
-    // Incremental counter
+#[test]
+fn generates_metric_api_model_incremental_counter() {
     let m = Metric::new(
         "my_metric",
         MetricKind::Incremental,
