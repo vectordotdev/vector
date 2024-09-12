@@ -480,6 +480,34 @@ configuration: {
 				"""
 			required: false
 			type: object: options: {
+				file: {
+					required: true
+					description: """
+						Retrieve secrets from a file path.
+
+						The secret must be a JSON text string with key/value pairs. For example:
+						```json
+						{
+							"username": "test",
+							"password": "example-password"
+						}
+						```
+
+						If an error occurs while reading the file, Vector will log the error and exit.
+
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						path: {
+							description: "The file path to read."
+							required: true
+							type: string: {
+								examples: ["/path/to/secret.json"]
+							}
+						}
+					}
+				}
 				exec: {
 					required: true
 					description: """
