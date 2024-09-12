@@ -43,7 +43,7 @@ impl VectorSendEventMetadata {
 pub fn extract_topic_name(file_path: &str) -> String {
     // Topic: If the file being uploaded matches the archived-log filepattern we can extract
     // its topic from said pattern; otherwise propagate the empty-string.
-    let topic_regex = Regex::new(r"archived-log\/log-sync-internal\/([a-zA-Z\/]+)\/date").unwrap();
+    let topic_regex = Regex::new(r"archived-log\/log-sync-internal\/([a-zA-Z-_\/]+)\/date").unwrap();
     let topic_capture = topic_regex.captures(file_path);
     if !topic_capture.is_none() {
         return topic_capture.unwrap()[1].to_string();
@@ -60,7 +60,7 @@ mod tests {
     fn extract_topic_name_success() {
         let file_path = "databricks-logs/archived-log/log-sync-internal/test-topic/date=2024-04-02/us-west-2/vector-aggregator-0/test.log";
         assert_eq!(extract_topic_name(file_path), "test-topic");
-        let file_path_structured = "databricks-logs/archived-log/log-sync-internal/test-topic/date=2024-04-02/us-west-2/vector-aggregator-0/test.log";
+        let file_path_structured = "databricks-logs/archived-log/log-sync-internal/structured-log/test-topic/date=2024-04-02/us-west-2/vector-aggregator-0/test.log";
         assert_eq!(extract_topic_name(file_path_structured), "structured-log/test-topic");
     }
 
