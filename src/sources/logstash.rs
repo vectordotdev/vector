@@ -559,13 +559,13 @@ fn decode_data_frame(
     }
     let sequence_number = rest.get_u32();
     let pair_count = rest.get_u32();
-    if pair_count <= 0 {
+    if pair_count == 0 {
         return None; // Invalid number of fields
     }
 
     let mut fields = BTreeMap::<KeyString, serde_json::Value>::new();
     for _ in 0..pair_count {
-        let (key, value, right) = decode_pair(&rest)?;
+        let (key, value, right) = decode_pair(rest)?;
         rest = right;
 
         fields.insert(
