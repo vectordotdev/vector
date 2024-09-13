@@ -152,6 +152,23 @@ pub struct RootOpts {
     #[arg(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
 
+    /// Method for watching config
+    ///
+    /// By default `vector` use `inotify` which is recommended for linux based system
+    /// `poll` watcher can be used where inotify not work. ie, attaching config using NFS
+    #[arg(long, default_value = "inotify", env = "VECTOR_WATCH_METHOD")]
+    pub watch_config_method: WatchConfigMethod,
+
+    /// poll for changes in configuration file on given interval
+    ///
+    /// This config is only applicable if poll is enabled in `--watch-config-method`
+    #[arg(
+        long,
+        env = "VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS",
+        default_value = "30"
+    )]
+    pub watch_config_poll_interval_seconds: NonZeroU64,
+
     /// Set the internal log rate limit
     #[arg(
         short,
@@ -352,6 +369,14 @@ impl Color {
 pub enum LogFormat {
     Text,
     Json,
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WatchConfigMethod {
+    /// recommended for linux based systems
+    Inotify,
+    /// works for EFS/NFS like network storage systems
+    Poll,
 }
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
