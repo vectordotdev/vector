@@ -17,7 +17,7 @@ use vector_lib::{
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_events::{CheckRetryEvent},
-    sinks::{util::{retries::RetryLogic, vector_event::VectorSendEventMetadata}, Healthcheck},
+    sinks::{util::{retries::RetryLogic, vector_event::VectorEventLogSendMetadata}, Healthcheck},
 };
 
 #[derive(Debug, Clone)]
@@ -52,6 +52,7 @@ pub struct AzureBlobMetadata {
     pub count: usize,
     pub byte_size: JsonSize,
     pub finalizers: EventFinalizers,
+    pub event_log_metadata: VectorEventLogSendMetadata,
 }
 
 #[derive(Debug, Clone)]
@@ -86,8 +87,8 @@ pub struct AzureBlobResponse {
     pub inner: PutBlockBlobResponse,
     pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,
-    // Extending S3 response with additional information relevant for vector send event logs
-    pub send_event_metadata: VectorSendEventMetadata,
+    // Extending Azure response with additional information relevant for vector send event logs
+    pub event_log_metadata: VectorEventLogSendMetadata,
 }
 
 impl DriverResponse for AzureBlobResponse {
