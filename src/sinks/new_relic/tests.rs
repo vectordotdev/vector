@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use futures::{future::ready, stream};
 use serde::Deserialize;
 use vector_lib::config::{init_telemetry, Tags, Telemetry};
+use vrl::value;
 
 use super::*;
 use crate::{
@@ -78,11 +79,11 @@ macro_rules! model_map {
 
 #[test]
 fn generates_event_api_model_without_message_field() {
-    let mut map = HashMap::<KeyString, Value>::new();
-    map.insert("eventType".into(), Value::from("TestEvent".to_owned()));
-    map.insert("user".into(), Value::from("Joe".to_owned()));
-    map.insert("user_id".into(), Value::from(123456));
-    let event = Event::Log(LogEvent::from(map));
+    let event = Event::Log(LogEvent::from(value!({
+        "eventType": "TestEvent",
+        "user": "Joe",
+        "user_id": 123456,
+    })));
     let model =
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
@@ -98,15 +99,12 @@ fn generates_event_api_model_without_message_field() {
 
 #[test]
 fn generates_event_api_model_with_message_field() {
-    let mut map = HashMap::<KeyString, Value>::new();
-    map.insert("eventType".into(), Value::from("TestEvent".to_owned()));
-    map.insert("user".into(), Value::from("Joe".to_owned()));
-    map.insert("user_id".into(), Value::from(123456));
-    map.insert(
-        "message".into(),
-        Value::from("This is a message".to_owned()),
-    );
-    let event = Event::Log(LogEvent::from(map));
+    let event = Event::Log(LogEvent::from(value!({
+        "eventType": "TestEvent",
+        "user": "Joe",
+        "user_id": 123456,
+        "message": "This is a message",
+    })));
     let model =
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
@@ -123,15 +121,12 @@ fn generates_event_api_model_with_message_field() {
 
 #[test]
 fn generates_event_api_model_with_json_inside_message_field() {
-    let mut map = HashMap::<KeyString, Value>::new();
-    map.insert("eventType".into(), Value::from("TestEvent".to_owned()));
-    map.insert("user".into(), Value::from("Joe".to_owned()));
-    map.insert("user_id".into(), Value::from(123456));
-    map.insert(
-        "message".into(),
-        Value::from("{\"my_key\" : \"my_value\"}".to_owned()),
-    );
-    let event = Event::Log(LogEvent::from(map));
+    let event = Event::Log(LogEvent::from(value!({
+        "eventType": "TestEvent",
+        "user": "Joe",
+        "user_id": 123456,
+        "message": "{\"my_key\" : \"my_value\"}",
+    })));
     let model =
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
@@ -148,9 +143,7 @@ fn generates_event_api_model_with_json_inside_message_field() {
 
 #[test]
 fn generates_log_api_model_without_message_field() {
-    let mut map = HashMap::<KeyString, Value>::new();
-    map.insert("tag_key".into(), Value::from("tag_value".to_owned()));
-    let event = Event::Log(LogEvent::from(map));
+    let event = Event::Log(LogEvent::from(value!({"tag_key": "tag_value"})));
     let model = LogsApiModel::try_from(vec![event]).expect("Failed mapping logs into API model");
     let logs = model.0[0].get("logs").expect("Logs data store not present");
 
@@ -165,13 +158,10 @@ fn generates_log_api_model_without_message_field() {
 
 #[test]
 fn generates_log_api_model_with_message_field() {
-    let mut map = HashMap::<KeyString, Value>::new();
-    map.insert("tag_key".into(), Value::from("tag_value".to_owned()));
-    map.insert(
-        "message".into(),
-        Value::from("This is a message".to_owned()),
-    );
-    let event = Event::Log(LogEvent::from(map));
+    let event = Event::Log(LogEvent::from(value!({
+        "tag_key": "tag_value",
+        "message": "This is a message",
+    })));
     let model = LogsApiModel::try_from(vec![event]).expect("Failed mapping logs into API model");
     let logs = model.0[0].get("logs").expect("Logs data store not present");
 
