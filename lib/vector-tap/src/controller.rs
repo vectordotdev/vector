@@ -131,7 +131,7 @@ impl TapPayload {
         )))
     }
 
-    /// Raise an `invalid_match`event against the provided output pattern.
+    /// Raise an `invalid_match` event against the provided output pattern.
     pub fn invalid_output_pattern_match<T: Into<String>>(
         pattern: T,
         invalid_matches: Vec<String>,
