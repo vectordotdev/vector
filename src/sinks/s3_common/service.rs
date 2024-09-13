@@ -18,7 +18,10 @@ use vector_lib::stream::DriverResponse;
 use super::config::S3Options;
 use super::partitioner::S3PartitionKey;
 
-use crate::sinks::util::vector_event::VectorSendEventMetadata;
+use crate::sinks::{
+    util::vector_event::VectorSendEventMetadata,
+    util::vector_event::extract_topic_name,
+};
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -127,12 +130,14 @@ impl Service<S3Request> for S3Service {
         let events_byte_size = request
             .request_metadata
             .into_events_estimated_json_encoded_byte_size();
+            let topic_name = extract_topic_name(&request.metadata.s3_key);
 
         let send_event_metadata = VectorSendEventMetadata {
             bytes: request.body.len(),
             events_len: request.metadata.count,
             blob: request.metadata.s3_key.clone(),
             container: request.bucket.clone(),
+            topic: topic_name,
         };
 
         let client = self.client.clone();

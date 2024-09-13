@@ -12,6 +12,7 @@ use tracing::Instrument;
 use crate::sinks::{
     azure_common::config::{AzureBlobRequest, AzureBlobResponse},
     util::vector_event::VectorSendEventMetadata,
+    util::vector_event::extract_topic_name,
 };
 
 #[derive(Clone)]
@@ -51,12 +52,14 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 Some(encoding) => blob.content_encoding(encoding),
                 None => blob,
             };
+            let topic_name = extract_topic_name(&request.metadata.partition_key);
 
             let send_event_metadata = VectorSendEventMetadata {
                 bytes: byte_size,
                 events_len: request.metadata.count,
                 blob: request.metadata.partition_key.clone(),
                 container: request.metadata.container_name.clone(),
+                topic: topic_name,
             };
 
             let result = blob
