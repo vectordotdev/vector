@@ -325,6 +325,11 @@ base: components: sinks: mqtt: configuration: {
 			}
 		}
 	}
+	retain: {
+		description: "Whether the messages should be retained by the server"
+		required:    false
+		type: bool: default: false
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
