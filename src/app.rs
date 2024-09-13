@@ -488,10 +488,10 @@ pub async fn load_configs(
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
 
-    if watcher_conf.is_some() {
+    if let Some(watcher_conf) = watcher_conf {
         // Start listening for config changes immediately.
         config::watcher::spawn_thread(
-            watcher_conf.unwrap(),
+            watcher_conf,
             signal_handler.clone_tx(),
             config_paths.iter().map(Into::into),
             None,

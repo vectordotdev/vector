@@ -1,13 +1,13 @@
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use std::{
     sync::mpsc::{channel, Receiver},
     thread,
 };
 
-use notify::{
-    recommended_watcher, EventKind, PollWatcher, RecommendedWatcher, RecursiveMode,
-    Watcher as NotifyWatcher,
-};
+use notify::{recommended_watcher, EventKind, RecursiveMode};
 
 use crate::Error;
 
@@ -31,24 +31,41 @@ pub enum WatcherConfig {
 
 enum Watcher {
     /// recommended watcher for os, usually inotify for linux based systems
-    RecommendedWatcher(RecommendedWatcher),
+    RecommendedWatcher(notify::RecommendedWatcher),
     /// poll based watcher. for watching files from NFS.
-    PollWatcher(PollWatcher),
+    PollWatcher(notify::PollWatcher),
 }
 
 impl Watcher {
     fn add_paths(&mut self, config_paths: &[PathBuf]) -> Result<(), Error> {
-        let watcher: &mut dyn NotifyWatcher = match self {
-            &mut Watcher::RecommendedWatcher(ref mut w) => w,
-            &mut Watcher::PollWatcher(ref mut w) => w,
-        };
-
         for path in config_paths {
-            watcher.watch(path, RecursiveMode::Recursive)?;
+            self.watch(path, RecursiveMode::Recursive)?;
+        }
+        Ok(())
+    }
+
+    fn watch(&mut self, path: &Path, recursive_mode: RecursiveMode) -> Result<(), Error> {
+        match self {
+            &mut Watcher::RecommendedWatcher(ref mut watcher) => {
+                watcher.watch(path, recursive_mode)?
+            }
+            &mut Watcher::PollWatcher(ref mut watcher) => watcher.watch(path, recursive_mode)?,
         }
         Ok(())
     }
 }
+
+// impl From<notify::RecommendedWatcher> for Watcher {
+//     fn from(recommended_watcher: notify::RecommendedWatcher) -> Self {
+//         Watcher::RecommendedWatcher(recommended_watcher)
+//     }
+// }
+
+// impl From<notify::PollWatcher> for Watcher {
+//     fn from(poll_watcher: notify::PollWatcher) -> Self {
+//         Watcher::PollWatcher(poll_watcher)
+//     }
+// }
 
 /// Sends a ReloadFromDisk on config_path changes.
 /// Accumulates file changes until no change for given duration has occurred.
@@ -139,7 +156,7 @@ fn create_watcher(
         WatcherConfig::PollWatcher(interval) => {
             let config =
                 notify::Config::default().with_poll_interval(Duration::from_secs(*interval));
-            let poll_watcher = PollWatcher::new(sender, config)?;
+            let poll_watcher = notify::PollWatcher::new(sender, config)?;
             let mut watcher = Watcher::PollWatcher(poll_watcher);
             watcher.add_paths(config_paths)?;
             Ok((watcher, receiver))
