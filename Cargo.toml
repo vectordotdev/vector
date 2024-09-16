@@ -347,7 +347,7 @@ stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.0", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
-tokio-postgres = { version = "0.7.11", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-postgres = { version = "0.7.12", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["connect"], optional = true}
 toml.workspace = true
 tonic = { workspace = true, optional = true }
