@@ -17,6 +17,7 @@ use vector_lib::{
     transform::Transform,
 };
 
+use super::dot_graph::GraphConfig;
 use super::schema::Options as SchemaOptions;
 use super::ComponentKey;
 use super::OutputId;
@@ -57,6 +58,10 @@ where
     T: Configurable + Serialize + 'static,
 {
     #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub graph: GraphConfig,
+
+    #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     #[configurable(metadata(docs::hidden))]
@@ -75,7 +80,11 @@ where
     {
         let inputs = Inputs::from_iter(inputs);
         let inner = inner.into();
-        TransformOuter { inputs, inner }
+        TransformOuter {
+            inputs,
+            inner,
+            graph: Default::default(),
+        }
     }
 
     pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U>
@@ -94,6 +103,7 @@ where
         TransformOuter {
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
+            graph: self.graph,
         }
     }
 }
