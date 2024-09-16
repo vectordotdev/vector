@@ -322,7 +322,7 @@ async-nats = { version = "0.33.0", default-features = false, optional = true }
 nkeys = { version = "0.4.3", default-features = false, optional = true }
 nom = { version = "7.1.3", default-features = false, optional = true }
 notify = { version = "6.1.1", default-features = false, features = ["macos_fsevent"] }
-once_cell = { version = "1.19", default-features = false }
+once_cell = { version = "1.20", default-features = false }
 openssl = { version = "0.10.66", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "4.2.2", default-features = false }

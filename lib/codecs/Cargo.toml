@@ -19,7 +19,7 @@ dyn-clone = { version = "1", default-features = false }
 influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
-once_cell = { version = "1.19", default-features = false }
+once_cell = { version = "1.20", default-features = false }
 ordered-float = { version = "4.2.2", default-features = false }
 prost = { version = "0.12.6", default-features = false, features = ["std"] }
 prost-reflect = { workspace = true, features = ["serde"] }
