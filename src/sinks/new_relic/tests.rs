@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::TryFrom, num::NonZeroU32, time::SystemTime};
+use std::{collections::BTreeMap, convert::TryFrom, num::NonZeroU32, time::SystemTime};
 
 use chrono::{DateTime, Utc};
 use futures::{future::ready, stream};
@@ -73,7 +73,7 @@ macro_rules! model_map {
     ( $( $key:literal :  $value:expr , )* ) => {
         [ $( ( KeyString::from($key), Value::from($value) ), )* ]
             .into_iter()
-            .collect::<HashMap<_, _>>()
+            .collect::<BTreeMap<_, _>>()
     }
 }
 
@@ -170,6 +170,26 @@ fn generates_log_api_model_with_message_field() {
         &[model_map! {
             "tag_key": "tag_value",
             "message": "This is a message",
+        }]
+    );
+}
+
+#[test]
+fn generates_log_api_model_with_dotted_fields() {
+    let sub = value!({"four": 2});
+    let event = Event::Log(LogEvent::from(value!({
+        "one.two": 1,
+        "three": sub,
+    })));
+    let model = LogsApiModel::try_from(vec![event]).expect("Failed mapping logs into API model");
+    let logs = model.0[0].get("logs").expect("Logs data store not present");
+
+    assert_eq!(
+        &logs[..],
+        &[model_map! {
+            "one.two": 1,
+            "three": model_map! {"four": 2,},
+            "message": "log from vector",
         }]
     );
 }
