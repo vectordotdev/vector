@@ -1,15 +1,15 @@
-use std::{collections::BTreeMap, convert::TryFrom, num::NonZeroU32, time::SystemTime};
+use std::{convert::TryFrom, num::NonZeroU32, time::SystemTime};
 
 use chrono::{DateTime, Utc};
 use futures::{future::ready, stream};
 use serde::Deserialize;
 use vector_lib::config::{init_telemetry, Tags, Telemetry};
-use vrl::value;
+use vrl::{btreemap, value};
 
 use super::*;
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
-    event::{Event, KeyString, LogEvent, Metric, MetricKind, MetricValue, Value},
+    event::{Event, LogEvent, Metric, MetricKind, MetricValue},
     test_util::{
         components::{
             run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
@@ -69,14 +69,6 @@ async fn component_spec_compliance_data_volume() {
     .await;
 }
 
-macro_rules! model_map {
-    ( $( $key:literal :  $value:expr , )* ) => {
-        [ $( ( KeyString::from($key), Value::from($value) ), )* ]
-            .into_iter()
-            .collect::<BTreeMap<_, _>>()
-    }
-}
-
 #[test]
 fn generates_event_api_model_without_message_field() {
     let event = Event::Log(LogEvent::from(value!({
@@ -89,10 +81,10 @@ fn generates_event_api_model_without_message_field() {
 
     assert_eq!(
         &model.0[..],
-        &[model_map! {
-            "eventType": "TestEvent",
-            "user": "Joe",
-            "user_id": 123456,
+        &[btreemap! {
+            "eventType" => "TestEvent",
+            "user" => "Joe",
+            "user_id" => 123456,
         }]
     );
 }
@@ -110,11 +102,11 @@ fn generates_event_api_model_with_message_field() {
 
     assert_eq!(
         &model.0[..],
-        &[model_map! {
-            "eventType": "TestEvent",
-            "user": "Joe",
-            "user_id": 123456,
-            "message": "This is a message",
+        &[btreemap! {
+            "eventType" =>"TestEvent",
+            "user" =>"Joe",
+            "user_id" =>123456,
+            "message" =>"This is a message",
         }]
     );
 }
@@ -132,11 +124,11 @@ fn generates_event_api_model_with_json_inside_message_field() {
 
     assert_eq!(
         &model.0[..],
-        &[model_map! {
-            "eventType": "TestEvent",
-            "user": "Joe",
-            "user_id": 123456,
-            "my_key": "my_value",
+        &[btreemap! {
+            "eventType" =>"TestEvent",
+            "user" =>"Joe",
+            "user_id" =>123456,
+            "my_key" =>"my_value",
         }]
     );
 }
@@ -149,9 +141,9 @@ fn generates_log_api_model_without_message_field() {
 
     assert_eq!(
         &logs[..],
-        &[model_map! {
-            "tag_key": "tag_value",
-            "message": "log from vector",
+        &[btreemap! {
+            "tag_key" =>"tag_value",
+            "message" =>"log from vector",
         }]
     );
 }
@@ -167,9 +159,9 @@ fn generates_log_api_model_with_message_field() {
 
     assert_eq!(
         &logs[..],
-        &[model_map! {
-            "tag_key": "tag_value",
-            "message": "This is a message",
+        &[btreemap! {
+            "tag_key" =>"tag_value",
+            "message" =>"This is a message",
         }]
     );
 }
@@ -186,10 +178,10 @@ fn generates_log_api_model_with_dotted_fields() {
 
     assert_eq!(
         &logs[..],
-        &[model_map! {
-            "one.two": 1,
-            "three": model_map! {"four": 2,},
-            "message": "log from vector",
+        &[btreemap! {
+            "one.two" =>1,
+            "three" =>btreemap! {"four" =>2,},
+            "message" =>"log from vector",
         }]
     );
 }
@@ -209,11 +201,11 @@ fn generates_metric_api_model_without_timestamp() {
 
     assert_eq!(
         &metrics[..],
-        &[model_map! {
-            "name": "my_metric",
-            "value": 100.0,
-            "timestamp": metrics[0].get("timestamp").unwrap().clone(),
-            "type": "gauge",
+        &[btreemap! {
+            "name" =>"my_metric",
+            "value" =>100.0,
+            "timestamp" =>metrics[0].get("timestamp").unwrap().clone(),
+            "type" =>"gauge",
         }]
     );
 }
@@ -236,11 +228,11 @@ fn generates_metric_api_model_with_timestamp() {
 
     assert_eq!(
         &metrics[..],
-        &[model_map! {
-            "name": "my_metric",
-            "value": 100.0,
-            "timestamp": stamp.timestamp(),
-            "type": "gauge",
+        &[btreemap! {
+            "name" =>"my_metric",
+            "value" =>100.0,
+            "timestamp" =>stamp.timestamp(),
+            "type" =>"gauge",
         }]
     );
 }
@@ -264,12 +256,12 @@ fn generates_metric_api_model_incremental_counter() {
 
     assert_eq!(
         &metrics[..],
-        &[model_map! {
-            "name": "my_metric",
-            "value": 100.0,
-            "interval.ms": 1000,
-            "timestamp": stamp.timestamp(),
-            "type": "count",
+        &[btreemap! {
+            "name" =>"my_metric",
+            "value" =>100.0,
+            "interval.ms" =>1000,
+            "timestamp" =>stamp.timestamp(),
+            "type" =>"count",
         }]
     );
 }
