@@ -3,8 +3,9 @@ use std::{convert::TryFrom, num::NonZeroU32, time::SystemTime};
 use chrono::{DateTime, Utc};
 use futures::{future::ready, stream};
 use serde::Deserialize;
+use serde_json::{json, to_value};
 use vector_lib::config::{init_telemetry, Tags, Telemetry};
-use vrl::{btreemap, value};
+use vrl::value;
 
 use super::*;
 use crate::{
@@ -80,12 +81,12 @@ fn generates_event_api_model_without_message_field() {
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
     assert_eq!(
-        &model.0[..],
-        &[btreemap! {
-            "eventType" => "TestEvent",
-            "user" => "Joe",
-            "user_id" => 123456,
-        }]
+        to_value(&model).unwrap(),
+        json!([{
+            "eventType": "TestEvent",
+            "user": "Joe",
+            "user_id": 123456,
+        }])
     );
 }
 
@@ -101,13 +102,13 @@ fn generates_event_api_model_with_message_field() {
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
     assert_eq!(
-        &model.0[..],
-        &[btreemap! {
-            "eventType" =>"TestEvent",
-            "user" =>"Joe",
-            "user_id" =>123456,
-            "message" =>"This is a message",
-        }]
+        to_value(&model).unwrap(),
+        json!([{
+            "eventType": "TestEvent",
+            "user": "Joe",
+            "user_id": 123456,
+            "message": "This is a message",
+        }])
     );
 }
 
@@ -123,13 +124,13 @@ fn generates_event_api_model_with_json_inside_message_field() {
         EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
 
     assert_eq!(
-        &model.0[..],
-        &[btreemap! {
-            "eventType" =>"TestEvent",
-            "user" =>"Joe",
-            "user_id" =>123456,
-            "my_key" =>"my_value",
-        }]
+        to_value(&model).unwrap(),
+        json!([{
+            "eventType": "TestEvent",
+            "user": "Joe",
+            "user_id": 123456,
+            "my_key": "my_value",
+        }])
     );
 }
 
@@ -137,14 +138,15 @@ fn generates_event_api_model_with_json_inside_message_field() {
 fn generates_log_api_model_without_message_field() {
     let event = Event::Log(LogEvent::from(value!({"tag_key": "tag_value"})));
     let model = LogsApiModel::try_from(vec![event]).expect("Failed mapping logs into API model");
-    let logs = model.0[0].get("logs").expect("Logs data store not present");
 
     assert_eq!(
-        &logs[..],
-        &[btreemap! {
-            "tag_key" =>"tag_value",
-            "message" =>"log from vector",
-        }]
+        to_value(&model).unwrap(),
+        json!([{
+            "logs": [{
+                "message": "log from vector",
+                "attributes": {"tag_key": "tag_value"},
+            }]
+        }])
     );
 }
 
@@ -155,14 +157,15 @@ fn generates_log_api_model_with_message_field() {
         "message": "This is a message",
     })));
     let model = LogsApiModel::try_from(vec![event]).expect("Failed mapping logs into API model");
-    let logs = model.0[0].get("logs").expect("Logs data store not present");
 
     assert_eq!(
-        &logs[..],
-        &[btreemap! {
-            "tag_key" =>"tag_value",
-            "message" =>"This is a message",
-        }]
+        to_value(&model).unwrap(),
+        json!([{
+            "logs": [{
+                "message": "This is a message",
+                "attributes": {"tag_key": "tag_value"},
+            }]
+        }])
     );
 }
 
@@ -174,15 +177,40 @@ fn generates_log_api_model_with_dotted_fields() {
         "three": sub,
     })));
     let model = LogsApiModel::try_from(vec![event]).expect("Failed mapping logs into API model");
-    let logs = model.0[0].get("logs").expect("Logs data store not present");
 
     assert_eq!(
-        &logs[..],
-        &[btreemap! {
-            "one.two" =>1,
-            "three" =>btreemap! {"four" =>2,},
-            "message" =>"log from vector",
-        }]
+        to_value(&model).unwrap(),
+        json!([{
+            "logs": [{
+                "message": "log from vector",
+                "attributes": {
+                    "one.two": 1,
+                    "three": {"four": 2},
+                },
+            }]
+        }])
+    );
+}
+
+#[test]
+fn generates_log_api_model_with_timestamp() {
+    let stamp = DateTime::<Utc>::from(SystemTime::now());
+    let event = Event::Log(LogEvent::from(value!({
+        "timestamp": stamp,
+        "tag_key": "tag_value",
+        "message": "This is a message",
+    })));
+    let model = LogsApiModel::try_from(vec![event]).expect("Failed mapping logs into API model");
+
+    assert_eq!(
+        to_value(&model).unwrap(),
+        json!([{
+            "logs": [{
+                "message": "This is a message",
+                "timestamp": stamp.timestamp_millis(),
+                "attributes": {"tag_key": "tag_value"},
+            }]
+        }])
     );
 }
 
@@ -195,18 +223,18 @@ fn generates_metric_api_model_without_timestamp() {
     ));
     let model =
         MetricsApiModel::try_from(vec![event]).expect("Failed mapping metrics into API model");
-    let metrics = model.0[0]
-        .get("metrics")
-        .expect("Metric data store not present");
+    let metrics = &model.0[0].metrics;
 
     assert_eq!(
-        &metrics[..],
-        &[btreemap! {
-            "name" =>"my_metric",
-            "value" =>100.0,
-            "timestamp" =>metrics[0].get("timestamp").unwrap().clone(),
-            "type" =>"gauge",
-        }]
+        to_value(&model).unwrap(),
+        json!([{
+            "metrics": [{
+                "name": "my_metric",
+                "value": 100.0,
+                "timestamp": metrics[0].get("timestamp").unwrap().clone(),
+                "type": "gauge",
+            }]
+        }])
     );
 }
 
@@ -222,18 +250,17 @@ fn generates_metric_api_model_with_timestamp() {
     let event = Event::Metric(m);
     let model =
         MetricsApiModel::try_from(vec![event]).expect("Failed mapping metrics into API model");
-    let metrics = model.0[0]
-        .get("metrics")
-        .expect("Metric data store not present");
 
     assert_eq!(
-        &metrics[..],
-        &[btreemap! {
-            "name" =>"my_metric",
-            "value" =>100.0,
-            "timestamp" =>stamp.timestamp(),
-            "type" =>"gauge",
-        }]
+        to_value(&model).unwrap(),
+        json!([{
+            "metrics": [{
+                "name": "my_metric",
+                "value": 100.0,
+                "timestamp": stamp.timestamp(),
+                "type": "gauge",
+            }]
+        }])
     );
 }
 
@@ -250,18 +277,17 @@ fn generates_metric_api_model_incremental_counter() {
     let event = Event::Metric(m);
     let model =
         MetricsApiModel::try_from(vec![event]).expect("Failed mapping metrics into API model");
-    let metrics = model.0[0]
-        .get("metrics")
-        .expect("Metric data store not present");
 
     assert_eq!(
-        &metrics[..],
-        &[btreemap! {
-            "name" =>"my_metric",
-            "value" =>100.0,
-            "interval.ms" =>1000,
-            "timestamp" =>stamp.timestamp(),
-            "type" =>"count",
-        }]
+        to_value(&model).unwrap(),
+        json!([{
+            "metrics": [{
+                "name": "my_metric",
+                "value": 100.0,
+                "interval.ms": 1000,
+                "timestamp": stamp.timestamp(),
+                "type": "count",
+            }]
+        }])
     );
 }
