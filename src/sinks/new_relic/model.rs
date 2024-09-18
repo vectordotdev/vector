@@ -8,6 +8,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
+use vector_lib::event::ObjectMap;
 use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
 use vrl::event_path;
 
@@ -21,14 +22,13 @@ pub enum NewRelicApiModel {
     Logs(LogsApiModel),
 }
 
-type KeyValData = HashMap<KeyString, Value>;
-type DataStore = HashMap<KeyString, Vec<KeyValData>>;
+type DataStore = HashMap<KeyString, Vec<ObjectMap>>;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MetricsApiModel(pub Vec<DataStore>);
 
 impl MetricsApiModel {
-    pub fn new(metric_array: Vec<KeyValData>) -> Self {
+    pub fn new(metric_array: Vec<ObjectMap>) -> Self {
         let mut metric_store = DataStore::new();
         metric_store.insert("metrics".into(), metric_array);
         Self(vec![metric_store])
@@ -55,7 +55,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 // Generate Value::Object() from BTreeMap<String, String>
                 let (series, data, _) = metric.into_parts();
 
-                let mut metric_data = KeyValData::new();
+                let mut metric_data = ObjectMap::new();
 
                 // We only handle gauge and counter metrics
                 // Extract value & type and set type-related attributes
@@ -145,10 +145,10 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct EventsApiModel(pub Vec<KeyValData>);
+pub struct EventsApiModel(pub Vec<ObjectMap>);
 
 impl EventsApiModel {
-    pub fn new(events_array: Vec<KeyValData>) -> Self {
+    pub fn new(events_array: Vec<ObjectMap>) -> Self {
         Self(events_array)
     }
 }
@@ -160,7 +160,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
         let mut num_non_log_events = 0;
         let mut num_nan_value = 0;
 
-        let events_array: Vec<HashMap<KeyString, Value>> = buf_events
+        let events_array: Vec<ObjectMap> = buf_events
             .into_iter()
             .filter_map(|event| {
                 let Some(log) = event.try_into_log() else {
@@ -168,7 +168,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                     return None;
                 };
 
-                let mut event_model = KeyValData::new();
+                let mut event_model = ObjectMap::new();
                 for (k, v) in log.convert_to_fields() {
                     event_model.insert(k, v.clone());
                 }
@@ -242,7 +242,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
 pub struct LogsApiModel(pub Vec<DataStore>);
 
 impl LogsApiModel {
-    pub fn new(logs_array: Vec<KeyValData>) -> Self {
+    pub fn new(logs_array: Vec<ObjectMap>) -> Self {
         let mut logs_store = DataStore::new();
         logs_store.insert("logs".into(), logs_array);
         Self(vec![logs_store])
@@ -254,8 +254,9 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
 
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
         let mut num_non_log_events = 0;
+        let mut num_non_object_events = 0;
 
-        let logs_array: Vec<HashMap<KeyString, Value>> = buf_events
+        let logs_array: Vec<ObjectMap> = buf_events
             .into_iter()
             .filter_map(|event| {
                 let Some(log) = event.try_into_log() else {
@@ -263,22 +264,37 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
                     return None;
                 };
 
-                let mut log_model = KeyValData::new();
-                for (k, v) in log.convert_to_fields() {
-                    log_model.insert(k, v.clone());
-                }
-                if log.get(event_path!("message")).is_none() {
-                    log_model.insert("message".into(), Value::from("log from vector".to_owned()));
+                // We convert the log event into a logs API model simply by transmuting the type
+                // wrapper and dropping all arrays, which are not supported by the API. We could
+                // flatten out the keys, as this is what New Relic does internally, and we used to
+                // do that, but the flattening iterator accessed through
+                // `LogEvent::convert_to_fields` adds quotes to dotted fields names, which produces
+                // broken attributes in New Relic, and nesting objects is actually a (slightly) more
+                // efficient representation of the key names.
+                let (value, _metadata) = log.into_parts();
+                let Some(mut obj) = value.into_object() else {
+                    num_non_object_events += 1;
+                    return None;
+                };
+                strip_arrays(&mut obj);
+                if !obj.contains_key("message") {
+                    obj.insert("message".into(), Value::from("log from vector".to_owned()));
                 }
 
-                Some(log_model)
+                Some(obj)
             })
             .collect();
 
         if num_non_log_events > 0 {
             emit!(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_non_log_events,
-                reason: "non-log event"
+                reason: "non-log event",
+            });
+        }
+        if num_non_object_events > 0 {
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: num_non_object_events,
+                reason: "non-object event",
             });
         }
 
@@ -288,4 +304,13 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
             Err(NewRelicSinkError::new("No valid logs to generate"))
         }
     }
+}
+
+fn strip_arrays(obj: &mut ObjectMap) {
+    obj.retain(|_key, value| !value.is_array());
+    obj.iter_mut().for_each(|(_key, value)| {
+        if let Some(obj) = value.as_object_mut() {
+            strip_arrays(obj);
+        }
+    });
 }
