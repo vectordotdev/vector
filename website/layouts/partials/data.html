@@ -722,8 +722,8 @@
             {{- .name -}}
           </span>:
           <span class="text-gray-200">
-            <{{ delimit .type `><span class="text-grey-500"> |
-          </span>` }}></span>{{ if not $isLast }}, {{ end -}}
+            &lt;{{ delimit .type `<span class="text-grey-500"> | </span>` | safeHTML}}&gt;
+          </span>{{ if not $isLast }}, {{ end -}}
           {{ end -}}
           {{- if gt (len $optionalArgs) 0 -}},
           [{{- $lastArg := sub (len $optionalArgs) 1 -}}
@@ -733,13 +733,13 @@
             {{- .name -}}
           </span>:
           <span class="text-gray-200">
-            <{{ delimit .type `><span class="text-grey-500"> |
-          </span>` }}></span>{{ if not $isLast }}, {{ end -}}
+            &lt;{{ delimit .type `<span class="text-grey-500"> | </span>`  | safeHTML}}&gt;
+          </span>{{ if not $isLast }}, {{ end -}}
           {{ end -}}]{{ end }})
           {{- with $return -}}
           <div class="ml-3">
             <span class="font-extrabold">::</span> <span class="text-gray-200">
-              <{{ delimit .types " | " }}>
+              &lt;{{ delimit .types " | " }}&gt;
             </span>{{ if not $infallible }}, &lt;error>{{ end }}
           </div>
           {{- end -}}
