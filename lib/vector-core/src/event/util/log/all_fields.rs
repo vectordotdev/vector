@@ -221,20 +221,24 @@ mod test {
         .map(|(k, v)| (k.into(), v))
         .collect();
 
-        let collected: Vec<_> = all_fields(&fields).collect();
+        let collected: Vec<_> = all_fields(&fields, true).collect();
         assert_eq!(collected, expected);
     }
 
+    fn special_fields() -> ObjectMap {
+        fields_from_json(json!({
+                    "a-b": 1,
+                    "a*b": 2,
+                    "a b": 3,
+                    ".a .b*": 4,
+                    "\"a\"": 5,
+        }))
+    }
+
     #[test]
-    fn keys_special() {
-        let fields = fields_from_json(json!({
-            "a-b": 1,
-            "a*b": 2,
-            "a b": 3,
-            ".a .b*": 4,
-            "\"a\"": 5,
-        }));
-        let mut collected: Vec<_> = all_fields(&fields).collect();
+    fn keys_special_quoted() {
+        let fields = special_fields();
+        let mut collected: Vec<_> = all_fields(&fields, true).collect();
         collected.sort_by(|(a, _), (b, _)| a.cmp(b));
 
         let mut expected: Vec<(KeyString, &Value)> = vec![
@@ -249,6 +253,27 @@ mod test {
         .collect();
         // Compare without the leading `"` char so that the order is the same as the collected fields.
         expected.sort_by(|(a, _), (b, _)| a[1..].cmp(&b[1..]));
+
+        assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn keys_special_unquoted() {
+        let fields = special_fields();
+        let mut collected: Vec<_> = all_fields(&fields, false).collect();
+        collected.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+        let mut expected: Vec<(KeyString, &Value)> = vec![
+            ("a-b", &Value::Integer(1)),
+            ("a*b", &Value::Integer(2)),
+            ("a b", &Value::Integer(3)),
+            (".a .b*", &Value::Integer(4)),
+            ("\"a\"", &Value::Integer(5)),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
+        expected.sort_by(|(a, _), (b, _)| a.cmp(b));
 
         assert_eq!(collected, expected);
     }
@@ -273,22 +298,26 @@ mod test {
         assert_eq!(collected, expected);
     }
 
+    fn nested_fields() -> ObjectMap {
+        fields_from_json(json!({
+                    "a": {
+                        "b": {
+                            "c": 5
+                        },
+                        "a": 4,
+                        "array": [null, 3, {
+                            "x": 1
+                        }, [2]]
+                    },
+                    "a.b.c": 6,
+                    "d": {},
+                    "e": [],
+        }))
+    }
+
     #[test]
-    fn keys_nested() {
-        let fields = fields_from_json(json!({
-            "a": {
-                "b": {
-                    "c": 5
-                },
-                "a": 4,
-                "array": [null, 3, {
-                    "x": 1
-                }, [2]]
-            },
-            "a.b.c": 6,
-            "d": {},
-            "e": [],
-        }));
+    fn keys_nested_quoted() {
+        let fields = nested_fields();
         let expected: Vec<_> = vec![
             ("a.a", Value::Integer(4)),
             ("a.array[0]", Value::Null),
@@ -304,7 +333,33 @@ mod test {
         .map(|(k, v)| (k.into(), v))
         .collect();
 
-        let collected: Vec<_> = all_fields(&fields).map(|(k, v)| (k, v.clone())).collect();
+        let collected: Vec<_> = all_fields(&fields, true)
+            .map(|(k, v)| (k, v.clone()))
+            .collect();
+        assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn keys_nested_unquoted() {
+        let fields = nested_fields();
+        let expected: Vec<_> = vec![
+            ("a.a", Value::Integer(4)),
+            ("a.array[0]", Value::Null),
+            ("a.array[1]", Value::Integer(3)),
+            ("a.array[2].x", Value::Integer(1)),
+            ("a.array[3][0]", Value::Integer(2)),
+            ("a.b.c", Value::Integer(5)),
+            ("a.b.c", Value::Integer(6)),
+            ("d", Value::Object(ObjectMap::new())),
+            ("e", Value::Array(Vec::new())),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
+
+        let collected: Vec<_> = all_fields(&fields, false)
+            .map(|(k, v)| (k, v.clone()))
+            .collect();
         assert_eq!(collected, expected);
     }
 
