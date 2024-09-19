@@ -113,28 +113,6 @@ fn generates_event_api_model_with_message_field() {
 }
 
 #[test]
-fn generates_event_api_model_with_json_inside_message_field() {
-    let event = Event::Log(LogEvent::from(value!({
-        "eventType": "TestEvent",
-        "user": "Joe",
-        "user_id": 123456,
-        "message": "{\"my_key\" : \"my_value\"}",
-    })));
-    let model =
-        EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
-
-    assert_eq!(
-        to_value(&model).unwrap(),
-        json!([{
-            "eventType": "TestEvent",
-            "user": "Joe",
-            "user_id": 123456,
-            "my_key": "my_value",
-        }])
-    );
-}
-
-#[test]
 fn generates_log_api_model_without_message_field() {
     let event = Event::Log(LogEvent::from(value!({"tag_key": "tag_value"})));
     let model = LogsApiModel::try_from(vec![event]).expect("Failed mapping logs into API model");

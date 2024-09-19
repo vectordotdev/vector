@@ -1,15 +1,9 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    convert::TryFrom,
-    fmt::Debug,
-};
+use std::{collections::BTreeMap, convert::TryFrom, fmt::Debug};
 
 use chrono::Utc;
-use ordered_float::NotNan;
 use serde::Serialize;
 use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
 use vector_lib::{config::log_schema, event::ObjectMap};
-use vrl::event_path;
 
 use super::NewRelicSinkError;
 use crate::event::{Event, MetricKind, MetricValue, Value};
@@ -158,7 +152,6 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
 
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
         let mut num_non_log_events = 0;
-        let mut num_nan_value = 0;
 
         let events_array: Vec<ObjectMap> = buf_events
             .into_iter()
@@ -173,42 +166,6 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                     event_model.insert(k, v.clone());
                 }
 
-                if let Some(message) = log.get(event_path!("message")) {
-                    let message = message.to_string_lossy().replace("\\\"", "\"");
-                    // If message contains a JSON string, parse it and insert all fields into self
-                    if let serde_json::Result::Ok(json_map) =
-                        serde_json::from_str::<HashMap<String, serde_json::Value>>(&message)
-                    {
-                        for (k, v) in json_map {
-                            match v {
-                                serde_json::Value::String(s) => {
-                                    event_model.insert(k.into(), Value::from(s));
-                                }
-                                serde_json::Value::Number(n) => {
-                                    if let Some(f) = n.as_f64() {
-                                        event_model.insert(
-                                            k.into(),
-                                            Value::from(NotNan::new(f).ok().or_else(|| {
-                                                num_nan_value += 1;
-                                                None
-                                            })?),
-                                        );
-                                    } else {
-                                        event_model.insert(k.into(), Value::from(n.as_i64()));
-                                    }
-                                }
-                                serde_json::Value::Bool(b) => {
-                                    event_model.insert(k.into(), Value::from(b));
-                                }
-                                _ => {
-                                    // Note that arrays and nested objects are silently dropped.
-                                }
-                            }
-                        }
-                        event_model.remove("message");
-                    }
-                }
-
                 if !event_model.contains_key("eventType") {
                     event_model.insert("eventType".into(), Value::from("VectorSink".to_owned()));
                 }
@@ -221,12 +178,6 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
             emit!(ComponentEventsDropped::<INTENTIONAL> {
                 count: num_non_log_events,
                 reason: "non-log event"
-            });
-        }
-        if num_nan_value > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: num_nan_value,
-                reason: "NaN value not supported"
             });
         }
 
