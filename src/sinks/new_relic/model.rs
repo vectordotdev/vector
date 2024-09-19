@@ -2,10 +2,9 @@ use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
     fmt::Debug,
-    time::SystemTime,
 };
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use ordered_float::NotNan;
 use serde::Serialize;
 use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
@@ -30,11 +29,23 @@ pub(super) struct MetricsApiModel(pub [MetricDataStore; 1]);
 
 #[derive(Debug, Serialize)]
 pub(super) struct MetricDataStore {
-    pub metrics: Vec<ObjectMap>,
+    pub metrics: Vec<MetricData>,
+}
+
+#[derive(Debug, Serialize)]
+pub(super) struct MetricData {
+    #[serde(rename = "interval.ms", skip_serializing_if = "Option::is_none")]
+    pub interval_ms: Option<i64>,
+    pub name: String,
+    pub r#type: &'static str,
+    pub value: f64,
+    pub timestamp: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<BTreeMap<String, String>>,
 }
 
 impl MetricsApiModel {
-    pub(super) fn new(metrics: Vec<ObjectMap>) -> Self {
+    pub(super) fn new(metrics: Vec<MetricData>) -> Self {
         Self([MetricDataStore { metrics }])
     }
 }
@@ -59,23 +70,19 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 // Generate Value::Object() from BTreeMap<String, String>
                 let (series, data, _) = metric.into_parts();
 
-                let mut metric_data = ObjectMap::new();
-
                 // We only handle gauge and counter metrics
                 // Extract value & type and set type-related attributes
-                let (value, metric_type) = match (data.value, &data.kind) {
+                let (value, metric_type, interval_ms) = match (data.value, &data.kind) {
                     (MetricValue::Counter { value }, MetricKind::Incremental) => {
                         let Some(interval_ms) = data.time.interval_ms else {
                             // Incremental counter without an interval is worthless, skip this metric
                             num_missing_interval += 1;
                             return None;
                         };
-                        metric_data
-                            .insert("interval.ms".into(), Value::from(interval_ms.get() as i64));
-                        (value, "count")
+                        (value, "count", Some(interval_ms.get() as i64))
                     }
-                    (MetricValue::Counter { value }, MetricKind::Absolute) => (value, "gauge"),
-                    (MetricValue::Gauge { value }, _) => (value, "gauge"),
+                    (MetricValue::Counter { value }, MetricKind::Absolute)
+                    | (MetricValue::Gauge { value }, _) => (value, "gauge", None),
                     _ => {
                         // Unsupported metric type
                         num_unsupported_metric_type += 1;
@@ -84,34 +91,20 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
                 };
 
                 // Set name, type, value, timestamp, and attributes
-                metric_data.insert("name".into(), Value::from(series.name.name));
-                metric_data.insert("type".into(), Value::from(metric_type));
-                let Some(value) = NotNan::new(value).ok() else {
+                if value.is_nan() {
                     num_nan_value += 1;
                     return None;
                 };
-                metric_data.insert("value".into(), Value::from(value));
-                metric_data.insert(
-                    "timestamp".into(),
-                    Value::from(
-                        data.time
-                            .timestamp
-                            .unwrap_or_else(|| DateTime::<Utc>::from(SystemTime::now()))
-                            .timestamp(),
-                    ),
-                );
-                if let Some(tags) = series.tags {
-                    metric_data.insert(
-                        "attributes".into(),
-                        Value::from(
-                            tags.iter_single()
-                                .map(|(key, value)| (key.into(), Value::from(value)))
-                                .collect::<BTreeMap<_, _>>(),
-                        ),
-                    );
-                }
 
-                Some(metric_data)
+                let timestamp = data.time.timestamp.unwrap_or_else(Utc::now);
+                Some(MetricData {
+                    interval_ms,
+                    name: series.name.name,
+                    r#type: metric_type,
+                    value,
+                    timestamp: timestamp.timestamp_millis(),
+                    attributes: series.tags.map(|tags| tags.into_iter_single().collect()),
+                })
             })
             .collect();
 

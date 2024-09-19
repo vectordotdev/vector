@@ -1,6 +1,6 @@
-use std::{convert::TryFrom, num::NonZeroU32, time::SystemTime};
+use std::{convert::TryFrom, num::NonZeroU32};
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use futures::{future::ready, stream};
 use serde::Deserialize;
 use serde_json::{json, to_value};
@@ -194,7 +194,7 @@ fn generates_log_api_model_with_dotted_fields() {
 
 #[test]
 fn generates_log_api_model_with_timestamp() {
-    let stamp = DateTime::<Utc>::from(SystemTime::now());
+    let stamp = Utc::now();
     let event = Event::Log(LogEvent::from(value!({
         "timestamp": stamp,
         "tag_key": "tag_value",
@@ -231,7 +231,7 @@ fn generates_metric_api_model_without_timestamp() {
             "metrics": [{
                 "name": "my_metric",
                 "value": 100.0,
-                "timestamp": metrics[0].get("timestamp").unwrap().clone(),
+                "timestamp": metrics[0].timestamp,
                 "type": "gauge",
             }]
         }])
@@ -240,7 +240,7 @@ fn generates_metric_api_model_without_timestamp() {
 
 #[test]
 fn generates_metric_api_model_with_timestamp() {
-    let stamp = DateTime::<Utc>::from(SystemTime::now());
+    let stamp = Utc::now();
     let m = Metric::new(
         "my_metric",
         MetricKind::Absolute,
@@ -252,12 +252,12 @@ fn generates_metric_api_model_with_timestamp() {
         MetricsApiModel::try_from(vec![event]).expect("Failed mapping metrics into API model");
 
     assert_eq!(
-        to_value(&model).unwrap(),
+        to_value(model).unwrap(),
         json!([{
             "metrics": [{
                 "name": "my_metric",
                 "value": 100.0,
-                "timestamp": stamp.timestamp(),
+                "timestamp": stamp.timestamp_millis(),
                 "type": "gauge",
             }]
         }])
@@ -266,7 +266,7 @@ fn generates_metric_api_model_with_timestamp() {
 
 #[test]
 fn generates_metric_api_model_incremental_counter() {
-    let stamp = DateTime::<Utc>::from(SystemTime::now());
+    let stamp = Utc::now();
     let m = Metric::new(
         "my_metric",
         MetricKind::Incremental,
@@ -279,13 +279,13 @@ fn generates_metric_api_model_incremental_counter() {
         MetricsApiModel::try_from(vec![event]).expect("Failed mapping metrics into API model");
 
     assert_eq!(
-        to_value(&model).unwrap(),
+        to_value(model).unwrap(),
         json!([{
             "metrics": [{
                 "name": "my_metric",
                 "value": 100.0,
                 "interval.ms": 1000,
-                "timestamp": stamp.timestamp(),
+                "timestamp": stamp.timestamp_millis(),
                 "type": "count",
             }]
         }])
