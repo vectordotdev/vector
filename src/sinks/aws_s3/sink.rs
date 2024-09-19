@@ -18,7 +18,8 @@ use crate::{
         },
         util::{
             metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-            RequestBuilder, vector_event::VectorSendEventMetadata, vector_event::extract_topic_name,
+            RequestBuilder,
+            vector_event::{VectorEventLogSendMetadata, generate_count_map},
         },
     },
 };
@@ -61,11 +62,29 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         let finalizers = events.take_finalizers();
         let s3_key_prefix = partition_key.key_prefix.clone();
 
+        // TODO: There's a good amount of overlapping code for event logs and we will continue to
+        // need to update more sinks with this functionality. Might be tricky but might be good to
+        // refactor/update the base request builder class to minimize this duplication
+
+        // Create event metadata here as this is where the list of events are available pre-encoding
+        // And we want to access this list to process the raw events to see specific field values
+        let event_log_metadata = VectorEventLogSendMetadata {
+            // Events are not encoded here yet, so byte size is not yet known
+            // Setting as 0 here and updating when it is set in build_request()
+            bytes: 0,
+            events_len: events.len(),
+            // Similarly the exact blob isn't determined here yet
+            blob: "".to_string(),
+            container: self.bucket.clone(),
+            count_map: generate_count_map(&events),
+        };
+
         let metadata = S3Metadata {
             partition_key,
             s3_key: s3_key_prefix,
             count: events.len(),
             finalizers,
+            event_log_metadata: event_log_metadata,
         };
 
         (metadata, builder, events)
@@ -105,15 +124,11 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
         s3metadata.s3_key = format_s3_key(&s3metadata.s3_key, &filename, &extension);
 
         let body = payload.into_payload();
-        let topic_name = extract_topic_name(&s3metadata.s3_key);
 
-        VectorSendEventMetadata {
-            bytes: body.len(),
-            events_len: s3metadata.count,
-            blob: s3metadata.s3_key.clone(),
-            container: self.bucket.clone(),
-            topic: topic_name,
-        }.emit_sending_event();
+        // Update some components of the metadata since they've been computed now
+        s3metadata.event_log_metadata.bytes = body.len();
+        s3metadata.event_log_metadata.blob = s3metadata.s3_key.clone();
+        s3metadata.event_log_metadata.emit_sending_event();
 
         S3Request {
             body: body,

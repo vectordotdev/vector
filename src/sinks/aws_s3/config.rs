@@ -208,7 +208,7 @@ impl S3SinkConfig {
             // Returns back the same result so it continues to work downstream
             .map_result(|result: Result<S3Response, _>| {
                 if let Ok(ref response) = result {
-                    response.send_event_metadata.emit_upload_event();
+                    response.event_log_metadata.emit_upload_event();
                 }
                 result
             })

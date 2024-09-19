@@ -8,3 +8,5 @@ This lists custom changes merged in Databricks fork of Vector.
 7. Add a new event for successful upload to cloud storage (+ rework old send) https://github.com/databricks/vector/pull/14
 8. Add new Vector events for topology events (new source/sink creation, vector start/stop) https://github.com/databricks/vector/pull/17
 9. Provide an option to override the Content-Encoding header for files uploaded by Google Cloud Storage sink https://github.com/databricks/vector/pull/30
+10. Add functionality to derive topic from file upload path https://github.com/databricks/vector/pull/33
+11. Update event logs to support emitting granular upload events https://github.com/databricks/vector/pull/35
