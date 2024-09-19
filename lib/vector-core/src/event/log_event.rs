@@ -434,7 +434,7 @@ impl LogEvent {
     pub fn all_event_fields(
         &self,
     ) -> Option<impl Iterator<Item = (KeyString, &Value)> + Serialize> {
-        self.as_map().map(all_fields)
+        self.as_map().map(|map| all_fields(map, true))
     }
 
     /// Similar to [`LogEvent::all_event_fields`], but doesn't traverse individual array elements.
@@ -455,11 +455,24 @@ impl LogEvent {
         }
     }
 
-    /// Returns an iterator of all fields if the value is an Object. Otherwise,
-    /// a single field is returned with a "message" key
+    /// Returns an iterator of all fields if the value is an Object. Otherwise, a single field is
+    /// returned with a "message" key. Field names that are could be interpreted as alternate paths
+    /// (i.e. containing periods, square brackets, etc) are quoted.
     pub fn convert_to_fields(&self) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
         if let Some(map) = self.as_map() {
-            util::log::all_fields(map)
+            util::log::all_fields(map, true)
+        } else {
+            util::log::all_fields_non_object_root(self.value())
+        }
+    }
+
+    /// Returns an iterator of all fields if the value is an Object. Otherwise, a single field is
+    /// returned with a "message" key. Field names are not quoted.
+    pub fn convert_to_fields_unquoted(
+        &self,
+    ) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
+        if let Some(map) = self.as_map() {
+            util::log::all_fields(map, false)
         } else {
             util::log::all_fields_non_object_root(self.value())
         }

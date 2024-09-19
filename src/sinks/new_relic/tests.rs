@@ -135,6 +135,27 @@ fn generates_event_api_model_with_json_inside_message_field() {
 }
 
 #[test]
+fn generates_event_api_model_with_dotted_fields() {
+    let sub = value!({"two":"three"});
+    let event = Event::Log(LogEvent::from(value!({
+        "one.two": "Joe",
+        "eventType": "TestEvent",
+        "four": sub,
+    })));
+    let model =
+        EventsApiModel::try_from(vec![event]).expect("Failed mapping events into API model");
+
+    assert_eq!(
+        to_value(&model).unwrap(),
+        json!([{
+            "eventType": "TestEvent",
+            "one.two": "Joe",
+            "four.two": "three",
+        }])
+    );
+}
+
+#[test]
 fn generates_log_api_model_without_message_field() {
     let event = Event::Log(LogEvent::from(value!({"tag_key": "tag_value"})));
     let model = LogsApiModel::try_from(vec![event]).expect("Failed mapping logs into API model");

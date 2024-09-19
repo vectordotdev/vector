@@ -5,7 +5,7 @@ use crate::event::{KeyString, ObjectMap};
 /// It is implemented as a wrapper around `all_fields` to reduce code
 /// duplication.
 pub fn keys(fields: &ObjectMap) -> impl Iterator<Item = KeyString> + '_ {
-    all_fields(fields).map(|(k, _)| k)
+    all_fields(fields, true).map(|(k, _)| k)
 }
 
 #[cfg(test)]

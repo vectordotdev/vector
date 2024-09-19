@@ -10,14 +10,14 @@ static IS_VALID_PATH_SEGMENT: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
-pub fn all_fields(fields: &ObjectMap) -> FieldsIter {
-    FieldsIter::new(fields)
+pub fn all_fields(fields: &ObjectMap, quote_periods: bool) -> FieldsIter {
+    FieldsIter::new(None, fields, quote_periods)
 }
 
 /// Same functionality as `all_fields` but it prepends a character that denotes the
 /// path type.
 pub fn all_metadata_fields(fields: &ObjectMap) -> FieldsIter {
-    FieldsIter::new_with_prefix(PathPrefix::Metadata, fields)
+    FieldsIter::new(Some(PathPrefix::Metadata), fields, true)
 }
 
 /// An iterator with a single "message" element
@@ -57,25 +57,22 @@ pub struct FieldsIter<'a> {
     path: Vec<PathComponent<'a>>,
     /// Treat array as a single value and don't traverse each element.
     skip_array_elements: bool,
+    /// Add quoting to field names containing periods.
+    quote_periods: bool,
 }
 
 impl<'a> FieldsIter<'a> {
-    // TODO deprecate this in favor of `new_with_prefix`.
-    fn new(fields: &'a ObjectMap) -> FieldsIter<'a> {
+    fn new(
+        path_prefix: Option<PathPrefix>,
+        fields: &'a ObjectMap,
+        quote_periods: bool,
+    ) -> FieldsIter<'a> {
         FieldsIter {
-            path_prefix: None,
+            path_prefix,
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
             skip_array_elements: false,
-        }
-    }
-
-    fn new_with_prefix(path_prefix: PathPrefix, fields: &'a ObjectMap) -> FieldsIter<'a> {
-        FieldsIter {
-            path_prefix: Some(path_prefix),
-            stack: vec![LeafIter::Map(fields.iter())],
-            path: vec![],
-            skip_array_elements: false,
+            quote_periods,
         }
     }
 
@@ -87,6 +84,7 @@ impl<'a> FieldsIter<'a> {
             stack: vec![LeafIter::Root((value, false))],
             path: vec![],
             skip_array_elements: false,
+            quote_periods: false,
         }
     }
 
@@ -96,6 +94,7 @@ impl<'a> FieldsIter<'a> {
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
             skip_array_elements: true,
+            quote_periods: false,
         }
     }
 
@@ -137,10 +136,10 @@ impl<'a> FieldsIter<'a> {
             match path_iter.next() {
                 None => break res.into(),
                 Some(PathComponent::Key(key)) => {
-                    if IS_VALID_PATH_SEGMENT.is_match(key) {
-                        res.push_str(key);
-                    } else {
+                    if self.quote_periods && !IS_VALID_PATH_SEGMENT.is_match(key) {
                         res.push_str(&format!("\"{key}\""));
+                    } else {
+                        res.push_str(key);
                     }
                 }
                 Some(PathComponent::Index(index)) => {

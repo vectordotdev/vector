@@ -169,7 +169,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                 };
 
                 let mut event_model = ObjectMap::new();
-                for (k, v) in log.convert_to_fields() {
+                for (k, v) in log.convert_to_fields_unquoted() {
                     event_model.insert(k, v.clone());
                 }
 
