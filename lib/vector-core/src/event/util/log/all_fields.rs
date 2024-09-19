@@ -10,8 +10,14 @@ static IS_VALID_PATH_SEGMENT: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
-pub fn all_fields(fields: &ObjectMap, quote_periods: bool) -> FieldsIter {
-    FieldsIter::new(None, fields, quote_periods)
+pub fn all_fields(fields: &ObjectMap) -> FieldsIter {
+    FieldsIter::new(None, fields, true)
+}
+
+/// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order and their corresponding
+/// values. Field names containing meta-characters are not quoted.
+pub fn all_fields_unquoted(fields: &ObjectMap) -> FieldsIter {
+    FieldsIter::new(None, fields, false)
 }
 
 /// Same functionality as `all_fields` but it prepends a character that denotes the
@@ -58,21 +64,21 @@ pub struct FieldsIter<'a> {
     /// Treat array as a single value and don't traverse each element.
     skip_array_elements: bool,
     /// Add quoting to field names containing periods.
-    quote_periods: bool,
+    quote_meta: bool,
 }
 
 impl<'a> FieldsIter<'a> {
     fn new(
         path_prefix: Option<PathPrefix>,
         fields: &'a ObjectMap,
-        quote_periods: bool,
+        quote_meta: bool,
     ) -> FieldsIter<'a> {
         FieldsIter {
             path_prefix,
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
             skip_array_elements: false,
-            quote_periods,
+            quote_meta,
         }
     }
 
@@ -84,7 +90,7 @@ impl<'a> FieldsIter<'a> {
             stack: vec![LeafIter::Root((value, false))],
             path: vec![],
             skip_array_elements: false,
-            quote_periods: false,
+            quote_meta: false,
         }
     }
 
@@ -94,7 +100,7 @@ impl<'a> FieldsIter<'a> {
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
             skip_array_elements: true,
-            quote_periods: false,
+            quote_meta: false,
         }
     }
 
@@ -136,7 +142,7 @@ impl<'a> FieldsIter<'a> {
             match path_iter.next() {
                 None => break res.into(),
                 Some(PathComponent::Key(key)) => {
-                    if self.quote_periods && !IS_VALID_PATH_SEGMENT.is_match(key) {
+                    if self.quote_meta && !IS_VALID_PATH_SEGMENT.is_match(key) {
                         res.push_str(&format!("\"{key}\""));
                     } else {
                         res.push_str(key);
@@ -221,7 +227,7 @@ mod test {
         .map(|(k, v)| (k.into(), v))
         .collect();
 
-        let collected: Vec<_> = all_fields(&fields, true).collect();
+        let collected: Vec<_> = all_fields(&fields).collect();
         assert_eq!(collected, expected);
     }
 
@@ -238,7 +244,7 @@ mod test {
     #[test]
     fn keys_special_quoted() {
         let fields = special_fields();
-        let mut collected: Vec<_> = all_fields(&fields, true).collect();
+        let mut collected: Vec<_> = all_fields(&fields).collect();
         collected.sort_by(|(a, _), (b, _)| a.cmp(b));
 
         let mut expected: Vec<(KeyString, &Value)> = vec![
@@ -260,7 +266,7 @@ mod test {
     #[test]
     fn keys_special_unquoted() {
         let fields = special_fields();
-        let mut collected: Vec<_> = all_fields(&fields, false).collect();
+        let mut collected: Vec<_> = all_fields_unquoted(&fields).collect();
         collected.sort_by(|(a, _), (b, _)| a.cmp(b));
 
         let mut expected: Vec<(KeyString, &Value)> = vec![
@@ -333,9 +339,7 @@ mod test {
         .map(|(k, v)| (k.into(), v))
         .collect();
 
-        let collected: Vec<_> = all_fields(&fields, true)
-            .map(|(k, v)| (k, v.clone()))
-            .collect();
+        let collected: Vec<_> = all_fields(&fields).map(|(k, v)| (k, v.clone())).collect();
         assert_eq!(collected, expected);
     }
 
@@ -357,7 +361,7 @@ mod test {
         .map(|(k, v)| (k.into(), v))
         .collect();
 
-        let collected: Vec<_> = all_fields(&fields, false)
+        let collected: Vec<_> = all_fields_unquoted(&fields)
             .map(|(k, v)| (k, v.clone()))
             .collect();
         assert_eq!(collected, expected);

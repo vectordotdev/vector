@@ -434,7 +434,7 @@ impl LogEvent {
     pub fn all_event_fields(
         &self,
     ) -> Option<impl Iterator<Item = (KeyString, &Value)> + Serialize> {
-        self.as_map().map(|map| all_fields(map, true))
+        self.as_map().map(all_fields)
     }
 
     /// Similar to [`LogEvent::all_event_fields`], but doesn't traverse individual array elements.
@@ -460,7 +460,7 @@ impl LogEvent {
     /// (i.e. containing periods, square brackets, etc) are quoted.
     pub fn convert_to_fields(&self) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
         if let Some(map) = self.as_map() {
-            util::log::all_fields(map, true)
+            util::log::all_fields(map)
         } else {
             util::log::all_fields_non_object_root(self.value())
         }
@@ -472,7 +472,7 @@ impl LogEvent {
         &self,
     ) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
         if let Some(map) = self.as_map() {
-            util::log::all_fields(map, false)
+            util::log::all_fields_unquoted(map)
         } else {
             util::log::all_fields_non_object_root(self.value())
         }
