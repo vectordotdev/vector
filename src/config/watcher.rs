@@ -45,12 +45,16 @@ impl Watcher {
     }
 
     fn watch(&mut self, path: &Path, recursive_mode: RecursiveMode) -> Result<(), Error> {
+        use notify::Watcher as NotifyWatcher;
         match self {
-            &mut Watcher::RecommendedWatcher(ref mut watcher) => {
-                watcher.watch(path, recursive_mode)
+            Watcher::RecommendedWatcher(ref mut watcher) => {
+                watcher.watch(path, recursive_mode)?;
             }
-            &mut Watcher::PollWatcher(ref mut watcher) => watcher.watch(path, recursive_mode),
+            Watcher::PollWatcher(ref mut watcher) => {
+                watcher.watch(path, recursive_mode)?;
+            }
         }
+        Ok(())
     }
 }
 
@@ -145,22 +149,20 @@ fn create_watcher(
     info!("Creating configuration file watcher.");
 
     let (sender, receiver) = channel();
-    match watcher_conf {
+    let mut watcher = match watcher_conf {
         WatcherConfig::RecommendedWatcher => {
             let recommended_watcher = recommended_watcher(sender)?;
-            let mut watcher = Watcher::RecommendedWatcher(recommended_watcher);
-            watcher.add_paths(config_paths)?;
-            Ok((watcher, receiver))
+            Watcher::RecommendedWatcher(recommended_watcher)
         }
         WatcherConfig::PollWatcher(interval) => {
             let config =
                 notify::Config::default().with_poll_interval(Duration::from_secs(*interval));
             let poll_watcher = notify::PollWatcher::new(sender, config)?;
-            let mut watcher = Watcher::PollWatcher(poll_watcher);
-            watcher.add_paths(config_paths)?;
-            Ok((watcher, receiver))
+            Watcher::PollWatcher(poll_watcher)
         }
-    }
+    };
+    watcher.add_paths(config_paths)?;
+    Ok((watcher, receiver))
 }
 
 #[cfg(all(test, unix, not(target_os = "macos")))] // https://github.com/vectordotdev/vector/issues/5000
