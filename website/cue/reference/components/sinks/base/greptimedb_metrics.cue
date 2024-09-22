@@ -99,6 +99,18 @@ base: components: sinks: greptimedb_metrics: configuration: {
 		required: false
 		type: string: examples: ["grpc_compression"]
 	}
+	new_naming: {
+		description: """
+			Use greptime prefixed naming for time index and value columns
+
+			This is to keep consistency with greptimedb's naming pattern
+			Default to `false` for compatibility
+			"""
+		required: false
+		type: bool: examples: [
+			false,
+		]
+	}
 	password: {
 		description: """
 			The password for your GreptimeDB instance.

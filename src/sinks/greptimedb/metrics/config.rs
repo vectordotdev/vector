@@ -3,6 +3,7 @@ use crate::sinks::{
         default_dbname,
         metrics::{
             request::GreptimeDBGrpcRetryLogic,
+            request_builder::RequestBuilderOptions,
             service::{healthcheck, GreptimeDBGrpcService},
             sink,
         },
@@ -109,6 +110,13 @@ pub struct GreptimeDBMetricsConfig {
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    /// Use greptime prefixed naming for time index and value columns
+    ///
+    /// This is to keep consistency with greptimedb's naming pattern
+    /// Default to `false` for compatibility
+    #[configurable(metadata(docs::examples = false))]
+    pub new_naming: Option<bool>,
 }
 
 impl_generate_config_from_default!(GreptimeDBMetricsConfig);
@@ -124,6 +132,9 @@ impl SinkConfig for GreptimeDBMetricsConfig {
         let sink = sink::GreptimeDBGrpcSink {
             service,
             batch_settings: self.batch.into_batcher_settings()?,
+            request_builder_options: RequestBuilderOptions {
+                use_new_naming: self.new_naming.unwrap_or(false),
+            },
         };
 
         let healthcheck = healthcheck(self)?;
