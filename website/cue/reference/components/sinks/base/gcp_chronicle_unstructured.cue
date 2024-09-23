@@ -78,15 +78,18 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 	compression: {
 		description: "Compression configuration."
 		required:    false
-		type: string: {
-			default: "none"
-			enum: {
-				gzip: """
-					[Gzip][gzip] compression.
-
-					[gzip]: https://www.gzip.org/
-					"""
-				none: "No compression."
+		type: {
+			object: options: gzip: {
+				description: "Compression level."
+				required:    true
+				type: {
+					string: enum: ["none", "fast", "best", "default"]
+					uint: enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+				}
+			}
+			string: {
+				default: "none"
+				enum: none: "No compression."
 			}
 		}
 	}

@@ -53,7 +53,6 @@ use crate::{
     tls::{TlsConfig, TlsSettings},
 };
 
-
 /// Compression configuration.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
@@ -530,7 +529,10 @@ impl ChronicleRequestBuilder {
             transformer,
         };
         let compression = Compression::from(config.compression);
-        Ok(Self { encoder, compression })
+        Ok(Self {
+            encoder,
+            compression,
+        })
     }
 }
 
