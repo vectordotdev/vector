@@ -24,6 +24,7 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
+use crate::sinks::util::buffer::compression::CompressionLevel;
 use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{self, EncodingConfig},
@@ -55,7 +56,7 @@ use crate::{
 
 /// Compression configuration.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 #[configurable(metadata(
@@ -69,14 +70,14 @@ pub enum ChronicleCompression {
     /// [Gzip][gzip] compression.
     ///
     /// [gzip]: https://www.gzip.org/
-    Gzip,
+    Gzip(CompressionLevel),
 }
 
 impl From<ChronicleCompression> for Compression {
     fn from(compression: ChronicleCompression) -> Self {
         match compression {
             ChronicleCompression::None => Compression::None,
-            ChronicleCompression::Gzip => Compression::gzip_default(),
+            ChronicleCompression::Gzip(compression_level) => Compression::Gzip(compression_level),
         }
     }
 }
@@ -528,7 +529,7 @@ impl ChronicleRequestBuilder {
             encoder,
             transformer,
         };
-        let compression = Compression::from(config.compression.clone());
+        let compression = Compression::from(config.compression);
         Ok(Self { encoder, compression })
     }
 }
