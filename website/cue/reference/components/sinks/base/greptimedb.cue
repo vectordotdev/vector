@@ -101,10 +101,10 @@ base: components: sinks: greptimedb: configuration: {
 	}
 	new_naming: {
 		description: """
-			Use greptime prefixed naming for time index and value columns
+			Use Greptime's prefixed naming for time index and value columns.
 
-			This is to keep consistency with greptimedb's naming pattern
-			Default to `false` for compatibility
+			This is to keep consistency with GreptimeDB's naming pattern.
+			Default to `false` for compatibility.
 			"""
 		required: false
 		type: bool: examples: [
