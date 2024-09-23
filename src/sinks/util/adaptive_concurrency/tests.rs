@@ -29,6 +29,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::json_size::JsonSize;
 
 use super::controller::ControllerStatistics;
+use super::AdaptiveConcurrencySettings;
 use crate::{
     config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
@@ -136,6 +137,10 @@ struct TestParams {
     #[configurable(derived)]
     #[serde(default = "default_concurrency")]
     concurrency: Concurrency,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    adaptive_concurrency: AdaptiveConcurrencySettings,
 }
 
 const fn default_interval() -> f64 {
@@ -418,6 +423,7 @@ async fn run_test(params: TestParams) -> TestResults {
             rate_limit_num: 9999,
             timeout_secs: 1,
             retry_jitter_mode: JitterMode::None,
+            adaptive_concurrency: params.adaptive_concurrency,
             ..Default::default()
         },
         params,
