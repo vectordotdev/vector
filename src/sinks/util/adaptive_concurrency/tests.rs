@@ -5,7 +5,7 @@ use core::task::Context;
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
-    fs::{read_dir, File},
+    fs::File,
     future::pending,
     io::Read,
     path::PathBuf,
@@ -21,6 +21,7 @@ use futures::{
 };
 use rand::{thread_rng, Rng};
 use rand_distr::Exp1;
+use rstest::*;
 use serde::Deserialize;
 use snafu::Snafu;
 use tokio::time::{self, sleep, Duration, Instant};
@@ -623,9 +624,7 @@ struct TestInput {
     controller: ControllerResults,
 }
 
-async fn run_compare(file_path: PathBuf, input: TestInput) {
-    eprintln!("Running test in {:?}", file_path);
-
+async fn run_compare(input: TestInput) {
     let results = run_test(input.params).await;
 
     let mut failures = Vec::new();
@@ -673,42 +672,23 @@ async fn run_compare(file_path: PathBuf, input: TestInput) {
     assert!(failures.is_empty(), "{:#?}", results);
 }
 
+#[rstest]
 #[tokio::test]
-async fn all_tests() {
-    const PATH: &str = "tests/data/adaptive-concurrency";
-
-    // Read and parse everything first
-    let mut entries = read_dir(PATH)
-        .expect("Could not open data directory")
-        .map(|entry| entry.expect("Could not read data directory").path())
-        .filter_map(|file_path| {
-            if (file_path.extension().map(|ext| ext == "toml")).unwrap_or(false) {
-                let mut data = String::new();
-                File::open(&file_path)
-                    .unwrap()
-                    .read_to_string(&mut data)
-                    .unwrap();
-                let input: TestInput = toml::from_str(&data)
-                    .unwrap_or_else(|error| panic!("Invalid TOML in {:?}: {:?}", file_path, error));
-                Some((file_path, input))
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-
-    entries.sort_unstable_by_key(|entry| entry.0.to_string_lossy().to_string());
+async fn all_tests(#[files("tests/data/adaptive-concurrency/*.toml")] file_path: PathBuf) {
+    let mut data = String::new();
+    File::open(&file_path)
+        .unwrap()
+        .read_to_string(&mut data)
+        .unwrap();
+    let input: TestInput = toml::from_str(&data)
+        .unwrap_or_else(|error| panic!("Invalid TOML in {:?}: {:?}", file_path, error));
 
     time::pause();
 
-    // The first delay takes just slightly longer than all the rest,
-    // which causes the first test to run differently than all the
-    // others. Throw in a dummy delay to take up this delay "slack".
+    // The first delay takes just slightly longer than all the rest, which causes the first
+    // statistic to be inaccurate. Throw in a dummy delay to take up this delay "slack".
     sleep(Duration::from_millis(1)).await;
     time::advance(Duration::from_millis(1)).await;
 
-    // Then run all the tests
-    for (file_path, input) in entries {
-        run_compare(file_path, input).await;
-    }
+    run_compare(input).await;
 }
