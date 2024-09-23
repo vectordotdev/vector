@@ -47,10 +47,10 @@ impl Watcher {
     fn watch(&mut self, path: &Path, recursive_mode: RecursiveMode) -> Result<(), Error> {
         use notify::Watcher as NotifyWatcher;
         match self {
-            Watcher::RecommendedWatcher(ref mut watcher) => {
+            Watcher::RecommendedWatcher(watcher) => {
                 watcher.watch(path, recursive_mode)?;
             }
-            Watcher::PollWatcher(ref mut watcher) => {
+            Watcher::PollWatcher(watcher) => {
                 watcher.watch(path, recursive_mode)?;
             }
         }
