@@ -5826,9 +5826,9 @@ dependencies = [
 
 [[package]]
 name = "nkeys"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2de02c883c178998da8d0c9816a88ef7ef5c58314dd1585c97a4a5679f3ab337"
+checksum = "9f49e787f4c61cbd0f9320b31cc26e58719f6aa5068e34697dd3aea361412fe3"
 dependencies = [
  "data-encoding",
  "ed25519",
@@ -10447,7 +10447,7 @@ dependencies = [
  "mlua",
  "mongodb",
  "nix 0.26.2",
- "nkeys 0.4.3",
+ "nkeys 0.4.4",
  "nom",
  "notify",
  "num-format",
