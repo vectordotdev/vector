@@ -58,6 +58,7 @@ impl ConditionalConfig for DatadogSearchConfig {
     fn build(
         &self,
         _enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        _vrl_caches: &vector_lib::vrl_cache::VrlCacheRegistry,
     ) -> crate::Result<Condition> {
         let matcher = as_log(build_matcher(&self.source, &EventFilter));
 

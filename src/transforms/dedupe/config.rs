@@ -58,6 +58,7 @@ impl TransformConfig for DedupeConfig {
     fn outputs(
         &self,
         _: vector_lib::enrichment::TableRegistry,
+        _: vector_lib::vrl_cache::VrlCacheRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

@@ -114,7 +114,8 @@ impl_generate_config_from_default!(ReduceConfig);
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Reduce::new(self, &context.enrichment_tables).map(Transform::event_task)
+        Reduce::new(self, &context.enrichment_tables, &context.vrl_caches)
+            .map(Transform::event_task)
     }
 
     fn input(&self) -> Input {
@@ -124,6 +125,7 @@ impl TransformConfig for ReduceConfig {
     fn outputs(
         &self,
         _: vector_lib::enrichment::TableRegistry,
+        _: vector_lib::vrl_cache::VrlCacheRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

@@ -560,7 +560,7 @@ fn build_outputs(
             .iter()
             .enumerate()
         {
-            match condition.build(&Default::default()) {
+            match condition.build(&Default::default(), &Default::default()) {
                 Ok(condition) => conditions.push(condition),
                 Err(error) => errors.push(format!(
                     "failed to create test condition '{}': {}",

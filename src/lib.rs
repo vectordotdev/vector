@@ -124,6 +124,7 @@ pub(crate) mod utilization;
 pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
+pub mod vrl_cache;
 
 pub use source_sender::SourceSender;
 pub use vector_lib::{event, metrics, schema, tcp, tls};

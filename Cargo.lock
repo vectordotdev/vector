@@ -10790,6 +10790,7 @@ dependencies = [
  "vector-lookup",
  "vector-stream",
  "vector-tap",
+ "vrl-cache",
 ]
 
 [[package]]
@@ -10884,6 +10885,7 @@ dependencies = [
  "tracing-subscriber",
  "vector-vrl-functions",
  "vrl",
+ "vrl-cache",
 ]
 
 [[package]]
@@ -10898,6 +10900,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "vector-vrl-functions",
  "vrl",
+ "vrl-cache",
  "wasm-bindgen",
 ]
 
@@ -11007,6 +11010,13 @@ dependencies = [
  "webbrowser",
  "woothee",
  "zstd 0.13.2",
+]
+
+[[package]]
+name = "vrl-cache"
+version = "0.1.0"
+dependencies = [
+ "vrl",
 ]
 
 [[package]]

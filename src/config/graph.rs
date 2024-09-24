@@ -78,6 +78,7 @@ impl Graph {
                     in_ty: transform.inner.input().data_type(),
                     outputs: transform.inner.outputs(
                         vector_lib::enrichment::TableRegistry::default(),
+                        vector_lib::vrl_cache::VrlCacheRegistry::default(),
                         &[(id.into(), schema::Definition::any())],
                         schema.log_namespace(),
                     ),
