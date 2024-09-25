@@ -45,7 +45,9 @@ Let's have a look at a more complex example. Imagine that you're working with
 HTTP log events that look like this:
 
 ```text
-"{\"status\":200,\"timestamp\":\"2021-03-01T19:19:24.646170Z\",\"message\":\"SUCCESS\",\"username\":\"ub40fan4life\"}"
+{
+  "message": "{\"status\":200,\"timestamp\":\"2021-03-01T19:19:24.646170Z\",\"message\":\"SUCCESS\",\"username\":\"ub40fan4life\"}"
+}
 ```
 
 You want to apply these changes to each event:
