@@ -51,16 +51,27 @@ HTTP log events that look like this:
 You want to apply these changes to each event:
 
 - Parse the raw string into JSON
-- Reformat the `time` into a UNIX timestamp
+- Attempts to convert the timestamp and checks if the conversion was successful
+- If the conversion is successful, convert the time to a UNIX timestamp; otherwise, use the current time
 - Remove the `username` field
+- Remove the temporary timestamp (`parsed_timestamp`) field
 - Convert the `message` to lowercase
 
 This VRL program would accomplish all of that:
 
 ```coffee
 . = parse_json!(string!(.message))
-.timestamp = to_unix_timestamp(to_timestamp!(.timestamp))
+
+.parsed_timestamp = parse_timestamp!(.timestamp, format: "%Y-%m-%dT%H:%M:%S.%fZ")
+
+if is_timestamp(.parsed_timestamp) {
+  .timestamp = to_unix_timestamp(.parsed_timestamp)
+} else {
+  .timestamp = to_unix_timestamp(now())
+}
+
 del(.username)
+del(.parsed_timestamp)
 .message = downcase(string!(.message))
 ```
 
