@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 pub mod cache_get;
-pub mod cache_set;
+pub mod cache_put;
 pub mod caches;
 
 mod internal_events;
@@ -13,6 +13,6 @@ use vrl::compiler::Function;
 pub fn vrl_functions() -> Vec<Box<dyn Function>> {
     vec![
         Box::new(cache_get::CacheGet) as _,
-        Box::new(cache_set::CacheSet) as _,
+        Box::new(cache_put::CachePut) as _,
     ]
 }

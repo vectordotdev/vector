@@ -3,10 +3,10 @@ use vrl::prelude::*;
 use crate::{caches::VrlCacheRegistry, vrl_util};
 
 #[derive(Clone, Copy, Debug)]
-pub struct CacheSet;
-impl Function for CacheSet {
+pub struct CachePut;
+impl Function for CachePut {
     fn identifier(&self) -> &'static str {
-        "cache_set"
+        "cache_put"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -32,7 +32,7 @@ impl Function for CacheSet {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "write to cache",
-            source: r#"cache_set!("test_cache", "test_key", "test_value")"#,
+            source: r#"cache_put!("test_cache", "test_key", "test_value")"#,
             result: Ok(""),
         }]
     }
@@ -61,7 +61,7 @@ impl Function for CacheSet {
         let key = arguments.required("key");
         let value = arguments.required("value");
 
-        Ok(CacheSetFn {
+        Ok(CachePutFn {
             cache,
             key,
             value,
@@ -72,14 +72,14 @@ impl Function for CacheSet {
 }
 
 #[derive(Debug, Clone)]
-pub struct CacheSetFn {
+pub struct CachePutFn {
     cache: String,
     key: Box<dyn Expression>,
     value: Box<dyn Expression>,
     registry: VrlCacheRegistry,
 }
 
-impl FunctionExpression for CacheSetFn {
+impl FunctionExpression for CachePutFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let key = self.key.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned();
         let value = self.value.resolve(ctx)?;
@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn set_val() {
         let registry = get_cache_registry();
-        let func = CacheSetFn {
+        let func = CachePutFn {
             cache: "test".to_string(),
             key: expr!("test_key"),
             value: expr!("test_value"),
