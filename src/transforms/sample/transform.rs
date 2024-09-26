@@ -121,7 +121,7 @@ mod tests {
         };
 
         vrl_config
-            .build(&Default::default())
+            .build(&Default::default(), &Default::default())
             .expect("should not fail to build VRL condition")
     }
 

@@ -31,7 +31,7 @@ impl Function for CacheGet {
         &[Example {
             title: "read from cache",
             source: r#"cache_get!("test_cache", "test_key")"#,
-            result: Ok(r#"{"id": 1, "firstname": "Bob", "surname": "Smith"}"#),
+            result: Ok(r#""test_value""#),
         }]
     }
 
@@ -104,11 +104,7 @@ mod tests {
 
     fn get_cache_registry() -> VrlCacheRegistry {
         let registry = VrlCacheRegistry::default();
-        registry
-            .caches
-            .write()
-            .unwrap()
-            .insert("test".to_string(), VrlCache::default());
+        registry.insert_caches(BTreeMap::from([("test".to_string(), VrlCache::default())]));
         registry
     }
 
@@ -116,13 +112,8 @@ mod tests {
     fn get_val() {
         let registry = get_cache_registry();
         registry
-            .caches
-            .write()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .data
-            .insert("test_key".to_string(), Value::from("test_value"));
+            .writer()
+            .put_val("test", "test_key", Value::from("test_value"));
         let func = CacheGetFn {
             cache: "test".to_string(),
             key: expr!("test_key"),

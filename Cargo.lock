@@ -11016,6 +11016,8 @@ dependencies = [
 name = "vrl-cache"
 version = "0.1.0"
 dependencies = [
+ "metrics",
+ "vector-common",
  "vrl",
 ]
 

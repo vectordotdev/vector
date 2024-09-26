@@ -258,13 +258,13 @@ mod test {
 
             assert_eq!(
                 config
-                    .build(&Default::default())
+                    .build(&Default::default(), &Default::default())
                     .map(|_| ())
                     .map_err(|e| e.to_string()),
                 build
             );
 
-            if let Ok(cond) = config.build(&Default::default()) {
+            if let Ok(cond) = config.build(&Default::default(), &Default::default()) {
                 assert_eq!(
                     cond.check_with_context(event.clone()).0,
                     check.map_err(|e| e.to_string())

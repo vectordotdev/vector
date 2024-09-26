@@ -7,3 +7,5 @@ publish = false
 
 [dependencies]
 vrl.workspace = true
+metrics.workspace = true
+vector-common = { path = "../vector-common" }

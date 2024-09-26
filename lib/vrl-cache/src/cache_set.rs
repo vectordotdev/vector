@@ -32,7 +32,7 @@ impl Function for CacheSet {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "write to cache",
-            source: r#"cache_get!("test_cache", "test_key", "test_value")"#,
+            source: r#"cache_set!("test_cache", "test_key", "test_value")"#,
             result: Ok(""),
         }]
     }
@@ -84,13 +84,8 @@ impl FunctionExpression for CacheSetFn {
         let key = self.key.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned();
         let value = self.value.resolve(ctx)?;
         self.registry
-            .caches
-            .write()
-            .unwrap()
-            .get_mut(&self.cache)
-            .unwrap()
-            .data
-            .insert(key, value.clone());
+            .writer()
+            .put_val(&self.cache, &key, value.clone());
         Ok(value)
     }
 
@@ -114,11 +109,7 @@ mod tests {
 
     fn get_cache_registry() -> VrlCacheRegistry {
         let registry = VrlCacheRegistry::default();
-        registry
-            .caches
-            .write()
-            .unwrap()
-            .insert("test".to_string(), VrlCache::default());
+        registry.insert_caches(BTreeMap::from([("test".to_string(), VrlCache::default())]));
         registry
     }
 
@@ -148,13 +139,8 @@ mod tests {
         assert_eq!(
             value!("test_value"),
             registry
-                .caches
-                .read()
-                .unwrap()
-                .get("test")
-                .unwrap()
-                .data
-                .get("test_key")
+                .as_readonly()
+                .get_val("test", "test_key")
                 .unwrap()
                 .clone()
         );

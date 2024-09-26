@@ -385,7 +385,8 @@ group_by = [ "request_id" ]
                 );
             let schema_definitions = reduce_config
                 .outputs(
-                    vector_lib::enrichment::TableRegistry::default(),
+                    TableRegistry::default(),
+                    VrlCacheRegistry::default(),
                     &[("test".into(), input_definition)],
                     LogNamespace::Legacy,
                 )
@@ -396,6 +397,7 @@ group_by = [ "request_id" ]
 
             let new_schema_definition = reduce_config.outputs(
                 TableRegistry::default(),
+                VrlCacheRegistry::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
                 LogNamespace::Legacy,
             )[0]
@@ -487,6 +489,7 @@ merge_strategies.baz = "max"
 
             let new_schema_definition = reduce_config.outputs(
                 TableRegistry::default(),
+                VrlCacheRegistry::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
                 LogNamespace::Legacy,
             )[0]
@@ -557,6 +560,7 @@ group_by = [ "request_id" ]
             let (tx, rx) = mpsc::channel(1);
             let new_schema_definition = reduce_config.outputs(
                 TableRegistry::default(),
+                VrlCacheRegistry::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
                 LogNamespace::Legacy,
             )[0]
@@ -765,6 +769,7 @@ merge_strategies.bar = "concat"
 
             let new_schema_definition = reduce_config.outputs(
                 TableRegistry::default(),
+                VrlCacheRegistry::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
                 LogNamespace::Legacy,
             )[0]

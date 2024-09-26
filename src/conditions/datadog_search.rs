@@ -1201,7 +1201,7 @@ mod test {
 
             // Every query should build successfully.
             let cond = config
-                .build(&Default::default())
+                .build(&Default::default(), &Default::default())
                 .unwrap_or_else(|_| panic!("build failed: {}", source));
 
             assert!(

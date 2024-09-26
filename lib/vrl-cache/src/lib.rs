@@ -4,6 +4,7 @@ pub mod cache_get;
 pub mod cache_set;
 pub mod caches;
 
+mod internal_events;
 mod vrl_util;
 
 pub use caches::VrlCacheRegistry;
