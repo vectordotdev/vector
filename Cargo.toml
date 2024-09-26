@@ -281,7 +281,7 @@ chrono-tz.workspace = true
 cidr-utils = { version = "0.6.1", default-features = false }
 colored = { version = "2.1.0", default-features = false }
 csv = { version = "1.3", default-features = false }
-databend-client ={ version = "0.20.1", default-features = false, features = ["rustls"], optional = true }
+databend-client ={ version = "0.21.0", default-features = false, features = ["rustls"], optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.17", default-features = false }
