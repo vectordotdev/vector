@@ -24,3 +24,5 @@ timestamps.
 
 As the `axiom` sink now uses the native Axiom ingest endpoint the full wealth of
 vector's HTTP support is now open to the `axiom` sink where and when needed.
+
+authors: darach
