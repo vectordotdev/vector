@@ -24,7 +24,7 @@ components: sinks: axiom: {
 				max_bytes:    1_048_576
 				timeout_secs: 1.0
 			}
-			compression: enabled: false
+			compression: enabled: true
 			encoding: {
 				enabled: true
 				codec: enabled: false
