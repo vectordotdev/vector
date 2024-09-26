@@ -1264,6 +1264,7 @@ dependencies = [
  "base64-simd",
  "bytes 1.7.1",
  "bytes-utils",
+ "futures-core",
  "http 0.2.9",
  "http 1.1.0",
  "http-body 0.4.5",
@@ -1276,6 +1277,8 @@ dependencies = [
  "ryu",
  "serde",
  "time",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
