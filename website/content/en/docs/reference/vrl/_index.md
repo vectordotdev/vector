@@ -53,7 +53,7 @@ HTTP log events that look like this:
 You want to apply these changes to each event:
 
 - Parse the raw string into JSON
-- Attempts to convert the timestamp and checks if the conversion was successful
+- Attempt to convert the timestamp and checks if the conversion was successful
 - If the conversion is successful, convert the time to a UNIX timestamp; otherwise, use the current time
 - Remove the `username` field
 - Remove the temporary timestamp (`parsed_timestamp`) field
