@@ -19,6 +19,13 @@ rate.action = "defer" | "drop"
 
 concurrency = "auto"
 
+# Delete any of these that are not needed
+adaptive_concurrency.initial_concurrency = 1
+adaptive_concurrency.decrease_ratio = 0.9
+adaptive_concurrency.ewma_alpha = 0.4
+adaptive_concurrency.rtt_deviation_scale = 2.5
+adaptive_concurrency.max_concurrency_limit = 200
+
 [stats.in_flight]
 max = [,]
 mean = [,]
