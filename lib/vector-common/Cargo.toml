@@ -49,7 +49,7 @@ futures.workspace = true
 indexmap.workspace = true
 metrics.workspace = true
 nom = { version = "7", optional = true }
-ordered-float = { version = "4.2.2", default-features = false }
+ordered-float = { version = "4.3.0", default-features = false }
 paste = "1.0.15"
 pin-project.workspace = true
 ryu = { version = "1", default-features = false }
