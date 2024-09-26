@@ -73,7 +73,7 @@ pub struct AxiomConfig {
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    /// Controls how acknowledgements are handled for this this sink.
+    /// Controls how acknowledgements are handled for this sink.
     #[configurable(derived)]
     #[serde(
         default,
