@@ -7,7 +7,7 @@ use vector_common::byte_size_of::ByteSizeOf;
 use vector_common::internal_event::emit;
 use vrl::core::Value;
 
-use crate::internal_events::{VrlCacheInserted, VrlCacheRead, VrlCacheReadFailed};
+use crate::internal_events::{VrlCacheDeleted, VrlCacheInserted, VrlCacheRead, VrlCacheReadFailed};
 
 type CacheMap = BTreeMap<String, VrlCache>;
 
@@ -96,5 +96,17 @@ impl VrlCacheWriter {
             new_objects_count: locked[cache].data.keys().len(),
             new_byte_size: locked[cache].data.size_of(),
         });
+    }
+
+    pub fn delete_val(&self, cache: &str, key: &str) -> Option<Value> {
+        let mut locked = self.0.write().unwrap();
+        let result = locked.get_mut(cache).unwrap().data.remove(key);
+        emit(VrlCacheDeleted {
+            cache: cache.to_string(),
+            key: key.to_string(),
+            new_objects_count: locked[cache].data.keys().len(),
+            new_byte_size: locked[cache].data.size_of(),
+        });
+        result
     }
 }
