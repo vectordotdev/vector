@@ -480,10 +480,10 @@ base: components: sources: http: configuration: {
 				DELETE:  "HTTP DELETE method."
 				GET:     "HTTP GET method."
 				HEAD:    "HTTP HEAD method."
+				OPTIONS: "HTTP OPTIONS method."
 				PATCH:   "HTTP PATCH method."
 				POST:    "HTTP POST method."
-				PUT:     "HTTP PUT method."
-				OPTIONS: "HTTP OPTIONS method."
+				PUT:     "HTTP Put method."
 			}
 		}
 	}
