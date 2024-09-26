@@ -134,4 +134,35 @@ mod tests {
 
         assert_eq!(Ok(value!("test_value")), got);
     }
+
+    #[test]
+    fn get_val_key_not_found() {
+        let registry = get_cache_registry();
+        let func = CacheGetFn {
+            cache: "test".to_string(),
+            key: expr!("test_key"),
+            registry: registry.as_readonly(),
+        };
+
+        let tz = TimeZone::default();
+        let object: Value = BTreeMap::new().into();
+        let mut target = TargetValue {
+            value: object,
+            metadata: value!({}),
+            secrets: Secrets::new(),
+        };
+        let mut runtime_state = RuntimeState::default();
+        let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
+
+        let got = func.resolve(&mut ctx);
+
+        assert_eq!(
+            Err(ExpressionError::Error {
+                message: "key not found in cache: test_key".to_string(),
+                labels: vec![],
+                notes: vec![]
+            }),
+            got
+        );
+    }
 }
