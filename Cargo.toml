@@ -288,7 +288,7 @@ dyn-clone = { version = "1.0.17", default-features = false }
 encoding_rs = { version = "0.8.34", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.13", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.0.33", default-features = false, features = ["default"] }
+flate2 = { version = "1.0.34", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob.workspace = true
 governor = { version = "0.6.3", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
