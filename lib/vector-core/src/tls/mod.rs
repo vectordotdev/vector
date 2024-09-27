@@ -183,13 +183,13 @@ pub fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnector
 }
 
 fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
-    let verify_hostname = settings
-        .tls()
-        .map_or(true, |settings| settings.verify_hostname);
-    let configure = tls_connector_builder(settings)?
+    let mut configure = tls_connector_builder(settings)?
         .build()
         .configure()
-        .context(TlsBuildConnectorSnafu)?
-        .verify_hostname(verify_hostname);
+        .context(TlsBuildConnectorSnafu)?;
+    let tls_setting = settings.tls().cloned();
+    if let Some(tls_setting) = &tls_setting {
+        tls_setting.apply_connect_configuration(&mut configure)
+    }
     Ok(configure)
 }
