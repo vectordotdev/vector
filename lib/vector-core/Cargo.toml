@@ -50,7 +50,7 @@ smallvec = { version = "1", default-features = false, features = ["serde", "cons
 snafu = { version = "0.7.5", default-features = false }
 socket2 = { version = "0.5.7", default-features = false }
 tokio = { version = "1.40.0", default-features = false, features = ["net"] }
-tokio-openssl = { version = "0.6.4", default-features = false }
+tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
 toml.workspace = true
