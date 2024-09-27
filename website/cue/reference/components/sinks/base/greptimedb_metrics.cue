@@ -119,9 +119,7 @@ base: components: sinks: greptimedb_metrics: configuration: {
 			Default to `false` for compatibility.
 			"""
 		required: false
-		type: bool: examples: [
-			false,
-		]
+		type: bool: {}
 	}
 	password: {
 		description: """
