@@ -210,9 +210,9 @@ pub fn build_tls_connector(
                 Err(error) => {
                     error
                         .source()
-                        .unwrap()
+                        .expect("was expecting to have a source in tlsError variant returned from apply_connect_configuration(). See SetSniSnafu.")
                         .downcast_ref::<openssl::error::ErrorStack>()
-                        .unwrap();
+                        .expect("was expecting the source error to be of type openssl::error::ErrorStack from apply_connect_configuration(). See SetSniSnafu.");
                 }
             }
         }
