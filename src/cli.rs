@@ -160,9 +160,9 @@ pub struct RootOpts {
 pub watch_config_method: WatchConfigMethod,
 
 
-    /// poll for changes in configuration file on given interval
-    ///
-    /// This config is only applicable if poll is enabled in `--watch-config-method`
+/// Poll for changes in the configuration file at the given interval.
+///
+/// This setting is only applicable if `Poll` is set in `--watch-config-method`.
     #[arg(
         long,
         env = "VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS",
