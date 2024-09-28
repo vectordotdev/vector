@@ -23,9 +23,9 @@ const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 pub enum WatcherConfig {
-    /// recommended watcher for os, usually inotify for linux based systems
+    /// Recommended watcher for the current OS, usually `inotify` for Linux-based systems.
     RecommendedWatcher,
-    /// poll based watcher. for watching files from NFS.
+    /// Poll-based watcher, typically used for watching files on NFS.
     PollWatcher(u64),
 }
 
