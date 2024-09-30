@@ -116,7 +116,7 @@ fn default_subject_key_field() -> OptionalValuePath {
 }
 
 const fn default_subscription_capacity() -> usize {
-    4096
+    65536
 }
 
 impl GenerateConfig for NatsSourceConfig {
