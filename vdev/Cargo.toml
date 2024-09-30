@@ -28,7 +28,7 @@ os_info = { version = "3.8.2", default-features = false }
 # watch https://github.com/epage/anstyle for official interop with Clap
 owo-colors = { version = "4.0.0", features = ["supports-colors"] }
 paste = "1.0.15"
-regex = { version = "1.10.6", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.11.0", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 serde.workspace = true
 serde_json.workspace = true
