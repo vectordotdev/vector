@@ -2,13 +2,11 @@
 //! See <https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries>
 //! for more information.
 use bytes::{Bytes, BytesMut};
-use std::{cell::RefCell, collections::BTreeSet};
 
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
 use http::{header::HeaderValue, Request, StatusCode, Uri};
 use hyper::Body;
-use indexmap::IndexMap;
 use indoc::indoc;
 use serde::Serialize;
 use serde_json::json;
@@ -17,16 +15,7 @@ use std::collections::HashMap;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_lib::configurable::attributes::CustomAttribute;
-use vector_lib::configurable::{
-    schema::{
-        apply_base_metadata, generate_const_string_schema, generate_enum_schema,
-        generate_one_of_schema, generate_struct_schema, get_or_generate_schema, SchemaGenerator,
-        SchemaObject,
-    },
-    Configurable, GenerateError, Metadata, ToValue,
-};
-use vector_lib::configurable::{configurable_component, Configurable, GenerateError, Metadata};
+use vector_lib::configurable::{configurable_component};
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::{
     config::{telemetry, AcknowledgementsConfig, Input},
@@ -36,7 +25,6 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
-use crate::sinks::util::buffer::compression::CompressionLevel;
 use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{self, EncodingConfig},
@@ -48,6 +36,7 @@ use crate::{
         gcp_chronicle::{
             partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
             sink::ChronicleSink,
+            compression::ChronicleCompression,
         },
         gcs_common::{
             config::{healthcheck_response, GcsRetryLogic},
@@ -64,106 +53,6 @@ use crate::{
     template::{Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
-
-/// Compression configuration.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
-#[serde(rename_all = "snake_case")]
-#[configurable(metadata(
-    docs::enum_tag_description = "The compression algorithm to use for sending."
-))]
-pub enum ChronicleCompression {
-    /// No compression.
-    #[derivative(Default)]
-    None,
-
-    /// [Gzip][gzip] compression.
-    ///
-    /// [gzip]: https://www.gzip.org/
-    Gzip(CompressionLevel),
-}
-
-impl From<ChronicleCompression> for Compression {
-    fn from(compression: ChronicleCompression) -> Self {
-        match compression {
-            ChronicleCompression::None => Compression::None,
-            ChronicleCompression::Gzip(compression_level) => Compression::Gzip(compression_level),
-        }
-    }
-}
-
-// Schema generation largely copied from `src/sinks/util/buffer/compression`
-impl Configurable for ChronicleCompression {
-    fn metadata() -> Metadata {
-        let mut metadata = Metadata::default();
-        metadata.set_title("Compression configuration.");
-        metadata.set_description("All compression algorithms use the default compression level unless otherwise specified.");
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
-        metadata.add_custom_attribute(CustomAttribute::flag("docs::advanced"));
-        metadata
-    }
-
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        const ALGORITHM_NAME: &str = "algorithm";
-        const LEVEL_NAME: &str = "level";
-        const LOGICAL_NAME: &str = "logical_name";
-        const ENUM_TAGGING_MODE: &str = "docs::enum_tagging";
-
-        let generate_string_schema = |logical_name: &str,
-                                      title: Option<&'static str>,
-                                      description: &'static str|
-         -> SchemaObject {
-            let mut const_schema = generate_const_string_schema(logical_name.to_lowercase());
-            let mut const_metadata = Metadata::with_description(description);
-            if let Some(title) = title {
-                const_metadata.set_title(title);
-            }
-            const_metadata.add_custom_attribute(CustomAttribute::kv(LOGICAL_NAME, logical_name));
-            apply_base_metadata(&mut const_schema, const_metadata);
-            const_schema
-        };
-
-        // First, we'll create the string-only subschemas for each algorithm, and wrap those up
-        // within a one-of schema.
-        let mut string_metadata = Metadata::with_description("Compression algorithm.");
-        string_metadata.add_custom_attribute(CustomAttribute::kv(ENUM_TAGGING_MODE, "external"));
-
-        let none_string_subschema = generate_string_schema("None", None, "No compression.");
-        let gzip_string_subschema = generate_string_schema(
-            "Gzip",
-            Some("[Gzip][gzip] compression."),
-            "[gzip]: https://www.gzip.org/",
-        );
-
-        let mut all_string_oneof_subschema = generate_one_of_schema(&[none_string_subschema, gzip_string_subschema]);
-        apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
-
-        let compression_level_schema =
-            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), gen, None)?;
-
-        let mut required = BTreeSet::new();
-        required.insert(ALGORITHM_NAME.to_string());
-
-        let mut properties = IndexMap::new();
-        properties.insert(
-            ALGORITHM_NAME.to_string(),
-            all_string_oneof_subschema.clone(),
-        );
-        properties.insert(LEVEL_NAME.to_string(), compression_level_schema);
-
-        let mut full_subschema = generate_struct_schema(properties, required, None);
-        let mut full_metadata =
-            Metadata::with_description("Compression algorithm and compression level.");
-        full_metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
-        apply_base_metadata(&mut full_subschema, full_metadata);
-
-        Ok(generate_one_of_schema(&[
-            all_string_oneof_subschema,
-            full_subschema,
-        ]))
-    }
-}
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
