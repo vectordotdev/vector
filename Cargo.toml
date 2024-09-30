@@ -389,7 +389,7 @@ base64 = "0.22.1"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
 libc = "0.2.159"
-similar-asserts = "1.5.0"
+similar-asserts = "1.6.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
