@@ -2231,9 +2231,9 @@ dependencies = [
 
 [[package]]
 name = "community-id"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f6af96839c04974cf381e427792a99913ecf3f7bfb348f153dc8a8e5f9803ad"
+checksum = "9c9e701443040497976ce85ba641ef0c4a6b319307b9d93718fc76bb77540bff"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
