@@ -73,7 +73,7 @@ vrl.workspace = true
 security-framework = "2.10.0"
 
 [target.'cfg(windows)'.dependencies]
-schannel = "0.1.23"
+schannel = "0.1.24"
 
 [build-dependencies]
 prost-build = "0.12"
