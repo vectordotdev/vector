@@ -3388,6 +3388,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
+name = "fancy-regex"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "531e46835a22af56d1e3b66f04844bed63158bc094a628bec1d321d9b4c44bf2"
+dependencies = [
+ "bit-set",
+ "regex-automata 0.4.4",
+ "regex-syntax 0.8.2",
+]
+
+[[package]]
 name = "fastrand"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10917,8 +10928,9 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vrl"
-version = "0.18.0"
-source = "git+https://github.com/vectordotdev/vrl?rev=cfcef6626e9131fbce5f45e7d05a6d82bc9f7116#cfcef6626e9131fbce5f45e7d05a6d82bc9f7116"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c22ec61cbd43e563df185521f9a2fb2f42f6ab96604a574c82f6564049fb431"
 dependencies = [
  "aes",
  "ansi_term",
@@ -10948,6 +10960,7 @@ dependencies = [
  "domain",
  "dyn-clone",
  "exitcode",
+ "fancy-regex",
  "flate2",
  "grok",
  "hex",
