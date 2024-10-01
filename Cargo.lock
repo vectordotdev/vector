@@ -4781,9 +4781,9 @@ dependencies = [
 
 [[package]]
 name = "is_ci"
-version = "1.1.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "616cde7c720bb2bb5824a224687d8f77bfd38922027f01d825cd7453be5099fb"
+checksum = "7655c9839580ee829dfacba1d1278c2b7883e50a277ff7541299489d6bdfdc45"
 
 [[package]]
 name = "itertools"
@@ -6405,11 +6405,12 @@ checksum = "c1b04fb49957986fdce4d6ee7a65027d55d4b6d2265e5848bbb507b58ccfdb6f"
 
 [[package]]
 name = "owo-colors"
-version = "4.0.0"
+version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caff54706df99d2a78a5a4e3455ff45448d81ef1bb63c22cd14052ca0e993a3f"
+checksum = "fb37767f6569cd834a413442455e0f066d0d522de8630436e2a1761d9726ba56"
 dependencies = [
- "supports-color",
+ "supports-color 2.1.0",
+ "supports-color 3.0.1",
 ]
 
 [[package]]
@@ -9091,6 +9092,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "supports-color"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8775305acf21c96926c900ad056abeef436701108518cf890020387236ac5a77"
+dependencies = [
+ "is_ci",
+]
+
+[[package]]
 name = "syn"
 version = "0.15.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10322,7 +10332,7 @@ dependencies = [
  "log",
  "once_cell",
  "os_info",
- "owo-colors 4.0.0",
+ "owo-colors 4.1.0",
  "paste",
  "regex",
  "reqwest 0.11.26",
