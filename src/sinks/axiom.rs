@@ -57,9 +57,9 @@ pub struct AxiomConfig {
 
     /// The compression algorithm to use.
     ///
-    /// Supported values: `none` ( not recommended ), `gzip` ( recommended, default ), `deflate`
+    /// Supported values: `none` ( not recommended ), `zstd` ( recommended, default ), `gzip`, `deflate`
     #[configurable(derived)]
-    #[serde(default = "Compression::gzip_default")]
+    #[serde(default = "Compression::zstd_default")]
     compression: Compression,
 
     /// The TLS settings for the connection.
