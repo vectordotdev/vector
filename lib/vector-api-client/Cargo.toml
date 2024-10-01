@@ -13,7 +13,7 @@ serde.workspace = true
 serde_json.workspace = true
 
 # Error handling
-anyhow = { version = "1.0.86", default-features = false, features = ["std"] }
+anyhow = { version = "1.0.89", default-features = false, features = ["std"] }
 
 # Tokio / Futures
 futures.workspace = true
