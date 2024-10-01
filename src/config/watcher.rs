@@ -58,18 +58,6 @@ impl Watcher {
     }
 }
 
-// impl From<notify::RecommendedWatcher> for Watcher {
-//     fn from(recommended_watcher: notify::RecommendedWatcher) -> Self {
-//         Watcher::RecommendedWatcher(recommended_watcher)
-//     }
-// }
-
-// impl From<notify::PollWatcher> for Watcher {
-//     fn from(poll_watcher: notify::PollWatcher) -> Self {
-//         Watcher::PollWatcher(poll_watcher)
-//     }
-// }
-
 /// Sends a ReloadFromDisk on config_path changes.
 /// Accumulates file changes until no change for given duration has occurred.
 /// Has best effort guarantee of detecting all file changes from the end of
