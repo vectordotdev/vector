@@ -547,7 +547,7 @@ pub fn watcher_config(
     interval: NonZeroU64,
 ) -> config::watcher::WatcherConfig {
     match method {
-        WatchConfigMethod::Inotify => config::watcher::WatcherConfig::RecommendedWatcher,
+        WatchConfigMethod::Recommended => config::watcher::WatcherConfig::RecommendedWatcher,
         WatchConfigMethod::Poll => config::watcher::WatcherConfig::PollWatcher(interval.into()),
     }
 }
