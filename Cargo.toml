@@ -402,7 +402,7 @@ tower-test = "0.4.0"
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
 vrl.workspace = true
 
-wiremock = "0.6.1"
+wiremock = "0.6.2"
 zstd = { version = "0.13.0", default-features = false }
 
 [patch.crates-io]
