@@ -47,7 +47,7 @@ impl TryFrom<Compression> for ChronicleCompression {
             Compression::None => Ok(ChronicleCompression::None),
             Compression::Gzip(compression_level) => {
                 Ok(ChronicleCompression::Gzip(compression_level))
-            },
+            }
             _ => Err("Compression type is not supported by Chronicle".to_string()),
         }
     }
@@ -139,9 +139,7 @@ impl<'de> de::Deserialize<'de> for ChronicleCompression {
         D: de::Deserializer<'de>,
     {
         Compression::deserialize(deserializer)
-            .and_then(|x| ChronicleCompression::try_from(x)
-                .map_err(|err| de::Error::custom(err))
-            )
+            .and_then(|x| ChronicleCompression::try_from(x).map_err(|err| de::Error::custom(err)))
     }
 }
 

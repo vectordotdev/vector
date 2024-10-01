@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_lib::configurable::{configurable_component};
+use vector_lib::configurable::configurable_component;
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::{
     config::{telemetry, AcknowledgementsConfig, Input},
@@ -34,9 +34,9 @@ use crate::{
     schema,
     sinks::{
         gcp_chronicle::{
+            compression::ChronicleCompression,
             partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
             sink::ChronicleSink,
-            compression::ChronicleCompression,
         },
         gcs_common::{
             config::{healthcheck_response, GcsRetryLogic},
@@ -157,7 +157,6 @@ pub struct ChronicleUnstructuredConfig {
     #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: ChronicleCompression,
 
@@ -199,7 +198,7 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
             credentials_path = "/path/to/credentials.json"
             customer_id = "customer_id"
             namespace = "namespace"
-            compression = gzip
+            compression = "gzip"
             log_type = "log_type"
             encoding.codec = "text"
         "#})
@@ -488,6 +487,7 @@ impl ChronicleRequestBuilder {
     fn new(config: &ChronicleUnstructuredConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.config().build()?;
+        let compression = Compression::from(config.compression);
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
         let encoder = ChronicleEncoder {
             customer_id: config.customer_id.clone(),
@@ -502,7 +502,6 @@ impl ChronicleRequestBuilder {
             encoder,
             transformer,
         };
-        let compression = Compression::from(config.compression);
         Ok(Self {
             encoder,
             compression,
