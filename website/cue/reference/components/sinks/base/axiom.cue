@@ -2,14 +2,8 @@ package metadata
 
 base: components: sinks: axiom: configuration: {
 	acknowledgements: {
-		description: """
-			Controls how acknowledgements are handled for this sink.
-
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
-
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
-			"""
-		required: false
+		description: "Controls how acknowledgements are handled for this sink."
+		required:    false
 		type: object: options: enabled: {
 			description: """
 				Whether or not end-to-end acknowledgements are enabled.
@@ -27,15 +21,47 @@ base: components: sinks: axiom: configuration: {
 			type: bool: {}
 		}
 	}
+	batch: {
+		description: "The batch settings for the sink."
+		required:    false
+		type: object: options: {
+			max_bytes: {
+				description: """
+					The maximum size of a batch that is processed by a sink.
+
+					This is based on the uncompressed size of the batched events, before they are
+					serialized/compressed.
+					"""
+				required: false
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
+			}
+			max_events: {
+				description: "The maximum size of a batch before it is flushed."
+				required:    false
+				type: uint: unit: "events"
+			}
+			timeout_secs: {
+				description: "The maximum age of a batch before it is flushed."
+				required:    false
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
+			}
+		}
+	}
 	compression: {
 		description: """
-			Compression configuration.
+			The compression algorithm to use.
 
-			All compression algorithms use the default compression level unless otherwise specified.
+			Supported values: `none` ( not recommended ), `zstd` ( recommended, default ), `gzip`, `deflate`
 			"""
 		required: false
 		type: string: {
-			default: "none"
+			default: "zstd"
 			enum: {
 				gzip: """
 					[Gzip][gzip] compression.
@@ -64,7 +90,7 @@ base: components: sinks: axiom: configuration: {
 	dataset: {
 		description: "The Axiom dataset to write to."
 		required:    true
-		type: string: examples: ["${AXIOM_DATASET}", "vector.dev"]
+		type: string: examples: ["${AXIOM_DATASET}", "vector_rocks"]
 	}
 	org_id: {
 		description: """
@@ -271,8 +297,12 @@ base: components: sinks: axiom: configuration: {
 		}
 	}
 	tls: {
-		description: "TLS configuration."
-		required:    false
+		description: """
+			The TLS settings for the connection.
+
+			Optional, constrains TLS settings for this sink.
+			"""
+		required: false
 		type: object: options: {
 			alpn_protocols: {
 				description: """
