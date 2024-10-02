@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-types = { version = "0.12", default-features = false, features = ["std"] }
-bytes = { version = "1.7.1", default-features = false }
+bytes = { version = "1.7.2", default-features = false }
 snap = { version = "1.1.1", default-features = false }
 
 [dev-dependencies]

@@ -10,7 +10,7 @@ async-recursion = "1.1.1"
 async-stream = "0.3.5"
 async-trait = { version = "0.1", default-features = false }
 bytecheck = { version = "0.6.9", default-features = false, features = ["std"] }
-bytes = { version = "1.7.1", default-features = false }
+bytes = { version = "1.7.2", default-features = false }
 crc32fast = { version = "1.4.2", default-features = false }
 crossbeam-queue = { version = "0.3.11", default-features = false, features = ["std"] }
 crossbeam-utils = { version = "0.8.20", default-features = false }
