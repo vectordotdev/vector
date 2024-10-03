@@ -24,11 +24,11 @@ components: sinks: axiom: {
 				max_bytes:    1_048_576
 				timeout_secs: 1.0
 			}
-            compression: {
-			    enabled: true
+			compression: {
+				enabled: true
 				default: "zstd"
-                algorithms: ["zstd"]
-                 levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+				algorithms: ["zstd"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
 			encoding: {
 				enabled: true
