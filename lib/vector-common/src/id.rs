@@ -1,7 +1,8 @@
 use std::ops::Deref;
 
-pub use vector_lib::config::ComponentKey;
-use vector_lib::configurable::configurable_component;
+use vector_config::configurable_component;
+
+pub use crate::config::ComponentKey;
 
 /// A list of upstream [source][sources] or [transform][transforms] IDs.
 ///
@@ -22,6 +23,7 @@ pub struct Inputs<T: 'static>(Vec<T>);
 
 impl<T> Inputs<T> {
     /// Returns `true` if no inputs are present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -61,7 +63,7 @@ where
 
 impl<T> Extend<T> for Inputs<T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        self.0.extend(iter)
+        self.0.extend(iter);
     }
 }
 

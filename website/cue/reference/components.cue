@@ -1199,7 +1199,7 @@ components: {
 						}
 					}
 					type:              "counter"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_distribution: {
@@ -1212,7 +1212,7 @@ components: {
 						}
 					}
 					type:              "distribution"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_gauge: {
@@ -1225,7 +1225,7 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_histogram: {
@@ -1238,7 +1238,7 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_set: {
@@ -1251,7 +1251,7 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_summary: {
@@ -1264,7 +1264,7 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 			}
 		}

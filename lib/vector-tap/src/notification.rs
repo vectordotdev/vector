@@ -1,9 +1,11 @@
-use async_graphql::{Object, SimpleObject, Union};
+#[cfg(feature = "api")]
+use async_graphql::{SimpleObject, Union};
 
-#[derive(Debug, Clone, PartialEq, Eq, SimpleObject)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "api", derive(SimpleObject))]
 /// A component was found that matched the provided pattern
 pub struct Matched {
-    #[graphql(skip)]
+    #[cfg_attr(feature = "api", graphql(skip))]
     message: String,
     /// Pattern that raised the notification
     pub pattern: String,
@@ -18,10 +20,11 @@ impl Matched {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, SimpleObject)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "api", derive(SimpleObject))]
 /// There isn't currently a component that matches this pattern
 pub struct NotMatched {
-    #[graphql(skip)]
+    #[cfg_attr(feature = "api", graphql(skip))]
     message: String,
     /// Pattern that raised the notification
     pub pattern: String,
@@ -39,11 +42,12 @@ impl NotMatched {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, SimpleObject)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "api", derive(SimpleObject))]
 /// The pattern matched source(s) which cannot be tapped for inputs or sink(s)
 /// which cannot be tapped for outputs
 pub struct InvalidMatch {
-    #[graphql(skip)]
+    #[cfg_attr(feature = "api", graphql(skip))]
     message: String,
     /// Pattern that raised the notification
     pattern: String,
@@ -61,7 +65,8 @@ impl InvalidMatch {
     }
 }
 
-#[derive(Union, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "api", derive(Union))]
 /// A specific kind of notification with additional details
 pub enum Notification {
     Matched(Matched),
@@ -70,37 +75,11 @@ pub enum Notification {
 }
 
 impl Notification {
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             Notification::Matched(n) => n.message.as_ref(),
             Notification::NotMatched(n) => n.message.as_ref(),
             Notification::InvalidMatch(n) => n.message.as_ref(),
         }
-    }
-}
-
-/// This wrapper struct hoists `message` up from [`Notification`] for a more
-/// natural querying experience. While ideally [`Notification`] would be a
-/// GraphQL interface with a common `message` field, an interface cannot be
-/// directly nested into the union of [`super::OutputEventsPayload`].
-///
-/// The GraphQL specification forbids such a nesting:
-/// <http://spec.graphql.org/October2021/#sel-HAHdfFDABABkG3_I>
-#[derive(Debug, Clone)]
-pub struct EventNotification {
-    pub notification: Notification,
-}
-
-#[Object]
-/// A notification regarding events observation
-impl EventNotification {
-    /// Notification details
-    async fn notification(&self) -> &Notification {
-        &self.notification
-    }
-
-    /// The human-readable message associated with the notification
-    async fn message(&self) -> &str {
-        self.notification.as_str()
     }
 }

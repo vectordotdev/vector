@@ -1,7 +1,8 @@
 package metadata
 
-components: sinks: greptimedb: {
-	title: "GreptimeDB"
+components: sinks: greptimedb_metrics: {
+	title: "GreptimeDB Metrics"
+	alias: "greptimedb"
 
 	classes: {
 		commonly_used: true
@@ -20,7 +21,7 @@ components: sinks: greptimedb: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    10_000_000
+				max_events:   20
 				timeout_secs: 1.0
 			}
 			compression: enabled: false

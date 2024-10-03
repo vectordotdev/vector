@@ -17,7 +17,6 @@ amzn
 anchore
 androideabi
 andy
-anonymousip
 ansicpg
 anumber
 anycondition
@@ -569,6 +568,7 @@ jtype
 juchiast
 karppila
 kartar
+kebabcase
 kemmer
 kernelmode
 keybase
@@ -630,7 +630,6 @@ losslessly
 lpop
 lpush
 Luc
-luciofranco
 lucperkins
 lukesteensen
 macports
@@ -682,7 +681,6 @@ mlua
 mmdb
 Mmm
 moby
-mockwatchlogs
 modulesloaddir
 mooper
 moosh
@@ -781,7 +779,7 @@ nullishness
 numbackends
 oahd
 oap
-oidc
+OIDC
 OKD
 omfwd
 omitempty
@@ -819,6 +817,7 @@ paq
 parallelizable
 pareto
 partitionable
+pascalcase
 passthrough
 pathbuf
 pathgen
@@ -952,6 +951,7 @@ sccache
 schemaless
 schemars
 schoen
+screamingsnakecase
 sda
 sdata
 SDID
@@ -1158,6 +1158,7 @@ undertagline
 underutilized
 underutilizing
 unevictable
+unflatten
 unioning
 unitdir
 unmark
@@ -1206,7 +1207,6 @@ walkthrough
 waninfo
 wasmtime
 watchexec
-watchlogs
 wayfor
 webgraphviz
 webpki

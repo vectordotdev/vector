@@ -45,13 +45,16 @@ site_generation = 2
 
 # Search
 [params.search]
-algolia_app_id = "EOIG7V0A2O"
-# Note that it's okay to use this on the front end: https://www.algolia.com/doc/guides/security/api-keys/#search-only-api-key
-algolia_public_api_key = "5f712eef8e5dcf4ac4bbbd0099960626"
-
-algolia_index_prod = "vector_docs_prod"
-algolia_index_staging = "vector_docs_staging"
 algolia_autocomplete_theme = "classic"
+typesense_index = "vector_docs"
+
+# Note that it's okay to use this on the front end: https://typesense.com/docs/guide/security.html#public-api-key
+typesense_public_dev_apikey = "aTFLzhfCVeTj619Pxkhmz18798Nsau0Z"
+typesense_dev_host = "dnm1k9zrpctsvjowp"
+
+# Note that it's okay to use this on the front end: https://typesense.com/docs/guide/security.html#public-api-key
+typesense_public_prod_apikey = "BdepvpnczVgPL008lqhuBlkZo5s0rrWE"
+typesense_prod_host = "gk6e3zbyuntvc5dap"
 
 # VRL JSON server
 

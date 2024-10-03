@@ -9,9 +9,17 @@ use vector_lib::{
     metrics::AgentDDSketch,
 };
 
+pub(super) struct RequestBuilderOptions {
+    pub(super) use_new_naming: bool,
+}
+
 pub(super) const DISTRIBUTION_QUANTILES: [f64; 5] = [0.5, 0.75, 0.90, 0.95, 0.99];
 pub(super) const DISTRIBUTION_STAT_FIELD_COUNT: usize = 5;
 pub(super) const SUMMARY_STAT_FIELD_COUNT: usize = 2;
+pub(super) const LEGACY_TIME_INDEX_COLUMN_NAME: &str = "ts";
+pub(super) const TIME_INDEX_COLUMN_NAME: &str = "greptime_timestamp";
+pub(super) const LEGACY_VALUE_COLUMN_NAME: &str = "val";
+pub(super) const VALUE_COLUMN_NAME: &str = "greptime_value";
 
 fn encode_f64_value(
     name: &str,
@@ -23,7 +31,10 @@ fn encode_f64_value(
     columns.push(f64_value(value));
 }
 
-pub fn metric_to_insert_request(metric: Metric) -> RowInsertRequest {
+pub fn metric_to_insert_request(
+    metric: Metric,
+    options: &RequestBuilderOptions,
+) -> RowInsertRequest {
     let ns = metric.namespace();
     let metric_name = metric.name();
     let table_name = if let Some(ns) = ns {
@@ -39,7 +50,11 @@ pub fn metric_to_insert_request(metric: Metric) -> RowInsertRequest {
         .timestamp()
         .map(|t| t.timestamp_millis())
         .unwrap_or_else(|| Utc::now().timestamp_millis());
-    schema.push(ts_column("ts"));
+    schema.push(ts_column(if options.use_new_naming {
+        TIME_INDEX_COLUMN_NAME
+    } else {
+        LEGACY_TIME_INDEX_COLUMN_NAME
+    }));
     columns.push(timestamp_millisecond_value(timestamp));
 
     // tags
@@ -53,13 +68,40 @@ pub fn metric_to_insert_request(metric: Metric) -> RowInsertRequest {
     // fields
     match metric.value() {
         MetricValue::Counter { value } => {
-            encode_f64_value("val", *value, &mut schema, &mut columns);
+            encode_f64_value(
+                if options.use_new_naming {
+                    VALUE_COLUMN_NAME
+                } else {
+                    LEGACY_VALUE_COLUMN_NAME
+                },
+                *value,
+                &mut schema,
+                &mut columns,
+            );
         }
         MetricValue::Gauge { value } => {
-            encode_f64_value("val", *value, &mut schema, &mut columns);
+            encode_f64_value(
+                if options.use_new_naming {
+                    VALUE_COLUMN_NAME
+                } else {
+                    LEGACY_VALUE_COLUMN_NAME
+                },
+                *value,
+                &mut schema,
+                &mut columns,
+            );
         }
         MetricValue::Set { values } => {
-            encode_f64_value("val", values.len() as f64, &mut schema, &mut columns);
+            encode_f64_value(
+                if options.use_new_naming {
+                    VALUE_COLUMN_NAME
+                } else {
+                    LEGACY_VALUE_COLUMN_NAME
+                },
+                values.len() as f64,
+                &mut schema,
+                &mut columns,
+            );
         }
         MetricValue::Distribution { samples, .. } => {
             encode_distribution(samples, &mut schema, &mut columns);
@@ -230,7 +272,11 @@ mod tests {
         .with_tags(Some([("host".to_owned(), "my_host".to_owned())].into()))
         .with_timestamp(Some(Utc::now()));
 
-        let insert = metric_to_insert_request(metric);
+        let options = RequestBuilderOptions {
+            use_new_naming: false,
+        };
+
+        let insert = metric_to_insert_request(metric, &options);
 
         assert_eq!(insert.table_name, "ns_load1");
         let rows = insert.rows.expect("Empty insert request");
@@ -242,18 +288,60 @@ mod tests {
             .iter()
             .map(|c| c.column_name.as_ref())
             .collect::<Vec<&str>>();
-        assert!(column_names.contains(&"ts"));
+        assert!(column_names.contains(&LEGACY_TIME_INDEX_COLUMN_NAME));
         assert!(column_names.contains(&"host"));
-        assert!(column_names.contains(&"val"));
+        assert!(column_names.contains(&LEGACY_VALUE_COLUMN_NAME));
 
-        assert_eq!(get_column(&rows, "val"), 1.1);
+        assert_eq!(get_column(&rows, LEGACY_VALUE_COLUMN_NAME), 1.1);
 
         let metric2 = Metric::new(
             "load1",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.1 },
         );
-        let insert2 = metric_to_insert_request(metric2);
+        let insert2 = metric_to_insert_request(metric2, &options);
+        assert_eq!(insert2.table_name, "load1");
+    }
+
+    #[test]
+    fn test_metric_data_to_insert_request_new_naming() {
+        let metric = Metric::new(
+            "load1",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.1 },
+        )
+        .with_namespace(Some("ns"))
+        .with_tags(Some([("host".to_owned(), "my_host".to_owned())].into()))
+        .with_timestamp(Some(Utc::now()));
+
+        let options = RequestBuilderOptions {
+            use_new_naming: true,
+        };
+
+        let insert = metric_to_insert_request(metric, &options);
+
+        assert_eq!(insert.table_name, "ns_load1");
+        let rows = insert.rows.expect("Empty insert request");
+        assert_eq!(rows.rows.len(), 1);
+        assert_eq!(rows.rows[0].values.len(), 3);
+
+        let column_names = rows
+            .schema
+            .iter()
+            .map(|c| c.column_name.as_ref())
+            .collect::<Vec<&str>>();
+        assert!(column_names.contains(&TIME_INDEX_COLUMN_NAME));
+        assert!(column_names.contains(&"host"));
+        assert!(column_names.contains(&VALUE_COLUMN_NAME));
+
+        assert_eq!(get_column(&rows, VALUE_COLUMN_NAME), 1.1);
+
+        let metric2 = Metric::new(
+            "load1",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.1 },
+        );
+        let insert2 = metric_to_insert_request(metric2, &options);
         assert_eq!(insert2.table_name, "load1");
     }
 
@@ -264,11 +352,15 @@ mod tests {
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.1 },
         );
-        let insert = metric_to_insert_request(metric);
+        let options = RequestBuilderOptions {
+            use_new_naming: false,
+        };
+
+        let insert = metric_to_insert_request(metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(rows.rows[0].values.len(), 2);
 
-        assert_eq!(get_column(&rows, "val"), 1.1);
+        assert_eq!(get_column(&rows, LEGACY_VALUE_COLUMN_NAME), 1.1);
     }
 
     #[test]
@@ -280,11 +372,15 @@ mod tests {
                 values: ["foo".to_owned(), "bar".to_owned()].into_iter().collect(),
             },
         );
-        let insert = metric_to_insert_request(metric);
+        let options = RequestBuilderOptions {
+            use_new_naming: false,
+        };
+
+        let insert = metric_to_insert_request(metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(rows.rows[0].values.len(), 2);
 
-        assert_eq!(get_column(&rows, "val"), 2.0);
+        assert_eq!(get_column(&rows, LEGACY_VALUE_COLUMN_NAME), 2.0);
     }
 
     #[test]
@@ -297,7 +393,11 @@ mod tests {
                 statistic: StatisticKind::Histogram,
             },
         );
-        let insert = metric_to_insert_request(metric);
+        let options = RequestBuilderOptions {
+            use_new_naming: false,
+        };
+
+        let insert = metric_to_insert_request(metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(
             rows.rows[0].values.len(),
@@ -329,7 +429,11 @@ mod tests {
                 sum: 8.0,
             },
         );
-        let insert = metric_to_insert_request(metric);
+        let options = RequestBuilderOptions {
+            use_new_naming: false,
+        };
+
+        let insert = metric_to_insert_request(metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(
             rows.rows[0].values.len(),
@@ -356,8 +460,11 @@ mod tests {
                 sum: 12.0,
             },
         );
+        let options = RequestBuilderOptions {
+            use_new_naming: false,
+        };
 
-        let insert = metric_to_insert_request(metric);
+        let insert = metric_to_insert_request(metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(
             rows.rows[0].values.len(),
@@ -386,8 +493,11 @@ mod tests {
                 sketch: MetricSketch::AgentDDSketch(sketch),
             },
         );
+        let options = RequestBuilderOptions {
+            use_new_naming: false,
+        };
 
-        let insert = metric_to_insert_request(metric);
+        let insert = metric_to_insert_request(metric, &options);
         let rows = insert.rows.expect("Empty insert request");
         assert_eq!(
             rows.rows[0].values.len(),

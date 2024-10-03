@@ -487,7 +487,7 @@ base: components: sources: nats: configuration: {
 			[async_nats_subscription_capacity]: https://docs.rs/async-nats/latest/async_nats/struct.ConnectOptions.html#method.subscription_capacity
 			"""
 		required: false
-		type: uint: default: 4096
+		type: uint: default: 65536
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

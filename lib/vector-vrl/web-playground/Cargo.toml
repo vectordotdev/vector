@@ -17,6 +17,8 @@ gloo-utils = { version = "0.2", features = ["serde"] }
 getrandom = { version = "0.2", features = ["js"] }
 vector-vrl-functions = { path = "../functions" }
 enrichment = { path = "../../enrichment" }
+cargo-lock = "9.0.0"
 
 [build-dependencies]
-cargo_toml = "0.20.4"
+cargo_toml = "0.20.5"
+cargo-lock = "9.0.0"
