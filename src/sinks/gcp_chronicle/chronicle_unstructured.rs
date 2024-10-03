@@ -110,6 +110,7 @@ pub struct ChronicleUnstructuredTowerRequestConfigDefaults;
 impl TowerRequestConfigDefaults for ChronicleUnstructuredTowerRequestConfigDefaults {
     const RATE_LIMIT_NUM: u64 = 1_000;
 }
+
 /// Configuration for the `gcp_chronicle_unstructured` sink.
 #[configurable_component(sink(
     "gcp_chronicle_unstructured",
@@ -158,6 +159,7 @@ pub struct ChronicleUnstructuredConfig {
     pub encoding: EncodingConfig,
 
     #[serde(default)]
+    #[configurable(derived)]
     pub compression: ChronicleCompression,
 
     #[configurable(derived)]
