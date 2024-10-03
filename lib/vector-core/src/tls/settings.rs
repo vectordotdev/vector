@@ -20,8 +20,8 @@ use super::{
     AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, DerExportSnafu,
     EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu,
     NewStoreBuilderSnafu, ParsePkcs12Snafu, Pkcs12Snafu, PrivateKeyParseSnafu, Result,
-    SetAlpnProtocolsSnafu, SetCertificateSnafu, SetPrivateKeySnafu, SetSniSnafu,
-    SetVerifyCertSnafu, TlsError, TlsIdentitySnafu, X509ParseSnafu,
+    SetAlpnProtocolsSnafu, SetCertificateSnafu, SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError,
+    TlsIdentitySnafu, X509ParseSnafu,
 };
 
 pub const PEM_START_MARKER: &str = "-----BEGIN ";
@@ -343,12 +343,15 @@ impl TlsSettings {
         Ok(())
     }
 
-    pub fn apply_connect_configuration(&self, connection: &mut ConnectConfiguration) -> Result<()> {
+    pub fn apply_connect_configuration(
+        &self,
+        connection: &mut ConnectConfiguration,
+    ) -> std::result::Result<(), openssl::error::ErrorStack> {
         connection.set_verify_hostname(self.verify_hostname);
         if let Some(server_name) = &self.server_name {
             // Prevent native TLS lib from inferring default SNI using domain name from url.
             connection.set_use_server_name_indication(false);
-            connection.set_hostname(server_name).context(SetSniSnafu)?;
+            connection.set_hostname(server_name)?;
         }
         Ok(())
     }

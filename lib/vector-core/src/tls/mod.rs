@@ -191,7 +191,9 @@ fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
         .context(TlsBuildConnectorSnafu)?;
     let tls_setting = settings.tls().cloned();
     if let Some(tls_setting) = &tls_setting {
-        tls_setting.apply_connect_configuration(&mut configure)?;
+        tls_setting
+            .apply_connect_configuration(&mut configure)
+            .context(SetSniSnafu)?;
     }
     Ok(configure)
 }
