@@ -21,7 +21,7 @@ jobs:
       # Run `git checkout`
       - uses: actions/checkout@v3
       # Install the `buf` CLI
-      - uses: bufbuild/buf-setup-action@v1.43.0
+      - uses: bufbuild/buf-setup-action@v1.44.0
       # Perform breaking change detection against the `master` branch
       - uses: bufbuild/buf-breaking-action@v1.1.4
         with:
