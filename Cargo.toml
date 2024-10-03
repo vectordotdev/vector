@@ -169,7 +169,7 @@ vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
-async-stream = { version = "0.3.5", default-features = false }
+async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.83", default-features = false }
 futures.workspace = true
 tokio = { version = "1.40.0", default-features = false, features = ["full"] }
