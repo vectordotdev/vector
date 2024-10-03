@@ -209,8 +209,16 @@ impl GcpAuthenticator {
                         Ok(()) => {
                             sender.send_replace(());
                             let expires_in = inner.token.read().unwrap().expires_in() as u64;
-                            deadline =
-                                Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
+                            // Rather than an expected fresh token, the Metadata Server may return
+                            // the same (cached) token during the last 300 seconds of its lifetime.
+                            // This scenario is handled by retrying the token refresh after the
+                            // METADATA_TOKEN_ERROR_RETRY_SECS period when a fresh token is expected
+                            if !(expires_in > METADATA_TOKEN_EXPIRY_MARGIN_SECS) {
+                                deadline = Duration::from_secs(METADATA_TOKEN_ERROR_RETRY_SECS);
+                            } else {
+                                deadline =
+                                    Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
+                            }
                         }
                         Err(error) => {
                             error!(
@@ -314,8 +322,8 @@ mod tests {
                 api_key = "testing"
             "#,
         )
-        .await
-        .expect("build_auth failed");
+            .await
+            .expect("build_auth failed");
         assert!(matches!(auth, GcpAuthenticator::None));
     }
 
