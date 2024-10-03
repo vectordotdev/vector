@@ -1,9 +1,10 @@
-use cargo_lock::Lockfile;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs, io};
+
+use cargo_lock::{package::SourceKind, Lockfile};
 
 fn get_vector_lock_path() -> PathBuf {
     let path = fs::canonicalize(env::var("CARGO_MANIFEST_DIR").unwrap()).unwrap();
@@ -52,18 +53,30 @@ fn write_vrl_constants(lockfile: &Lockfile, output_file: &mut File) {
         .packages
         .iter()
         .find(|&package| package.name.as_str() == "vrl")
-        .expect("missing VRL dependency")
-        .source
-        .clone()
-        .expect("missing VRL source id");
+        .expect("missing VRL dependency");
 
-    let version = &vrl_dep
-        .git_reference()
-        .expect("expecting VRL to be installed from git")
-        .pretty_ref()
-        .unwrap()
-        .to_string();
-    let link = vrl_dep.url().to_string();
+    let vrl_source = vrl_dep.source.clone().expect("missing VRL source id");
+
+    let version = match vrl_source.kind() {
+        SourceKind::Git(_) => vrl_source
+            .precise()
+            .expect("git reference should have precise")
+            .to_string(),
+        SourceKind::Path
+        | SourceKind::Registry
+        | SourceKind::SparseRegistry
+        | SourceKind::LocalRegistry
+        | SourceKind::Directory => vrl_dep.version.to_string(),
+        _ => String::from("unknown source kind"),
+    };
+    println!("cargo:warning={:?}", version);
+
+    //.git_reference()
+    //.expect("expecting VRL to be installed from git")
+    //.pretty_ref()
+    //.unwrap()
+    //.to_string();
+    let link = vrl_source.url().to_string();
     //{
     //None => {
     //let repo = vrl_dep
