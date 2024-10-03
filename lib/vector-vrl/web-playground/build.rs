@@ -57,40 +57,31 @@ fn write_vrl_constants(lockfile: &Lockfile, output_file: &mut File) {
 
     let vrl_source = vrl_dep.source.clone().expect("missing VRL source id");
 
-    let version = match vrl_source.kind() {
-        SourceKind::Git(_) => vrl_source
-            .precise()
-            .expect("git reference should have precise")
-            .to_string(),
+    let (version, link) = match vrl_source.kind() {
+        SourceKind::Git(_) => {
+            let precise = vrl_source
+                .precise()
+                .expect("git reference should have precise")
+                .to_string();
+            (
+                precise.clone(),
+                format!("{}/tree/{precise}", vrl_source.url()),
+            )
+        }
+        SourceKind::Registry if vrl_source.is_default_registry() => {
+            let version = vrl_dep.version.to_string();
+            (
+                version.to_string(),
+                format!("https://crates.io/crates/vrl/{version}"),
+            )
+        }
         SourceKind::Path
         | SourceKind::Registry
         | SourceKind::SparseRegistry
         | SourceKind::LocalRegistry
-        | SourceKind::Directory => vrl_dep.version.to_string(),
-        _ => String::from("unknown source kind"),
+        | SourceKind::Directory => unimplemented!("unhandled source kind: {:?}", vrl_source.kind()),
+        _ => unimplemented!("unknown source kind: {:?}", vrl_source.kind()),
     };
-    println!("cargo:warning={:?}", version);
-
-    //.git_reference()
-    //.expect("expecting VRL to be installed from git")
-    //.pretty_ref()
-    //.unwrap()
-    //.to_string();
-    let link = vrl_source.url().to_string();
-    //{
-    //None => {
-    //let repo = vrl_dep
-    //.git
-    //.as_ref()
-    //.expect("VRL dependency should use 'version' or 'git'");
-    //let version = vrl_dep
-    //.rev
-    //.as_ref()
-    //.expect("VRL git revision not specified");
-    //(version.clone(), format!("{repo}/tree/{version}"))
-    //}
-    //Some(v) => (v.clone(), format!("https://crates.io/crates/vrl/{v}")),
-    //};
 
     output_file
         .write_all(create_const_statement("VRL_VERSION", &version).as_bytes())
