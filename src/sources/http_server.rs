@@ -361,7 +361,7 @@ impl SourceConfig for SimpleHttpConfig {
 
         let source = SimpleHttpSource {
             headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"))?,
-            query_parameters: remove_duplicates(self.query_parameters.clone(), "query_parameters"),
+            query_parameters: build_param_matcher(&remove_duplicates(self.query_parameters.clone(), "query_parameters"))?,
             path_key: self.path_key.clone(),
             host_key: self.host_key.clone(),
             decoder,
@@ -409,7 +409,7 @@ impl SourceConfig for SimpleHttpConfig {
 #[derive(Clone)]
 struct SimpleHttpSource {
     headers: Vec<HttpConfigParamKind>,
-    query_parameters: Vec<String>,
+    query_parameters: Vec<HttpConfigParamKind>,
     path_key: OptionalValuePath,
     host_key: OptionalValuePath,
     decoder: Decoder,

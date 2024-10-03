@@ -33,9 +33,12 @@ use crate::{
     http::KeepaliveConfig,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::util::{
-        http::{add_query_parameters, HttpMethod},
-        ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    sources::{
+        util::{
+            http::{add_query_parameters, HttpMethod},
+            ErrorMessage, HttpSource, HttpSourceAuthConfig,
+        },
+        http_server::{build_param_matcher, remove_duplicates, HttpConfigParamKind}
     },
     tls::TlsEnableableConfig,
 };
@@ -180,7 +183,7 @@ impl SourceConfig for LogplexConfig {
                 .build()?;
 
         let source = LogplexSource {
-            query_parameters: self.query_parameters.clone(),
+            query_parameters: build_param_matcher(&remove_duplicates(self.query_parameters.clone(), "query_parameters"))?,
             decoder,
             log_namespace,
         };
@@ -220,7 +223,7 @@ impl SourceConfig for LogplexConfig {
 
 #[derive(Clone, Default)]
 struct LogplexSource {
-    query_parameters: Vec<String>,
+    query_parameters: Vec<HttpConfigParamKind>,
     decoder: Decoder,
     log_namespace: LogNamespace,
 }

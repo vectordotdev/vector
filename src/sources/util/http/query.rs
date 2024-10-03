@@ -6,20 +6,16 @@ use vector_lib::{
     event::Event,
 };
 
-use crate::sources::http_server::{build_param_matcher, remove_duplicates, HttpConfigParamKind};
+use crate::sources::http_server::HttpConfigParamKind;
 
 pub fn add_query_parameters(
     events: &mut [Event],
-    query_parameters_config: &[String],
+    query_parameters_config: &[HttpConfigParamKind],
     query_parameters: &HashMap<String, String>,
     log_namespace: LogNamespace,
     source_name: &'static str,
 ) {
-    let query_parameters_config = build_param_matcher(&remove_duplicates(
-        query_parameters_config.to_vec(),
-        "query_parameters",
-    ));
-    for qp in &query_parameters_config.unwrap() {
+    for qp in query_parameters_config {
         match qp {
             // Add each non-wildcard containing query_parameter that was specified
             // in the `query_parameters` config option to the event if an exact match
@@ -69,13 +65,16 @@ pub fn add_query_parameters(
 #[cfg(test)]
 mod tests {
     use crate::event::LogEvent;
-    use crate::sources::util::add_query_parameters;
+    use crate::sources::{
+        util::add_query_parameters,
+        http_server::HttpConfigParamKind
+    };
     use vector_lib::config::LogNamespace;
     use vrl::{path, value};
 
     #[test]
     fn multiple_query_params() {
-        let query_params_names = ["param1".into(), "param2".into()];
+        let query_params_names = [HttpConfigParamKind::Exact("param1".into()), HttpConfigParamKind::Exact("param2".into())];
         let query_params = [
             ("param1".into(), "value1".into()),
             ("param2".into(), "value2".into()),
@@ -111,7 +110,7 @@ mod tests {
     }
     #[test]
     fn multiple_query_params_wildcard() {
-        let query_params_names = ["*".into()];
+        let query_params_names = [HttpConfigParamKind::Glob(glob::Pattern::new("*").unwrap())];
         let query_params = [
             ("param1".into(), "value1".into()),
             ("param2".into(), "value2".into()),
