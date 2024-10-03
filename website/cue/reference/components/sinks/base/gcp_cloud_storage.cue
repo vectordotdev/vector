@@ -443,7 +443,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 	}
 	endpoint: {
 		description: "API endpoint for Google Cloud Storage"
-		required: false
+		required:    false
 		type: string: {
 			default: "https://storage.googleapis.com"
 			examples: ["http://localhost:9000"]
