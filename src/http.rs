@@ -1,11 +1,4 @@
 #![allow(missing_docs)]
-use std::{
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
-};
-
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
@@ -22,6 +15,12 @@ use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
+use std::{
+    fmt,
+    net::SocketAddr,
+    task::{Context, Poll},
+    time::Duration,
+};
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -205,10 +204,10 @@ pub fn build_tls_connector(
     let settings = tls_settings.tls().cloned();
     https.set_callback(move |c, _uri| {
         if let Some(settings) = &settings {
-            settings.apply_connect_configuration(c);
+            settings.apply_connect_configuration(c)
+        } else {
+            Ok(())
         }
-
-        Ok(())
     });
     Ok(https)
 }
