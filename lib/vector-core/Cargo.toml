@@ -9,7 +9,7 @@ publish = false
 async-graphql = { version = "7.0.7", default-features = false, features = ["playground" ], optional = true }
 async-trait = { version = "0.1", default-features = false }
 bitmask-enum = { version = "2.2.4", default-features = false }
-bytes = { version = "1.7.1", default-features = false, features = ["serde"] }
+bytes = { version = "1.7.2", default-features = false, features = ["serde"] }
 chrono.workspace = true
 chrono-tz.workspace = true
 crossbeam-utils = { version = "0.8.20", default-features = false }
