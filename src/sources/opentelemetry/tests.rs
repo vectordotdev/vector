@@ -9,7 +9,7 @@ use vector_lib::config::LogNamespace;
 use vector_lib::lookup::path;
 use vector_lib::opentelemetry::proto::{
     collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-    common::v1::{any_value, AnyValue, KeyValue},
+    common::v1::{any_value, AnyValue, KeyValue, InstrumentationScope},
     logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     resource::v1::Resource as OtelResource,
 };
@@ -81,7 +81,17 @@ async fn receive_grpc_logs_vector_namespace() {
                     dropped_attributes_count: 0,
                 }),
                 scope_logs: vec![ScopeLogs {
-                    scope: None,
+                    scope: Some(InstrumentationScope {
+                        name: "some.scope.name".into(),
+                        version: "1.2.3".into(),
+                        attributes: vec![KeyValue {
+                            key: "scope_attr".into(),
+                            value: Some(AnyValue {
+                                value: Some(any_value::Value::StringValue("scope_val".into())),
+                            }),
+                        }],
+                        dropped_attributes_count: 7,
+                    }),
                     log_records: vec![LogRecord {
                         time_unix_nano: 1,
                         observed_time_unix_nano: 2,
@@ -132,6 +142,22 @@ async fn receive_grpc_logs_vector_namespace() {
         assert_eq!(
             meta.get(path!("opentelemetry", "attributes")).unwrap(),
             &value!({attr_key: "attr_val"})
+        );
+        assert_eq!(
+            meta.get(path!("opentelemetry", "scope", "name")).unwrap(),
+            &value!("some.scope.name")
+        );
+        assert_eq!(
+            meta.get(path!("opentelemetry", "scope", "version")).unwrap(),
+            &value!("1.2.3")
+        );
+        assert_eq!(
+            meta.get(path!("opentelemetry", "scope", "attributes")).unwrap(),
+            &value!({scope_attr: "scope_val"})
+        );
+        assert_eq!(
+            meta.get(path!("opentelemetry", "scope", "dropped_attributes_count")).unwrap(),
+            &value!(7)
         );
         assert_eq!(
             meta.get(path!("opentelemetry", "trace_id")).unwrap(),
@@ -219,7 +245,17 @@ async fn receive_grpc_logs_legacy_namespace() {
                     dropped_attributes_count: 0,
                 }),
                 scope_logs: vec![ScopeLogs {
-                    scope: None,
+                    scope: Some(InstrumentationScope {
+                        name: "some.scope.name".into(),
+                        version: "1.2.3".into(),
+                        attributes: vec![KeyValue {
+                            key: "scope_attr".into(),
+                            value: Some(AnyValue {
+                                value: Some(any_value::Value::StringValue("scope_val".into())),
+                            }),
+                        }],
+                        dropped_attributes_count: 7,
+                    }),
                     log_records: vec![LogRecord {
                         time_unix_nano: 1,
                         observed_time_unix_nano: 2,
@@ -261,6 +297,18 @@ async fn receive_grpc_logs_legacy_namespace() {
             (
                 "resources",
                 Value::Object(vec_into_btmap(vec![("res_key", "res_val".into())])),
+            ),
+            (
+                "scope",
+                Value::Object(vec_into_btmap(vec![
+                    ("name", "some.scope.name".into()),
+                    ("version", "1.2.3".into()),
+                    (
+                        "attributes",
+                        Value::Object(vec_into_btmap(vec![("scope_attr", "scope_val".into())])),
+                    ),
+                    ("dropped_attributes_count", 7.into()),
+                ])),
             ),
             ("message", "log body".into()),
             ("trace_id", "4ac52aadf321c2e531db005df08792f5".into()),

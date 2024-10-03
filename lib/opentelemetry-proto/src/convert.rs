@@ -14,7 +14,7 @@ use vrl::{
 };
 
 use super::proto::{
-    common::v1::{any_value::Value as PBValue, KeyValue},
+    common::v1::{any_value::Value as PBValue, KeyValue, InstrumentationScope},
     logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
     resource::v1::Resource,
     trace::v1::{
@@ -27,6 +27,9 @@ const SOURCE_NAME: &str = "opentelemetry";
 
 pub const RESOURCE_KEY: &str = "resources";
 pub const ATTRIBUTES_KEY: &str = "attributes";
+pub const SCOPE_KEY: &str = "scope";
+pub const NAME_KEY: &str = "name";
+pub const VERSION_KEY: &str = "version";
 pub const TRACE_ID_KEY: &str = "trace_id";
 pub const SPAN_ID_KEY: &str = "span_id";
 pub const SEVERITY_TEXT_KEY: &str = "severity_text";
@@ -37,18 +40,21 @@ pub const FLAGS_KEY: &str = "flags";
 
 impl ResourceLogs {
     pub fn into_event_iter(self, log_namespace: LogNamespace) -> impl Iterator<Item = Event> {
-        let resource = self.resource;
         let now = Utc::now();
 
         self.scope_logs
             .into_iter()
-            .flat_map(|scope_log| scope_log.log_records)
-            .map(move |log_record| {
-                ResourceLog {
-                    resource: resource.clone(),
-                    log_record,
-                }
-                .into_event(log_namespace, now)
+            .flat_map(move |scope_log| {
+                let scope = scope_log.scope;
+                let resource = self.resource.clone();
+                scope_log.log_records.into_iter().map(move |log_record| {
+                    ResourceLog {
+                        resource: resource.clone(),
+                        scope: scope.clone(),
+                        log_record,
+                    }
+                    .into_event(log_namespace, now)
+                })
             })
     }
 }
@@ -92,6 +98,7 @@ impl From<PBValue> for Value {
 
 struct ResourceLog {
     resource: Option<Resource>,
+    scope: Option<InstrumentationScope>,
     log_record: LogRecord,
 }
 
@@ -211,6 +218,46 @@ impl ResourceLog {
                 log
             }
         };
+
+        // Insert instrumentation scope (scope name, version, and attributes)
+        if let Some(scope) = self.scope {
+            if !scope.name.is_empty() {
+                log_namespace.insert_source_metadata(
+                    SOURCE_NAME,
+                    &mut log,
+                    Some(LegacyKey::Overwrite(path!(SCOPE_KEY, NAME_KEY))),
+                    path!(SCOPE_KEY, NAME_KEY),
+                    scope.name,
+                );
+            }
+            if !scope.version.is_empty() {
+                log_namespace.insert_source_metadata(
+                    SOURCE_NAME,
+                    &mut log,
+                    Some(LegacyKey::Overwrite(path!(SCOPE_KEY, VERSION_KEY))),
+                    path!(SCOPE_KEY, VERSION_KEY),
+                    scope.version,
+                );
+            }
+            if !scope.attributes.is_empty() {
+                log_namespace.insert_source_metadata(
+                    SOURCE_NAME,
+                    &mut log,
+                    Some(LegacyKey::Overwrite(path!(SCOPE_KEY, ATTRIBUTES_KEY))),
+                    path!(SCOPE_KEY, ATTRIBUTES_KEY),
+                    kv_list_into_value(scope.attributes),
+                );
+            }
+            if scope.dropped_attributes_count > 0 {
+                log_namespace.insert_source_metadata(
+                    SOURCE_NAME,
+                    &mut log,
+                    Some(LegacyKey::Overwrite(path!(SCOPE_KEY, DROPPED_ATTRIBUTES_COUNT_KEY))),
+                    path!(SCOPE_KEY, DROPPED_ATTRIBUTES_COUNT_KEY),
+                    scope.dropped_attributes_count,
+                );
+            }
+        }
 
         // Optional fields
         if let Some(resource) = self.resource {

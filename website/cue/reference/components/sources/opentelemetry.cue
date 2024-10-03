@@ -112,6 +112,47 @@ components: sources: opentelemetry: {
 						]
 					}
 				}
+				"scope.name": {
+					description: "Instrumentation scope name (often logger name)."
+					required:   false
+					common:     true
+					type: string: {
+						default: null
+						examples: ["some.module.name"]
+					}
+				}
+				"scope.version": {
+					description: "Instrumentation scope version."
+					required:	false
+					common:     false
+					type: string: {
+						default: null
+						examples: ["1.2.3"]
+					}
+				}
+				"scope.attributes": {
+					description: "Set of attributes that belong to the instrumentation scope."
+					required:	false
+					common:     false
+					type: object: {
+						default: null
+						examples: [
+							{
+								"attr1":	"value1"
+								"attr2":	"value2"
+								"attr3":	"value3"
+							},
+						]
+					}
+				}
+				"scope.dropped_attributes_count": {
+					description: "Number of attributes dropped from the instrumentation scope (if not zero)."
+					required:	false
+					common:     false
+					type: uint: {
+						unit: null
+					}
+				}
 				message: {
 					description: "Contains the body of the log record."
 					required:    false
