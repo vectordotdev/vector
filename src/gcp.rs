@@ -322,8 +322,8 @@ mod tests {
                 api_key = "testing"
             "#,
         )
-            .await
-            .expect("build_auth failed");
+        .await
+        .expect("build_auth failed");
         assert!(matches!(auth, GcpAuthenticator::None));
     }
 
