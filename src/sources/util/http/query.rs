@@ -65,16 +65,17 @@ pub fn add_query_parameters(
 #[cfg(test)]
 mod tests {
     use crate::event::LogEvent;
-    use crate::sources::{
-        util::add_query_parameters,
-        http_server::HttpConfigParamKind
-    };
+    use crate::sources::{http_server::HttpConfigParamKind, util::add_query_parameters};
+
     use vector_lib::config::LogNamespace;
     use vrl::{path, value};
 
     #[test]
     fn multiple_query_params() {
-        let query_params_names = [HttpConfigParamKind::Exact("param1".into()), HttpConfigParamKind::Exact("param2".into())];
+        let query_params_names = [
+            HttpConfigParamKind::Exact("param1".into()),
+            HttpConfigParamKind::Exact("param2".into()),
+        ];
         let query_params = [
             ("param1".into(), "value1".into()),
             ("param2".into(), "value2".into()),

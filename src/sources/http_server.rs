@@ -361,7 +361,10 @@ impl SourceConfig for SimpleHttpConfig {
 
         let source = SimpleHttpSource {
             headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"))?,
-            query_parameters: build_param_matcher(&remove_duplicates(self.query_parameters.clone(), "query_parameters"))?,
+            query_parameters: build_param_matcher(&remove_duplicates(
+                self.query_parameters.clone(),
+                "query_parameters",
+            ))?,
             path_key: self.path_key.clone(),
             host_key: self.host_key.clone(),
             decoder,
