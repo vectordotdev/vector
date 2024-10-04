@@ -213,13 +213,12 @@ impl GcpAuthenticator {
                             // the same (cached) token during the last 300 seconds of its lifetime.
                             // This scenario is handled by retrying the token refresh after the
                             // METADATA_TOKEN_ERROR_RETRY_SECS period when a fresh token is expected
-                            if !(expires_in > METADATA_TOKEN_EXPIRY_MARGIN_SECS) {
-                                deadline = Duration::from_secs(METADATA_TOKEN_ERROR_RETRY_SECS);
+                            let new_deadline = if expires_in <= METADATA_TOKEN_EXPIRY_MARGIN_SECS {
+                                METADATA_TOKEN_ERROR_RETRY_SECS
                             } else {
-                                deadline =
-                                    Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
-                            }
-                        }
+                                expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS
+                            };
+                            deadline = Duration::from_secs(new_deadline);                        }
                         Err(error) => {
                             error!(
                                 message = "Failed to update GCP authentication token.",
