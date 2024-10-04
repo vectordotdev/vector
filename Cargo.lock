@@ -2026,19 +2026,6 @@ checksum = "8d18b093eba54c9aaa1e3784d4361eb2ba944cf7d0a932a830132238f483e8d8"
 
 [[package]]
 name = "cidr-utils"
-version = "0.5.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2315f7119b7146d6a883de6acd63ddf96071b5f79d9d98d2adaa84d749f6abf1"
-dependencies = [
- "debug-helper",
- "num-bigint",
- "num-traits",
- "once_cell",
- "regex",
-]
-
-[[package]]
-name = "cidr-utils"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25c0a9fb70c2c2cc2a520aa259b1d1345650046a07df1b6da1d3cefcd327f43e"
@@ -2816,12 +2803,6 @@ name = "deadpool-runtime"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63dfa964fe2a66f3fde91fc70b267fe193d822c7e603e2a675a49a7f46ad3f49"
-
-[[package]]
-name = "debug-helper"
-version = "0.3.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f578e8e2c440e7297e008bb5486a3a8a194775224bbc23729b0dbdfaeebf162e"
 
 [[package]]
 name = "der"
@@ -5855,11 +5836,11 @@ dependencies = [
 
 [[package]]
 name = "no-proxy"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b41e7479dc3678ea792431e04bafd62a31879035f4a5fa707602df062f58c77"
+checksum = "6d688d11967f7f52e273fb8f8f07ecb094254fed630e22a0cab60cc98047a5db"
 dependencies = [
- "cidr-utils 0.5.11",
+ "cidr-utils",
  "serde",
 ]
 
@@ -10400,7 +10381,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "chrono-tz",
- "cidr-utils 0.6.1",
+ "cidr-utils",
  "clap",
  "colored",
  "console-subscriber",
@@ -10944,7 +10925,7 @@ dependencies = [
  "charset",
  "chrono",
  "chrono-tz",
- "cidr-utils 0.6.1",
+ "cidr-utils",
  "clap",
  "codespan-reporting",
  "community-id",
