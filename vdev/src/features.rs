@@ -22,6 +22,7 @@ macro_rules! mapping {
 
 static SOURCE_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     mapping!(
+        prometheus_pushgateway => prometheus,
         prometheus_scrape => prometheus,
         prometheus_remote_write => prometheus,
     )
@@ -46,7 +47,6 @@ static SINK_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|
 #[derive(Deserialize)]
 pub struct VectorConfig {
     api: Option<Value>,
-    enterprise: Option<Value>,
 
     #[serde(default)]
     sources: ComponentMap,
@@ -84,7 +84,6 @@ pub fn load_and_extract(filename: &Path) -> Result<Vec<String>> {
 pub fn from_config(config: VectorConfig) -> Vec<String> {
     let mut features = FeatureSet::default();
     add_option(&mut features, "api", &config.api);
-    add_option(&mut features, "enterprise", &config.enterprise);
 
     get_features(
         &mut features,

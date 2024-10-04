@@ -49,8 +49,6 @@ enum TcpError {
     DnsError { source: dns::DnsError },
     #[snafu(display("No addresses returned."))]
     NoAddresses,
-    #[snafu(display("Send error: {}", source))]
-    SendError { source: tokio::io::Error },
 }
 
 /// A TCP sink.

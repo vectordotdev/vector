@@ -13,7 +13,7 @@ sources:
   logs:
     type: "file"
     include: [ "/var/log/*.log" ]
-    ignore_older: 86400 # 1 day
+    ignore_older_secs: 86400 # 1 day
 
 # Parse the data as JSON
 # Docs: https://vector.dev/docs/reference/transforms/remap

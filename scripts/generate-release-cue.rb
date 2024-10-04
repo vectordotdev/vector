@@ -26,6 +26,7 @@ require_relative "util/version"
 
 ROOT = ".."
 RELEASE_REFERENCE_DIR = File.join(ROOT, "website", "cue", "reference", "releases")
+CHANGELOG_DIR = File.join(ROOT, "changelog.d")
 TYPES = ["chore", "docs", "feat", "fix", "enhancement", "perf"]
 TYPES_THAT_REQUIRE_SCOPES = ["feat", "enhancement", "fix"]
 
@@ -109,6 +110,107 @@ def create_log_file!(current_commits, new_version)
   release_log_path
 end
 
+def retire_changelog_entries!()
+
+  Dir.glob("#{CHANGELOG_DIR}/*.md") do |fname|
+    if File.basename(fname) == "README.md"
+      next
+    end
+    system('git', 'rm', fname)
+  end
+end
+
+def generate_changelog!(new_version)
+
+  entries = ""
+
+  Dir.glob("#{CHANGELOG_DIR}/*.md") do |fname|
+
+    if File.basename(fname) == "README.md"
+      next
+    end
+
+    if entries != ""
+      entries += ",\n"
+    end
+
+    fragment_contents = File.open(fname)
+
+    # add the GitHub username for any fragments
+    # that have an authors field at the end of the
+    # fragment. This is generally used for external
+    # contributor PRs.
+    lines = fragment_contents.to_a
+    last = lines.last
+    contributors = Array.new
+
+    if last.start_with?("authors: ")
+      contributors = last[9..].split(" ").map(&:strip)
+
+      # remove that line from the description
+      lines.pop()
+    end
+
+    description = lines.join("").strip()
+
+    # get the PR number of the changelog fragment.
+    # the fragment type is not used in the Vector release currently.
+    basename = File.basename(fname, ".md")
+    parts = basename.split(".")
+
+    if parts.length() != 2
+       Util::Printer.error!("Changelog fragment #{fname} is invalid (exactly two period delimiters required).")
+    end
+
+    fragment_type = parts[1]
+
+    # map the fragment type to Vector's semantic types
+    # https://github.com/vectordotdev/vector/blob/master/.github/semantic.yml#L13
+    # the type "chore" isn't rendered in the changelog on the website currently,
+    # but we are mapping "breaking" and "deprecations" to that type, and both of
+    # these are handled in the upgrade guide separately.
+
+    # NOTE: If the fragment types are altered, update both the 'changelog.d/README.md' and
+    #       'scripts/check_changelog_fragments.sh' accordingly.
+    type = ""
+    if fragment_type == "breaking"
+      type = "chore"
+    elsif fragment_type == "security" or fragment_type == "fix"
+      type = "fix"
+    elsif fragment_type == "deprecation"
+      type = "chore"
+    elsif fragment_type == "feature"
+      type = "feat"
+    elsif fragment_type == "enhancement"
+      type = "enhancement"
+    else
+       Util::Printer.error!("Changelog fragment #{fname} is invalid. Fragment type #{fragment_type} unrecognized.")
+    end
+
+    # Note: `pr_numbers`, `scopes` and `breaking` are being omitted from the entries.
+    #       These are currently not required for rendering in the website.
+    entry = "{\n" +
+      "type: #{type.to_json}\n" +
+      "description: \"\"\"\n" +
+      "#{description}\n" +
+      "\"\"\"\n"
+
+    if contributors.length() > 0
+      entry += "contributors: #{contributors.to_json}\n"
+    end
+
+    entry += "}"
+
+    entries += entry
+  end
+
+  if entries != ""
+    retire_changelog_entries!()
+  end
+
+  entries
+end
+
 def create_release_file!(new_version)
   release_log_path = "#{RELEASE_REFERENCE_DIR}/#{new_version}.log"
   git_log = Vector::GitLogCommit.from_file!(release_log_path)
@@ -119,6 +221,8 @@ def create_release_file!(new_version)
   if commits.any?
     commits.each(&:validate!)
     cue_commits = commits.collect(&:to_cue_struct).join(",\n    ")
+
+    changelog_entries = generate_changelog!(new_version)
 
     if File.exists?(release_reference_path)
       words =
@@ -149,6 +253,10 @@ def create_release_file!(new_version)
             codename: ""
 
             whats_next: []
+
+            changelog: [
+          #{changelog_entries}
+            ]
 
             commits: [
           #{cue_commits}

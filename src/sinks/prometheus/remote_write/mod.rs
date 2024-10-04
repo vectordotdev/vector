@@ -1,11 +1,10 @@
-//! The Prometheus Remote Write [`vector_core::sink::VectorSink`].
-//! Contains the [`vector_core::sink::VectorSink`] instance that is responsible
-//! for taking a stream of [`vector_core::event::Event`] and forwarding
+//! The Prometheus Remote Write sink.
+//! Contains the [`VectorSink`] instance that is responsible
+//! for taking a stream of [`Event`] and forwarding
 //! them to a server via the [Prometheus Remote Write protocol][remote_write].
 //!
 //! [remote_write]: https://prometheus.io/docs/concepts/remote_write_spec/
 
-use snafu::prelude::*;
 use vector_lib::event::Metric;
 
 use crate::sinks::{
@@ -24,11 +23,12 @@ mod tests;
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests;
 
+#[cfg(all(test, feature = "sources-prometheus-remote-write"))]
 pub use config::RemoteWriteConfig;
 
-#[derive(Debug, Snafu)]
+#[cfg(feature = "aws-core")]
+#[derive(Debug, snafu::Snafu)]
 enum Errors {
-    #[cfg(feature = "aws-core")]
     #[snafu(display("aws.region required when AWS authentication is in use"))]
     AwsRegionRequired,
 }

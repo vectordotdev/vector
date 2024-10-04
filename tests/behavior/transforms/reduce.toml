@@ -88,18 +88,18 @@
 
 ##------------------------------------------------------------------------------
 
-[transforms.reduce_strats]
+[transforms.reduce_strategies]
   inputs = []
   type = "reduce"
   group_by = [ "request_id" ]
 
-  [transforms.reduce_strats.merge_strategies]
+  [transforms.reduce_strategies.merge_strategies]
     "message" = "concat"
     "other_value" = "array"
     "another" = "concat_newline"
     "concat_array" = "concat"
 
-  [transforms.reduce_strats.ends_when]
+  [transforms.reduce_strategies.ends_when]
     type = "vrl"
     source = 'exists(.test_end_message)'
 
@@ -107,7 +107,7 @@
   name = "reduce_merge_strategies"
 
   [[tests.inputs]]
-    insert_at = "reduce_strats"
+    insert_at = "reduce_strategies"
     type = "log"
     [tests.inputs.log_fields]
       message = "first message value"
@@ -118,7 +118,7 @@
       counter = 5
 
   [[tests.inputs]]
-    insert_at = "reduce_strats"
+    insert_at = "reduce_strategies"
     type = "log"
     [tests.inputs.log_fields]
       message = "second message value"
@@ -129,7 +129,7 @@
       counter = 7
 
   [[tests.inputs]]
-    insert_at = "reduce_strats"
+    insert_at = "reduce_strategies"
     type = "log"
     [tests.inputs.log_fields]
       message = "other reduce one"
@@ -140,7 +140,7 @@
       counter = 11
 
   [[tests.inputs]]
-    insert_at = "reduce_strats"
+    insert_at = "reduce_strategies"
     type = "log"
     [tests.inputs.log_fields]
       message = "third message value"
@@ -151,7 +151,7 @@
       test_end_message = true
 
   [[tests.inputs]]
-    insert_at = "reduce_strats"
+    insert_at = "reduce_strategies"
     type = "log"
     [tests.inputs.log_fields]
       message = "other reduce two"
@@ -162,7 +162,7 @@
       counter = 7
 
   [[tests.inputs]]
-    insert_at = "reduce_strats"
+    insert_at = "reduce_strategies"
     type = "log"
     [tests.inputs.log_fields]
       message = "other reduce three"
@@ -173,7 +173,7 @@
       test_end_message = true
 
   [[tests.outputs]]
-    extract_from = "reduce_strats"
+    extract_from = "reduce_strategies"
     [[tests.outputs.conditions]]
       type = "vrl"
       source = '''

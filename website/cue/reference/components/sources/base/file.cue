@@ -26,8 +26,10 @@ base: components: sources: file: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the [global `data_dir` option][global_data_dir] is used. Make sure the running user has write
-			permissions to this directory.
+			By default, the [global `data_dir` option][global_data_dir] is used.
+			Make sure the running user has write permissions to this directory.
+
+			If this directory is specified, then Vector will attempt to create it.
 
 			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 			"""
@@ -167,10 +169,7 @@ base: components: sources: file: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {
-			default: "host"
-			examples: ["hostname"]
-		}
+		type: string: examples: ["hostname"]
 	}
 	ignore_checkpoints: {
 		description: """
@@ -364,6 +363,17 @@ base: components: sources: file: configuration: {
 		type: uint: {
 			examples: [0, 5, 60]
 			unit: "seconds"
+		}
+	}
+	rotate_wait_secs: {
+		description: """
+			How long to keep an open handle to a rotated log file.
+			The default value represents "no limit"
+			"""
+		required: false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "seconds"
 		}
 	}
 }

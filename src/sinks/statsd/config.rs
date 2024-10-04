@@ -57,7 +57,7 @@ pub struct StatsdSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -128,7 +128,7 @@ impl SinkConfig for StatsdSinkConfig {
 
         let socket_mode = self.mode.as_socket_mode();
         let request_builder =
-            StatsdRequestBuilder::new(self.default_namespace.clone(), socket_mode)?;
+            StatsdRequestBuilder::new(self.default_namespace.clone(), socket_mode);
         let protocol = Protocol::from(socket_mode.as_str());
 
         let connector = self.mode.as_connector();

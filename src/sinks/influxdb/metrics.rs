@@ -2,7 +2,6 @@ use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
-use serde::Serialize;
 use tower::Service;
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
@@ -100,7 +99,7 @@ pub struct InfluxDbConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -111,12 +110,6 @@ pub fn default_summary_quantiles() -> Vec<f64> {
 
 pub fn example_tags() -> HashMap<String, String> {
     HashMap::from([("region".to_string(), "us-west-1".to_string())])
-}
-
-// https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
-#[derive(Debug, Clone, PartialEq, Serialize)]
-struct InfluxDbRequest {
-    series: Vec<String>,
 }
 
 impl_generate_config_from_default!(InfluxDbConfig);

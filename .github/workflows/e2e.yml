@@ -1,0 +1,116 @@
+# End to End Suite
+#
+# Runs on:
+#   - PRs if there are code changes to the source files that are noted in `vdev e2e ci_paths`
+#   - MQ (always pass)
+#   - Scheduled: at midnight UTC Tues-Sat
+
+name: E2E Test Suite
+
+on:
+  pull_request:
+  # Needs to pass by default in MQ
+  merge_group:
+    types: [checks_requested]
+  schedule:
+    # At midnight UTC Tue-Sat
+    - cron: '0 0 * * 2-6'
+
+concurrency:
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
+  cancel-in-progress: true
+
+env:
+  CONTAINER_TOOL: "docker"
+  DD_ENV: "ci"
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+  RUST_BACKTRACE: full
+  TEST_LOG: vector=debug
+  VERBOSE: true
+  CI: true
+  PROFILE: debug
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+
+  changes:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/changes.yml
+    with:
+      base_ref: ${{ github.event.pull_request.base.ref }}
+      head_ref: ${{ github.event.pull_request.head.ref  }}
+      source: false
+      e2e_tests: true
+    secrets: inherit
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-20.04-8core
+    timeout-minutes: 45
+    needs: changes
+    if: always() && (
+      github.event_name == 'schedule' || (
+          needs.changes.outputs.all-e2e == 'true'
+            || needs.changes.outputs.e2e-datadog-logs == 'true'
+            || needs.changes.outputs.e2e-datadog-metrics == 'true'
+        )
+      )
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+
+      - run: sudo npm -g install @datadog/datadog-ci
+
+      - run: docker image prune -af ; docker container prune -f
+
+      - name: Determine if secrets are defined (PR author is team member).
+        if: github.event_name == 'pull_request'
+        env:
+          GH_APP_DATADOG_VECTOR_CI_APP_ID: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+        run: |
+          if [[ "$GH_APP_DATADOG_VECTOR_CI_APP_ID" != "" ]] ; then
+            echo "PR_HAS_ACCESS_TO_SECRETS=true" >> "$GITHUB_ENV"
+          else
+            echo "PR_HAS_ACCESS_TO_SECRETS=false" >> "$GITHUB_ENV"
+          fi
+
+      - if: (github.event_name == 'schedule' || needs.changes.outputs.all-e2e == 'true' || needs.changes.outputs.e2e-datadog-logs == 'true') &&
+          (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
+        name: e2e-datadog-logs
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 35
+          max_attempts: 3
+          command: bash scripts/ci-int-e2e-test.sh e2e datadog-logs
+
+      - if: (github.event_name == 'schedule' || needs.changes.outputs.all-e2e == 'true' || needs.changes.outputs.e2e-datadog-metrics == 'true') &&
+          (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
+        name: e2e-datadog-metrics
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 35
+          max_attempts: 3
+          command: bash scripts/ci-int-e2e-test.sh e2e datadog-metrics
+
+
+  e2e-test-suite:
+    name: E2E Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    needs: e2e-tests
+    env:
+      FAILED: ${{ contains(needs.*.result, 'failure') }}
+    steps:
+      - run: |
+          echo "failed=${{ env.FAILED }}"
+          if [[ "$FAILED" == "true" ]] ; then
+            exit 1
+          else
+            exit 0
+          fi

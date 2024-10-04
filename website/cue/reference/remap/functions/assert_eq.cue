@@ -16,6 +16,8 @@ remap: functions: assert_eq: {
 			""",
 	]
 
+	pure: false
+
 	arguments: [
 		{
 			name:        "left"

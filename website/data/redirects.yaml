@@ -61,6 +61,7 @@ sources:
 - postgresql_metrics
 - prometheus_remote_write
 - prometheus_scrape
+- pulsar
 - socket
 - splunk_hec
 - statsd

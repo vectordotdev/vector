@@ -425,9 +425,9 @@ mod test {
 
     #[test]
     fn parse_partial_invalid_keys() {
-        let source = r#"max_size: 100
+        let source = r"max_size: 100
 max_events: 42
-"#;
+";
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
         assert_eq!(error.to_string(), BUFFER_CONFIG_NO_MATCH_ERR);
     }
@@ -435,9 +435,9 @@ max_events: 42
     #[test]
     fn parse_without_type_tag() {
         check_single_stage(
-            r#"
+            r"
           max_events: 100
-          "#,
+          ",
             BufferType::Memory {
                 max_events: NonZeroUsize::new(100).unwrap(),
                 when_full: WhenFull::Block,
@@ -448,11 +448,11 @@ max_events: 42
     #[test]
     fn parse_multiple_stages() {
         check_multiple_stages(
-            r#"
+            r"
           - max_events: 42
           - max_events: 100
             when_full: drop_newest
-          "#,
+          ",
             &[
                 BufferType::Memory {
                     max_events: NonZeroUsize::new(42).unwrap(),
@@ -469,9 +469,9 @@ max_events: 42
     #[test]
     fn ensure_field_defaults_for_all_types() {
         check_single_stage(
-            r#"
+            r"
           type: memory
-          "#,
+          ",
             BufferType::Memory {
                 max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::Block,
@@ -479,10 +479,10 @@ max_events: 42
         );
 
         check_single_stage(
-            r#"
+            r"
           type: memory
           max_events: 100
-          "#,
+          ",
             BufferType::Memory {
                 max_events: NonZeroUsize::new(100).unwrap(),
                 when_full: WhenFull::Block,
@@ -490,10 +490,10 @@ max_events: 42
         );
 
         check_single_stage(
-            r#"
+            r"
           type: memory
           when_full: drop_newest
-          "#,
+          ",
             BufferType::Memory {
                 max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::DropNewest,
@@ -501,10 +501,10 @@ max_events: 42
         );
 
         check_single_stage(
-            r#"
+            r"
           type: memory
           when_full: overflow
-          "#,
+          ",
             BufferType::Memory {
                 max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::Overflow,
@@ -512,10 +512,10 @@ max_events: 42
         );
 
         check_single_stage(
-            r#"
+            r"
           type: disk
           max_size: 1024
-          "#,
+          ",
             BufferType::DiskV2 {
                 max_size: NonZeroU64::new(1024).unwrap(),
                 when_full: WhenFull::Block,

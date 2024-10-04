@@ -53,7 +53,7 @@ mod test {
 
     #[test]
     fn from_lua() {
-        let lua_event = r#"
+        let lua_event = r"
         {
             a = 1,
             nested = {
@@ -61,7 +61,7 @@ mod test {
                 array = {'example value', '', 'another value'}
             }
         }
-        "#;
+        ";
 
         let event: LogEvent = Lua::new().load(lua_event).eval().unwrap();
 

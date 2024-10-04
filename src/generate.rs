@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 use serde::Serialize;
 use toml::{map::Map, Value};
 use vector_lib::configurable::component::{
-    ExampleError, SinkDescription, SourceDescription, TransformDescription,
+    SinkDescription, SourceDescription, TransformDescription,
 };
 use vector_lib::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
@@ -133,7 +133,7 @@ pub(crate) fn generate_example(
     let mut errs = Vec::new();
 
     let mut source_names = Vec::new();
-    if let Some(source_types) = components.get(0) {
+    if let Some(source_types) = components.first() {
         let mut sources = IndexMap::new();
 
         for (i, source_expr) in source_types.iter().enumerate() {
@@ -158,12 +158,10 @@ pub(crate) fn generate_example(
             let mut example = match SourceDescription::example(&source_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!(
-                            "failed to generate source '{}': {}",
-                            source_type, err
-                        ));
-                    }
+                    errs.push(format!(
+                        "failed to generate source '{}': {}",
+                        source_type, err
+                    ));
                     Value::Table(Map::new())
                 }
             };
@@ -221,12 +219,10 @@ pub(crate) fn generate_example(
             let mut example = match TransformDescription::example(&transform_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!(
-                            "failed to generate transform '{}': {}",
-                            transform_type, err
-                        ));
-                    }
+                    errs.push(format!(
+                        "failed to generate transform '{}': {}",
+                        transform_type, err
+                    ));
                     Value::Table(Map::new())
                 }
             };
@@ -273,9 +269,7 @@ pub(crate) fn generate_example(
             let mut example = match SinkDescription::example(&sink_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
-                    }
+                    errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
                     Value::Table(Map::new())
                 }
             };
@@ -489,6 +483,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -526,6 +523,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -557,6 +557,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -580,6 +583,9 @@ mod tests {
 
                 [sinks.sink0.encoding]
                 codec = "json"
+
+                [sinks.sink0.encoding.json]
+                pretty = false
 
                 [sinks.sink0.healthcheck]
                 enabled = true
@@ -691,6 +697,8 @@ mod tests {
                 type: console
                 encoding:
                   codec: json
+                  json:
+                    pretty: false
                 healthcheck:
                   enabled: true
                   uri: null
@@ -756,7 +764,10 @@ mod tests {
                   "target": "stdout",
                   "type": "console",
                   "encoding": {
-                    "codec": "json"
+                    "codec": "json",
+                    "json": {
+                      "pretty": false
+                    }
                   },
                   "healthcheck": {
                     "enabled": true,

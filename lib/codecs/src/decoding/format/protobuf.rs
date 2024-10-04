@@ -3,8 +3,7 @@ use std::path::PathBuf;
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
-use ordered_float::NotNan;
-use prost_reflect::{DynamicMessage, MessageDescriptor, ReflectMessage};
+use prost_reflect::{DynamicMessage, MessageDescriptor};
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
 use vector_core::event::LogEvent;
@@ -13,9 +12,7 @@ use vector_core::{
     event::Event,
     schema,
 };
-use vrl::value::{Kind, ObjectMap};
-
-use crate::common::protobuf::get_message_descriptor;
+use vrl::value::Kind;
 
 use super::Deserializer;
 
@@ -24,10 +21,7 @@ use super::Deserializer;
 #[derive(Debug, Clone, Default)]
 pub struct ProtobufDeserializerConfig {
     /// Protobuf-specific decoding options.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub protobuf: ProtobufDeserializerOptions,
 }
 
@@ -101,7 +95,8 @@ impl Deserializer for ProtobufDeserializer {
         let dynamic_message = DynamicMessage::decode(self.message_descriptor.clone(), bytes)
             .map_err(|error| format!("Error parsing protobuf: {:?}", error))?;
 
-        let proto_vrl = to_vrl(&prost_reflect::Value::Message(dynamic_message), None)?;
+        let proto_vrl =
+            vrl::protobuf::proto_to_value(&prost_reflect::Value::Message(dynamic_message), None)?;
         let mut event = Event::Log(LogEvent::from(proto_vrl));
         let event = match log_namespace {
             LogNamespace::Vector => event,
@@ -124,99 +119,12 @@ impl Deserializer for ProtobufDeserializer {
 impl TryFrom<&ProtobufDeserializerConfig> for ProtobufDeserializer {
     type Error = vector_common::Error;
     fn try_from(config: &ProtobufDeserializerConfig) -> vector_common::Result<Self> {
-        let message_descriptor =
-            get_message_descriptor(&config.protobuf.desc_file, &config.protobuf.message_type)?;
+        let message_descriptor = vrl::protobuf::get_message_descriptor(
+            &config.protobuf.desc_file,
+            &config.protobuf.message_type,
+        )?;
         Ok(Self::new(message_descriptor))
     }
-}
-
-fn to_vrl(
-    prost_reflect_value: &prost_reflect::Value,
-    field_descriptor: Option<&prost_reflect::FieldDescriptor>,
-) -> vector_common::Result<vrl::value::Value> {
-    let vrl_value = match prost_reflect_value {
-        prost_reflect::Value::Bool(v) => vrl::value::Value::from(*v),
-        prost_reflect::Value::I32(v) => vrl::value::Value::from(*v),
-        prost_reflect::Value::I64(v) => vrl::value::Value::from(*v),
-        prost_reflect::Value::U32(v) => vrl::value::Value::from(*v),
-        prost_reflect::Value::U64(v) => vrl::value::Value::from(*v),
-        prost_reflect::Value::F32(v) => vrl::value::Value::Float(
-            NotNan::new(f64::from(*v)).map_err(|_e| "Float number cannot be Nan")?,
-        ),
-        prost_reflect::Value::F64(v) => {
-            vrl::value::Value::Float(NotNan::new(*v).map_err(|_e| "F64 number cannot be Nan")?)
-        }
-        prost_reflect::Value::String(v) => vrl::value::Value::from(v.as_str()),
-        prost_reflect::Value::Bytes(v) => vrl::value::Value::from(v.clone()),
-        prost_reflect::Value::EnumNumber(v) => {
-            if let Some(field_descriptor) = field_descriptor {
-                let kind = field_descriptor.kind();
-                let enum_desc = kind.as_enum().ok_or_else(|| {
-                    format!(
-                        "Internal error while parsing protobuf enum. Field descriptor: {:?}",
-                        field_descriptor
-                    )
-                })?;
-                vrl::value::Value::from(
-                    enum_desc
-                        .get_value(*v)
-                        .ok_or_else(|| {
-                            format!("The number {} cannot be in '{}'", v, enum_desc.name())
-                        })?
-                        .name(),
-                )
-            } else {
-                Err("Expected valid field descriptor")?
-            }
-        }
-        prost_reflect::Value::Message(v) => {
-            let mut obj_map = ObjectMap::new();
-            for field_desc in v.descriptor().fields() {
-                let field_value = v.get_field(&field_desc);
-                let out = to_vrl(field_value.as_ref(), Some(&field_desc))?;
-                obj_map.insert(field_desc.name().into(), out);
-            }
-            vrl::value::Value::from(obj_map)
-        }
-        prost_reflect::Value::List(v) => {
-            let vec = v
-                .iter()
-                .map(|o| to_vrl(o, field_descriptor))
-                .collect::<Result<Vec<_>, vector_common::Error>>()?;
-            vrl::value::Value::from(vec)
-        }
-        prost_reflect::Value::Map(v) => {
-            if let Some(field_descriptor) = field_descriptor {
-                let kind = field_descriptor.kind();
-                let message_desc = kind.as_message().ok_or_else(|| {
-                    format!(
-                        "Internal error while parsing protobuf field descriptor: {:?}",
-                        field_descriptor
-                    )
-                })?;
-                vrl::value::Value::from(
-                    v.iter()
-                        .map(|kv| {
-                            Ok((
-                                kv.0.as_str()
-                                    .ok_or_else(|| {
-                                        format!(
-                                            "Internal error while parsing protobuf map. Field descriptor: {:?}",
-                                            field_descriptor
-                                        )
-                                    })?
-                                    .into(),
-                                to_vrl(kv.1, Some(&message_desc.map_entry_value_field()))?,
-                            ))
-                        })
-                        .collect::<vector_common::Result<ObjectMap>>()?,
-                )
-            } else {
-                Err("Expected valid field descriptor")?
-            }
-        }
-    };
-    Ok(vrl_value)
 }
 
 #[cfg(test)]
@@ -240,7 +148,8 @@ mod tests {
         validate_log: fn(&LogEvent),
     ) {
         let input = Bytes::from(protobuf_bin_message);
-        let message_descriptor = get_message_descriptor(&protobuf_desc_path, message_type).unwrap();
+        let message_descriptor =
+            vrl::protobuf::get_message_descriptor(&protobuf_desc_path, message_type).unwrap();
         let deserializer = ProtobufDeserializer::new(message_descriptor);
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
@@ -318,7 +227,11 @@ mod tests {
         let protobuf_desc_path = test_data_dir().join("protos/test_protobuf.desc");
         let message_type = "test_protobuf.Person";
         let validate_log = |log: &LogEvent| {
-            assert_eq!(log["name"], "".into());
+            // No field will be set.
+            assert!(!log.contains("name"));
+            assert!(!log.contains("id"));
+            assert!(!log.contains("email"));
+            assert!(!log.contains("phones"));
         };
 
         parse_and_validate(
@@ -332,7 +245,7 @@ mod tests {
     #[test]
     fn deserialize_error_invalid_protobuf() {
         let input = Bytes::from("{ foo");
-        let message_descriptor = get_message_descriptor(
+        let message_descriptor = vrl::protobuf::get_message_descriptor(
             &test_data_dir().join("protos/test_protobuf.desc"),
             "test_protobuf.Person",
         )

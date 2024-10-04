@@ -93,7 +93,7 @@ pub struct PubsubConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -206,7 +206,6 @@ impl HttpEventEncoder<Value> for PubSubSinkEventEncoder {
     }
 }
 
-#[async_trait::async_trait]
 impl HttpSink for PubsubSink {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;

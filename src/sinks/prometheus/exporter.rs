@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
+    body::HttpBody,
     header::HeaderValue,
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
@@ -20,6 +21,7 @@ use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
 use tower::ServiceBuilder;
+use tower_http::compression::CompressionLayer;
 use tracing::{Instrument, Span};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
@@ -40,11 +42,7 @@ use crate::{
     http::{build_http_trace_layer, Auth},
     internal_events::PrometheusNormalizationError,
     sinks::{
-        util::{
-            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet},
-            statistic::validate_quantiles,
-            StreamSink,
-        },
+        util::{statistic::validate_quantiles, StreamSink},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -146,7 +144,7 @@ pub struct PrometheusExporterConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -264,7 +262,6 @@ impl MetricMetadata {
 #[derive(Clone, Debug)]
 struct MetricRef {
     series: MetricSeries,
-    kind: MetricKind,
     value: Discriminant<MetricValue>,
     bounds: Option<Vec<f64>>,
 }
@@ -285,7 +282,6 @@ impl MetricRef {
 
         Self {
             series: metric.series().clone(),
-            kind: metric.kind(),
             value: discriminant(metric.value()),
             bounds,
         }
@@ -294,10 +290,7 @@ impl MetricRef {
 
 impl PartialEq for MetricRef {
     fn eq(&self, other: &Self) -> bool {
-        self.series == other.series
-            && self.kind == other.kind
-            && self.value == other.value
-            && self.bounds == other.bounds
+        self.series == other.series && self.value == other.value && self.bounds == other.bounds
     }
 }
 
@@ -306,7 +299,6 @@ impl Eq for MetricRef {}
 impl Hash for MetricRef {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.series.hash(state);
-        self.kind.hash(state);
         self.value.hash(state);
         if let Some(bounds) = &self.bounds {
             for bound in bounds {
@@ -316,44 +308,7 @@ impl Hash for MetricRef {
     }
 }
 
-struct PrometheusExporterMetricNormalizer {
-    distributions_as_summaries: bool,
-    buckets: Vec<f64>,
-}
-
-impl MetricNormalize for PrometheusExporterMetricNormalizer {
-    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        let new_metric = match metric.value() {
-            MetricValue::Distribution { .. } => {
-                // Convert the distribution as-is, and then let the normalizer absolute-ify it.
-                let (series, data, metadata) = metric.into_parts();
-                let (time, kind, value) = data.into_parts();
-
-                let new_value = if self.distributions_as_summaries {
-                    // We use a sketch when in summary mode because they're actually able to be
-                    // merged and provide correct output, unlike the aggregated summaries that
-                    // we handle from _sources_ like Prometheus.  The collector code itself
-                    // will render sketches as aggregated summaries, so we have continuity there.
-                    value
-                        .distribution_to_sketch()
-                        .expect("value should be distribution already")
-                } else {
-                    value
-                        .distribution_to_agg_histogram(&self.buckets)
-                        .expect("value should be distribution already")
-                };
-
-                let data = MetricData::from_parts(time, kind, new_value);
-                Metric::from_parts(series, data, metadata)
-            }
-            _ => metric,
-        };
-
-        state.make_absolute(new_metric)
-    }
-}
-
-fn authorized(req: &Request<Body>, auth: &Option<Auth>) -> bool {
+fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
     if let Some(auth) = auth {
         let headers = req.headers();
         if let Some(auth_header) = headers.get(hyper::header::AUTHORIZATION) {
@@ -394,9 +349,9 @@ struct Handler {
 }
 
 impl Handler {
-    fn handle(
+    fn handle<T: HttpBody>(
         &self,
-        req: Request<Body>,
+        req: Request<T>,
         metrics: &RwLock<IndexMap<MetricRef, (Metric, MetricMetadata)>>,
     ) -> Response<Body> {
         let mut response = Response::new(Body::empty());
@@ -494,6 +449,7 @@ impl PrometheusExporter {
 
             let service = ServiceBuilder::new()
                 .layer(build_http_trace_layer(span.clone()))
+                .layer(CompressionLayer::new())
                 .service(inner);
 
             async move { Ok::<_, Infallible>(service) }
@@ -523,6 +479,55 @@ impl PrometheusExporter {
         self.server_shutdown_trigger = Some(trigger);
         Ok(())
     }
+
+    fn normalize(&mut self, metric: Metric) -> Option<Metric> {
+        let new_metric = match metric.value() {
+            MetricValue::Distribution { .. } => {
+                // Convert the distribution as-is, and then absolute-ify it.
+                let (series, data, metadata) = metric.into_parts();
+                let (time, kind, value) = data.into_parts();
+
+                let new_value = if self.config.distributions_as_summaries {
+                    // We use a sketch when in summary mode because they're actually able to be
+                    // merged and provide correct output, unlike the aggregated summaries that
+                    // we handle from _sources_ like Prometheus.  The collector code itself
+                    // will render sketches as aggregated summaries, so we have continuity there.
+                    value
+                        .distribution_to_sketch()
+                        .expect("value should be distribution already")
+                } else {
+                    value
+                        .distribution_to_agg_histogram(&self.config.buckets)
+                        .expect("value should be distribution already")
+                };
+
+                let data = MetricData::from_parts(time, kind, new_value);
+                Metric::from_parts(series, data, metadata)
+            }
+            _ => metric,
+        };
+
+        match new_metric.kind() {
+            MetricKind::Absolute => Some(new_metric),
+            MetricKind::Incremental => {
+                let metrics = self.metrics.read().expect(LOCK_FAILED);
+                let metric_ref = MetricRef::from_metric(&new_metric);
+
+                if let Some(existing) = metrics.get(&metric_ref) {
+                    let mut current = existing.0.value().clone();
+                    if current.add(new_metric.value()) {
+                        // If we were able to add to the existing value (i.e. they were compatible),
+                        // return the result as an absolute metric.
+                        return Some(new_metric.with_value(current).into_absolute());
+                    }
+                }
+
+                // Otherwise, if we didn't have an existing value or we did and it was not
+                // compatible with the new value, simply return the new value as absolute.
+                Some(new_metric.into_absolute())
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -534,10 +539,6 @@ impl StreamSink<Event> for PrometheusExporter {
 
         let mut last_flush = Instant::now();
         let flush_period = self.config.flush_period_secs;
-        let mut normalizer = MetricNormalizer::from(PrometheusExporterMetricNormalizer {
-            distributions_as_summaries: self.config.distributions_as_summaries,
-            buckets: self.config.buckets.clone(),
-        });
 
         while let Some(event) = input.next().await {
             // If we've exceed our flush interval, go through all of the metrics we're currently
@@ -553,22 +554,14 @@ impl StreamSink<Event> for PrometheusExporter {
 
                 let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
-                let normalizer_mut = normalizer.get_state_mut();
-                metrics.retain(|metric_ref, (_, metadata)| {
-                    if metadata.has_expired(last_flush) {
-                        normalizer_mut.remove(&metric_ref.series);
-                        false
-                    } else {
-                        true
-                    }
-                });
+                metrics.retain(|_metric_ref, (_, metadata)| !metadata.has_expired(last_flush));
             }
 
             // Now process the metric we got.
             let mut metric = event.into_metric();
             let finalizers = metric.take_finalizers();
 
-            if let Some(normalized) = normalizer.normalize(metric) {
+            if let Some(normalized) = self.normalize(metric) {
                 let normalized = if self.config.suppress_timestamp {
                     normalized.with_timestamp(None)
                 } else {
@@ -603,16 +596,16 @@ impl StreamSink<Event> for PrometheusExporter {
 #[cfg(test)]
 mod tests {
     use chrono::{Duration, Utc};
+    use flate2::read::GzDecoder;
     use futures::stream;
     use indoc::indoc;
     use similar_asserts::assert_eq;
+    use std::io::Read;
     use tokio::{sync::oneshot::error::TryRecvError, time};
     use vector_lib::{
         event::{MetricTags, StatisticKind},
-        metric_tags, samples,
-    };
-    use vector_lib::{
         finalization::{BatchNotifier, BatchStatus},
+        metric_tags, samples,
         sensitive_string::SensitiveString,
     };
 
@@ -794,6 +787,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn encoding_gzip() {
+        let (name1, event1) = create_metric_gauge(None, 123.4);
+        let events = vec![event1];
+
+        let body_raw = export_and_fetch_raw(None, events, false, Some(String::from("gzip"))).await;
+        let expected = format!(
+            indoc! {r#"
+                # HELP {name} {name}
+                # TYPE {name} gauge
+                {name}{{some_tag="some_value"}} 123.4
+            "#},
+            name = name1,
+        );
+
+        let mut gz = GzDecoder::new(&body_raw[..]);
+        let mut body_decoded = String::new();
+        let _ = gz.read_to_string(&mut body_decoded);
+
+        assert!(body_raw.len() < expected.len());
+        assert_eq!(body_decoded, expected);
+    }
+
+    #[tokio::test]
     async fn updates_timestamps() {
         let timestamp1 = Utc::now();
         let (name, event1) = create_metric_gauge(None, 123.4);
@@ -869,11 +885,12 @@ mod tests {
         )));
     }
 
-    async fn export_and_fetch(
+    async fn export_and_fetch_raw(
         tls_config: Option<TlsEnableableConfig>,
         mut events: Vec<Event>,
         suppress_timestamp: bool,
-    ) -> String {
+        encoding: Option<String>,
+    ) -> hyper::body::Bytes {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
@@ -908,9 +925,17 @@ mod tests {
         // Events are marked as delivered as soon as they are aggregated.
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let request = Request::get(format!("{}://{}/metrics", proto, address))
+        let mut request = Request::get(format!("{}://{}/metrics", proto, address))
             .body(Body::empty())
             .expect("Error creating request.");
+
+        if let Some(ref encoding) = encoding {
+            request.headers_mut().insert(
+                http::header::ACCEPT_ENCODING,
+                HeaderValue::from_str(encoding.as_str()).unwrap(),
+            );
+        }
+
         let proxy = ProxyConfig::default();
         let result = HttpClient::new(client_settings, &proxy)
             .unwrap()
@@ -920,15 +945,29 @@ mod tests {
 
         assert!(result.status().is_success());
 
+        if encoding.is_some() {
+            assert!(result
+                .headers()
+                .contains_key(http::header::CONTENT_ENCODING));
+        }
+
         let body = result.into_body();
         let bytes = hyper::body::to_bytes(body)
             .await
             .expect("Reading body failed");
-        let result = String::from_utf8(bytes.to_vec()).unwrap();
 
         sink_handle.await.unwrap();
 
-        result
+        bytes
+    }
+
+    async fn export_and_fetch(
+        tls_config: Option<TlsEnableableConfig>,
+        events: Vec<Event>,
+        suppress_timestamp: bool,
+    ) -> String {
+        let bytes = export_and_fetch_raw(tls_config, events, suppress_timestamp, None);
+        String::from_utf8(bytes.await.to_vec()).unwrap()
     }
 
     async fn export_and_fetch_with_auth(
@@ -1329,6 +1368,75 @@ mod tests {
             .get(&MetricRef::from_metric(&expected_histogram))
             .expect("histogram metric should exist");
         assert_eq!(actual_histogram.0.value(), expected_histogram.value());
+    }
+
+    #[tokio::test]
+    async fn sink_gauge_incremental_absolute_mix() {
+        // Because Prometheus does not, itself, have the concept of an Incremental metric, the
+        // Exporter must apply a normalization function that converts all metrics to Absolute ones
+        // before handling them.
+
+        // This test ensures that this normalization works correctly when applied to a mix of both
+        // Incremental and Absolute inputs.
+        let config = PrometheusExporterConfig {
+            address: next_addr(), // Not actually bound, just needed to fill config
+            tls: None,
+            ..Default::default()
+        };
+
+        let sink = PrometheusExporter::new(config);
+
+        let base_absolute_gauge_metric = Metric::new(
+            "gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 100.0 },
+        );
+
+        let base_incremental_gauge_metric = Metric::new(
+            "gauge",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: -10.0 },
+        );
+
+        let metrics = vec![
+            base_absolute_gauge_metric.clone(),
+            base_absolute_gauge_metric
+                .clone()
+                .with_value(MetricValue::Gauge { value: 333.0 }),
+            base_incremental_gauge_metric.clone(),
+            base_incremental_gauge_metric
+                .clone()
+                .with_value(MetricValue::Gauge { value: 4.0 }),
+        ];
+
+        // Now run the events through the sink and see what ends up in the internal metric map.
+        let metrics_handle = Arc::clone(&sink.metrics);
+
+        let events = metrics
+            .iter()
+            .cloned()
+            .map(Event::Metric)
+            .collect::<Vec<_>>();
+
+        let sink = VectorSink::from_event_streamsink(sink);
+        let input_events = stream::iter(events).map(Into::into);
+        sink.run(input_events).await.unwrap();
+
+        let metrics_after = metrics_handle.read().unwrap();
+
+        // The gauge metric should be present.
+        assert_eq!(metrics_after.len(), 1);
+
+        let expected_gauge = Metric::new(
+            "gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 327.0 },
+        );
+
+        let actual_gauge = metrics_after
+            .get(&MetricRef::from_metric(&expected_gauge))
+            .expect("gauge metric should exist");
+        assert_eq!(actual_gauge.0.value(), expected_gauge.value());
     }
 }
 

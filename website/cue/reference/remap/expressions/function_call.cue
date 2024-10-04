@@ -143,6 +143,13 @@ remap: expressions: function_call: {
 				Suggestions on how to update the VRL program can usually be found in the actual warning and the function documentation.
 				"""
 		}
+		purity: {
+			title: "Purity"
+			description: """
+				VRL functions can be marked as "pure" or "impure". When a function
+				is pure, it is idempotent and has no side-effects. Otherwise, it is impure.
+				"""
+		}
 	}
 
 	examples: [

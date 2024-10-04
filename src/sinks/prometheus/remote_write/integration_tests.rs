@@ -2,11 +2,12 @@ use std::{collections::HashMap, ops::Range};
 
 use serde_json::Value;
 
-use super::{tests::*, *};
+use super::tests::*;
 use crate::{
     config::{SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
     sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
+    sinks::prometheus::remote_write::config::RemoteWriteConfig,
     test_util::components::{assert_sink_compliance, HTTP_SINK_TAGS},
     tls::{self, TlsConfig},
 };

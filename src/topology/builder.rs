@@ -330,6 +330,7 @@ impl<'a> Builder<'a> {
                 acknowledgements: source.sink_acknowledgements,
                 schema_definitions,
                 schema: self.config.schema,
+                extra_context: self.extra_context.clone(),
             };
             let source = source.inner.build(context).await;
             let server = match source {
@@ -344,7 +345,7 @@ impl<'a> Builder<'a> {
             // been signalled to forcefully shutdown, or if the source pump encounters an error.
             //
             // The forceful shutdown will only resolve if the source itself doesn't shutdown gracefully
-            // within the alloted time window. This can occur normally for certain sources, like stdin,
+            // within the allotted time window. This can occur normally for certain sources, like stdin,
             // where the I/O is blocking (in a separate thread) and won't wake up to check if it's time
             // to shutdown unless some input is given.
             let server = async move {
@@ -464,6 +465,7 @@ impl<'a> Builder<'a> {
                 schema_definitions,
                 merged_schema_definition: merged_definition.clone(),
                 schema: self.config.schema,
+                extra_context: self.extra_context.clone(),
             };
 
             let node = TransformNode::from_parts(

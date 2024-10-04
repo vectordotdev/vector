@@ -26,3 +26,6 @@ service:
     logs:
       receivers: [otlp]
       exporters: [otlp,otlphttp]
+    traces:
+      receivers: [otlp]
+      exporters: [otlp,otlphttp]

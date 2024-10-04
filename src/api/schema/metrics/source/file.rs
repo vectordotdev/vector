@@ -65,10 +65,13 @@ impl FileSourceMetrics {
         self.0
             .iter()
             .filter_map(|m| m.tag_value("file").map(|file| (file, m)))
-            .fold(BTreeMap::new(), |mut map, (file, m)| {
-                map.entry(file).or_insert_with(Vec::new).push(m);
-                map
-            })
+            .fold(
+                BTreeMap::new(),
+                |mut map: BTreeMap<String, Vec<&Metric>>, (file, m)| {
+                    map.entry(file).or_default().push(m);
+                    map
+                },
+            )
             .into_iter()
             .map(FileSourceMetricFile::from_tuple)
             .collect()

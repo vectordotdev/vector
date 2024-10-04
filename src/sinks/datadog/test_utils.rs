@@ -8,7 +8,7 @@ use crate::sinks::util::test::build_test_server_status;
 // signaling status. This enum allows us to signal which API endpoint and what
 // kind of response we want our test to model without getting into the details
 // of exactly what that code is.
-pub(super) enum ApiStatus {
+pub enum ApiStatus {
     OKv1,
     #[cfg(feature = "sinks-datadog_logs")]
     OKv2,
@@ -18,7 +18,7 @@ pub(super) enum ApiStatus {
     BadRequestv2,
 }
 
-pub(super) fn test_server(
+pub fn test_server(
     addr: std::net::SocketAddr,
     api_status: ApiStatus,
 ) -> (

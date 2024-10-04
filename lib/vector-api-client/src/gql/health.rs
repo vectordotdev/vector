@@ -1,6 +1,5 @@
 //! Health queries/subscriptions, for asserting a GraphQL API server is alive.
 
-use async_trait::async_trait;
 use graphql_client::GraphQLQuery;
 
 /// Shorthand for a Chrono datetime, set to UTC.
@@ -29,13 +28,11 @@ pub struct HealthQuery;
 pub struct HeartbeatSubscription;
 
 /// Extension methods for health queries.
-#[async_trait]
 pub trait HealthQueryExt {
     /// Executes a health query.
     async fn health_query(&self) -> crate::QueryResult<HealthQuery>;
 }
 
-#[async_trait]
 impl HealthQueryExt for crate::Client {
     /// Executes a health query.
     async fn health_query(&self) -> crate::QueryResult<HealthQuery> {

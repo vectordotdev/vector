@@ -324,7 +324,7 @@ async fn no_retry_on_incorrect_data_warp() {
         .unwrap()
         .unwrap();
 
-    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
 }
 
 #[tokio::test]

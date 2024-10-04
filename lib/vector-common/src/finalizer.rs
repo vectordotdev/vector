@@ -115,7 +115,7 @@ where
             tokio::select! {
                 biased;
                 _ = &mut shutdown, if handle_shutdown => break,
-                _ = flush.notified() => {
+                () = flush.notified() => {
                     // Drop all the existing status receivers and start over.
                     status_receivers = S::default();
                 },

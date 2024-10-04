@@ -130,7 +130,7 @@ fn merge_partial_events_with_custom_expiration(
                 .get(&file_path)
                 .and_then(|x| x.as_str())
                 .map(|x| x.to_string())
-                .unwrap_or_else(String::new);
+                .unwrap_or_default();
 
             state.add_event(event, &file, &message_path, expiration_time);
             if !is_partial {

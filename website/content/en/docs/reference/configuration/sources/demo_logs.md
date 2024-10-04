@@ -1,7 +1,7 @@
 ---
 title: Demo Logs
 description: Generate fake log events, which can be useful for testing and demos
-kind: source
+component_kind: source
 layout: component
 tags: ["demo", "random", "fake", "component", "source"]
 ---

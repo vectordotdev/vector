@@ -65,7 +65,10 @@ pub(crate) static GELF_TARGET_PATHS: Lazy<GelfTargetPaths> = Lazy::new(|| GelfTa
     short_message: OwnedTargetPath::event(owned_value_path!(gelf_fields::SHORT_MESSAGE)),
 });
 
-/// Regex for matching valid field names. Must contain only word chars, periods and dashes.
-/// Additional field names must also be prefixed with an `_` , however that is intentionally
-/// omitted from this regex to be checked separately to create a specific error message.
-pub static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());
+/// Regex for matching valid field names in the encoder. According to the original spec by graylog,
+/// must contain only word chars, periods and dashes. Additional field names must also be prefixed
+/// with an `_` , however that is intentionally omitted from this regex to be checked separately
+/// to create a specific error message.
+/// As Graylog itself will produce GELF with any existing field names on the Graylog GELF Output,
+/// vector is more lenient, too, at least allowing the additional `@` character.
+pub static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-@]*$").unwrap());

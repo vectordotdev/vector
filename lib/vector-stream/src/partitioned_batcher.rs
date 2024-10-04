@@ -454,7 +454,7 @@ mod test {
     }
 
     fn arb_partitioner() -> impl Strategy<Value = TestPartitioner> {
-        (1..u8::max_value(),).prop_map(|(ks,)| TestPartitioner {
+        (1..u8::MAX,).prop_map(|(ks,)| TestPartitioner {
             key_space: NonZeroU8::new(ks).unwrap(),
         })
     }
@@ -462,7 +462,7 @@ mod test {
     proptest! {
         #[test]
         fn size_hint_eq(stream: Vec<u64>,
-                        item_limit in 1..u16::max_value(),
+                        item_limit in 1..u16::MAX,
                         allocation_limit in 8..128,
                         partitioner in arb_partitioner(),
                         timer in arb_timer()) {
@@ -488,7 +488,7 @@ mod test {
     proptest! {
         #[test]
         fn batch_item_size_leq_limit(stream: Vec<u64>,
-                                     item_limit in 1..u16::max_value(),
+                                     item_limit in 1..u16::MAX,
                                      allocation_limit in 8..128,
                                      partitioner in arb_partitioner(),
                                      timer in arb_timer()) {
@@ -542,7 +542,7 @@ mod test {
             .fold(
                 HashMap::default(),
                 |mut acc: HashMap<u8, Vec<u64>>, (key, item)| {
-                    let arr: &mut Vec<u64> = acc.entry(key).or_insert_with(Vec::default);
+                    let arr: &mut Vec<u64> = acc.entry(key).or_default();
                     arr.push(item);
                     acc
                 },
@@ -556,7 +556,7 @@ mod test {
     proptest! {
         #[test]
         fn batch_does_not_reorder(stream: Vec<u64>,
-                                  item_limit in 1..u16::max_value(),
+                                  item_limit in 1..u16::MAX,
                                   allocation_limit in 8..128,
                                   partitioner in arb_partitioner(),
                                   timer in arb_timer()) {
@@ -602,7 +602,7 @@ mod test {
     proptest! {
         #[test]
         fn batch_does_not_lose_items(stream: Vec<u64>,
-                                     item_limit in 1..u16::max_value(),
+                                     item_limit in 1..u16::MAX,
                                      allocation_limit in 8..128,
                                      partitioner in arb_partitioner(),
                                      timer in arb_timer()) {

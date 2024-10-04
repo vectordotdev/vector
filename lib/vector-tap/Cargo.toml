@@ -1,0 +1,38 @@
+[package]
+name = "vector-tap"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2021"
+publish = false
+license = "MPL-2.0"
+
+[features]
+api = ["dep:async-graphql"]
+
+[dependencies]
+async-graphql = { version = "7.0.7", default-features = false, features = ["playground"], optional = true}
+colored = { version = "2.1.0", default-features = false }
+futures.workspace = true
+glob.workspace = true
+serde_yaml = { version = "0.9.34", default-features = false }
+snafu = { version = "0.7.5", default-features = false }
+tokio = { version = "1.40.0", default-features = false, features = ["time"] }
+tokio-stream = { version = "0.1.16", default-features = false, features = ["sync"] }
+tokio-tungstenite = { version = "0.20.1", default-features = false }
+tracing = { version = "0.1.34", default-features = false }
+url = { version = "2.5.2", default-features = false }
+uuid.workspace = true
+vector-api-client = { path = "../vector-api-client" }
+vector-common = { path = "../vector-common" }
+vector-core = { path = "../vector-core" }
+vector-buffers = { path = "../vector-buffers" }
+futures-util = "0.3.30"
+
+[dev-dependencies]
+chrono = { workspace = true }
+portpicker = { path = "../portpicker" }
+serde_json = { workspace = true }
+tokio = { version = "1.40.0", default-features = false, features = ["test-util"] }
+
+
+

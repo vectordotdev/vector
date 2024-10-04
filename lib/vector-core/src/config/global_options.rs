@@ -50,20 +50,14 @@ pub struct GlobalOptions {
     ///
     /// This is used if a component does not have its own specific log schema. All events use a log
     /// schema, whether or not the default is used, to assign event fields on incoming events.
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub log_schema: LogSchema,
 
     /// Telemetry options.
     ///
     /// Determines whether `source` and `service` tags should be emitted with the
     /// `component_sent_*` and `component_received_*` events.
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub telemetry: Telemetry,
 
     /// The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone.
@@ -72,17 +66,11 @@ pub struct GlobalOptions {
     /// local time.
     ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub timezone: Option<TimeZone>,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub proxy: ProxyConfig,
 
     /// Controls how acknowledgements are handled for all sinks by default.
@@ -94,7 +82,7 @@ pub struct GlobalOptions {
     #[serde(
         default,
         deserialize_with = "bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
@@ -107,10 +95,7 @@ pub struct GlobalOptions {
     /// captured, but not so long that they continue to build up indefinitely, as this will consume
     /// a small amount of memory for each metric.
     #[configurable(deprecated)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub expire_metrics: Option<Duration>,
 
     /// The amount of time, in seconds, that internal metrics will persist after having not been
@@ -121,10 +106,7 @@ pub struct GlobalOptions {
     /// setting this to a value that ensures that metrics live long enough to be emitted and
     /// captured, but not so long that they continue to build up indefinitely, as this will consume
     /// a small amount of memory for each metric.
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub expire_metrics_secs: Option<f64>,
 }
 

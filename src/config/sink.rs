@@ -11,10 +11,11 @@ use vector_lib::configurable::{
 };
 use vector_lib::{
     config::{AcknowledgementsConfig, GlobalOptions, Input},
+    id::Inputs,
     sink::VectorSink,
 };
 
-use super::{id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
+use super::{dot_graph::GraphConfig, schema, ComponentKey, ProxyConfig, Resource};
 use crate::extra_context::ExtraContext;
 use crate::sinks::{util::UriSerde, Healthcheck};
 
@@ -53,6 +54,10 @@ where
     T: Configurable + Serialize + 'static,
 {
     #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub graph: GraphConfig,
+
+    #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     /// The full URI to make HTTP healthcheck requests to.
@@ -67,17 +72,11 @@ where
     healthcheck: SinkHealthcheckOptions,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_lib::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub buffer: BufferConfig,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_lib::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     proxy: ProxyConfig,
 
     #[serde(flatten)]
@@ -101,6 +100,7 @@ where
             healthcheck_uri: None,
             inner: inner.into(),
             proxy: Default::default(),
+            graph: Default::default(),
         }
     }
 
@@ -157,6 +157,7 @@ where
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
+            graph: self.graph,
         }
     }
 }
@@ -244,6 +245,9 @@ pub struct SinkContext {
     pub schema: schema::Options,
     pub app_name: String,
     pub app_name_slug: String,
+
+    /// Extra context data provided by the running app and shared across all components. This can be
+    /// used to pass shared settings or other data from outside the components.
     pub extra_context: ExtraContext,
 }
 

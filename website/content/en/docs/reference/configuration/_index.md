@@ -23,6 +23,7 @@ data_dir: "/var/lib/vector"
 
 # Vector's API (disabled by default)
 # Enable and try it out with the `vector top` command
+# NOTE: this is _enabled_ for helm chart deployments, see: https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/examples/datadog-values.yaml#L78-L81
 api:
   enabled: false
 # address = "127.0.0.1:8686"
@@ -33,7 +34,7 @@ sources:
     type: "file"
     include:
       - "/var/log/apache2/*.log" # supports globbing
-    ignore_older: 86400          # 1 day
+    ignore_older_secs: 86400     # 1 day
 
 # Structure and parse via Vector's Remap Language
 transforms:
@@ -93,9 +94,9 @@ enabled = false
 
 # Ingest data by tailing one or more files
 [sources.apache_logs]
-type         = "file"
-include      = ["/var/log/apache2/*.log"]    # supports globbing
-ignore_older = 86400                         # 1 day
+type              = "file"
+include           = ["/var/log/apache2/*.log"]    # supports globbing
+ignore_older_secs = 86400                         # 1 day
 
 # Structure and parse via Vector's Remap Language
 [transforms.apache_parser]

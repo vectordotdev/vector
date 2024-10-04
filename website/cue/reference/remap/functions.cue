@@ -25,6 +25,7 @@ remap: {
 		internal_failure_reasons: [...string]
 		examples?: [remap.#Example, ...remap.#Example]
 		deprecated: bool | *false
+		pure:       bool | *true
 	}
 
 	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Convert" | "Debug" | "Enrichment" | "Enumerate" | "Event" | "Path" | "Cryptography" | "IP" | "Number" | "Object" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type"
@@ -78,7 +79,7 @@ remap: {
 		   match criteria. Therefore, use date ranges as the _only_ criteria when the enrichment
 		   data set is very small.
 
-		For `geoip` enrichment tables, this condition needs to be a VRL object with a single key-value pair
+		For `geoip` and `mmdb` enrichment tables, this condition needs to be a VRL object with a single key-value pair
 		whose value needs to be a valid IP address. Example: `{"ip": .ip }`. If a return field is expected
 		and without a value, `null` is used. This table can return the following fields:
 

@@ -1,14 +1,15 @@
 {{ $params := site.Params.search }}
-{{ $appId := printf `"%s"` $params.algolia_app_id }}
-{{ $apiKey := printf `"%s"` $params.algolia_public_api_key }}
-{{ $index := cond hugo.IsProduction $params.algolia_index_prod $params.algolia_index_staging }}
-{{ $index = printf `"%s"` $index }}
+{{ $apiKey := cond hugo.IsProduction $params.typesense_public_prod_apikey $params.typesense_public_dev_apikey }}
+{{ $apiKey = printf `"%s"` $apiKey }}
+{{ $index := printf `"%s"` $params.typesense_index }}
+{{ $host := cond hugo.IsProduction $params.typesense_prod_host $params.typesense_dev_host }}
+{{ $host = printf `"%s"` $host }}
 {{ $searchJs := "js/search.tsx" }}
 {{ $jsOpts := dict "sourceMap" "inline"
   "defines" (dict "process.env.NODE_ENV" "\"development\""
-  "process.env.ALGOLIA_APP_ID" $appId
-  "process.env.ALGOLIA_PUBLIC_API_KEY" $apiKey
-  "process.env.ALGOLIA_INDEX_NAME" $index) }}
+  "process.env.TYPESENSE_PUBLIC_API_KEY" $apiKey
+  "process.env.TYPESENSE_HOST" $host
+  "process.env.TYPESENSE_INDEX" $index) }}
 {{ $babelOpts := dict "noComments" true }}
 {{ $compiled := resources.Get $searchJs | js.Build $jsOpts | babel $babelOpts | fingerprint "sha256" }}
 <script src="{{ $compiled.RelPermalink }}"></script>

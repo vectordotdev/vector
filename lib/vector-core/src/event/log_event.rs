@@ -1,3 +1,4 @@
+use crate::event::util::log::all_fields_skip_array_elements;
 use bytes::Bytes;
 use chrono::Utc;
 use std::{
@@ -318,18 +319,26 @@ impl LogEvent {
     /// aware that if the field has been dropped and then somehow re-added, we still fetch
     /// the dropped value here.
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
-        if let Some(dropped) = self.metadata().dropped_field(&meaning) {
-            Some(dropped)
-        } else {
+        self.metadata().dropped_field(&meaning).or_else(|| {
             self.metadata()
                 .schema_definition()
                 .meaning_path(meaning.as_ref())
                 .and_then(|path| self.get(path))
-        }
+        })
+    }
+
+    /// Retrieves the mutable value of a field based on it's meaning.
+    /// Note that this does _not_ check the dropped fields, unlike `get_by_meaning`, since the
+    /// purpose of the mutable reference is to be able to modify the value and modifying the dropped
+    /// fields has no effect on the resulting event.
+    pub fn get_mut_by_meaning(&mut self, meaning: impl AsRef<str>) -> Option<&mut Value> {
+        Arc::clone(self.metadata.schema_definition())
+            .meaning_path(meaning.as_ref())
+            .and_then(|path| self.get_mut(path))
     }
 
     /// Retrieves the target path of a field based on the specified `meaning`.
-    fn find_key_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&OwnedTargetPath> {
+    pub fn find_key_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&OwnedTargetPath> {
         self.metadata()
             .schema_definition()
             .meaning_path(meaning.as_ref())
@@ -428,22 +437,42 @@ impl LogEvent {
         self.as_map().map(all_fields)
     }
 
+    /// Similar to [`LogEvent::all_event_fields`], but doesn't traverse individual array elements.
+    pub fn all_event_fields_skip_array_elements(
+        &self,
+    ) -> Option<impl Iterator<Item = (KeyString, &Value)> + Serialize> {
+        self.as_map().map(all_fields_skip_array_elements)
+    }
+
     /// If the metadata root value is a map, build and return an iterator to metadata field and value pairs.
     /// TODO: Ideally this should return target paths to be consistent with other `LogEvent` methods.
     pub fn all_metadata_fields(
         &self,
     ) -> Option<impl Iterator<Item = (KeyString, &Value)> + Serialize> {
         match self.metadata.value() {
-            Value::Object(metadata_map) => Some(metadata_map).map(all_metadata_fields),
+            Value::Object(metadata_map) => Some(all_metadata_fields(metadata_map)),
             _ => None,
         }
     }
 
-    /// Returns an iterator of all fields if the value is an Object. Otherwise,
-    /// a single field is returned with a "message" key
+    /// Returns an iterator of all fields if the value is an Object. Otherwise, a single field is
+    /// returned with a "message" key. Field names that are could be interpreted as alternate paths
+    /// (i.e. containing periods, square brackets, etc) are quoted.
     pub fn convert_to_fields(&self) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
         if let Some(map) = self.as_map() {
             util::log::all_fields(map)
+        } else {
+            util::log::all_fields_non_object_root(self.value())
+        }
+    }
+
+    /// Returns an iterator of all fields if the value is an Object. Otherwise, a single field is
+    /// returned with a "message" key. Field names are not quoted.
+    pub fn convert_to_fields_unquoted(
+        &self,
+    ) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
+        if let Some(map) = self.as_map() {
+            util::log::all_fields_unquoted(map)
         } else {
             util::log::all_fields_non_object_root(self.value())
         }
@@ -804,7 +833,8 @@ mod test {
     use super::*;
     use crate::test_util::open_fixture;
     use lookup::event_path;
-    use vrl::value;
+    use uuid::Version;
+    use vrl::{btreemap, value};
 
     // The following two tests assert that renaming a key has no effect if the
     // keys are equivalent, whether the key exists in the log or not.
@@ -1138,6 +1168,49 @@ mod test {
         assert_eq!(
             actual,
             vec![("%a.b".into(), 1.into()), ("%c".into(), 2.into())]
+        );
+    }
+
+    #[test]
+    fn skip_array_elements() {
+        let log = LogEvent::from(Value::from(btreemap! {
+            "arr" => [1],
+            "obj" => btreemap! {
+                "arr" => [1,2,3]
+            },
+        }));
+
+        let actual: Vec<(KeyString, Value)> = log
+            .all_event_fields_skip_array_elements()
+            .unwrap()
+            .map(|(s, v)| (s, v.clone()))
+            .collect();
+        assert_eq!(
+            actual,
+            vec![
+                ("arr".into(), [1].into()),
+                ("obj.arr".into(), [1, 2, 3].into())
+            ]
+        );
+    }
+
+    #[test]
+    fn metadata_set_unique_uuid_v7_source_event_id() {
+        // Check if event id is UUID v7
+        let log1 = LogEvent::default();
+        assert_eq!(
+            log1.metadata()
+                .source_event_id()
+                .expect("source_event_id should be auto-generated for new events")
+                .get_version(),
+            Some(Version::SortRand)
+        );
+
+        // Check if event id is unique on creation
+        let log2 = LogEvent::default();
+        assert_ne!(
+            log1.metadata().source_event_id(),
+            log2.metadata().source_event_id()
         );
     }
 }

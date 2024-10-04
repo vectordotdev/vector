@@ -9,7 +9,7 @@ use super::config::Environment;
 use crate::{platform, util};
 
 static DATA_DIR: Lazy<PathBuf> = Lazy::new(|| {
-    [platform::data_dir().as_path(), Path::new("integration")]
+    [platform::data_dir(), Path::new("integration")]
         .into_iter()
         .collect()
 });

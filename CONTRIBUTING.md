@@ -102,7 +102,11 @@ outputs to reference the filter, and finally update the outputs of `workflow_cal
 ### Git Branches
 
 _All_ changes must be made in a branch and submitted as [pull requests](#github-pull-requests).
-Vector does not adopt any type of branch naming style, but please use something
+
+If you want your branch to have a website preview build created, include the word `website` in the
+branch.
+
+Otherwise, Vector does not adopt any type of branch naming style, but please use something
 descriptive of your changes.
 
 ### Git Commits
@@ -128,7 +132,7 @@ format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
 A list of allowed sub-categories is defined
-[here](https://github.com/vectordotdev/vector/tree/master/.github).
+[here](https://github.com/vectordotdev/vector/blob/master/.github/semantic.yml#L21).
 
 The following are all good examples of pull request titles:
 
@@ -161,6 +165,15 @@ with one of our engineers. This way we can talk through the solution and
 discuss if a change that large is even needed! This will produce a quicker
 response to the change and likely produce code that aligns better with our
 process.
+
+#### Changelog
+
+By default, all pull requests are assumed to include user-facing changes that
+need to be communicated in the project's changelog. If your pull request does
+not contain user-facing changes that warrant describing in the changelog, add
+the label 'no-changelog' to your PR. When in doubt, consult the vector team
+for guidance. The details on how to add a changelog entry for your PR are
+outlined in detail in [changelog.d/README.md](changelog.d/README.md).
 
 ### CI
 
@@ -228,7 +241,7 @@ first to ensure they pass.
 
 ```sh
 # Run the Clippy linter to catch common mistakes.
-cargo vdev check rust
+cargo vdev check rust --clippy
 # Ensure all code is properly formatted. Code can be run through `rustfmt` using `cargo fmt` to ensure it is properly formatted.
 cargo vdev check fmt
 # Ensure the internal metrics that Vector emits conform to standards.

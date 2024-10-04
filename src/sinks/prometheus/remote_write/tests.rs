@@ -10,7 +10,7 @@ use super::*;
 use crate::{
     config::SinkContext,
     event::{MetricKind, MetricValue},
-    sinks::{prometheus::remote_write::RemoteWriteConfig, util::test::build_test_server},
+    sinks::{prometheus::remote_write::config::RemoteWriteConfig, util::test::build_test_server},
     test_util::{
         self,
         components::{assert_sink_compliance, HTTP_SINK_TAGS},

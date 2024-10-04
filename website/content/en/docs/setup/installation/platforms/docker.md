@@ -36,21 +36,23 @@ Vector is an end-to-end observability data pipeline designed to deploy under var
 Create a new Vector configuration. The below will output dummy logs to stdout.
 
 ```shell
-cat <<-EOF > $PWD/vector.toml
-[api]
-enabled = true
-address = "0.0.0.0:8686"
-
-[sources.demo_logs]
-type = "demo_logs"
-interval = 1.0
-format = "json"
-
-[sinks.console]
-inputs = ["demo_logs"]
-target = "stdout"
-type = "console"
-encoding.codec = "json"
+cat <<-EOF > $PWD/vector.yaml
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+sources:
+  demo_logs:
+    type: demo_logs
+    interval: 1
+    format: json
+sinks:
+  console:
+    inputs:
+      - demo_logs
+    target: stdout
+    type: console
+    encoding:
+      codec: json
 EOF
 ```
 
@@ -61,6 +63,7 @@ docker run \
   -d \
   -v $PWD/vector.yaml:/etc/vector/vector.yaml:ro \
   -p 8686:8686 \
+  --name vector \
   timberio/vector:{{< version >}}-debian
 ```
 
@@ -69,19 +72,19 @@ Make sure to substitute out `debian` if you're using a different distribution.
 ### Stop
 
 ```shell
-docker stop timberio/vector
+docker stop vector
 ```
 
 ### Reload
 
 ```shell
-docker kill --signal=HUP timberio/vector
+docker kill --signal=HUP vector
 ```
 
 ### Restart
 
 ```shell
-docker restart -f $(docker ps -aqf "name=vector")
+docker restart $(docker ps -aqf "name=vector")
 ```
 
 ### Observe
@@ -95,13 +98,13 @@ docker logs -f $(docker ps -aqf "name=vector")
 To access metrics from your Vector image:
 
 ```shell
-vector top
+docker exec -ti $(docker ps -aqf "name=vector") vector top
 ```
 
 ### Uninstall
 
 ```shell
-docker rm timberio/vector
+docker rm vector
 ```
 
 [docker]: https://docker.com

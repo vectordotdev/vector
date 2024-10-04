@@ -63,8 +63,11 @@ base: components: sources: prometheus_remote_write: configuration: {
 			}
 			max_connection_age_secs: {
 				description: """
-					The maximum amount of time a connection may exist before it is closed
-					by sending a `Connection: close` header on the HTTP response.
+					The maximum amount of time a connection may exist before it is closed by sending
+					a `Connection: close` header on the HTTP response. Set this to a large value like
+					`100000000` to "disable" this feature
+
+					Only applies to HTTP/0.9, HTTP/1.0, and HTTP/1.1 requests.
 
 					A random jitter configured by `max_connection_age_jitter_factor` is added
 					to the specified duration to spread out connection storms.
@@ -143,14 +146,14 @@ base: components: sources: prometheus_remote_write: configuration: {
 			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

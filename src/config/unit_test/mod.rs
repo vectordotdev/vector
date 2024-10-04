@@ -1,4 +1,13 @@
-#[cfg(all(test, feature = "vector-unit-test-tests"))]
+// should match vector-unit-test-tests feature
+#[cfg(all(
+    test,
+    feature = "sources-demo_logs",
+    feature = "transforms-remap",
+    feature = "transforms-route",
+    feature = "transforms-filter",
+    feature = "transforms-reduce",
+    feature = "sinks-console"
+))]
 mod tests;
 mod unit_test_components;
 
@@ -32,7 +41,7 @@ use crate::{
         self, loading, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
         TestDefinition, TestInput, TestInputValue, TestOutput,
     },
-    event::{Event, LogEvent, Value},
+    event::{Event, EventMetadata, LogEvent, Value},
     signal,
     topology::{builder::TopologyPieces, RunningTopology},
 };
@@ -74,15 +83,29 @@ impl UnitTest {
     }
 }
 
+/// Loads Log Schema from configurations and sets global schema.
+/// Once this is done, configurations can be correctly loaded using
+/// configured log schema defaults.
+/// If deny is set, will panic if schema has already been set.
+fn init_log_schema_from_paths(
+    config_paths: &[ConfigPath],
+    deny_if_set: bool,
+) -> Result<(), Vec<String>> {
+    let builder = config::loading::load_builder_from_paths(config_paths)?;
+    vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
+    Ok(())
+}
+
 pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    config::init_log_schema(paths, false)?;
-    let (mut secrets_backends_loader, _) = loading::load_secret_backends_from_paths(paths)?;
-    let (config_builder, _) = if secrets_backends_loader.has_secrets_to_retrieve() {
+    init_log_schema_from_paths(paths, false)?;
+    let mut secrets_backends_loader = loading::load_secret_backends_from_paths(paths)?;
+    let config_builder = if secrets_backends_loader.has_secrets_to_retrieve() {
         let resolved_secrets = secrets_backends_loader
             .retrieve(&mut signal_handler.subscribe())
+            .await
             .map_err(|e| vec![e])?;
         loading::load_builder_from_paths_with_secrets(paths, resolved_secrets)?
     } else {
@@ -216,15 +239,18 @@ impl UnitTestBuildMetadata {
         Ok(inputs
             .into_iter()
             .map(|(insert_at, events)| {
-                let mut source_config = template_sources.remove(&insert_at).unwrap_or_else(|| {
-                    // At this point, all inputs should have been validated to
-                    // correspond with valid transforms, and all valid transforms
-                    // have a source attached.
-                    panic!(
-                        "Invalid input: cannot insert at {:?}",
-                        insert_at.to_string()
-                    )
-                });
+                let mut source_config =
+                    template_sources
+                        .shift_remove(&insert_at)
+                        .unwrap_or_else(|| {
+                            // At this point, all inputs should have been validated to
+                            // correspond with valid transforms, and all valid transforms
+                            // have a source attached.
+                            panic!(
+                                "Invalid input: cannot insert at {:?}",
+                                insert_at.to_string()
+                            )
+                        });
                 source_config.events.extend(events);
                 let id: &str = self
                     .source_ids
@@ -581,7 +607,12 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                 result
                     .program
                     .resolve(&mut ctx)
-                    .map(|v| Event::Log(LogEvent::from(v.clone())))
+                    .map(|_| {
+                        Event::Log(LogEvent::from_parts(
+                            target.value.clone(),
+                            EventMetadata::default_with_value(target.metadata.clone()),
+                        ))
+                    })
                     .map_err(|e| e.to_string())
             } else {
                 Err("input type 'vrl' requires the field 'source'".to_string())

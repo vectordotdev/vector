@@ -1,0 +1,12 @@
+features:
+- mqtt-integration-tests
+
+test_filter: '::mqtt::'
+
+matrix:
+  version: ['5.0.15']
+
+paths:
+- "src/internal_events/mqtt.rs"
+- "src/sinks/mqtt/**"
+- "src/sinks/util/**"

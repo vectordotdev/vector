@@ -14,22 +14,22 @@ use vector_lib::schema::meaning;
 use vrl::path::OwnedValuePath;
 use vrl::value::Value;
 
-use crate::{event::Event, serde::skip_serializing_if_default};
+use crate::{event::Event, serde::is_default};
 
 /// Transformations to prepare an event for serialization.
 #[configurable_component(no_deser)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Transformer {
     /// List of fields that are included in the encoded event.
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    #[serde(default, skip_serializing_if = "is_default")]
     only_fields: Option<Vec<ConfigValuePath>>,
 
     /// List of fields that are excluded from the encoded event.
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    #[serde(default, skip_serializing_if = "is_default")]
     except_fields: Option<Vec<ConfigValuePath>>,
 
     /// Format used for timestamp fields.
-    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    #[serde(default, skip_serializing_if = "is_default")]
     timestamp_format: Option<TimestampFormat>,
 }
 

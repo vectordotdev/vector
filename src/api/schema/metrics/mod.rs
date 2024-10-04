@@ -15,7 +15,7 @@ mod uptime;
 mod host;
 
 pub use allocated_bytes::{AllocatedBytes, ComponentAllocatedBytes};
-use async_graphql::{Interface, Object, Subscription};
+use async_graphql::{Interface, Subscription};
 use chrono::{DateTime, Utc};
 pub use errors::{ComponentErrorsTotal, ErrorsTotal};
 pub use filter::*;
@@ -45,9 +45,9 @@ pub enum MetricType {
 #[derive(Default)]
 pub struct MetricsQuery;
 
-#[Object]
+#[cfg(feature = "sources-host_metrics")]
+#[async_graphql::Object]
 impl MetricsQuery {
-    #[cfg(feature = "sources-host_metrics")]
     /// Vector host metrics
     async fn host_metrics(&self) -> host::HostMetrics {
         host::HostMetrics::new()

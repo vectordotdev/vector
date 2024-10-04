@@ -349,95 +349,24 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
 }
 
 #[tokio::test]
-/// Assert that events are sent and the DD-EVP-ORIGIN header is set when
-/// 'enterprise' is flagged on, v2 API
+/// Assert that events are sent and the DD-EVP-ORIGIN header is not set, v2 API
 ///
-/// Vector allows for flagging a global 'enterprise' context that indicates
-/// whether we're running in Datadog enterprise mode or not. When this flag is
-/// active we should set the origin header discussed above correctly, as well as
+/// When this flag is not active we should not set the origin header discussed above, as well as
 /// still sending events through the sink.
-async fn enterprise_headers_v2() {
-    enterprise_headers_inner(ApiStatus::OKv2).await
+async fn headers_v2() {
+    headers_inner(ApiStatus::OKv2).await
 }
 
 #[tokio::test]
-/// Assert that events are sent and the DD-EVP-ORIGIN header is set when
-/// 'enterprise' is flagged on, v1 API
+/// Assert that events are sent and the DD-EVP-ORIGIN header is not set, v1 API
 ///
-/// Vector allows for flagging a global 'enterprise' context that indicates
-/// whether we're running in Datadog enterprise mode or not. When this flag is
-/// active we should set the origin header discussed above correctly, as well as
+/// When this flag is not active we should not set the origin header discussed above, as well as
 /// still sending events through the sink.
-async fn enterprise_headers_v1() {
-    enterprise_headers_inner(ApiStatus::OKv1).await
+async fn headers_v1() {
+    headers_inner(ApiStatus::OKv1).await
 }
 
-async fn enterprise_headers_inner(api_status: ApiStatus) {
-    let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
-            default_api_key = "atoken"
-            compression = "none"
-        "#})
-    .unwrap();
-    cx.app_name = "Vector Enterprise".to_string();
-    cx.app_name_slug = "vector-enterprise".to_string();
-
-    let addr = next_addr();
-    // Swap out the endpoint so we can force send it to our local server
-    let endpoint = format!("http://{}", addr);
-    config.local_dd_common.endpoint = Some(endpoint.clone());
-
-    let (sink, _) = config.build(cx).await.unwrap();
-
-    let (rx, _trigger, server) = test_server(addr, api_status);
-    tokio::spawn(server);
-
-    let (_expected_messages, events) = random_lines_with_stream(100, 10, None);
-
-    let api_key = "0xDECAFBAD";
-    let events = events.map(|mut e| {
-        println!("EVENT: {:?}", e);
-        e.iter_logs_mut().for_each(|log| {
-            log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
-        });
-        e
-    });
-
-    sink.run(events).await.unwrap();
-    let output: (Parts, Bytes) = rx.take(1).collect::<Vec<_>>().await.pop().unwrap();
-    let parts = output.0;
-
-    assert_eq!(
-        parts.headers.get("DD-EVP-ORIGIN").unwrap(),
-        "vector-enterprise"
-    );
-    assert!(parts.headers.get("DD-EVP-ORIGIN-VERSION").is_some());
-}
-
-#[tokio::test]
-/// Assert that events are sent and the DD-EVP-ORIGIN header is not set when
-/// 'enterprise' is flagged off, v2 API
-///
-/// Vector allows for flagging a global 'enterprise' context that indicates
-/// whether we're running in Datadog enterprise mode or not. When this flag is
-/// not active we should not set the origin header discussed above, as well as
-/// still sending events through the sink.
-async fn no_enterprise_headers_v2() {
-    no_enterprise_headers_inner(ApiStatus::OKv2).await
-}
-
-#[tokio::test]
-/// Assert that events are sent and the DD-EVP-ORIGIN header is not set when
-/// 'enterprise' is flagged off, v1 API
-///
-/// Vector allows for flagging a global 'enterprise' context that indicates
-/// whether we're running in Datadog enterprise mode or not. When this flag is
-/// not active we should not set the origin header discussed above, as well as
-/// still sending events through the sink.
-async fn no_enterprise_headers_v1() {
-    no_enterprise_headers_inner(ApiStatus::OKv1).await
-}
-
-async fn no_enterprise_headers_inner(api_status: ApiStatus) {
+async fn headers_inner(api_status: ApiStatus) {
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
@@ -503,6 +432,54 @@ async fn error_is_retriable() {
     // note: HttpError::CallRequest and HttpError::MakeHttpsConnector are all retry-able,
     //       but are not straightforward to instantiate due to the design of
     //       the crates they originate from.
+}
+
+#[tokio::test]
+async fn does_not_send_too_big_payloads() {
+    crate::test_util::trace_init();
+
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+            default_api_key = "atoken"
+            compression = "none"
+        "#})
+    .unwrap();
+
+    let addr = next_addr();
+    let endpoint = format!("http://{}", addr);
+    config.local_dd_common.endpoint = Some(endpoint.clone());
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (mut rx, _trigger, server) = test_server(addr, ApiStatus::OKv2);
+    tokio::spawn(server);
+
+    // Generate input that will require escaping when serialized to json, and therefore grow in size
+    // between batching and encoding. This is a very specific example that will fit in a batch of
+    // <4,250,000 but serialize to >5,000,000, defeating the current 750k safety buffer.
+    let events = (0..1000).map(|_n| {
+        let data = serde_json::json!({"a": "b"});
+        let nested = serde_json::to_string(&data).unwrap();
+        event_with_api_key(&nested.repeat(401), "foo")
+    });
+
+    sink.run_events(events).await.unwrap();
+
+    let mut sizes = Vec::new();
+    loop {
+        tokio::select! {
+            Some((_parts, body)) = rx.next() => {
+                sizes.push(body.len());
+            }
+            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
+                break;
+            }
+        }
+    }
+
+    assert!(!sizes.is_empty());
+    for size in sizes {
+        assert!(size < 5_000_000, "{} not less than max", size);
+    }
 }
 
 #[tokio::test]

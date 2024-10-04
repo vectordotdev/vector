@@ -499,6 +499,7 @@ _values: {
 	"string"?: #TypeString & {_args: required: Args.required}
 	"ascii_char"?: #TypeAsciiChar & {_args: required: Args.required}
 	"timestamp"?: #TypeTimestamp & {_args: required: Args.required}
+	"int"?: #TypeInt & {_args: required: Args.required}
 	"uint"?: #TypeUint & {_args: required: Args.required}
 }
 
@@ -618,6 +619,25 @@ _values: {
 	examples: [_values.current_timestamp]
 }
 
+#TypeInt: {
+	_args: required: bool
+	let Args = _args
+
+	if !Args.required {
+		// `default` sets the default value.
+		default: int | *null
+	}
+
+	// `examples` clarify values through examples. This should be used
+	// when examples cannot be derived from the `default` or `enum`
+	// options.
+	examples?: [int, ...int]
+
+	// `unit` clarifies the value's unit. While this should be included
+	// as the suffix in the name, this helps to explicitly clarify that.
+	unit?: #Unit | null
+}
+
 #TypeUint: {
 	_args: required: bool
 	let Args = _args
@@ -676,7 +696,7 @@ _coercing_fields: """
 	:------|:------------|:-------
 	`%F %T` | `YYYY-MM-DD HH:MM:SS` | `2020-12-01 02:37:54`
 	`%v %T` | `DD-Mmm-YYYY HH:MM:SS` | `01-Dec-2020 02:37:54`
-	`%FT%T` | [ISO 8601](\(urls.iso_8601))\\[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
+	`%FT%T` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
 	`%a, %d %b %Y %T` | [RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone | `Tue, 01 Dec 2020 02:37:54`
 	`%a %d %b %T %Y` | [`date`](\(urls.date)) command output without time zone | `Tue 01 Dec 02:37:54 2020`
 	`%a %b %e %T %Y` | [ctime](\(urls.ctime)) format | `Tue Dec  1 02:37:54 2020`

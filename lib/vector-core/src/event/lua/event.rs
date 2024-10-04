@@ -169,11 +169,13 @@ mod test {
     }
 
     #[test]
+    // the panic message a) is platform dependent and b) can change if any code is added before this function.
+    #[allow(clippy::should_panic_without_expect)]
     #[should_panic]
     fn from_lua_missing_log_and_metric() {
-        let lua_event = r#"{
+        let lua_event = r"{
             some_field: {}
-        }"#;
+        }";
         Lua::new().load(lua_event).eval::<Event>().unwrap();
     }
 }

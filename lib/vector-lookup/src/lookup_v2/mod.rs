@@ -15,6 +15,7 @@ use vrl::value::KeyString;
 /// use [optional_path::OptionalValuePath].
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(try_from = "String", into = "String")]
 pub struct ConfigValuePath(pub OwnedValuePath);
 
@@ -59,6 +60,7 @@ impl From<&str> for ConfigValuePath {
 /// with prefix default to `PathPrefix::Event`
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(try_from = "String", into = "String")]
 pub struct ConfigTargetPath(pub OwnedTargetPath);
 

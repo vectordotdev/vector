@@ -1,7 +1,7 @@
 ---
 title: AWS S3
 description: Collect logs from [AWS S3](https://aws.amazon.com/s3)
-kind: source
+component_kind: source
 layout: component
 tags: ["aws", "s3", "storage", "component", "source", "logs"]
 ---

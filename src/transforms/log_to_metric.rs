@@ -493,6 +493,34 @@ fn get_gauge_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     })
 }
 
+fn get_set_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
+    let set_values = log
+        .get(event_path!("set", "values"))
+        .ok_or_else(|| TransformError::PathNotFound {
+            path: "set.values".to_string(),
+        })?
+        .as_array()
+        .ok_or_else(|| TransformError::ParseError {
+            path: "set.values".to_string(),
+            kind: TransformParseErrorKind::ArrayError,
+        })?;
+
+    let mut values: Vec<String> = Vec::new();
+    for e_value in set_values {
+        let value = e_value
+            .as_bytes()
+            .ok_or_else(|| TransformError::ParseError {
+                path: "set.values".to_string(),
+                kind: TransformParseErrorKind::ArrayError,
+            })?;
+        values.push(String::from_utf8_lossy(value).to_string());
+    }
+
+    Ok(MetricValue::Set {
+        values: values.into_iter().collect(),
+    })
+}
+
 fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_samples = log
         .get(event_path!("distribution", "samples"))
@@ -755,6 +783,7 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
                 "histogram" => Some(get_histogram_value(log)?),
                 "summary" => Some(get_summary_value(log)?),
                 "counter" => Some(get_counter_value(log)?),
+                "set" => Some(get_set_value(log)?),
                 _ => None,
             };
 
@@ -1923,6 +1952,47 @@ mod tests {
                 "test.transform.counter",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 10.0 },
+                metric.metadata().clone(),
+            )
+            .with_namespace(Some("test_namespace"))
+            .with_tags(Some(metric_tags!(
+                "env" => "test_env",
+                "host" => "localhost",
+            )))
+            .with_timestamp(Some(ts()))
+        );
+    }
+
+    #[tokio::test]
+    async fn transform_set() {
+        let config = parse_yaml_config(
+            r#"
+            metrics: []
+            all_metrics: true
+            "#,
+        );
+
+        let json_str = r#"{
+          "set": {
+            "values": ["990.0", "1234"]
+          },
+          "kind": "incremental",
+          "name": "test.transform.set",
+          "tags": {
+            "env": "test_env",
+            "host": "localhost"
+          }
+        }"#;
+        let log = create_log_event(json_str);
+        let metric = do_transform(config, log.clone()).await.unwrap();
+        assert_eq!(
+            *metric.as_metric(),
+            Metric::new_with_metadata(
+                "test.transform.set",
+                MetricKind::Incremental,
+                MetricValue::Set {
+                    values: vec!["990.0".into(), "1234".into()].into_iter().collect()
+                },
                 metric.metadata().clone(),
             )
             .with_namespace(Some("test_namespace"))

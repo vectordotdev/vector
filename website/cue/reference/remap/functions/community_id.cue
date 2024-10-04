@@ -27,13 +27,13 @@ remap: functions: community_id: {
 		},
 		{
 			name:        "source_port"
-			description: "The source port."
+			description: "The source port or ICMP type."
 			required:    false
 			type: ["integer"]
 		},
 		{
 			name:        "destination_port"
-			description: "The destination port."
+			description: "The destination port or ICMP code."
 			required:    false
 			type: ["integer"]
 		},

@@ -1,0 +1,11 @@
+
+optimization_goal: ingress_throughput
+
+target:
+  name: vector
+  command: /usr/bin/vector
+  cpu_allotment: 7
+  memory_allotment: 30g
+
+  environment:
+    VECTOR_THREADS: 4

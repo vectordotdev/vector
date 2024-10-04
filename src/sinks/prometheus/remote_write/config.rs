@@ -108,7 +108,7 @@ pub struct RemoteWriteConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
@@ -163,7 +163,9 @@ impl SinkConfig for RemoteWriteConfig {
                     .ok_or(Errors::AwsRegionRequired)?
                     .ok_or(Errors::AwsRegionRequired)?;
                 Some(Auth::Aws {
-                    credentials_provider: aws_auth.credentials_provider(region.clone()).await?,
+                    credentials_provider: aws_auth
+                        .credentials_provider(region.clone(), cx.proxy(), &self.tls)
+                        .await?,
                     region,
                 })
             }

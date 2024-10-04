@@ -3,28 +3,19 @@ use std::{num::NonZeroUsize, path::PathBuf, process::ExitStatus, time::Duration}
 
 use exitcode::ExitCode;
 use futures::StreamExt;
-#[cfg(feature = "enterprise")]
-use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::runtime::{self, Runtime};
-use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::{broadcast::error::RecvError, MutexGuard};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-#[cfg(feature = "enterprise")]
-use crate::config::enterprise::{
-    attach_enterprise_components, report_configuration, EnterpriseError, EnterpriseMetadata,
-    EnterpriseReporter,
-};
 use crate::extra_context::ExtraContext;
-#[cfg(not(feature = "enterprise-tests"))]
-use crate::metrics;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts},
     config::{self, Config, ConfigPath},
     heartbeat,
-    internal_events::{VectorQuit, VectorStarted, VectorStopped},
+    internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
@@ -48,8 +39,6 @@ pub struct ApplicationConfig {
     pub internal_topologies: Vec<RunningTopology>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
-    #[cfg(feature = "enterprise")]
-    pub enterprise: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
     pub extra_context: ExtraContext,
 }
 
@@ -88,14 +77,6 @@ impl ApplicationConfig {
         config: Config,
         extra_context: ExtraContext,
     ) -> Result<Self, ExitCode> {
-        // This is ugly, but needed to allow `config` to be mutable for building the enterprise
-        // features, but also avoid a "does not need to be mutable" warning when the enterprise
-        // feature is not enabled.
-        #[cfg(feature = "enterprise")]
-        let mut config = config;
-        #[cfg(feature = "enterprise")]
-        let enterprise = build_enterprise(&mut config, config_paths.clone())?;
-
         #[cfg(feature = "api")]
         let api = config.api;
 
@@ -111,8 +92,6 @@ impl ApplicationConfig {
             internal_topologies: Vec::new(),
             #[cfg(feature = "api")]
             api,
-            #[cfg(feature = "enterprise")]
-            enterprise,
             extra_context,
         })
     }
@@ -144,7 +123,8 @@ impl ApplicationConfig {
                 Ok(api_server) => {
                     emit!(ApiStarted {
                         addr: self.api.address.unwrap(),
-                        playground: self.api.playground
+                        playground: self.api.playground,
+                        graphql: self.api.graphql
                     });
 
                     Some(api_server)
@@ -195,7 +175,7 @@ impl Application {
         opts: Opts,
         extra_context: ExtraContext,
     ) -> Result<(Runtime, Self), ExitCode> {
-        init_global(!opts.root.openssl_no_probe);
+        opts.root.init_global();
 
         let color = opts.root.color.use_color();
 
@@ -223,7 +203,7 @@ impl Application {
         let config = runtime.block_on(ApplicationConfig::from_opts(
             &opts.root,
             &mut signals.handler,
-            extra_context.clone(),
+            extra_context,
         ))?;
 
         Ok((
@@ -256,8 +236,6 @@ impl Application {
             topology: config.topology,
             config_paths: config.config_paths.clone(),
             require_healthy: root_opts.require_healthy,
-            #[cfg(feature = "enterprise")]
-            enterprise_reporter: config.enterprise,
             extra_context: config.extra_context,
         });
 
@@ -341,12 +319,8 @@ async fn handle_signal(
 ) -> Option<SignalTo> {
     match signal {
         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
-            let mut topology_controller = topology_controller.lock().await;
-            let new_config = config_builder.build().map_err(handle_config_errors).ok();
-            match topology_controller.reload(new_config).await {
-                ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
-                _ => None,
-            }
+            let topology_controller = topology_controller.lock().await;
+            reload_config_from_result(topology_controller, config_builder.build()).await
         }
         Ok(SignalTo::ReloadFromDisk) => {
             let mut topology_controller = topology_controller.lock().await;
@@ -362,14 +336,9 @@ async fn handle_signal(
                 signal_handler,
                 allow_empty_config,
             )
-            .await
-            .map_err(handle_config_errors)
-            .ok();
+            .await;
 
-            match topology_controller.reload(new_config).await {
-                ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
-                _ => None,
-            }
+            reload_config_from_result(topology_controller, new_config).await
         }
         Err(RecvError::Lagged(amt)) => {
             warn!("Overflow, dropped {} signals.", amt);
@@ -377,6 +346,23 @@ async fn handle_signal(
         }
         Err(RecvError::Closed) => Some(SignalTo::Shutdown(None)),
         Ok(signal) => Some(signal),
+    }
+}
+
+async fn reload_config_from_result(
+    mut topology_controller: MutexGuard<'_, TopologyController>,
+    config: Result<Config, Vec<String>>,
+) -> Option<SignalTo> {
+    match config {
+        Ok(new_config) => match topology_controller.reload(new_config).await {
+            ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
+            _ => None,
+        },
+        Err(errors) => {
+            handle_config_errors(errors);
+            emit!(VectorConfigLoadError);
+            None
+        }
     }
 }
 
@@ -445,15 +431,6 @@ impl FinishedApplication {
     }
 }
 
-pub fn init_global(openssl_probe: bool) {
-    if openssl_probe {
-        openssl_probe::init_ssl_cert_env_vars();
-    }
-
-    #[cfg(not(feature = "enterprise-tests"))]
-    metrics::init_global().expect("metrics initialization failed");
-}
-
 fn get_log_levels(default: &str) -> String {
     std::env::var("VECTOR_LOG")
         .or_else(|_| {
@@ -499,22 +476,21 @@ pub async fn load_configs(
 
     if watch_config {
         // Start listening for config changes immediately.
-        config::watcher::spawn_thread(config_paths.iter().map(Into::into), None).map_err(
-            |error| {
-                error!(message = "Unable to start config watcher.", %error);
-                exitcode::CONFIG
-            },
-        )?;
+        config::watcher::spawn_thread(
+            signal_handler.clone_tx(),
+            config_paths.iter().map(Into::into),
+            None,
+        )
+        .map_err(|error| {
+            error!(message = "Unable to start config watcher.", %error);
+            exitcode::CONFIG
+        })?;
     }
 
     info!(
         message = "Loading configs.",
         paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
     );
-
-    // config::init_log_schema should be called before initializing sources.
-    #[cfg(not(feature = "enterprise-tests"))]
-    config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
     let mut config = config::load_from_paths_with_provider_and_secrets(
         &config_paths,
@@ -524,6 +500,7 @@ pub async fn load_configs(
     .await
     .map_err(handle_config_errors)?;
 
+    config::init_log_schema(config.global.log_schema.clone(), true);
     config::init_telemetry(config.global.telemetry.clone(), true);
 
     if !config.healthchecks.enabled {
@@ -533,41 +510,6 @@ pub async fn load_configs(
     config.graceful_shutdown_duration = graceful_shutdown_duration;
 
     Ok(config)
-}
-
-#[cfg(feature = "enterprise")]
-// Enable enterprise features, if applicable.
-fn build_enterprise(
-    config: &mut Config,
-    config_paths: Vec<ConfigPath>,
-) -> Result<Option<EnterpriseReporter<BoxFuture<'static, ()>>>, ExitCode> {
-    use crate::ENTERPRISE_ENABLED;
-
-    ENTERPRISE_ENABLED
-        .set(
-            config
-                .enterprise
-                .as_ref()
-                .map(|e| e.enabled)
-                .unwrap_or_default(),
-        )
-        .expect("double initialization of enterprise enabled flag");
-
-    match EnterpriseMetadata::try_from(&*config) {
-        Ok(metadata) => {
-            let enterprise = EnterpriseReporter::new();
-
-            attach_enterprise_components(config, &metadata);
-            enterprise.send(report_configuration(config_paths, metadata));
-
-            Ok(Some(enterprise))
-        }
-        Err(EnterpriseError::MissingApiKey) => {
-            error!("Enterprise configuration incomplete: missing API key.");
-            Err(exitcode::CONFIG)
-        }
-        Err(_) => Ok(None),
-    }
 }
 
 pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) {

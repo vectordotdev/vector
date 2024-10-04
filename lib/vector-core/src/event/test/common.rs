@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, iter};
 
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use quickcheck::{empty_shrinker, Arbitrary, Gen};
 use vrl::value::{ObjectMap, Value};
 
@@ -50,9 +50,7 @@ fn datetime(g: &mut Gen) -> DateTime<Utc> {
     // are. We just sort of arbitrarily restrict things.
     let secs = i64::arbitrary(g) % 32_000;
     let nanosecs = u32::arbitrary(g) % 32_000;
-    NaiveDateTime::from_timestamp_opt(secs, nanosecs)
-        .expect("invalid timestamp")
-        .and_utc()
+    DateTime::from_timestamp(secs, nanosecs).expect("invalid timestamp")
 }
 
 impl Arbitrary for Event {

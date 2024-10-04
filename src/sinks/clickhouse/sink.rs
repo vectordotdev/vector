@@ -1,43 +1,39 @@
-use bytes::Bytes;
-use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+//! Implementation of the `clickhouse` sink.
 
-use super::service::{ClickhouseRequest, ClickhouseRetryLogic, ClickhouseService};
-use crate::sinks::prelude::*;
+use super::{config::Format, request_builder::ClickhouseRequestBuilder};
+use crate::sinks::{prelude::*, util::http::HttpRequest};
 
-pub struct ClickhouseSink {
+pub struct ClickhouseSink<S> {
     batch_settings: BatcherSettings,
-    compression: Compression,
-    encoding: (Transformer, Encoder<Framer>),
-    service: Svc<ClickhouseService, ClickhouseRetryLogic>,
-    protocol: &'static str,
+    service: S,
     database: Template,
     table: Template,
+    format: Format,
+    request_builder: ClickhouseRequestBuilder,
 }
 
-impl ClickhouseSink {
-    pub fn new(
+impl<S> ClickhouseSink<S>
+where
+    S: Service<HttpRequest<PartitionKey>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: std::fmt::Debug + Into<crate::Error> + Send,
+{
+    pub const fn new(
         batch_settings: BatcherSettings,
-        compression: Compression,
-        transformer: Transformer,
-        service: Svc<ClickhouseService, ClickhouseRetryLogic>,
-        protocol: &'static str,
+        service: S,
         database: Template,
         table: Template,
+        format: Format,
+        request_builder: ClickhouseRequestBuilder,
     ) -> Self {
         Self {
             batch_settings,
-            compression,
-            encoding: (
-                transformer,
-                Encoder::<Framer>::new(
-                    NewlineDelimitedEncoderConfig.build().into(),
-                    JsonSerializerConfig::default().build().into(),
-                ),
-            ),
             service,
-            protocol,
             database,
             table,
+            format,
+            request_builder,
         }
     }
 
@@ -45,16 +41,14 @@ impl ClickhouseSink {
         let batch_settings = self.batch_settings;
 
         input
-            .batched_partitioned(KeyPartitioner::new(self.database, self.table), || {
-                batch_settings.as_byte_size_config()
-            })
+            .batched_partitioned(
+                KeyPartitioner::new(self.database, self.table, self.format),
+                || batch_settings.as_byte_size_config(),
+            )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(
                 default_request_builder_concurrency_limit(),
-                ClickhouseRequestBuilder {
-                    compression: self.compression,
-                    encoding: self.encoding,
-                },
+                self.request_builder,
             )
             .filter_map(|request| async {
                 match request {
@@ -66,14 +60,19 @@ impl ClickhouseSink {
                 }
             })
             .into_driver(self.service)
-            .protocol(self.protocol)
             .run()
             .await
     }
 }
 
 #[async_trait::async_trait]
-impl StreamSink<Event> for ClickhouseSink {
+impl<S> StreamSink<Event> for ClickhouseSink<S>
+where
+    S: Service<HttpRequest<PartitionKey>> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: std::fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(
         self: Box<Self>,
         input: futures_util::stream::BoxStream<'_, Event>,
@@ -82,72 +81,28 @@ impl StreamSink<Event> for ClickhouseSink {
     }
 }
 
-struct ClickhouseRequestBuilder {
-    compression: Compression,
-    encoding: (Transformer, Encoder<Framer>),
-}
-
-impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
-    type Metadata = (PartitionKey, EventFinalizers);
-    type Events = Vec<Event>;
-    type Encoder = (Transformer, Encoder<Framer>);
-    type Payload = Bytes;
-    type Request = ClickhouseRequest;
-    type Error = std::io::Error;
-
-    fn compression(&self) -> Compression {
-        self.compression
-    }
-
-    fn encoder(&self) -> &Self::Encoder {
-        &self.encoding
-    }
-
-    fn split_input(
-        &self,
-        input: (PartitionKey, Vec<Event>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let (key, mut events) = input;
-
-        let finalizers = events.take_finalizers();
-        let builder = RequestMetadataBuilder::from_events(&events);
-        ((key, finalizers), builder, events)
-    }
-
-    fn build_request(
-        &self,
-        metadata: Self::Metadata,
-        request_metadata: RequestMetadata,
-        payload: EncodeResult<Self::Payload>,
-    ) -> Self::Request {
-        let (key, finalizers) = metadata;
-        ClickhouseRequest {
-            database: key.database,
-            table: key.table,
-            body: payload.into_payload(),
-            compression: self.compression,
-            finalizers,
-            metadata: request_metadata,
-        }
-    }
-}
-
 /// PartitionKey used to partition events by (database, table) pair.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-struct PartitionKey {
-    database: String,
-    table: String,
+pub(super) struct PartitionKey {
+    pub database: String,
+    pub table: String,
+    pub format: Format,
 }
 
 /// KeyPartitioner that partitions events by (database, table) pair.
 struct KeyPartitioner {
     database: Template,
     table: Template,
+    format: Format,
 }
 
 impl KeyPartitioner {
-    const fn new(database: Template, table: Template) -> Self {
-        Self { database, table }
+    const fn new(database: Template, table: Template, format: Format) -> Self {
+        Self {
+            database,
+            table,
+            format,
+        }
     }
 
     fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
@@ -171,6 +126,10 @@ impl Partitioner for KeyPartitioner {
     fn partition(&self, item: &Self::Item) -> Self::Key {
         let database = Self::render(&self.database, item, "database_key")?;
         let table = Self::render(&self.table, item, "table_key")?;
-        Some(PartitionKey { database, table })
+        Some(PartitionKey {
+            database,
+            table,
+            format: self.format,
+        })
     }
 }

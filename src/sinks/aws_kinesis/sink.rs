@@ -65,21 +65,12 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .batched_partitioned(
-                KinesisPartitioner {
-                    _phantom: PhantomData,
-                },
-                || batch_settings.as_byte_size_config(),
-            )
-            .map(|(key, events)| {
+            .batched(batch_settings.as_byte_size_config())
+            .map(|events| {
                 let metadata = RequestMetadata::from_batch(
                     events.iter().map(|req| req.get_metadata().clone()),
                 );
-                BatchKinesisRequest {
-                    key,
-                    events,
-                    metadata,
-                }
+                BatchKinesisRequest { events, metadata }
             })
             .into_driver(self.service)
             .run()
@@ -148,7 +139,6 @@ pub struct BatchKinesisRequest<R>
 where
     R: Record + Clone,
 {
-    pub key: KinesisKey,
     pub events: Vec<KinesisRequest<R>>,
     metadata: RequestMetadata,
 }
@@ -159,9 +149,6 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            key: KinesisKey {
-                partition_key: self.key.partition_key.clone(),
-            },
             events: self.events.to_vec(),
             metadata: self.metadata.clone(),
         }
@@ -187,24 +174,5 @@ where
 
     fn metadata_mut(&mut self) -> &mut RequestMetadata {
         &mut self.metadata
-    }
-}
-
-struct KinesisPartitioner<R>
-where
-    R: Record,
-{
-    _phantom: PhantomData<R>,
-}
-
-impl<R> Partitioner for KinesisPartitioner<R>
-where
-    R: Record,
-{
-    type Item = KinesisRequest<R>;
-    type Key = KinesisKey;
-
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.key.clone()
     }
 }

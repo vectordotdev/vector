@@ -19,9 +19,10 @@ impl InternalEvent for AwsBytesSent {
             region = ?self.region,
         );
         counter!(
-            "component_sent_bytes_total", self.byte_size as u64,
+            "component_sent_bytes_total",
             "protocol" => "https",
             "region" => region,
-        );
+        )
+        .increment(self.byte_size as u64);
     }
 }

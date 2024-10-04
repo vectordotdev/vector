@@ -141,7 +141,7 @@ impl SubscriptionClient {
     }
 
     /// Start a new subscription request.
-    pub fn start<T: GraphQLQuery + Send + Sync>(
+    pub fn start<T>(
         &self,
         request_body: &graphql_client::QueryBody<T::Variables>,
     ) -> BoxedSubscription<T>

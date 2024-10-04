@@ -84,10 +84,7 @@ pub struct InfluxDbLogsConfig {
     pub influxdb2_settings: Option<InfluxDb2Settings>,
 
     #[configurable(derived)]
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     pub encoding: Transformer,
 
     #[configurable(derived)]
@@ -105,7 +102,7 @@ pub struct InfluxDbLogsConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 
@@ -323,7 +320,6 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
     }
 }
 
-#[async_trait::async_trait]
 impl HttpSink for InfluxDbLogsSink {
     type Input = BytesMut;
     type Output = BytesMut;

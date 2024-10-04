@@ -1,7 +1,7 @@
 ---
 title: Socket
 description: Collect logs using the [socket](https://en.wikipedia.org/wiki/Network_socket) client
-kind: source
+component_kind: source
 layout: component
 tags: ["socket", "component", "source", "logs"]
 aliases: ["/docs/reference/sources/tcp", "/docs/reference/sources/udp"]

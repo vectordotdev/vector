@@ -116,7 +116,7 @@ fn default_subject_key_field() -> OptionalValuePath {
 }
 
 const fn default_subscription_capacity() -> usize {
-    4096
+    65536
 }
 
 impl GenerateConfig for NatsSourceConfig {
@@ -171,7 +171,7 @@ impl SourceConfig for NatsSourceConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]

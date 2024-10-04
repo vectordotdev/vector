@@ -4,11 +4,11 @@ use proptest::{arbitrary::any, strategy::Strategy};
 
 use super::{filesystem::TestFilesystem, record::Record};
 use crate::variants::disk_v2::{
-    DiskBufferConfig, DiskBufferConfigBuilder, Reader, ReaderError, Writer, WriterError,
+    BufferReader, BufferWriter, DiskBufferConfig, DiskBufferConfigBuilder, ReaderError, WriterError,
 };
 
-pub type TestReader = Reader<Record, TestFilesystem>;
-pub type TestWriter = Writer<Record, TestFilesystem>;
+pub type TestReader = BufferReader<Record, TestFilesystem>;
+pub type TestWriter = BufferWriter<Record, TestFilesystem>;
 pub type ReaderResult<T> = Result<T, ReaderError<Record>>;
 pub type WriterResult<T> = Result<T, WriterError<Record>>;
 
@@ -37,9 +37,7 @@ pub fn arb_buffer_config() -> impl Strategy<Value = DiskBufferConfig<TestFilesys
         .prop_map(|(n1, n2, n3)| {
             let max_buffer_size = u64::from(n1) * 64;
             let max_data_file_size = u64::from(n2) * 2;
-            let max_record_size = n3
-                .try_into()
-                .expect("u16 should never be smaller than usize");
+            let max_record_size = n3.into();
 
             let mut path = std::env::temp_dir();
             path.push("vector-disk-v2-model");
