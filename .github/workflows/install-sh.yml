@@ -33,14 +33,9 @@ jobs:
         if: ${{ github.event_name != 'issue_comment' }}
         uses: actions/checkout@v3
 
-      - run: sudo apt-get install --yes curl bc
+      - run: sudo apt-get install --yes bc
       - run: bash distribution/install.sh -- -y
       - run: ~/.vector/bin/vector --version
-
-      - name: (PR comment) Get PR branch
-        if: github.event_name == 'issue_comment'
-        uses: xt0rted/pull-request-comment-branch@v2
-        id: comment-branch
 
       - name: (PR comment) Set latest commit status as ${{ job.status }}
         if: github.event_name == 'issue_comment'
