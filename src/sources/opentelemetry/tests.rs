@@ -9,7 +9,7 @@ use vector_lib::config::LogNamespace;
 use vector_lib::lookup::path;
 use vector_lib::opentelemetry::proto::{
     collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-    common::v1::{any_value, AnyValue, KeyValue, InstrumentationScope},
+    common::v1::{any_value, AnyValue, InstrumentationScope, KeyValue},
     logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     resource::v1::Resource as OtelResource,
 };
@@ -148,15 +148,18 @@ async fn receive_grpc_logs_vector_namespace() {
             &value!("some.scope.name")
         );
         assert_eq!(
-            meta.get(path!("opentelemetry", "scope", "version")).unwrap(),
+            meta.get(path!("opentelemetry", "scope", "version"))
+                .unwrap(),
             &value!("1.2.3")
         );
         assert_eq!(
-            meta.get(path!("opentelemetry", "scope", "attributes")).unwrap(),
+            meta.get(path!("opentelemetry", "scope", "attributes"))
+                .unwrap(),
             &value!({scope_attr: "scope_val"})
         );
         assert_eq!(
-            meta.get(path!("opentelemetry", "scope", "dropped_attributes_count")).unwrap(),
+            meta.get(path!("opentelemetry", "scope", "dropped_attributes_count"))
+                .unwrap(),
             &value!(7)
         );
         assert_eq!(

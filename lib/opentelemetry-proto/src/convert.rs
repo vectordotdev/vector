@@ -14,7 +14,7 @@ use vrl::{
 };
 
 use super::proto::{
-    common::v1::{any_value::Value as PBValue, KeyValue, InstrumentationScope},
+    common::v1::{any_value::Value as PBValue, InstrumentationScope, KeyValue},
     logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
     resource::v1::Resource,
     trace::v1::{
@@ -42,20 +42,18 @@ impl ResourceLogs {
     pub fn into_event_iter(self, log_namespace: LogNamespace) -> impl Iterator<Item = Event> {
         let now = Utc::now();
 
-        self.scope_logs
-            .into_iter()
-            .flat_map(move |scope_log| {
-                let scope = scope_log.scope;
-                let resource = self.resource.clone();
-                scope_log.log_records.into_iter().map(move |log_record| {
-                    ResourceLog {
-                        resource: resource.clone(),
-                        scope: scope.clone(),
-                        log_record,
-                    }
-                    .into_event(log_namespace, now)
-                })
+        self.scope_logs.into_iter().flat_map(move |scope_log| {
+            let scope = scope_log.scope;
+            let resource = self.resource.clone();
+            scope_log.log_records.into_iter().map(move |log_record| {
+                ResourceLog {
+                    resource: resource.clone(),
+                    scope: scope.clone(),
+                    log_record,
+                }
+                .into_event(log_namespace, now)
             })
+        })
     }
 }
 
@@ -252,7 +250,10 @@ impl ResourceLog {
                 log_namespace.insert_source_metadata(
                     SOURCE_NAME,
                     &mut log,
-                    Some(LegacyKey::Overwrite(path!(SCOPE_KEY, DROPPED_ATTRIBUTES_COUNT_KEY))),
+                    Some(LegacyKey::Overwrite(path!(
+                        SCOPE_KEY,
+                        DROPPED_ATTRIBUTES_COUNT_KEY
+                    ))),
                     path!(SCOPE_KEY, DROPPED_ATTRIBUTES_COUNT_KEY),
                     scope.dropped_attributes_count,
                 );
