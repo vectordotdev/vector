@@ -205,7 +205,9 @@ install_from_archive() {
         ensure tar -xzf "$_file" --directory="$_unpack_dir" --strip-components=2
         # copy all files (including hidden), ref: https://askubuntu.com/a/86891
         ensure cp -r "$_unpack_dir/bin/." "$prefix/bin"
-        ensure cp -r "$_unpack_dir/etc/." "$prefix/etc"
+        if [ -d "$_unpack_dir/etc/." ]; then
+          ensure cp -r "$_unpack_dir/etc/." "$prefix/etc"
+        fi
         ensure mkdir -p "$prefix/share/vector/config"
         ensure cp -r "$_unpack_dir/config/." "$prefix/share/vector/config"
         ensure cp "$_unpack_dir"/README.md "$prefix/share/vector/"
