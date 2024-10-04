@@ -441,6 +441,14 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			}
 		}
 	}
+	endpoint: {
+		description: "API endpoint for Google Cloud Storage"
+		required:    false
+		type: string: {
+			default: "https://storage.googleapis.com"
+			examples: ["http://localhost:9000"]
+		}
+	}
 	filename_append_uuid: {
 		description: """
 			Whether or not to append a UUID v4 token to the end of the object key.

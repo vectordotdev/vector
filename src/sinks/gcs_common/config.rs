@@ -14,7 +14,9 @@ use crate::{
     },
 };
 
-pub const BASE_URL: &str = "https://storage.googleapis.com/";
+pub fn default_endpoint() -> String {
+    "https://storage.googleapis.com".to_string()
+}
 
 /// GCS Predefined ACLs.
 ///
