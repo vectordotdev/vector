@@ -745,7 +745,7 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
         }
     };
 
-    let tags = &mut MetricTags::default();
+    let mut tags = MetricTags::default();
 
     if let Some(els) = log.get(event_path!("tags")) {
         if let Some(el) = els.as_object() {
@@ -754,7 +754,7 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
             }
         }
     }
-    let tags_result = Some(tags.clone());
+    let tags_result = Some(tags);
 
     let kind_str = match try_get_string_from_log(log, "kind")? {
         Some(n) => n,
