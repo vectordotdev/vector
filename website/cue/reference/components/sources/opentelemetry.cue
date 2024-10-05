@@ -135,7 +135,6 @@ components: sources: opentelemetry: {
 					required:	false
 					common:     false
 					type: object: {
-						default: null
 						examples: [
 							{
 								"attr1":	"value1"
