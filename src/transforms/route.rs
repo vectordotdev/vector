@@ -20,6 +20,7 @@ pub(crate) const UNMATCHED_ROUTE: &str = "_unmatched";
 pub struct Route {
     conditions: Vec<(String, Condition)>,
     reroute_unmatched: bool,
+    exclusive: bool,
 }
 
 impl Route {
@@ -32,6 +33,7 @@ impl Route {
         Ok(Self {
             conditions,
             reroute_unmatched: config.reroute_unmatched,
+            exclusive: config.exclusive,
         })
     }
 }
@@ -43,6 +45,9 @@ impl SyncTransform for Route {
             let (result, event) = condition.check(event.clone());
             if result {
                 output.push(Some(output_name), event);
+                if self.exclusive {
+                    return;
+                }
             } else {
                 check_failed += 1;
             }
@@ -73,6 +78,11 @@ pub struct RouteConfig {
     #[configurable(metadata(docs::human_name = "Reroute Unmatched Events"))]
     reroute_unmatched: bool,
 
+    /// Exclusive Routing mode only routes events to the first route that matches.
+    #[serde(default = "crate::serde::default_false")]
+    #[configurable(metadata(docs::human_name = "Exclusive Routing"))]
+    exclusive: bool,
+
     /// A table of route identifiers to logical conditions representing the filter of the route.
     ///
     /// Each route can then be referenced as an input by other components with the name
@@ -90,6 +100,7 @@ impl GenerateConfig for RouteConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             reroute_unmatched: true,
+            exclusive: false,
             route: IndexMap::new(),
         })
         .unwrap()
@@ -184,7 +195,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"reroute_unmatched":true,"route":{"first":{"type":"vrl","source":".message == \"hello world\"","runtime":"ast"}}}"#
+            r#"{"reroute_unmatched":true,"exclusive":false,"route":{"first":{"type":"vrl","source":".message == \"hello world\"","runtime":"ast"}}}"#
         );
     }
 
@@ -359,6 +370,52 @@ mod test {
         transform.transform(event.clone(), &mut outputs);
         for output_name in output_names {
             let events: Vec<_> = outputs.drain_named(output_name).collect();
+            assert_eq!(events.len(), 0);
+        }
+    }
+    #[test]
+    fn route_exclusive_output() {
+        let output_names = vec!["first", "second", "third", UNMATCHED_ROUTE];
+        let event = Event::from_json_value(
+            serde_json::json!({"message": "hello world", "second": "second", "third": "third"}),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            exclusive = true
+
+            route.first.type = "vrl"
+            route.first.source = '.message == "hello world"'
+
+            route.second.type = "vrl"
+            route.second.source = '.second == "second"'
+
+            route.third.type = "vrl"
+            route.third.source = '.third == "third"'
+        "#,
+        )
+        .unwrap();
+
+        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            output_names
+                .iter()
+                .map(|output_name| {
+                    TransformOutput::new(DataType::all_bits(), HashMap::new())
+                        .with_port(output_name.to_owned())
+                })
+                .collect(),
+            1,
+        );
+
+        transform.transform(event.clone(), &mut outputs);
+        for output_name in output_names {
+            let mut events: Vec<_> = outputs.drain_named(output_name).collect();
+            if output_name == "first" {
+                assert_eq!(events.len(), 1);
+                assert_eq!(events.pop().unwrap(), event);
+            }
             assert_eq!(events.len(), 0);
         }
     }
