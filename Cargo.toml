@@ -940,6 +940,7 @@ benches = [
   "sources-syslog",
   "transforms-lua",
   "transforms-sample",
+  "enrichment-tables-benches",
 ]
 dnstap-benches = ["sources-dnstap"]
 language-benches = ["sinks-socket", "sources-socket", "transforms-lua", "transforms-remap"]
