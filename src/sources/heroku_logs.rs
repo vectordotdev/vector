@@ -13,7 +13,9 @@ use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use vector_lib::lookup::{lookup_v2::parse_value_path, owned_value_path, path};
+use vector_lib::lookup::{
+    lookup_v2::parse_value_path, lookup_v2::OptionalTargetPath, owned_value_path, path,
+};
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
@@ -183,6 +185,7 @@ impl SourceConfig for LogplexConfig {
             "events",
             HttpMethod::Post,
             StatusCode::OK,
+            OptionalTargetPath::none(),
             true,
             &self.tls,
             &self.auth,
