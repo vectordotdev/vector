@@ -620,6 +620,7 @@ transforms-logs = [
   "transforms-aws_ec2_metadata",
   "transforms-dedupe",
   "transforms-filter",
+  "transforms-gate",
   "transforms-log_to_metric",
   "transforms-lua",
   "transforms-metric_to_log",
@@ -646,6 +647,7 @@ transforms-aggregate = []
 transforms-aws_ec2_metadata = ["dep:arc-swap"]
 transforms-dedupe = ["transforms-impl-dedupe"]
 transforms-filter = []
+transforms-gate = []
 transforms-log_to_metric = []
 transforms-lua = ["dep:mlua", "vector-lib/lua"]
 transforms-metric_to_log = []
@@ -659,6 +661,7 @@ transforms-throttle = ["dep:governor"]
 
 # Implementations of transforms
 transforms-impl-sample = []
+transforms-impl-gate = []
 transforms-impl-dedupe = ["dep:lru"]
 transforms-impl-reduce = []
 

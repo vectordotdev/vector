@@ -53,6 +53,8 @@ mod exec;
 mod file_descriptor;
 #[cfg(feature = "transforms-filter")]
 mod filter;
+#[cfg(feature = "transforms-gate")]
+mod gate;
 #[cfg(feature = "sources-fluent")]
 mod fluent;
 #[cfg(feature = "sources-gcp_pubsub")]
@@ -193,6 +195,8 @@ pub(crate) use self::file::*;
 pub(crate) use self::file_descriptor::*;
 #[cfg(feature = "transforms-filter")]
 pub(crate) use self::filter::*;
+#[cfg(feature = "transforms-gate")]
+pub(crate) use self::gate::*;
 #[cfg(feature = "sources-fluent")]
 pub(crate) use self::fluent::*;
 #[cfg(feature = "sources-gcp_pubsub")]
