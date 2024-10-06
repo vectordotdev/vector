@@ -6,6 +6,9 @@ vdev = "run --quiet --package vdev --"
 # CentOS 7, 8, and a few other Linux distributions.
 JEMALLOC_SYS_WITH_LG_PAGE = "16"
 
+[profile.release]
+overflow-checks = true
+
 [target.'cfg(all())']
 rustflags = [
   "-Dclippy::print_stdout",
