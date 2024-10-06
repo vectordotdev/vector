@@ -1,0 +1,24 @@
+---
+# aqua - Declarative CLI Version Manager
+# https://aquaproj.github.io/
+registries:
+  - type: standard
+    ref: v4.27.0 # renovate: depName=aquaproj/aqua-registry
+  - name: local
+    type: local
+    path: registry.yaml
+packages:
+  - name: crates.io/wasm-pack@0.10.3
+    registry: local
+  - name: crates.io/cargo-deb@1.41.3
+    registry: local
+  - name: crates.io/cross@0.2.5
+    registry: local
+  - name: crates.io/cargo-nextest@0.9.47
+    registry: local
+  - name: crates.io/cargo-deny@0.13.9
+    registry: local
+  - name: crates.io/cargo-msrv@0.15.1
+    registry: local
+  - name: crates.io/dd-rust-license-tool@1.0.1
+    registry: local
