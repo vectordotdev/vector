@@ -202,6 +202,16 @@ base: components: sinks: aws_s3: configuration: {
 				required:    true
 				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
+			sign: {
+				description: """
+					Whether to sign requests.
+
+					Setting this to false can be useful when writing to an AWS S3 bucket that allows
+					anonymous requests.
+					"""
+				required: false
+				type: bool: default: true
+			}
 		}
 	}
 	batch: {
