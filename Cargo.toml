@@ -940,6 +940,8 @@ benches = [
   "sources-syslog",
   "transforms-lua",
   "transforms-sample",
+  "tracing/release_max_level_info",
+  "tracing/max_level_info",
 ]
 dnstap-benches = ["sources-dnstap"]
 language-benches = ["sinks-socket", "sources-socket", "transforms-lua", "transforms-remap"]
@@ -954,6 +956,12 @@ proptest = ["dep:proptest", "dep:proptest-derive"]
 
 [[bench]]
 name = "default"
+harness = false
+required-features = ["benches"]
+
+[[bench]]
+name = "integration"
+path = "benches/integration/mod.rs"
 harness = false
 required-features = ["benches"]
 
