@@ -47,6 +47,20 @@ base: components: sources: http: configuration: {
 			}
 		}
 	}
+	custom_response_headers: {
+		description: "Custom response headers to be added to the HTTP response"
+		required:    false
+		type: object: {
+			examples: [{
+				"Access-Control-Allow-Origin": ["my-cool-server", "my-other-server"]
+			}]
+			options: "*": {
+				description: "A custom response header key-value pair"
+				required:    true
+				type: array: items: type: string: {}
+			}
+		}
+	}
 	decoding: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
