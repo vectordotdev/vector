@@ -167,7 +167,7 @@ parent = "about"
 weight = 1
 
 [[languages.en.menus.footer]]
-name = "What is Observability Pipelines?"
+name = "What are Observability Pipelines?"
 url = "/docs/about/what-is-observability-pipelines"
 parent = "about"
 weight = 2
