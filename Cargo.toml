@@ -547,6 +547,7 @@ sources-logs = [
   "sources-vector",
 ]
 sources-metrics = [
+  "dep:prost",
   "sources-apache_metrics",
   "sources-aws_ecs_metrics",
   "sources-eventstoredb_metrics",
@@ -576,7 +577,7 @@ sources-exec = []
 sources-file = ["vector-lib/file-source"]
 sources-file-descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
-sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost-types", "protobuf-build", "dep:tonic"]
+sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "protobuf-build", "dep:tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
 sources-host_metrics =  ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
 sources-http_client = ["sources-utils-http-client"]
@@ -616,7 +617,7 @@ sources-utils-net-tcp = ["listenfd", "dep:ipnet"]
 sources-utils-net-udp = ["listenfd"]
 sources-utils-net-unix = []
 
-sources-vector = ["dep:tonic", "protobuf-build"]
+sources-vector = [ "dep:prost", "dep:tonic", "protobuf-build"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
@@ -749,7 +750,7 @@ sinks-console = []
 sinks-databend = ["dep:databend-client"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
-sinks-datadog_metrics = ["protobuf-build", "dep:prost-reflect"]
+sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
 sinks-datadog_traces = ["protobuf-build", "dep:prost", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sinks-elasticsearch = ["transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
@@ -769,7 +770,7 @@ sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-papertrail = ["dep:syslog"]
-sinks-prometheus = ["dep:base64", "vector-lib/prometheus"]
+sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "dep:lru"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
