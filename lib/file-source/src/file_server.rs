@@ -16,7 +16,6 @@ use futures::{
     Future, Sink, SinkExt,
     future::{Either, select},
 };
-use futures_util::future::join_all;
 use indexmap::IndexMap;
 use tokio::{
     fs::{self, remove_file},
@@ -53,6 +52,7 @@ where
     pub line_delimiter: Bytes,
     pub data_dir: PathBuf,
     pub glob_minimum_cooldown: Duration,
+    pub max_read_backoff: Duration,
     pub fingerprinter: Fingerprinter,
     pub oldest_first: bool,
     pub remove_after: Option<Duration>,
@@ -107,33 +107,18 @@ where
 
         let mut existing_files = Vec::new();
         for path in self.paths_provider.paths().into_iter() {
-            if let Some(file_id) = self
+            if let Some((file_id, metadata)) = self
                 .fingerprinter
                 .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
                 .await
             {
-                existing_files.push((path, file_id));
+                let created = metadata
+                    .and_then(|m| m.created().ok())
+                    .map(DateTime::<Utc>::from)
+                    .unwrap_or_else(Utc::now);
+                existing_files.push((created, path, file_id));
             }
         }
-
-        let metadata = join_all(
-            existing_files
-                .iter()
-                .map(|(path, _file_id)| fs::metadata(path)),
-        )
-        .await;
-
-        let created = metadata.into_iter().map(|m| {
-            m.and_then(|m| m.created())
-                .map(DateTime::<Utc>::from)
-                .unwrap_or_else(|_| Utc::now())
-        });
-
-        let mut existing_files: Vec<(DateTime<Utc>, PathBuf, FileFingerprint)> = existing_files
-            .into_iter()
-            .zip(created)
-            .map(|((path, file_id), key)| (key, path, file_id))
-            .collect();
 
         existing_files.sort_by_key(|(key, _, _)| *key);
 
@@ -186,11 +171,13 @@ where
                     watcher.set_file_findable(false); // assume not findable until found
                 }
                 for path in self.paths_provider.paths().into_iter() {
-                    if let Some(file_id) = self
+                    if let Some((file_id, metadata)) = self
                         .fingerprinter
                         .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
                         .await
                     {
+                        let modified = metadata.and_then(|m| m.modified().ok());
+
                         if let Some(watcher) = fp_map.get_mut(&file_id) {
                             // file fingerprint matches a watched file
                             let was_found_this_cycle = watcher.file_findable();
@@ -200,6 +187,7 @@ where
                                     message = "Continue watching file.",
                                     path = ?path,
                                 );
+                                watcher.set_modified(modified);
                             } else if !was_found_this_cycle {
                                 // matches a file with a different path
                                 info!(
@@ -208,16 +196,16 @@ where
                                     old_path = ?watcher.path
                                 );
                                 watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                watcher.set_modified(modified);
                             } else {
                                 info!(
                                     message = "More than one file has the same fingerprint.",
                                     path = ?path,
                                     old_path = ?watcher.path
                                 );
-                                let (old_path, new_path) = (&watcher.path, &path);
-                                if let (Ok(old_modified_time), Ok(new_modified_time)) = (
-                                    fs::metadata(old_path).await.and_then(|m| m.modified()),
-                                    fs::metadata(new_path).await.and_then(|m| m.modified()),
+                                if let (Ok(old_modified_time), Some(new_modified_time)) = (
+                                    fs::metadata(&watcher.path).await.and_then(|m| m.modified()),
+                                    modified,
                                 ) && old_modified_time < new_modified_time
                                 {
                                     info!(
@@ -226,6 +214,7 @@ where
                                         old_modified_time = ?old_modified_time,
                                     );
                                     watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                    watcher.set_modified(modified);
                                 }
                             }
                         } else {
@@ -388,12 +377,15 @@ where
             stats.record("sending", start.elapsed());
 
             let start = time::Instant::now();
-            // When no lines have been read we kick the backup_cap up by twice,
-            // limited by the hard-coded cap. Else, we set the backup_cap to its
-            // minimum on the assumption that next time through there will be
-            // more lines to read promptly.
+            // When no lines have been read we kick the backoff_cap up by twice,
+            // limited by the max_read_backoff cap. Else, we set the backoff_cap
+            // to its minimum on the assumption that next time through there will
+            // be more lines to read promptly.
             backoff_cap = if global_bytes_read == 0 {
-                cmp::min(2_048, backoff_cap.saturating_mul(2))
+                cmp::min(
+                    self.max_read_backoff.as_millis() as usize,
+                    backoff_cap.saturating_mul(2),
+                )
             } else {
                 1
             };

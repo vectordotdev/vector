@@ -162,6 +162,17 @@ pub struct FileConfig {
     #[configurable(metadata(docs::human_name = "Glob Minimum Cooldown"))]
     pub glob_minimum_cooldown_ms: Duration,
 
+    /// The maximum interval between checks for new content in inactive files.
+    ///
+    /// Files are considered inactive when no new data has been read. Such files are then checked
+    /// less frequently for new data. This sets the upper limit for the delay before attempting to
+    /// read such files again, improving performance while still eventually detecting new content.
+    #[serde(default = "default_max_read_backoff_ms")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::type_unit = "milliseconds"))]
+    #[configurable(metadata(docs::human_name = "Inactive Files Read Backoff Interval"))]
+    pub max_read_backoff_ms: Duration,
+
     #[configurable(derived)]
     #[serde(alias = "fingerprinting", default)]
     fingerprint: FingerprintConfig,
@@ -259,6 +270,10 @@ const fn default_read_from() -> ReadFromConfig {
 
 const fn default_glob_minimum_cooldown_ms() -> Duration {
     Duration::from_millis(1000)
+}
+
+const fn default_max_read_backoff_ms() -> Duration {
+    Duration::from_millis(2048)
 }
 
 const fn default_multi_line_timeout() -> u64 {
@@ -371,6 +386,7 @@ impl Default for FileConfig {
             offset_key: None,
             data_dir: None,
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
+            max_read_backoff_ms: default_max_read_backoff_ms(),
             message_start_indicator: None,
             multi_line_timeout: default_multi_line_timeout(), // millis
             multiline: None,
@@ -504,6 +520,7 @@ pub fn file_source(
         .collect::<Vec<PathBuf>>();
     let ignore_before = calculate_ignore_before(config.ignore_older_secs);
     let glob_minimum_cooldown = config.glob_minimum_cooldown_ms;
+    let max_read_backoff = config.max_read_backoff_ms;
     let (ignore_checkpoints, read_from) = reconcile_position_options(
         config.start_at_beginning,
         config.ignore_checkpoints,
@@ -544,6 +561,7 @@ pub fn file_source(
         line_delimiter: line_delimiter_as_bytes,
         data_dir,
         glob_minimum_cooldown,
+        max_read_backoff,
         fingerprinter: Fingerprinter::new(strategy, config.max_line_bytes, config.ignore_not_found),
         oldest_first: config.oldest_first,
         remove_after: config.remove_after_secs.map(Duration::from_secs),
@@ -863,6 +881,7 @@ mod tests {
             },
             data_dir: Some(dir.path().to_path_buf()),
             glob_minimum_cooldown_ms: Duration::from_millis(100),
+            max_read_backoff_ms: Duration::from_millis(200),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
@@ -881,6 +900,7 @@ mod tests {
             include = [ "/var/log/**/*.log" ]
             file_key = "file"
             glob_minimum_cooldown_ms = 1000
+            max_read_backoff_ms = 2048
             multi_line_timeout = 1000
             max_read_bytes = 2048
             line_delimiter = "\n"

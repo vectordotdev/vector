@@ -231,6 +231,17 @@ pub struct Config {
     #[configurable(metadata(docs::human_name = "Glob Minimum Cooldown"))]
     glob_minimum_cooldown_ms: Duration,
 
+    /// The maximum interval between checks for new content in inactive files.
+    ///
+    /// Files are considered inactive when no new data has been read. Such files are then checked
+    /// less frequently for new data. This sets the upper limit for the delay before attempting to
+    /// read such files again, improving performance while still eventually detecting new content.
+    #[serde(default = "default_max_read_backoff_ms")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::type_unit = "milliseconds"))]
+    #[configurable(metadata(docs::human_name = "Inactive Files Read Backoff Interval"))]
+    max_read_backoff_ms: Duration,
+
     /// Overrides the name of the log field used to add the ingestion timestamp to each event.
     ///
     /// This is useful to compute the latency between important event processing
@@ -318,6 +329,7 @@ impl Default for Config {
             max_merged_line_bytes: None,
             fingerprint_lines: default_fingerprint_lines(),
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
+            max_read_backoff_ms: default_max_read_backoff_ms(),
             ingestion_timestamp_field: None,
             timezone: None,
             kube_config_file: None,
@@ -579,6 +591,7 @@ struct Source {
     max_merged_line_bytes: Option<usize>,
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
+    max_read_backoff: Duration,
     use_apiserver_cache: bool,
     ingestion_timestamp_field: Option<OwnedTargetPath>,
     delay_deletion: Duration,
@@ -638,6 +651,8 @@ impl Source {
 
         let glob_minimum_cooldown = config.glob_minimum_cooldown_ms;
 
+        let max_read_backoff = config.max_read_backoff_ms;
+
         let delay_deletion = config.delay_deletion_ms;
 
         let ingestion_timestamp_field = config
@@ -668,6 +683,7 @@ impl Source {
             max_merged_line_bytes: config.max_merged_line_bytes,
             fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
+            max_read_backoff,
             use_apiserver_cache: config.use_apiserver_cache,
             ingestion_timestamp_field,
             delay_deletion,
@@ -705,6 +721,7 @@ impl Source {
             max_merged_line_bytes,
             fingerprint_lines,
             glob_minimum_cooldown,
+            max_read_backoff,
             use_apiserver_cache,
             ingestion_timestamp_field,
             delay_deletion,
@@ -848,6 +865,8 @@ impl Source {
             // This value specifies not exactly the globbing, but interval
             // between the polling the files to watch from the `paths_provider`.
             glob_minimum_cooldown,
+            // The maximum delay between checks for new content in inactive files.
+            max_read_backoff,
             // The shape of the log files is well-known in the Kubernetes
             // environment, so we pick the a specially crafted fingerprinter
             // for the log files.
@@ -1080,6 +1099,10 @@ const fn default_max_line_bytes() -> usize {
 
 const fn default_glob_minimum_cooldown_ms() -> Duration {
     Duration::from_millis(60_000)
+}
+
+const fn default_max_read_backoff_ms() -> Duration {
+    Duration::from_millis(2048)
 }
 
 const fn default_fingerprint_lines() -> usize {
