@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [build-dependencies]
-prost-build = { version = "0.12", default-features = false}
+prost-build = { version = "0.13", default-features = false}
 tonic-build.workspace = true
 
 [dependencies]
@@ -15,7 +15,7 @@ chrono.workspace = true
 hex = { version = "0.4.3", default-features = false, features = ["std"] }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false }
 ordered-float = { version = "4.3.0", default-features = false }
-prost = { version = "0.12", default-features = false, features = ["std"] }
+prost = { version = "0.13", default-features = false, features = ["std"] }
 tonic.workspace = true
 vrl.workspace = true
 vector-core = { path = "../vector-core", default-features = false }

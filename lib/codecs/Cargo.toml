@@ -21,7 +21,7 @@ lookup = { package = "vector-lookup", path = "../vector-lookup", default-feature
 memchr = { version = "2", default-features = false }
 once_cell = { version = "1.19", default-features = false }
 ordered-float = { version = "4.3.0", default-features = false }
-prost = { version = "0.12.6", default-features = false, features = ["std"] }
+prost = { version = "0.13.1", default-features = false, features = ["std"] }
 prost-reflect = { workspace = true, features = ["serde"] }
 regex = { version = "1.11.0", default-features = false, features = ["std", "perf"] }
 serde.workspace = true

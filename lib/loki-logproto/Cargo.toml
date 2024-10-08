@@ -8,8 +8,8 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-prost = { version = "0.12", default-features = false, features = ["std"] }
-prost-types = { version = "0.12", default-features = false, features = ["std"] }
+prost = { version = "0.13", default-features = false, features = ["std"] }
+prost-types = { version = "0.13", default-features = false, features = ["std"] }
 bytes = { version = "1.7.2", default-features = false }
 snap = { version = "1.1.1", default-features = false }
 
@@ -17,4 +17,4 @@ snap = { version = "1.1.1", default-features = false }
 chrono.workspace = true
 
 [build-dependencies]
-prost-build = { version = "0.12" }
+prost-build = { version = "0.13" }
