@@ -81,6 +81,8 @@ pub mod new_relic;
 pub mod opendal_common;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
+#[cfg(feature = "sinks-postgres")]
+pub mod postgres;
 #[cfg(feature = "sinks-prometheus")]
 pub mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
