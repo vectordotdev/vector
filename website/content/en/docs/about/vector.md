@@ -1,5 +1,5 @@
 ---
-title: What is Vector?
+title: Vector
 weight: 1
 tags: ["concepts"]
 ---

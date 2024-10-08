@@ -1,5 +1,5 @@
 ---
-title: What are Observability Pipelines?
+title: Observability Pipelines
 weight: 2
 tags: ["concepts"]
 ---
