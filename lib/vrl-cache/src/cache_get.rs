@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use vrl::{compiler::expression::Query, prelude::*};
 
 use crate::{
     caches::{VrlCacheRegistry, VrlCacheSearch},
@@ -24,15 +24,27 @@ impl Function for CacheGet {
                 kind: kind::BYTES,
                 required: true,
             },
+            Parameter {
+                keyword: "ttl_target",
+                kind: kind::ANY,
+                required: true,
+            },
         ]
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
-            title: "read from cache",
-            source: r#"cache_get!("test_cache", "test_key")"#,
-            result: Ok(r#""test_value""#),
-        }]
+        &[
+            Example {
+                title: "read from cache",
+                source: r#"cache_get!("test_cache", "test_key")"#,
+                result: Ok(r#""test_value""#),
+            },
+            Example {
+                title: "read from cache with TTL",
+                source: r#"cache_get!("test_cache", "test_key", ttl_target: .ttl)"#,
+                result: Ok(r#""test_value""#),
+            },
+        ]
     }
 
     fn compile(
@@ -57,10 +69,12 @@ impl Function for CacheGet {
             .expect("cache is not valid utf8")
             .into_owned();
         let key = arguments.required("key");
+        let ttl = arguments.optional_query("ttl_target")?;
 
         Ok(CacheGetFn {
             cache,
             key,
+            _ttl: ttl,
             registry: registry.as_readonly(),
         }
         .as_expr())
@@ -71,6 +85,7 @@ impl Function for CacheGet {
 pub struct CacheGetFn {
     cache: String,
     key: Box<dyn Expression>,
+    _ttl: Option<Query>,
     registry: VrlCacheSearch,
 }
 
@@ -117,6 +132,7 @@ mod tests {
         let func = CacheGetFn {
             cache: "test".to_string(),
             key: expr!("test_key"),
+            _ttl: None,
             registry: registry.as_readonly(),
         };
 
@@ -141,6 +157,7 @@ mod tests {
         let func = CacheGetFn {
             cache: "test".to_string(),
             key: expr!("test_key"),
+            _ttl: None,
             registry: registry.as_readonly(),
         };
 
