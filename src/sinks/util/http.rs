@@ -521,6 +521,8 @@ where
 
         match status {
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
+            StatusCode::NOT_FOUND => RetryAction::Retry("not found".into()),
+            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timedout".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
