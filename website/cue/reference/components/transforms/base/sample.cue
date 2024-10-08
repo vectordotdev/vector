@@ -35,4 +35,14 @@ base: components: transforms: sample: configuration: {
 			1500,
 		]
 	}
+  sample_rate_key: {
+    description: """
+    The name of the log field used to add the sample rate to each event. If set to "", the rate will not be set.
+    """
+    required: false
+		type: string: {
+			default: "sample_rate"
+			examples: ["sample_rate", ""]
+		}
+  }
 }
