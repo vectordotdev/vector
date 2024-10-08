@@ -471,6 +471,9 @@ impl RetryLogic for HttpRetryLogic {
 
         match status {
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
+            StatusCode::NOT_FOUND => RetryAction::Retry("not found".into()),
+            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
+            StatusCode::FORBIDDEN => RetryAction::Retry("request forbidden".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
