@@ -4,7 +4,7 @@ fn main() -> Result<(), Error> {
     tonic_build::configure()
         .build_client(true)
         .build_server(true)
-        .compile(
+        .compile_protos(
             &[
                 "src/proto/opentelemetry-proto/opentelemetry/proto/common/v1/common.proto",
                 "src/proto/opentelemetry-proto/opentelemetry/proto/resource/v1/resource.proto",
