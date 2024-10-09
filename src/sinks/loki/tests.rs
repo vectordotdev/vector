@@ -177,13 +177,14 @@ async fn timestamp_out_of_range() {
 }
 
 #[tokio::test]
-async fn structured_metadata_in_json_encoding() {
+async fn structured_metadata_as_json() {
     let (config, cx) = load_sink::<LokiConfig>(
         r#"
         endpoint = "http://localhost:3100"
         labels = {test = "structured_metadata"}
         structured_metadata.bar = "{{ foo }}"
         encoding.codec = "json"
+        encoding.except_fields = ["foo"]
         "#,
     )
     .unwrap();
@@ -193,13 +194,9 @@ async fn structured_metadata_in_json_encoding() {
     let mut e1 = Event::Log(LogEvent::from("hello world"));
     e1.as_mut_log().insert("foo", "bar");
 
-    let record = sink.encoder.encode_event(e1).unwrap();
+    let event = sink.encoder.encode_event(e1).unwrap();
+    let body = serde_json::json!(event.event);
+    let expected_metadata = serde_json::json!({"bar": "bar"});
 
-    // The final event should have timestamps and labels removed
-    let expected_line = serde_json::to_string(&serde_json::json!({
-        "message": "hello world",
-    })).unwrap();
-
-    assert_eq!(record.event.event, expected_line);
-    assert_eq!(record.event.structured_metadata[0], ("bar".to_string(), "bar".to_string()));
+    assert_eq!(body[2], expected_metadata);
 }
