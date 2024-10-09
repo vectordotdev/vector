@@ -13,7 +13,7 @@ if ($env:RELEASE_BUILDER -ne "true") {
 }
 
 # Enable retries to avoid transient network issues.
-export NUGET_ENABLE_ENHANCED_HTTP_RETRY=true
+$env:NUGET_ENABLE_ENHANCED_HTTP_RETRY = "true"
 
 # Install some required dependencies / tools.
 choco install make
