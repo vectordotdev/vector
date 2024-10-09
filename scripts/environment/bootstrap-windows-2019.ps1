@@ -12,6 +12,9 @@ if ($env:RELEASE_BUILDER -ne "true") {
     rustup run stable cargo install cargo-nextest --version 0.9.72 --locked
 }
 
+# Enable retries to avoid transient network issues.
+export NUGET_ENABLE_ENHANCED_HTTP_RETRY=true
+
 # Install some required dependencies / tools.
 choco install make
 choco install protoc
