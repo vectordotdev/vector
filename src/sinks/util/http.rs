@@ -806,8 +806,6 @@ mod test {
         let response_500 = Response::builder().status(500).body(Bytes::new()).unwrap();
         let response_400 = Response::builder().status(400).body(Bytes::new()).unwrap();
         let response_501 = Response::builder().status(501).body(Bytes::new()).unwrap();
-        
-
         assert!(logic.should_retry_response(&response_429).is_retryable());
         assert!(logic.should_retry_response(&response_500).is_retryable());
         assert!(logic.should_retry_response(&response_403).is_retryable());
