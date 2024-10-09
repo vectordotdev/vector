@@ -126,6 +126,7 @@ members = [
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
   "lib/vector-vrl/web-playground",
+  "lib/vrl-cache",
   "vdev",
 ]
 

@@ -42,6 +42,7 @@ impl TransformConfig for NoopTransformConfig {
     fn outputs(
         &self,
         _: vector_lib::enrichment::TableRegistry,
+        _: vector_lib::vrl_cache::VrlCacheRegistry,
         definitions: &[(OutputId, Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

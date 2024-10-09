@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 codecs = { path = "../codecs", default-features = false }
 enrichment = { path = "../enrichment" }
+vrl-cache = { path = "../vrl-cache" }
 file-source = { path = "../file-source", optional = true }
 opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
 prometheus-parser = { path = "../prometheus-parser", optional = true }

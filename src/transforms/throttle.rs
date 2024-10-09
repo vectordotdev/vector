@@ -83,6 +83,7 @@ impl TransformConfig for ThrottleConfig {
     fn outputs(
         &self,
         _: vector_lib::enrichment::TableRegistry,
+        _: vector_lib::vrl_cache::VrlCacheRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -130,7 +131,7 @@ where
         let exclude = config
             .exclude
             .as_ref()
-            .map(|condition| condition.build(&context.enrichment_tables))
+            .map(|condition| condition.build(&context.enrichment_tables, &context.vrl_caches))
             .transpose()?;
 
         Ok(Self {

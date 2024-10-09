@@ -52,6 +52,7 @@ impl TransformConfig for BasicTransformConfig {
     fn outputs(
         &self,
         _: vector_lib::enrichment::TableRegistry,
+        _: vector_lib::vrl_cache::VrlCacheRegistry,
         definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

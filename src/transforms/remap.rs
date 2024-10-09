@@ -15,6 +15,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::enrichment::TableRegistry;
 use vector_lib::lookup::{metadata_path, owned_value_path, PathPrefix};
 use vector_lib::schema::Definition;
+use vector_lib::vrl_cache::VrlCacheRegistry;
 use vector_lib::TimeZone;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::compiler::runtime::{Runtime, Terminate};
@@ -39,7 +40,7 @@ use crate::{
 };
 
 const DROPPED: &str = "dropped";
-type CacheKey = (TableRegistry, schema::Definition);
+type CacheKey = (TableRegistry, VrlCacheRegistry, schema::Definition);
 type CacheValue = (Program, String, MeaningList);
 
 /// Configuration for the `remap` transform.
@@ -167,15 +168,14 @@ impl RemapConfig {
     fn compile_vrl_program(
         &self,
         enrichment_tables: TableRegistry,
+        vrl_caches: VrlCacheRegistry,
         merged_schema_definition: schema::Definition,
     ) -> Result<(Program, String, MeaningList)> {
-        if let Some((_, res)) = self
-            .cache
-            .lock()
-            .expect("Data poisoned")
-            .iter()
-            .find(|v| v.0 .0 == enrichment_tables && v.0 .1 == merged_schema_definition)
-        {
+        if let Some((_, res)) = self.cache.lock().expect("Data poisoned").iter().find(|v| {
+            v.0 .0 == enrichment_tables
+                && v.0 .1 == vrl_caches
+                && v.0 .2 == merged_schema_definition
+        }) {
             return res.clone().map_err(Into::into);
         }
 
@@ -195,6 +195,7 @@ impl RemapConfig {
         };
 
         let mut functions = vrl::stdlib::all();
+        functions.append(&mut vector_lib::vrl_cache::vrl_functions());
         functions.append(&mut vector_lib::enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::all());
 
@@ -208,6 +209,7 @@ impl RemapConfig {
         let mut config = CompileConfig::default();
 
         config.set_custom(enrichment_tables.clone());
+        config.set_custom(vrl_caches.clone());
         config.set_custom(MeaningList::default());
 
         let res = compile_vrl(&source, &functions, &state, config)
@@ -220,10 +222,10 @@ impl RemapConfig {
                 )
             });
 
-        self.cache
-            .lock()
-            .expect("Data poisoned")
-            .push(((enrichment_tables, merged_schema_definition), res.clone()));
+        self.cache.lock().expect("Data poisoned").push((
+            (enrichment_tables, vrl_caches, merged_schema_definition),
+            res.clone(),
+        ));
 
         res.map_err(Into::into)
     }
@@ -260,6 +262,7 @@ impl TransformConfig for RemapConfig {
     fn outputs(
         &self,
         enrichment_tables: vector_lib::enrichment::TableRegistry,
+        vrl_caches: vector_lib::vrl_cache::VrlCacheRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -273,7 +276,7 @@ impl TransformConfig for RemapConfig {
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
         let compiled = self
-            .compile_vrl_program(enrichment_tables, merged_definition)
+            .compile_vrl_program(enrichment_tables, vrl_caches, merged_definition)
             .map(|(program, _, meaning_list)| (program.final_type_info().state, meaning_list.0))
             .map_err(|_| ());
 
@@ -420,6 +423,7 @@ impl Remap<AstRunner> {
     ) -> crate::Result<(Self, String)> {
         let (program, warnings, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
+            context.vrl_caches.clone(),
             context.merged_schema_definition.clone(),
         )?;
 
@@ -800,6 +804,7 @@ mod tests {
 
         let mut outputs = conf.outputs(
             TableRegistry::default(),
+            VrlCacheRegistry::default(),
             &[(OutputId::dummy(), initial_definition)],
             LogNamespace::Vector,
         );
@@ -1472,6 +1477,7 @@ mod tests {
         assert_eq!(
             conf.outputs(
                 vector_lib::enrichment::TableRegistry::default(),
+                vector_lib::vrl_cache::VrlCacheRegistry::default(),
                 &[(
                     "test".into(),
                     schema::Definition::new_with_default_metadata(
@@ -1635,9 +1641,11 @@ mod tests {
         };
 
         let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
+        let vrl_caches = vector_lib::vrl_cache::VrlCacheRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables.clone(),
+            vrl_caches.clone(),
             &[("in".into(), schema::Definition::default_legacy_namespace())],
             LogNamespace::Legacy,
         );
@@ -1661,6 +1669,7 @@ mod tests {
 
         let outputs2 = transform2.outputs(
             enrichment_tables,
+            vrl_caches,
             &[(
                 "in1".into(),
                 outputs1[0].schema_definitions(true)[&"in".into()].clone(),
@@ -1708,9 +1717,11 @@ mod tests {
         };
 
         let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
+        let vrl_caches = vector_lib::vrl_cache::VrlCacheRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables.clone(),
+            vrl_caches.clone(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1746,6 +1757,7 @@ mod tests {
 
         let outputs2 = transform2.outputs(
             enrichment_tables,
+            vrl_caches,
             &[(
                 "in1".into(),
                 outputs1[0].schema_definitions(true)[&"in".into()].clone(),
@@ -1789,9 +1801,11 @@ mod tests {
         };
 
         let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
+        let vrl_caches = vector_lib::vrl_cache::VrlCacheRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables,
+            vrl_caches,
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1832,9 +1846,11 @@ mod tests {
         };
 
         let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
+        let vrl_caches = vector_lib::vrl_cache::VrlCacheRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables,
+            vrl_caches,
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1863,9 +1879,11 @@ mod tests {
         };
 
         let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
+        let vrl_caches = vector_lib::vrl_cache::VrlCacheRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables,
+            vrl_caches,
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1906,9 +1924,11 @@ mod tests {
         };
 
         let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
+        let vrl_caches = vector_lib::vrl_cache::VrlCacheRegistry::default();
 
         let outputs1 = transform1.outputs(
             enrichment_tables,
+            vrl_caches,
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1970,8 +1990,10 @@ mod tests {
         assert_eq!(result.as_log().get("."), Some(&Value::Null));
 
         let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
+        let vrl_caches = vector_lib::vrl_cache::VrlCacheRegistry::default();
         let outputs1 = conf.outputs(
             enrichment_tables,
+            vrl_caches,
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(

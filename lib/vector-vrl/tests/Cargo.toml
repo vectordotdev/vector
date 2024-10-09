@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 chrono-tz.workspace = true
 enrichment = { path = "../../enrichment" }
+vrl-cache = { path = "../../vrl-cache" }
 vrl.workspace = true
 vector-vrl-functions = { path = "../../vector-vrl/functions" }
 

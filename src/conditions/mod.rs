@@ -119,13 +119,14 @@ impl ConditionConfig {
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        vrl_caches: &vector_lib::vrl_cache::VrlCacheRegistry,
     ) -> crate::Result<Condition> {
         match self {
             ConditionConfig::IsLog => Ok(Condition::IsLog),
             ConditionConfig::IsMetric => Ok(Condition::IsMetric),
             ConditionConfig::IsTrace => Ok(Condition::IsTrace),
-            ConditionConfig::Vrl(x) => x.build(enrichment_tables),
-            ConditionConfig::DatadogSearch(x) => x.build(enrichment_tables),
+            ConditionConfig::Vrl(x) => x.build(enrichment_tables, vrl_caches),
+            ConditionConfig::DatadogSearch(x) => x.build(enrichment_tables, vrl_caches),
         }
     }
 }
@@ -154,6 +155,7 @@ pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone
     fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        vrl_caches: &vector_lib::vrl_cache::VrlCacheRegistry,
     ) -> crate::Result<Condition>;
 }
 
@@ -193,6 +195,7 @@ impl AnyCondition {
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        vrl_caches: &vector_lib::vrl_cache::VrlCacheRegistry,
     ) -> crate::Result<Condition> {
         match self {
             AnyCondition::String(s) => {
@@ -200,9 +203,9 @@ impl AnyCondition {
                     source: s.clone(),
                     runtime: Default::default(),
                 };
-                vrl_config.build(enrichment_tables)
+                vrl_config.build(enrichment_tables, vrl_caches)
             }
-            AnyCondition::Map(m) => m.build(enrichment_tables),
+            AnyCondition::Map(m) => m.build(enrichment_tables, vrl_caches),
         }
     }
 }
