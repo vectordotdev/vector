@@ -87,7 +87,7 @@ jobs:
     steps:
     - name: check-spelling
       id: spelling
-      uses: check-spelling/check-spelling@v0.0.21
+      uses: check-spelling/check-spelling@v0.0.22
       with:
         suppress_push_for_open_pull_request: 1
         checkout: true
