@@ -137,10 +137,9 @@ pub struct LokiEvent {
 
 impl ByteSizeOf for LokiEvent {
     fn allocated_bytes(&self) -> usize {
-        let metadata_size: usize = self.structured_metadata.iter()
-            .map(|(key, value)| key.allocated_bytes() + value.allocated_bytes())
-            .sum();
-        self.timestamp.allocated_bytes() + self.event.allocated_bytes() + metadata_size
+        self.timestamp.allocated_bytes() + self.event.allocated_bytes() + self.structured_metadata.iter().fold(0, |res, item| {
+            res + item.0.allocated_bytes() + item.1.allocated_bytes()
+        })
     }
 }
 
@@ -153,11 +152,7 @@ impl Serialize for LokiEvent {
         seq.serialize_element(&self.timestamp.to_string())?;
         let event = String::from_utf8_lossy(&self.event);
         seq.serialize_element(&event)?;
-        let metadata: Vec<(String, String)> = self.structured_metadata
-            .iter()
-            .map(|(key, value)| (key.clone(), value.clone()))
-            .collect();
-        seq.serialize_element(&metadata)?;
+        seq.serialize_element(&self.structured_metadata)?;
         seq.end()
     }
 }
