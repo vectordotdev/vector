@@ -97,7 +97,6 @@ pub mod serde;
 #[cfg(windows)]
 pub mod service;
 pub mod signal;
-#[cfg(unix)]
 pub(crate) mod sink_ext;
 #[allow(unreachable_pub)]
 pub mod sinks;
