@@ -56,8 +56,6 @@ pub struct AxiomConfig {
     request: RequestConfig,
 
     /// The compression algorithm to use.
-    ///
-    /// Supported values: `none` ( not recommended ), `zstd` ( recommended, default ), `gzip`, `deflate`
     #[configurable(derived)]
     #[serde(default = "Compression::zstd_default")]
     compression: Compression,
