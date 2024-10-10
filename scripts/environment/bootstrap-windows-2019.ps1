@@ -12,12 +12,47 @@ if ($env:RELEASE_BUILDER -ne "true") {
     rustup run stable cargo install cargo-nextest --version 0.9.72 --locked
 }
 
-# Enable retries to avoid transient network issues.
-$env:NUGET_ENABLE_ENHANCED_HTTP_RETRY = "true"
+# Support for retries to avoid transient network issues such as 503 errors.
+# This can be deleted after issue https://github.com/vectordotdev/vector/issues/21468 is resolved.
+function Retry-Command {
+  param (
+    [Parameter(Mandatory=$true)]
+    [scriptblock]$Command,
 
-# Install some required dependencies / tools.
-choco install make
-choco install protoc
+    [int]$Retries = 3,
+
+    [int]$DelaySeconds = 10
+  )
+
+  for ($i = 0; $i -lt $Retries; $i++) {
+    try {
+      Invoke-Command -ScriptBlock $Command
+      return
+    }
+    catch {
+      Write-Host "Command failed with error: $_"
+    }
+
+    if ($i -lt ($Retries - 1)) {
+      Write-Host "Retrying in $DelaySeconds seconds..."
+      Start-Sleep -Seconds $DelaySeconds
+      $DelaySeconds = $DelaySeconds * 2
+    } else {
+      Write-Host "No retries reached. Command failed."
+      exit 1
+    }
+  }
+}
+
+$command_1 = {
+  choco install make
+}
+Retry-Command -Command $command_1 -Retries 3 -DelaySeconds 2
+
+$command_2 = {
+  choco install protoc
+}
+Retry-Command -Command $command_2 -Retries 3 -DelaySeconds 2
 
 # Set a specific override path for libclang.
 echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
