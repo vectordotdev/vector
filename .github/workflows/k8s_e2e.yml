@@ -100,7 +100,7 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: VECTOR_VERSION="$(cargo vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: e2e-test-deb-package
           path: target/artifacts/*
@@ -202,7 +202,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request_review' }}
         uses: actions/checkout@v3
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: e2e-test-deb-package
           path: target/artifacts
