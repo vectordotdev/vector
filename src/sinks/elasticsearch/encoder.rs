@@ -126,6 +126,9 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
             written_bytes +=
                 as_tracked_write::<_, _, io::Error>(writer, &log, |mut writer, log| {
                     writer.write_all(&[b'\n'])?;
+                    // False positive clippy hit on the following line. Clippy wants us to skip the
+                    // borrow, but then the value is moved for the following line.
+                    #[allow(clippy::needless_borrows_for_generic_args)]
                     serde_json::to_writer(&mut writer, log)?;
                     writer.write_all(&[b'\n'])?;
                     Ok(())

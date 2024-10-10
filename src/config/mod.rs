@@ -687,22 +687,27 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "sources-file_descriptor"))]
     async fn no_conflict_fd_resources() {
+        use crate::sources::file_descriptors::file_descriptor::null_fd;
+        let fd1 = null_fd().unwrap();
+        let fd2 = null_fd().unwrap();
         let result = load(
-            r#"
+            &format!(
+                r#"
             [sources.file_descriptor1]
             type = "file_descriptor"
-            fd = 10
+            fd = {fd1}
 
             [sources.file_descriptor2]
             type = "file_descriptor"
-            fd = 20
+            fd = {fd2}
 
             [sinks.out]
             type = "test_basic"
             inputs = ["file_descriptor1", "file_descriptor2"]
-            "#,
+            "#
+            ),
             Format::Toml,
         )
         .await;

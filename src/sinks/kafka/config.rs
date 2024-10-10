@@ -149,7 +149,7 @@ impl KafkaSinkConfig {
             .set("bootstrap.servers", &self.bootstrap_servers)
             .set(
                 "socket.timeout.ms",
-                &self.socket_timeout_ms.as_millis().to_string(),
+                self.socket_timeout_ms.as_millis().to_string(),
             )
             .set("statistics.interval.ms", "1000");
 

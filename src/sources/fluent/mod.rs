@@ -474,7 +474,7 @@ impl Decoder for FluentDecoder {
             src.advance(byte_size);
 
             let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
-                let base64_encoded_message = BASE64_STANDARD.encode(&src);
+                let base64_encoded_message = BASE64_STANDARD.encode(&src[..]);
                 emit!(FluentMessageDecodeError {
                     error: &error,
                     base64_encoded_message

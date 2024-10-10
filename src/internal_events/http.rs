@@ -98,6 +98,7 @@ impl InternalEvent for HttpEventsReceived<'_> {
     }
 }
 
+#[cfg(feature = "sources-utils-http")]
 #[derive(Debug)]
 pub struct HttpBadRequest<'a> {
     code: u16,
@@ -116,6 +117,7 @@ impl<'a> HttpBadRequest<'a> {
     }
 }
 
+#[cfg(feature = "sources-utils-http")]
 impl<'a> InternalEvent for HttpBadRequest<'a> {
     fn emit(self) {
         warn!(

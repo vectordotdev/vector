@@ -9,15 +9,15 @@
 //! This sink transforms metrics into GreptimeDB table using following rules:
 //!
 //! - Table name: `{namespace}_{metric_name}`. If the metric doesn't have a
-//! namespace, we will use metric_name for table name.
+//!   namespace, we will use metric_name for table name.
 //! - Timestamp: timestamp is stored as a column called `ts`.
 //! - Tags: metric tags are stored as string columns with its name as column
-//! name
+//!   name
 //! - Counter and Gauge: the value of counter and gauge are stored in a column
-//! called `val`
+//!   called `val`
 //! - Set: the number of set items is stored in a column called `val`.
 //! - Distribution, Histogram and Summary, Sketch: Statistical attributes like
-//! `sum`, `count`, "max", "min", quantiles and buckets are stored as columns.
+//!   `sum`, `count`, "max", "min", quantiles and buckets are stored as columns.
 //!
 
 mod batch;
