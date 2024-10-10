@@ -38,8 +38,7 @@ use super::StreamDecodingError;
 /// TCP source indefinitely.
 pub trait FramingError: std::error::Error + StreamDecodingError + Send + Sync + Any {
     /// Coerces the error to a `dyn Any`.
-    /// This is useful for downcasting the error to a concrete type, as we are dealing
-    /// with Box<dyn FramingError> instead of a concrete `FramingError` enum.
+    /// This is useful for downcasting the error to a concrete type
     fn as_any(&self) -> &dyn Any;
 }
 
