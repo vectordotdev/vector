@@ -624,6 +624,22 @@ cli: {
 			description: "Watch for changes in the configuration file and reload accordingly"
 			type: bool: default: false
 		}
+		VECTOR_WATCH_CONFIG_METHOD: {
+			description: """
+                Method for watching config files.
+
+                `recommend` - recommended event based watcher for host OS
+                `poll` - `poll` watcher can be used in cases where event based watcher doesn't work, e.g., when attaching the configuration via NFS.
+                """
+			type: text: default: recommended
+		}
+		VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS: {
+			description: """
+                Poll for config changes at given interval
+                only applicable if `poll` is set in `--watch-config-method`
+                """
+			type: bool: default: false
+		}
 		VECTOR_INTERNAL_LOG_RATE_LIMIT: {
 			description: "Set the internal log rate limit. This limits Vector from emitting identical logs more than once over the given number of seconds."
 			type: uint: {

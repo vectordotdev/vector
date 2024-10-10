@@ -1,5 +1,10 @@
 #![allow(missing_docs)]
-use std::{num::NonZeroUsize, path::PathBuf, process::ExitStatus, time::Duration};
+use std::{
+    num::{NonZeroU64, NonZeroUsize},
+    path::PathBuf,
+    process::ExitStatus,
+    time::Duration,
+};
 
 use exitcode::ExitCode;
 use futures::StreamExt;
@@ -12,7 +17,7 @@ use crate::extra_context::ExtraContext;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, LogFormat, Opts, RootOpts},
+    cli::{handle_config_errors, LogFormat, Opts, RootOpts, WatchConfigMethod},
     config::{self, Config, ConfigPath},
     heartbeat,
     internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
@@ -59,9 +64,18 @@ impl ApplicationConfig {
         let graceful_shutdown_duration = (!opts.no_graceful_shutdown_limit)
             .then(|| Duration::from_secs(u64::from(opts.graceful_shutdown_limit_secs)));
 
+        let watcher_conf = if opts.watch_config {
+            Some(watcher_config(
+                opts.watch_config_method,
+                opts.watch_config_poll_interval_seconds,
+            ))
+        } else {
+            None
+        };
+
         let config = load_configs(
             &config_paths,
-            opts.watch_config,
+            watcher_conf,
             opts.require_healthy,
             opts.allow_empty_config,
             graceful_shutdown_duration,
@@ -466,7 +480,7 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
 
 pub async fn load_configs(
     config_paths: &[ConfigPath],
-    watch_config: bool,
+    watcher_conf: Option<config::watcher::WatcherConfig>,
     require_healthy: Option<bool>,
     allow_empty_config: bool,
     graceful_shutdown_duration: Option<Duration>,
@@ -474,9 +488,10 @@ pub async fn load_configs(
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
 
-    if watch_config {
+    if let Some(watcher_conf) = watcher_conf {
         // Start listening for config changes immediately.
         config::watcher::spawn_thread(
+            watcher_conf,
             signal_handler.clone_tx(),
             config_paths.iter().map(Into::into),
             None,
@@ -525,4 +540,14 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
         internal_log_rate_secs = rate,
     );
     info!(message = "Log level is enabled.", level = ?level);
+}
+
+pub fn watcher_config(
+    method: WatchConfigMethod,
+    interval: NonZeroU64,
+) -> config::watcher::WatcherConfig {
+    match method {
+        WatchConfigMethod::Recommended => config::watcher::WatcherConfig::RecommendedWatcher,
+        WatchConfigMethod::Poll => config::watcher::WatcherConfig::PollWatcher(interval.into()),
+    }
 }
