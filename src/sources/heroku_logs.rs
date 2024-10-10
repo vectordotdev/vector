@@ -33,9 +33,12 @@ use crate::{
     http::KeepaliveConfig,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::util::{
-        http::{add_query_parameters, HttpMethod},
-        ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    sources::{
+        http_server::{build_param_matcher, remove_duplicates, HttpConfigParamKind},
+        util::{
+            http::{add_query_parameters, HttpMethod},
+            ErrorMessage, HttpSource, HttpSourceAuthConfig,
+        },
     },
     tls::TlsEnableableConfig,
 };
@@ -51,9 +54,16 @@ pub struct LogplexConfig {
 
     /// A list of URL query parameters to include in the log event.
     ///
+    /// Accepts the wildcard (`*`) character for query parameters matching a specified pattern.
+    ///
+    /// Specifying "*" results in all query parameters included in the log event.
+    ///
     /// These override any values included in the body with conflicting names.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "application", docs::examples = "source"))]
+    #[configurable(metadata(docs::examples = "application"))]
+    #[configurable(metadata(docs::examples = "source"))]
+    #[configurable(metadata(docs::examples = "param*"))]
+    #[configurable(metadata(docs::examples = "*"))]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
@@ -173,7 +183,10 @@ impl SourceConfig for LogplexConfig {
                 .build()?;
 
         let source = LogplexSource {
-            query_parameters: self.query_parameters.clone(),
+            query_parameters: build_param_matcher(&remove_duplicates(
+                self.query_parameters.clone(),
+                "query_parameters",
+            ))?,
             decoder,
             log_namespace,
         };
@@ -213,7 +226,7 @@ impl SourceConfig for LogplexConfig {
 
 #[derive(Clone, Default)]
 struct LogplexSource {
-    query_parameters: Vec<String>,
+    query_parameters: Vec<HttpConfigParamKind>,
     decoder: Decoder,
     log_namespace: LogNamespace,
 }
@@ -546,6 +559,51 @@ mod tests {
             assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
             assert_eq!(log["appname"], "lumberjack-store".into());
             assert_eq!(log["absent"], Value::Null);
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn logplex_query_parameters_wildcard() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let auth = make_auth();
+
+            let (rx, addr) = source(
+                Some(auth.clone()),
+                vec!["*".to_string()],
+                EventStatus::Delivered,
+                true,
+            )
+            .await;
+
+            let mut events = spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        200,
+                        send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
+                    )
+                },
+                rx,
+                SAMPLE_BODY.lines().count(),
+            )
+            .await;
+
+            let event = events.remove(0);
+            let log = event.as_log();
+
+            assert_eq!(
+                *log.get_message().unwrap(),
+                r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
+            );
+            assert_eq!(
+                log[log_schema().timestamp_key().unwrap().to_string()],
+                "2020-01-08T22:33:57.353034+00:00"
+                    .parse::<DateTime<Utc>>()
+                    .unwrap()
+                    .into()
+            );
+            assert_eq!(*log.get_host().unwrap(), "host".into());
+            assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
+            assert_eq!(log["appname"], "lumberjack-store".into());
         }).await;
     }
 

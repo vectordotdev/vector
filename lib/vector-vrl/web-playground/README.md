@@ -13,7 +13,7 @@ To build the project we need to use `wasm-pack`. This compiles our Rust code
 to WebAssembly which can then be used within the browser. Install it by running:
 
 ```shell
-cargo install --locked --version 0.10.3 wasm-pack
+cargo install --locked --version 0.13.0 wasm-pack
 ```
 
 After installing `wasm-pack` we must compile our project by running:

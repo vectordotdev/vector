@@ -26,10 +26,10 @@ mod builder;
 mod cmd;
 mod compiler;
 mod diff;
+mod dot_graph;
 mod enrichment_table;
 pub mod format;
 mod graph;
-mod id;
 mod loading;
 pub mod provider;
 pub mod schema;
@@ -47,7 +47,6 @@ pub use cmd::{cmd, Opts};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, Inputs};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
     load_from_str, load_source_from_paths, merge_path_lists, process_paths, COLLECTOR,
@@ -63,8 +62,12 @@ pub use transform::{
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
 pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
-pub use vector_lib::config::{
-    init_log_schema, init_telemetry, log_schema, proxy::ProxyConfig, telemetry, LogSchema, OutputId,
+pub use vector_lib::{
+    config::{
+        init_log_schema, init_telemetry, log_schema, proxy::ProxyConfig, telemetry, ComponentKey,
+        LogSchema, OutputId,
+    },
+    id::Inputs,
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
