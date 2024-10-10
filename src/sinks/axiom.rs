@@ -1,13 +1,20 @@
-use std::collections::HashMap;
-
+use vector_lib::codecs::encoding::FramingConfig;
+use vector_lib::codecs::encoding::JsonSerializerConfig;
+use vector_lib::codecs::encoding::JsonSerializerOptions;
+use vector_lib::codecs::encoding::SerializerConfig;
+use vector_lib::codecs::MetricTagValues;
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
+    codecs::{EncodingConfigWithFraming, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    http::Auth as HttpAuthConfig,
     sinks::{
-        elasticsearch::{ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchConfig},
-        util::{http::RequestConfig, Compression},
+        http::config::{HttpMethod, HttpSinkConfig},
+        util::{
+            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
+        },
         Healthcheck, VectorSink,
     },
     tls::TlsConfig,
@@ -41,20 +48,30 @@ pub struct AxiomConfig {
 
     /// The Axiom dataset to write to.
     #[configurable(metadata(docs::examples = "${AXIOM_DATASET}"))]
-    #[configurable(metadata(docs::examples = "vector.dev"))]
+    #[configurable(metadata(docs::examples = "vector_rocks"))]
     dataset: String,
 
     #[configurable(derived)]
     #[serde(default)]
     request: RequestConfig,
 
+    /// The compression algorithm to use.
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(default = "Compression::zstd_default")]
     compression: Compression,
 
+    /// The TLS settings for the connection.
+    ///
+    /// Optional, constrains TLS settings for this sink.
     #[configurable(derived)]
     tls: Option<TlsConfig>,
 
+    /// The batch settings for the sink.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    /// Controls how acknowledgements are handled for this sink.
     #[configurable(derived)]
     #[serde(
         default,
@@ -81,32 +98,44 @@ impl GenerateConfig for AxiomConfig {
 impl SinkConfig for AxiomConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let mut request = self.request.clone();
-        request.headers.insert(
-            "X-Axiom-Org-Id".to_string(),
-            self.org_id.clone().unwrap_or_default(),
-        );
-        let query = HashMap::from([("timestamp-field".to_string(), "@timestamp".to_string())]);
+        if let Some(org_id) = &self.org_id {
+            // NOTE: Only add the org id header if an org id is provided
+            request
+                .headers
+                .insert("X-Axiom-Org-Id".to_string(), org_id.clone());
+        }
 
         // Axiom has a custom high-performance database that can be ingested
-        // into using our HTTP endpoints, including one compatible with the
-        // Elasticsearch Bulk API.
-        // This configuration wraps the Elasticsearch config to minimize the
-        // amount of code.
-        let elasticsearch_config = ElasticsearchConfig {
-            endpoints: vec![self.build_endpoint()],
+        // into using the native HTTP ingest endpoint. This configuration wraps
+        // the vector HTTP sink with the necessary adjustments to send data
+        // to Axiom, whilst keeping the configuration simple and easy to use
+        // and maintenance of the vector axiom sink to a minimum.
+        //
+        let http_sink_config = HttpSinkConfig {
+            uri: self.build_endpoint().try_into()?,
             compression: self.compression,
-            auth: Some(ElasticsearchAuthConfig::Basic {
-                user: "axiom".to_string(),
-                password: self.token.clone(),
+            auth: Some(HttpAuthConfig::Bearer {
+                token: self.token.clone(),
             }),
-            query: Some(query),
+            method: HttpMethod::Post,
             tls: self.tls.clone(),
             request,
-            api_version: ElasticsearchApiVersion::V6,
-            ..Default::default()
+            acknowledgements: self.acknowledgements,
+            batch: self.batch,
+            headers: None,
+            encoding: EncodingConfigWithFraming::new(
+                Some(FramingConfig::NewlineDelimited),
+                SerializerConfig::Json(JsonSerializerConfig {
+                    metric_tag_values: MetricTagValues::Single,
+                    options: JsonSerializerOptions { pretty: false }, // Minified JSON
+                }),
+                Transformer::default(),
+            ),
+            payload_prefix: "".into(), // Always newline delimited JSON
+            payload_suffix: "".into(), // Always newline delimited JSON
         };
 
-        elasticsearch_config.build(cx).await
+        http_sink_config.build(cx).await
     }
 
     fn input(&self) -> Input {
@@ -126,7 +155,11 @@ impl AxiomConfig {
             CLOUD_URL.to_string()
         };
 
-        format!("{}/v1/datasets/{}/elastic", url, self.dataset)
+        // NOTE trim any trailing slashes to avoid redundant rewriting or 301 redirects from intermediate proxies
+        // NOTE Most axiom users will not need to configure a url, this is for the other 1%
+        let url = url.trim_end_matches('/');
+
+        format!("{}/v1/datasets/{}/ingest", url, self.dataset)
     }
 }
 
@@ -135,6 +168,18 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::AxiomConfig>();
+
+        let config = super::AxiomConfig {
+            url: Some("https://axiom.my-domain.com///".to_string()),
+            org_id: None,
+            dataset: "vector_rocks".to_string(),
+            ..Default::default()
+        };
+        let endpoint = config.build_endpoint();
+        assert_eq!(
+            endpoint,
+            "https://axiom.my-domain.com/v1/datasets/vector_rocks/ingest"
+        );
     }
 }
 
@@ -161,6 +206,7 @@ mod integration_tests {
         let token = env::var("AXIOM_TOKEN").expect("AXIOM_TOKEN environment variable to be set");
         assert!(!token.is_empty(), "$AXIOM_TOKEN required");
         let dataset = env::var("AXIOM_DATASET").unwrap();
+        let org_id = env::var("AXIOM_ORG_ID").unwrap();
 
         let cx = SinkContext::default();
 
@@ -168,6 +214,7 @@ mod integration_tests {
             url: Some(url.clone()),
             token: token.clone().into(),
             dataset: dataset.clone(),
+            org_id: Some(org_id.clone()),
             ..Default::default()
         };
 
@@ -228,6 +275,7 @@ mod integration_tests {
         };
         let query_res: QueryResponse = client
             .post(format!("{}/v1/datasets/_apl?format=legacy", url))
+            .header("X-Axiom-Org-Id", org_id)
             .header("Authorization", format!("Bearer {}", token))
             .json(&query_req)
             .send()

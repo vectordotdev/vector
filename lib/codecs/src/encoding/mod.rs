@@ -10,9 +10,9 @@ use bytes::BytesMut;
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CsvSerializer,
     CsvSerializerConfig, GelfSerializer, GelfSerializerConfig, JsonSerializer,
-    JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer,
-    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, ProtobufSerializer,
-    ProtobufSerializerConfig, ProtobufSerializerOptions, RawMessageSerializer,
+    JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer, LogfmtSerializerConfig,
+    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
+    ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions, RawMessageSerializer,
     RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
 pub use framing::{
