@@ -236,3 +236,6 @@ uuid_from_friendly_id!\(".*"\)
 
 # changelog.d fragment authors line
 ^authors: .*$
+
+# Pattern for PowerShell script
+(?i)\b\w+-Command\b
