@@ -454,6 +454,7 @@ timeframe
 timeseries
 timespan
 timestamped
+typesense
 tzdata
 ubuntu
 unchunked

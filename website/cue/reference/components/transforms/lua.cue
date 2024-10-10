@@ -63,6 +63,7 @@ components: transforms: lua: {
 						-- Add root level field
 						event.log.field = "new value"
 						-- Add nested field
+						event.log.nested = {}
 						event.log.nested.field = "nested value"
 						-- Rename field
 						event.log.renamed_field = event.log.field_to_rename

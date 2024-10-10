@@ -455,11 +455,24 @@ impl LogEvent {
         }
     }
 
-    /// Returns an iterator of all fields if the value is an Object. Otherwise,
-    /// a single field is returned with a "message" key
+    /// Returns an iterator of all fields if the value is an Object. Otherwise, a single field is
+    /// returned with a "message" key. Field names that are could be interpreted as alternate paths
+    /// (i.e. containing periods, square brackets, etc) are quoted.
     pub fn convert_to_fields(&self) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
         if let Some(map) = self.as_map() {
             util::log::all_fields(map)
+        } else {
+            util::log::all_fields_non_object_root(self.value())
+        }
+    }
+
+    /// Returns an iterator of all fields if the value is an Object. Otherwise, a single field is
+    /// returned with a "message" key. Field names are not quoted.
+    pub fn convert_to_fields_unquoted(
+        &self,
+    ) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
+        if let Some(map) = self.as_map() {
+            util::log::all_fields_unquoted(map)
         } else {
             util::log::all_fields_non_object_root(self.value())
         }
@@ -1186,7 +1199,10 @@ mod test {
         // Check if event id is UUID v7
         let log1 = LogEvent::default();
         assert_eq!(
-            log1.metadata().source_event_id().get_version(),
+            log1.metadata()
+                .source_event_id()
+                .expect("source_event_id should be auto-generated for new events")
+                .get_version(),
             Some(Version::SortRand)
         );
 

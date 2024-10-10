@@ -40,16 +40,16 @@ tokenize = [
 
 [dependencies]
 async-stream = "0.3.5"
-bytes = { version = "1.7.1", default-features = false, optional = true }
-chrono-tz = { version = "0.9.0", default-features = false, features = ["serde"] }
+bytes = { version = "1.7.2", default-features = false, optional = true }
 chrono.workspace = true
+chrono-tz.workspace = true
 crossbeam-utils = { version = "0.8.20", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
-futures = { version = "0.3.30", default-features = false, features = ["std"] }
+futures.workspace = true
 indexmap.workspace = true
 metrics.workspace = true
 nom = { version = "7", optional = true }
-ordered-float = { version = "4.2.2", default-features = false }
+ordered-float = { version = "4.3.0", default-features = false }
 paste = "1.0.15"
 pin-project.workspace = true
 ryu = { version = "1", default-features = false }
@@ -66,7 +66,7 @@ vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
-futures = { version = "0.3.30", default-features = false, features = ["async-await", "std"] }
-tokio = { version = "1.39.3", default-features = false, features = ["rt", "time"] }
+futures = { version = "0.3.30", default-features = false, features = ["async-await"] }
+tokio = { version = "1.40.0", default-features = false, features = ["rt", "time"] }
 quickcheck = "1"
 quickcheck_macros = "1"
