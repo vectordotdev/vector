@@ -54,12 +54,8 @@ base: components: sinks: axiom: configuration: {
 		}
 	}
 	compression: {
-		description: """
-			The compression algorithm to use.
-
-			Supported values: `none` ( not recommended ), `zstd` ( recommended, default ), `gzip`, `deflate`
-			"""
-		required: false
+		description: "The compression algorithm to use."
+		required:    false
 		type: string: {
 			default: "zstd"
 			enum: {
