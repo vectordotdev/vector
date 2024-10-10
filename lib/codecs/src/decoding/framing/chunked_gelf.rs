@@ -32,6 +32,7 @@ const fn default_pending_messages_limit() -> usize {
 #[derive(Debug, Clone, Default)]
 pub struct ChunkedGelfDecoderConfig {
     /// Options for the chunked GELF decoder.
+    #[serde(default)]
     pub chunked_gelf: ChunkedGelfDecoderOptions,
 }
 
