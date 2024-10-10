@@ -47,12 +47,12 @@ function Retry-Command {
 $command_1 = {
   choco install make
 }
-Retry-Command -Command $command_1 -Retries 3 -DelaySeconds 2
+Retry-Command -Command $command_1 -Retries 5 -DelaySeconds 2
 
 $command_2 = {
   choco install protoc
 }
-Retry-Command -Command $command_2 -Retries 3 -DelaySeconds 2
+Retry-Command -Command $command_2 -Retries 5 -DelaySeconds 2
 
 # Set a specific override path for libclang.
 echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
