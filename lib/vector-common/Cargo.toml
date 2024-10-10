@@ -39,7 +39,7 @@ tokenize = [
 ]
 
 [dependencies]
-async-stream = "0.3.5"
+async-stream = "0.3.6"
 bytes = { version = "1.7.2", default-features = false, optional = true }
 chrono.workspace = true
 chrono-tz.workspace = true

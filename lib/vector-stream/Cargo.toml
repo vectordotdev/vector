@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-async-stream = { version = "0.3.5", default-features = false }
+async-stream = { version = "0.3.6", default-features = false }
 futures.workspace = true
 futures-util = { version = "0.3.29", default-features = false, features = ["std"] }
 pin-project.workspace = true
