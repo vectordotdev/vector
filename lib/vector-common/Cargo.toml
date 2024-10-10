@@ -66,7 +66,7 @@ vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
-futures = { version = "0.3.30", default-features = false, features = ["async-await"] }
+futures = { version = "0.3.31", default-features = false, features = ["async-await"] }
 tokio = { version = "1.40.0", default-features = false, features = ["rt", "time"] }
 quickcheck = "1"
 quickcheck_macros = "1"
