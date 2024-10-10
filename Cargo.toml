@@ -148,6 +148,7 @@ prost-reflect = { version = "0.14", features = ["serde"], default-features = fal
 prost-types = { version = "0.12", default-features = false}
 serde_json = { version = "1.0.128", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.210", default-features = false, features = ["alloc", "derive", "rc"] }
+tokio = { version = "1.39.2", default-features = false, features = ["full"] }
 toml = { version = "0.8.19", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }

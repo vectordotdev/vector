@@ -10,7 +10,6 @@ use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use vrl::value::{kind::Collection, Kind};
 
 #[cfg(unix)]
-use crate::serde::default_framing_message_based;
 use crate::{
     codecs::DecodingConfig,
     config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
@@ -152,12 +151,12 @@ impl SourceConfig for SocketConfig {
             }
             Mode::Udp(config) => {
                 let log_namespace = cx.log_namespace(config.log_namespace);
-                let decoder = DecodingConfig::new(
-                    config.framing().clone(),
-                    config.decoding().clone(),
-                    log_namespace,
-                )
-                .build()?;
+                let decoding = config.decoding().clone();
+                let framing = config
+                    .framing()
+                    .clone()
+                    .unwrap_or_else(|| decoding.default_message_based_framing());
+                let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
                 Ok(udp::udp(
                     config,
                     decoder,
@@ -169,15 +168,12 @@ impl SourceConfig for SocketConfig {
             #[cfg(unix)]
             Mode::UnixDatagram(config) => {
                 let log_namespace = cx.log_namespace(config.log_namespace);
-                let decoder = DecodingConfig::new(
-                    config
-                        .framing
-                        .clone()
-                        .unwrap_or_else(default_framing_message_based),
-                    config.decoding.clone(),
-                    log_namespace,
-                )
-                .build()?;
+                let decoding = config.decoding.clone();
+                let framing = config
+                    .framing
+                    .clone()
+                    .unwrap_or_else(|| decoding.default_message_based_framing());
+                let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
                 unix::unix_datagram(config, decoder, cx.shutdown, cx.out, log_namespace)
             }
@@ -334,17 +330,19 @@ mod test {
 
     use bytes::{BufMut, Bytes, BytesMut};
     use futures::{stream, StreamExt};
+    use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
+    use serde_json::json;
     use tokio::io::AsyncReadExt;
     use tokio::net::TcpStream;
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
     };
-    use vector_lib::codecs::NewlineDelimitedDecoderConfig;
     #[cfg(unix)]
     use vector_lib::codecs::{
         decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig,
     };
+    use vector_lib::codecs::{GelfDeserializerConfig, NewlineDelimitedDecoderConfig};
     use vector_lib::event::EventContainer;
     use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
     use vrl::value::ObjectMap;
@@ -382,6 +380,53 @@ mod test {
         tls::{self, TlsConfig, TlsEnableableConfig, TlsSourceConfig},
         SourceSender,
     };
+
+    fn get_gelf_payload(message: &str) -> String {
+        serde_json::to_string(&json!({
+            "version": "1.1",
+            "host": "example.org",
+            "short_message": message,
+            "timestamp": 1234567890.123,
+            "level": 6,
+            "_foo": "bar",
+        }))
+        .unwrap()
+    }
+
+    fn create_gelf_chunk(
+        message_id: u64,
+        sequence_number: u8,
+        total_chunks: u8,
+        payload: &[u8],
+    ) -> Bytes {
+        const GELF_MAGIC: [u8; 2] = [0x1e, 0x0f];
+        let mut chunk = BytesMut::new();
+        chunk.put_slice(&GELF_MAGIC);
+        chunk.put_u64(message_id);
+        chunk.put_u8(sequence_number);
+        chunk.put_u8(total_chunks);
+        chunk.put(payload);
+        chunk.freeze()
+    }
+
+    fn get_gelf_chunks(short_message: &str, max_size: usize, rng: &mut SmallRng) -> Vec<Bytes> {
+        let message_id = rand::random();
+        let payload = get_gelf_payload(short_message);
+        let payload_chunks = payload.as_bytes().chunks(max_size).collect::<Vec<_>>();
+        let total_chunks = payload_chunks.len();
+        assert!(total_chunks <= 128, "too many gelf chunks");
+
+        let mut chunks = payload_chunks
+            .into_iter()
+            .enumerate()
+            .map(|(i, payload_chunk)| {
+                create_gelf_chunk(message_id, i as u8, total_chunks as u8, payload_chunk)
+            })
+            .collect::<Vec<_>>();
+        // Shuffle the chunks to simulate out-of-order delivery
+        chunks.shuffle(rng);
+        chunks
+    }
 
     #[test]
     fn generate_config() {
@@ -855,20 +900,24 @@ mod test {
 
     //////// UDP TESTS ////////
     fn send_lines_udp(addr: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
+        send_packets_udp(addr, lines.into_iter().map(|line| line.into()))
+    }
+
+    fn send_packets_udp(addr: SocketAddr, packets: impl IntoIterator<Item = Bytes>) -> SocketAddr {
         let bind = next_addr();
         let socket = UdpSocket::bind(bind)
             .map_err(|error| panic!("{:}", error))
             .ok()
             .unwrap();
 
-        for line in lines {
+        for packet in packets {
             assert_eq!(
                 socket
-                    .send_to(line.as_bytes(), addr)
+                    .send_to(&packet, addr)
                     .map_err(|error| panic!("{:}", error))
                     .ok()
                     .unwrap(),
-                line.as_bytes().len()
+                packet.len()
             );
             // Space things out slightly to try to avoid dropped packets
             thread::sleep(Duration::from_millis(1));
@@ -1059,10 +1108,12 @@ mod test {
             let address = next_addr();
             let mut config = UdpConfig::from_address(address.into());
             config.max_length = 10;
-            config.framing = CharacterDelimitedDecoderConfig {
-                character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
-            }
-            .into();
+            config.framing = Some(
+                CharacterDelimitedDecoderConfig {
+                    character_delimited: CharacterDelimitedDecoderOptions::new(b',', None),
+                }
+                .into(),
+            );
             let address = init_udp_with_config(tx, config).await;
 
             send_lines_udp(
@@ -1078,6 +1129,40 @@ mod test {
             assert_eq!(
                 events[1].as_log()[log_schema().message_key().unwrap().to_string()],
                 "short one".into()
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn udp_decodes_chunked_gelf_messages() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let address = next_addr();
+            let mut config = UdpConfig::from_address(address.into());
+            config.decoding = GelfDeserializerConfig::default().into();
+            let address = init_udp_with_config(tx, config).await;
+            let seed = 42;
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let max_size = 300;
+            let big_message = "This is a very large message".repeat(500);
+            let another_big_message = "This is another very large message".repeat(500);
+            let mut chunks = get_gelf_chunks(big_message.as_str(), max_size, &mut rng);
+            let mut another_chunks =
+                get_gelf_chunks(another_big_message.as_str(), max_size, &mut rng);
+            chunks.append(&mut another_chunks);
+            chunks.shuffle(&mut rng);
+
+            send_packets_udp(address, chunks);
+
+            let events = collect_n(rx, 2).await;
+            assert_eq!(
+                events[1].as_log()[log_schema().message_key().unwrap().to_string()],
+                big_message.into()
+            );
+            assert_eq!(
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+                another_big_message.into()
             );
         })
         .await;
@@ -1220,11 +1305,35 @@ mod test {
     }
 
     ////////////// UNIX TEST LIBS //////////////
+
     #[cfg(unix)]
     async fn init_unix(sender: SourceSender, stream: bool, use_vector_namespace: bool) -> PathBuf {
-        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+        init_unix_inner(sender, stream, use_vector_namespace, None).await
+    }
 
-        let mut config = UnixConfig::new(in_path.clone());
+    #[cfg(unix)]
+    async fn init_unix_with_config(
+        sender: SourceSender,
+        stream: bool,
+        use_vector_namespace: bool,
+        config: UnixConfig,
+    ) -> PathBuf {
+        init_unix_inner(sender, stream, use_vector_namespace, Some(config)).await
+    }
+
+    #[cfg(unix)]
+    async fn init_unix_inner(
+        sender: SourceSender,
+        stream: bool,
+        use_vector_namespace: bool,
+        config: Option<UnixConfig>,
+    ) -> PathBuf {
+        let mut config = config.unwrap_or_else(|| {
+            UnixConfig::new(tempfile::tempdir().unwrap().into_path().join("unix_test"))
+        });
+
+        let in_path = config.path.clone();
+
         if use_vector_namespace {
             config.log_namespace = Some(true);
         }
@@ -1234,6 +1343,7 @@ mod test {
         } else {
             Mode::UnixDatagram(config)
         };
+
         let server = SocketConfig { mode }
             .build(SourceContext::new_test(sender, None))
             .await
@@ -1323,11 +1433,17 @@ mod test {
     ////////////// UNIX DATAGRAM TESTS //////////////
     #[cfg(unix)]
     async fn send_lines_unix_datagram(path: PathBuf, lines: &[&str]) {
+        let packets = lines.iter().map(|line| Bytes::from(line.to_string()));
+        send_packets_unix_datagram(path, packets).await;
+    }
+
+    #[cfg(unix)]
+    async fn send_packets_unix_datagram(path: PathBuf, packets: impl IntoIterator<Item = Bytes>) {
         let socket = UnixDatagram::unbound().unwrap();
         socket.connect(path).unwrap();
 
-        for line in lines {
-            socket.send(line.as_bytes()).await.unwrap();
+        for packet in packets {
+            socket.send(&packet).await.unwrap();
         }
         socket.shutdown(std::net::Shutdown::Both).unwrap();
     }
@@ -1397,6 +1513,41 @@ mod test {
 
         let dgram = &buf[..size];
         assert_eq!(dgram, bytes);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_chunked_gelf_messages() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+            let mut config = UnixConfig::new(in_path.clone());
+            config.decoding = GelfDeserializerConfig::default().into();
+            let path = init_unix_with_config(tx, false, false, config).await;
+            let seed = 42;
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let max_size = 20;
+            let big_message = "This is a very large message".repeat(5);
+            let another_big_message = "This is another very large message".repeat(5);
+            let mut chunks = get_gelf_chunks(big_message.as_str(), max_size, &mut rng);
+            let mut another_chunks =
+                get_gelf_chunks(another_big_message.as_str(), max_size, &mut rng);
+            chunks.append(&mut another_chunks);
+            chunks.shuffle(&mut rng);
+
+            send_packets_unix_datagram(path, chunks).await;
+
+            let events = collect_n(rx, 2).await;
+            assert_eq!(
+                events[1].as_log()[log_schema().message_key().unwrap().to_string()],
+                big_message.into()
+            );
+            assert_eq!(
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+                another_big_message.into()
+            );
+        })
+        .await;
     }
 
     #[cfg(unix)]

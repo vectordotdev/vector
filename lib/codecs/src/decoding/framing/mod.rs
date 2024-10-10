@@ -5,16 +5,18 @@
 
 mod bytes;
 mod character_delimited;
+mod chunked_gelf;
 mod length_delimited;
 mod newline_delimited;
 mod octet_counting;
 
-use std::fmt::Debug;
+use std::{any::Any, fmt::Debug};
 
 use ::bytes::Bytes;
 pub use character_delimited::{
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions,
 };
+pub use chunked_gelf::{ChunkedGelfDecoder, ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions};
 use dyn_clone::DynClone;
 pub use length_delimited::{LengthDelimitedDecoder, LengthDelimitedDecoderConfig};
 pub use newline_delimited::{
@@ -34,23 +36,33 @@ use super::StreamDecodingError;
 /// It requires conformance to `TcpError` so that we can determine whether the
 /// error is recoverable or if trying to continue will lead to hanging up the
 /// TCP source indefinitely.
-pub trait FramingError: std::error::Error + StreamDecodingError + Send + Sync {}
+pub trait FramingError: std::error::Error + StreamDecodingError + Send + Sync + Any {
+    /// Coerces the error to a `dyn Any`.
+    /// This is useful for downcasting the error to a concrete type, as we are dealing
+    /// with Box<dyn FramingError> instead of a concrete `FramingError` enum.
+    fn as_any(&self) -> &dyn Any;
+}
 
 impl std::error::Error for BoxedFramingError {}
 
-impl FramingError for std::io::Error {}
-
-impl FramingError for LinesCodecError {}
-
-impl From<std::io::Error> for BoxedFramingError {
-    fn from(error: std::io::Error) -> Self {
-        Box::new(error)
+impl FramingError for std::io::Error {
+    fn as_any(&self) -> &dyn Any {
+        self as &dyn Any
     }
 }
 
-impl From<LinesCodecError> for BoxedFramingError {
-    fn from(error: LinesCodecError) -> Self {
-        Box::new(error)
+impl FramingError for LinesCodecError {
+    fn as_any(&self) -> &dyn Any {
+        self as &dyn Any
+    }
+}
+
+impl<T> From<T> for BoxedFramingError
+where
+    T: FramingError + 'static,
+{
+    fn from(value: T) -> Self {
+        Box::new(value)
     }
 }
 

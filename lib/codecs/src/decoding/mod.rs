@@ -20,10 +20,11 @@ pub use format::{
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesDecoder, BytesDecoderConfig, CharacterDelimitedDecoder,
-    CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions, FramingError,
-    LengthDelimitedDecoder, LengthDelimitedDecoderConfig, NewlineDelimitedDecoder,
-    NewlineDelimitedDecoderConfig, NewlineDelimitedDecoderOptions, OctetCountingDecoder,
-    OctetCountingDecoderConfig, OctetCountingDecoderOptions,
+    CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions, ChunkedGelfDecoder,
+    ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions, FramingError, LengthDelimitedDecoder,
+    LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
+    NewlineDelimitedDecoderOptions, OctetCountingDecoder, OctetCountingDecoderConfig,
+    OctetCountingDecoderOptions,
 };
 use smallvec::SmallVec;
 use std::fmt::Debug;
@@ -99,6 +100,11 @@ pub enum FramingConfig {
     ///
     /// [octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
     OctetCounting(OctetCountingDecoderConfig),
+
+    /// Byte frames which are chunked GELF messages.
+    ///
+    /// [chunked_gelf]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html
+    ChunkedGelf(ChunkedGelfDecoderConfig),
 }
 
 impl From<BytesDecoderConfig> for FramingConfig {
@@ -131,6 +137,12 @@ impl From<OctetCountingDecoderConfig> for FramingConfig {
     }
 }
 
+impl From<ChunkedGelfDecoderConfig> for FramingConfig {
+    fn from(config: ChunkedGelfDecoderConfig) -> Self {
+        Self::ChunkedGelf(config)
+    }
+}
+
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
     pub fn build(&self) -> Framer {
@@ -140,6 +152,7 @@ impl FramingConfig {
             FramingConfig::LengthDelimited(config) => Framer::LengthDelimited(config.build()),
             FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
             FramingConfig::OctetCounting(config) => Framer::OctetCounting(config.build()),
+            FramingConfig::ChunkedGelf(config) => Framer::ChunkedGelf(config.build()),
         }
     }
 }
@@ -159,6 +172,8 @@ pub enum Framer {
     OctetCounting(OctetCountingDecoder),
     /// Uses an opaque `Framer` implementation for framing.
     Boxed(BoxedFramer),
+    /// Uses a `ChunkedGelfDecoder` for framing.
+    ChunkedGelf(ChunkedGelfDecoder),
 }
 
 impl tokio_util::codec::Decoder for Framer {
@@ -173,6 +188,7 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::NewlineDelimited(framer) => framer.decode(src),
             Framer::OctetCounting(framer) => framer.decode(src),
             Framer::Boxed(framer) => framer.decode(src),
+            Framer::ChunkedGelf(framer) => framer.decode(src),
         }
     }
 
@@ -184,6 +200,7 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::NewlineDelimited(framer) => framer.decode_eof(src),
             Framer::OctetCounting(framer) => framer.decode_eof(src),
             Framer::Boxed(framer) => framer.decode_eof(src),
+            Framer::ChunkedGelf(framer) => framer.decode_eof(src),
         }
     }
 }
@@ -358,6 +375,14 @@ impl DeserializerConfig {
             DeserializerConfig::Gelf(_) => {
                 FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig::new(0))
             }
+        }
+    }
+
+    /// Returns an appropriate default framing config for the given deserializer with message based inputs.
+    pub fn default_message_based_framing(&self) -> FramingConfig {
+        match self {
+            DeserializerConfig::Gelf(_) => FramingConfig::ChunkedGelf(Default::default()),
+            _ => FramingConfig::Bytes,
         }
     }
 
