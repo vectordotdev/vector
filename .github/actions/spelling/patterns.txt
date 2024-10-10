@@ -236,9 +236,3 @@ uuid_from_friendly_id!\(".*"\)
 
 # changelog.d fragment authors line
 ^authors: .*$
-
-# Pattern for matching CLI flags
-\s--?(\w+)\s
-
-# Workaround for spellchecker bug.
-Retry-Command
