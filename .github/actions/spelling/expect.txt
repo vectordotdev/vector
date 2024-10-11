@@ -317,7 +317,6 @@ enp
 enumdecl
 enumflags
 envsubst
-EOIG
 EOL'ed
 Err'ing
 errorf
@@ -442,7 +441,6 @@ Godbolt
 gogoproto
 gohai
 goldberg
-goldmark
 GPB
 gpgcheck
 gpgkey
@@ -745,6 +743,7 @@ nodebuginfo
 nodistro
 nofield
 nofree
+nohup
 nomac
 NONALPHANUM
 nonbare
@@ -825,6 +824,7 @@ peekable
 PEMS
 pgmajfault
 pgrep
+pidof
 PII
 Pitbull
 pkc
@@ -1280,3 +1280,4 @@ zulip
 Zunstable
 zup
 zurp
+sni
