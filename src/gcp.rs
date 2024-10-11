@@ -218,7 +218,8 @@ impl GcpAuthenticator {
                             } else {
                                 expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS
                             };
-                            deadline = Duration::from_secs(new_deadline);                        }
+                            deadline = Duration::from_secs(new_deadline);
+                        }
                         Err(error) => {
                             error!(
                                 message = "Failed to update GCP authentication token.",
