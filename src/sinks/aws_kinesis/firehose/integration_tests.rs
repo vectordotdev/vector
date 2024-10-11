@@ -123,7 +123,7 @@ async fn firehose_put_records_without_partition_key() {
     #[allow(clippy::needless_collect)] // https://github.com/rust-lang/rust-clippy/issues/6909
     let input = input
         .into_iter()
-        .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+        .map(|rec| serde_json::to_value(rec.into_log()).unwrap())
         .collect::<Vec<_>>();
     for hit in hits {
         let hit = hit
@@ -235,7 +235,7 @@ async fn firehose_put_records_with_partition_key() {
     #[allow(clippy::needless_collect)] // https://github.com/rust-lang/rust-clippy/issues/6909
     let input = input
         .into_iter()
-        .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+        .map(|rec| serde_json::to_value(rec.into_log()).unwrap())
         .collect::<Vec<_>>();
     for hit in hits {
         let hit = hit

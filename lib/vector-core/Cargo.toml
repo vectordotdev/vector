@@ -5,6 +5,9 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 publish = false
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(ddsketch_extended)'] }
+
 [dependencies]
 async-graphql = { version = "7.0.7", default-features = false, features = ["playground" ], optional = true }
 async-trait = { version = "0.1", default-features = false }

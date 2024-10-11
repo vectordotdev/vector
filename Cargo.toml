@@ -50,6 +50,9 @@ debug = false # Do not include debug symbols in the executable.
 [profile.bench]
 debug = true
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
+
 [package.metadata.deb]
 name = "vector"
 section = "admin"
@@ -538,7 +541,7 @@ sources-logs = [
   "sources-nats",
   "sources-opentelemetry",
   "sources-pulsar",
-  "sources-file-descriptor",
+  "sources-file_descriptor",
   "sources-redis",
   "sources-socket",
   "sources-splunk_hec",
@@ -575,7 +578,7 @@ sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
 sources-file = ["vector-lib/file-source"]
-sources-file-descriptor = ["tokio-util/io"]
+sources-file_descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "protobuf-build", "dep:tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
@@ -757,7 +760,7 @@ sinks-file = ["dep:async-compression"]
 sinks-gcp = ["sinks-gcp-chronicle", "dep:base64", "gcp"]
 sinks-gcp-chronicle = ["gcp"]
 sinks-greptimedb_metrics = ["dep:greptimedb-ingester"]
-sinks-greptimedb_logs = []
+sinks-greptimedb_logs = ["dep:greptimedb-ingester"]
 sinks-honeycomb = []
 sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
@@ -799,6 +802,7 @@ all-integration-tests = [
   "datadog-logs-integration-tests",
   "datadog-metrics-integration-tests",
   "datadog-traces-integration-tests",
+  "dnstap-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
@@ -822,7 +826,6 @@ all-integration-tests = [
   "pulsar-integration-tests",
   "redis-integration-tests",
   "splunk-integration-tests",
-  "dnstap-integration-tests",
   "webhdfs-integration-tests",
 ]
 
