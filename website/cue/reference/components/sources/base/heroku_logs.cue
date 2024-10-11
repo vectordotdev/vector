@@ -439,12 +439,16 @@ base: components: sources: heroku_logs: configuration: {
 		description: """
 			A list of URL query parameters to include in the log event.
 
+			Accepts the wildcard (`*`) character for query parameters matching a specified pattern.
+
+			Specifying "*" results in all query parameters included in the log event.
+
 			These override any values included in the body with conflicting names.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: examples: ["application", "source"]
+			items: type: string: examples: ["application", "source", "param*", "*"]
 		}
 	}
 	tls: {
