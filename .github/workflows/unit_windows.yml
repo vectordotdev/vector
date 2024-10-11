@@ -1,7 +1,7 @@
 name: Unit - Windows
 
 on:
-  workflow_call:
+  pull_request:
 
 jobs:
 
