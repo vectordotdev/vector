@@ -294,7 +294,7 @@ jobs:
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
     runs-on: release-builder-windows
-    timeout-minutes: 90
+    timeout-minutes: 120
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
