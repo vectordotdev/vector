@@ -203,6 +203,7 @@ Tizen
 Tmobile
 Tomtec
 Tooky
+Toolset
 Touchmate
 Traefik
 Trekstor
