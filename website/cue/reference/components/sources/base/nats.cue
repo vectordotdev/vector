@@ -356,7 +356,7 @@ base: components: sources: nats: configuration: {
 					delimiter: {
 						description: "The character that delimits byte sequences."
 						required:    true
-						type: uint: {}
+						type: ascii_char: {}
 					}
 					max_length: {
 						description: """
@@ -487,7 +487,7 @@ base: components: sources: nats: configuration: {
 			[async_nats_subscription_capacity]: https://docs.rs/async-nats/latest/async_nats/struct.ConnectOptions.html#method.subscription_capacity
 			"""
 		required: false
-		type: uint: default: 4096
+		type: uint: default: 65536
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
@@ -552,6 +552,15 @@ base: components: sources: nats: configuration: {
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
 			verify_certificate: {
 				description: """
 					Enables certificate verification. For components that create a server, this requires that the
@@ -592,6 +601,6 @@ base: components: sources: nats: configuration: {
 			If the port is not specified it defaults to 4222.
 			"""
 		required: true
-		type: string: examples: ["nats://demo.nats.io", "nats://127.0.0.1:4242"]
+		type: string: examples: ["nats://demo.nats.io", "nats://127.0.0.1:4242", "nats://localhost:4222,nats://localhost:5222,nats://localhost:6222"]
 	}
 }

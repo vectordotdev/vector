@@ -441,6 +441,14 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			}
 		}
 	}
+	endpoint: {
+		description: "API endpoint for Google Cloud Storage"
+		required:    false
+		type: string: {
+			default: "https://storage.googleapis.com"
+			examples: ["http://localhost:9000"]
+		}
+	}
 	filename_append_uuid: {
 		description: """
 			Whether or not to append a UUID v4 token to the end of the object key.
@@ -497,7 +505,7 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 				type: object: options: delimiter: {
 					description: "The ASCII (7-bit) character that delimits byte sequences."
 					required:    true
-					type: uint: {}
+					type: ascii_char: {}
 				}
 			}
 			length_delimited: {
@@ -841,6 +849,15 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

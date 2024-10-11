@@ -307,7 +307,7 @@ base: components: sinks: socket: configuration: {
 				type: object: options: delimiter: {
 					description: "The ASCII (7-bit) character that delimits byte sequences."
 					required:    true
-					type: uint: {}
+					type: ascii_char: {}
 				}
 			}
 			length_delimited: {
@@ -460,6 +460,15 @@ base: components: sinks: socket: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

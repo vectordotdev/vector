@@ -135,7 +135,7 @@ impl Deserializer for InfluxdbDeserializer {
                                     ts.iter().map(|t| (t.0.to_string(), t.1.to_string())),
                                 )
                             }))
-                            .with_timestamp(timestamp.and_then(DateTime::from_timestamp_micros)),
+                            .with_timestamp(timestamp.map(DateTime::from_timestamp_nanos)),
                         ))
                     })
                     .collect::<Vec<_>>()
@@ -157,7 +157,6 @@ impl From<&InfluxdbDeserializerConfig> for InfluxdbDeserializer {
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use chrono::DateTime;
     use vector_core::{
         config::LogNamespace,
         event::{Metric, MetricKind, MetricTags, MetricValue},
@@ -168,9 +167,11 @@ mod tests {
     #[test]
     fn deserialize_success() {
         let deser = InfluxdbDeserializer::new(true);
-        let buffer = Bytes::from(
-            "cpu,host=A,region=west usage_system=64i,usage_user=10i 1590488773254420000",
-        );
+        let now = chrono::Utc::now();
+        let now_timestamp_nanos = now.timestamp_nanos_opt().unwrap();
+        let buffer = Bytes::from(format!(
+            "cpu,host=A,region=west usage_system=64i,usage_user=10i {now_timestamp_nanos}"
+        ));
         let events = deser.parse(buffer, LogNamespace::default()).unwrap();
         assert_eq!(events.len(), 2);
 
@@ -185,7 +186,7 @@ mod tests {
                 ("host".to_string(), "A".to_string()),
                 ("region".to_string(), "west".to_string()),
             ])))
-            .with_timestamp(DateTime::from_timestamp_micros(1590488773254420000))
+            .with_timestamp(Some(now))
         );
         assert_eq!(
             events[1].as_metric(),
@@ -198,7 +199,7 @@ mod tests {
                 ("host".to_string(), "A".to_string()),
                 ("region".to_string(), "west".to_string()),
             ])))
-            .with_timestamp(DateTime::from_timestamp_micros(1590488773254420000))
+            .with_timestamp(Some(now))
         );
     }
 

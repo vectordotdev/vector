@@ -142,16 +142,8 @@ fn example_librdkafka_options() -> HashMap<String, String> {
     ])
 }
 
-/// Used to determine the options to set in configs, since both Kafka consumers and producers have
-/// unique options, they use the same struct, and the error if given the wrong options.
-#[derive(Debug, PartialOrd, PartialEq, Eq)]
-pub enum KafkaRole {
-    Consumer,
-    Producer,
-}
-
 impl KafkaSinkConfig {
-    pub(crate) fn to_rdkafka(&self, kafka_role: KafkaRole) -> crate::Result<ClientConfig> {
+    pub(crate) fn to_rdkafka(&self) -> crate::Result<ClientConfig> {
         let mut client_config = ClientConfig::new();
         client_config
             .set("bootstrap.servers", &self.bootstrap_servers)
@@ -164,73 +156,71 @@ impl KafkaSinkConfig {
         self.auth.apply(&mut client_config)?;
 
         // All batch options are producer only.
-        if kafka_role == KafkaRole::Producer {
-            client_config
-                .set("compression.codec", &to_string(self.compression))
-                .set(
-                    "message.timeout.ms",
-                    &self.message_timeout_ms.as_millis().to_string(),
-                );
+        client_config
+            .set("compression.codec", &to_string(self.compression))
+            .set(
+                "message.timeout.ms",
+                &self.message_timeout_ms.as_millis().to_string(),
+            );
 
-            if let Some(value) = self.batch.timeout_secs {
-                // Delay in milliseconds to wait for messages in the producer queue to accumulate before
-                // constructing message batches (MessageSets) to transmit to brokers. A higher value
-                // allows larger and more effective (less overhead, improved compression) batches of
-                // messages to accumulate at the expense of increased message delivery latency.
-                // Type: float
-                let key = "queue.buffering.max.ms";
-                if let Some(val) = self.librdkafka_options.get(key) {
-                    return Err(format!("Batching setting `batch.timeout_secs` sets `librdkafka_options.{}={}`.\
-                                        The config already sets this as `librdkafka_options.queue.buffering.max.ms={}`.\
-                                        Please delete one.", key, value, val).into());
-                }
-                debug!(
-                    librdkafka_option = key,
-                    batch_option = "timeout_secs",
-                    value,
-                    "Applying batch option as librdkafka option."
-                );
-                client_config.set(key, &((value * 1000.0).round().to_string()));
+        if let Some(value) = self.batch.timeout_secs {
+            // Delay in milliseconds to wait for messages in the producer queue to accumulate before
+            // constructing message batches (MessageSets) to transmit to brokers. A higher value
+            // allows larger and more effective (less overhead, improved compression) batches of
+            // messages to accumulate at the expense of increased message delivery latency.
+            // Type: float
+            let key = "queue.buffering.max.ms";
+            if let Some(val) = self.librdkafka_options.get(key) {
+                return Err(format!("Batching setting `batch.timeout_secs` sets `librdkafka_options.{key}={value}`.\
+                                    The config already sets this as `librdkafka_options.queue.buffering.max.ms={val}`.\
+                                    Please delete one.").into());
             }
-            if let Some(value) = self.batch.max_events {
-                // Maximum number of messages batched in one MessageSet. The total MessageSet size is
-                // also limited by batch.size and message.max.bytes.
-                // Type: integer
-                let key = "batch.num.messages";
-                if let Some(val) = self.librdkafka_options.get(key) {
-                    return Err(format!("Batching setting `batch.max_events` sets `librdkafka_options.{}={}`.\
-                                        The config already sets this as `librdkafka_options.batch.num.messages={}`.\
-                                        Please delete one.", key, value, val).into());
-                }
-                debug!(
-                    librdkafka_option = key,
-                    batch_option = "max_events",
-                    value,
-                    "Applying batch option as librdkafka option."
-                );
-                client_config.set(key, &value.to_string());
+            debug!(
+                librdkafka_option = key,
+                batch_option = "timeout_secs",
+                value,
+                "Applying batch option as librdkafka option."
+            );
+            client_config.set(key, &((value * 1000.0).round().to_string()));
+        }
+        if let Some(value) = self.batch.max_events {
+            // Maximum number of messages batched in one MessageSet. The total MessageSet size is
+            // also limited by batch.size and message.max.bytes.
+            // Type: integer
+            let key = "batch.num.messages";
+            if let Some(val) = self.librdkafka_options.get(key) {
+                return Err(format!("Batching setting `batch.max_events` sets `librdkafka_options.{key}={value}`.\
+                                    The config already sets this as `librdkafka_options.batch.num.messages={val}`.\
+                                    Please delete one.").into());
             }
-            if let Some(value) = self.batch.max_bytes {
-                // Maximum size (in bytes) of all messages batched in one MessageSet, including protocol
-                // framing overhead. This limit is applied after the first message has been added to the
-                // batch, regardless of the first message's size, this is to ensure that messages that
-                // exceed batch.size are produced. The total MessageSet size is also limited by
-                // batch.num.messages and message.max.bytes.
-                // Type: integer
-                let key = "batch.size";
-                if let Some(val) = self.librdkafka_options.get(key) {
-                    return Err(format!("Batching setting `batch.max_bytes` sets `librdkafka_options.{}={}`.\
-                                        The config already sets this as `librdkafka_options.batch.size={}`.\
-                                        Please delete one.", key, value, val).into());
-                }
-                debug!(
-                    librdkafka_option = key,
-                    batch_option = "max_bytes",
-                    value,
-                    "Applying batch option as librdkafka option."
-                );
-                client_config.set(key, &value.to_string());
+            debug!(
+                librdkafka_option = key,
+                batch_option = "max_events",
+                value,
+                "Applying batch option as librdkafka option."
+            );
+            client_config.set(key, &value.to_string());
+        }
+        if let Some(value) = self.batch.max_bytes {
+            // Maximum size (in bytes) of all messages batched in one MessageSet, including protocol
+            // framing overhead. This limit is applied after the first message has been added to the
+            // batch, regardless of the first message's size, this is to ensure that messages that
+            // exceed batch.size are produced. The total MessageSet size is also limited by
+            // batch.num.messages and message.max.bytes.
+            // Type: integer
+            let key = "batch.size";
+            if let Some(val) = self.librdkafka_options.get(key) {
+                return Err(format!("Batching setting `batch.max_bytes` sets `librdkafka_options.{key}={value}`.\
+                                    The config already sets this as `librdkafka_options.batch.size={val}`.\
+                                    Please delete one.").into());
             }
+            debug!(
+                librdkafka_option = key,
+                batch_option = "max_bytes",
+                value,
+                "Applying batch option as librdkafka option."
+            );
+            client_config.set(key, &value.to_string());
         }
 
         for (key, value) in self.librdkafka_options.iter() {

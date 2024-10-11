@@ -17,7 +17,6 @@ amzn
 anchore
 androideabi
 andy
-anonymousip
 ansicpg
 anumber
 anycondition
@@ -318,7 +317,6 @@ enp
 enumdecl
 enumflags
 envsubst
-EOIG
 EOL'ed
 Err'ing
 errorf
@@ -443,7 +441,6 @@ Godbolt
 gogoproto
 gohai
 goldberg
-goldmark
 GPB
 gpgcheck
 gpgkey
@@ -516,6 +513,7 @@ imds
 IMSD
 incentivizes
 incrementalize
+indexgateway
 indexmap
 indicatif
 indoc
@@ -568,6 +566,7 @@ jtype
 juchiast
 karppila
 kartar
+kebabcase
 kemmer
 kernelmode
 keybase
@@ -619,6 +618,7 @@ lognamespace
 lognamespacing
 logplex
 logproto
+logql
 logqlmodel
 logsense
 logsev
@@ -628,7 +628,6 @@ losslessly
 lpop
 lpush
 Luc
-luciofranco
 lucperkins
 lukesteensen
 macports
@@ -680,7 +679,6 @@ mlua
 mmdb
 Mmm
 moby
-mockwatchlogs
 modulesloaddir
 mooper
 moosh
@@ -745,6 +743,7 @@ nodebuginfo
 nodistro
 nofield
 nofree
+nohup
 nomac
 NONALPHANUM
 nonbare
@@ -779,6 +778,7 @@ nullishness
 numbackends
 oahd
 oap
+OIDC
 OKD
 omfwd
 omitempty
@@ -808,6 +808,7 @@ ouicompat
 outputspatterns
 overaligned
 overalignment
+owen
 owo
 oyaml
 pageheap
@@ -815,6 +816,7 @@ paq
 parallelizable
 pareto
 partitionable
+pascalcase
 passthrough
 pathbuf
 pathgen
@@ -822,6 +824,7 @@ peekable
 PEMS
 pgmajfault
 pgrep
+pidof
 PII
 Pitbull
 pkc
@@ -866,6 +869,7 @@ purgecss
 pyld
 Pzb
 qqq
+queryrangebase
 quickcheck
 quix
 quuux
@@ -936,6 +940,7 @@ rxs
 ryangjchandler
 ryu
 sadf
+salvacorts
 samehost
 samenet
 samerole
@@ -946,6 +951,7 @@ sccache
 schemaless
 schemars
 schoen
+screamingsnakecase
 sda
 sdata
 SDID
@@ -1152,6 +1158,7 @@ undertagline
 underutilized
 underutilizing
 unevictable
+unflatten
 unioning
 unitdir
 unmark
@@ -1200,7 +1207,6 @@ walkthrough
 waninfo
 wasmtime
 watchexec
-watchlogs
 wayfor
 webgraphviz
 webpki
@@ -1274,3 +1280,4 @@ zulip
 Zunstable
 zup
 zurp
+sni

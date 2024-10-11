@@ -117,4 +117,6 @@
 ^\Qwebsite/cue/reference/remap/functions/ip_pton.cue\E$
 ^\Qwebsite/layouts/shortcodes/config/unit-tests.html\E$
 ^lib/codecs/tests/data/native_encoding/
+^\Qwebsite/config.toml\E$
 ignore$
+^\Qscripts/environment/bootstrap-windows-2019.ps1\E$

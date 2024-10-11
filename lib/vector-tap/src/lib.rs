@@ -3,6 +3,10 @@
 #[macro_use]
 extern crate tracing;
 
+pub mod controller;
+pub mod notification;
+pub mod topology;
+
 use std::{borrow::Cow, collections::BTreeMap};
 
 use colored::{ColoredString, Colorize};
@@ -188,8 +192,8 @@ impl<'a> TapRunner<'a> {
                                 self.output_event_stdout(&output_events, formatter);
                             }
                             OutputChannel::AsyncChannel(sender_tx) => {
-                                if sender_tx.send(output_events).await.is_err() {
-                                    debug!("Could not send events");
+                                if let Err(error) = sender_tx.send(output_events).await {
+                                    error!("Could not send tap events: {error}");
                                 }
                             }
                         }

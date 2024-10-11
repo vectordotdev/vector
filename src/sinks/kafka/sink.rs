@@ -1,7 +1,6 @@
 use rdkafka::{
-    consumer::{BaseConsumer, Consumer},
     error::KafkaError,
-    producer::FutureProducer,
+    producer::{BaseProducer, FutureProducer, Producer},
     ClientConfig,
 };
 use snafu::{ResultExt, Snafu};
@@ -9,7 +8,7 @@ use tokio::time::Duration;
 use tracing::Span;
 use vrl::path::OwnedTargetPath;
 
-use super::config::{KafkaRole, KafkaSinkConfig};
+use super::config::KafkaSinkConfig;
 use crate::{
     kafka::KafkaStatisticsContext,
     sinks::kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
@@ -46,7 +45,7 @@ pub(crate) fn create_producer(
 
 impl KafkaSink {
     pub(crate) fn new(config: KafkaSinkConfig) -> crate::Result<Self> {
-        let producer_config = config.to_rdkafka(KafkaRole::Producer)?;
+        let producer_config = config.to_rdkafka()?;
         let producer = create_producer(producer_config)?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
@@ -105,7 +104,7 @@ impl KafkaSink {
 
 pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     trace!("Healthcheck started.");
-    let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
+    let client_config = config.to_rdkafka().unwrap();
     let topic: Option<String> = match config.healthcheck_topic {
         Some(topic) => Some(topic),
         _ => match config.topic.render_string(&LogEvent::from_str_legacy("")) {
@@ -121,10 +120,11 @@ pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     };
 
     tokio::task::spawn_blocking(move || {
-        let consumer: BaseConsumer = client.create().unwrap();
+        let producer: BaseProducer = client_config.create().unwrap();
         let topic = topic.as_ref().map(|topic| &topic[..]);
 
-        consumer
+        producer
+            .client()
             .fetch_metadata(topic, Duration::from_secs(3))
             .map(|_| ())
     })

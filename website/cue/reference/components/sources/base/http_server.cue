@@ -316,7 +316,7 @@ base: components: sources: http_server: configuration: {
 					delimiter: {
 						description: "The character that delimits byte sequences."
 						required:    true
-						type: uint: {}
+						type: ascii_char: {}
 					}
 					max_length: {
 						description: """
@@ -477,12 +477,13 @@ base: components: sources: http_server: configuration: {
 		type: string: {
 			default: "POST"
 			enum: {
-				DELETE: "HTTP DELETE method."
-				GET:    "HTTP GET method."
-				HEAD:   "HTTP HEAD method."
-				PATCH:  "HTTP PATCH method."
-				POST:   "HTTP POST method."
-				PUT:    "HTTP Put method."
+				DELETE:  "HTTP DELETE method."
+				GET:     "HTTP GET method."
+				HEAD:    "HTTP HEAD method."
+				OPTIONS: "HTTP OPTIONS method."
+				PATCH:   "HTTP PATCH method."
+				POST:    "HTTP POST method."
+				PUT:     "HTTP Put method."
 			}
 		}
 	}
@@ -506,12 +507,16 @@ base: components: sources: http_server: configuration: {
 		description: """
 			A list of URL query parameters to include in the log event.
 
+			Accepts the wildcard (`*`) character for query parameters matching a specified pattern.
+
+			Specifying "*" results in all query parameters included in the log event.
+
 			These override any values included in the body with conflicting names.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: examples: ["application", "source"]
+			items: type: string: examples: ["application", "source", "param*", "*"]
 		}
 	}
 	response_code: {
@@ -599,6 +604,15 @@ base: components: sources: http_server: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """
