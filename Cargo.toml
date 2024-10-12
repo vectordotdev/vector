@@ -138,7 +138,7 @@ chrono-tz = { version = "0.10.0", default-features = false, features = ["serde"]
 clap = { version = "4.5.20", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.1", default-features = false }
-indexmap = { version = "2.5.0", default-features = false, features = ["serde", "std"] }
+indexmap = { version = "2.6.0", default-features = false, features = ["serde", "std"] }
 metrics = "0.23.0"
 metrics-tracing-context = { version = "0.16.0", default-features = false }
 metrics-util = { version = "0.17.0", default-features = false, features = ["registry"] }
