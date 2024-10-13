@@ -79,7 +79,7 @@ pub struct RemapConfig {
     /// Required if `source` or `file` are missing.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
-    #[configurable(metadata(docs::examples = "./my/program.vrl"))]
+    #[configurable(metadata(docs::examples = ["./my/program.vrl", "./my/program2.vrl"]))]
     pub files: Option<Vec<PathBuf>>,
 
     /// When set to `single`, metric tag values are exposed as single strings, the
