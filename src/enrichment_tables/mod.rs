@@ -6,6 +6,7 @@ pub use vector_lib::enrichment::{Condition, IndexHandle, Table};
 use crate::config::{EnrichmentTableConfig, GlobalOptions};
 
 pub mod file;
+pub mod memory;
 
 #[cfg(feature = "enrichment-tables-geoip")]
 pub mod geoip;
@@ -21,6 +22,10 @@ pub mod mmdb;
 pub enum EnrichmentTables {
     /// Exposes data from a static file as an enrichment table.
     File(file::FileConfig),
+
+    /// Exposes data from a memory cache as an enrichment table. The cache can be written to using
+    /// a sink.
+    Memory(memory::MemoryConfig),
 
     /// Exposes data from a [MaxMind][maxmind] [GeoIP2][geoip2] database as an enrichment table.
     ///
