@@ -272,6 +272,22 @@ impl ser::Serialize for Compression {
     }
 }
 
+pub const ALGORITHM_NAME: &str = "algorithm";
+pub const LEVEL_NAME: &str = "level";
+pub const LOGICAL_NAME: &str = "logical_name";
+pub const ENUM_TAGGING_MODE: &str = "docs::enum_tagging";
+
+pub fn generate_string_schema(logical_name: &str, title: Option<&'static str>, description: &'static str) -> SchemaObject {
+    let mut const_schema = generate_const_string_schema(logical_name.to_lowercase());
+    let mut const_metadata = Metadata::with_description(description);
+    if let Some(title) = title {
+        const_metadata.set_title(title);
+    }
+    const_metadata.add_custom_attribute(CustomAttribute::kv(LOGICAL_NAME, logical_name));
+    apply_base_metadata(&mut const_schema, const_metadata);
+    const_schema
+}
+
 // TODO: Consider an approach for generating schema of "string or object" structure used by this type.
 impl Configurable for Compression {
     fn referenceable_name() -> Option<&'static str> {
@@ -288,25 +304,6 @@ impl Configurable for Compression {
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        const ALGORITHM_NAME: &str = "algorithm";
-        const LEVEL_NAME: &str = "level";
-        const LOGICAL_NAME: &str = "logical_name";
-        const ENUM_TAGGING_MODE: &str = "docs::enum_tagging";
-
-        let generate_string_schema = |logical_name: &str,
-                                      title: Option<&'static str>,
-                                      description: &'static str|
-         -> SchemaObject {
-            let mut const_schema = generate_const_string_schema(logical_name.to_lowercase());
-            let mut const_metadata = Metadata::with_description(description);
-            if let Some(title) = title {
-                const_metadata.set_title(title);
-            }
-            const_metadata.add_custom_attribute(CustomAttribute::kv(LOGICAL_NAME, logical_name));
-            apply_base_metadata(&mut const_schema, const_metadata);
-            const_schema
-        };
-
         // First, we'll create the string-only subschemas for each algorithm, and wrap those up
         // within a one-of schema.
         let mut string_metadata = Metadata::with_description("Compression algorithm.");
