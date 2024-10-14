@@ -22,10 +22,11 @@ const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1
 
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
+/// Refer to [`crate::cli::WatchConfigMethod`] for details.
 pub enum WatcherConfig {
-    /// Recommended watcher for the current OS, usually `inotify` for Linux-based systems.
+    /// Recommended watcher for the current OS.
     RecommendedWatcher,
-    /// Poll-based watcher, typically used for watching files on NFS.
+    /// A poll-based watcher that checks for file changes at regular intervals.
     PollWatcher(u64),
 }
 
