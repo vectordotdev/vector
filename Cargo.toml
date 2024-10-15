@@ -287,6 +287,8 @@ dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.17", default-features = false }
 encoding_rs = { version = "0.8.34", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.13", default-features = false }
+evmap = { version = "10.0.2", default-features = false, optional = true }
+evmap-derive = { version = "0.2.0", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.33", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.29", default-features = false }
@@ -352,6 +354,7 @@ tokio-tungstenite = {version = "0.20.1", default-features = false, features = ["
 toml.workspace = true
 tonic = { workspace = true, optional = true }
 hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"], optional = true }
+thread_local = { version = "1.1.8", default-features = false, optional = true }
 typetag = { version = "0.2.18", default-features = false }
 url = { version = "2.5.2", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }
@@ -497,9 +500,10 @@ protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
 # Enrichment Tables
-enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb"]
+enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 enrichment-tables-geoip = ["dep:maxminddb"]
 enrichment-tables-mmdb = ["dep:maxminddb"]
+enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
 codecs-syslog = ["vector-lib/syslog"]
@@ -949,7 +953,7 @@ remap-benches = ["transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
-enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb"]
+enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 proptest = ["dep:proptest", "dep:proptest-derive"]
 
 [[bench]]

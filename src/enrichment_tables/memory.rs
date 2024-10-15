@@ -1,9 +1,20 @@
 //! Handles enrichment tables for `type = memory`.
-use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 
+use evmap::{self};
+use evmap_derive::ShallowCopy;
+use thread_local::ThreadLocal;
+use vector_lib::EstimatedJsonEncodedSizeOf;
+
+use async_trait::async_trait;
 use bytes::Bytes;
+use futures::stream::BoxStream;
+use tokio_stream::StreamExt;
 use vector_lib::configurable::configurable_component;
 use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use vector_lib::event::{Event, EventStatus, Finalizable};
+use vector_lib::internal_event::{CountByteSize, EventsSent, InternalEventHandle, Output};
+use vector_lib::sink::StreamSink;
 use vrl::value::{KeyString, ObjectMap, Value};
 
 use crate::config::EnrichmentTableConfig;
@@ -53,10 +64,10 @@ impl EnrichmentTableConfig for MemoryConfig {
 impl_generate_config_from_default!(MemoryConfig);
 
 /// Single memory entry containing the value and TTL
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash, ShallowCopy)]
 pub struct MemoryEntry {
     key: String,
-    value: Value,
+    value: Box<Value>,
     ttl: i64,
 }
 
@@ -67,25 +78,40 @@ impl MemoryEntry {
                 KeyString::from("key"),
                 Value::Bytes(Bytes::copy_from_slice(self.key.as_bytes())),
             ),
-            (KeyString::from("value"), self.value.clone()),
+            (KeyString::from("value"), (*self.value).clone()),
             (KeyString::from("ttl"), Value::Integer(self.ttl)),
         ])
     }
 }
 
 /// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a memory structure.
-#[derive(Clone)]
 pub struct Memory {
-    data: BTreeMap<String, MemoryEntry>,
+    read_handle_factory: evmap::ReadHandleFactory<String, MemoryEntry>,
+    read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
+    write_handle: Arc<Mutex<evmap::WriteHandle<String, MemoryEntry>>>,
     _config: MemoryConfig,
 }
 
 impl Memory {
     /// Creates a new [Memory] based on the provided config.
     pub fn new(config: MemoryConfig) -> Self {
+        let (read_handle, write_handle) = evmap::new();
         Self {
             _config: config,
-            data: Default::default(),
+            read_handle_factory: read_handle.factory(),
+            read_handle: ThreadLocal::new(),
+            write_handle: Arc::new(Mutex::new(write_handle)),
+        }
+    }
+}
+
+impl Clone for Memory {
+    fn clone(&self) -> Self {
+        Self {
+            read_handle_factory: self.read_handle_factory.clone(),
+            read_handle: ThreadLocal::new(),
+            write_handle: self.write_handle.clone(),
+            _config: self._config.clone(),
         }
     }
 }
@@ -118,7 +144,11 @@ impl Table for Memory {
             Some(_) if condition.len() > 1 => Err("Only one condition is allowed".to_string()),
             Some(Condition::Equals { value, .. }) => {
                 let key = value.to_string_lossy();
-                match self.data.get(key.as_ref()) {
+                match self
+                    .read_handle
+                    .get_or(|| self.read_handle_factory.handle())
+                    .get_one(key.as_ref())
+                {
                     Some(row) => Ok(vec![row.into_object_map()]),
                     None => Ok(Default::default()),
                 }
@@ -149,7 +179,51 @@ impl Table for Memory {
 
 impl std::fmt::Debug for Memory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Memory {} row(s)", self.data.len(),)
+        write!(
+            f,
+            "Memory {} row(s)",
+            self.read_handle
+                .get_or(|| self.read_handle_factory.handle())
+                .len()
+        )
+    }
+}
+
+#[async_trait]
+impl StreamSink<Event> for Memory {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let events_sent = register!(EventsSent::from(Output(None)));
+        while let Some(mut event) = input.next().await {
+            let event_byte_size = event.estimated_json_encoded_size_of();
+
+            let finalizers = event.take_finalizers();
+
+            // Panic: This sink only accepts Logs, so this should never panic
+            let log = event.into_log();
+
+            match log.value() {
+                Value::Object(map) => {
+                    // Panic: If the Mutex is poisoned
+                    let mut handle = self.write_handle.lock().unwrap();
+                    for (k, v) in map.iter() {
+                        handle.update(
+                            k.as_str().to_string(),
+                            MemoryEntry {
+                                key: k.as_str().to_string(),
+                                value: Box::new(v.clone()),
+                                ttl: 500,
+                            },
+                        );
+                    }
+                    handle.refresh();
+                }
+                _ => (),
+            };
+
+            finalizers.update_status(EventStatus::Delivered);
+            events_sent.emit(CountByteSize(1, event_byte_size));
+        }
+        Ok(())
     }
 }
 
@@ -159,15 +233,19 @@ mod tests {
 
     #[test]
     fn finds_row() {
-        let mut memory = Memory::new(Default::default());
-        memory.data = BTreeMap::from([(
-            "test_key".to_string(),
-            MemoryEntry {
-                key: "test_key".to_string(),
-                value: Value::Integer(5),
-                ttl: 500,
-            },
-        )]);
+        let memory = Memory::new(Default::default());
+        {
+            let mut handle = memory.write_handle.lock().unwrap();
+            handle.update(
+                "test_key".to_string(),
+                MemoryEntry {
+                    key: "test_key".to_string(),
+                    value: Box::new(Value::Integer(5)),
+                    ttl: 500,
+                },
+            );
+            handle.refresh();
+        }
 
         let condition = Condition::Equals {
             field: "key",
