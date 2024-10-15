@@ -755,8 +755,8 @@ jobs:
       - analyze-experiment
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
-      SKIP_REGRESSION:
-        ${{ contains(github.event.pull_request.labels.*.name, 'ci-condition: skip-regression') }}
+      SKIP_REGRESSION: "${{ contains(github.event.pull_request.labels.*.name, 'ci-condition: skip-regression') }}"
+
     steps:
       - name: (PR review) Submit PR result as failed
         if: github.event_name == 'pull_request_review' && env.FAILED == 'true' && env.SKIP_REGRESSION == 'true'
