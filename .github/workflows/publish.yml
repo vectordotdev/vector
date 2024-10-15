@@ -293,7 +293,7 @@ jobs:
 
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
-    runs-on: release-builder-windows
+    runs-on: release-builder-windows-2022
     timeout-minutes: 90
     needs: generate-publish-metadata
     env:
@@ -308,13 +308,13 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Windows-specific)
-        run: .\scripts\environment\bootstrap-windows-2019.ps1
+        run: .\scripts\environment\bootstrap-windows-2022.ps1
       - name: Install Wix
         shell: bash
         run: |
           mkdir -p /c/wix
           cd /c/wix
-          curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
+          curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip > wix-binaries.zip
           unzip -o wix-binaries.zip
           rm wix-binaries.zip
       - name: Build Vector
