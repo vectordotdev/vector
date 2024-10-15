@@ -787,7 +787,7 @@ jobs:
       - name: exit
         run: |
           echo "failed=${{ env.FAILED }}"
-          if [[ "${{ env.FAILED }}" == "true" ]] ; then
+          if [[ "$FAILED" == "true" ]] ; then
             exit 1
           else
             exit 0
