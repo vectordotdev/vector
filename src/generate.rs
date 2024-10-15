@@ -119,7 +119,7 @@ pub(crate) fn generate_example(
 ) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = opts
         .expression
-        .split(|c| c == '|' || c == '/')
+        .split(['|', '/'])
         .map(|s| {
             s.split(',')
                 .map(|s| s.trim().to_string())

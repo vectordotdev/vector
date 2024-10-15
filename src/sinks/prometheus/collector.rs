@@ -301,7 +301,7 @@ impl StringCollector {
         let mut result = String::with_capacity(key.len() + value.len() + 3);
         result.push_str(key);
         result.push_str("=\"");
-        while let Some(i) = value.find(|ch| ch == '\\' || ch == '"') {
+        while let Some(i) = value.find(['\\', '"']) {
             result.push_str(&value[..i]);
             result.push('\\');
             // Ugly but works because we know the character at `i` is ASCII

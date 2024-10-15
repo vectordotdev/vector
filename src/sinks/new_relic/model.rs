@@ -45,7 +45,7 @@ pub(super) struct MetricData {
 }
 
 impl MetricsApiModel {
-    pub(super) fn new(metrics: Vec<MetricData>) -> Self {
+    pub(super) const fn new(metrics: Vec<MetricData>) -> Self {
         Self([MetricDataStore { metrics }])
     }
 }
@@ -148,7 +148,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
 pub(super) struct EventsApiModel(pub Vec<ObjectMap>);
 
 impl EventsApiModel {
-    pub(super) fn new(events_array: Vec<ObjectMap>) -> Self {
+    pub(super) const fn new(events_array: Vec<ObjectMap>) -> Self {
         Self(events_array)
     }
 }
@@ -265,7 +265,7 @@ pub(super) enum Timestamp {
 }
 
 impl LogsApiModel {
-    pub(super) fn new(logs: Vec<LogMessage>) -> Self {
+    pub(super) const fn new(logs: Vec<LogMessage>) -> Self {
         Self([LogDataStore { logs }])
     }
 }

@@ -156,7 +156,7 @@ impl Lua {
         globals.raw_set("event", LuaEvent { inner: event })?;
 
         let func = lua.registry_value::<mlua::Function<'_>>(&self.vector_func)?;
-        func.call(())?;
+        func.call::<(), ()>(())?;
 
         let result = globals
             .raw_get::<_, Option<LuaEvent>>("event")
