@@ -69,7 +69,7 @@ impl TransformConfig for SampleConfig {
             self.key_field.clone(),
             self.exclude
                 .as_ref()
-                .map(|condition| condition.build(&context.enrichment_tables))
+                .map(|condition| condition.build(&context.enrichment_tables, &context.vrl_caches))
                 .transpose()?,
         )))
     }
@@ -81,6 +81,7 @@ impl TransformConfig for SampleConfig {
     fn outputs(
         &self,
         _: vector_lib::enrichment::TableRegistry,
+        _: vector_lib::vrl_cache::VrlCacheRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

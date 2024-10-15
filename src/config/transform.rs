@@ -118,6 +118,8 @@ pub struct TransformContext {
 
     pub enrichment_tables: vector_lib::enrichment::TableRegistry,
 
+    pub vrl_caches: vector_lib::vrl_cache::VrlCacheRegistry,
+
     /// Tracks the schema IDs assigned to schemas exposed by the transform.
     ///
     /// Given a transform can expose multiple [`TransformOutput`] channels, the ID is tied to the identifier of
@@ -144,6 +146,7 @@ impl Default for TransformContext {
             key: Default::default(),
             globals: Default::default(),
             enrichment_tables: Default::default(),
+            vrl_caches: Default::default(),
             schema_definitions: HashMap::from([(None, HashMap::new())]),
             merged_schema_definition: schema::Definition::any(),
             schema: SchemaOptions::default(),
@@ -210,6 +213,7 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     fn outputs(
         &self,
         enrichment_tables: vector_lib::enrichment::TableRegistry,
+        vrl_caches: vector_lib::vrl_cache::VrlCacheRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
 
         // This only exists for transforms that create logs from non-logs, to know which namespace
@@ -267,6 +271,7 @@ pub fn get_transform_output_ids<T: TransformConfig + ?Sized>(
     transform
         .outputs(
             vector_lib::enrichment::TableRegistry::default(),
+            vector_lib::vrl_cache::VrlCacheRegistry::default(),
             &[(key.clone().into(), schema::Definition::any())],
             global_log_namespace,
         )

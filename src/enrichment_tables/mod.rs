@@ -7,6 +7,9 @@ use crate::config::{EnrichmentTableConfig, GlobalOptions};
 
 pub mod file;
 
+#[cfg(feature = "enrichment-tables-memory")]
+pub mod memory;
+
 #[cfg(feature = "enrichment-tables-geoip")]
 pub mod geoip;
 
@@ -21,6 +24,11 @@ pub mod mmdb;
 pub enum EnrichmentTables {
     /// Exposes data from a static file as an enrichment table.
     File(file::FileConfig),
+
+    /// Exposes data from a memory cache as an enrichment table. The cache can be written to using
+    /// a sink.
+    #[cfg(feature = "enrichment-tables-memory")]
+    Memory(memory::MemoryConfig),
 
     /// Exposes data from a [MaxMind][maxmind] [GeoIP2][geoip2] database as an enrichment table.
     ///
@@ -41,6 +49,8 @@ impl NamedComponent for EnrichmentTables {
     fn get_component_name(&self) -> &'static str {
         match self {
             Self::File(config) => config.get_component_name(),
+            #[cfg(feature = "enrichment-tables-memory")]
+            Self::Memory(config) => config.get_component_name(),
             #[cfg(feature = "enrichment-tables-geoip")]
             Self::Geoip(config) => config.get_component_name(),
             #[cfg(feature = "enrichment-tables-mmdb")]

@@ -31,6 +31,7 @@ impl ConditionalConfig for VrlConfig {
     fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        vrl_caches: &vector_lib::vrl_cache::VrlCacheRegistry,
     ) -> crate::Result<Condition> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
@@ -45,6 +46,7 @@ impl ConditionalConfig for VrlConfig {
         let functions = vrl::stdlib::all()
             .into_iter()
             .chain(vector_lib::enrichment::vrl_functions())
+            .chain(vector_lib::vrl_cache::vrl_functions())
             .chain(vector_vrl_functions::all())
             .collect::<Vec<_>>();
 
@@ -52,6 +54,7 @@ impl ConditionalConfig for VrlConfig {
 
         let mut config = CompileConfig::default();
         config.set_custom(enrichment_tables.clone());
+        config.set_custom(vrl_caches.clone());
         config.set_read_only();
 
         let CompilationResult {
@@ -255,13 +258,13 @@ mod test {
 
             assert_eq!(
                 config
-                    .build(&Default::default())
+                    .build(&Default::default(), &Default::default())
                     .map(|_| ())
                     .map_err(|e| e.to_string()),
                 build
             );
 
-            if let Ok(cond) = config.build(&Default::default()) {
+            if let Ok(cond) = config.build(&Default::default(), &Default::default()) {
                 assert_eq!(
                     cond.check_with_context(event.clone()).0,
                     check.map_err(|e| e.to_string())

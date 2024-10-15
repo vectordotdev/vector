@@ -1,0 +1,11 @@
+[package]
+name = "vrl-cache"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+vrl.workspace = true
+metrics.workspace = true
+vector-common = { path = "../vector-common" }

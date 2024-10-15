@@ -40,6 +40,7 @@ mod transform;
 pub mod unit_test;
 mod validation;
 mod vars;
+mod vrl_cache;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
@@ -69,6 +70,7 @@ pub use vector_lib::{
     },
     id::Inputs,
 };
+pub use vrl_cache::VrlCacheOuter;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ConfigPath {
@@ -105,6 +107,7 @@ pub struct Config {
     sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
     transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
+    pub vrl_caches: IndexMap<ComponentKey, VrlCacheOuter>,
     tests: Vec<TestDefinition>,
     secret: IndexMap<ComponentKey, SecretBackends>,
     pub graceful_shutdown_duration: Option<Duration>,

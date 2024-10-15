@@ -26,7 +26,7 @@ impl Route {
     pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
         let mut conditions = Vec::with_capacity(config.route.len());
         for (output_name, condition) in config.route.iter() {
-            let condition = condition.build(&context.enrichment_tables)?;
+            let condition = condition.build(&context.enrichment_tables, &context.vrl_caches)?;
             conditions.push((output_name.clone(), condition));
         }
         Ok(Self {
@@ -121,6 +121,7 @@ impl TransformConfig for RouteConfig {
     fn outputs(
         &self,
         _: vector_lib::enrichment::TableRegistry,
+        _: vector_lib::vrl_cache::VrlCacheRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
