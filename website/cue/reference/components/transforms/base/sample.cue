@@ -15,7 +15,7 @@ base: components: transforms: sample: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["{{ service }}", "{{hostname}}-{{service}}"]
+			examples: ["{{ service }}", "{{ hostname }}-{{ service }}"]
 			syntax: "template"
 		}
 	}
