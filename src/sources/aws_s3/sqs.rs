@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::{future::ready, num::NonZeroUsize, panic, sync::Arc};
+use std::{future::ready, num::NonZeroUsize, panic, sync::Arc, sync::LazyLock};
 
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::Client as S3Client;
@@ -15,7 +15,6 @@ use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::serde_as;
 use smallvec::SmallVec;
@@ -51,8 +50,8 @@ use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
 use vector_lib::event::MaybeAsLogMut;
 use vector_lib::lookup::{metadata_path, path, PathPrefix};
 
-static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
-    Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
+static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
+    LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
 
 /// SQS configuration options.
 //
