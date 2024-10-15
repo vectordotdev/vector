@@ -47,9 +47,12 @@ pub struct SampleConfig {
 
     /// The value to group events into separate buckets to be sampled independently.
     ///
-    /// If left unspecified, or if the event doesn't have `group_by`, then the event is not sampled
-    /// separately
-    #[configurable(metadata(docs::examples = "{{ service }}", docs::examples = "{{ hostname }}-{{ service }}"))]
+    /// If left unspecified, or if the event doesn't have `group_by`, then the event is not
+    /// sampled separately.
+    #[configurable(metadata(
+        docs::examples = "{{ service }}",
+        docs::examples = "{{ hostname }}-{{ service }}"
+    ))]
     pub group_by: Option<Template>,
 
     /// A logical condition used to exclude events from sampling.

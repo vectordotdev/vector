@@ -10,8 +10,8 @@ base: components: transforms: sample: configuration: {
 		description: """
 			The value to group events into separate buckets to be sampled independently.
 
-			If left unspecified, or if the event doesn't have `group_by`, then the event is not sampled
-			separately
+			If left unspecified, or if the event doesn't have `group_by`, then the event is not
+			sampled separately.
 			"""
 		required: false
 		type: string: {

@@ -76,30 +76,29 @@ impl FunctionTransform for Sample {
             .map(|v| v.to_string_lossy());
 
         // Fetch actual field value if group_by option is set.
-        let group_by_key = self
-            .group_by
-            .as_ref()
-            .and_then(|group_by| match &event {
-                Event::Log(event) => group_by.render_string(event)
-                    .map_err(|error| {
-                        emit!(TemplateRenderingError {
-                            error,
-                            field: Some("group_by"),
-                            drop_event: false,
-                        })
+        let group_by_key = self.group_by.as_ref().and_then(|group_by| match &event {
+            Event::Log(event) => group_by
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("group_by"),
+                        drop_event: false,
                     })
-                    .ok(),
-                Event::Trace(event) => group_by.render_string(event)
-                    .map_err(|error| {
-                        emit!(TemplateRenderingError {
-                            error,
-                            field: Some("group_by"),
-                            drop_event: false,
-                        })
+                })
+                .ok(),
+            Event::Trace(event) => group_by
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("group_by"),
+                        drop_event: false,
                     })
-                    .ok(),
-                Event::Metric(_) => panic!("component can never receive metric events"),
-            });
+                })
+                .ok(),
+            Event::Metric(_) => panic!("component can never receive metric events"),
+        });
 
         let counter_value: u64 = *self.counter.entry(group_by_key.clone()).or_default();
 
