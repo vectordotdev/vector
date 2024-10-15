@@ -10,6 +10,7 @@ use crate::{
         TransformOutput,
     },
     schema,
+    template::Template,
     transforms::Transform,
 };
 
@@ -44,10 +45,12 @@ pub struct SampleConfig {
     #[configurable(metadata(docs::examples = "message"))]
     pub key_field: Option<String>,
 
-    /// A field for grouping sampling by a particular log field. Logs that come in with a unique
-    /// value for the field will be sampled together.
-    #[configurable(metadata(docs::examples = ".log_field"))]
-    pub group_by: Option<String>,
+    /// The value to group events into separate buckets to be sampled independently.
+    ///
+    /// If left unspecified, or if the event doesn't have `group_by`, then the event is not rate
+    /// limited separately.
+    #[configurable(metadata(docs::examples = "{{ service }}", docs::examples = "{{hostname}}-{{service}}"))]
+    pub group_by: Option<Template>,
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,

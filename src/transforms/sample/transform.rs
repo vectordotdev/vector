@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::hash_map::Entry;
 use vector_lib::config::LegacyKey;
 use vrl::event_path;
 
@@ -7,19 +6,19 @@ use crate::{
     conditions::Condition,
     event::Event,
     internal_events::SampleEventDiscarded,
+    sinks::prelude::TemplateRenderingError,
+    template::Template,
     transforms::{FunctionTransform, OutputBuffer},
 };
-
-const DEFAULT_GROUP_NAME: &str = "default";
 
 #[derive(Clone)]
 pub struct Sample {
     name: String,
     rate: u64,
     key_field: Option<String>,
-    group_by: Option<String>,
+    group_by: Option<Template>,
     exclude: Option<Condition>,
-    counter: HashMap<String, u64>,
+    counter: HashMap<Option<String>, u64>,
 }
 
 impl Sample {
@@ -30,7 +29,7 @@ impl Sample {
         name: String,
         rate: u64,
         key_field: Option<String>,
-        group_by: Option<String>,
+        group_by: Option<Template>,
         exclude: Option<Condition>,
     ) -> Self {
         Self {
@@ -60,10 +59,6 @@ impl FunctionTransform for Sample {
             }
         };
 
-        // Initialize counter if necessary
-        let default_group_name = String::from(DEFAULT_GROUP_NAME);
-        self.counter.entry(default_group_name.clone()).or_insert(0);
-
         let value = self
             .key_field
             .as_ref()
@@ -81,45 +76,42 @@ impl FunctionTransform for Sample {
             .map(|v| v.to_string_lossy());
 
         // Fetch actual field value if group_by option is set.
-        let group_by_value = self
+        let group_by_key = self
             .group_by
             .as_ref()
             .and_then(|group_by| match &event {
-                Event::Log(event) => event
-                    .parse_path_and_get_value(group_by.as_str())
-                    .ok()
-                    .flatten(),
-                Event::Trace(event) => event
-                    .parse_path_and_get_value(group_by.as_str())
-                    .ok()
-                    .flatten(),
+                Event::Log(event) => group_by.render_string(event)
+                    .map_err(|error| {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("group_by"),
+                            drop_event: false,
+                        })
+                    })
+                    .ok(),
+                Event::Trace(event) => group_by.render_string(event)
+                    .map_err(|error| {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("group_by"),
+                            drop_event: false,
+                        })
+                    })
+                    .ok(),
                 Event::Metric(_) => panic!("component can never receive metric events"),
-            })
-            .map(|v| v.to_string());
+            });
 
-        // Find the appropriate counter_key: If group_by option is passed, the counter key should
-        // be the value of the log attribute. If group_by option is not passed, then it should just
-        // fallback to the default bucket (i.e. have the same functionality as a general counter).
-        let counter_key: String = if let Some(group_by_value) = group_by_value {
-            group_by_value
-        } else {
-            default_group_name
-        };
-
-        let counter_value: u64 = match self.counter.entry(counter_key.clone()) {
-            Entry::Occupied(e) => *e.get(),
-            Entry::Vacant(e) => *e.insert(0),
-        };
+        let counter_value: u64 = *self.counter.entry(group_by_key.clone()).or_default();
 
         let num = if let Some(value) = value {
             seahash::hash(value.as_bytes())
         } else {
             counter_value
         };
-                    
+
         // reset counter for particular key, or default key if group_by option isn't provided
         let increment: u64 = (counter_value + 1) % self.rate;
-        self.counter.insert(counter_key.clone(), increment);
+        self.counter.insert(group_by_key.clone(), increment);
 
         if num % self.rate == 0 {
             match event {
@@ -282,7 +274,7 @@ mod tests {
 
     #[test]
     fn handles_group_by() {
-        for group_by in &[None, Some("other_field".into())] {
+        for group_by in &[None, Some(Template::try_from("{{ other_field }}").unwrap())] {
             let mut event = Event::Log(LogEvent::from("nananana"));
             let log = event.as_mut_log();
             log.insert("other_field", "foo");
@@ -291,7 +283,10 @@ mod tests {
                 0,
                 log_schema().message_key().map(ToString::to_string),
                 group_by.clone(),
-                Some(condition_contains("other_field", "foo")),
+                Some(condition_contains(
+                    log_schema().message_key().unwrap().to_string().as_str(),
+                    "na",
+                )),
             );
             let iterations = 0..1000;
             let total_passed = iterations
