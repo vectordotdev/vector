@@ -32,7 +32,9 @@ on:
   # Don't want to run this on each PR commit, but because GH doesn't allow specifying different required checks
   # for pull request and merge queue, we need to "run" it in pull request, but in the jobs we will just auto pass.
   pull_request:
-
+  # Also, this workflow runs every Monday at 5:00 AM UTC.
+  schedule:
+    - cron: "0 5 * * 1"
 concurrency:
   # In flight runs will be canceled only by re-trigger through the merge queue or if additional PR commits are pushed.
   # The comment.html_url should always be unique.
@@ -753,9 +755,11 @@ jobs:
       - analyze-experiment
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
+      SKIP_REGRESSION:
+        ${{ contains(github.event.pull_request.labels.*.name, 'ci-condition: skip-regression') }}
     steps:
       - name: (PR review) Submit PR result as failed
-        if: github.event_name == 'pull_request_review' && env.FAILED == 'true'
+        if: github.event_name == 'pull_request_review' && env.FAILED == 'true' && env.SKIP_REGRESSION == 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
@@ -764,7 +768,7 @@ jobs:
           status: 'failure'
 
       - name: (PR review) Submit PR result as success
-        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
+        if: github.event_name == 'pull_request_review' && env.FAILED != 'true' && env.SKIP_REGRESSION == 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
@@ -773,16 +777,17 @@ jobs:
           status: 'success'
 
       - name: (PR) Indicate why skipped
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || env.SKIP_REGRESSION == 'true'
         run: |
-           echo "### Workflow skipped" >> $GITHUB_STEP_SUMMARY
-           echo "This workflow doesn't run on PR's automatically." >> $GITHUB_STEP_SUMMARY
-           echo "To trigger a run, leave a comment with \`/ci-run-regression\`" >> $GITHUB_STEP_SUMMARY
+          echo "### Workflow skipped" >> $GITHUB_STEP_SUMMARY
+          echo "This workflow doesn't run on PRs automatically." >> $GITHUB_STEP_SUMMARY
+          echo "This workflow doesn't run on PRs created by Dependabot." >> $GITHUB_STEP_SUMMARY
+          echo "To trigger a run, leave a review comment with \`/ci-run-regression\`" >> $GITHUB_STEP_SUMMARY
 
       - name: exit
         run: |
           echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+          if [[ "${{ env.FAILED }}" == "true" ]] ; then
             exit 1
           else
             exit 0
