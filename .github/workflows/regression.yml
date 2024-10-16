@@ -67,7 +67,7 @@ jobs:
           all_changed:
             - added|deleted|modified: "**"
           ignore:
-            - "./.github/**"
+            - "./.github/!(regression.yml)"
             - "./.gitignore"
             - "distribution/**"
             - "rust-doc/**"
