@@ -5191,12 +5191,11 @@ checksum = "3f35c735096c0293d313e8f2a641627472b83d01b937177fe76e5e2708d31e0d"
 
 [[package]]
 name = "lalrpop-util"
-version = "0.22.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "feee752d43abd0f4807a921958ab4131f692a44d4d599733d4419c5d586176ce"
+checksum = "108dc8f5dabad92c65a03523055577d847f5dcc00f3e7d3a68bc4d48e01d8fe1"
 dependencies = [
  "regex-automata 0.4.8",
- "rustversion",
 ]
 
 [[package]]
@@ -11049,7 +11048,8 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.19.0"
-source = "git+https://github.com/vectordotdev/vrl?branch=main#dc0311d03bd21c73c359a719b5cbdd17f01f63f3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c22ec61cbd43e563df185521f9a2fb2f42f6ab96604a574c82f6564049fb431"
 dependencies = [
  "aes",
  "ansi_term",
@@ -11092,7 +11092,7 @@ dependencies = [
  "influxdb-line-protocol",
  "itertools 0.13.0",
  "lalrpop",
- "lalrpop-util 0.22.0",
+ "lalrpop-util 0.21.0",
  "md-5",
  "mlua",
  "nom",
