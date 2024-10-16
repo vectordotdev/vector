@@ -7,6 +7,7 @@ labels: "domain: releasing"
 
 The week before the release:
 
+- [ ] Cut a new release of [VRL](https://github.com/vectordotdev/vrl) if needed
 - [ ] Check for any outstanding deprecation actions in [DEPRECATIONS.md](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATIONS.md) and
       take them (or have someone help you take them)
 - [ ] Create a new release branch from master to freeze commits
@@ -14,13 +15,17 @@ The week before the release:
 - [ ] Create a new release preparation branch from `master`
   - `git checkout -b prepare-v0.<new version number> && git push -u`
 - [ ] Pin VRL to latest released version rather than `main`
-- [ ] Check if there is a newer version of Alpine or Debian available to update the release images
-      in `distribution/docker/`. Update if so.
+- [ ] Check if there is a newer version of [Alpine](https://alpinelinux.org/releases/) or
+      [Debian](https://www.debian.org/releases/) available to update the release images in
+      `distribution/docker/`. Update if so.
 - [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
   - [ ] Add description key to the generated cue file with a description of the release (see
         previous releases for examples).
   - [ ] Ensure any breaking changes are highlighted in the release upgrade guide
   - [ ] Ensure any deprecations are highlighted in the release upgrade guide
+  - [ ] Review generated changelog entries to ensure they are understandable to end-users
+  - [ ] Copy VRL changelogs from the VRL version in the last Vector release as a new changelog entry
+        ([example](https://github.com/vectordotdev/vector/blob/9c67bba358195f5018febca2f228dfcb2be794b5/website/cue/reference/releases/0.41.0.cue#L33-L64))
 - [ ] Update version number in `website/cue/reference/administration/interfaces/kubectl.cue`
 - [ ] Update version number in `distribution/install.sh`
 - [ ] Add new version to `website/cue/reference/versions.cue`
