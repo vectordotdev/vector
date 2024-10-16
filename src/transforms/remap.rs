@@ -79,7 +79,7 @@ pub struct RemapConfig {
     /// Required if `source` or `file` are missing.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
-    #[configurable(metadata(docs::examples = ["./my/program.vrl", "./my/program2.vrl"]))]
+    #[configurable(metadata(docs::examples = "['./my/program.vrl', './my/program2.vrl']"))]
     pub files: Option<Vec<PathBuf>>,
 
     /// When set to `single`, metric tag values are exposed as single strings, the
@@ -192,9 +192,7 @@ impl RemapConfig {
 
         let source = match (&self.source, &self.file, &self.files) {
             (Some(source), None, None) => source.to_owned(),
-            (None, Some(path), None) => {
-                Self::read_file(path)?
-            }
+            (None, Some(path), None) => Self::read_file(path)?,
             (None, None, Some(paths)) => {
                 let mut combined_source = String::new();
                 for path in paths {
