@@ -52,7 +52,6 @@ jobs:
     if: github.event_name != 'pull_request'
     outputs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
-      comment_valid: ${{ steps.comment.outputs.isTeamMember }}
     steps:
     - uses: actions/checkout@v3
 
