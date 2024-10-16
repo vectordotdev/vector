@@ -8,6 +8,7 @@ updates:
     labels:
       - "domain: deps"
       - "no-changelog"
+      - "ci-condition: skip-regression"
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
@@ -71,6 +72,7 @@ updates:
     labels:
       - "domain: releasing"
       - "no-changelog"
+      - "ci-condition: skip-regression"
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
@@ -81,6 +83,7 @@ updates:
     labels:
       - "domain: ci"
       - "no-changelog"
+      - "ci-condition: skip-regression"
     commit-message:
       prefix: "chore(ci)"
     groups:
