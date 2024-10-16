@@ -480,6 +480,7 @@ fn annotate_from_container(
 mod tests {
     use k8s_openapi::api::core::v1::PodIP;
     use similar_asserts::assert_eq;
+    use std::path::PathBuf;
     use vector_lib::lookup::{event_path, metadata_path};
 
     use super::*;
