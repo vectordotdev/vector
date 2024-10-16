@@ -7,12 +7,13 @@ labels: "domain: releasing"
 
 The week before the release:
 
-- [ ] Check for any outstanding deprecation actions in [DEPRECATIONS.md](docs/DEPRECATIONS.md) and
+- [ ] Check for any outstanding deprecation actions in [DEPRECATIONS.md](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATIONS.md) and
       take them (or have someone help you take them)
 - [ ] Create a new release branch from master to freeze commits
   - `git fetch && git checkout origin/master && git checkout -b v0.<new version number> && git push -u`
 - [ ] Create a new release preparation branch from `master`
   - `git checkout -b prepare-v0.<new version number> && git push -u`
+- [ ] Pin VRL to latest released version rather than `main`
 - [ ] Check if there is a newer version of Alpine or Debian available to update the release images
       in `distribution/docker/`. Update if so.
 - [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release

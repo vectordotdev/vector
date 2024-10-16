@@ -275,7 +275,7 @@ impl mlua::UserData for LuaEvent {
                 .ok()
                 .flatten()
             {
-                let string = lua.create_string(&value.coerce_to_bytes())?;
+                let string = lua.create_string(value.coerce_to_bytes())?;
                 Ok(Some(string))
             } else {
                 Ok(None)
@@ -306,9 +306,7 @@ impl mlua::UserData for LuaEvent {
                             .flatten()
                     });
                     match value {
-                        Some(value) => {
-                            Ok((key, Some(lua.create_string(&value.coerce_to_bytes())?)))
-                        }
+                        Some(value) => Ok((key, Some(lua.create_string(value.coerce_to_bytes())?))),
                         None => Ok((None, None)),
                     }
                 })?;

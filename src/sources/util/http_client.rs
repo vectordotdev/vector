@@ -154,6 +154,7 @@ pub(crate) async fn call<
                 HttpMethod::Put => Request::put(&url),
                 HttpMethod::Patch => Request::patch(&url),
                 HttpMethod::Delete => Request::delete(&url),
+                HttpMethod::Options => Request::options(&url),
             };
 
             // add user specified headers

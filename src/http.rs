@@ -1,11 +1,4 @@
 #![allow(missing_docs)]
-use std::{
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
-};
-
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
@@ -22,6 +15,12 @@ use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
+use std::{
+    fmt,
+    net::SocketAddr,
+    task::{Context, Poll},
+    time::Duration,
+};
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -205,10 +204,10 @@ pub fn build_tls_connector(
     let settings = tls_settings.tls().cloned();
     https.set_callback(move |c, _uri| {
         if let Some(settings) = &settings {
-            settings.apply_connect_configuration(c);
+            settings.apply_connect_configuration(c)
+        } else {
+            Ok(())
         }
-
-        Ok(())
     });
     Ok(https)
 }
@@ -444,9 +443,9 @@ impl Default for KeepaliveConfig {
 ///
 /// **Notes:**
 /// - This is intended to be used in a Hyper server (or similar) that will automatically close
-/// the connection after a response with a `Connection: close` header is sent.
+///   the connection after a response with a `Connection: close` header is sent.
 /// - This layer assumes that it is instantiated once per connection, which is true within the
-/// Hyper framework.
+///   Hyper framework.
 
 pub struct MaxConnectionAgeLayer {
     start_reference: Instant,
@@ -496,9 +495,9 @@ where
 ///
 /// **Notes:**
 /// - This is intended to be used in a Hyper server (or similar) that will automatically close
-/// the connection after a response with a `Connection: close` header is sent.
+///   the connection after a response with a `Connection: close` header is sent.
 /// - This service assumes that it is instantiated once per connection, which is true within the
-/// Hyper framework.
+///   Hyper framework.
 #[derive(Clone)]
 pub struct MaxConnectionAgeService<S> {
     service: S,

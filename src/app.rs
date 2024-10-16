@@ -3,12 +3,12 @@ use std::{
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
     process::ExitStatus,
+    sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
 
 use exitcode::ExitCode;
 use futures::StreamExt;
-use once_cell::race::OnceNonZeroUsize;
 use tokio::runtime::{self, Runtime};
 use tokio::sync::{broadcast::error::RecvError, MutexGuard};
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -35,7 +35,11 @@ use std::os::unix::process::ExitStatusExt;
 use std::os::windows::process::ExitStatusExt;
 use tokio::runtime::Handle;
 
-pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
+static WORKER_THREADS: AtomicUsize = AtomicUsize::new(0);
+
+pub fn worker_threads() -> Option<NonZeroUsize> {
+    NonZeroUsize::new(WORKER_THREADS.load(Ordering::Relaxed))
+}
 
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
@@ -465,14 +469,14 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
     rt_builder.enable_all().thread_name(thread_name);
 
     let threads = threads.unwrap_or_else(crate::num_threads);
-    let threads = NonZeroUsize::new(threads).ok_or_else(|| {
+    if threads == 0 {
         error!("The `threads` argument must be greater or equal to 1.");
-        exitcode::CONFIG
-    })?;
+        return Err(exitcode::CONFIG);
+    }
     WORKER_THREADS
-        .set(threads)
-        .expect("double thread initialization");
-    rt_builder.worker_threads(threads.get());
+        .compare_exchange(0, threads, Ordering::Acquire, Ordering::Relaxed)
+        .unwrap_or_else(|_| panic!("double thread initialization"));
+    rt_builder.worker_threads(threads);
 
     debug!(messaged = "Building runtime.", worker_threads = threads);
     Ok(rt_builder.build().expect("Unable to create async runtime"))
