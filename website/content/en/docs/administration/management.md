@@ -223,7 +223,7 @@ Additionally you can add method for watching config change by setting the `--wat
 `recommended` is default and it uses file event listener for file change events.
 `poll` can used where the event listener won't work. eg., attaching config files by NFS/EFS. which polls for file changes on certain interval.
 
-you can set the poll interval by setting flag `--watch-config-poll-interval-seconds`. which defaults to `30`.
+You can set the poll interval by setting flag `--watch-config-poll-interval-seconds`. which defaults to `30`.
 
 ## How it works
 
