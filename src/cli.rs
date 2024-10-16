@@ -159,7 +159,11 @@ pub struct RootOpts {
     /// - `kqueue` for unix/macos
     /// - `ReadDirectoryChangesWatcher` for windows
     /// The `poll` watcher can be used in cases where `inotify` doesn't work, e.g., when attaching the configuration via NFS.
-    #[arg(long, default_value = "inotify", env = "VECTOR_WATCH_METHOD")]
+    #[arg(
+        long,
+        default_value = "recommended",
+        env = "VECTOR_WATCH_CONFIG_METHOD"
+    )]
     pub watch_config_method: WatchConfigMethod,
 
     /// Poll for changes in the configuration file at the given interval.

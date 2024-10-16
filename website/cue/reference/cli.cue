@@ -157,6 +157,18 @@ cli: {
 			env_var:     "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS"
 			type:        "integer"
 		}
+		"watch-config-poll-interval-seconds": {
+			description: env_vars.VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS.description
+			env_var:     "VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS"
+			default:     env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.type.uint.default
+			type:        "integer"
+		}
+		"watch-config-method": {
+			description: env_vars.VECTOR_WATCH_CONFIG_METHOD.description
+			env_var:     "VECTOR_WATCH_CONFIG_METHOD"
+			default:     env_vars.VECTOR_WATCH_CONFIG_METHOD.default
+			type:        "string"
+		}
 	}
 
 	// Reusable options
@@ -638,7 +650,10 @@ cli: {
                 Poll for config changes at given interval
                 only applicable if `poll` is set in `--watch-config-method`
                 """
-			type: bool: default: false
+			type: uint: {
+				default: 30
+				unit:    "seconds"
+			}
 		}
 		VECTOR_INTERNAL_LOG_RATE_LIMIT: {
 			description: "Set the internal log rate limit. This limits Vector from emitting identical logs more than once over the given number of seconds."
