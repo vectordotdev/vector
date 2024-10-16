@@ -730,7 +730,7 @@ mod tests {
         let err = remap(config).unwrap_err().to_string();
         assert_eq!(
             &err,
-            "must provide exactly one of `source` or `file` configuration"
+            "must provide exactly one of `source` or `file` or `files` configuration"
         )
     }
 
@@ -745,7 +745,7 @@ mod tests {
         let err = remap(config).unwrap_err().to_string();
         assert_eq!(
             &err,
-            "must provide exactly one of `source` or `file` configuration"
+            "must provide exactly one of `source` or `file` or `files` configuration"
         )
     }
 
