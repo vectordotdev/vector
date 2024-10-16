@@ -47,11 +47,30 @@ env:
 
 jobs:
 
+  # Determine if the suite should run
+  check-should-run:
+    runs-on: ubuntu-latest
+    outputs:
+      should-run: ${{ steps.set-should-run.outputs.SHOULD_RUN }}
+    steps:
+      - name: Determine if should run
+        id: set-should-run
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "SHOULD_RUN=false" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" != "pull_request_review" &&
+                  "${{ !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip-regression') }}" == "true" ]]; then
+            echo "SHOULD_RUN=true" >> $GITHUB_OUTPUT
+          else
+            echo "SHOULD_RUN=false" >> $GITHUB_OUTPUT
+          fi
+
   # Only run this workflow if files changed in areas that could possibly introduce a regression
-  should-run:
+  check-source-changed:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.event_name != 'pull_request'
+    needs: check-should-run
+    if: ${{ needs.check-should-run.outputs.should-run == 'true' }}
     outputs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
@@ -116,8 +135,8 @@ jobs:
     name: Compute metadata
     runs-on: ubuntu-22.04
     timeout-minutes: 5
-    needs: should-run
-    if: github.event_name != 'merge_group' || needs.should-run.outputs.source_changed == 'true'
+    needs: check-source-changed
+    if: github.event_name != 'merge_group' || needs.check-source-changed.outputs.source_changed == 'true'
     outputs:
       pr-number: ${{ steps.pr-metadata-merge-queue.outputs.PR_NUMBER || steps.pr-metadata-comment.outputs.PR_NUMBER }}
       baseline-sha: ${{ steps.pr-metadata-merge-queue.outputs.BASELINE_SHA || steps.pr-metadata-comment.outputs.BASELINE_SHA }}
@@ -755,11 +774,9 @@ jobs:
       - analyze-experiment
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
-      SKIP_REGRESSION: "${{ contains(github.event.pull_request.labels.*.name, 'ci-condition: skip-regression') }}"
-
     steps:
       - name: (PR review) Submit PR result as failed
-        if: github.event_name == 'pull_request_review' && env.FAILED == 'true' && env.SKIP_REGRESSION == 'true'
+        if: github.event_name == 'pull_request_review' && env.FAILED == 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
@@ -768,7 +785,7 @@ jobs:
           status: 'failure'
 
       - name: (PR review) Submit PR result as success
-        if: github.event_name == 'pull_request_review' && env.FAILED != 'true' && env.SKIP_REGRESSION == 'true'
+        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
@@ -777,11 +794,11 @@ jobs:
           status: 'success'
 
       - name: (PR) Indicate why skipped
-        if: github.event_name == 'pull_request' || env.SKIP_REGRESSION == 'true'
+        if: github.event_name == 'pull_request'
         run: |
           echo "### Workflow skipped" >> $GITHUB_STEP_SUMMARY
           echo "This workflow doesn't run on PRs automatically." >> $GITHUB_STEP_SUMMARY
-          echo "This workflow doesn't run on PRs created by Dependabot." >> $GITHUB_STEP_SUMMARY
+          echo "This workflow doesn't run on PRs with the 'ci-condition: skip-regression' label." >> $GITHUB_STEP_SUMMARY
           echo "To trigger a run, leave a review comment with \`/ci-run-regression\`" >> $GITHUB_STEP_SUMMARY
 
       - name: exit
