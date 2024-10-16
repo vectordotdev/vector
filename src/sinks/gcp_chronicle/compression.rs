@@ -7,13 +7,15 @@ use indexmap::IndexMap;
 use vector_lib::configurable::attributes::CustomAttribute;
 use vector_lib::configurable::{
     schema::{
-        apply_base_metadata, generate_one_of_schema,
-        generate_struct_schema, get_or_generate_schema, SchemaGenerator, SchemaObject,
+        apply_base_metadata, generate_one_of_schema, generate_struct_schema,
+        get_or_generate_schema, SchemaGenerator, SchemaObject,
     },
     Configurable, GenerateError, Metadata,
 };
 
-use crate::sinks::util::buffer::compression::{generate_string_schema, CompressionLevel, ALGORITHM_NAME, ENUM_TAGGING_MODE, LEVEL_NAME};
+use crate::sinks::util::buffer::compression::{
+    generate_string_schema, CompressionLevel, ALGORITHM_NAME, ENUM_TAGGING_MODE, LEVEL_NAME,
+};
 use crate::sinks::util::Compression;
 
 /// Compression configuration.

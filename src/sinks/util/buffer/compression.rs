@@ -277,7 +277,11 @@ pub const LEVEL_NAME: &str = "level";
 pub const LOGICAL_NAME: &str = "logical_name";
 pub const ENUM_TAGGING_MODE: &str = "docs::enum_tagging";
 
-pub fn generate_string_schema(logical_name: &str, title: Option<&'static str>, description: &'static str) -> SchemaObject {
+pub fn generate_string_schema(
+    logical_name: &str,
+    title: Option<&'static str>,
+    description: &'static str,
+) -> SchemaObject {
     let mut const_schema = generate_const_string_schema(logical_name.to_lowercase());
     let mut const_metadata = Metadata::with_description(description);
     if let Some(title) = title {
