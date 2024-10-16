@@ -376,9 +376,10 @@ pub enum LogFormat {
 
 #[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WatchConfigMethod {
-    ///recommended watcher for host OS
+    /// Recommended watcher for the current OS, usually `inotify` for Linux-based systems.
     Recommended,
-    /// works for EFS/NFS like network storage systems
+    /// Poll-based watcher, typically used for watching files on EFS/NFS-like network storage systems.
+    /// The interval is determined by  [`RootOpts::watch_config_poll_interval_seconds`].
     Poll,
 }
 
