@@ -23,24 +23,24 @@ releases: "0.42.0": {
 				### Breaking Changes & Upgrade Guide
 
 				- The multi-line mode of the `parse_groks` VRL function is now enabled by default.
-				Use the `(?-m)` modifier to disable this behaviour. (https://github.com/vectordotdev/vrl/pull/1022)
+				Use the `(?-m)` modifier to disable this behavior. (https://github.com/vectordotdev/vrl/pull/1022)
 
 				### Enhancements
 
-				- The `keyvalue` grok filter is extended to match Datadog implementation. (https://github.com/vectordotdev/vrl/pull/1015)
+				- The `keyvalue` grok filter is extended to match the Datadog implementation. (https://github.com/vectordotdev/vrl/pull/1015)
 
 				### Fixes
 
-				- The `parse_xml` function now doesn't add an unnecessary `text` key when processing single nodes. (https://github.com/vectordotdev/vrl/pull/849)
-				- `parse_grok` and `parse_groks` no longer require field names containing a hyphen (e.g. `@a-b`) to be quoted.
+				- The `parse_xml` function no longer adds an unnecessary `text` key when processing single nodes. (https://github.com/vectordotdev/vrl/pull/849)
+				- `parse_grok` and `parse_groks` no longer require field names containing a hyphen (for example, `@a-b`) to be quoted.
 				- The function `match_datadog_query` doesn't panic if an invalid path is passed, instead it returns an error. (https://github.com/vectordotdev/vrl/pull/1031)
-				- The `parse_ruby_hash` parser is extended to match Datadog implementation. Previously it would parse the key in `{:key => "value"}` as `:key`, now it will parse it as `key`. (https://github.com/vectordotdev/vrl/pull/1050)
+				- The `parse_ruby_hash` parser is extended to match the Datadog implementation. Previously it would parse the key in `{:key => "value"}` as `:key`, now it parses it as `key`. (https://github.com/vectordotdev/vrl/pull/1050)
 				"""
 		},
 		{
 			type: "enhancement"
 			description: """
-				Adds more aggregations to `aggregate` transform: count, diff, max, min, mean, sum, latest and stdev. Current aggregation is named `auto` and is made the default (acts like a combination of `sum` and `latest`).
+				Adds more aggregations to `aggregate` transform: count, diff, max, min, mean, sum, latest and stdev. The current aggregation is named `auto` and is made the default (acts like a combination of `sum` and `latest`).
 				"""
 			contributors: ["esensar"]
 		},
@@ -54,14 +54,14 @@ releases: "0.42.0": {
 		{
 			type: "feat"
 			description: """
-				Adds support `OPTIONS` HTTP-method for `http_server` source
+				Adds support for `OPTIONS` HTTP-method for `http_server` source
 				"""
 			contributors: ["sillent"]
 		},
 		{
 			type: "feat"
 			description: """
-				Adds support for additional `graph` configuration on each component so that users can add arbitrary graphviz node attributes when generating a graph via `vector graph`.
+				Adds support for additional `graph` configuration on each component so that users can add arbitrary graphviz node attributes when generating a graph through `vector graph`.
 				"""
 			contributors: ["esensar"]
 		},
@@ -110,7 +110,7 @@ releases: "0.42.0": {
 			type: "fix"
 			description: """
 				Previously, when the `new_relic` sink sent non-standard event fields to the logs
-				API, it would include those fields beside the standard event fields (i.e.
+				API, it would include those fields beside the standard event fields (for example, 
 				`message` and `timestamp`). Now, any such fields are sent in an `attributes`
 				object, as specified by the [New Relic Logs
 				API](https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/).
@@ -144,7 +144,7 @@ releases: "0.42.0": {
 			type: "enhancement"
 			description: """
 				Add support for providing Server Name Indication (SNI) in the TLS handshake when
-				connecting to a server via `tls.server_name` for components that support TLS.
+				connecting to a server through `tls.server_name` for components that support TLS.
 				"""
 			contributors: ["anil-db"]
 		},
@@ -177,7 +177,7 @@ releases: "0.42.0": {
 		{
 			type: "feat"
 			description: """
-				Adds `scope` information to logs received via the `opentelemetry` source.
+				Adds `scope` information to logs received through the `opentelemetry` source.
 				"""
 			contributors: ["srstrickland"]
 		},
@@ -186,7 +186,7 @@ releases: "0.42.0": {
 			description: """
 				When using the `all_metrics: true` flag in `log_to_metric` transform, the
 				`namespace` field is now optional and no longer required. If the `namespace` field
-				is not provided, the produced metric will not have a namespace at all.
+				is not provided, the produced metric does not have a namespace at all.
 				"""
 			contributors: ["jorgehermo9"]
 		},
@@ -218,7 +218,7 @@ releases: "0.42.0": {
 		{
 			type: "fix"
 			description: """
-				The adaptive request concurrency mechanism now longer deadlocks if setting
+				The adaptive request concurrency mechanism no longer deadlocks if setting
 				`adaptive_concurrency.decrease_ratio` in a sink to a value less than 0.5.
 				"""
 		},
