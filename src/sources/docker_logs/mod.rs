@@ -1,6 +1,5 @@
-use std::{
-    collections::HashMap, convert::TryFrom, future::ready, pin::Pin, sync::Arc, time::Duration,
-};
+use std::sync::{Arc, LazyLock};
+use std::{collections::HashMap, convert::TryFrom, future::ready, pin::Pin, time::Duration};
 
 use bollard::{
     container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
@@ -12,7 +11,6 @@ use bollard::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
-use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
@@ -55,9 +53,9 @@ const CONTAINER: &str = "container_id";
 // Prevent short hostname from being wrongly recognized as a container's short ID.
 const MIN_HOSTNAME_LENGTH: usize = 6;
 
-static STDERR: Lazy<Bytes> = Lazy::new(|| "stderr".into());
-static STDOUT: Lazy<Bytes> = Lazy::new(|| "stdout".into());
-static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
+static STDERR: LazyLock<Bytes> = LazyLock::new(|| "stderr".into());
+static STDOUT: LazyLock<Bytes> = LazyLock::new(|| "stdout".into());
+static CONSOLE: LazyLock<Bytes> = LazyLock::new(|| "console".into());
 
 /// Configuration for the `docker_logs` source.
 #[serde_as]

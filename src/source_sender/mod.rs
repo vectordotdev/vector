@@ -481,11 +481,10 @@ impl Inner {
         let mut unsent_event_count = UnsentEventCount::new(events.len());
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             let count = events.len();
-            self.send(events).await.map_err(|err| {
+            self.send(events).await.inspect_err(|_| {
                 // The unsent event count is discarded here because the caller emits the
                 // `StreamClosedError`.
                 unsent_event_count.discard();
-                err
             })?;
             unsent_event_count.decr(count);
         }

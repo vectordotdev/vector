@@ -5,7 +5,6 @@ generator:
       addr: "0.0.0.0:8282"
       variant: "fluent"
       bytes_per_second: "256 Mb"
-      block_sizes: ["1Kb", "2Kb", "4Kb", "8Kb", "256Kb", "512Kb", "1024Kb"]
       maximum_prebuild_cache_size_bytes: "256 Mb"
 
 blackhole:

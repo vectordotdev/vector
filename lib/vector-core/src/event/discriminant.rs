@@ -292,6 +292,7 @@ mod tests {
 
     #[test]
     fn with_hash_map() {
+        #[allow(clippy::mutable_key_type)]
         let mut map: HashMap<Discriminant, usize> = HashMap::new();
 
         let event_stream_1 = {
