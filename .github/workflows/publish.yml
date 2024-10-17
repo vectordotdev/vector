@@ -264,7 +264,7 @@ jobs:
 
   build-x86_64-apple-darwin-packages:
     name: Build Vector for x86_64-apple-darwin (.tar.gz)
-    runs-on: macos-latest-xl
+    runs-on: macos-latest-xlarge
     timeout-minutes: 90
     needs: generate-publish-metadata
     env:
@@ -448,13 +448,16 @@ jobs:
 
   macos-verify:
     name: Verify macOS Package
-    runs-on: macos-12
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
       - build-x86_64-apple-darwin-packages
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+    strategy:
+      matrix:
+        runner: [macos-13, macos-14, macos-15]
     steps:
       - name: Checkout Vector
         uses: actions/checkout@v3
