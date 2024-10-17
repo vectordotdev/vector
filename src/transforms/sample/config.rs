@@ -1,6 +1,6 @@
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
-use vrl::owned_value_path;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vrl::value::Kind;
 
 use crate::{
@@ -43,6 +43,9 @@ pub struct SampleConfig {
     /// sampled together, but that overall `1/N` transactions are sampled.
     #[configurable(metadata(docs::examples = "message"))]
     pub key_field: Option<String>,
+    #[serde(default = "default_sample_rate_key")]
+    #[configurable(metadata(docs::examples = "sample_rate"))]
+    pub sample_rate_key: OptionalValuePath,
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
@@ -54,6 +57,7 @@ impl GenerateConfig for SampleConfig {
             rate: 10,
             key_field: None,
             exclude: None::<AnyCondition>,
+            sample_rate_key: default_sample_rate_key(),
         })
         .unwrap()
     }
@@ -105,6 +109,10 @@ impl TransformConfig for SampleConfig {
     }
 }
 
+pub fn default_sample_rate_key() -> OptionalValuePath {
+  OptionalValuePath::from(owned_value_path!("sample_rate"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,6 +135,7 @@ mod tests {
                 rate: 1,
                 key_field: None,
                 exclude: None,
+                sample_rate_key: default_sample_rate_key(),
             };
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
