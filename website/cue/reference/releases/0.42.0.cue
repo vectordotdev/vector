@@ -110,7 +110,7 @@ releases: "0.42.0": {
 			type: "fix"
 			description: """
 				Previously, when the `new_relic` sink sent non-standard event fields to the logs
-				API, it would include those fields beside the standard event fields (for example, 
+				API, it would include those fields beside the standard event fields (for example,
 				`message` and `timestamp`). Now, any such fields are sent in an `attributes`
 				object, as specified by the [New Relic Logs
 				API](https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/).
