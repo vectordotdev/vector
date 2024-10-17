@@ -709,6 +709,7 @@ sinks-logs = [
   "sinks-new_relic",
   "sinks-papertrail",
   "sinks-pulsar",
+  "sinks-openobserve",
   "sinks-redis",
   "sinks-sematext",
   "sinks-socket",
