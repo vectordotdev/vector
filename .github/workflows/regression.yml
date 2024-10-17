@@ -59,7 +59,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "SHOULD_RUN=false" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event_name }}" == "pull_request_review" ]]; then
-            # This will run in the conext of a CI review trigger.
+            # This will run in the context of a CI review trigger.
             echo "SHOULD_RUN=true" >> $GITHUB_OUTPUT
           elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'ci-condition: skip-regression') }}" == "true" ]]; then
             echo "SHOULD_RUN=false" >> $GITHUB_OUTPUT
