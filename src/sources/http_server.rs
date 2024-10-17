@@ -14,7 +14,9 @@ use vector_lib::codecs::{
     NewlineDelimitedDecoderConfig,
 };
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
+use vector_lib::lookup::{
+    lookup_v2::OptionalTargetPath, lookup_v2::OptionalValuePath, owned_value_path, path,
+};
 use vector_lib::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
@@ -153,6 +155,11 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_http_response_code")]
     response_code: StatusCode,
 
+    /// The event key in which the requested URL path used to send the request is stored.
+    #[serde(default = "default_response_body_key")]
+    #[configurable(metadata(docs::examples = "vector_http_path"))]
+    response_body_key: OptionalTargetPath,
+
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
@@ -279,6 +286,7 @@ impl Default for SimpleHttpConfig {
             host_key: default_host_key(),
             method: default_http_method(),
             response_code: default_http_response_code(),
+            response_body_key: default_response_body_key(),
             strict_path: true,
             framing: None,
             decoding: Some(default_decoding()),
@@ -305,6 +313,10 @@ fn default_path_key() -> OptionalValuePath {
 
 fn default_host_key() -> OptionalValuePath {
     OptionalValuePath::none()
+}
+
+fn default_response_body_key() -> OptionalTargetPath {
+    OptionalTargetPath::none()
 }
 
 const fn default_http_response_code() -> StatusCode {
@@ -375,6 +387,7 @@ impl SourceConfig for SimpleHttpConfig {
             self.path.as_str(),
             self.method,
             self.response_code,
+            self.response_body_key.clone(),
             self.strict_path,
             &self.tls,
             &self.auth,
@@ -573,7 +586,7 @@ mod tests {
     };
     use vector_lib::config::LogNamespace;
     use vector_lib::event::LogEvent;
-    use vector_lib::lookup::lookup_v2::OptionalValuePath;
+    use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
     use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath, PathPrefix};
     use vector_lib::schema::Definition;
     use vrl::value::{kind::Collection, Kind, ObjectMap};
@@ -606,6 +619,7 @@ mod tests {
         path: &'a str,
         method: &'a str,
         response_code: StatusCode,
+        response_body_key: OptionalTargetPath,
         strict_path: bool,
         status: EventStatus,
         acknowledgements: bool,
@@ -636,6 +650,7 @@ mod tests {
                 strict_path,
                 path_key,
                 host_key,
+                response_body_key,
                 path,
                 method,
                 framing,
@@ -663,6 +678,15 @@ mod tests {
             .unwrap()
             .status()
             .as_u16()
+    }
+
+    async fn send_with_response(address: SocketAddr, body: &str) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(&format!("http://{}/", address))
+            .body(body.to_owned())
+            .send()
+            .await
+            .unwrap()
     }
 
     async fn send_with_headers(address: SocketAddr, body: &str, headers: HeaderMap) -> u16 {
@@ -745,6 +769,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -791,6 +816,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -830,6 +856,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -863,6 +890,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -901,6 +929,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -946,6 +975,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -997,6 +1027,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1083,6 +1114,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1127,6 +1159,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1169,6 +1202,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1259,6 +1293,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1290,6 +1325,7 @@ mod tests {
                 "/event/path",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1331,6 +1367,7 @@ mod tests {
                 "/event",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 false,
                 EventStatus::Delivered,
                 true,
@@ -1392,6 +1429,7 @@ mod tests {
             "/",
             "POST",
             StatusCode::OK,
+            OptionalTargetPath::none(),
             true,
             EventStatus::Delivered,
             true,
@@ -1417,6 +1455,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::ACCEPTED,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1451,6 +1490,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Rejected,
                 true,
@@ -1482,6 +1522,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                OptionalTargetPath::none(),
                 true,
                 EventStatus::Rejected,
                 false,
@@ -1515,6 +1556,7 @@ mod tests {
             "/",
             "GET",
             StatusCode::OK,
+            OptionalTargetPath::none(),
             true,
             EventStatus::Delivered,
             true,
@@ -1524,6 +1566,96 @@ mod tests {
         .await;
 
         assert_eq!(200, send_request(addr, "GET", "", "/").await);
+    }
+
+    #[tokio::test]
+    async fn http_response_body_key() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "remote_ip",
+                "/",
+                "POST",
+                StatusCode::OK,
+                OptionalTargetPath::event("message"),
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                None,
+            )
+            .await;
+
+            spawn_collect_n(
+                async move {
+                    let response = send_with_response(addr, "test body\n").await;
+                    assert_eq!(200, response.status());
+                    assert_eq!("\"test body\"", response.text().await.unwrap());
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn http_response_body_key_json() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "remote_ip",
+                "/",
+                "POST",
+                StatusCode::OK,
+                OptionalTargetPath::event("key1"),
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::default().into()),
+            )
+            .await;
+
+            spawn_collect_n(
+                async move {
+                    let response = send_with_response(addr, "{\"key1\": \"value1\"}\n").await;
+                    assert_eq!(200, response.status());
+                    assert_eq!("\"value1\"", response.text().await.unwrap());
+                },
+                rx,
+                1,
+            )
+            .await;
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn http_response_body_key_missing() {
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            OptionalTargetPath::event("response"),
+            true,
+            EventStatus::Rejected,
+            false,
+            None,
+            None,
+        )
+        .await;
+
+        assert_eq!(500, send(addr, "test body\n").await);
     }
 
     #[test]
