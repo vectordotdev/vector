@@ -30,7 +30,7 @@ base: components: sinks: openobserve: configuration: {
             password: {
                 description: "The password for basic authentication."
                 required: true
-                type: string: examples: ["v9Ca7qHaMKELlDtU"]
+                type: string: examples: ["your_ingestion_password"]
             }
         }
     }
