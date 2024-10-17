@@ -221,7 +221,7 @@ You can make Vector automatically reload itself when its [configuration file][co
 Additionally you can add method for watching config change by setting the `--watch-config-method` to `recommended` or `poll`.
 
 `recommended` is default and it uses file event listener for file change events.
-`poll` can used where the event listener won't work. eg., attaching config files by NFS/EFS. which polls for file changes on certain interval.
+`poll` can used where the event listener won't work, eg. attaching config files by NFS/EFS, which will poll for file changes on certain interval.
 
 You can set the poll interval by setting flag `--watch-config-poll-interval-seconds`. which defaults to `30`.
 
