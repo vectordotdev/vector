@@ -480,6 +480,68 @@ configuration: {
 				"""
 			required: false
 			type: object: options: {
+				file: {
+					required: true
+					description: """
+						Retrieve secrets from a file path.
+
+						The secret must be a JSON text string with key/value pairs. For example:
+						```json
+						{
+							"username": "test",
+							"password": "example-password"
+						}
+						```
+
+						If an error occurs while reading the file, Vector will log the error and exit.
+
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						path: {
+							description: "The file path to read."
+							required: true
+							type: string: {
+								examples: ["/path/to/secret.json"]
+							}
+						}
+					}
+				}
+				directory: {
+					required: true
+					description: """
+						Retrieve secrets from file contents in a directory.
+
+						The directory must contain files with names corresponding to secret keys.
+
+						If an error occurs while reading the file, Vector will log the error and exit.
+
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						path: {
+							description: """
+								The path of the directory with secrets.
+								"""
+							required: true
+							type: string: {
+								examples: [
+									"${CREDENTIALS_DIRECTORY}", // https://systemd.io/CREDENTIALS
+									"/path/to/secrets-directory",
+								]
+							}
+						}
+						remove_trailing_whitespace: {
+							description: """
+								Remove trailing whitespace from file contents.
+								"""
+							required:    false
+							type: bool: default: false
+						}
+					}
+				}
 				exec: {
 					required: true
 					description: """
