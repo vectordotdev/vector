@@ -24,7 +24,7 @@ use aws_smithy_runtime_api::client::{
     runtime_components::RuntimeComponents,
 };
 use aws_smithy_types::body::SdkBody;
-use aws_types::sdk_config::SharedHttpClient;
+use aws_types::sdk_config::{SharedAsyncSleep, SharedHttpClient};
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::HeaderMap;
@@ -201,25 +201,27 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     };
 
     // Build the configuration first.
-    let mut config_builder = SdkConfig::builder()
-        .http_client(connector)
-        .sleep_impl(Arc::new(TokioSleep::new()))
-        .identity_cache(auth.credentials_cache().await?)
-        .credentials_provider(
+    let mut config_builder = SdkConfig::builder();
+
+    config_builder
+        .set_http_client(Some(SharedHttpClient::new(connector)))
+        .set_sleep_impl(Some(SharedAsyncSleep::new(Arc::new(TokioSleep::new()))))
+        .set_identity_cache(Some(auth.credentials_cache().await?))
+        .set_region(Some(region.clone()))
+        .set_retry_config(Some(retry_config.clone()))
+        .set_credentials_provider(
             auth.credentials_provider(region.clone(), proxy, tls_options)
                 .await?,
-        )
-        .region(region.clone())
-        .retry_config(retry_config.clone());
+        );
 
     if let Some(endpoint_override) = endpoint {
-        config_builder = config_builder.endpoint_url(endpoint_override);
+        config_builder.set_endpoint_url(Some(endpoint_override));
     }
 
     if let Some(use_fips) =
         aws_config::default_provider::use_fips::use_fips_provider(&provider_config).await
     {
-        config_builder = config_builder.use_fips(use_fips);
+        config_builder.set_use_fips(Some(use_fips));
     }
 
     if let Some(timeout) = timeout {
@@ -234,7 +236,7 @@ pub async fn create_client_and_region<T: ClientBuilder>(
             .set_connect_timeout(connect_timeout.map(Duration::from_secs))
             .set_read_timeout(read_timeout.map(Duration::from_secs));
 
-        config_builder = config_builder.timeout_config(timeout_config_builder.build());
+        config_builder.set_timeout_config(Some(timeout_config_builder.build()));
     }
 
     let config = config_builder.build();
