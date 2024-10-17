@@ -438,12 +438,11 @@ impl FinishedApplication {
 fn get_log_levels(default: &str) -> String {
     std::env::var("VECTOR_LOG")
         .or_else(|_| {
-            std::env::var("LOG").map(|log| {
+            std::env::var("LOG").inspect(|_log| {
                 warn!(
                     message =
                         "DEPRECATED: Use of $LOG is deprecated. Please use $VECTOR_LOG instead."
                 );
-                log
             })
         })
         .unwrap_or_else(|_| default.into())

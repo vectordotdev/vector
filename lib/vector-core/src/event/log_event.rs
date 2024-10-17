@@ -625,7 +625,7 @@ impl EventDataEq for LogEvent {
 
 #[cfg(any(test, feature = "test"))]
 mod test_utils {
-    use super::*;
+    use super::{log_schema, Bytes, LogEvent, Utc};
 
     // these rely on the global log schema, which is no longer supported when using the
     // "LogNamespace::Vector" namespace.

@@ -656,7 +656,7 @@ mod tests {
 
     async fn send(address: SocketAddr, body: &str) -> u16 {
         reqwest::Client::new()
-            .post(&format!("http://{}/", address))
+            .post(format!("http://{}/", address))
             .body(body.to_owned())
             .send()
             .await
@@ -667,7 +667,7 @@ mod tests {
 
     async fn send_with_headers(address: SocketAddr, body: &str, headers: HeaderMap) -> u16 {
         reqwest::Client::new()
-            .post(&format!("http://{}/", address))
+            .post(format!("http://{}/", address))
             .headers(headers)
             .body(body.to_owned())
             .send()
@@ -679,7 +679,7 @@ mod tests {
 
     async fn send_with_query(address: SocketAddr, body: &str, query: &str) -> u16 {
         reqwest::Client::new()
-            .post(&format!("http://{}?{}", address, query))
+            .post(format!("http://{}?{}", address, query))
             .body(body.to_owned())
             .send()
             .await
@@ -690,7 +690,7 @@ mod tests {
 
     async fn send_with_path(address: SocketAddr, body: &str, path: &str) -> u16 {
         reqwest::Client::new()
-            .post(&format!("http://{}{}", address, path))
+            .post(format!("http://{}{}", address, path))
             .body(body.to_owned())
             .send()
             .await
@@ -701,9 +701,8 @@ mod tests {
 
     async fn send_request(address: SocketAddr, method: &str, body: &str, path: &str) -> u16 {
         let method = Method::from_bytes(method.to_owned().as_bytes()).unwrap();
-        format!("method: {}", method.as_str());
         reqwest::Client::new()
-            .request(method, &format!("http://{}{}", address, path))
+            .request(method, format!("http://{address}{path}"))
             .body(body.to_owned())
             .send()
             .await
@@ -714,7 +713,7 @@ mod tests {
 
     async fn send_bytes(address: SocketAddr, body: Vec<u8>, headers: HeaderMap) -> u16 {
         reqwest::Client::new()
-            .post(&format!("http://{}/", address))
+            .post(format!("http://{address}/"))
             .headers(headers)
             .body(body)
             .send()
