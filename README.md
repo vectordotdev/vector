@@ -99,7 +99,7 @@ The following performance tests demonstrate baseline performance between
 common protocols with the exception of the Regex Parsing test.
 
 | Test                                                                                                                   | Vector          | Filebeat | FluentBit       | FluentD   | Logstash  | SplunkUF        | SplunkHF |
-|--:---------------------------------------------------------------------------------------------------------------------|-:-:-------------|-:-:------|-:-:-------------|-:-:-------|-:-:-------|-:-:-------------|-:-:------|
+| ---------------------------------------------------------------------------------------------------------------------- | --------------- | -------- | --------------- | --------- | --------- | --------------- | -------- |
 | [TCP to Blackhole](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) | _**86mib/s**_   | n/a      | 64.4mib/s       | 27.7mib/s | 40.6mib/s | n/a             | n/a      |
 | [File to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_to_tcp_performance)           | _**76.7mib/s**_ | 7.8mib/s | 35mib/s         | 26.1mib/s | 3.1mib/s  | 40.1mib/s       | 39mib/s  |
 | [Regex Parsing](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/regex_parsing_performance)       | 13.2mib/s       | n/a      | _**20.5mib/s**_ | 2.6mib/s  | 4.6mib/s  | n/a             | 7.8mib/s |
@@ -114,7 +114,7 @@ The following correctness tests are not exhaustive, but they demonstrate
 fundamental differences in quality and attention to detail:
 
 | Test                                                                                                                                 | Vector | Filebeat | FluentBit | FluentD | Logstash | Splunk UF | Splunk HF |
-|--:-----------------------------------------------------------------------------------------------------------------------------------|-:-:----|-:-:------|-:-:-------|-:-:-----|-:-:------|-:-:-------|-:-:-------|
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------ | -------- | --------- | ------- | -------- | --------- | --------- |
 | [Disk Buffer Persistence](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | **✓**  | ✓        |           |         | ⚠        | ✓         | ✓         |
 | [File Rotate (create)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_rotate_create_correctness)         | **✓**  | ✓        | ✓         | ✓       | ✓        | ✓         | ✓         |
 | [File Rotate (copytruncate)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | **✓**  |          |           |         |          | ✓         | ✓         |
@@ -129,7 +129,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 Vector is an end-to-end, unified, open data platform.
 
 |                     | **Vector** | Beats | Fluentbit | Fluentd | Logstash | Splunk UF | Splunk HF | Telegraf |
-|--:------------------|-:-:--------|-:-:---|-:-:-------|-:-:-----|-:-:------|-:-:-------|-:-:-------|-:-:------|
+| ------------------- | ---------- | ----- | --------- | ------- | -------- | --------- | --------- | -------- |
 | **End-to-end**      | **✓**      |       |           |         |          |           |           | ✓        |
 | Agent               | **✓**      | ✓     | ✓         |         |          | ✓         |           | ✓        |
 | Aggregator          | **✓**      |       |           | ✓       | ✓        |           | ✓         | ✓        |
