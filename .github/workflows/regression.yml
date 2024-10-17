@@ -58,12 +58,13 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "SHOULD_RUN=false" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" != "pull_request_review" &&
-                  "${{ !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip-regression') }}" == "true" ]]; then
+          elif [[ "${{ github.event_name }}" == "pull_request_review" ]]; then
+            echo "SHOULD_RUN=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'ci-condition: skip-regression') }}" == "true" ]]; then
             # The small caveat here is that we still want to run the suite via a review comment.
             echo "SHOULD_RUN=false" >> $GITHUB_OUTPUT
           else
-            echo "SHOULD_RUN=true" >> $GITHUB_OUTPUT
+           echo "SHOULD_RUN=true" >> $GITHUB_OUTPUT
           fi
 
   # Only run this workflow if files changed in areas that could possibly introduce a regression
