@@ -142,6 +142,7 @@ Nextbook
 Nextcloud
 OVH
 Odys
+Openobserve
 Openpeak
 Oppo
 Ovi
