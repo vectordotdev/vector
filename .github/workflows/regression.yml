@@ -100,13 +100,13 @@ jobs:
           echo "IGNORE='${{ env.IGNORE }}'"
           export SOURCE_CHANGED=$(comm -2 -3 <(printf "%s\n" "${{ env.ALL }}") <(printf "%s\n" "${{ env.IGNORE }}"))
           echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
-          
+
           if [ "${SOURCE_CHANGED}" == "" ]; then
             export SOURCE_CHANGED="false"
           else
             export SOURCE_CHANGED="true"
           fi
-          
+
           echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
           echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
 
