@@ -10923,6 +10923,7 @@ dependencies = [
  "vector-lookup",
  "vector-stream",
  "vector-tap",
+ "vrl",
 ]
 
 [[package]]

@@ -155,6 +155,7 @@ toml = { version = "0.8.19", default-features = false, features = ["display", "p
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 uuid = { version = "1.10.0", features = ["v4", "v7", "serde"] }
+vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vrl = { git = "https://github.com/vectordotdev/vrl", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
@@ -171,7 +172,7 @@ dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
-vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
+vector-lib.workspace = true
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
@@ -405,7 +406,7 @@ test-generator = "0.3.1"
 tokio = { version = "1.40.0", features = ["test-util"] }
 tokio-test = "0.4.4"
 tower-test = "0.4.0"
-vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
+vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
 
 wiremock = "0.6.2"
