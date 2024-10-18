@@ -6,7 +6,7 @@ on:
 jobs:
 
   test-windows:
-    runs-on: windows-2019-8core
+    runs-on: windows-2022-8core
     timeout-minutes: 60
     steps:
       - name: (PR review) Set latest commit status as pending
@@ -28,7 +28,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request_review' }}
         uses: actions/checkout@v3
 
-      - run: .\scripts\environment\bootstrap-windows-2019.ps1
+      - run: .\scripts\environment\bootstrap-windows-2022.ps1
       - run: make test
 
       - name: (PR review) Set latest commit status as ${{ job.status }}

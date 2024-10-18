@@ -54,61 +54,61 @@ jobs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Collect file changes
-      id: changes
-      if: github.event_name == 'merge_group'
-      uses: dorny/paths-filter@v3
-      with:
-        base: ${{ github.event.merge_group.base_ref }}
-        ref: ${{ github.event.merge_group.head_ref }}
-        list-files: shell
-        filters: |
-          all_changed:
-            - added|deleted|modified: "**"
-          ignore:
-            - "./.github/**"
-            - "./.gitignore"
-            - "distribution/**"
-            - "rust-doc/**"
-            - "docs/**"
-            - "rfcs/**"
-            - "testing/**"
-            - "tilt/**"
-            - "website/**"
-            - "*.md"
-            - "Tiltfile"
-            - "netlify.toml"
-            - "NOTICE"
-            - "LICENSE-3rdparty.csv"
-            - "LICENSE"
-            - "lib/codecs/tests/data/**"
+      - name: Collect file changes
+        id: changes
+        if: github.event_name == 'merge_group'
+        uses: dorny/paths-filter@v3
+        with:
+          base: ${{ github.event.merge_group.base_ref }}
+          ref: ${{ github.event.merge_group.head_ref }}
+          list-files: shell
+          filters: |
+            all_changed:
+              - added|deleted|modified: "**"
+            ignore:
+              - "./.github/!(regression.yml)"
+              - "./.gitignore"
+              - "distribution/**"
+              - "rust-doc/**"
+              - "docs/**"
+              - "rfcs/**"
+              - "testing/**"
+              - "tilt/**"
+              - "website/**"
+              - "*.md"
+              - "Tiltfile"
+              - "netlify.toml"
+              - "NOTICE"
+              - "LICENSE-3rdparty.csv"
+              - "LICENSE"
+              - "lib/codecs/tests/data/**"
 
-    # This step allows us to conservatively run the tests if we added a new
-    # file or directory for source code, but forgot to add it to this workflow.
-    # Instead, we may unnecessarily run the test on new file or dir additions that
-    # wouldn't likely introduce regressions.
-    - name: Determine if should not run due to irrelevant file changes
-      id: filter
-      if: github.event_name == 'merge_group'
-      env:
-        ALL: ${{ steps.changes.outputs.all_changed_files }}
-        IGNORE: ${{ steps.changes.outputs.ignore_files }}
-      run: |
-        echo "ALL='${{ env.ALL }}'"
-        echo "IGNORE='${{ env.IGNORE }}'"
-        export SOURCE_CHANGED=$(comm -2 -3 <(printf "%s\n" "${{ env.ALL }}") <(printf "%s\n" "${{ env.IGNORE }}"))
-        echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
+      # This step allows us to conservatively run the tests if we added a new
+      # file or directory for source code, but forgot to add it to this workflow.
+      # Instead, we may unnecessarily run the test on new file or dir additions that
+      # wouldn't likely introduce regressions.
+      - name: Determine if should not run due to irrelevant file changes
+        id: filter
+        if: github.event_name == 'merge_group'
+        env:
+          ALL: ${{ steps.changes.outputs.all_changed_files }}
+          IGNORE: ${{ steps.changes.outputs.ignore_files }}
+        run: |
+          echo "ALL='${{ env.ALL }}'"
+          echo "IGNORE='${{ env.IGNORE }}'"
+          export SOURCE_CHANGED=$(comm -2 -3 <(printf "%s\n" "${{ env.ALL }}") <(printf "%s\n" "${{ env.IGNORE }}"))
+          echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
 
-        if [ "${SOURCE_CHANGED}" == "" ]; then
-          export SOURCE_CHANGED="false"
-        else
-          export SOURCE_CHANGED="true"
-        fi
+          if [ "${SOURCE_CHANGED}" == "" ]; then
+            export SOURCE_CHANGED="false"
+          else
+            export SOURCE_CHANGED="true"
+          fi
 
-        echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
-        echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
+          echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
+          echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
 
   compute-metadata:
     name: Compute metadata
@@ -225,7 +225,7 @@ jobs:
       - name: Set SMP version
         id: experimental-meta
         run: |
-          export SMP_CRATE_VERSION="0.15.1"
+          export SMP_CRATE_VERSION="0.16.1"
           echo "smp crate version: ${SMP_CRATE_VERSION}"
           echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
 
@@ -259,7 +259,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.6.1
+        uses: docker/setup-buildx-action@v3.7.1
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@v6.9.0
@@ -297,7 +297,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.6.1
+        uses: docker/setup-buildx-action@v3.7.1
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@v6.9.0
@@ -775,9 +775,9 @@ jobs:
       - name: (PR) Indicate why skipped
         if: github.event_name == 'pull_request'
         run: |
-           echo "### Workflow skipped" >> $GITHUB_STEP_SUMMARY
-           echo "This workflow doesn't run on PR's automatically." >> $GITHUB_STEP_SUMMARY
-           echo "To trigger a run, leave a comment with \`/ci-run-regression\`" >> $GITHUB_STEP_SUMMARY
+          echo "### Workflow skipped" >> $GITHUB_STEP_SUMMARY
+          echo "This workflow doesn't run on PR's automatically." >> $GITHUB_STEP_SUMMARY
+          echo "To trigger a run, leave a comment with \`/ci-run-regression\`" >> $GITHUB_STEP_SUMMARY
 
       - name: exit
         run: |

@@ -435,6 +435,7 @@ rpms
 rstest
 rsyslog
 rsyslogd
+scriptblock
 security-tab
 servlet
 Sinjo
