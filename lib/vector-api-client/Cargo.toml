@@ -24,7 +24,7 @@ tokio-stream = { version = "0.1.16", default-features = false, features = ["sync
 graphql_client = { version = "0.14.0", default-features = false, features = ["graphql_query_derive"] }
 
 # HTTP / WebSockets
-reqwest = { version = "0.11.26", default-features = false, features = ["json"] }
+reqwest = { version = "0.12.4", default-features = false, features = ["json"] }
 tokio-tungstenite = { version = "0.20.1", default-features = false, features = ["connect", "rustls"] }
 
 # External libs
