@@ -457,7 +457,7 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     strategy:
       matrix:
-        runner: [macos-13, macos-14, macos-15]
+        runner: [macos-14, macos-15]
     steps:
       - name: Checkout Vector
         uses: actions/checkout@v3
