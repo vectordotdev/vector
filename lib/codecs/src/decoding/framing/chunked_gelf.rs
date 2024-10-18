@@ -243,7 +243,7 @@ impl ChunkedGelfDecoder {
             let timeout = self.timeout;
             let timeout_handle = tokio::spawn(async move {
                 tokio::time::sleep(timeout).await;
-                let mut state_lock = state.lock().unwrap();
+                let mut state_lock = state.lock().expect("poisoned lock");
                 if state_lock.remove(&message_id).is_some() {
                     warn!(
                         message_id = message_id,
