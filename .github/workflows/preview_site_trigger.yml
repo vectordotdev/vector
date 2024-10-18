@@ -23,7 +23,7 @@ jobs:
 
       # Upload the artifact
       - name: Upload PR information artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pr
           path: pr/
