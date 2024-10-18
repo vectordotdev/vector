@@ -7,11 +7,10 @@
 //! internal events and metrics, and testing that they fit the required
 //! patterns.
 
-use std::{env, time::Duration};
+use std::{env, sync::LazyLock, time::Duration};
 
 use futures::{stream, SinkExt, Stream, StreamExt};
 use futures_util::Future;
-use once_cell::sync::Lazy;
 use tokio::{pin, select, time::sleep};
 use vector_lib::event_test_util;
 
@@ -76,7 +75,7 @@ pub struct ComponentTests {
 }
 
 /// The component test specification for all sources.
-pub static SOURCE_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+pub static SOURCE_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| ComponentTests {
     events: &["BytesReceived", "EventsReceived", "EventsSent"],
     tagged_counters: &["component_received_bytes_total"],
     untagged_counters: &[
@@ -88,14 +87,14 @@ pub static SOURCE_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
 });
 
 /// The component error test specification (sources and sinks).
-pub static COMPONENT_TESTS_ERROR: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+pub static COMPONENT_TESTS_ERROR: LazyLock<ComponentTests> = LazyLock::new(|| ComponentTests {
     events: &["Error"],
     tagged_counters: &["component_errors_total"],
     untagged_counters: &[],
 });
 
 /// The component test specification for all transforms.
-pub static TRANSFORM_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+pub static TRANSFORM_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| ComponentTests {
     events: &["EventsReceived", "EventsSent"],
     tagged_counters: &[],
     untagged_counters: &[
@@ -107,7 +106,7 @@ pub static TRANSFORM_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
 });
 
 /// The component test specification for sinks that are push-based.
-pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
+pub static SINK_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| {
     ComponentTests {
         events: &["BytesSent", "EventsSent"], // EventsReceived is emitted in the topology
         tagged_counters: &["component_sent_bytes_total"],
@@ -119,7 +118,7 @@ pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
 });
 
 /// The component test specification for sinks with source and service identification.
-pub static DATA_VOLUME_SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
+pub static DATA_VOLUME_SINK_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| {
     ComponentTests {
         events: &["BytesSent", "EventsSent"], // EventsReceived is emitted in the topology
         tagged_counters: &[
@@ -131,7 +130,7 @@ pub static DATA_VOLUME_SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
 });
 
 /// The component test specification for sinks which simply expose data, or do not otherwise "send" it anywhere.
-pub static NONSENDING_SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+pub static NONSENDING_SINK_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| ComponentTests {
     events: &["EventsSent"],
     tagged_counters: &[
         "component_sent_events_total",
@@ -141,14 +140,15 @@ pub static NONSENDING_SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentT
 });
 
 /// The component test specification for components with multiple outputs.
-pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
-    events: &["EventsSent"],
-    tagged_counters: &[
-        "component_sent_events_total",
-        "component_sent_event_bytes_total",
-    ],
-    untagged_counters: &[],
-});
+pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: LazyLock<ComponentTests> =
+    LazyLock::new(|| ComponentTests {
+        events: &["EventsSent"],
+        tagged_counters: &[
+            "component_sent_events_total",
+            "component_sent_event_bytes_total",
+        ],
+        untagged_counters: &[],
+    });
 
 impl ComponentTests {
     /// Run the test specification, and assert that all tests passed.
@@ -253,7 +253,7 @@ impl ComponentTester {
 
 /// Runs and returns a future and asserts that the provided test specification passes.
 pub async fn assert_source<T>(
-    tests: &Lazy<ComponentTests>,
+    tests: &LazyLock<ComponentTests>,
     tags: &[&str],
     f: impl Future<Output = T>,
 ) -> T {
@@ -347,7 +347,7 @@ pub async fn run_and_assert_source_advanced<SC>(
     setup: impl FnOnce(&mut SourceContext),
     timeout: Option<Duration>,
     event_count: Option<usize>,
-    tests: &Lazy<ComponentTests>,
+    tests: &LazyLock<ComponentTests>,
     tags: &[&str],
 ) -> Vec<Event>
 where

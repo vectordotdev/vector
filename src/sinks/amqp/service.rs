@@ -22,7 +22,7 @@ pub(super) struct AmqpRequest {
 }
 
 impl AmqpRequest {
-    pub(super) fn new(
+    pub(super) const fn new(
         body: Bytes,
         exchange: String,
         routing_key: String,

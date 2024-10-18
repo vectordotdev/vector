@@ -4,13 +4,13 @@ remap: functions: parse_influxdb: {
 	category: "Parse"
 	description: """
 		Parses the `value` as an [InfluxDB line protocol](https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/)
-		string, producing a list of Vector-compatible metrics".
+		string, producing a list of Vector-compatible metrics.
 		"""
 	notices: [
 		"""
-			    This function will return a log event with the shape of a Vector-compatible metric, but not a metric event itself.
-			    You will likely want to pipe the output of this function through a `log_to_metric` transform with the option `all_metrics`
-				set to `true` to convert the metric-shaped log events to metric events so _real_ metrics are produced.
+			This function will return a log event with the shape of a Vector-compatible metric, but not a metric event itself.
+			You will likely want to pipe the output of this function through a `log_to_metric` transform with the option `all_metrics`
+			set to `true` to convert the metric-shaped log events to metric events so _real_ metrics are produced.
 			""",
 		"""
 			The only metric type that is produced is a `gauge`. Each metric name is prefixed with the `measurement` field, followed

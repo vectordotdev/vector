@@ -1,4 +1,4 @@
-See [DEPRECATION.md](docs/DEPRECATION.md#process) for the process for updating this file.
+See [DEPRECATION.md](/docs/DEPRECATION.md#process) for the process for updating this file.
 
 The format for each entry should be: `<version> <identifier> <description>`.
 

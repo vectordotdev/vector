@@ -101,10 +101,16 @@ pub struct SimpleHttpConfig {
 
     /// A list of URL query parameters to include in the log event.
     ///
+    /// Accepts the wildcard (`*`) character for query parameters matching a specified pattern.
+    ///
+    /// Specifying "*" results in all query parameters included in the log event.
+    ///
     /// These override any values included in the body with conflicting names.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "application"))]
     #[configurable(metadata(docs::examples = "source"))]
+    #[configurable(metadata(docs::examples = "param*"))]
+    #[configurable(metadata(docs::examples = "*"))]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
@@ -306,7 +312,7 @@ const fn default_http_response_code() -> StatusCode {
 }
 
 /// Removes duplicates from the list, and logs a `warn!()` for each duplicate removed.
-fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
+pub fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> {
     list.sort();
 
     let mut dedup = false;
@@ -332,12 +338,12 @@ fn socket_addr_to_ip_string(addr: &SocketAddr) -> String {
 }
 
 #[derive(Clone)]
-enum HttpConfigParamKind {
+pub enum HttpConfigParamKind {
     Glob(glob::Pattern),
     Exact(String),
 }
 
-fn build_param_matcher(list: &[String]) -> crate::Result<Vec<HttpConfigParamKind>> {
+pub fn build_param_matcher(list: &[String]) -> crate::Result<Vec<HttpConfigParamKind>> {
     list.iter()
         .map(|s| match s.contains('*') {
             true => Ok(HttpConfigParamKind::Glob(glob::Pattern::new(s)?)),
@@ -355,7 +361,10 @@ impl SourceConfig for SimpleHttpConfig {
 
         let source = SimpleHttpSource {
             headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"))?,
-            query_parameters: remove_duplicates(self.query_parameters.clone(), "query_parameters"),
+            query_parameters: build_param_matcher(&remove_duplicates(
+                self.query_parameters.clone(),
+                "query_parameters",
+            ))?,
             path_key: self.path_key.clone(),
             host_key: self.host_key.clone(),
             decoder,
@@ -403,7 +412,7 @@ impl SourceConfig for SimpleHttpConfig {
 #[derive(Clone)]
 struct SimpleHttpSource {
     headers: Vec<HttpConfigParamKind>,
-    query_parameters: Vec<String>,
+    query_parameters: Vec<HttpConfigParamKind>,
     path_key: OptionalValuePath,
     host_key: OptionalValuePath,
     decoder: Decoder,
@@ -647,7 +656,7 @@ mod tests {
 
     async fn send(address: SocketAddr, body: &str) -> u16 {
         reqwest::Client::new()
-            .post(&format!("http://{}/", address))
+            .post(format!("http://{}/", address))
             .body(body.to_owned())
             .send()
             .await
@@ -658,7 +667,7 @@ mod tests {
 
     async fn send_with_headers(address: SocketAddr, body: &str, headers: HeaderMap) -> u16 {
         reqwest::Client::new()
-            .post(&format!("http://{}/", address))
+            .post(format!("http://{}/", address))
             .headers(headers)
             .body(body.to_owned())
             .send()
@@ -670,7 +679,7 @@ mod tests {
 
     async fn send_with_query(address: SocketAddr, body: &str, query: &str) -> u16 {
         reqwest::Client::new()
-            .post(&format!("http://{}?{}", address, query))
+            .post(format!("http://{}?{}", address, query))
             .body(body.to_owned())
             .send()
             .await
@@ -681,7 +690,7 @@ mod tests {
 
     async fn send_with_path(address: SocketAddr, body: &str, path: &str) -> u16 {
         reqwest::Client::new()
-            .post(&format!("http://{}{}", address, path))
+            .post(format!("http://{}{}", address, path))
             .body(body.to_owned())
             .send()
             .await
@@ -692,9 +701,8 @@ mod tests {
 
     async fn send_request(address: SocketAddr, method: &str, body: &str, path: &str) -> u16 {
         let method = Method::from_bytes(method.to_owned().as_bytes()).unwrap();
-        format!("method: {}", method.as_str());
         reqwest::Client::new()
-            .request(method, &format!("http://{}{}", address, path))
+            .request(method, format!("http://{address}{path}"))
             .body(body.to_owned())
             .send()
             .await
@@ -705,7 +713,7 @@ mod tests {
 
     async fn send_bytes(address: SocketAddr, body: Vec<u8>, headers: HeaderMap) -> u16 {
         reqwest::Client::new()
-            .post(&format!("http://{}/", address))
+            .post(format!("http://{address}/"))
             .headers(headers)
             .body(body)
             .send()
@@ -1184,6 +1192,44 @@ mod tests {
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
             assert_eq!(log["absent"], Value::Null);
+            assert_event_metadata(log).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn http_query_wildcard() {
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec!["*".to_string()],
+                "http_path",
+                "remote_ip",
+                "/",
+                "POST",
+                StatusCode::OK,
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::default().into()),
+            )
+            .await;
+
+            spawn_ok_collect_n(
+                send_with_query(addr, "{\"key1\":\"value1\"}", "source=staging&region=gb"),
+                rx,
+                1,
+            )
+            .await
+        })
+        .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["key1"], "value1".into());
+            assert_eq!(log["source"], "staging".into());
+            assert_eq!(log["region"], "gb".into());
             assert_event_metadata(log).await;
         }
     }

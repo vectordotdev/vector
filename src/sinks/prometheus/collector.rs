@@ -301,7 +301,7 @@ impl StringCollector {
         let mut result = String::with_capacity(key.len() + value.len() + 3);
         result.push_str(key);
         result.push_str("=\"");
-        while let Some(i) = value.find(|ch| ch == '\\' || ch == '"') {
+        while let Some(i) = value.find(['\\', '"']) {
             result.push_str(&value[..i]);
             result.push('\\');
             // Ugly but works because we know the character at `i` is ASCII
@@ -943,9 +943,11 @@ mod tests {
     }
 
     /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
+    ///
     /// > Label names MUST be unique within a LabelSet.
-    /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
-    /// we only publish the last tag in the list.
+    ///
+    /// Prometheus itself will reject the metric with an error. Largely to remain backward
+    /// compatible with older versions of Vector, we only publish the last tag in the list.
     #[test]
     fn encodes_duplicate_tags() {
         let tags = metric_tags!(
