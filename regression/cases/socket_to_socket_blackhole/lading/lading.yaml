@@ -13,4 +13,4 @@ blackhole:
 
 target_metrics:
   - prometheus: # internal telemetry
-      uri: "http://127.0.0.1:9090/telemetry"
+      uri: "http://127.0.0.1:9090/metrics"
