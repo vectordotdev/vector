@@ -139,9 +139,9 @@ clap = { version = "4.5.20", default-features = false, features = ["derive", "er
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.1", default-features = false }
 indexmap = { version = "2.6.0", default-features = false, features = ["serde", "std"] }
-metrics = "0.23.0"
-metrics-tracing-context = { version = "0.16.0", default-features = false }
-metrics-util = { version = "0.17.0", default-features = false, features = ["registry"] }
+metrics = "0.24.0"
+metrics-tracing-context = { version = "0.17.0", default-features = false }
+metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 pin-project = { version = "1.1.6", default-features = false }
 proptest = { version = "1.5" }
 proptest-derive = { version = "0.4.0" }
