@@ -133,7 +133,7 @@ impl DatadogLogsConfig {
         let protocol = self.get_protocol(dd_common);
 
         let sink = LogSinkBuilder::new(encoding, service, default_api_key, batch, protocol)
-            .compression(Compression::zstd_default())
+            .compression(self.compression.unwrap_or_default())
             .build();
 
         Ok(VectorSink::from_event_streamsink(sink))
