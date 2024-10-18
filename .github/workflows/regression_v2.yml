@@ -1,0 +1,74 @@
+name: "Pavlos Regression Check"
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline-sha:
+        description: "The SHA to use as the baseline (optional)"
+        required: false
+      comparison-sha:
+        description: "The SHA to use for comparison (optional)"
+        required: false
+
+jobs:
+  resolve-shas:
+    runs-on: ubuntu-latest
+    outputs:
+      baseline-sha: ${{ steps.set_shas.outputs.baseline_sha }}
+      comparison-sha: ${{ steps.set_shas.outputs.comparison_sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set SHAs
+        id: set_shas
+        run: |
+          if [ -z "${{ github.event.inputs.baseline-sha }}" ]; then
+            BASELINE_SHA=$(git rev-list -n 1 --before="24 hours ago" origin/master)
+            echo "Using baseline SHA from 24 hours ago: $BASELINE_SHA"
+          else
+            BASELINE_SHA="${{ github.event.inputs.baseline-sha }}"
+            echo "Using provided baseline SHA: $BASELINE_SHA"
+          fi
+          
+          if [ -z "${{ github.event.inputs.comparison-sha }}" ]; then
+            COMPARISON_SHA=$(git rev-parse origin/master)
+            echo "Using current HEAD for comparison SHA: $COMPARISON_SHA"
+          else
+            COMPARISON_SHA="${{ github.event.inputs.comparison-sha }}"
+            echo "Using provided comparison SHA: $COMPARISON_SHA"
+          fi
+          
+          echo "baseline_sha=$BASELINE_SHA" >> $GITHUB_OUTPUT
+          echo "comparison_sha=$COMPARISON_SHA" >> $GITHUB_OUTPUT
+
+      - name: Validate SHAs
+        id: validate_shas
+        run: |
+          BASELINE_SHA="${{ steps.set_shas.outputs.baseline_sha }}"
+          COMPARISON_SHA="${{ steps.set_shas.outputs.comparison_sha }}"
+          
+          if git cat-file -e "${BASELINE_SHA}^{commit}"; then
+            echo "Baseline SHA is valid."
+          else
+            echo "Invalid baseline SHA: $BASELINE_SHA."
+            exit 1
+          fi
+          
+          if git cat-file -e "${COMPARISON_SHA}^{commit}"; then
+            echo "Comparison SHA is valid."
+          else
+            echo "Invalid comparison SHA: $COMPARISON_SHA."
+            exit 1
+          fi
+          
+          echo "Both baseline-sha and comparison-sha are valid."
+
+  display-results:
+    runs-on: ubuntu-latest
+    needs: resolve-shas
+    steps:
+      - name: Display Results
+        run: |
+          echo "Baseline SHA: ${{ needs.resolve-shas.outputs.baseline-sha }}"
+          echo "Comparison SHA: ${{ needs.resolve-shas.outputs.comparison-sha }}"
