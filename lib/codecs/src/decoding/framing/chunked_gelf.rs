@@ -17,14 +17,9 @@ use vector_config::configurable_component;
 const GELF_MAGIC: &[u8] = &[0x1e, 0x0f];
 const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
 const DEFAULT_TIMEOUT_SECS: f64 = 5.0;
-const DEFAULT_PENDING_MESSAGES_LIMIT: usize = 1000;
 
 const fn default_timeout_secs() -> f64 {
     DEFAULT_TIMEOUT_SECS
-}
-
-const fn default_pending_messages_limit() -> usize {
-    DEFAULT_PENDING_MESSAGES_LIMIT
 }
 
 /// Config used to build a `ChunkedGelfDecoder`.
@@ -61,13 +56,11 @@ pub struct ChunkedGelfDecoderOptions {
     pub timeout_secs: f64,
 
     /// The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
-    /// dropping chunks of new messages. This limit ensures the memory usage of the decoder's state is bounded.
-    #[serde(
-        default = "default_pending_messages_limit",
-        skip_serializing_if = "vector_core::serde::is_default"
-    )]
-    #[derivative(Default(value = "default_pending_messages_limit()"))]
-    pub pending_messages_limit: usize,
+    /// dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
+    /// If this option is not set, the decoder does not limit the number of pending messages and the memory usage
+    /// of pending messages can grow unbounded. This matches Graylog Server's behavior.
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    pub pending_messages_limit: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -173,12 +166,12 @@ pub struct ChunkedGelfDecoder {
     bytes_decoder: BytesDecoder,
     state: Arc<Mutex<HashMap<u64, MessageState>>>,
     timeout: Duration,
-    pending_messages_limit: usize,
+    pending_messages_limit: Option<usize>,
 }
 
 impl ChunkedGelfDecoder {
     /// Creates a new `ChunkedGelfDecoder`.
-    pub fn new(timeout_secs: f64, pending_messages_limit: usize) -> Self {
+    pub fn new(timeout_secs: f64, pending_messages_limit: Option<usize>) -> Self {
         Self {
             bytes_decoder: BytesDecoder::new(),
             state: Arc::new(Mutex::new(HashMap::new())),
@@ -235,14 +228,16 @@ impl ChunkedGelfDecoder {
 
         let mut state_lock = self.state.lock().expect("poisoned lock");
 
-        ensure!(
-            state_lock.len() < self.pending_messages_limit,
-            PendingMessagesLimitReachedSnafu {
-                message_id,
-                sequence_number,
-                pending_messages_limit: self.pending_messages_limit
-            }
-        );
+        if let Some(pending_messages_limit) = self.pending_messages_limit {
+            ensure!(
+                state_lock.len() < pending_messages_limit,
+                PendingMessagesLimitReachedSnafu {
+                    message_id,
+                    sequence_number,
+                    pending_messages_limit
+                }
+            );
+        }
 
         let message_state = state_lock.entry(message_id).or_insert_with(|| {
             // We need to spawn a task that will clear the message state after a certain time
@@ -312,7 +307,7 @@ impl ChunkedGelfDecoder {
 
 impl Default for ChunkedGelfDecoder {
     fn default() -> Self {
-        Self::new(DEFAULT_TIMEOUT_SECS, DEFAULT_PENDING_MESSAGES_LIMIT)
+        Self::new(DEFAULT_TIMEOUT_SECS, None)
     }
 }
 
@@ -568,7 +563,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[traced_test]
     async fn decode_chunk_with_invalid_header() {
         let mut src = BytesMut::new();
         src.extend_from_slice(GELF_MAGIC);
@@ -587,7 +581,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[traced_test]
     async fn decode_chunk_with_invalid_total_chunks() {
         let message_id = 1u64;
         let sequence_number = 1u8;
@@ -606,7 +599,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[traced_test]
     async fn decode_chunk_with_invalid_sequence_number() {
         let message_id = 1u64;
         let total_chunks = 2u8;
@@ -626,7 +618,6 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    #[traced_test]
     async fn decode_when_reached_pending_messages_limit(
         two_chunks_message: ([BytesMut; 2], String),
         three_chunks_message: ([BytesMut; 3], String),
@@ -634,7 +625,8 @@ mod tests {
         let pending_messages_limit = 1;
         let (mut two_chunks, _) = two_chunks_message;
         let (mut three_chunks, _) = three_chunks_message;
-        let mut decoder = ChunkedGelfDecoder::new(DEFAULT_TIMEOUT_SECS, pending_messages_limit);
+        let mut decoder =
+            ChunkedGelfDecoder::new(DEFAULT_TIMEOUT_SECS, Some(pending_messages_limit));
 
         let frame = decoder.decode_eof(&mut two_chunks[0]).unwrap();
         assert!(frame.is_none());
@@ -652,7 +644,6 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    #[traced_test]
     async fn decode_chunk_with_different_total_chunks() {
         let message_id = 1u64;
         let sequence_number = 0u8;
