@@ -11,7 +11,7 @@ use std::time::Duration;
 use tokio;
 use tokio::task::JoinHandle;
 use tokio_util::codec::Decoder;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 use vector_config::configurable_component;
 
 const GELF_MAGIC: &[u8] = &[0x1e, 0x0f];
@@ -342,6 +342,7 @@ mod tests {
 
     use super::*;
     use bytes::{BufMut, BytesMut};
+    use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
     use rstest::{fixture, rstest};
     use tracing_test::traced_test;
 
@@ -522,6 +523,60 @@ mod tests {
         assert_eq!(frame, Some(Bytes::from(expected_chunked_message)));
     }
 
+    #[tokio::test]
+    async fn decode_shuffled_messages() {
+        let mut rng = SmallRng::seed_from_u64(420);
+        let total_chunks = 100u8;
+        let first_message_id = 1u64;
+        let first_payload = "first payload";
+        let second_message_id = 2u64;
+        let second_payload = "second payload";
+        let first_message_chunks = (0..total_chunks).map(|sequence_number| {
+            create_chunk(
+                first_message_id,
+                sequence_number,
+                total_chunks,
+                first_payload,
+            )
+        });
+        let second_message_chunks = (0..total_chunks).map(|sequence_number| {
+            create_chunk(
+                second_message_id,
+                sequence_number,
+                total_chunks,
+                second_payload,
+            )
+        });
+        let expected_first_message = first_payload.repeat(total_chunks as usize);
+        let expected_second_message = second_payload.repeat(total_chunks as usize);
+        let mut merged_chunks = first_message_chunks
+            .chain(second_message_chunks)
+            .collect::<Vec<_>>();
+        merged_chunks.shuffle(&mut rng);
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        let mut count = 0;
+        let first_retrieved_message = loop {
+            assert!(count < 2 * total_chunks as usize);
+            if let Some(message) = decoder.decode_eof(&mut merged_chunks[count]).unwrap() {
+                break message;
+            } else {
+                count = count + 1;
+            }
+        };
+        let second_retrieved_message = loop {
+            assert!(count < 2 * total_chunks as usize);
+            if let Some(message) = decoder.decode_eof(&mut merged_chunks[count]).unwrap() {
+                break message;
+            } else {
+                count = count + 1;
+            }
+        };
+
+        assert_eq!(second_retrieved_message, expected_first_message);
+        assert_eq!(first_retrieved_message, expected_second_message);
+    }
+
     #[rstest]
     #[tokio::test(start_paused = true)]
     #[traced_test]
@@ -615,7 +670,7 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    async fn decode_when_reached_pending_messages_limit(
+    async fn decode_reached_pending_messages_limit(
         two_chunks_message: ([BytesMut; 2], String),
         three_chunks_message: ([BytesMut; 3], String),
     ) {
@@ -666,7 +721,7 @@ mod tests {
     #[rstest]
     #[tokio::test]
     #[traced_test]
-    async fn decode_when_duplicated_chunk(two_chunks_message: ([BytesMut; 2], String)) {
+    async fn decode_duplicated_chunk(two_chunks_message: ([BytesMut; 2], String)) {
         let (mut chunks, _) = two_chunks_message;
         let mut decoder = ChunkedGelfDecoder::default();
 
