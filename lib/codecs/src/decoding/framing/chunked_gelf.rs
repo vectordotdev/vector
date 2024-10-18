@@ -47,7 +47,7 @@ impl ChunkedGelfDecoderConfig {
 #[derivative(Default)]
 pub struct ChunkedGelfDecoderOptions {
     /// The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
-    /// decoder drops all the received chunks of the incomplete message and starts over.
+    /// decoder drops all the received chunks of the timed out message.
     #[serde(default = "default_timeout_secs")]
     #[derivative(Default(value = "default_timeout_secs()"))]
     pub timeout_secs: f64,
