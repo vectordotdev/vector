@@ -11,7 +11,7 @@ use std::time::Duration;
 use tokio;
 use tokio::task::JoinHandle;
 use tokio_util::codec::Decoder;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use vector_config::configurable_component;
 
 const GELF_MAGIC: &[u8] = &[0x1e, 0x0f];
@@ -267,7 +267,7 @@ impl ChunkedGelfDecoder {
         );
 
         if message_state.is_chunk_present(sequence_number) {
-            info!(
+            debug!(
                 message_id = message_id,
                 sequence_number = sequence_number,
                 internal_log_rate_limit = true,
