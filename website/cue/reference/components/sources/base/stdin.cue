@@ -283,15 +283,17 @@ base: components: sources: stdin: configuration: {
 			chunked_gelf: {
 				description:   "Options for the chunked GELF decoder."
 				relevant_when: "method = \"chunked_gelf\""
-				required:      true
+				required:      false
 				type: object: options: {
 					pending_messages_limit: {
 						description: """
 																The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
-																dropping chunks of new messages. This limit ensures the memory usage of the decoder's state is bounded.
+																dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
+																If this option is not set, the decoder does not limit the number of pending messages and the memory usage
+																of pending messages can grow unbounded. This matches Graylog Server's behavior.
 																"""
 						required: false
-						type: uint: default: 1000
+						type: uint: {}
 					}
 					timeout_secs: {
 						description: """
