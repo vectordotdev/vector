@@ -561,7 +561,7 @@ mod tests {
             if let Some(message) = decoder.decode_eof(&mut merged_chunks[count]).unwrap() {
                 break message;
             } else {
-                count = count + 1;
+                count += 1;
             }
         };
         let second_retrieved_message = loop {
@@ -569,7 +569,7 @@ mod tests {
             if let Some(message) = decoder.decode_eof(&mut merged_chunks[count]).unwrap() {
                 break message;
             } else {
-                count = count + 1;
+                count += 1
             }
         };
 
