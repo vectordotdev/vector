@@ -3066,9 +3066,9 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "0.10.1"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7eefe29e8dd614abbee51a1616654cab123c4c56850ab83f5b7f1e1f9977bf7c"
+checksum = "64008666d9f3b6a88a63cd28ad8f3a5a859b8037e11bfb680c1b24945ea1c28d"
 dependencies = [
  "bytes 1.7.2",
  "futures-util",
@@ -4436,7 +4436,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.7",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.40",
@@ -6239,9 +6239,9 @@ dependencies = [
 
 [[package]]
 name = "octseq"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ed2eaec452d98ccc1c615dd843fd039d9445f2fb4da114ee7e6af5fcb68be98"
+checksum = "126c3ca37c9c44cec575247f43a3e4374d8927684f129d2beeb0d2cef262fe12"
 dependencies = [
  "bytes 1.7.2",
  "serde",
@@ -7243,7 +7243,7 @@ checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes 1.7.2",
  "heck 0.5.0",
- "itertools 0.12.1",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "once_cell",
@@ -7276,7 +7276,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81bddcdb20abf9501610992b6759a4c888aef7d1a7247ef75e2404275ac24af1"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.11.0",
  "proc-macro2 1.0.88",
  "quote 1.0.37",
  "syn 2.0.79",
@@ -7289,7 +7289,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.11.0",
  "proc-macro2 1.0.88",
  "quote 1.0.37",
  "syn 2.0.79",
@@ -11036,7 +11036,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.19.0"
-source = "git+https://github.com/vectordotdev/vrl?branch=main#dc0311d03bd21c73c359a719b5cbdd17f01f63f3"
+source = "git+https://github.com/vectordotdev/vrl?branch=main#3e1c7b09feed72369dc11352f2dfb00c65fcb00b"
 dependencies = [
  "aes",
  "ansi_term",
