@@ -2288,6 +2288,7 @@ dependencies = [
  "cfg-if",
  "itoa",
  "ryu",
+ "serde",
  "static_assertions",
 ]
 
@@ -11035,7 +11036,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.19.0"
-source = "git+https://github.com/vectordotdev/vrl?branch=main#3e1c7b09feed72369dc11352f2dfb00c65fcb00b"
+source = "git+https://github.com/vectordotdev/vrl?rev=018c28e1d6c7b67cb467549ec8d1ebf3f5230780#018c28e1d6c7b67cb467549ec8d1ebf3f5230780"
 dependencies = [
  "aes",
  "ansi_term",
@@ -11055,6 +11056,7 @@ dependencies = [
  "clap",
  "codespan-reporting",
  "community-id",
+ "compact_str",
  "convert_case 0.6.0",
  "crypto_secretbox",
  "csv",

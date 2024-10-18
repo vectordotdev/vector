@@ -156,7 +156,7 @@ tonic = { version = "0.11", default-features = false, features = ["transport", "
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 uuid = { version = "1.11.0", features = ["v4", "v7", "serde"] }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
-vrl = { git = "https://github.com/vectordotdev/vrl", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { git = "https://github.com/vectordotdev/vrl", rev = "018c28e1d6c7b67cb467549ec8d1ebf3f5230780", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
 pin-project.workspace = true
@@ -408,7 +408,6 @@ tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
-
 wiremock = "0.6.2"
 zstd = { version = "0.13.0", default-features = false }
 
