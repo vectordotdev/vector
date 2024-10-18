@@ -34,7 +34,7 @@ pub(super) fn build_pod_logs_directory(
 ///
 /// Inspired by <https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L186>
 pub(super) fn parse_log_file_path(path: &str) -> Option<LogFileInfo<'_>> {
-    let mut components = path.rsplit('/');
+    let mut components = path.rsplit(std::path::MAIN_SEPARATOR);
 
     let _log_file_name = components.next()?;
     let container_name = components.next()?;
