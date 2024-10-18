@@ -374,7 +374,7 @@ base: components: sources: gcp_pubsub: configuration: {
 																The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
 																dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
 																If this option is not set, the decoder does not limit the number of pending messages and the memory usage
-																of pending messages can grow unbounded. This matches Graylog Server's behavior.
+																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
 																"""
 						required: false
 						type: uint: {}
@@ -382,7 +382,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					timeout_secs: {
 						description: """
 																The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
-																decoder drops all the received chunks of the incomplete message and starts over.
+																decoder drops all the received chunks of the timed out message.
 																"""
 						required: false
 						type: float: default: 5.0
