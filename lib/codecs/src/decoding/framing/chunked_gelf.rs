@@ -55,7 +55,7 @@ pub struct ChunkedGelfDecoderOptions {
     /// The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
     /// dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
     /// If this option is not set, the decoder does not limit the number of pending messages and the memory usage
-    /// of pending messages can grow unbounded. This matches Graylog Server's behavior.
+    /// of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub pending_messages_limit: Option<usize>,
 }
