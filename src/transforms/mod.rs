@@ -12,6 +12,8 @@ pub mod aggregate;
 pub mod aws_ec2_metadata;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
+#[cfg(feature = "transforms-gate")]
+pub mod gate;
 #[cfg(feature = "transforms-log_to_metric")]
 pub mod log_to_metric;
 #[cfg(feature = "transforms-lua")]
