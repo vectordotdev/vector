@@ -185,7 +185,7 @@ pub struct RootOpts {
 
     /// Set runtime allocation tracing
     #[cfg(feature = "allocation-tracing")]
-    #[arg(long, env = "ALLOCATION_TRACING", default_value = "false")]
+    #[arg(long, env = "ALLOCATION_TRACING", default_value = "true")]
     pub allocation_tracing: bool,
 
     /// Set allocation tracing reporting rate in milliseconds.
