@@ -87,7 +87,7 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
 
     let mut response_lines: Vec<Vec<String>> = Vec::new();
     for o in objects {
-        let bs = op.read(o.path()).await.unwrap();
+        let bs = op.read(o.path()).await.unwrap().to_vec();
         let buf_read = BufReader::new(Cursor::new(bs));
 
         response_lines.push(buf_read.lines().map(|l| l.unwrap()).collect());
