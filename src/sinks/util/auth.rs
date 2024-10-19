@@ -3,7 +3,7 @@ pub enum Auth {
     Basic(crate::http::Auth),
     #[cfg(feature = "aws-core")]
     Aws {
-        credentials_provider: aws_credential_types::provider::SharedCredentialsProvider,
+        credentials_provider: Option<aws_credential_types::provider::SharedCredentialsProvider>,
         region: aws_types::region::Region,
     },
 }
