@@ -195,6 +195,7 @@ scopes:
   - axiom sink # Anything `axiom` sink related
   - azure_blob sink # Anything `azure_blob` sink related
   - azure_monitor_logs sink # Anything `azure_monitor_logs` sink related
+  - better_stack sink # Anything `better_stack` sink related
   - blackhole sink # Anything `blackhole` sink related
   - clickhouse sink # Anything `clickhouse` sink related
   - console sink # Anything `console` sink related
