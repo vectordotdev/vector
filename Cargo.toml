@@ -773,6 +773,7 @@ sinks-mqtt = ["dep:rumqttc"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
+sinks-openobserve = ["sinks-http"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "dep:lru"]
@@ -822,6 +823,7 @@ all-integration-tests = [
   "nats-integration-tests",
   "nginx-integration-tests",
   "opentelemetry-integration-tests",
+  "openobserve-integration-tests",
   "postgresql_metrics-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
@@ -886,6 +888,7 @@ mqtt-integration-tests = ["sinks-mqtt"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 opentelemetry-integration-tests = ["sources-opentelemetry", "dep:prost"]
+openobserve-integration-tests = ["sinks-openobserve"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "sinks-influxdb"]
 pulsar-integration-tests = ["sinks-pulsar", "sources-pulsar"]

@@ -80,6 +80,8 @@ pub mod mqtt;
 pub mod nats;
 #[cfg(feature = "sinks-new_relic")]
 pub mod new_relic;
+#[cfg(feature = "sinks-openobserve")]
+pub mod openobserve;
 #[cfg(feature = "sinks-webhdfs")]
 pub mod opendal_common;
 #[cfg(feature = "sinks-papertrail")]
