@@ -1,4 +1,7 @@
-name: "Semantic PR"
+# This is a GitHub Action that ensures that the PR titles match the Conventional Commits spec.
+# See: https://www.conventionalcommits.org/en/v1.0.0/
+
+name: "PR Title Semantic Check"
 
 on:
   pull_request:
