@@ -958,7 +958,7 @@ transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduc
 codecs-benches = []
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb"]
-proptest = ["dep:proptest", "dep:proptest-derive"]
+proptest = ["dep:proptest", "dep:proptest-derive", "vrl/proptest"]
 
 [[bench]]
 name = "default"
