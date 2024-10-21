@@ -3,11 +3,26 @@ package metadata
 components: sinks: openobserve: {
 	title: "OpenObserve"
 
+	classes: {
+		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
+		egress_method: "batch"
+		service_providers: ["OpenObserve"]
+		stateful: false
+	}
+
 	features: {
-		healthcheck: {
-			enabled: false
-		}
+		acknowledgements: true
+		auto_generated:   true
+		healthcheck: enabled: true
 		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    10_000_000
+				timeout_secs: 1.0
+			}
 			compression: {
 				enabled: true
 				default: "gzip"
@@ -23,38 +38,47 @@ components: sinks: openobserve: {
 					default: "rfc3339"
 				}
 			}
+			proxy: enabled: true
+			request: {
+				enabled: true
+				headers: true
+			}
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+				enabled_by_scheme:      true
+			}
+			to: {
+				service: services.openobserve
+
+				interface: {
+					socket: {
+						api: {
+							title: "OpenObserve HTTP API"
+							url:   urls.openobserve
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
+			}
 		}
 	}
 
-	configuration: {
-		type: "http"
-		inputs: ["source_or_transform_id"]
-		uri: {
-			description: "The OpenObserve endpoint to send data to."
-			required: true
-			type: string: default: "http://localhost:5080/api/default/default/_json"
-		}
-		method: {
-			description: "The HTTP method to use."
-			required: true
-			type: string: default: "post"
-		}
-		auth: {
-			strategy: {
-				description: "The authentication strategy."
-				required: true
-				type: string: default: "basic"
-			}
-			user: {
-				description: "The username for basic authentication."
-				required: true
-				type: string: default: "test@example.com"
-			}
-			password: {
-				description: "The password for basic authentication."
-				required: true
-				type: string: default: "your_ingestion_password"
-			}
-		}
+	support: {
+		requirements: []
+		warnings: []
+		notices: []
+	}
+
+	configuration: base.components.sinks.openobserve.configuration
+
+	input: {
+		logs: true
+		metrics: false
+		traces: false
 	}
 }
