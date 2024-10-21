@@ -82,7 +82,7 @@ jobs:
             COMPARISON_SHA="${{ github.event.inputs.comparison-sha }}"
             echo "Using provided comparison SHA: ${COMPARISON_SHA}"
           fi
-          
+
           # Validate comparison SHA
           if [ -n "${COMPARISON_SHA}" ] && git cat-file -e "${COMPARISON_SHA}^{commit}"; then
             echo "Comparison SHA is valid."
@@ -97,7 +97,7 @@ jobs:
 
           echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
           echo "COMPARISON_SHA=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
-          
+
           echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
           echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
 
