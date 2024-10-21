@@ -387,7 +387,7 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int opentelemetry
-      
+
       - name: openobserve
         if: ${{ startsWith(github.event.review.body, '/ci-run-integration-openobserve')
           || startsWith(github.event.review.body, '/ci-run-integration-all')
