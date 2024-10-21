@@ -233,7 +233,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
 ///
 /// * `criterion` - Criterion benchmark manager
 /// * `benchmark_name` - The name of the benchmark
-/// * `configs' - Vec of tuples of (config_name, config_snippet)
+/// * `configs` - Vec of tuples of (config_name, config_snippet)
 /// * `input_name` - Name of the input to the first transform
 /// * `output_name` - Name of the last transform
 /// * `input` - Line to use as input

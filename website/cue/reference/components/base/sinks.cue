@@ -76,6 +76,34 @@ base: components: sinks: configuration: {
 			}
 		}
 	}
+	graph: {
+		description: """
+			Extra graph configuration
+
+			Configure output for component when generated with graph command
+			"""
+		required: false
+		type: object: options: node_attributes: {
+			description: """
+				Node attributes to add to this component's node in resulting graph
+
+				They are added to the node as provided
+				"""
+			required: false
+			type: object: {
+				examples: [{
+					color: "red"
+					name:  "Example Node"
+					width: "5.0"
+				}]
+				options: "*": {
+					description: "A single graph node attribute in graphviz DOT language."
+					required:    true
+					type: string: {}
+				}
+			}
+		}
+	}
 	healthcheck: {
 		description: "Healthcheck configuration."
 		required:    false
@@ -119,7 +147,7 @@ base: components: sinks: configuration: {
 			Configure to proxy traffic through an HTTP(S) proxy when making external requests.
 
 			Similar to common proxy configuration convention, you can set different proxies
-			to use based on the type of traffic being proxied, as well as set specific hosts that
+			to use based on the type of traffic being proxied. You can also set specific hosts that
 			should not be proxied.
 			"""
 		required: false

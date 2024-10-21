@@ -77,7 +77,7 @@ pub(super) struct Inner {
 
     /// An internal vector id that can be used to identify this event across all components.
     #[derivative(PartialEq = "ignore")]
-    pub(crate) source_event_id: Uuid,
+    pub(crate) source_event_id: Option<Uuid>,
 }
 
 /// Metric Origin metadata for submission to Datadog.
@@ -236,7 +236,7 @@ impl EventMetadata {
     }
 
     /// Returns a reference to the event id.
-    pub fn source_event_id(&self) -> Uuid {
+    pub fn source_event_id(&self) -> Option<Uuid> {
         self.0.source_event_id
     }
 }
@@ -253,7 +253,7 @@ impl Default for Inner {
             upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
-            source_event_id: Uuid::now_v7(),
+            source_event_id: Some(Uuid::now_v7()),
         }
     }
 }
@@ -333,7 +333,7 @@ impl EventMetadata {
 
     /// Replaces the existing `source_event_id` with the given one.
     #[must_use]
-    pub fn with_source_event_id(mut self, source_event_id: Uuid) -> Self {
+    pub fn with_source_event_id(mut self, source_event_id: Option<Uuid>) -> Self {
         self.get_mut().source_event_id = source_event_id;
         self
     }
@@ -346,6 +346,17 @@ impl EventMetadata {
         let other = other.into_owned();
         inner.finalizers.merge(other.finalizers);
         inner.secrets.merge(other.secrets);
+
+        // Update `source_event_id` if necessary.
+        match (inner.source_event_id, other.source_event_id) {
+            (None, Some(id)) => {
+                inner.source_event_id = Some(id);
+            }
+            (Some(uuid1), Some(uuid2)) if uuid2 < uuid1 => {
+                inner.source_event_id = Some(uuid2);
+            }
+            _ => {} // Keep the existing value.
+        };
     }
 
     /// Update the finalizer(s) status.
@@ -543,5 +554,23 @@ mod test {
         assert_eq!(a.get("key-a").unwrap().as_ref(), "value-a1");
         assert_eq!(a.get("key-b").unwrap().as_ref(), "value-b1");
         assert_eq!(a.get("key-c").unwrap().as_ref(), "value-c2");
+    }
+
+    #[test]
+    fn metadata_source_event_id_merging() {
+        let m1 = EventMetadata::default();
+        let m2 = EventMetadata::default();
+
+        {
+            let mut merged = m1.clone();
+            merged.merge(m2.clone());
+            assert_eq!(merged.source_event_id(), m1.source_event_id());
+        }
+
+        {
+            let mut merged = m2.clone();
+            merged.merge(m1.clone());
+            assert_eq!(merged.source_event_id(), m1.source_event_id());
+        }
     }
 }

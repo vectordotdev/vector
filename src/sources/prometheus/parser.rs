@@ -178,8 +178,9 @@ fn combine_tags(
 
 #[cfg(test)]
 mod test {
+    use std::sync::LazyLock;
+
     use chrono::{TimeZone, Timelike, Utc};
-    use once_cell::sync::Lazy;
     use similar_asserts::assert_eq;
     use vector_lib::assert_event_data_eq;
     use vector_lib::metric_tags;
@@ -187,7 +188,7 @@ mod test {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
 
-    static TIMESTAMP: Lazy<DateTime<Utc>> = Lazy::new(|| {
+    static TIMESTAMP: LazyLock<DateTime<Utc>> = LazyLock::new(|| {
         Utc.with_ymd_and_hms(2021, 2, 4, 4, 5, 6)
             .single()
             .and_then(|t| t.with_nanosecond(789 * 1_000_000))
