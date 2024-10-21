@@ -22,7 +22,7 @@ use crate::{
 pub struct OpenObserveConfig {
     /// The OpenObserve endpoint to send data to.
     #[configurable(metadata(docs::examples = "http://localhost:5080/api/default/default/_json"))]
-    endpoint: UriSerde,
+    uri: UriSerde,
 
     /// The user and password to authenticate with OpenObserve endpoint.
     #[configurable(derived)]
@@ -81,14 +81,13 @@ impl SinkConfig for OpenObserveConfig {
         let request = self.request.clone();
 
         // OpenObserve supports native HTTP ingest endpoint. This configuration wraps
-        // the vector HTTP sink with the necessary adjustments to send data
-        // to OpenObserve, whilst keeping the configuration simple and easy to use
-        // and maintenance of the vector axiom sink to a minimum.
-        //
+        // the vector HTTP sink to provide official support for OpenObserve. This sink will 
+        // allow maintaining the vector OpenObserve sink independent of the vector HTTP sink
+        // configuration and will allow to accomodate any future changes to the interface.
         let http_sink_config = HttpSinkConfig {
-            uri: self.endpoint.clone(),
+            uri: self.uri.clone(),
             compression: self.compression,
-            auth: self.auth.choose_one(&self.endpoint.auth)?,
+            auth: self.auth.choose_one(&self.uri.auth)?,
             method: HttpMethod::Post,
             tls: self.tls.clone(),
             request,
