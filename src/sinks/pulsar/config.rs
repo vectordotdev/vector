@@ -1,4 +1,3 @@
-use std::time::Duration;
 use crate::{
     schema,
     sinks::{
@@ -16,6 +15,7 @@ use pulsar::{
 };
 use pulsar::{error::AuthenticationError, OperationRetryOptions};
 use snafu::ResultExt;
+use std::time::Duration;
 use vector_lib::codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use vector_lib::config::DataType;
 use vector_lib::lookup::lookup_v2::OptionalTargetPath;
@@ -177,7 +177,9 @@ pub enum PulsarCompression {
 }
 
 #[configurable_component]
-#[configurable(description = "Custom connection retry options configuration for the Pulsar client.")]
+#[configurable(
+    description = "Custom connection retry options configuration for the Pulsar client."
+)]
 #[derive(Clone, Debug)]
 pub struct CustomConnectionRetryOptions {
     /// Minimum delay between connection retries.
@@ -253,15 +255,36 @@ impl PulsarSinkConfig {
 
         // Apply configuration for reconnection exponential backoff.
         let default_retry_options = ConnectionRetryOptions::default();
-        let retry_options = self.connection_retry_options.as_ref().map_or(default_retry_options.clone(), |opts| {
-            ConnectionRetryOptions {
-                min_backoff: opts.min_backoff_ms.map_or(default_retry_options.min_backoff, |ms| Duration::from_millis(ms)),
-                max_backoff: opts.max_backoff_secs.map_or(default_retry_options.max_backoff, |secs| Duration::from_secs(secs)),
-                max_retries: opts.max_retries.unwrap_or(default_retry_options.max_retries),
-                connection_timeout: opts.connection_timeout_secs.map_or(default_retry_options.connection_timeout, |secs| Duration::from_secs(secs)),
-                keep_alive: opts.keep_alive_secs.map_or(default_retry_options.keep_alive, |secs| Duration::from_secs(secs)),
-            }
-        });
+        let retry_options =
+            self.connection_retry_options
+                .as_ref()
+                .map_or(default_retry_options.clone(), |opts| {
+                    ConnectionRetryOptions {
+                        min_backoff: opts
+                            .min_backoff_ms
+                            .map_or(default_retry_options.min_backoff, |ms| {
+                                Duration::from_millis(ms)
+                            }),
+                        max_backoff: opts
+                            .max_backoff_secs
+                            .map_or(default_retry_options.max_backoff, |secs| {
+                                Duration::from_secs(secs)
+                            }),
+                        max_retries: opts
+                            .max_retries
+                            .unwrap_or(default_retry_options.max_retries),
+                        connection_timeout: opts
+                            .connection_timeout_secs
+                            .map_or(default_retry_options.connection_timeout, |secs| {
+                                Duration::from_secs(secs)
+                            }),
+                        keep_alive: opts
+                            .keep_alive_secs
+                            .map_or(default_retry_options.keep_alive, |secs| {
+                                Duration::from_secs(secs)
+                            }),
+                    }
+                });
 
         builder = builder.with_connection_retry_options(retry_options);
 
