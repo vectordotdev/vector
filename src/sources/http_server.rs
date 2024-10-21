@@ -356,8 +356,11 @@ pub fn build_param_matcher(list: &[String]) -> crate::Result<Vec<HttpConfigParam
 #[typetag::serde(name = "http_server")]
 impl SourceConfig for SimpleHttpConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = self.get_decoding_config()?.build()?;
         let log_namespace = cx.log_namespace(self.log_namespace);
+        let decoder = self
+            .get_decoding_config()?
+            .build()?
+            .with_log_namespace(log_namespace);
 
         let source = SimpleHttpSource {
             headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"))?,
