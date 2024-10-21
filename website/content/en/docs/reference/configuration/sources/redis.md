@@ -1,7 +1,7 @@
 ---
 title: Redis
 description: Collect observability data from Redis.
-kind: source
+component_kind: source
 layout: component
 tags: ["redis", "component", "source"]
 ---

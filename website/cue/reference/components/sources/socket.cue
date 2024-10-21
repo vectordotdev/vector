@@ -114,5 +114,6 @@ components: sources: socket: {
 		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total
 		connection_send_errors_total: components.sources.internal_metrics.output.metrics.connection_send_errors_total
 		connection_shutdown_total:    components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		component_received_bytes:     components.sources.internal_metrics.output.metrics.component_received_bytes
 	}
 }

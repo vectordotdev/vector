@@ -64,5 +64,37 @@ remap: functions: parse_url: {
 				fragment: null
 			}
 		},
+		{
+			title: "Parse URL with internationalized domain name"
+			source: #"""
+				parse_url!("https://www.café.com")
+				"""#
+			return: {
+				scheme:   "https"
+				username: ""
+				password: ""
+				host:     "www.xn--caf-dma.com"
+				port:     null
+				path:     "/"
+				query: {}
+				fragment: null
+			}
+		},
+		{
+			title: "Parse URL with mixed case internationalized domain name"
+			source: #"""
+				parse_url!("https://www.CAFé.com")
+				"""#
+			return: {
+				scheme:   "https"
+				username: ""
+				password: ""
+				host:     "www.xn--caf-dma.com"
+				port:     null
+				path:     "/"
+				query: {}
+				fragment: null
+			}
+		},
 	]
 }

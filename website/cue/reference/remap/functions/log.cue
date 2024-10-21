@@ -55,7 +55,7 @@ remap: functions: log: {
 			title: "Log an error"
 			input: log: field: "not an integer"
 			source: #"""
-				ts, err = to_int(.field)
+				_, err = to_int(.field)
 				if err != null {
 					log(err, level: "error")
 				}

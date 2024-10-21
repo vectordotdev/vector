@@ -218,7 +218,7 @@ components: {
 				uses_uri?: bool
 			}
 
-			exposes?:                      #FeaturesExpose
+			exposes?: #FeaturesExpose
 			send?: #FeaturesSend & {_args: Args}
 		}
 
@@ -227,8 +227,7 @@ components: {
 
 	#FeaturesAcknowledgements: bool
 
-	#FeaturesAggregate: {
-	}
+	#FeaturesAggregate: {}
 
 	#FeaturesCollect: {
 		checkpoint: {
@@ -245,8 +244,7 @@ components: {
 		tls?: #FeaturesTLS & {_args: {mode: "connect"}}
 	}
 
-	#FeaturesConvert: {
-	}
+	#FeaturesConvert: {}
 
 	#FeaturesEnrich: {
 		from: service: {
@@ -265,11 +263,9 @@ components: {
 		}
 	}
 
-	#FeaturesFilter: {
-	}
+	#FeaturesFilter: {}
 
-	#FeaturesGenerate: {
-	}
+	#FeaturesGenerate: {}
 
 	#FeaturesSendBufferBytes: {
 		enabled:        bool
@@ -327,17 +323,13 @@ components: {
 		tls: #FeaturesTLS & {_args: {mode: "accept"}}
 	}
 
-	#FeaturesReduce: {
-	}
+	#FeaturesReduce: {}
 
-	#FeaturesRoute: {
-	}
+	#FeaturesRoute: {}
 
-	#FeaturesSanitize: {
-	}
+	#FeaturesSanitize: {}
 
-	#FeaturesShape: {
-	}
+	#FeaturesShape: {}
 
 	#FeaturesSend: {
 		_args: {
@@ -1207,7 +1199,7 @@ components: {
 						}
 					}
 					type:              "counter"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_distribution: {
@@ -1220,7 +1212,7 @@ components: {
 						}
 					}
 					type:              "distribution"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_gauge: {
@@ -1233,7 +1225,7 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_histogram: {
@@ -1246,7 +1238,7 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_set: {
@@ -1259,7 +1251,7 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_summary: {
@@ -1272,7 +1264,7 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 			}
 		}

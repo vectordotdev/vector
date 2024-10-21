@@ -43,7 +43,7 @@ sinks:
   splunk_hec_metrics:
     type:     "splunk_hec_metrics"
     inputs: [ "log2metric" ]
-    endpoint: "http://localhost:8080"
+    endpoint: "http://0.0.0.0:8080"
     token:    "splunk_token"
     healthcheck:
       enabled: false

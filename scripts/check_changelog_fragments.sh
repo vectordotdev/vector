@@ -17,7 +17,7 @@ if [ ! -d "${CHANGELOG_DIR}" ]; then
 fi
 
 # diff-filter=A lists only added files
-FRAGMENTS=$(git diff --name-only --diff-filter=A origin/master ${CHANGELOG_DIR})
+FRAGMENTS=$(git diff --name-only --diff-filter=A --merge-base origin/master ${CHANGELOG_DIR})
 
 if [ -z "$FRAGMENTS" ]; then
   echo "No changelog fragments detected"
@@ -56,16 +56,17 @@ while IFS= read -r fname; do
     exit 1
   fi
 
-  # if specified, this option validates that the contents of the news fragment
-  # contains a properly formatted authors line at the end of the file, generally
-  # used for external contributor PRs.
-  if [[ $1 == "--authors" ]]; then
-    last=$( tail -n 1 "${CHANGELOG_DIR}/${fname}" )
-    if ! [[ "${last}" =~ ^(authors: .*)$ ]]; then
-      echo "invalid fragment contents: author option was specified but fragment ${fname} contains no authors."
-      exit 1
-    fi
-
+  # Each fragment should have a properly formatted authors line at the end of the file.
+  last=$( tail -n 1 "${CHANGELOG_DIR}/${fname}" )
+  if [[ "${last}" == "authors: "*@* ]]; then
+    echo "invalid fragment contents: author should not be prefixed with @"
+    exit 1
+  elif [[ "${last}" == "authors: "*,* ]]; then
+    echo "invalid fragment contents: authors should be space delimited, not comma delimited."
+    exit 1
+  elif ! [[ "${last}" =~ ^(authors: .*)$ ]]; then
+    echo "invalid fragment contents: author option was specified but fragment ${fname} contains no authors."
+    exit 1
   fi
 
 done <<< "$FRAGMENTS"

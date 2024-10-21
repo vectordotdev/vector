@@ -3,12 +3,12 @@ use std::{collections::HashMap, fmt, sync::Arc, time::Instant};
 
 use chrono::Utc;
 use futures::{Stream, StreamExt};
-use metrics::{register_histogram, Histogram};
+use metrics::{histogram, Histogram};
 use tracing::Span;
 use vector_lib::buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 use vector_lib::buffers::EventCount;
 use vector_lib::event::array::EventArrayIntoIter;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 use vector_lib::event::{into_event_stream, EventStatus};
 use vector_lib::finalization::{AddBatchNotifier, BatchNotifier};
 use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
@@ -31,7 +31,7 @@ pub use errors::{ClosedError, StreamSendError};
 
 pub(crate) const CHUNK_SIZE: usize = 1000;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 const TEST_BUFFER_SIZE: usize = 100;
 
 const LAG_TIME_NAME: &str = "source_lag_time_seconds";
@@ -170,13 +170,13 @@ impl SourceSender {
             buf_size: CHUNK_SIZE,
             inner: None,
             named_inners: Default::default(),
-            lag_time: Some(register_histogram!(LAG_TIME_NAME)),
+            lag_time: Some(histogram!(LAG_TIME_NAME)),
         }
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn new_test_sender_with_buffer(n: usize) -> (Self, LimitedReceiver<SourceSenderItem>) {
-        let lag_time = Some(register_histogram!(LAG_TIME_NAME));
+        let lag_time = Some(histogram!(LAG_TIME_NAME));
         let output_id = OutputId {
             component: "test".to_string().into(),
             port: None,
@@ -192,14 +192,14 @@ impl SourceSender {
         )
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
         let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
         let recv = recv.into_stream().flat_map(into_event_stream);
         (pipe, recv)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
         let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
         // In a source test pipeline, there is no sink to acknowledge
@@ -216,7 +216,7 @@ impl SourceSender {
         (pipe, recv)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn new_test_errors(
         error_at: impl Fn(usize) -> bool,
     ) -> (Self, impl Stream<Item = Event> + Unpin) {
@@ -242,7 +242,7 @@ impl SourceSender {
         (pipe, recv)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn add_outputs(
         &mut self,
         status: EventStatus,
@@ -481,11 +481,10 @@ impl Inner {
         let mut unsent_event_count = UnsentEventCount::new(events.len());
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             let count = events.len();
-            self.send(events).await.map_err(|err| {
+            self.send(events).await.inspect_err(|_| {
                 // The unsent event count is discarded here because the caller emits the
                 // `StreamClosedError`.
                 unsent_event_count.discard();
-                err
             })?;
             unsent_event_count.decr(count);
         }
@@ -526,7 +525,7 @@ impl Inner {
     }
 }
 
-fn get_timestamp_millis(value: &Value) -> Option<i64> {
+const fn get_timestamp_millis(value: &Value) -> Option<i64> {
     match value {
         Value::Timestamp(timestamp) => Some(timestamp.timestamp_millis()),
         _ => None,

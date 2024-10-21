@@ -39,6 +39,7 @@ pub enum RequestBuilderError {
         dropped_events: u64,
     },
 
+    #[allow(dead_code)]
     #[snafu(display("Unsupported endpoint ({})", reason))]
     UnsupportedEndpoint { reason: String, dropped_events: u64 },
 }
@@ -70,7 +71,7 @@ pub struct DatadogTracesRequestBuilder {
 }
 
 impl DatadogTracesRequestBuilder {
-    pub fn new(
+    pub const fn new(
         api_key: Arc<str>,
         endpoint_configuration: DatadogTracesEndpointConfiguration,
         compression: Compression,

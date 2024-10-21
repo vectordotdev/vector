@@ -1,0 +1,143 @@
+# CI Review Trigger
+#
+# This workflow is a central point for triggering workflow runs that normally run only as part of the merge queue,
+# on demand by a comment. The exception being the integration tests, which have their own workflow file for
+# comment triggers as the logic is a bit more complex.
+#
+# NOTE: This workflow runs on Pull Request Review Comments rather than normal comments to be able to
+# capture the SHA that the comment is associated with.
+#
+# The available triggers are:
+#
+# /ci-run-all                 : runs all of the below
+# /ci-run-cli                 : runs CLI - Linux
+# /ci-run-misc                : runs Miscellaneous - Linux
+# /ci-run-deny                : runs Deny - Linux
+# /ci-run-component-features  : runs Component Features - Linux
+# /ci-run-cross               : runs Cross
+# /ci-run-unit-mac            : runs Unit - Mac
+# /ci-run-unit-windows        : runs Unit - Windows
+# /ci-run-environment         : runs Environment Suite
+# /ci-run-regression          : runs Regression Detection Suite
+# /ci-run-k8s                 : runs K8s E2E Suite
+
+name: CI Review Trigger
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+env:
+  DD_ENV: "ci"
+  RUST_BACKTRACE: full
+  TEST_LOG: vector=debug
+  VERBOSE: true
+  CI: true
+  PROFILE: debug
+  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
+  # can be removed when we switch back to the upstream openssl-sys crate
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+# The below concurrency group settings would let us cancel in progress runs that were triggered with the
+# same comment on a given PR, which could save on time consuming runs.
+# But GH does not currently support the github.event.review.body as part of the concurrency name, this
+# appears to be due to the potential length of it.
+#concurrency:
+#  group: ${{ github.workflow }}-${{ github.event.issue.id }}-${{ github.event.review.body }}
+#  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate review
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: |
+        startsWith(github.event.review.body, '/ci-run-all')
+        || startsWith(github.event.review.body, '/ci-run-cli')
+        || startsWith(github.event.review.body, '/ci-run-misc')
+        || startsWith(github.event.review.body, '/ci-run-deny')
+        || startsWith(github.event.review.body, '/ci-run-component-features')
+        || startsWith(github.event.review.body, '/ci-run-cross')
+        || startsWith(github.event.review.body, '/ci-run-unit-mac')
+        || startsWith(github.event.review.body, '/ci-run-unit-windows')
+        || startsWith(github.event.review.body, '/ci-run-environment')
+        || startsWith(github.event.review.body, '/ci-run-regression')
+        || startsWith(github.event.review.body, '/ci-run-k8s')
+    steps:
+      - name: Generate authentication token
+        id: generate_token
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a
+        with:
+          app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
+      - name: Get PR review author
+        id: comment
+        uses: tspascoal/get-user-teams-membership@v3
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+
+      - name: Validate author membership
+        if: steps.comment.outputs.isTeamMember == 'false'
+        run: exit 1
+
+  cli:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cli')
+    uses: ./.github/workflows/cli.yml
+    secrets: inherit
+
+  misc:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-misc')
+    uses: ./.github/workflows/misc.yml
+    secrets: inherit
+
+  deny:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-deny')
+    uses: ./.github/workflows/deny.yml
+    secrets: inherit
+
+  component-features:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-component-features')
+    uses: ./.github/workflows/component_features.yml
+    secrets: inherit
+
+  cross:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cross')
+    uses: ./.github/workflows/cross.yml
+    secrets: inherit
+
+  unit-mac:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-unit-mac')
+    uses: ./.github/workflows/unit_mac.yml
+    secrets: inherit
+
+  unit-windows:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-unit-windows')
+    uses: ./.github/workflows/unit_windows.yml
+    secrets: inherit
+
+  environment:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-environment')
+    uses: ./.github/workflows/environment.yml
+    secrets: inherit
+
+  regression:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-regression')
+    uses: ./.github/workflows/regression.yml
+    secrets: inherit
+
+  k8s:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-k8s')
+    uses: ./.github/workflows/k8s_e2e.yml
+    secrets: inherit

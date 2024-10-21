@@ -1,15 +1,9 @@
 #![allow(missing_docs)]
-use std::{
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
-};
-
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
     header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Response, Uri,
+    Version,
 };
 use hyper::{
     body::{Body, HttpBody},
@@ -21,6 +15,12 @@ use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
+use std::{
+    fmt,
+    net::SocketAddr,
+    task::{Context, Poll},
+    time::Duration,
+};
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -139,13 +139,9 @@ where
 
             // Handle the errors and extract the response.
             let response = response_result
-                .map_err(|error| {
+                .inspect_err(|error| {
                     // Emit the error into the internal events system.
-                    emit!(http_client::GotHttpWarning {
-                        error: &error,
-                        roundtrip
-                    });
-                    error
+                    emit!(http_client::GotHttpWarning { error, roundtrip });
                 })
                 .context(CallRequestSnafu)?;
 
@@ -204,10 +200,10 @@ pub fn build_tls_connector(
     let settings = tls_settings.tls().cloned();
     https.set_callback(move |c, _uri| {
         if let Some(settings) = &settings {
-            settings.apply_connect_configuration(c);
+            settings.apply_connect_configuration(c)
+        } else {
+            Ok(())
         }
-
-        Ok(())
     });
     Ok(https)
 }
@@ -358,19 +354,19 @@ pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
 /// Builds a [TraceLayer] configured for a HTTP server.
 ///
 /// This layer emits HTTP specific telemetry for requests received, responses sent, and handler duration.
-pub fn build_http_trace_layer(
+pub fn build_http_trace_layer<T, U>(
     span: Span,
 ) -> TraceLayer<
     SharedClassifier<ServerErrorsAsFailures>,
-    impl Fn(&Request<Body>) -> Span + Clone,
-    impl Fn(&Request<Body>, &Span) + Clone,
-    impl Fn(&Response<Body>, Duration, &Span) + Clone,
+    impl Fn(&Request<T>) -> Span + Clone,
+    impl Fn(&Request<T>, &Span) + Clone,
+    impl Fn(&Response<U>, Duration, &Span) + Clone,
     (),
     (),
     (),
 > {
     TraceLayer::new_for_http()
-        .make_span_with(move |request: &Request<Body>| {
+        .make_span_with(move |request: &Request<T>| {
             // This is an error span so that the labels are always present for metrics.
             error_span!(
                parent: &span,
@@ -379,14 +375,12 @@ pub fn build_http_trace_layer(
                path = %request.uri().path(),
             )
         })
-        .on_request(Box::new(|_request: &Request<Body>, _span: &Span| {
+        .on_request(Box::new(|_request: &Request<T>, _span: &Span| {
             emit!(HttpServerRequestReceived);
         }))
-        .on_response(
-            |response: &Response<Body>, latency: Duration, _span: &Span| {
-                emit!(HttpServerResponseSent { response, latency });
-            },
-        )
+        .on_response(|response: &Response<U>, latency: Duration, _span: &Span| {
+            emit!(HttpServerResponseSent { response, latency });
+        })
         .on_failure(())
         .on_body_chunk(())
         .on_eos(())
@@ -398,8 +392,12 @@ pub fn build_http_trace_layer(
 #[derive(Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct KeepaliveConfig {
-    /// The maximum amount of time a connection may exist before it is closed
-    /// by sending a `Connection: close` header on the HTTP response.
+    /// The maximum amount of time a connection may exist before it is closed by sending
+    /// a `Connection: close` header on the HTTP response. Set this to a large value like
+    /// `100000000` to "disable" this feature
+    ///
+    ///
+    /// Only applies to HTTP/0.9, HTTP/1.0, and HTTP/1.1 requests.
     ///
     /// A random jitter configured by `max_connection_age_jitter_factor` is added
     /// to the specified duration to spread out connection storms.
@@ -441,9 +439,9 @@ impl Default for KeepaliveConfig {
 ///
 /// **Notes:**
 /// - This is intended to be used in a Hyper server (or similar) that will automatically close
-/// the connection after a response with a `Connection: close` header is sent.
+///   the connection after a response with a `Connection: close` header is sent.
 /// - This layer assumes that it is instantiated once per connection, which is true within the
-/// Hyper framework.
+///   Hyper framework.
 
 pub struct MaxConnectionAgeLayer {
     start_reference: Instant,
@@ -493,9 +491,9 @@ where
 ///
 /// **Notes:**
 /// - This is intended to be used in a Hyper server (or similar) that will automatically close
-/// the connection after a response with a `Connection: close` header is sent.
+///   the connection after a response with a `Connection: close` header is sent.
 /// - This service assumes that it is instantiated once per connection, which is true within the
-/// Hyper framework.
+///   Hyper framework.
 #[derive(Clone)]
 pub struct MaxConnectionAgeService<S> {
     service: S,
@@ -524,22 +522,32 @@ where
         let start_reference = self.start_reference;
         let max_connection_age = self.max_connection_age;
         let peer_addr = self.peer_addr;
+        let version = req.version();
         let future = self.service.call(req);
         Box::pin(async move {
             let mut response = future.await?;
-            if start_reference.elapsed() >= max_connection_age {
-                debug!(
-                    message = "Closing connection due to max connection age.",
-                    ?max_connection_age,
-                    connection_age = ?start_reference.elapsed(),
-                    ?peer_addr,
-                );
-                // Tell the client to close this connection.
-                // Hyper will automatically close the connection after the response is sent.
-                response.headers_mut().insert(
-                    hyper::header::CONNECTION,
-                    hyper::header::HeaderValue::from_static("close"),
-                );
+            match version {
+                Version::HTTP_09 | Version::HTTP_10 | Version::HTTP_11 => {
+                    if start_reference.elapsed() >= max_connection_age {
+                        debug!(
+                            message = "Closing connection due to max connection age.",
+                            ?max_connection_age,
+                            connection_age = ?start_reference.elapsed(),
+                            ?peer_addr,
+                        );
+                        // Tell the client to close this connection.
+                        // Hyper will automatically close the connection after the response is sent.
+                        response.headers_mut().insert(
+                            hyper::header::CONNECTION,
+                            hyper::header::HeaderValue::from_static("close"),
+                        );
+                    }
+                }
+                // TODO need to send GOAWAY frame
+                Version::HTTP_2 => (),
+                // TODO need to send GOAWAY frame
+                Version::HTTP_3 => (),
+                _ => (),
             }
             Ok(response)
         })
@@ -664,6 +672,52 @@ mod tests {
             response.headers().get("Connection"),
             Some(&HeaderValue::from_static("close"))
         );
+    }
+
+    #[tokio::test]
+    async fn test_max_connection_age_service_http2() {
+        tokio::time::pause();
+
+        let start_reference = Instant::now();
+        let max_connection_age = Duration::from_secs(0);
+        let mut service = MaxConnectionAgeService {
+            service: tower::service_fn(|_req: Request<Body>| async {
+                Ok::<Response<Body>, hyper::Error>(Response::new(Body::empty()))
+            }),
+            start_reference,
+            max_connection_age,
+            peer_addr: "1.2.3.4:1234".parse().unwrap(),
+        };
+
+        let mut req = Request::get("http://example.com")
+            .body(Body::empty())
+            .unwrap();
+        *req.version_mut() = Version::HTTP_2;
+        let response = service.call(req).await.unwrap();
+        assert_eq!(response.headers().get("Connection"), None);
+    }
+
+    #[tokio::test]
+    async fn test_max_connection_age_service_http3() {
+        tokio::time::pause();
+
+        let start_reference = Instant::now();
+        let max_connection_age = Duration::from_secs(0);
+        let mut service = MaxConnectionAgeService {
+            service: tower::service_fn(|_req: Request<Body>| async {
+                Ok::<Response<Body>, hyper::Error>(Response::new(Body::empty()))
+            }),
+            start_reference,
+            max_connection_age,
+            peer_addr: "1.2.3.4:1234".parse().unwrap(),
+        };
+
+        let mut req = Request::get("http://example.com")
+            .body(Body::empty())
+            .unwrap();
+        *req.version_mut() = Version::HTTP_3;
+        let response = service.call(req).await.unwrap();
+        assert_eq!(response.headers().get("Connection"), None);
     }
 
     #[tokio::test]

@@ -41,7 +41,6 @@ pub struct KinesisFirehoseClient {
     pub client: KinesisClient,
 }
 
-#[async_trait::async_trait]
 impl SendRecord for KinesisFirehoseClient {
     type T = KinesisRecord;
     type E = KinesisError;

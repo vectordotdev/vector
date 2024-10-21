@@ -8,7 +8,6 @@ use std::{
     task::{Context, Poll},
 };
 
-use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use crate::variants::disk_v2::{
@@ -206,7 +205,6 @@ impl AsyncWrite for TestFile {
     }
 }
 
-#[async_trait]
 impl AsyncFile for TestFile {
     #[instrument(skip(self), level = "debug")]
     async fn metadata(&self) -> io::Result<Metadata> {
@@ -304,7 +302,6 @@ impl Default for TestFilesystem {
     }
 }
 
-#[async_trait]
 impl Filesystem for TestFilesystem {
     type File = TestFile;
     type MemoryMap = TestMmap;

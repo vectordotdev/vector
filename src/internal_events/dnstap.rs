@@ -17,10 +17,11 @@ impl<E: std::fmt::Display> InternalEvent for DnstapParseError<E> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
-        );
+        )
+        .increment(1);
     }
 }
 

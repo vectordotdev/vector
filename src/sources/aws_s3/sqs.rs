@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::{future::ready, num::NonZeroUsize, panic, sync::Arc};
+use std::{future::ready, num::NonZeroUsize, panic, sync::Arc, sync::LazyLock};
 
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::Client as S3Client;
@@ -15,7 +15,6 @@ use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::serde_as;
 use smallvec::SmallVec;
@@ -32,6 +31,7 @@ use vector_lib::internal_event::{
 use crate::codecs::Decoder;
 use crate::event::{Event, LogEvent};
 use crate::{
+    aws::AwsTimeout,
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
     internal_events::{
@@ -50,8 +50,8 @@ use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
 use vector_lib::event::MaybeAsLogMut;
 use vector_lib::lookup::{metadata_path, path, PathPrefix};
 
-static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
-    Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
+static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
+    LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
 
 /// SQS configuration options.
 //
@@ -102,6 +102,13 @@ pub(super) struct Config {
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
 
+    /// Whether to delete non-retryable messages.
+    ///
+    /// If a message is rejected by the sink and not retryable, it is deleted from the queue.
+    #[serde(default = "default_true")]
+    #[derivative(Default(value = "default_true()"))]
+    pub(super) delete_failed_message: bool,
+
     /// Number of concurrent tasks to create for polling the queue for messages.
     ///
     /// Defaults to the number of available CPUs on the system.
@@ -115,10 +122,31 @@ pub(super) struct Config {
     #[configurable(metadata(docs::examples = 5))]
     pub(super) client_concurrency: Option<NonZeroUsize>,
 
+    /// Maximum number of messages to poll from SQS in a batch
+    ///
+    /// Defaults to 10
+    ///
+    /// Should be set to a smaller value when the files are large to help prevent the ingestion of
+    /// one file from causing the other files to exceed the visibility_timeout. Valid values are 1 - 10
+    // NOTE: We restrict this to u32 for safe conversion to i32 later.
+    #[serde(default = "default_max_number_of_messages")]
+    #[derivative(Default(value = "default_max_number_of_messages()"))]
+    #[configurable(metadata(docs::human_name = "Max Messages"))]
+    #[configurable(metadata(docs::examples = 1))]
+    pub(super) max_number_of_messages: u32,
+
     #[configurable(derived)]
     #[serde(default)]
     #[derivative(Default)]
     pub(super) tls_options: Option<TlsConfig>,
+
+    // Client timeout configuration for SQS operations. Take care when configuring these settings
+    // to allow enough time for the polling interval configured in `poll_secs`.
+    #[configurable(derived)]
+    #[derivative(Default)]
+    #[serde(default)]
+    #[serde(flatten)]
+    pub(super) timeout: Option<AwsTimeout>,
 }
 
 const fn default_poll_secs() -> u32 {
@@ -129,17 +157,18 @@ const fn default_visibility_timeout_secs() -> u32 {
     300
 }
 
+const fn default_max_number_of_messages() -> u32 {
+    10
+}
+
 const fn default_true() -> bool {
     true
 }
 
 #[derive(Debug, Snafu)]
 pub(super) enum IngestorNewError {
-    #[snafu(display("Invalid visibility timeout {}: {}", timeout, source))]
-    InvalidVisibilityTimeout {
-        source: std::num::TryFromIntError,
-        timeout: u64,
-    },
+    #[snafu(display("Invalid value for max_number_of_messages {}", messages))]
+    InvalidNumberOfMessages { messages: u32 },
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -200,9 +229,11 @@ pub struct State {
 
     queue_url: String,
     poll_secs: i32,
+    max_number_of_messages: i32,
     client_concurrency: usize,
     visibility_timeout_secs: i32,
     delete_message: bool,
+    delete_failed_message: bool,
     decoder: Decoder,
 }
 
@@ -220,6 +251,11 @@ impl Ingestor {
         multiline: Option<line_agg::Config>,
         decoder: Decoder,
     ) -> Result<Ingestor, IngestorNewError> {
+        if config.max_number_of_messages < 1 || config.max_number_of_messages > 10 {
+            return Err(IngestorNewError::InvalidNumberOfMessages {
+                messages: config.max_number_of_messages,
+            });
+        }
         let state = Arc::new(State {
             region,
 
@@ -231,12 +267,14 @@ impl Ingestor {
 
             queue_url: config.queue_url,
             poll_secs: config.poll_secs as i32,
+            max_number_of_messages: config.max_number_of_messages as i32,
             client_concurrency: config
                 .client_concurrency
                 .map(|n| n.get())
                 .unwrap_or_else(crate::num_threads),
             visibility_timeout_secs: config.visibility_timeout_secs as i32,
             delete_message: config.delete_message,
+            delete_failed_message: config.delete_failed_message,
             decoder,
         });
 
@@ -322,15 +360,13 @@ impl IngestorProcess {
     async fn run_once(&mut self) {
         let messages = self.receive_messages().await;
         let messages = messages
-            .map(|messages| {
+            .inspect(|messages| {
                 emit!(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
-                messages
             })
-            .map_err(|err| {
-                emit!(SqsMessageReceiveError { error: &err });
-                err
+            .inspect_err(|err| {
+                emit!(SqsMessageReceiveError { error: err });
             })
             .unwrap_or_default();
 
@@ -517,9 +553,8 @@ impl IngestorProcess {
         let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
             FramedRead::new(object_reader, self.state.decoder.framer.clone())
                 .map(|res| {
-                    res.map(|bytes| {
+                    res.inspect(|bytes| {
                         bytes_received.emit(ByteSize(bytes.len()));
-                        bytes
                     })
                     .map_err(|err| {
                         read_error = Some(err);
@@ -609,9 +644,11 @@ impl IngestorProcess {
                         BatchStatus::Delivered => Ok(()),
                         BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
                         BatchStatus::Rejected => {
-                            // Sinks are responsible for emitting ComponentEventsDropped.
-                            // Failed events cannot be retried, so continue to delete the SQS source message.
-                            Ok(())
+                            if self.state.delete_failed_message {
+                                Ok(())
+                            } else {
+                                Err(ProcessingError::ErrorAcknowledgement)
+                            }
                         }
                     }
                 }
@@ -626,7 +663,7 @@ impl IngestorProcess {
             .sqs_client
             .receive_message()
             .queue_url(self.state.queue_url.clone())
-            .max_number_of_messages(10)
+            .max_number_of_messages(self.state.max_number_of_messages)
             .visibility_timeout(self.state.visibility_timeout_secs)
             .wait_time_seconds(self.state.poll_secs)
             .send()

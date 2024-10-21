@@ -1,4 +1,4 @@
-See [DEPRECATION.md](docs/DEPRECATION.md#process) for the process for updating this file.
+See [DEPRECATION.md](/docs/DEPRECATION.md#process) for the process for updating this file.
 
 The format for each entry should be: `<version> <identifier> <description>`.
 
@@ -15,8 +15,5 @@ For example:
 ## To be deprecated
 
 ## To be migrated
-
-- v0.37.0 strict_env_vars Change the default for missing environment variable interpolation from
-  warning to erroring.
 
 ## To be removed

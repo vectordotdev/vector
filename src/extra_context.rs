@@ -9,19 +9,14 @@ use std::{
 /// Structure containing any extra data.
 /// The data is held in an [`Arc`] so is cheap to clone.
 #[derive(Clone, Default)]
-pub struct ExtraContext(Arc<HashMap<TypeId, Box<dyn Any + Send + Sync>>>);
+pub struct ExtraContext(Arc<HashMap<TypeId, ContextItem>>);
+
+type ContextItem = Box<dyn Any + Send + Sync>;
 
 impl ExtraContext {
-    /// Create a new `ExtraContext` with the provided [`HashMap`].
-    pub fn new(context: HashMap<TypeId, Box<dyn Any + Send + Sync>>) -> Self {
-        Self(Arc::new(context))
-    }
-
     /// Create a new `ExtraContext` that contains the single passed in value.
     pub fn single_value<T: Any + Send + Sync>(value: T) -> Self {
-        let mut map = HashMap::new();
-        map.insert(value.type_id(), Box::new(value) as _);
-        Self(Arc::new(map))
+        [Box::new(value) as _].into_iter().collect()
     }
 
     #[cfg(test)]
@@ -41,11 +36,18 @@ impl ExtraContext {
     }
 
     /// Get an object from the context, if it doesn't exist return the default.
-    pub fn get_or_default<T: 'static>(&self) -> T
-    where
-        T: Clone + Default,
-    {
+    pub fn get_or_default<T: Clone + Default + 'static>(&self) -> T {
         self.get().cloned().unwrap_or_default()
+    }
+}
+
+impl FromIterator<ContextItem> for ExtraContext {
+    fn from_iter<T: IntoIterator<Item = ContextItem>>(iter: T) -> Self {
+        Self(Arc::new(
+            iter.into_iter()
+                .map(|item| ((*item).type_id(), item))
+                .collect(),
+        ))
     }
 }
 

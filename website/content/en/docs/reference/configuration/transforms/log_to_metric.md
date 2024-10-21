@@ -1,7 +1,7 @@
 ---
 title: Log to metric
 description: Convert log events to metric events
-kind: transform
+component_kind: transform
 layout: component
 tags: ["log to metric", "convert", "component", "transform"]
 ---

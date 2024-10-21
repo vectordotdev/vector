@@ -6,6 +6,19 @@ base: components: transforms: sample: configuration: {
 		required:    false
 		type: condition: {}
 	}
+	group_by: {
+		description: """
+			The value to group events into separate buckets to be sampled independently.
+
+			If left unspecified, or if the event doesn't have `group_by`, then the event is not
+			sampled separately.
+			"""
+		required: false
+		type: string: {
+			examples: ["{{ service }}", "{{ hostname }}-{{ service }}"]
+			syntax: "template"
+		}
+	}
 	key_field: {
 		description: """
 			The name of the field whose value is hashed to determine if the event should be
@@ -27,10 +40,12 @@ base: components: transforms: sample: configuration: {
 		description: """
 			The rate at which events are forwarded, expressed as `1/N`.
 
-			For example, `rate = 10` means 1 out of every 10 events are forwarded and the rest are
+			For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
 			dropped.
 			"""
 		required: true
-		type: uint: {}
+		type: uint: examples: [
+			1500,
+		]
 	}
 }

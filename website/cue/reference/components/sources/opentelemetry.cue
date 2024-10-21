@@ -41,7 +41,7 @@ components: sources: opentelemetry: {
 		requirements: []
 		warnings: [
 			"""
-				The `opentelemetry` source only supports log events at this time.
+				The `opentelemetry` source only supports log and trace events at this time.
 				""",
 		]
 		notices: []
@@ -58,6 +58,12 @@ components: sources: opentelemetry: {
 			name: "logs"
 			description: """
 				Received log events will go to this output stream. Use `<component_id>.logs` as an input to downstream transforms and sinks.
+				"""
+		},
+		{
+			name: "traces"
+			description: """
+				Received trace events will go to this output stream. Use `<component_id>.traces` as an input to downstream transforms and sinks.
 				"""
 		},
 	]
@@ -104,6 +110,46 @@ components: sources: opentelemetry: {
 								"container.name": "vector"
 							},
 						]
+					}
+				}
+				"scope.name": {
+					description: "Instrumentation scope name (often logger name)."
+					required:    false
+					common:      true
+					type: string: {
+						default: null
+						examples: ["some.module.name"]
+					}
+				}
+				"scope.version": {
+					description: "Instrumentation scope version."
+					required:    false
+					common:      false
+					type: string: {
+						default: null
+						examples: ["1.2.3"]
+					}
+				}
+				"scope.attributes": {
+					description: "Set of attributes that belong to the instrumentation scope."
+					required:    false
+					common:      false
+					type: object: {
+						examples: [
+							{
+								"attr1": "value1"
+								"attr2": "value2"
+								"attr3": "value3"
+							},
+						]
+					}
+				}
+				"scope.dropped_attributes_count": {
+					description: "Number of attributes dropped from the instrumentation scope (if not zero)."
+					required:    false
+					common:      false
+					type: uint: {
+						unit: null
 					}
 				}
 				message: {
@@ -202,6 +248,12 @@ components: sources: opentelemetry: {
 				enable and adjust TLS behavior via the `grpc.tls.*` and `http.tls.*` options and/or via an
 				[OpenSSL configuration file](\(urls.openssl_conf)). The file location defaults to
 				`/usr/local/ssl/openssl.cnf` or can be specified with the `OPENSSL_CONF` environment variable.
+				"""
+		}
+		traces: {
+			title: "Ingest OTLP traces"
+			body: """
+				Trace support is experimental and subject to change as Vector has no strongly-typed structure for traces internally. Instead traces are stored as a key/value map similar to logs. This may change in the future to be a structured format.
 				"""
 		}
 	}

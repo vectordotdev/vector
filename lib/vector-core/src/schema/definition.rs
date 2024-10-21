@@ -381,7 +381,7 @@ impl Definition {
     /// # Panics
     ///
     /// This method panics if the provided path points to an unknown location in the collection.
-    fn add_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
+    pub fn add_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
         self.try_with_meaning(target_path, meaning)
             .unwrap_or_else(|err| panic!("{}", err));
     }
@@ -537,7 +537,7 @@ impl Definition {
 
 #[cfg(any(test, feature = "test"))]
 mod test_utils {
-    use super::*;
+    use super::{Definition, Kind};
     use crate::event::{Event, LogEvent};
 
     impl Definition {

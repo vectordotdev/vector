@@ -169,10 +169,7 @@ base: components: sources: file: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {
-			default: "host"
-			examples: ["hostname"]
-		}
+		type: string: examples: ["hostname"]
 	}
 	ignore_checkpoints: {
 		description: """
@@ -366,6 +363,17 @@ base: components: sources: file: configuration: {
 		type: uint: {
 			examples: [0, 5, 60]
 			unit: "seconds"
+		}
+	}
+	rotate_wait_secs: {
+		description: """
+			How long to keep an open handle to a rotated log file.
+			The default value represents "no limit"
+			"""
+		required: false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "seconds"
 		}
 	}
 }

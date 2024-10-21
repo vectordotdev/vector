@@ -22,33 +22,34 @@
   </head>
 
   <body>
-    <div class="headers-grid">
-      <div class="headers-grid-item">
-        <h2>VRL Playground</h2>
-      </div>
-      <div class="headers-grid-item">
-        <table>
-          <tr>
-            <td>Vector Version: </td>
-            <td><a id="vector-version-link"></a></td>
-          </tr>
-          <tr>
-            <td>VRL Version: </td>
-            <td><a id="vrl-version-link"></a></td>
-          </tr>
-        </table>
-      </div>
-      <div class="headers-grid-item" id="description-cell">
-          <p id="description-paragraph" >
+      <div class="top-bar-wrapper">
+      <div class="headers-grid">
+        <div class="headers-grid-item title-section">
+          <img id="logo" src="assets/dd_icon_rgb.svg" alt="Datadog Logo">
+          <h2>VRL Playground</h2>
+        </div>
+        <div class="headers-grid-item" id="description-cell">
+          <p id="description-paragraph">
             <a href="https://vector.dev/docs/reference/vrl/functions/">Vector Remap Language (VRL)</a> is an expression-oriented language designed for transforming
             observability data. This playground lets you write a program, run it against an event or
             events, share it, and see how the events are transformed.
           </p>
+        </div>
+        <div class="headers-grid-item version-info">
+          <table>
+            <tr>
+              <td>Vector Version: </td>
+              <td><a id="vector-version-link"></a></td>
+            </tr>
+            <tr>
+              <td>VRL Version: </td>
+              <td><a id="vrl-version-link"></a></td>
+            </tr>
+          </table>
+        </div>
       </div>
     </div>
     <div id="App">
-
-
       <div id="toolbar-section">
         <button id="run-code-btn" class="btn btn-primary" onClick="vrlPlayground.handleRunCode()">Run program</button>
         <button id="share-code-btn" class="btn btn-secondary" onClick="vrlPlayground.handleShareCode()">Share program</button>
@@ -59,7 +60,6 @@
           <div id="input-cell-title">
             <p class="cell-title">Program</p>
           </div>
-
           <div id="container-program"></div>
         </div>
       </div>

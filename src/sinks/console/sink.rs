@@ -81,7 +81,7 @@ mod test {
         let event = Event::Log(LogEvent::from("foo"));
 
         let encoder = Encoder::<Framer>::new(
-            NewlineDelimitedEncoder::new().into(),
+            NewlineDelimitedEncoder::default().into(),
             JsonSerializerConfig::default().build().into(),
         );
 

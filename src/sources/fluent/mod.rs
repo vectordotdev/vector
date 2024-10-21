@@ -14,6 +14,7 @@ use tokio_util::codec::Decoder;
 use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
+use vector_lib::ipallowlist::IpAllowlistConfig;
 use vector_lib::lookup::lookup_v2::parse_value_path;
 use vector_lib::lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
 use vector_lib::schema::Definition;
@@ -50,6 +51,9 @@ pub struct FluentConfig {
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
+    #[configurable(derived)]
+    pub permit_origin: Option<IpAllowlistConfig>,
+
     /// The size of the receive buffer used for each connection.
     ///
     /// This generally should not need to be changed.
@@ -75,6 +79,7 @@ impl GenerateConfig for FluentConfig {
         toml::Value::try_from(Self {
             address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
             keepalive: None,
+            permit_origin: None,
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
@@ -110,6 +115,7 @@ impl SourceConfig for FluentConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            self.permit_origin.clone().map(Into::into),
             FluentConfig::NAME,
             log_namespace,
         )
@@ -119,7 +125,10 @@ impl SourceConfig for FluentConfig {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self.schema_definition(log_namespace);
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -464,13 +473,12 @@ impl Decoder for FluentDecoder {
 
             src.advance(byte_size);
 
-            let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
-                let base64_encoded_message = BASE64_STANDARD.encode(&src);
+            let maybe_item = self.handle_message(res, byte_size).inspect_err(|error| {
+                let base64_encoded_message = BASE64_STANDARD.encode(&src[..]);
                 emit!(FluentMessageDecodeError {
-                    error: &error,
+                    error,
                     base64_encoded_message
                 });
-                error
             })?;
             if let Some(item) = maybe_item {
                 return Ok(Some(item));
@@ -894,6 +902,7 @@ mod tests {
             address: address.into(),
             tls: None,
             keepalive: None,
+            permit_origin: None,
             receive_buffer_bytes: None,
             acknowledgements: true.into(),
             connection_limit: None,
@@ -958,6 +967,7 @@ mod tests {
             address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
             tls: None,
             keepalive: None,
+            permit_origin: None,
             receive_buffer_bytes: None,
             acknowledgements: false.into(),
             connection_limit: None,
@@ -1013,6 +1023,7 @@ mod tests {
             address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
             tls: None,
             keepalive: None,
+            permit_origin: None,
             receive_buffer_bytes: None,
             acknowledgements: false.into(),
             connection_limit: None,
@@ -1125,7 +1136,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(format!("http://{}/", test_address))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()
@@ -1206,7 +1217,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(format!("http://{}/", test_address))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()
@@ -1234,6 +1245,7 @@ mod integration_tests {
                 address: address.into(),
                 tls: None,
                 keepalive: None,
+                permit_origin: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
