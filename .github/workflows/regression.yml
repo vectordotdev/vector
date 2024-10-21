@@ -54,7 +54,7 @@ jobs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Collect file changes
         id: changes
@@ -250,9 +250,9 @@ jobs:
     steps:
       - uses: colpal/actions-clean@v1
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.compute-metadata.outputs.baseline-sha }}
           path: baseline-vector
@@ -288,9 +288,9 @@ jobs:
     steps:
       - uses: colpal/actions-clean@v1
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
           path: comparison-vector
@@ -439,7 +439,7 @@ jobs:
             -f context='Regression Detection Suite / submission' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
@@ -553,7 +553,7 @@ jobs:
       - submit-job
       - compute-metadata
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.2
@@ -643,7 +643,7 @@ jobs:
             -f context='Regression Detection Suite / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
