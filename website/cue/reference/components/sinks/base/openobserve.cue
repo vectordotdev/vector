@@ -254,10 +254,13 @@ base: components: sinks: openobserve: configuration: {
 			}
 		}
 	}
-    endpoint: {
+    uri: {
         description: "The OpenObserve endpoint to send data to."
-        required: true
-        type: string: examples: ["http://localhost:5080/api/default/default/_json"]
+        required: false
+        type: string: {
+			default: "http://localhost:5080/api/default/default/_json"
+			examples: ["http://localhost:5080/api/default/default/_json"]
+		}
     }
     auth: {
         description: "Authentication for OpenObserve."

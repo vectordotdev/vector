@@ -1,3 +1,4 @@
+use http::Uri;
 use vector_lib::codecs::encoding::{FramingConfig, JsonSerializerConfig, SerializerConfig};
 use vector_lib::configurable::configurable_component;
 
@@ -21,6 +22,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct OpenObserveConfig {
     /// The OpenObserve endpoint to send data to.
+    #[serde(default = "default_endpoint")]
     #[configurable(metadata(docs::examples = "http://localhost:5080/api/default/default/_json"))]
     uri: UriSerde,
 
@@ -65,12 +67,19 @@ impl GenerateConfig for OpenObserveConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"
-            endpoint = "http://localhost:5080/api/default/default/_json"
+            uri = "http://localhost:5080/api/default/default/_json"
             Auth = "user: test@example.com, password: your_ingestion_password"
             encoding.codec = "json"
         "#,
         )
         .unwrap()
+    }
+}
+
+fn default_endpoint() -> UriSerde {
+    UriSerde {
+        uri: Uri::from_static("http://localhost:5080/api/default/default/_json"),
+        auth: None,
     }
 }
 
@@ -81,7 +90,7 @@ impl SinkConfig for OpenObserveConfig {
         let request = self.request.clone();
 
         // OpenObserve supports native HTTP ingest endpoint. This configuration wraps
-        // the vector HTTP sink to provide official support for OpenObserve. This sink will 
+        // the vector HTTP sink to provide official support for OpenObserve. This sink will
         // allow maintaining the vector OpenObserve sink independent of the vector HTTP sink
         // configuration and will allow to accomodate any future changes to the interface.
         let http_sink_config = HttpSinkConfig {
