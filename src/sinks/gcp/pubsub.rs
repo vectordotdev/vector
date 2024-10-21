@@ -278,8 +278,7 @@ mod integration_tests {
     use crate::test_util::components::{run_and_assert_sink_error, COMPONENT_ERROR_TAGS};
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
-        random_events_with_stream, random_metrics_with_stream,
-        random_string, trace_init,
+        random_events_with_stream, random_metrics_with_stream, random_string, trace_init,
     };
 
     const PROJECT: &str = "testproject";
