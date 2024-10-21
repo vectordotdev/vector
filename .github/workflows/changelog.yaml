@@ -26,7 +26,7 @@ jobs:
       # Checkout full depth because in the check_changelog_fragments script, we need to specify a
       # merge base. If we only shallow clone the repo, git may not have enough history to determine
       # the base.
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
