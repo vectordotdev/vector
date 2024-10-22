@@ -87,10 +87,7 @@ mod tests {
         let s_path = path.as_str();
         let cases = vec![
             // Valid inputs.
-            (
-                ("sandbox0-ns", "sandbox0-name", "sandbox0-uid"),
-                s_path,
-            ),
+            (("sandbox0-ns", "sandbox0-name", "sandbox0-uid"), s_path),
             // Invalid inputs.
             (("", "", ""), "/var/log/pods/__"),
         ];
