@@ -56,6 +56,8 @@ pub enum HttpError {
     CallRequest { source: hyper::Error },
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
+    #[snafu(display("Failed to acquire authentication resource."))]
+    ExtensionAuthentication,
 }
 
 impl HttpError {
@@ -64,6 +66,7 @@ impl HttpError {
             HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
             HttpError::CallRequest { .. }
             | HttpError::BuildTlsConnector { .. }
+            | HttpError::ExtensionAuthentication { .. }
             | HttpError::MakeHttpsConnector { .. } => true,
         }
     }
@@ -79,7 +82,7 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    async fn modify_request(&self, req: &mut Request<B>);
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn Error>>;
 }
 
 #[derive(Clone)]
@@ -112,17 +115,17 @@ struct ExpirableToken {
 
 impl OAuth2Extension
 {
-    async fn get_token(&self) -> String {
+    async fn get_token(&self) -> Result<String, Box<dyn Error>> {
         if let Some(token) = self.acquire_token_from_cache() {
-            return token.access_token;
+            return Ok(token.access_token);
         }
 
         //no valid token in cache (or no token at all)
-        let new_token = self.request_token().await.unwrap();
+        let new_token = self.request_token().await?;
         let token_to_return = new_token.access_token.clone(); 
         self.save_into_cache(new_token);
 
-        token_to_return
+        Ok(token_to_return)
     }
 
     fn acquire_token_from_cache(&self) -> Option<ExpirableToken> {
@@ -168,8 +171,14 @@ impl OAuth2Extension
             roundtrip
         });
 
-        let body = hyper::body::aggregate(response).await.unwrap();
-        let token: Token = serde_json::from_reader(body.reader()).unwrap();
+        if !response.status().is_success() {
+            let body_bytes = hyper::body::aggregate(response).await?;
+            let body_str = std::str::from_utf8(body_bytes.chunk())?.to_string();
+            return Err(Box::new(AcquireTokenError{message: body_str}));
+        }
+
+        let body = hyper::body::aggregate(response).await?;
+        let token: Token = serde_json::from_reader(body.reader())?;
 
         //expires_in means, in seconds, for how long it will be valid, lets say 5min, 
         //to not cause some random 4xx, because token expired in the meantime, we will make some
@@ -183,6 +192,19 @@ impl OAuth2Extension
     }
 }
 
+#[derive(Debug)]
+pub struct AcquireTokenError {
+    message: String
+}
+
+impl fmt::Display for AcquireTokenError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Server error from authentication server: {}", self.message)
+    }
+}
+
+impl Error for AcquireTokenError {}
+
 #[async_trait]
 impl <B> AuthExtension<B> for OAuth2Extension
 where 
@@ -190,11 +212,13 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    async fn modify_request(&self, req: &mut Request<B>)
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn Error>>
     {
-        let token = self.get_token().await;
+        let token = self.get_token().await?;
         let auth = Auth::Bearer{ token: SensitiveString::from(token)};
         auth.apply(req);
+
+        Ok(())
     }
 }
 
@@ -205,13 +229,15 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    async fn modify_request(&self, req: &mut Request<B>)
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn Error>>
     {
         let user = self.user.clone();
         let password = self.password.clone();
 
         let auth = Auth::Basic{ user, password };
         auth.apply(req);
+
+        Ok(())
     }
 }
 
@@ -280,13 +306,21 @@ where
         let auth_extension = self.auth_extension.clone();
 
         let fut = async move {
-
             //should request for token influence upstream service latency ?            
             if let Some(auth_extension) = auth_extension {
                 let auth_span = tracing::info_span!("auth_extension");
-                auth_extension.modify_request(&mut request)
+                let res = auth_extension.modify_request(&mut request)
                     .instrument(auth_span.clone().or_current())
-                    .await;
+                    .await
+                    .inspect_err(|error| {
+                        // Emit the error into the internal events system.
+                        emit!(http_client::GotAuthExtensionError{error});
+                    })
+                    .map_err(|_err| HttpError::ExtensionAuthentication);
+
+                if let Err(e) = res {
+                    return Err(e)
+                }
             }
 
             emit!(http_client::AboutToSendHttpRequest { request: &request });

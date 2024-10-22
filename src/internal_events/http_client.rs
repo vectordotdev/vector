@@ -95,6 +95,24 @@ impl<'a> InternalEvent for GotHttpWarning<'a> {
     }
 }
 
+#[derive(Debug)]
+pub struct GotAuthExtensionError<'a>  {
+    pub error: &'a Box<dyn std::error::Error>,
+}
+
+impl<'a> InternalEvent for GotAuthExtensionError<'a>  {
+    fn emit(self) {
+        warn!(
+            message = "HTTP Auth extension error.",
+            error = %self.error,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!("http_auth_ext_client_errors_total", "error_kind" => self.error.to_string()).increment(1);
+    }
+}
+
 /// Newtype placeholder to provide a formatter for the request and response body.
 struct FormatBody<'a, B>(&'a B);
 
