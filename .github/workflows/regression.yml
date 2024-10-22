@@ -420,7 +420,7 @@ jobs:
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 70
     needs:
       - compute-metadata
       - upload-baseline-image-to-ecr
@@ -479,7 +479,7 @@ jobs:
           path: ${{ runner.temp }}/submission-metadata
 
       - name: Await job
-        timeout-minutes: 120
+        timeout-minutes: 70
         env:
           RUST_LOG: info
         run: |
@@ -488,7 +488,7 @@ jobs:
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job status \
             --wait \
             --wait-delay-seconds 60 \
-            --wait-timeout-minutes 90 \
+            --wait-timeout-minutes 70 \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Handle cancellation if necessary
