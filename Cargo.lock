@@ -11093,6 +11093,8 @@ dependencies = [
  "pest_derive",
  "prettydiff",
  "prettytable-rs",
+ "proptest",
+ "proptest-derive",
  "prost 0.13.3",
  "prost-reflect",
  "psl",
