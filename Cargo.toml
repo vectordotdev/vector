@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.42.0"
+version = "0.43.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -139,9 +139,9 @@ clap = { version = "4.5.20", default-features = false, features = ["derive", "er
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.1", default-features = false }
 indexmap = { version = "2.6.0", default-features = false, features = ["serde", "std"] }
-metrics = "0.23.0"
-metrics-tracing-context = { version = "0.16.0", default-features = false }
-metrics-util = { version = "0.17.0", default-features = false, features = ["registry"] }
+metrics = "0.24.0"
+metrics-tracing-context = { version = "0.17.0", default-features = false }
+metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 pin-project = { version = "1.1.6", default-features = false }
 proptest = { version = "1.5" }
 proptest-derive = { version = "0.4.0" }
@@ -149,13 +149,14 @@ prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
 prost-types = { version = "0.12", default-features = false }
-serde_json = { version = "1.0.128", default-features = false, features = ["raw_value", "std"] }
+serde_json = { version = "1.0.132", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.210", default-features = false, features = ["alloc", "derive", "rc"] }
 toml = { version = "0.8.19", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
-uuid = { version = "1.10.0", features = ["v4", "v7", "serde"] }
-vrl = { version = "0.19.0", features = ["arbitrary", "cli", "test", "test_framework"] }
+uuid = { version = "1.11.0", features = ["v4", "v7", "serde"] }
+vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
+vrl = { git = "https://github.com/vectordotdev/vrl", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
 pin-project.workspace = true
@@ -171,7 +172,7 @@ dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
-vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
+vector-lib.workspace = true
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
@@ -275,13 +276,13 @@ greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingest
 
 # External libs
 arc-swap = { version = "1.7", default-features = false, optional = true }
-async-compression = { version = "0.4.14", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.4.16", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.22.1", default-features = false, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
 bollard = { version = "0.16.1", default-features = false, features = ["ssl", "chrono"], optional = true }
-bytes = { version = "1.7.2", default-features = false, features = ["serde"] }
+bytes = { version = "1.8.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.3.0", default-features = false }
 chrono.workspace = true
 chrono-tz.workspace = true
@@ -329,9 +330,9 @@ async-nats = { version = "0.33.0", default-features = false, optional = true }
 nkeys = { version = "0.4.4", default-features = false, optional = true }
 nom = { version = "7.1.3", default-features = false, optional = true }
 notify = { version = "6.1.1", default-features = false, features = ["macos_fsevent"] }
-openssl = { version = "0.10.66", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.67", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
-ordered-float = { version = "4.3.0", default-features = false }
+ordered-float = { version = "4.4.0", default-features = false }
 paste = "1.0.15"
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
@@ -394,7 +395,7 @@ azure_storage = { version = "0.17", default-features = false }
 base64 = "0.22.1"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
-libc = "0.2.159"
+libc = "0.2.160"
 similar-asserts = "1.6.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
@@ -405,7 +406,7 @@ test-generator = "0.3.1"
 tokio = { version = "1.40.0", features = ["test-util"] }
 tokio-test = "0.4.4"
 tower-test = "0.4.0"
-vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl", "test"] }
+vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
 
 wiremock = "0.6.2"
@@ -957,7 +958,7 @@ transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduc
 codecs-benches = []
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb"]
-proptest = ["dep:proptest", "dep:proptest-derive"]
+proptest = ["dep:proptest", "dep:proptest-derive", "vrl/proptest"]
 
 [[bench]]
 name = "default"

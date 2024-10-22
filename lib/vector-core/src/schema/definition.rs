@@ -537,7 +537,7 @@ impl Definition {
 
 #[cfg(any(test, feature = "test"))]
 mod test_utils {
-    use super::*;
+    use super::{Definition, Kind};
     use crate::event::{Event, LogEvent};
 
     impl Definition {

@@ -139,13 +139,9 @@ where
 
             // Handle the errors and extract the response.
             let response = response_result
-                .map_err(|error| {
+                .inspect_err(|error| {
                     // Emit the error into the internal events system.
-                    emit!(http_client::GotHttpWarning {
-                        error: &error,
-                        roundtrip
-                    });
-                    error
+                    emit!(http_client::GotHttpWarning { error, roundtrip });
                 })
                 .context(CallRequestSnafu)?;
 
