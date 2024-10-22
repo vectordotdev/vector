@@ -93,12 +93,14 @@ impl Encoder<Framer> {
     }
 
     /// Get the suffix that encloses a batch of events.
-    pub const fn batch_suffix(&self) -> &[u8] {
-        match (&self.framer, &self.serializer) {
+    pub const fn batch_suffix(&self, empty: bool) -> &[u8] {
+        match (&self.framer, &self.serializer, empty) {
             (
                 Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
                 Serializer::Json(_) | Serializer::NativeJson(_),
+                _,
             ) => b"]",
+            (Framer::NewlineDelimited(_), _, false) => b"\n",
             _ => &[],
         }
     }
@@ -321,5 +323,24 @@ mod tests {
         framed.flush().await.unwrap();
         let sink = framed.into_inner();
         assert_eq!(sink, b"(foo)(bar)");
+    }
+
+    #[tokio::test]
+    async fn test_encode_batch_newline() {
+        let encoder = Encoder::<Framer>::new(
+            Framer::NewlineDelimited(NewlineDelimitedEncoder::default()),
+            TextSerializerConfig::default().build().into(),
+        );
+        let source = futures::stream::iter(vec![
+            Event::Log(LogEvent::from("bar")),
+            Event::Log(LogEvent::from("baz")),
+            Event::Log(LogEvent::from("bat")),
+        ])
+        .map(Ok);
+        let sink: Vec<u8> = Vec::new();
+        let mut framed = FramedWrite::new(sink, encoder);
+        source.forward(&mut framed).await.unwrap();
+        let sink = framed.into_inner();
+        assert_eq!(sink, b"bar\nbaz\nbat\n");
     }
 }
