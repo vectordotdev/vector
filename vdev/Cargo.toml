@@ -28,7 +28,7 @@ os_info = { version = "3.8.2", default-features = false }
 owo-colors = { version = "4.1.0", features = ["supports-colors"] }
 paste = "1.0.15"
 regex = { version = "1.11.0", default-features = false, features = ["std", "perf"] }
-reqwest = { version = "0.11", features = ["json", "blocking"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml = "0.9.34"

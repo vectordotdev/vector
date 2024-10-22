@@ -1415,7 +1415,7 @@ dependencies = [
  "pin-project",
  "quick-xml",
  "rand 0.8.5",
- "reqwest 0.11.26",
+ "reqwest 0.11.27",
  "rustc_version 0.4.1",
  "serde",
  "serde_json",
@@ -3818,7 +3818,7 @@ dependencies = [
  "arc-swap",
  "futures 0.3.31",
  "log",
- "reqwest 0.11.26",
+ "reqwest 0.11.27",
  "serde",
  "serde_derive",
  "serde_json",
@@ -4436,7 +4436,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.7",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.40",
@@ -4585,6 +4585,22 @@ dependencies = [
  "native-tls",
  "tokio",
  "tokio-native-tls",
+]
+
+[[package]]
+name = "hyper-tls"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
+dependencies = [
+ "bytes 1.7.2",
+ "http-body-util",
+ "hyper 1.4.1",
+ "hyper-util",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
+ "tower-service",
 ]
 
 [[package]]
@@ -4986,7 +5002,7 @@ dependencies = [
  "k8s-test-framework",
  "rand 0.8.5",
  "regex",
- "reqwest 0.11.26",
+ "reqwest 0.12.4",
  "serde_json",
  "tokio",
  "tracing 0.1.40",
@@ -6209,7 +6225,7 @@ dependencies = [
  "getrandom 0.2.15",
  "http 0.2.9",
  "rand 0.8.5",
- "reqwest 0.11.26",
+ "reqwest 0.11.27",
  "serde",
  "serde_json",
  "serde_path_to_error",
@@ -6317,7 +6333,7 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "quick-xml",
- "reqwest 0.11.26",
+ "reqwest 0.11.27",
  "serde",
  "serde_json",
  "tokio",
@@ -7851,9 +7867,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.26"
+version = "0.11.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78bf93c4af7a8bb7d879d51cebe797356ff10ae8516ace542b5182d9dcac10b2"
+checksum = "dd67538700a17451e7cba03ac727fb961abb7607553461627b97de0b89cf4a62"
 dependencies = [
  "base64 0.21.7",
  "bytes 1.7.2",
@@ -7865,7 +7881,7 @@ dependencies = [
  "http-body 0.4.5",
  "hyper 0.14.28",
  "hyper-rustls 0.24.2",
- "hyper-tls",
+ "hyper-tls 0.5.0",
  "ipnet",
  "js-sys",
  "log",
@@ -7903,19 +7919,24 @@ checksum = "566cafdd92868e0939d3fb961bd0dc25fcfaaed179291093b3d43e6b3150ea10"
 dependencies = [
  "base64 0.22.1",
  "bytes 1.7.2",
+ "encoding_rs",
+ "futures-channel",
  "futures-core",
  "futures-util",
+ "h2 0.4.6",
  "http 1.1.0",
  "http-body 1.0.0",
  "http-body-util",
  "hyper 1.4.1",
  "hyper-rustls 0.26.0",
+ "hyper-tls 0.6.0",
  "hyper-util",
  "ipnet",
  "js-sys",
  "log",
  "mime",
  "mime_guess",
+ "native-tls",
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
@@ -7926,7 +7947,9 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "sync_wrapper 0.1.2",
+ "system-configuration",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls 0.25.0",
  "tokio-util",
  "tower-service",
@@ -10456,7 +10479,7 @@ dependencies = [
  "owo-colors 4.1.0",
  "paste",
  "regex",
- "reqwest 0.11.26",
+ "reqwest 0.12.4",
  "serde",
  "serde_json",
  "serde_yaml 0.9.34+deprecated",
@@ -10599,7 +10622,7 @@ dependencies = [
  "rdkafka",
  "redis",
  "regex",
- "reqwest 0.11.26",
+ "reqwest 0.12.4",
  "rmp-serde",
  "rmpv",
  "roaring",
@@ -10666,7 +10689,7 @@ dependencies = [
  "futures 0.3.31",
  "graphql_client",
  "indoc",
- "reqwest 0.11.26",
+ "reqwest 0.12.4",
  "serde",
  "serde_json",
  "tokio",
