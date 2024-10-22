@@ -7,6 +7,15 @@ on:
       - completed
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo workflow run conclusion
+        run: |
+          echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
+          echo "Workflow run head branch: ${{ github.event.workflow_run.head_branch }}"
+          echo "Workflow run head sha: ${{ github.event.workflow_run.head_sha }}"
+
   deploy_vector_preview_site:
     if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
     uses: ./.github/workflows/create_preview_sites.yml
