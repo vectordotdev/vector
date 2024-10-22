@@ -753,20 +753,28 @@ mod tests {
 
     #[test]
     fn test_annotate_from_file_info() {
-        let path = [
-            "var",
-            "log",
-            "pods",
-            "sandbox0-ns_sandbox0-name_sandbox0-uid",
-            "sandbox0-container0-name",
-            "1.log",
-        ]
-        .iter()
-        .collect::<PathBuf>();
+        let path = &format!(
+            "{}{}",
+            std::path::MAIN_SEPARATOR,
+            [
+                "var",
+                "log",
+                "pods",
+                "sandbox0-ns_sandbox0-name_sandbox0-uid",
+                "sandbox0-container0-name",
+                "1.log",
+            ]
+            .iter()
+            .collect::<PathBuf>()
+            .into_os_string()
+            .into_string()
+            .unwrap()
+        );
+        let s_path = path.as_str();
         let cases = vec![
             (
                 FieldsSpec::default(),
-                path,
+                s_path,
                 {
                     let mut log = LogEvent::default();
                     log.insert(
@@ -783,7 +791,7 @@ mod tests {
                         .into(),
                     ..Default::default()
                 },
-                path,
+                s_path,
                 {
                     let mut log = LogEvent::default();
                     log.insert(event_path!("container_name"), "sandbox0-container0-name");

@@ -69,11 +69,27 @@ mod tests {
 
     #[test]
     fn test_build_pod_logs_directory() {
+        let path = format!(
+            "{}{}",
+            std::path::MAIN_SEPARATOR,
+            [
+                "var",
+                "log",
+                "pods",
+                "sandbox0-ns_sandbox0-name_sandbox0-uid",
+            ]
+            .iter()
+            .collect::<PathBuf>()
+            .into_os_string()
+            .into_string()
+            .unwrap()
+        );
+        let s_path = path.as_str();
         let cases = vec![
             // Valid inputs.
             (
                 ("sandbox0-ns", "sandbox0-name", "sandbox0-uid"),
-                "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid",
+                s_path,
             ),
             // Invalid inputs.
             (("", "", ""), "/var/log/pods/__"),
@@ -89,10 +105,28 @@ mod tests {
 
     #[test]
     fn test_parse_log_file_path() {
+        let path = format!(
+            "{}{}",
+            std::path::MAIN_SEPARATOR,
+            [
+                "var",
+                "log",
+                "pods",
+                "sandbox0-ns_sandbox0-name_sandbox0-uid",
+                "sandbox0-container0-name",
+                "1.log",
+            ]
+            .iter()
+            .collect::<PathBuf>()
+            .into_os_string()
+            .into_string()
+            .unwrap()
+        );
+        let s_path = path.as_str();
         let cases = vec![
             // Valid inputs.
             (
-                "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
+                s_path,
                 Some(LogFileInfo {
                     pod_namespace: "sandbox0-ns",
                     pod_name: "sandbox0-name",
