@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+use axum::async_trait;
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
@@ -13,14 +14,13 @@ use hyper::{
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use rand::Rng;
+use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use std::{
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
+    error::Error, fmt, net::SocketAddr, sync::{Arc, Mutex}, task::{Context, Poll}, time::{Duration, SystemTime, UNIX_EPOCH}
 };
+use bytes::Buf;
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -28,7 +28,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
-use vector_lib::configurable::configurable_component;
+use vector_lib::{configurable::configurable_component, tls::{TlsConfig, TlsSettings}};
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
@@ -72,31 +72,173 @@ impl HttpError {
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
 type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
 
+#[async_trait]
+trait AuthExtension<B>: Send + Sync 
+where 
+    B: fmt::Debug + HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<crate::Error> + Send,
+{
+    async fn modify_request(&self, req: &mut Request<B>);
+}
+
+#[derive(Clone)]
+struct OAuth2Extension 
+{
+    token_endpoint: String,
+    client_id: String,
+    client_secret: SensitiveString,
+    http_client: HttpClient<Body>,
+    token: Arc<Mutex<Option<ExpirableToken>>>
+}
+
+#[derive(Clone)]
+struct BasicAuthExtension {
+    user: String,
+    password: SensitiveString,
+}
+
+#[derive(Debug, Deserialize)]
+struct Token {
+    access_token: String,
+    expires_in: u32 
+}
+
+#[derive(Debug, Clone)]
+struct ExpirableToken {
+    access_token: String,
+    expires_after_ms: u128
+}
+
+impl OAuth2Extension
+{
+    async fn get_token(&self) -> String {
+        if let Some(token) = self.acquire_token_from_cache() {
+            return token.access_token;
+        }
+
+        //no valid token in cache (or no token at all)
+        let new_token = self.request_token().await.unwrap();
+        let token_to_return = new_token.access_token.clone(); 
+        self.save_into_cache(new_token);
+
+        token_to_return
+    }
+
+    fn acquire_token_from_cache(&self) -> Option<ExpirableToken> {
+        let now = SystemTime::now();
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).unwrap();
+        let maybe_token = self.token.lock().unwrap();
+        match &*maybe_token {
+            Some(token) => {
+                if since_the_epoch.as_millis() < token.expires_after_ms {
+                    //we have token, token is valid for at least 1min, we can use it.
+                    return Some(token.clone());
+                }
+
+                return None
+            },
+            _ => None,
+        }
+    }
+
+    fn save_into_cache(&self, token: ExpirableToken) {
+        self.token.lock().unwrap().replace(token);
+    }
+
+    async fn request_token(&self) -> Result<ExpirableToken, Box<dyn Error>> {
+        let request_body = format!("client_secret={}&grant_type=client_credentials&response_type=token&client_id={}", self.client_secret.inner(), self.client_id);
+                
+        let builder = Request::post(self.token_endpoint.clone());
+        let builder = builder.header("Content-Type", "application/x-www-form-urlencoded");
+        let request = builder.body(Body::from(request_body)).expect("error creating request");
+
+        let response = self.http_client.send(request).await.unwrap();
+
+        let body = hyper::body::aggregate(response).await.unwrap();
+        let token: Token = serde_json::from_reader(body.reader()).unwrap();
+
+        //expires_in means, in seconds, for how long it will be valid, lets say 5min, 
+        //to not cause some random 4xx, because token expired in the meantime, we will make some
+        //room for token refreshing, this room is 1min (60seconds)
+        let token_is_valid_for_ms = (token.expires_in - 60) * 1000;
+        let now = SystemTime::now();
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).unwrap();
+        let token_will_expire_after_ms = since_the_epoch.as_millis() + (token_is_valid_for_ms as u128);
+
+        Ok(ExpirableToken{access_token:token.access_token, expires_after_ms: token_will_expire_after_ms})
+    }
+}
+
+#[async_trait]
+impl <B> AuthExtension<B> for OAuth2Extension
+where 
+    B: fmt::Debug + HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<crate::Error> + Send,
+{
+    async fn modify_request(&self, req: &mut Request<B>)
+    {
+        let token = self.get_token().await;
+        let auth = Auth::Bearer{ token: SensitiveString::from(token)};
+        auth.apply(req);
+    }
+}
+
+
+#[async_trait]
+impl <B> AuthExtension<B> for BasicAuthExtension
+where 
+    B: fmt::Debug + HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<crate::Error> + Send,
+{
+    async fn modify_request(&self, req: &mut Request<B>)
+    {
+        let user = self.user.clone();
+        let password = self.password.clone();
+
+        let auth = Auth::Basic{ user, password };
+        auth.apply(req);
+    }
+}
+
 pub struct HttpClient<B = Body> {
     client: Client<HttpProxyConnector, B>,
     user_agent: HeaderValue,
     proxy_connector: HttpProxyConnector,
+    auth_extension: Option<Arc<Box<dyn AuthExtension<B>>>>
 }
 
 impl<B> HttpClient<B>
 where
     B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
-    B::Error: Into<crate::Error>,
+    B::Error: Into<crate::Error> + Send,
 {
     pub fn new(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
     ) -> Result<HttpClient<B>, HttpError> {
-        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
+        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder(), None)
+    }
+
+    pub fn new_with_auth_extension(
+        tls_settings: impl Into<MaybeTlsSettings>,
+        proxy_config: &ProxyConfig,
+        auth_config: Option<HttpClientAuthorizationConfig>
+    ) -> Result<HttpClient<B>, HttpError> {
+        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder(), auth_config)
     }
 
     pub fn new_with_custom_client(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
         client_builder: &mut client::Builder,
+        auth_config: Option<HttpClientAuthorizationConfig>,
     ) -> Result<HttpClient<B>, HttpError> {
         let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
+        let auth_extension = build_auth_extension(auth_config, proxy_config);
         let client = client_builder.build(proxy_connector.clone());
 
         let app_name = crate::get_app_name();
@@ -108,6 +250,7 @@ where
             client,
             user_agent,
             proxy_connector,
+            auth_extension
         })
     }
 
@@ -119,13 +262,21 @@ where
         let _enter = span.enter();
 
         default_request_headers(&mut request, &self.user_agent);
-        self.maybe_add_proxy_headers(&mut request);
+        self.maybe_add_proxy_headers(&mut request); 
 
-        emit!(http_client::AboutToSendHttpRequest { request: &request });
-
-        let response = self.client.request(request);
+        let client = self.client.clone();
+        let request_extension = self.auth_extension.clone();
 
         let fut = async move {
+
+            emit!(http_client::AboutToSendHttpRequest { request: &request });
+
+            if let Some(request_extension) = request_extension {
+                request_extension.modify_request(&mut request).await;
+            }
+
+            let response: client::ResponseFuture = client.request(request);
+
             // Capture the time right before we issue the request.
             // Request doesn't start the processing until we start polling it.
             let before = std::time::Instant::now();
@@ -167,6 +318,42 @@ where
             }
         }
     }
+}
+
+fn build_auth_extension<B>(http_client_authorization_strategy: Option<HttpClientAuthorizationConfig>, 
+    proxy_config: &ProxyConfig,
+) -> Option<Arc<Box<dyn AuthExtension<B>>>>
+where 
+    B: fmt::Debug + HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<crate::Error> + Send,
+{
+    if let Some(http_client_authorization_strategy) = http_client_authorization_strategy {
+        match http_client_authorization_strategy.auth {
+            HttpClientAuthorizationStrategy::Basic { user, password } => {
+                let basic_auth_extension = BasicAuthExtension{user, password};
+                return Some(Arc::new(Box::new(basic_auth_extension)));
+            },
+            HttpClientAuthorizationStrategy::OAuth2 { token_endpoint, client_id, client_secret } => {
+                let tls_for_auth = http_client_authorization_strategy.tls.clone();
+                let tls_for_auth: TlsSettings = TlsSettings::from_options(&tls_for_auth).unwrap();
+                let empty_token = Arc::new(Mutex::new(None));
+                let auth_client = HttpClient::new(tls_for_auth, proxy_config).unwrap();
+
+                let oauth2_extension = OAuth2Extension {
+                    token_endpoint,
+                    client_id,
+                    client_secret,
+                    http_client: auth_client,
+                    token: empty_token
+                };
+
+                return Some(Arc::new(Box::new(oauth2_extension)));
+            },
+        }
+    }
+
+    None
 }
 
 pub fn build_proxy_connector(
@@ -249,6 +436,7 @@ impl<B> Clone for HttpClient<B> {
             client: self.client.clone(),
             user_agent: self.user_agent.clone(),
             proxy_connector: self.proxy_connector.clone(),
+            auth_extension: self.auth_extension.clone()
         }
     }
 }
@@ -260,6 +448,65 @@ impl<B> fmt::Debug for HttpClient<B> {
             .field("user_agent", &self.user_agent)
             .finish()
     }
+}
+
+/// Configuration for HTTP client providing an authentication mechanism. 
+#[configurable_component]
+#[configurable(metadata(docs::advanced))]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct HttpClientAuthorizationConfig {
+    /// Define how to authorize against an upstream.
+    #[configurable]
+    auth: HttpClientAuthorizationStrategy,
+
+    /// The TLS settings for the http client's connection.
+    ///
+    /// Optional, constrains TLS settings for this http client.
+    #[configurable(derived)]
+    tls: Option<TlsConfig>,
+}
+
+/// Configuration of the authentication strategy for HTTP requests.
+///
+/// HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
+/// HTTP header without any additional encryption beyond what is provided by the transport itself.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
+pub enum HttpClientAuthorizationStrategy {
+    /// Basic authentication.
+    ///
+    /// The username and password are concatenated and encoded via [base64][base64].
+    ///
+    /// [base64]: https://en.wikipedia.org/wiki/Base64
+    Basic {
+        /// The basic authentication username.
+        #[configurable(metadata(docs::examples = "username"))]
+        user: String,
+
+        /// The basic authentication password.
+        #[configurable(metadata(docs::examples = "password"))]
+        password: SensitiveString,
+    },
+
+    /// Authentication based on OAuth 2.0 protocol.
+    ///
+    /// This strategy allows to dynamically acquire and use token based on provided parameters.
+    OAuth2 {
+        /// Token endpoint location, required for token acquisition.
+        #[configurable(metadata(docs::examples = "https://auth.provider/oauth/token"))]
+        token_endpoint: String,
+
+        /// The client id.
+        #[configurable(metadata(docs::examples = "client_id"))]
+        client_id: String,
+
+        /// The sensitive client secret.
+        #[configurable(metadata(docs::examples = "client_secret"))]
+        client_secret: SensitiveString,
+    },
 }
 
 /// Configuration of the authentication strategy for HTTP requests.
