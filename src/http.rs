@@ -88,7 +88,7 @@ struct OAuth2Extension
     token_endpoint: String,
     client_id: String,
     client_secret: SensitiveString,
-    http_client: HttpClient<Body>,
+    client: Client<HttpProxyConnector, Body>,
     token: Arc<Mutex<Option<ExpirableToken>>>
 }
 
@@ -153,7 +153,20 @@ impl OAuth2Extension
         let builder = builder.header("Content-Type", "application/x-www-form-urlencoded");
         let request = builder.body(Body::from(request_body)).expect("error creating request");
 
-        let response = self.http_client.send(request).await.unwrap();
+        let before = std::time::Instant::now();
+        let response_result = self.client.request(request).await;
+        let roundtrip = before.elapsed();
+
+        let response = response_result
+        .inspect_err(|error| {
+            emit!(http_client::GotHttpWarning { error, roundtrip });
+        })
+        .context(CallRequestSnafu)?;
+
+        emit!(http_client::GotHttpResponse {
+            response: &response,
+            roundtrip
+        });
 
         let body = hyper::body::aggregate(response).await.unwrap();
         let token: Token = serde_json::from_reader(body.reader()).unwrap();
@@ -185,7 +198,6 @@ where
     }
 }
 
-
 #[async_trait]
 impl <B> AuthExtension<B> for BasicAuthExtension
 where 
@@ -207,7 +219,7 @@ pub struct HttpClient<B = Body> {
     client: Client<HttpProxyConnector, B>,
     user_agent: HeaderValue,
     proxy_connector: HttpProxyConnector,
-    auth_extension: Option<Arc<Box<dyn AuthExtension<B>>>>
+    auth_extension: Option<Arc<dyn AuthExtension<B>>>
 }
 
 impl<B> HttpClient<B>
@@ -238,7 +250,7 @@ where
         auth_config: Option<HttpClientAuthorizationConfig>,
     ) -> Result<HttpClient<B>, HttpError> {
         let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
-        let auth_extension = build_auth_extension(auth_config, proxy_config);
+        let auth_extension = build_auth_extension(auth_config, proxy_config, client_builder);
         let client = client_builder.build(proxy_connector.clone());
 
         let app_name = crate::get_app_name();
@@ -265,16 +277,19 @@ where
         self.maybe_add_proxy_headers(&mut request); 
 
         let client = self.client.clone();
-        let request_extension = self.auth_extension.clone();
+        let auth_extension = self.auth_extension.clone();
 
         let fut = async move {
 
-            emit!(http_client::AboutToSendHttpRequest { request: &request });
-
-            if let Some(request_extension) = request_extension {
-                request_extension.modify_request(&mut request).await;
+            //should request for token influence upstream service latency ?            
+            if let Some(auth_extension) = auth_extension {
+                let auth_span = tracing::info_span!("auth_extension");
+                auth_extension.modify_request(&mut request)
+                    .instrument(auth_span.clone().or_current())
+                    .await;
             }
 
+            emit!(http_client::AboutToSendHttpRequest { request: &request });
             let response: client::ResponseFuture = client.request(request);
 
             // Capture the time right before we issue the request.
@@ -322,7 +337,8 @@ where
 
 fn build_auth_extension<B>(http_client_authorization_strategy: Option<HttpClientAuthorizationConfig>, 
     proxy_config: &ProxyConfig,
-) -> Option<Arc<Box<dyn AuthExtension<B>>>>
+    client_builder: &mut client::Builder,
+) -> Option<Arc<dyn AuthExtension<B>>>
 where 
     B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
@@ -332,23 +348,25 @@ where
         match http_client_authorization_strategy.auth {
             HttpClientAuthorizationStrategy::Basic { user, password } => {
                 let basic_auth_extension = BasicAuthExtension{user, password};
-                return Some(Arc::new(Box::new(basic_auth_extension)));
+                return Some(Arc::new(basic_auth_extension));
             },
             HttpClientAuthorizationStrategy::OAuth2 { token_endpoint, client_id, client_secret } => {
                 let tls_for_auth = http_client_authorization_strategy.tls.clone();
                 let tls_for_auth: TlsSettings = TlsSettings::from_options(&tls_for_auth).unwrap();
                 let empty_token = Arc::new(Mutex::new(None));
-                let auth_client = HttpClient::new(tls_for_auth, proxy_config).unwrap();
+
+                let auth_proxy_connector = build_proxy_connector(tls_for_auth.into(), proxy_config).unwrap();
+                let auth_client = client_builder.build(auth_proxy_connector.clone());
 
                 let oauth2_extension = OAuth2Extension {
                     token_endpoint,
                     client_id,
                     client_secret,
-                    http_client: auth_client,
+                    client: auth_client,
                     token: empty_token
                 };
 
-                return Some(Arc::new(Box::new(oauth2_extension)));
+                return Some(Arc::new(oauth2_extension));
             },
         }
     }
