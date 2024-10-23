@@ -158,6 +158,7 @@ pub struct RootOpts {
     /// - `inotify` for Linux-based systems.
     /// - `kqueue` for unix/macos
     /// - `ReadDirectoryChangesWatcher` for windows
+    ///
     /// The `poll` watcher can be used in cases where `inotify` doesn't work, e.g., when attaching the configuration via NFS.
     #[arg(
         long,
