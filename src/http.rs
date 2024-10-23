@@ -193,8 +193,8 @@ impl OAuth2Extension
         }
 
         let token_is_valid_for_ms : u128 = grace_period_seconds as u128 * 1000;
-        //we are multiplying by 1000 becuase expires_in field is in seconds, grace_period also, 
-        //but later we oparate on miliseconds. 
+        //we are multiplying by 1000 because expires_in field is in seconds, grace_period also, 
+        //but later we operate on milliseconds. 
         let now = SystemTime::now();
         let since_the_epoch = now.duration_since(UNIX_EPOCH).unwrap();
         let token_will_expire_after_ms = since_the_epoch.as_millis() + (token_is_valid_for_ms as u128);
