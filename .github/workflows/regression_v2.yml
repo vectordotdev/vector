@@ -175,6 +175,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: check-source-changed
     if: ${{ needs.check-source-changed.outputs.source_changed }}
+    steps:
+      - name: Gate check passed
+        run: echo "Source code changes detected, proceeding with regression tests"
 
   ##
   ## BUILD
