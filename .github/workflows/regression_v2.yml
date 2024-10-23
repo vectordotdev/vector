@@ -152,7 +152,6 @@ jobs:
       # wouldn't likely introduce regressions.
       - name: Determine if should not run due to irrelevant file changes
         id: filter
-        if: github.event_name == 'merge_group'
         env:
           ALL: ${{ steps.changes.outputs.all_changed_files }}
           IGNORE: ${{ steps.changes.outputs.ignore_files }}
