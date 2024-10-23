@@ -1,7 +1,7 @@
 #
 # VECTOR BUILDER
 #
-FROM ghcr.io/vectordotdev/vector/soak-builder@sha256:c51a7091de2caebaa690e17f37dbfed4d4059dcdf5114a5596e8ca9b5ef494f3 as builder
+FROM ghcr.io/vectordotdev/vector/soak-builder@sha256:c51a7091de2caebaa690e17f37dbfed4d4059dcdf5114a5596e8ca9b5ef494f3 AS builder
 WORKDIR /vector
 COPY . .
 RUN bash scripts/environment/install-protoc.sh
