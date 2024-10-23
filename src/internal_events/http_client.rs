@@ -96,20 +96,25 @@ impl<'a> InternalEvent for GotHttpWarning<'a> {
 }
 
 #[derive(Debug)]
-pub struct GotAuthExtensionError<'a>  {
+pub struct AuthExtensionError<'a>  {
     pub error: &'a Box<dyn std::error::Error + Send + Sync>,
 }
 
-impl<'a> InternalEvent for GotAuthExtensionError<'a>  {
+impl<'a> InternalEvent for AuthExtensionError<'a>  {
     fn emit(self) {
-        warn!(
+        error!(
             message = "HTTP Auth extension error.",
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::PROCESSING,
             internal_log_rate_limit = true,
         );
-        counter!("http_auth_ext_client_errors_total", "error_kind" => self.error.to_string()).increment(1);
+        counter!(
+            "component_errors_total",
+            "error_type" => error_type::CONFIGURATION_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
     }
 }
 

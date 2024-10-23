@@ -10,7 +10,6 @@ checkpoints/*
 miniodat
 bench_output.txt
 sample.log
-vector.yaml
 scripts/package-lock.json
 target
 node_modules

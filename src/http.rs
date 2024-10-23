@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use axum::async_trait;
+use async_trait::async_trait;
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
@@ -57,7 +57,7 @@ pub enum HttpError {
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
     #[snafu(display("Failed to acquire authentication resource."))]
-    ExtensionAuthentication {
+    AuthenticationExtension {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
 }
@@ -68,7 +68,7 @@ impl HttpError {
             HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
             HttpError::CallRequest { .. }
             | HttpError::BuildTlsConnector { .. }
-            | HttpError::ExtensionAuthentication { .. }
+            | HttpError::AuthenticationExtension { .. }
             | HttpError::MakeHttpsConnector { .. } => true,
         }
     }
@@ -93,6 +93,7 @@ struct OAuth2Extension
     token_endpoint: String,
     client_id: String,
     client_secret: SensitiveString,
+    grace_period: u32,
     client: Client<HttpProxyConnector, Body>,
     token: Arc<Mutex<Option<ExpirableToken>>>
 }
@@ -183,8 +184,17 @@ impl OAuth2Extension
 
         //expires_in means, in seconds, for how long it will be valid, lets say 5min, 
         //to not cause some random 4xx, because token expired in the meantime, we will make some
-        //room for token refreshing, this room is 1min (60seconds)
-        let token_is_valid_for_ms = (token.expires_in - 60) * 1000;
+        //room for token refreshing, this room is a grace_period.
+        let (mut grace_period_seconds, overflow) = token.expires_in.overflowing_sub(self.grace_period);
+
+        //if time for grace period exceed an expire_in, it basically means: always use new token.
+        if overflow {
+            grace_period_seconds = 0;
+        }
+
+        let token_is_valid_for_ms : u128 = grace_period_seconds as u128 * 1000;
+        //we are multiplying by 1000 becuase expires_in field is in seconds, grace_period also, 
+        //but later we oparate on miliseconds. 
         let now = SystemTime::now();
         let since_the_epoch = now.duration_since(UNIX_EPOCH).unwrap();
         let token_will_expire_after_ms = since_the_epoch.as_millis() + (token_is_valid_for_ms as u128);
@@ -315,9 +325,9 @@ where
                     .await
                     .inspect_err(|error| {
                         // Emit the error into the internal events system.
-                        emit!(http_client::GotAuthExtensionError{error});
+                        emit!(http_client::AuthExtensionError{error});
                     })
-                    .context(ExtensionAuthenticationSnafu)?;
+                    .context(AuthenticationExtensionSnafu)?;
             }
 
             emit!(http_client::AboutToSendHttpRequest { request: &request });
@@ -381,7 +391,7 @@ where
                 let basic_auth_extension = BasicAuthExtension{user, password};
                 return Some(Arc::new(basic_auth_extension));
             },
-            HttpClientAuthorizationStrategy::OAuth2 { token_endpoint, client_id, client_secret } => {
+            HttpClientAuthorizationStrategy::OAuth2 { token_endpoint, client_id, client_secret, grace_period } => {
                 let tls_for_auth = http_client_authorization_strategy.tls.clone();
                 let tls_for_auth: TlsSettings = TlsSettings::from_options(&tls_for_auth).unwrap();
                 let empty_token = Arc::new(Mutex::new(None));
@@ -393,6 +403,7 @@ where
                     token_endpoint,
                     client_id,
                     client_secret,
+                    grace_period,
                     client: auth_client,
                     token: empty_token
                 };
@@ -555,7 +566,21 @@ pub enum HttpClientAuthorizationStrategy {
         /// The sensitive client secret.
         #[configurable(metadata(docs::examples = "client_secret"))]
         client_secret: SensitiveString,
+        
+        /// The grace period configuration for a bearer token.
+        /// To avoid random authorization failures caused by expired token exception, 
+        /// we will acquire new token, some time (grace period) before current token will be expired,
+        /// because of that, we will always execute request with fresh enought token.
+        #[serde(default = "default_oauth2_token_grace_period")]
+        #[configurable(metadata(docs::examples = 300))]
+        #[configurable(metadata(docs::type_unit = "seconds"))]
+        #[configurable(metadata(docs::human_name = "Grace period for bearer token."))]
+        grace_period: u32,
     },
+}
+
+const fn default_oauth2_token_grace_period() -> u32 {
+    300 // 5 minutes
 }
 
 /// Configuration of the authentication strategy for HTTP requests.
