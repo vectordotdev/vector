@@ -57,7 +57,9 @@ pub enum HttpError {
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
     #[snafu(display("Failed to acquire authentication resource."))]
-    ExtensionAuthentication,
+    ExtensionAuthentication {
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
 }
 
 impl HttpError {
@@ -82,7 +84,7 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn Error>>;
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
 }
 
 #[derive(Clone)]
@@ -115,7 +117,7 @@ struct ExpirableToken {
 
 impl OAuth2Extension
 {
-    async fn get_token(&self) -> Result<String, Box<dyn Error>> {
+    async fn get_token(&self) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         if let Some(token) = self.acquire_token_from_cache() {
             return Ok(token.access_token);
         }
@@ -149,7 +151,7 @@ impl OAuth2Extension
         self.token.lock().unwrap().replace(token);
     }
 
-    async fn request_token(&self) -> Result<ExpirableToken, Box<dyn Error>> {
+    async fn request_token(&self) -> Result<ExpirableToken, Box<dyn std::error::Error + Send + Sync>> {
         let request_body = format!("client_secret={}&grant_type=client_credentials&response_type=token&client_id={}", self.client_secret.inner(), self.client_id);
                 
         let builder = Request::post(self.token_endpoint.clone());
@@ -163,8 +165,7 @@ impl OAuth2Extension
         let response = response_result
         .inspect_err(|error| {
             emit!(http_client::GotHttpWarning { error, roundtrip });
-        })
-        .context(CallRequestSnafu)?;
+        })?;
 
         emit!(http_client::GotHttpResponse {
             response: &response,
@@ -212,7 +213,7 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn Error>>
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
     {
         let token = self.get_token().await?;
         let auth = Auth::Bearer{ token: SensitiveString::from(token)};
@@ -229,7 +230,7 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn Error>>
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
     {
         let user = self.user.clone();
         let password = self.password.clone();
@@ -309,18 +310,14 @@ where
             //should request for token influence upstream service latency ?            
             if let Some(auth_extension) = auth_extension {
                 let auth_span = tracing::info_span!("auth_extension");
-                let res = auth_extension.modify_request(&mut request)
+                auth_extension.modify_request(&mut request)
                     .instrument(auth_span.clone().or_current())
                     .await
                     .inspect_err(|error| {
                         // Emit the error into the internal events system.
                         emit!(http_client::GotAuthExtensionError{error});
                     })
-                    .map_err(|_err| HttpError::ExtensionAuthentication);
-
-                if let Err(e) = res {
-                    return Err(e)
-                }
+                    .context(ExtensionAuthenticationSnafu)?;
             }
 
             emit!(http_client::AboutToSendHttpRequest { request: &request });
