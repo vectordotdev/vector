@@ -570,7 +570,7 @@ pub enum HttpClientAuthorizationStrategy {
         /// The grace period configuration for a bearer token.
         /// To avoid random authorization failures caused by expired token exception, 
         /// we will acquire new token, some time (grace period) before current token will be expired,
-        /// because of that, we will always execute request with fresh enought token.
+        /// because of that, we will always execute request with fresh enough token.
         #[serde(default = "default_oauth2_token_grace_period")]
         #[configurable(metadata(docs::examples = 300))]
         #[configurable(metadata(docs::type_unit = "seconds"))]
