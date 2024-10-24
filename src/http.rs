@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+use async_trait::async_trait;
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
@@ -13,14 +14,13 @@ use hyper::{
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use rand::Rng;
+use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use std::{
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
+    error::Error, fmt, net::SocketAddr, sync::{Arc, Mutex}, task::{Context, Poll}, time::{Duration, SystemTime, UNIX_EPOCH}
 };
+use bytes::Buf;
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -28,7 +28,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
-use vector_lib::configurable::configurable_component;
+use vector_lib::{configurable::configurable_component, tls::{TlsConfig, TlsSettings}};
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
@@ -56,6 +56,10 @@ pub enum HttpError {
     CallRequest { source: hyper::Error },
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
+    #[snafu(display("Failed to acquire authentication resource."))]
+    AuthenticationExtension {
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
 }
 
 impl HttpError {
@@ -64,6 +68,7 @@ impl HttpError {
             HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
             HttpError::CallRequest { .. }
             | HttpError::BuildTlsConnector { .. }
+            | HttpError::AuthenticationExtension { .. }
             | HttpError::MakeHttpsConnector { .. } => true,
         }
     }
@@ -72,31 +77,217 @@ impl HttpError {
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
 type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
 
+#[async_trait]
+trait AuthExtension<B>: Send + Sync 
+where 
+    B: fmt::Debug + HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<crate::Error> + Send,
+{
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
+}
+
+#[derive(Clone)]
+struct OAuth2Extension 
+{
+    token_endpoint: String,
+    client_id: String,
+    client_secret: SensitiveString,
+    grace_period: u32,
+    client: Client<HttpProxyConnector, Body>,
+    token: Arc<Mutex<Option<ExpirableToken>>>
+}
+
+#[derive(Clone)]
+struct BasicAuthExtension {
+    user: String,
+    password: SensitiveString,
+}
+
+#[derive(Debug, Deserialize)]
+struct Token {
+    access_token: String,
+    expires_in: u32 
+}
+
+#[derive(Debug, Clone)]
+struct ExpirableToken {
+    access_token: String,
+    expires_after_ms: u128
+}
+
+impl OAuth2Extension
+{
+    async fn get_token(&self) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        if let Some(token) = self.acquire_token_from_cache() {
+            return Ok(token.access_token);
+        }
+
+        //no valid token in cache (or no token at all)
+        let new_token = self.request_token().await?;
+        let token_to_return = new_token.access_token.clone(); 
+        self.save_into_cache(new_token);
+
+        Ok(token_to_return)
+    }
+
+    fn acquire_token_from_cache(&self) -> Option<ExpirableToken> {
+        let now = SystemTime::now();
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).unwrap();
+        let maybe_token = self.token.lock().unwrap();
+        match &*maybe_token {
+            Some(token) => {
+                if since_the_epoch.as_millis() < token.expires_after_ms {
+                    //we have token, token is valid for at least 1min, we can use it.
+                    return Some(token.clone());
+                }
+
+                return None
+            },
+            _ => None,
+        }
+    }
+
+    fn save_into_cache(&self, token: ExpirableToken) {
+        self.token.lock().unwrap().replace(token);
+    }
+
+    async fn request_token(&self) -> Result<ExpirableToken, Box<dyn std::error::Error + Send + Sync>> {
+        let request_body = format!("client_secret={}&grant_type=client_credentials&response_type=token&client_id={}", self.client_secret.inner(), self.client_id);
+                
+        let builder = Request::post(self.token_endpoint.clone());
+        let builder = builder.header("Content-Type", "application/x-www-form-urlencoded");
+        let request = builder.body(Body::from(request_body)).expect("error creating request");
+
+        let before = std::time::Instant::now();
+        let response_result = self.client.request(request).await;
+        let roundtrip = before.elapsed();
+
+        let response = response_result
+        .inspect_err(|error| {
+            emit!(http_client::GotHttpWarning { error, roundtrip });
+        })?;
+
+        emit!(http_client::GotHttpResponse {
+            response: &response,
+            roundtrip
+        });
+
+        if !response.status().is_success() {
+            let body_bytes = hyper::body::aggregate(response).await?;
+            let body_str = std::str::from_utf8(body_bytes.chunk())?.to_string();
+            return Err(Box::new(AcquireTokenError{message: body_str}));
+        }
+
+        let body = hyper::body::aggregate(response).await?;
+        let token: Token = serde_json::from_reader(body.reader())?;
+
+        //expires_in means, in seconds, for how long it will be valid, lets say 5min, 
+        //to not cause some random 4xx, because token expired in the meantime, we will make some
+        //room for token refreshing, this room is a grace_period.
+        let (mut grace_period_seconds, overflow) = token.expires_in.overflowing_sub(self.grace_period);
+
+        //if time for grace period exceed an expire_in, it basically means: always use new token.
+        if overflow {
+            grace_period_seconds = 0;
+        }
+
+        let token_is_valid_for_ms : u128 = grace_period_seconds as u128 * 1000;
+        //we are multiplying by 1000 because expires_in field is in seconds, grace_period also, 
+        //but later we operate on milliseconds. 
+        let now = SystemTime::now();
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).unwrap();
+        let token_will_expire_after_ms = since_the_epoch.as_millis() + (token_is_valid_for_ms as u128);
+
+        Ok(ExpirableToken{access_token:token.access_token, expires_after_ms: token_will_expire_after_ms})
+    }
+}
+
+#[derive(Debug)]
+pub struct AcquireTokenError {
+    message: String
+}
+
+impl fmt::Display for AcquireTokenError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Server error from authentication server: {}", self.message)
+    }
+}
+
+impl Error for AcquireTokenError {}
+
+#[async_trait]
+impl <B> AuthExtension<B> for OAuth2Extension
+where 
+    B: fmt::Debug + HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<crate::Error> + Send,
+{
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+    {
+        let token = self.get_token().await?;
+        let auth = Auth::Bearer{ token: SensitiveString::from(token)};
+        auth.apply(req);
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl <B> AuthExtension<B> for BasicAuthExtension
+where 
+    B: fmt::Debug + HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<crate::Error> + Send,
+{
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+    {
+        let user = self.user.clone();
+        let password = self.password.clone();
+
+        let auth = Auth::Basic{ user, password };
+        auth.apply(req);
+
+        Ok(())
+    }
+}
+
 pub struct HttpClient<B = Body> {
     client: Client<HttpProxyConnector, B>,
     user_agent: HeaderValue,
     proxy_connector: HttpProxyConnector,
+    auth_extension: Option<Arc<dyn AuthExtension<B>>>
 }
 
 impl<B> HttpClient<B>
 where
     B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
-    B::Error: Into<crate::Error>,
+    B::Error: Into<crate::Error> + Send,
 {
     pub fn new(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
     ) -> Result<HttpClient<B>, HttpError> {
-        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
+        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder(), None)
+    }
+
+    pub fn new_with_auth_extension(
+        tls_settings: impl Into<MaybeTlsSettings>,
+        proxy_config: &ProxyConfig,
+        auth_config: Option<HttpClientAuthorizationConfig>
+    ) -> Result<HttpClient<B>, HttpError> {
+        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder(), auth_config)
     }
 
     pub fn new_with_custom_client(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
         client_builder: &mut client::Builder,
+        auth_config: Option<HttpClientAuthorizationConfig>,
     ) -> Result<HttpClient<B>, HttpError> {
         let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
+        let auth_extension = build_auth_extension(auth_config, proxy_config, client_builder);
         let client = client_builder.build(proxy_connector.clone());
 
         let app_name = crate::get_app_name();
@@ -108,6 +299,7 @@ where
             client,
             user_agent,
             proxy_connector,
+            auth_extension
         })
     }
 
@@ -119,13 +311,28 @@ where
         let _enter = span.enter();
 
         default_request_headers(&mut request, &self.user_agent);
-        self.maybe_add_proxy_headers(&mut request);
+        self.maybe_add_proxy_headers(&mut request); 
 
-        emit!(http_client::AboutToSendHttpRequest { request: &request });
-
-        let response = self.client.request(request);
+        let client = self.client.clone();
+        let auth_extension = self.auth_extension.clone();
 
         let fut = async move {
+            //should request for token influence upstream service latency ?            
+            if let Some(auth_extension) = auth_extension {
+                let auth_span = tracing::info_span!("auth_extension");
+                auth_extension.modify_request(&mut request)
+                    .instrument(auth_span.clone().or_current())
+                    .await
+                    .inspect_err(|error| {
+                        // Emit the error into the internal events system.
+                        emit!(http_client::AuthExtensionError{error});
+                    })
+                    .context(AuthenticationExtensionSnafu)?;
+            }
+
+            emit!(http_client::AboutToSendHttpRequest { request: &request });
+            let response: client::ResponseFuture = client.request(request);
+
             // Capture the time right before we issue the request.
             // Request doesn't start the processing until we start polling it.
             let before = std::time::Instant::now();
@@ -167,6 +374,46 @@ where
             }
         }
     }
+}
+
+fn build_auth_extension<B>(http_client_authorization_strategy: Option<HttpClientAuthorizationConfig>, 
+    proxy_config: &ProxyConfig,
+    client_builder: &mut client::Builder,
+) -> Option<Arc<dyn AuthExtension<B>>>
+where 
+    B: fmt::Debug + HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<crate::Error> + Send,
+{
+    if let Some(http_client_authorization_strategy) = http_client_authorization_strategy {
+        match http_client_authorization_strategy.auth {
+            HttpClientAuthorizationStrategy::Basic { user, password } => {
+                let basic_auth_extension = BasicAuthExtension{user, password};
+                return Some(Arc::new(basic_auth_extension));
+            },
+            HttpClientAuthorizationStrategy::OAuth2 { token_endpoint, client_id, client_secret, grace_period } => {
+                let tls_for_auth = http_client_authorization_strategy.tls.clone();
+                let tls_for_auth: TlsSettings = TlsSettings::from_options(&tls_for_auth).unwrap();
+                let empty_token = Arc::new(Mutex::new(None));
+
+                let auth_proxy_connector = build_proxy_connector(tls_for_auth.into(), proxy_config).unwrap();
+                let auth_client = client_builder.build(auth_proxy_connector.clone());
+
+                let oauth2_extension = OAuth2Extension {
+                    token_endpoint,
+                    client_id,
+                    client_secret,
+                    grace_period,
+                    client: auth_client,
+                    token: empty_token
+                };
+
+                return Some(Arc::new(oauth2_extension));
+            },
+        }
+    }
+
+    None
 }
 
 pub fn build_proxy_connector(
@@ -249,6 +496,7 @@ impl<B> Clone for HttpClient<B> {
             client: self.client.clone(),
             user_agent: self.user_agent.clone(),
             proxy_connector: self.proxy_connector.clone(),
+            auth_extension: self.auth_extension.clone()
         }
     }
 }
@@ -260,6 +508,79 @@ impl<B> fmt::Debug for HttpClient<B> {
             .field("user_agent", &self.user_agent)
             .finish()
     }
+}
+
+/// Configuration for HTTP client providing an authentication mechanism. 
+#[configurable_component]
+#[configurable(metadata(docs::advanced))]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct HttpClientAuthorizationConfig {
+    /// Define how to authorize against an upstream.
+    #[configurable]
+    auth: HttpClientAuthorizationStrategy,
+
+    /// The TLS settings for the http client's connection.
+    ///
+    /// Optional, constrains TLS settings for this http client.
+    #[configurable(derived)]
+    tls: Option<TlsConfig>,
+}
+
+/// Configuration of the authentication strategy for HTTP requests.
+///
+/// HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
+/// HTTP header without any additional encryption beyond what is provided by the transport itself.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
+pub enum HttpClientAuthorizationStrategy {
+    /// Basic authentication.
+    ///
+    /// The username and password are concatenated and encoded via [base64][base64].
+    ///
+    /// [base64]: https://en.wikipedia.org/wiki/Base64
+    Basic {
+        /// The basic authentication username.
+        #[configurable(metadata(docs::examples = "username"))]
+        user: String,
+
+        /// The basic authentication password.
+        #[configurable(metadata(docs::examples = "password"))]
+        password: SensitiveString,
+    },
+
+    /// Authentication based on OAuth 2.0 protocol.
+    ///
+    /// This strategy allows to dynamically acquire and use token based on provided parameters.
+    OAuth2 {
+        /// Token endpoint location, required for token acquisition.
+        #[configurable(metadata(docs::examples = "https://auth.provider/oauth/token"))]
+        token_endpoint: String,
+
+        /// The client id.
+        #[configurable(metadata(docs::examples = "client_id"))]
+        client_id: String,
+
+        /// The sensitive client secret.
+        #[configurable(metadata(docs::examples = "client_secret"))]
+        client_secret: SensitiveString,
+        
+        /// The grace period configuration for a bearer token.
+        /// To avoid random authorization failures caused by expired token exception, 
+        /// we will acquire new token, some time (grace period) before current token will be expired,
+        /// because of that, we will always execute request with fresh enough token.
+        #[serde(default = "default_oauth2_token_grace_period")]
+        #[configurable(metadata(docs::examples = 300))]
+        #[configurable(metadata(docs::type_unit = "seconds"))]
+        #[configurable(metadata(docs::human_name = "Grace period for bearer token."))]
+        grace_period: u32,
+    },
+}
+
+const fn default_oauth2_token_grace_period() -> u32 {
+    300 // 5 minutes
 }
 
 /// Configuration of the authentication strategy for HTTP requests.
