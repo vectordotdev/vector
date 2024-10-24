@@ -26,7 +26,7 @@ If the docs do not answer your question, try the following:
 already asked your question before. This is especially useful if you have a specific error message
 you are observing.
 * You can also search [Discord][discord] threads. Note that the #support channel is no longer active because we migrated
-  to Github Issues/Discussions.
+  to GitHub Issues/Discussions.
 
 ### Provide details
 
