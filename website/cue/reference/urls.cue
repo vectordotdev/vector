@@ -386,6 +386,7 @@ urls: {
 	nix:                                        "https://nixos.org/nix/"
 	nixos:                                      "https://nixos.org/"
 	nixpkgs_9682:                               "\(github)/NixOS/nixpkgs/issues/9682"
+	openobserve:                                "https://openobserve.ai/docs/ingestion/logs/vector/"
 	openssl:                                    "https://www.openssl.org/"
 	openssl_conf:                               "https://www.openssl.org/docs/man3.1/man5/config.html"
 	opentelemetry:                              "https://opentelemetry.io"
