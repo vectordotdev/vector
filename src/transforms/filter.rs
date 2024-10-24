@@ -43,8 +43,7 @@ impl GenerateConfig for FilterConfig {
 impl TransformConfig for FilterConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Filter::new(
-            self.condition
-                .build(&context.enrichment_tables, &context.vrl_caches)?,
+            self.condition.build(&context.enrichment_tables)?,
         )))
     }
 
@@ -55,7 +54,6 @@ impl TransformConfig for FilterConfig {
     fn outputs(
         &self,
         _enrichment_tables: vector_lib::enrichment::TableRegistry,
-        _vrl_caches: vector_lib::vrl_cache::VrlCacheRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

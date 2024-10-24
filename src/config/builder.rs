@@ -11,7 +11,7 @@ use super::api;
 use super::{
     compiler, schema, BoxedSink, BoxedSource, BoxedTransform, ComponentKey, Config,
     EnrichmentTableOuter, HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition,
-    TransformOuter, VrlCacheOuter,
+    TransformOuter,
 };
 
 /// A complete Vector configuration.
@@ -39,10 +39,6 @@ pub struct ConfigBuilder {
     /// All configured enrichment tables.
     #[serde(default)]
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
-
-    /// All configured VRL caches.
-    #[serde(default)]
-    pub vrl_caches: IndexMap<ComponentKey, VrlCacheOuter>,
 
     /// All configured sources.
     #[serde(default)]
@@ -92,7 +88,6 @@ impl From<Config> for ConfigBuilder {
             schema,
             healthchecks,
             enrichment_tables,
-            vrl_caches,
             sources,
             sinks,
             transforms,
@@ -120,7 +115,6 @@ impl From<Config> for ConfigBuilder {
             schema,
             healthchecks,
             enrichment_tables,
-            vrl_caches,
             sources,
             sinks,
             transforms,
@@ -230,11 +224,6 @@ impl ConfigBuilder {
                 errors.push(format!("duplicate enrichment_table name found: {}", k));
             }
         });
-        with.vrl_caches.keys().for_each(|k| {
-            if self.vrl_caches.contains_key(k) {
-                errors.push(format!("duplicate vrl_cache name found: {}", k));
-            }
-        });
         with.sources.keys().for_each(|k| {
             if self.sources.contains_key(k) {
                 errors.push(format!("duplicate source id found: {}", k));
@@ -265,7 +254,6 @@ impl ConfigBuilder {
         }
 
         self.enrichment_tables.extend(with.enrichment_tables);
-        self.vrl_caches.extend(with.vrl_caches);
         self.sources.extend(with.sources);
         self.sinks.extend(with.sinks);
         self.transforms.extend(with.transforms);

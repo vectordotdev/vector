@@ -15,6 +15,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
+use vector_lib::config::LogNamespace;
 use vector_lib::internal_event::{
     self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
 };
@@ -30,7 +31,6 @@ use vector_lib::{
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
 };
-use vector_lib::{config::LogNamespace, vrl_cache::caches::VrlCache};
 
 use super::{
     fanout::{self, Fanout},
@@ -57,9 +57,6 @@ use crate::{
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
     LazyLock::new(vector_lib::enrichment::TableRegistry::default);
-
-static VRL_CACHES: LazyLock<vector_lib::vrl_cache::VrlCacheRegistry> =
-    LazyLock::new(vector_lib::vrl_cache::VrlCacheRegistry::default);
 
 pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
     LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
@@ -114,10 +111,9 @@ impl<'a> Builder<'a> {
     /// Builds the new pieces of the topology found in `self.diff`.
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
         let enrichment_tables = self.load_enrichment_tables().await;
-        let vrl_caches = self.build_vrl_caches().await;
         let source_tasks = self.build_sources().await;
-        self.build_transforms(enrichment_tables, vrl_caches).await;
-        self.build_sinks(enrichment_tables, vrl_caches).await;
+        self.build_transforms(enrichment_tables).await;
+        self.build_sinks(enrichment_tables).await;
 
         // We should have all the data for the enrichment tables loaded now, so switch them over to
         // readonly.
@@ -205,21 +201,6 @@ impl<'a> Builder<'a> {
         ENRICHMENT_TABLES.load(enrichment_tables);
 
         &ENRICHMENT_TABLES
-    }
-
-    /// Builds the VRL caches
-    /// The caches are stored in the `VRL_CACHES` global variable.
-    async fn build_vrl_caches(&mut self) -> &'static vector_lib::vrl_cache::VrlCacheRegistry {
-        let mut caches = HashMap::new();
-
-        for (name, _cache) in self.config.vrl_caches.iter() {
-            let cache_name = name.to_string();
-            caches.insert(cache_name, VrlCache::default());
-        }
-
-        VRL_CACHES.insert_caches(caches);
-
-        &VRL_CACHES
     }
 
     async fn build_sources(&mut self) -> HashMap<ComponentKey, Task> {
@@ -421,7 +402,6 @@ impl<'a> Builder<'a> {
     async fn build_transforms(
         &mut self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
-        vrl_caches: &vector_lib::vrl_cache::VrlCacheRegistry,
     ) {
         let mut definition_cache = HashMap::default();
 
@@ -436,7 +416,6 @@ impl<'a> Builder<'a> {
                 &transform.inputs,
                 self.config,
                 enrichment_tables.clone(),
-                vrl_caches.clone(),
                 &mut definition_cache,
             ) {
                 Ok(definitions) => definitions,
@@ -467,7 +446,6 @@ impl<'a> Builder<'a> {
                 .inner
                 .outputs(
                     enrichment_tables.clone(),
-                    vrl_caches.clone(),
                     &input_definitions,
                     self.config.schema.log_namespace(),
                 )
@@ -482,7 +460,6 @@ impl<'a> Builder<'a> {
                 key: Some(key.clone()),
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
-                vrl_caches: vrl_caches.clone(),
                 schema_definitions,
                 merged_schema_definition: merged_definition.clone(),
                 schema: self.config.schema,
@@ -492,7 +469,6 @@ impl<'a> Builder<'a> {
             let node = TransformNode::from_parts(
                 key.clone(),
                 enrichment_tables.clone(),
-                vrl_caches.clone(),
                 transform,
                 &input_definitions,
                 self.config.schema.log_namespace(),
@@ -529,11 +505,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    async fn build_sinks(
-        &mut self,
-        enrichment_tables: &vector_lib::enrichment::TableRegistry,
-        vrl_caches: &vector_lib::vrl_cache::VrlCacheRegistry,
-    ) {
+    async fn build_sinks(&mut self, enrichment_tables: &vector_lib::enrichment::TableRegistry) {
         for (key, sink) in self
             .config
             .sinks()
@@ -564,7 +536,6 @@ impl<'a> Builder<'a> {
                 sink,
                 self.config,
                 enrichment_tables.clone(),
-                vrl_caches.clone(),
             ) {
                 self.errors.append(&mut err);
             };
@@ -766,7 +737,6 @@ impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
         enrichment_tables: vector_lib::enrichment::TableRegistry,
-        vrl_caches: vector_lib::vrl_cache::VrlCacheRegistry,
         transform: &TransformOuter<OutputId>,
         schema_definition: &[(OutputId, Definition)],
         global_log_namespace: LogNamespace,
@@ -778,7 +748,6 @@ impl TransformNode {
             input_details: transform.inner.input(),
             outputs: transform.inner.outputs(
                 enrichment_tables,
-                vrl_caches,
                 schema_definition,
                 global_log_namespace,
             ),
