@@ -101,13 +101,19 @@ pub struct GlobalOptions {
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
     ///
-    /// Not set by default, which allows all internal metrics to grow unbounded over time. If you
-    /// have a configuration that emits many high-cardinality metrics, you may want to consider
-    /// setting this to a value that ensures that metrics live long enough to be emitted and
-    /// captured, but not so long that they continue to build up indefinitely, as this will consume
-    /// a small amount of memory for each metric.
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    /// Set this to a value (default 5 minutes) that ensures that metrics live long enough to be
+    /// emitted and captured,
+    #[serde(
+        default = "default_expire_metrics_secs",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     pub expire_metrics_secs: Option<f64>,
+}
+
+// https://github.com/rust-lang/rust-clippy/issues/6427
+#[allow(clippy::unnecessary_wraps)]
+fn default_expire_metrics_secs() -> Option<f64> {
+    Some(300.0)
 }
 
 impl GlobalOptions {
@@ -340,7 +346,7 @@ mod tests {
             })
         };
 
-        assert_eq!(merge(None, None), Ok(None));
+        assert_eq!(merge(None, None), Ok(Some(300.0)));
         assert_eq!(merge(Some(1.0), None), Ok(Some(1.0)));
         assert_eq!(merge(None, Some(2.0)), Ok(Some(2.0)));
         assert_eq!(merge(Some(3.0), Some(3.0)), Ok(Some(3.0)));
