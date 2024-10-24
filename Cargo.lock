@@ -2194,6 +2194,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde_json",
+ "serde_with 3.11.0",
  "similar-asserts",
  "smallvec",
  "snafu 0.7.5",
