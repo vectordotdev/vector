@@ -10165,13 +10165,9 @@ dependencies = [
 
 [[package]]
 name = "twox-hash"
-version = "1.6.3"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
-dependencies = [
- "cfg-if",
- "static_assertions",
-]
+checksum = "d09466de2fbca05ea830e16e62943f26607ab2148fb72b642505541711d99ad2"
 
 [[package]]
 name = "typed-builder"
