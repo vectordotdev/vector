@@ -20,4 +20,4 @@ enrichment = { path = "../../enrichment" }
 vrl-cache = { path = "../../vrl-cache" }
 
 [build-dependencies]
-cargo_toml = "0.20.4"
+cargo-lock = "10.0.0"

@@ -1,26 +1,30 @@
+use std::sync::LazyLock;
+use std::task::{Context, Poll};
+
 use bytes::Bytes;
 use http::{
     header::{self, HeaderMap},
     HeaderName, HeaderValue, Request, StatusCode, Uri,
 };
 use hyper::Body;
-use once_cell::sync::Lazy;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
-use std::task::{Context, Poll};
 use tracing::Instrument;
 use vector_lib::lookup::lookup_v2::OwnedValuePath;
 
 use crate::{http::HttpClient, sinks::prelude::*};
 
-static LOG_TYPE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\w+$").unwrap());
-static LOG_TYPE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static("log-type"));
-static X_MS_DATE_HEADER: Lazy<HeaderName> = Lazy::new(|| HeaderName::from_static(X_MS_DATE));
-static X_MS_AZURE_RESOURCE_HEADER: Lazy<HeaderName> =
-    Lazy::new(|| HeaderName::from_static("x-ms-azureresourceid"));
-static TIME_GENERATED_FIELD_HEADER: Lazy<HeaderName> =
-    Lazy::new(|| HeaderName::from_static("time-generated-field"));
-static CONTENT_TYPE_VALUE: Lazy<HeaderValue> = Lazy::new(|| HeaderValue::from_static(CONTENT_TYPE));
+static LOG_TYPE_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\w+$").unwrap());
+static LOG_TYPE_HEADER: LazyLock<HeaderName> =
+    LazyLock::new(|| HeaderName::from_static("log-type"));
+static X_MS_DATE_HEADER: LazyLock<HeaderName> =
+    LazyLock::new(|| HeaderName::from_static(X_MS_DATE));
+static X_MS_AZURE_RESOURCE_HEADER: LazyLock<HeaderName> =
+    LazyLock::new(|| HeaderName::from_static("x-ms-azureresourceid"));
+static TIME_GENERATED_FIELD_HEADER: LazyLock<HeaderName> =
+    LazyLock::new(|| HeaderName::from_static("time-generated-field"));
+static CONTENT_TYPE_VALUE: LazyLock<HeaderValue> =
+    LazyLock::new(|| HeaderValue::from_static(CONTENT_TYPE));
 
 /// API endpoint for submitting logs
 const RESOURCE: &str = "/api/logs";
