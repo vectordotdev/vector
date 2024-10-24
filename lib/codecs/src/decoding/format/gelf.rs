@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, TimestampSecondsWithFrac};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
 use vector_config::configurable_component;
@@ -133,12 +134,7 @@ impl GelfDeserializer {
 
         if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
             if let Some(timestamp) = parsed.timestamp {
-                let dt = DateTime::from_timestamp(
-                    f64::trunc(timestamp) as i64,
-                    f64::fract(timestamp) as u32,
-                )
-                .expect("invalid timestamp");
-                log.insert(timestamp_key, dt);
+                log.insert(timestamp_key, timestamp);
                 // per GELF spec- add timestamp if not provided
             } else {
                 log.insert(timestamp_key, Utc::now());
@@ -204,13 +200,15 @@ impl GelfDeserializer {
     }
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 struct GelfMessage {
     version: String,
     host: String,
     short_message: String,
     full_message: Option<String>,
-    timestamp: Option<f64>,
+    #[serde_as(as = "Option<TimestampSecondsWithFrac<f64>>")]
+    timestamp: Option<DateTime<Utc>>,
     level: Option<u8>,
     facility: Option<String>,
     line: Option<f64>,
@@ -301,8 +299,7 @@ mod tests {
                 b"Backtrace here\n\nmore stuff"
             )))
         );
-        // Vector does not use the nanos
-        let dt = DateTime::from_timestamp(1385053862, 0).expect("invalid timestamp");
+        let dt = DateTime::from_timestamp(1385053862, 307_200_000).expect("invalid timestamp");
         assert_eq!(log.get(TIMESTAMP), Some(&Value::Timestamp(dt)));
         assert_eq!(log.get(LEVEL), Some(&Value::Integer(1)));
         assert_eq!(
