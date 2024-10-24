@@ -991,6 +991,62 @@ mod tests {
     }
 
     #[test]
+    fn test_suppress_annotation_fields() {
+        let cases = vec![
+            (
+                FieldsSpec {
+                    container_id: OptionalTargetPath::none(),
+                    ..FieldsSpec::default()
+                },
+                ContainerStatus {
+                    container_id: Some("container_id_foo".to_owned()),
+                    image_id: "test_image_id".to_owned(),
+                    ..ContainerStatus::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert(
+                        event_path!("kubernetes", "container_image_id"),
+                        "test_image_id",
+                    );
+                    log
+                },
+                LogNamespace::Legacy,
+            ),
+            (
+                FieldsSpec {
+                    container_id: OptionalTargetPath::none(),
+                    ..FieldsSpec::default()
+                },
+                ContainerStatus {
+                    container_id: Some("container_id_foo".to_owned()),
+                    image_id: "test_image_id".to_owned(),
+                    ..ContainerStatus::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "container_image_id"),
+                        "test_image_id",
+                    );
+                    log
+                },
+                LogNamespace::Vector,
+            ),
+        ];
+        for (fields_spec, container_status, expected, log_namespace) in cases.into_iter() {
+            let mut log = LogEvent::default();
+            annotate_from_container_status(
+                &mut log,
+                &fields_spec,
+                &container_status,
+                log_namespace,
+            );
+            assert_eq!(log, expected);
+        }
+    }
+
+    #[test]
     fn test_annotate_from_container() {
         let cases = vec![
             (

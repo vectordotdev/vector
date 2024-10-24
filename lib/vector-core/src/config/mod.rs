@@ -425,11 +425,14 @@ impl LogNamespace {
         value: impl Into<Value>,
     ) {
         match self {
-            LogNamespace::Vector => {
-                log.metadata_mut()
-                    .value_mut()
-                    .insert(path!(source_name).concat(metadata_key), value);
-            }
+            LogNamespace::Vector => match legacy_key {
+                None => { /* don't insert */ }
+                _ => {
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!(source_name).concat(metadata_key), value);
+                }
+            },
             LogNamespace::Legacy => match legacy_key {
                 None => { /* don't insert */ }
                 Some(LegacyKey::Overwrite(key)) => {
