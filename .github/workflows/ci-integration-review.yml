@@ -81,7 +81,7 @@ jobs:
 
   integration-tests:
     needs: prep-pr
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-20.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
