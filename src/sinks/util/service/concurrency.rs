@@ -126,10 +126,10 @@ impl Configurable for Concurrency {
     fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description(
-            r#"Configuration for outbound request concurrency.
+            r"Configuration for outbound request concurrency.
 
 This can be set either to one of the below enum values or to a positive integer, which denotes
-a fixed concurrency limit."#,
+a fixed concurrency limit.",
         );
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "external"));
         metadata

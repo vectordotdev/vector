@@ -199,7 +199,7 @@ mod tests {
     fn collection() {
         let mut keys = HashMap::new();
         collect_secret_keys(
-            indoc! {r#"
+            indoc! {r"
             SECRET[first_backend.secret_key]
             SECRET[first_backend.another_secret_key]
             SECRET[second_backend.secret_key]
@@ -208,7 +208,7 @@ mod tests {
             SECRET[first_backend...an_extra_secret_key]
             SECRET[non_matching_syntax]
             SECRET[.non.matching.syntax]
-        "#},
+        "},
             &mut keys,
         );
         assert_eq!(keys.len(), 2);
@@ -232,10 +232,10 @@ mod tests {
     fn collection_duplicates() {
         let mut keys = HashMap::new();
         collect_secret_keys(
-            indoc! {r#"
+            indoc! {r"
             SECRET[first_backend.secret_key]
             SECRET[first_backend.secret_key]
-        "#},
+        "},
             &mut keys,
         );
 

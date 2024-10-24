@@ -33,9 +33,9 @@ async fn parse_no_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              inputs[0]: unable to locate target transform 'foo'"#}
+              inputs[0]: unable to locate target transform 'foo'"}
         .to_owned(),]
     );
 
@@ -69,9 +69,9 @@ async fn parse_no_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              inputs[1]: unable to locate target transform 'foo'"#}
+              inputs[1]: unable to locate target transform 'foo'"}
         .to_owned(),]
     );
 }
@@ -102,9 +102,9 @@ async fn parse_no_test_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              must specify at least one input."#}
+              must specify at least one input."}
         .to_owned(),]
     );
 }
@@ -133,9 +133,9 @@ async fn parse_no_outputs() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              unit test must contain at least one of `outputs` or `no_outputs_from`."#}
+              unit test must contain at least one of `outputs` or `no_outputs_from`."}
         .to_owned(),]
     );
 }
@@ -170,9 +170,9 @@ async fn parse_invalid_output_targets() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              Invalid extract_from target in test 'broken test': 'nonexistent' does not exist"#}
+              Invalid extract_from target in test 'broken test': 'nonexistent' does not exist"}
         .to_owned(),]
     );
 
@@ -197,9 +197,9 @@ async fn parse_invalid_output_targets() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              Invalid no_outputs_from target in test 'broken test': 'nonexistent' does not exist"#}
+              Invalid no_outputs_from target in test 'broken test': 'nonexistent' does not exist"}
         .to_owned(),]
     );
 }
@@ -338,9 +338,9 @@ async fn parse_bad_input_event() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              unrecognized input type 'nah', expected one of: 'raw', 'log' or 'metric'"#}
+              unrecognized input type 'nah', expected one of: 'raw', 'log' or 'metric'"}
         .to_owned(),]
     );
 }
