@@ -105,12 +105,11 @@ pub fn write_all(
     n_events_pending: usize,
     buf: &[u8],
 ) -> io::Result<()> {
-    writer.write_all(buf).map_err(|error| {
+    writer.write_all(buf).inspect_err(|error| {
         emit!(EncoderWriteError {
-            error: &error,
+            error,
             count: n_events_pending,
         });
-        error
     })
 }
 

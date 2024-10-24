@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::{future::ready, num::NonZeroUsize, panic, sync::Arc};
+use std::{future::ready, num::NonZeroUsize, panic, sync::Arc, sync::LazyLock};
 
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::Client as S3Client;
@@ -15,7 +15,6 @@ use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::serde_as;
 use smallvec::SmallVec;
@@ -51,8 +50,8 @@ use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
 use vector_lib::event::MaybeAsLogMut;
 use vector_lib::lookup::{metadata_path, path, PathPrefix};
 
-static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
-    Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
+static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
+    LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
 
 /// SQS configuration options.
 //
@@ -361,15 +360,13 @@ impl IngestorProcess {
     async fn run_once(&mut self) {
         let messages = self.receive_messages().await;
         let messages = messages
-            .map(|messages| {
+            .inspect(|messages| {
                 emit!(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
-                messages
             })
-            .map_err(|err| {
-                emit!(SqsMessageReceiveError { error: &err });
-                err
+            .inspect_err(|err| {
+                emit!(SqsMessageReceiveError { error: err });
             })
             .unwrap_or_default();
 
@@ -556,9 +553,8 @@ impl IngestorProcess {
         let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
             FramedRead::new(object_reader, self.state.decoder.framer.clone())
                 .map(|res| {
-                    res.map(|bytes| {
+                    res.inspect(|bytes| {
                         bytes_received.emit(ByteSize(bytes.len()));
-                        bytes
                     })
                     .map_err(|err| {
                         read_error = Some(err);

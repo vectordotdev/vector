@@ -45,12 +45,11 @@ impl Server {
         let _guard = handle.enter();
 
         let addr = config.api.address.expect("No socket address");
-        let incoming = AddrIncoming::bind(&addr).map_err(|error| {
+        let incoming = AddrIncoming::bind(&addr).inspect_err(|error| {
             emit!(SocketBindError {
                 mode: SocketMode::Tcp,
-                error: &error,
+                error,
             });
-            error
         })?;
 
         let span = Span::current();

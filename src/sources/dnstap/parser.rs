@@ -3,6 +3,7 @@ use std::{
     convert::TryInto,
     fmt::Debug,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    sync::LazyLock,
 };
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
@@ -13,7 +14,6 @@ use hickory_proto::{
     rr::domain::Name,
     serialize::binary::{BinDecodable, BinDecoder},
 };
-use once_cell::sync::Lazy;
 use prost::Message;
 use snafu::Snafu;
 use vrl::{owned_value_path, path};
@@ -52,7 +52,7 @@ enum DnstapParserError {
     UnsupportedDnstapMessageTypeError { dnstap_message_type_id: i32 },
 }
 
-static DNSTAP_MESSAGE_REQUEST_TYPE_IDS: Lazy<HashSet<i32>> = Lazy::new(|| {
+static DNSTAP_MESSAGE_REQUEST_TYPE_IDS: LazyLock<HashSet<i32>> = LazyLock::new(|| {
     vec![
         DnstapMessageType::AuthQuery as i32,
         DnstapMessageType::ResolverQuery as i32,
@@ -65,7 +65,7 @@ static DNSTAP_MESSAGE_REQUEST_TYPE_IDS: Lazy<HashSet<i32>> = Lazy::new(|| {
     .into_iter()
     .collect()
 });
-static DNSTAP_MESSAGE_RESPONSE_TYPE_IDS: Lazy<HashSet<i32>> = Lazy::new(|| {
+static DNSTAP_MESSAGE_RESPONSE_TYPE_IDS: LazyLock<HashSet<i32>> = LazyLock::new(|| {
     vec![
         DnstapMessageType::AuthResponse as i32,
         DnstapMessageType::ResolverResponse as i32,

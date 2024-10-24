@@ -99,6 +99,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 HttpMethod::Post => warp::post().boxed(),
                 HttpMethod::Patch => warp::patch().boxed(),
                 HttpMethod::Delete => warp::delete().boxed(),
+                HttpMethod::Options => warp::options().boxed(),
             };
 
             // https://github.com/rust-lang/rust-clippy/issues/8148

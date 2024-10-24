@@ -1,12 +1,11 @@
 //! Functionality for managing template fields used by Vector's sinks.
-use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
+use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::LazyLock};
 
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
     FixedOffset, Utc,
 };
-use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use vector_lib::configurable::{configurable_component, ConfigurableString};
@@ -17,7 +16,7 @@ use crate::{
     event::{EventRef, Metric, Value},
 };
 
-static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
+static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
 /// Errors raised whilst parsing a Template field.
 #[allow(missing_docs)]

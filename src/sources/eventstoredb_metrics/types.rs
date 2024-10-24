@@ -1,4 +1,5 @@
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
+
 use regex::Regex;
 use serde::{
     de::{self, Error, MapAccess, Unexpected, Visitor},
@@ -244,7 +245,7 @@ where
     D: Deserializer<'de>,
 {
     struct PercentOrInteger;
-    static PERCENT_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d+)%").unwrap());
+    static PERCENT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\d+)%").unwrap());
 
     impl<'de> Visitor<'de> for PercentOrInteger {
         type Value = usize;

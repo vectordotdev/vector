@@ -3,6 +3,7 @@ use crate::sinks::{
         default_dbname,
         metrics::{
             request::GreptimeDBGrpcRetryLogic,
+            request_builder::RequestBuilderOptions,
             service::{healthcheck, GreptimeDBGrpcService},
             sink,
         },
@@ -109,6 +110,25 @@ pub struct GreptimeDBMetricsConfig {
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
+
+    /// Use Greptime's prefixed naming for time index and value columns.
+    ///
+    /// This is to keep consistency with GreptimeDB's naming pattern. By
+    /// default, this sink will use `val` for value column name, and `ts` for
+    /// time index name. When turned on, `greptime_value` and
+    /// `greptime_timestamp` will be used for these names.
+    ///
+    /// If you are using this Vector sink together with other data ingestion
+    /// sources of GreptimeDB, like Prometheus Remote Write and Influxdb Line
+    /// Protocol, it is highly recommended to turn on this.
+    ///
+    /// Also if there is a tag name conflict from your data source, for
+    /// example, you have a tag named as `val` or `ts`, you need to turn on
+    /// this option to avoid the conflict.
+    ///
+    /// Default to `false` for compatibility.
+    #[configurable]
+    pub new_naming: Option<bool>,
 }
 
 impl_generate_config_from_default!(GreptimeDBMetricsConfig);
@@ -124,6 +144,9 @@ impl SinkConfig for GreptimeDBMetricsConfig {
         let sink = sink::GreptimeDBGrpcSink {
             service,
             batch_settings: self.batch.into_batcher_settings()?,
+            request_builder_options: RequestBuilderOptions {
+                use_new_naming: self.new_naming.unwrap_or(false),
+            },
         };
 
         let healthcheck = healthcheck(self)?;

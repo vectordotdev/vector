@@ -1,11 +1,10 @@
-use std::{collections::HashMap, error, fmt, iter, num};
+use std::{collections::HashMap, error, fmt, iter, num, sync::LazyLock};
 
 use chrono::{DateTime, Utc};
-use once_cell::sync::Lazy;
 
 use crate::event::metric::{Metric, MetricKind, MetricTags, MetricValue};
 
-static SCOREBOARD: Lazy<HashMap<char, &'static str>> = Lazy::new(|| {
+static SCOREBOARD: LazyLock<HashMap<char, &'static str>> = LazyLock::new(|| {
     vec![
         ('_', "waiting"),
         ('S', "starting"),

@@ -6,10 +6,10 @@ pub mod transform;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
+    sync::LazyLock,
 };
 
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
-use once_cell::sync::Lazy;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use vector_lib::internal_event::DEFAULT_OUTPUT;
 
@@ -223,8 +223,8 @@ enum ComponentChanged {
     Removed(Component),
 }
 
-static COMPONENT_CHANGED: Lazy<tokio::sync::broadcast::Sender<ComponentChanged>> =
-    Lazy::new(|| {
+static COMPONENT_CHANGED: LazyLock<tokio::sync::broadcast::Sender<ComponentChanged>> =
+    LazyLock::new(|| {
         let (tx, _) = tokio::sync::broadcast::channel(10);
         tx
     });

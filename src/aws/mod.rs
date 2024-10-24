@@ -363,7 +363,7 @@ struct MeasuredBody {
 }
 
 impl MeasuredBody {
-    fn new(body: SdkBody, shared_bytes_sent: Arc<AtomicUsize>) -> Self {
+    const fn new(body: SdkBody, shared_bytes_sent: Arc<AtomicUsize>) -> Self {
         Self {
             inner: body,
             shared_bytes_sent,

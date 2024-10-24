@@ -99,6 +99,28 @@ base: components: sinks: greptimedb: configuration: {
 		required: false
 		type: string: examples: ["grpc_compression"]
 	}
+	new_naming: {
+		description: """
+			Use Greptime's prefixed naming for time index and value columns.
+
+			This is to keep consistency with GreptimeDB's naming pattern. By
+			default, this sink will use `val` for value column name, and `ts` for
+			time index name. When turned on, `greptime_value` and
+			`greptime_timestamp` will be used for these names.
+
+			If you are using this Vector sink together with other data ingestion
+			sources of GreptimeDB, like Prometheus Remote Write and Influxdb Line
+			Protocol, it is highly recommended to turn on this.
+
+			Also if there is a tag name conflict from your data source, for
+			example, you have a tag named as `val` or `ts`, you need to turn on
+			this option to avoid the conflict.
+
+			Default to `false` for compatibility.
+			"""
+		required: false
+		type: bool: {}
+	}
 	password: {
 		description: """
 			The password for your GreptimeDB instance.
@@ -346,6 +368,15 @@ base: components: sinks: greptimedb: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

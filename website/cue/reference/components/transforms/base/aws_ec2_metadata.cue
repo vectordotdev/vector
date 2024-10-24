@@ -26,7 +26,7 @@ base: components: transforms: aws_ec2_metadata: configuration: {
 			Configure to proxy traffic through an HTTP(S) proxy when making external requests.
 
 			Similar to common proxy configuration convention, you can set different proxies
-			to use based on the type of traffic being proxied, as well as set specific hosts that
+			to use based on the type of traffic being proxied. You can also set specific hosts that
 			should not be proxied.
 			"""
 		required: false

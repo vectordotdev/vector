@@ -42,5 +42,10 @@ ignore = [
     # Vulnerability in `rsa` crate: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
     # There is not fix available yet.
     # https://github.com/vectordotdev/vector/issues/19262
-    "RUSTSEC-2023-0071"
+    "RUSTSEC-2023-0071",
+
+    # Vulnerability in `tonic` crate: https://rustsec.org/advisories/RUSTSEC-2024-0376
+    # There is a fixed version (v0.12.3) but we are blocked from upgrading to `http` v1, which
+    # `tonic` v0.12 depends on. See https://github.com/vectordotdev/vector/issues/19179
+    "RUSTSEC-2024-0376",
 ]

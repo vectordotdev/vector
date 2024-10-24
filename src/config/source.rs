@@ -16,7 +16,7 @@ use vector_lib::{
     source::Source,
 };
 
-use super::{schema, ComponentKey, ProxyConfig, Resource};
+use super::{dot_graph::GraphConfig, schema, ComponentKey, ProxyConfig, Resource};
 use crate::{extra_context::ExtraContext, shutdown::ShutdownSignal, SourceSender};
 
 pub type BoxedSource = Box<dyn SourceConfig>;
@@ -54,6 +54,10 @@ pub struct SourceOuter {
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub graph: GraphConfig,
+
     #[serde(default, skip)]
     pub sink_acknowledgements: bool,
 
@@ -66,6 +70,7 @@ impl SourceOuter {
     pub(crate) fn new<I: Into<BoxedSource>>(inner: I) -> Self {
         Self {
             proxy: Default::default(),
+            graph: Default::default(),
             sink_acknowledgements: false,
             inner: inner.into(),
         }

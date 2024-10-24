@@ -121,6 +121,46 @@ base: components: sinks: pulsar: configuration: {
 			}
 		}
 	}
+	connection_retry_options: {
+		description: "Custom connection retry options configuration for the Pulsar client."
+		required:    false
+		type: object: options: {
+			connection_timeout_secs: {
+				description: "Time limit to establish a connection."
+				required:    false
+				type: uint: {
+					examples: [10]
+					unit: "seconds"
+				}
+			}
+			keep_alive_secs: {
+				description: "Keep-alive interval for each broker connection."
+				required:    false
+				type: uint: {
+					examples: [60]
+					unit: "seconds"
+				}
+			}
+			max_backoff_secs: {
+				description: "Maximum delay between reconnection retries."
+				required:    false
+				type: uint: {
+					examples: [30]
+					unit: "seconds"
+				}
+			}
+			max_retries: {
+				description: "Maximum number of connection retries."
+				required:    false
+				type: uint: examples: [12]
+			}
+			min_backoff_ms: {
+				description: "Minimum delay between connection retries."
+				required:    false
+				type: uint: unit: "milliseconds"
+			}
+		}
+	}
 	encoding: {
 		description: "Configures how events are encoded into raw bytes."
 		required:    true

@@ -35,8 +35,9 @@ RETVAL=0
 # Start
 start() {
   echo -n $"Starting $prog: "
-  daemon --pidfile=${pidfile} $vector $OPTIONS
+  daemon --pidfile=${pidfile} "nohup $vector </dev/null &> /dev/null &"
   RETVAL=$?
+  [ $RETVAL = 0 ] && pidof ${prog} > ${pidfile}
   echo
   return $RETVAL
 }

@@ -280,13 +280,10 @@ ordering.
 When there is a need or desire to share global state, there are a few options depending on the
 required constraints.
 
-If you're working with data that is _lazily initialized_ but _never changes after initialization_,
-we prefer **[`once_cell`](https://docs.rs/once_cell)**. It is slightly faster than
-[`lazy_static`](https://docs.rs/lazy-static), and additionally provides a richer API than both
-`lazy_static` and the standard library variants, such as `std::sync::Once`. Additionally, there is
-[active work happening](https://github.com/rust-lang/rust/issues/74465) to migrate the types in
-`once_cell` into `std::sync` directly, which will be easier to switch to if we're already using
-`once_cell`.
+If you're working with data that _never changes after initialization_,
+we prefer `std::sync::OnceLock` over **[`once_cell`](https://docs.rs/once_cell)** or
+[`lazy_static`](https://docs.rs/lazy-static). It is slightly faster and provides a richer API than
+`lazy_static`, and has equivalent features to the `once_cell` version.
 
 If you're working with data that _changes over time_, but has a very high read-to-write ratio, such
 as _many readers_, but _one writer_ and infrequent writes, we prefer

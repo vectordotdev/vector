@@ -1,11 +1,10 @@
-use std::sync::OnceLock;
+use std::sync::{LazyLock, OnceLock};
 
-use once_cell::sync::Lazy;
 use vector_common::request_metadata::GroupedCountByteSize;
 use vector_config::configurable_component;
 
 static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
-static TELEMETRY_DEFAULT: Lazy<Telemetry> = Lazy::new(Telemetry::default);
+static TELEMETRY_DEFAULT: LazyLock<Telemetry> = LazyLock::new(Telemetry::default);
 
 /// Loads the telemetry options from configurations and sets the global options.
 /// Once this is done, configurations can be correctly loaded using configured

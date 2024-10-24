@@ -101,7 +101,7 @@ async fn firehose_put_records_without_partition_key() {
         .expect("Could not build HTTP client");
 
     let response = client
-        .get(&format!("{}/{}/_search", common.base_url, stream))
+        .get(format!("{}/{}/_search", common.base_url, stream))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))
@@ -123,7 +123,7 @@ async fn firehose_put_records_without_partition_key() {
     #[allow(clippy::needless_collect)] // https://github.com/rust-lang/rust-clippy/issues/6909
     let input = input
         .into_iter()
-        .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+        .map(|rec| serde_json::to_value(rec.into_log()).unwrap())
         .collect::<Vec<_>>();
     for hit in hits {
         let hit = hit
@@ -213,7 +213,7 @@ async fn firehose_put_records_with_partition_key() {
         .expect("Could not build HTTP client");
 
     let response = client
-        .get(&format!("{}/{}/_search", common.base_url, stream))
+        .get(format!("{}/{}/_search", common.base_url, stream))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))
@@ -235,7 +235,7 @@ async fn firehose_put_records_with_partition_key() {
     #[allow(clippy::needless_collect)] // https://github.com/rust-lang/rust-clippy/issues/6909
     let input = input
         .into_iter()
-        .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+        .map(|rec| serde_json::to_value(rec.into_log()).unwrap())
         .collect::<Vec<_>>();
     for hit in hits {
         let hit = hit

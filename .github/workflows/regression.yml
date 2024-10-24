@@ -54,61 +54,61 @@ jobs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
       comment_valid: ${{ steps.comment.outputs.isTeamMember }}
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Collect file changes
-      id: changes
-      if: github.event_name == 'merge_group'
-      uses: dorny/paths-filter@v3
-      with:
-        base: ${{ github.event.merge_group.base_ref }}
-        ref: ${{ github.event.merge_group.head_ref }}
-        list-files: shell
-        filters: |
-          all_changed:
-            - added|deleted|modified: "**"
-          ignore:
-            - "./.github/**"
-            - "./.gitignore"
-            - "distribution/**"
-            - "rust-doc/**"
-            - "docs/**"
-            - "rfcs/**"
-            - "testing/**"
-            - "tilt/**"
-            - "website/**"
-            - "*.md"
-            - "Tiltfile"
-            - "netlify.toml"
-            - "NOTICE"
-            - "LICENSE-3rdparty.csv"
-            - "LICENSE"
-            - "lib/codecs/tests/data/**"
+      - name: Collect file changes
+        id: changes
+        if: github.event_name == 'merge_group'
+        uses: dorny/paths-filter@v3
+        with:
+          base: ${{ github.event.merge_group.base_ref }}
+          ref: ${{ github.event.merge_group.head_ref }}
+          list-files: shell
+          filters: |
+            all_changed:
+              - added|deleted|modified: "**"
+            ignore:
+              - "./.github/**/!(regression.yml)"
+              - "./.gitignore"
+              - "distribution/**"
+              - "rust-doc/**"
+              - "docs/**"
+              - "rfcs/**"
+              - "testing/**"
+              - "tilt/**"
+              - "website/**"
+              - "*.md"
+              - "Tiltfile"
+              - "netlify.toml"
+              - "NOTICE"
+              - "LICENSE-3rdparty.csv"
+              - "LICENSE"
+              - "lib/codecs/tests/data/**"
 
-    # This step allows us to conservatively run the tests if we added a new
-    # file or directory for source code, but forgot to add it to this workflow.
-    # Instead, we may unnecessarily run the test on new file or dir additions that
-    # wouldn't likely introduce regressions.
-    - name: Determine if should not run due to irrelevant file changes
-      id: filter
-      if: github.event_name == 'merge_group'
-      env:
-        ALL: ${{ steps.changes.outputs.all_changed_files }}
-        IGNORE: ${{ steps.changes.outputs.ignore_files }}
-      run: |
-        echo "ALL='${{ env.ALL }}'"
-        echo "IGNORE='${{ env.IGNORE }}'"
-        export SOURCE_CHANGED=$(comm -2 -3 <(printf "%s\n" "${{ env.ALL }}") <(printf "%s\n" "${{ env.IGNORE }}"))
-        echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
+      # This step allows us to conservatively run the tests if we added a new
+      # file or directory for source code, but forgot to add it to this workflow.
+      # Instead, we may unnecessarily run the test on new file or dir additions that
+      # wouldn't likely introduce regressions.
+      - name: Determine if should not run due to irrelevant file changes
+        id: filter
+        if: github.event_name == 'merge_group'
+        env:
+          ALL: ${{ steps.changes.outputs.all_changed_files }}
+          IGNORE: ${{ steps.changes.outputs.ignore_files }}
+        run: |
+          echo "ALL='${{ env.ALL }}'"
+          echo "IGNORE='${{ env.IGNORE }}'"
+          export SOURCE_CHANGED=$(comm -2 -3 <(printf "%s\n" "${{ env.ALL }}") <(printf "%s\n" "${{ env.IGNORE }}"))
+          echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
 
-        if [ "${SOURCE_CHANGED}" == "" ]; then
-          export SOURCE_CHANGED="false"
-        else
-          export SOURCE_CHANGED="true"
-        fi
+          if [ "${SOURCE_CHANGED}" == "" ]; then
+            export SOURCE_CHANGED="false"
+          else
+            export SOURCE_CHANGED="true"
+          fi
 
-        echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
-        echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
+          echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
+          echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
 
   compute-metadata:
     name: Compute metadata
@@ -225,7 +225,7 @@ jobs:
       - name: Set SMP version
         id: experimental-meta
         run: |
-          export SMP_CRATE_VERSION="0.15.1"
+          export SMP_CRATE_VERSION="0.16.1"
           echo "smp crate version: ${SMP_CRATE_VERSION}"
           echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
 
@@ -250,19 +250,19 @@ jobs:
     steps:
       - uses: colpal/actions-clean@v1
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.compute-metadata.outputs.baseline-sha }}
           path: baseline-vector
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.6.1
+        uses: docker/setup-buildx-action@v3.7.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.7.0
+        uses: docker/build-push-action@v6.9.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -288,19 +288,19 @@ jobs:
     steps:
       - uses: colpal/actions-clean@v1
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
           path: comparison-vector
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.6.1
+        uses: docker/setup-buildx-action@v3.7.1
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.7.0
+        uses: docker/build-push-action@v6.9.0
         with:
           context: comparison-vector/
           cache-from: type=gha
@@ -420,7 +420,7 @@ jobs:
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 70
     needs:
       - compute-metadata
       - upload-baseline-image-to-ecr
@@ -439,7 +439,7 @@ jobs:
             -f context='Regression Detection Suite / submission' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
@@ -479,7 +479,7 @@ jobs:
           path: ${{ runner.temp }}/submission-metadata
 
       - name: Await job
-        timeout-minutes: 120
+        timeout-minutes: 70
         env:
           RUST_LOG: info
         run: |
@@ -488,7 +488,7 @@ jobs:
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job status \
             --wait \
             --wait-delay-seconds 60 \
-            --wait-timeout-minutes 90 \
+            --wait-timeout-minutes 70 \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Handle cancellation if necessary
@@ -553,7 +553,7 @@ jobs:
       - submit-job
       - compute-metadata
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.2
@@ -643,7 +643,7 @@ jobs:
             -f context='Regression Detection Suite / analyze-experiment' \
             -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.compute-metadata.outputs.comparison-sha }}
 
@@ -775,9 +775,9 @@ jobs:
       - name: (PR) Indicate why skipped
         if: github.event_name == 'pull_request'
         run: |
-           echo "### Workflow skipped" >> $GITHUB_STEP_SUMMARY
-           echo "This workflow doesn't run on PR's automatically." >> $GITHUB_STEP_SUMMARY
-           echo "To trigger a run, leave a comment with \`/ci-run-regression\`" >> $GITHUB_STEP_SUMMARY
+          echo "### Workflow skipped" >> $GITHUB_STEP_SUMMARY
+          echo "This workflow doesn't run on PR's automatically." >> $GITHUB_STEP_SUMMARY
+          echo "To trigger a run, leave a comment with \`/ci-run-regression\`" >> $GITHUB_STEP_SUMMARY
 
       - name: exit
         run: |

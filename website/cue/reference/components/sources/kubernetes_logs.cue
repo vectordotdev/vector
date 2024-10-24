@@ -6,7 +6,7 @@ components: sources: kubernetes_logs: {
 	title: "Kubernetes Logs"
 
 	description: """
-		Collects Pod logs from Kubernetes Nodes, automatically enriching data
+		Collects Pod logs Vector's host Kubernetes Node, automatically enriching data
 		with metadata via the Kubernetes API.
 		"""
 

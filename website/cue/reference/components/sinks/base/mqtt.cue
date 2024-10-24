@@ -325,6 +325,11 @@ base: components: sinks: mqtt: configuration: {
 			}
 		}
 	}
+	retain: {
+		description: "Whether the messages should be retained by the server"
+		required:    false
+		type: bool: default: false
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
@@ -387,6 +392,15 @@ base: components: sinks: mqtt: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

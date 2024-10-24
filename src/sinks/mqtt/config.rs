@@ -52,6 +52,10 @@ pub struct MqttSinkConfig {
     /// MQTT publish topic (templates allowed)
     pub topic: Template,
 
+    /// Whether the messages should be retained by the server
+    #[serde(default = "default_retain")]
+    pub retain: bool,
+
     #[configurable(derived)]
     pub encoding: EncodingConfig,
 
@@ -112,6 +116,10 @@ const fn default_qos() -> MqttQoS {
     MqttQoS::AtLeastOnce
 }
 
+const fn default_retain() -> bool {
+    false
+}
+
 impl Default for MqttSinkConfig {
     fn default() -> Self {
         Self {
@@ -124,6 +132,7 @@ impl Default for MqttSinkConfig {
             clean_session: default_clean_session(),
             tls: None,
             topic: Template::try_from("vector").expect("Cannot parse as a template"),
+            retain: default_retain(),
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: AcknowledgementsConfig::default(),
             quality_of_service: MqttQoS::default(),

@@ -5,13 +5,13 @@ mod model;
 mod service;
 mod sink;
 
-pub use config::*;
-pub use encoding::*;
-pub use model::*;
-pub use service::*;
-pub use sink::*;
+use config::*;
+use encoding::*;
+use model::*;
+use service::*;
+use sink::*;
 
-pub use super::{Healthcheck, VectorSink};
+use super::{Healthcheck, VectorSink};
 
 #[cfg(test)]
-pub mod tests;
+mod tests;

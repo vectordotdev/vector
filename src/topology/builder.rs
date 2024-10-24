@@ -2,13 +2,12 @@ use std::{
     collections::HashMap,
     future::ready,
     num::NonZeroUsize,
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
     time::Instant,
 };
 
 use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryStreamExt};
 use futures_util::stream::FuturesUnordered;
-use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -56,18 +55,17 @@ use crate::{
     SourceSender,
 };
 
-static ENRICHMENT_TABLES: Lazy<vector_lib::enrichment::TableRegistry> =
-    Lazy::new(vector_lib::enrichment::TableRegistry::default);
+static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
+    LazyLock::new(vector_lib::enrichment::TableRegistry::default);
 
-pub(crate) static SOURCE_SENDER_BUFFER_SIZE: Lazy<usize> =
-    Lazy::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
+pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
+    LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
 
 const READY_ARRAY_CAPACITY: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(CHUNK_SIZE * 4) };
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
 
-static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
-    crate::app::WORKER_THREADS
-        .get()
+static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
+    crate::app::worker_threads()
         .map(std::num::NonZeroUsize::get)
         .unwrap_or_else(crate::num_threads)
 });

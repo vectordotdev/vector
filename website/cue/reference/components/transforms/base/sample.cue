@@ -6,6 +6,19 @@ base: components: transforms: sample: configuration: {
 		required:    false
 		type: condition: {}
 	}
+	group_by: {
+		description: """
+			The value to group events into separate buckets to be sampled independently.
+
+			If left unspecified, or if the event doesn't have `group_by`, then the event is not
+			sampled separately.
+			"""
+		required: false
+		type: string: {
+			examples: ["{{ service }}", "{{ hostname }}-{{ service }}"]
+			syntax: "template"
+		}
+	}
 	key_field: {
 		description: """
 			The name of the field whose value is hashed to determine if the event should be

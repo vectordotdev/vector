@@ -4991,9 +4991,9 @@ typescript@^4.1.3:
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.5.5.tgz#d8c953832d28924a9e3d37c73d729c846c5896f3"
   integrity sha512-TCTIul70LyWe6IJWT8QSYeA54WQe8EjQFU4wY52Fasj5UKx88LNYKCgBEHcOMOrFF1rKGbD8v/xcNWVUq9SymA==
 
-"typesense-sync@https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v1.0.0.tgz":
-  version "1.0.0"
-  resolved "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v1.0.0.tgz#f750afba4b130377f3fbcb63b0a3fe1fe24b2248"
+"typesense-sync@https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v1.0.4.tgz":
+  version "1.0.4"
+  resolved "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v1.0.4.tgz#f84c4d78140f8213d0ca5cad0ddb190bd6d90a01"
   dependencies:
     "@babel/runtime" "^7.25.0"
     crypto "^1.0.1"

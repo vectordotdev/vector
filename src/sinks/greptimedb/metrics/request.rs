@@ -1,5 +1,8 @@
 use crate::sinks::{
-    greptimedb::metrics::{batch::GreptimeDBBatchSizer, request_builder::metric_to_insert_request},
+    greptimedb::metrics::{
+        batch::GreptimeDBBatchSizer,
+        request_builder::{metric_to_insert_request, RequestBuilderOptions},
+    },
     prelude::*,
 };
 use greptimedb_ingester::{api::v1::*, Error as GreptimeError};
@@ -18,7 +21,7 @@ pub(super) struct GreptimeDBGrpcRequest {
 
 impl GreptimeDBGrpcRequest {
     // convert metrics event to GreptimeDBGrpcRequest
-    pub(super) fn from_metrics(metrics: Vec<Metric>) -> Self {
+    pub(super) fn from_metrics(metrics: Vec<Metric>, options: &RequestBuilderOptions) -> Self {
         let mut items = Vec::with_capacity(metrics.len());
         let mut finalizers = EventFinalizers::default();
         let mut request_metadata_builder = RequestMetadataBuilder::default();
@@ -31,7 +34,7 @@ impl GreptimeDBGrpcRequest {
 
             request_metadata_builder.track_event(metric.clone());
 
-            items.push(metric_to_insert_request(metric));
+            items.push(metric_to_insert_request(metric, options));
         }
 
         let request_size =

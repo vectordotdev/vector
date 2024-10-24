@@ -14,7 +14,7 @@ use crate::Error;
 /// But, config and topology reload logic can handle:
 ///  - Invalid config, caused either by user or by data race.
 ///  - Frequent changes, caused by user/editor modifying/saving file in small chunks.
-/// so we can use smaller, more responsive delay.
+///    so we can use smaller, more responsive delay.
 const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
 
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);

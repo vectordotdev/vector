@@ -119,3 +119,4 @@
 ^lib/codecs/tests/data/native_encoding/
 ^\Qwebsite/config.toml\E$
 ignore$
+^\Qscripts/environment/bootstrap-windows-2022.ps1\E$

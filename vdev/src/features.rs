@@ -1,7 +1,8 @@
-use std::{collections::BTreeSet, collections::HashMap, ffi::OsStr, fs, path::Path};
+use std::{
+    collections::BTreeSet, collections::HashMap, ffi::OsStr, fs, path::Path, sync::LazyLock,
+};
 
 use anyhow::{bail, Context, Result};
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -20,7 +21,7 @@ macro_rules! mapping {
 
 // Mapping of component names to feature name exceptions.
 
-static SOURCE_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+static SOURCE_FEATURE_MAP: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     mapping!(
         prometheus_pushgateway => prometheus,
         prometheus_scrape => prometheus,
@@ -28,9 +29,10 @@ static SOURCE_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new
     )
 });
 
-static TRANSFORM_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| mapping!());
+static TRANSFORM_FEATURE_MAP: LazyLock<HashMap<&'static str, &'static str>> =
+    LazyLock::new(|| mapping!());
 
-static SINK_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+static SINK_FEATURE_MAP: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     mapping!(
         gcp_pubsub => gcp,
         gcp_cloud_storage => gcp,

@@ -4,7 +4,7 @@ remap: functions: parse_influxdb: {
 	category: "Parse"
 	description: """
 		Parses the `value` as an [InfluxDB line protocol](https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/)
-		string, producing a list of Vector-compatible metrics".
+		string, producing a list of Vector-compatible metrics.
 		"""
 	notices: [
 		"""

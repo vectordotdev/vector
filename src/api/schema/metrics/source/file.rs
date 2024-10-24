@@ -57,7 +57,7 @@ impl<'a> FileSourceMetricFile<'a> {
 pub struct FileSourceMetrics(Vec<Metric>);
 
 impl FileSourceMetrics {
-    pub fn new(metrics: Vec<Metric>) -> Self {
+    pub const fn new(metrics: Vec<Metric>) -> Self {
         Self(metrics)
     }
 

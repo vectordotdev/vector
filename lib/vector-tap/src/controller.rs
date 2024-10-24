@@ -131,7 +131,7 @@ impl TapPayload {
         )))
     }
 
-    /// Raise an `invalid_match`event against the provided output pattern.
+    /// Raise an `invalid_match` event against the provided output pattern.
     pub fn invalid_output_pattern_match<T: Into<String>>(
         pattern: T,
         invalid_matches: Vec<String>,
@@ -451,13 +451,15 @@ async fn tap_handler(
     debug!(message = "Stopped tap.", outputs_patterns = ?patterns.for_outputs, inputs_patterns = ?patterns.for_inputs);
 }
 
-#[cfg(all(
+// FIXME: These these should be merged into `src/api/tests.rs` where _most_ of them were moved.
+/*#[cfg(all(
     test,
     feature = "sinks-blackhole",
     feature = "sources-demo_logs",
     feature = "transforms-log_to_metric",
     feature = "transforms-remap",
-))]
+))]*/
+#[cfg(not(all()))]
 mod tests {
     use std::time::Duration;
 

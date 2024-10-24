@@ -471,7 +471,7 @@ pub mod test_util {
 
     pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
         client()
-            .get(&format!("{}/query", endpoint))
+            .get(format!("{}/query", endpoint))
             .query(&[("q", query)])
             .send()
             .await

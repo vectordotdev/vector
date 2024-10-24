@@ -2,9 +2,9 @@ use std::{
     error, fmt,
     num::{ParseFloatError, ParseIntError},
     str::Utf8Error,
+    sync::LazyLock,
 };
 
-use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::{
@@ -12,8 +12,8 @@ use crate::{
     sources::util::extract_tag_key_and_value,
 };
 
-static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
-static NONALPHANUM: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z_\-0-9\.]").unwrap());
+static WHITESPACE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
+static NONALPHANUM: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^a-zA-Z_\-0-9\.]").unwrap());
 
 #[derive(Clone)]
 pub struct Parser {

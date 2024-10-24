@@ -1,7 +1,8 @@
 use crate::sinks::{
     greptimedb::metrics::{
         batch::GreptimeDBBatchSizer, request::GreptimeDBGrpcRequest,
-        request::GreptimeDBGrpcRetryLogic, service::GreptimeDBGrpcService,
+        request::GreptimeDBGrpcRetryLogic, request_builder::RequestBuilderOptions,
+        service::GreptimeDBGrpcService,
     },
     prelude::*,
     util::buffer::metrics::{MetricNormalize, MetricSet},
@@ -30,6 +31,7 @@ impl MetricNormalize for GreptimeDBMetricNormalize {
 pub struct GreptimeDBGrpcSink {
     pub(super) service: Svc<GreptimeDBGrpcService, GreptimeDBGrpcRetryLogic>,
     pub(super) batch_settings: BatcherSettings,
+    pub(super) request_builder_options: RequestBuilderOptions,
 }
 
 impl GreptimeDBGrpcSink {
@@ -41,7 +43,7 @@ impl GreptimeDBGrpcSink {
                 self.batch_settings
                     .as_item_size_config(GreptimeDBBatchSizer),
             )
-            .map(GreptimeDBGrpcRequest::from_metrics)
+            .map(|m| GreptimeDBGrpcRequest::from_metrics(m, &self.request_builder_options))
             .into_driver(self.service)
             .protocol("grpc")
             .run()

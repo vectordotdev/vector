@@ -260,7 +260,7 @@ impl Lua {
         }
 
         if let Some(source) = &config.source {
-            lua.load(source).eval().context(InvalidSourceSnafu)?;
+            lua.load(source).eval::<()>().context(InvalidSourceSnafu)?;
         }
 
         let hook_init_code = config.hooks.init.as_ref();

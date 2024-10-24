@@ -158,7 +158,7 @@ struct ConcatArrayMerger {
 }
 
 impl ConcatArrayMerger {
-    fn new(v: Vec<Value>) -> Self {
+    const fn new(v: Vec<Value>) -> Self {
         Self { v }
     }
 }
@@ -216,7 +216,7 @@ struct LongestArrayMerger {
 }
 
 impl LongestArrayMerger {
-    fn new(v: Vec<Value>) -> Self {
+    const fn new(v: Vec<Value>) -> Self {
         Self { v }
     }
 }
@@ -252,7 +252,7 @@ struct ShortestArrayMerger {
 }
 
 impl ShortestArrayMerger {
-    fn new(v: Vec<Value>) -> Self {
+    const fn new(v: Vec<Value>) -> Self {
         Self { v }
     }
 }

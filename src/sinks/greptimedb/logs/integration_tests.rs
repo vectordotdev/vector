@@ -74,7 +74,7 @@ impl GreptimeClient {
 
     async fn create_pipeline(&self, pipeline_name: &str, pipeline_content: &str) {
         self.client
-            .post(&format!(
+            .post(format!(
                 "{}/v1/events/pipelines/{}",
                 self.endpoint, pipeline_name
             ))
@@ -87,7 +87,7 @@ impl GreptimeClient {
 
     async fn query(&self, sql: &str) -> String {
         self.client
-            .get(&format!("{}/v1/sql", self.endpoint))
+            .get(format!("{}/v1/sql", self.endpoint))
             .query(&[("sql", sql)])
             .send()
             .await

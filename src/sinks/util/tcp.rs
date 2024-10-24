@@ -9,7 +9,6 @@ use std::{
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
-use futures_util::{future::ready, stream};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::{AsyncRead, ReadBuf},
@@ -29,6 +28,7 @@ use crate::{
         ConnectionOpen, OpenGauge, SocketMode, SocketSendError, TcpSocketConnectionEstablished,
         TcpSocketConnectionShutdown, TcpSocketOutgoingConnectionError,
     },
+    sink_ext::VecSinkExt,
     sinks::{
         util::{
             retries::ExponentialBackoff,
@@ -281,34 +281,34 @@ where
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
         // connection only when we have something to send.
         let mut encoder = self.encoder.clone();
-        let mut input = input.map(|mut event| {
-            let byte_size = event.size_of();
-            let json_byte_size = event.estimated_json_encoded_size_of();
-            let finalizers = event.metadata_mut().take_finalizers();
-            self.transformer.transform(&mut event);
-            let mut bytes = BytesMut::new();
+        let mut input = input
+            .map(|mut event| {
+                let byte_size = event.size_of();
+                let json_byte_size = event.estimated_json_encoded_size_of();
+                let finalizers = event.metadata_mut().take_finalizers();
+                self.transformer.transform(&mut event);
+                let mut bytes = BytesMut::new();
 
-            // Errors are handled by `Encoder`.
-            if encoder.encode(event, &mut bytes).is_ok() {
-                let item = bytes.freeze();
-                EncodedEvent {
-                    item,
-                    finalizers,
-                    byte_size,
-                    json_byte_size,
+                // Errors are handled by `Encoder`.
+                if encoder.encode(event, &mut bytes).is_ok() {
+                    let item = bytes.freeze();
+                    EncodedEvent {
+                        item,
+                        finalizers,
+                        byte_size,
+                        json_byte_size,
+                    }
+                } else {
+                    EncodedEvent::new(Bytes::new(), 0, JsonSize::zero())
                 }
-            } else {
-                EncodedEvent::new(Bytes::new(), 0, JsonSize::zero())
-            }
-        });
+            })
+            .peekable();
 
-        while let Some(item) = input.next().await {
+        while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let mut mapped_input = stream::once(ready(item)).chain(&mut input).map(Ok);
-
-            let result = match sink.send_all(&mut mapped_input).await {
+            let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
                 Ok(()) => sink.close().await,
                 Err(error) => Err(error),
             };

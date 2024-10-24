@@ -1,5 +1,5 @@
-use once_cell::sync::Lazy;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::LazyLock};
+
 use vector_lib::lookup::{owned_value_path, OwnedValuePath};
 use vrl::btreemap;
 use vrl::value::{
@@ -288,7 +288,7 @@ pub struct DnstapPaths {
 }
 
 /// Lazily initialized singleton.
-pub(crate) static DNSTAP_VALUE_PATHS: Lazy<DnstapPaths> = Lazy::new(|| DnstapPaths {
+pub(crate) static DNSTAP_VALUE_PATHS: LazyLock<DnstapPaths> = LazyLock::new(|| DnstapPaths {
     server_identity: owned_value_path!("serverId"),
     server_version: owned_value_path!("serverVersion"),
     extra: owned_value_path!("extraInfo"),

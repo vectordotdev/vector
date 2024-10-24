@@ -14,6 +14,7 @@ This document covers Vector's releases and the relevant aspect for Vector users.
 1. [Cadence](#cadence)
    1. [Stable channel](#stable-channel-2)
    1. [Nightly channel](#nightly-channel-2)
+1. [Support Policy](#support-policy)
 1. [Guarantees](#guarantees)
 1. [FAQ](#faq)
    1. [Which release type should I be using?](#which-release-type-should-i-be-using)
@@ -37,14 +38,14 @@ experimental or breaking changes.
 
 ### Stable channel
 
-* Go to our [GitHub repository] and click the "watch" button in the top right.
+- Go to our [GitHub repository] and click the "watch" button in the top right.
   Click "Custom" and then "Releases" to only be notified for new releases.
   See the [GitHub subscription docs] for more info.
-* Subscribe to the [Vector public calendar], release events are added.
-* Follow [@vectordotdev] on Twitter.
-* Head to our [chat], watch the `#announcements` channel, and configure
+- Subscribe to the [Vector public calendar], release events are added.
+- Follow [@vectordotdev] on Twitter.
+- Head to our [chat], watch the `#announcements` channel, and configure
   notifications accordingly.
-* If you are using a [package manager], you should be able to see the update
+- If you are using a [package manager], you should be able to see the update
   available when updating your package lists.
 
 ### Nightly channel
@@ -59,13 +60,17 @@ Please head over to Vector's [download page].
 
 ### Stable channel
 
-* **Every 6 weeks**
-* Release patch fixes as needed to fix high-priority bugs and regressions from the last major or minor release
-* Release daily builds representing the latest state of Vector for feedback
+- **Every 6 weeks**
+- Release patch fixes as needed to fix high-priority bugs and regressions from the last major or minor release
+- Release daily builds representing the latest state of Vector for feedback
 
 ### Nightly channel
 
-* **Every night**
+- **Every night**
+
+## Support Policy
+
+Vector currently supports only the latest minor release, as it remains in the 0.x version series. This support policy will be reviewed and may change with the release of version 1.0.0.
 
 ## Guarantees
 
