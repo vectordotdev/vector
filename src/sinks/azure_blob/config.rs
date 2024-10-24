@@ -42,11 +42,25 @@ impl TowerRequestConfigDefaults for AzureBlobTowerRequestConfigDefaults {
 pub struct AzureBlobSinkConfig {
     /// The Azure Blob Storage Account connection string.
     ///
-    /// Authentication with access key is the only supported authentication method.
+    /// Authentication with an access key or shared access signature (SAS)
+    /// are supported authentication methods. If using a non-account SAS,
+    /// healthchecks will fail and will need to be disabled by setting
+    /// `healthcheck.enabled` to `false` for this sink
+    ///
+    /// When generating an account SAS, the following are the minimum required option
+    /// settings for Vector to access blob storage and pass a health check.
+    /// | Option                 | Value              |
+    /// | ---------------------- | ------------------ |
+    /// | Allowed services       | Blob               |
+    /// | Allowed resource types | Container & Object |
+    /// | Allowed permissions    | Read & Create      |
     ///
     /// Either `storage_account`, or this field, must be specified.
     #[configurable(metadata(
         docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
+    ))]
+    #[configurable(metadata(
+        docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
     ))]
     pub connection_string: Option<SensitiveString>,
 
