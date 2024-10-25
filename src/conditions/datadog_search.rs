@@ -141,7 +141,7 @@ impl Filter<LogEvent> for EventFilter {
             Field::Attribute(field) => {
                 let to_match = to_match.to_owned();
 
-                string_or_numeric_match(field, move |value| value == to_match)
+                bool_string_or_numeric_match(field, move |value| value == to_match)
             }
         })
     }
@@ -305,7 +305,7 @@ impl Filter<LogEvent> for EventFilter {
 
 /// Returns a `Matcher` that returns true if the log event resolves to a string or
 /// numeric which matches the provided `func`.
-fn string_or_numeric_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
+fn bool_string_or_numeric_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
 where
     S: Into<String>,
     F: Fn(Cow<str>) -> bool + Send + Sync + Clone + 'static,
@@ -314,6 +314,7 @@ where
 
     Run::boxed(move |log: &LogEvent| {
         match log.parse_path_and_get_value(field.as_str()).ok().flatten() {
+            Some(Value::Boolean(v)) => func(v.to_string().into()),
             Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
             Some(Value::Integer(v)) => func(v.to_string().into()),
             Some(Value::Float(v)) => func(v.to_string().into()),
@@ -620,6 +621,18 @@ mod test {
                 r#"-a:"bla""#,
                 log_event!["a" => "bla"],
                 log_event!["tags" => vec!["a:bla"]],
+            ),
+            // Boolean attribute match.
+            (
+                "@a:true",
+                log_event!["a" => true],
+                log_event!["a" => false],
+            ),
+            // Boolean attribute match (negate).
+            (
+                "NOT @a:false",
+                log_event!["a" => true],
+                log_event!["a" => false],
             ),
             // String attribute match.
             (
@@ -1171,6 +1184,12 @@ mod test {
                 "@field:(value1 OR \n value2)",
                 log_event!["field" => "value1"],
                 log_event!["field" => "value"],
+            ),
+            // negate AND bool and string
+            (
+                "NOT (@field:true AND @field2:value2)",
+                log_event!["field" => false, "field2" => "value2"],
+                log_event!["field" => true, "field2" => "value2"],
             ),
         ]
     }
