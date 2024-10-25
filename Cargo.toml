@@ -142,7 +142,7 @@ indexmap = { version = "2.6.0", default-features = false, features = ["serde", "
 metrics = "0.24.0"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
-pin-project = { version = "1.1.6", default-features = false }
+pin-project = { version = "1.1.7", default-features = false }
 proptest = { version = "1.5" }
 proptest-derive = { version = "0.4.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
@@ -184,7 +184,7 @@ tokio = { version = "1.41.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { version = "0.1.16", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
-console-subscriber = { version = "0.4.0", default-features = false, optional = true }
+console-subscriber = { version = "0.4.1", default-features = false, optional = true }
 
 # Tracing
 tracing = { version = "0.1.34", default-features = false }
@@ -216,9 +216,9 @@ aws-sigv4 = { version = "1.2.4", default-features = false, features = ["sign-htt
 aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest", "credentials-process", "sso", "rt-tokio"], optional = true }
 aws-credential-types = { version = "1.2.1", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream", "rt-tokio"], optional = true }
-aws-smithy-types = { version = "1.2.7", default-features = false, features = ["rt-tokio"], optional = true }
+aws-smithy-types = { version = "1.2.8", default-features = false, features = ["rt-tokio"], optional = true }
 aws-smithy-runtime-api = { version = "1.7.2", default-features = false, optional = true }
-aws-smithy-runtime = { version = "1.7.2", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
+aws-smithy-runtime = { version = "1.7.3", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
 aws-smithy-async = { version = "1.2.1", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
@@ -293,7 +293,7 @@ databend-client = { version = "0.21.1", default-features = false, features = ["r
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.17", default-features = false }
-encoding_rs = { version = "0.8.34", default-features = false, features = ["serde"] }
+encoding_rs = { version = "0.8.35", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.13", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.34", default-features = false, features = ["default"] }
@@ -341,7 +341,7 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.35.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.24.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
-regex = { version = "1.11.0", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.6", default-features = false, features = ["std"], optional = true }
 rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
@@ -387,7 +387,7 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.16", default-features = false }
-aws-smithy-runtime = { version = "1.7.2", default-features = false, features = ["tls-rustls"] }
+aws-smithy-runtime = { version = "1.7.3", default-features = false, features = ["tls-rustls"] }
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
