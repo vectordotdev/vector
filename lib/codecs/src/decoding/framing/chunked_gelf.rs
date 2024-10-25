@@ -821,7 +821,7 @@ mod tests {
         let sequence_number = 0u8;
         let total_chunks = 1u8;
         let payload = "foo";
-        let mut chunk = create_chunk(message_id, sequence_number, total_chunks, &payload);
+        let mut chunk = create_chunk(message_id, sequence_number, total_chunks, payload);
         let mut decoder = ChunkedGelfDecoder::new(DEFAULT_TIMEOUT_SECS, None, Some(1), None);
 
         let frame = decoder.decode_eof(&mut chunk);
