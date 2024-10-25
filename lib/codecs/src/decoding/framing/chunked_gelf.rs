@@ -37,6 +37,8 @@ impl ChunkedGelfDecoderConfig {
         ChunkedGelfDecoder::new(
             self.chunked_gelf.timeout_secs,
             self.chunked_gelf.pending_messages_limit,
+            self.chunked_gelf.max_chunk_length,
+            self.chunked_gelf.max_message_length,
         )
     }
 }
@@ -58,6 +60,27 @@ pub struct ChunkedGelfDecoderOptions {
     /// of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub pending_messages_limit: Option<usize>,
+
+    /// The maximum length of a single GELF chunk, in bytes. Chunks longer than this length will
+    /// be dropped. If this option is not set, the decoder does not limit the length of chunks and
+    /// the per-chunk memory is unbounded.
+    ///
+    /// This limit takes only into account the chunk's payload and the GELF header bytes are excluded from the calculation.
+    #[serde(skip_serializing_if = "vector_core::serde::is_default")]
+    pub max_chunk_length: Option<usize>,
+
+    /// The maximum length of a single GELF message, in bytes. Messages longer than this length will
+    /// be dropped. If this option is not set, the decoder does not limit the length of messages and
+    /// the per-message memory is unbounded.
+    ///
+    /// Note that a message can be composed of multiple chunks and this limit is applied to the whole
+    /// message, not to individual chunks. This length should always be greater than the `max_chunk_length`.
+    /// This option is useful to limit the memory usage of the decoders's chunk buffer.
+    ///
+    /// This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.
+    /// The message's payload is the concatenation of all the chunks' payloads.
+    #[serde(skip_serializing_if = "vector_core::serde::is_default")]
+    pub max_message_length: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -65,6 +88,7 @@ struct MessageState {
     total_chunks: u8,
     chunks: [Bytes; GELF_MAX_TOTAL_CHUNKS as usize],
     chunks_bitmap: u128,
+    current_message_length: usize,
     timeout_task: JoinHandle<()>,
 }
 
@@ -74,6 +98,7 @@ impl MessageState {
             total_chunks,
             chunks: [const { Bytes::new() }; GELF_MAX_TOTAL_CHUNKS as usize],
             chunks_bitmap: 0,
+            current_message_length: 0,
             timeout_task,
         }
     }
@@ -85,15 +110,20 @@ impl MessageState {
 
     fn add_chunk(&mut self, sequence_number: u8, chunk: Bytes) {
         let chunk_bitmap_id = 1 << sequence_number;
-        self.chunks[sequence_number as usize] = chunk;
         self.chunks_bitmap |= chunk_bitmap_id;
+        self.current_message_length += chunk.remaining();
+        self.chunks[sequence_number as usize] = chunk;
     }
 
     fn is_complete(&self) -> bool {
         self.chunks_bitmap.count_ones() == self.total_chunks as u32
     }
 
-    fn retrieve_message(&mut self) -> Option<Bytes> {
+    fn current_message_length(&self) -> usize {
+        self.current_message_length
+    }
+
+    fn retrieve_message(&self) -> Option<Bytes> {
         if self.is_complete() {
             self.timeout_task.abort();
             let chunks = &self.chunks[0..self.total_chunks as usize];
@@ -108,34 +138,48 @@ impl MessageState {
     }
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Snafu, PartialEq, Eq)]
 pub enum ChunkedGelfDecoderError {
-    #[snafu(display("Invalid chunk header with less than 10 bytes: {header:?}"))]
+    #[snafu(display("Invalid chunk header with less than 10 bytes: 0x{header:0x}"))]
     InvalidChunkHeader { header: Bytes },
-    #[snafu(display("Invalid total chunks value {total_chunks} for message with id {message_id} and sequence number {sequence_number}"))]
+    #[snafu(display("Received chunk with message id {message_id} and sequence number {sequence_number} has an invalid total chunks value of {total_chunks}. It must be between 1 and {GELF_MAX_TOTAL_CHUNKS}."))]
     InvalidTotalChunks {
         message_id: u64,
         sequence_number: u8,
         total_chunks: u8,
     },
-    #[snafu(display("Sequence number {sequence_number} is greater than the total chunks value {total_chunks} for message with id {message_id}"))]
+    #[snafu(display("Received chunk with message id {message_id} and sequence number {sequence_number} has a sequence number greater than its total chunks value of {total_chunks}"))]
     InvalidSequenceNumber {
         message_id: u64,
         sequence_number: u8,
         total_chunks: u8,
     },
-    #[snafu(display("Pending messages limit of {pending_messages_limit} reached while processing message with id {message_id} and sequence number {sequence_number}"))]
+    #[snafu(display("Pending messages limit of {pending_messages_limit} reached while processing chunk with message id {message_id} and sequence number {sequence_number}"))]
     PendingMessagesLimitReached {
         message_id: u64,
         sequence_number: u8,
         pending_messages_limit: usize,
     },
-    #[snafu(display("Received message with id {message_id} and sequence number {sequence_number} has different total chunks values: original total chunks value {original_total_chunks}, received total chunks value {received_total_chunks}"))]
+    #[snafu(display("Received chunk with message id {message_id} and sequence number {sequence_number} has different total chunks values: original total chunks value is {original_total_chunks} and received total chunks value is {received_total_chunks}"))]
     TotalChunksMismatch {
         message_id: u64,
         sequence_number: u8,
         original_total_chunks: u8,
         received_total_chunks: u8,
+    },
+    #[snafu(display("Received chunk with message id {message_id} and sequence number {sequence_number} has exceeded the maximum chunk length: got {chunk_length} bytes and max chunk length is {max_chunk_length} bytes"))]
+    MaxChunkLengthExceeded {
+        message_id: u64,
+        sequence_number: u8,
+        chunk_length: usize,
+        max_chunk_length: usize,
+    },
+    #[snafu(display("Message with id {message_id} has exceeded the maximum message length and it will be dropped: got {message_length} bytes and max message length is {max_message_length} bytes. Discarding all buffered chunks of that message"))]
+    MaxMessageLengthExceeded {
+        message_id: u64,
+        sequence_number: u8,
+        message_length: usize,
+        max_message_length: usize,
     },
 }
 
@@ -164,16 +208,25 @@ pub struct ChunkedGelfDecoder {
     state: Arc<Mutex<HashMap<u64, MessageState>>>,
     timeout: Duration,
     pending_messages_limit: Option<usize>,
+    max_chunk_length: Option<usize>,
+    max_message_length: Option<usize>,
 }
 
 impl ChunkedGelfDecoder {
     /// Creates a new `ChunkedGelfDecoder`.
-    pub fn new(timeout_secs: f64, pending_messages_limit: Option<usize>) -> Self {
+    pub fn new(
+        timeout_secs: f64,
+        pending_messages_limit: Option<usize>,
+        max_chunk_length: Option<usize>,
+        max_message_length: Option<usize>,
+    ) -> Self {
         Self {
             bytes_decoder: BytesDecoder::new(),
             state: Arc::new(Mutex::new(HashMap::new())),
             timeout: Duration::from_secs_f64(timeout_secs),
             pending_messages_limit,
+            max_chunk_length,
+            max_message_length,
         }
     }
 
@@ -276,7 +329,33 @@ impl ChunkedGelfDecoder {
             return Ok(None);
         }
 
+        if let Some(max_chunk_length) = self.max_chunk_length {
+            let chunk_length = chunk.remaining();
+            ensure!(
+                chunk_length <= max_chunk_length,
+                MaxChunkLengthExceededSnafu {
+                    message_id,
+                    sequence_number,
+                    chunk_length,
+                    max_chunk_length
+                }
+            );
+        }
+
         message_state.add_chunk(sequence_number, chunk);
+
+        if let Some(max_message_length) = self.max_message_length {
+            let message_length = message_state.current_message_length();
+            if message_length > max_message_length {
+                state_lock.remove(&message_id);
+                return Err(ChunkedGelfDecoderError::MaxMessageLengthExceeded {
+                    message_id,
+                    sequence_number,
+                    message_length,
+                    max_message_length,
+                });
+            }
+        }
 
         if let Some(message) = message_state.retrieve_message() {
             state_lock.remove(&message_id);
@@ -304,7 +383,7 @@ impl ChunkedGelfDecoder {
 
 impl Default for ChunkedGelfDecoder {
     fn default() -> Self {
-        Self::new(DEFAULT_TIMEOUT_SECS, None)
+        Self::new(DEFAULT_TIMEOUT_SECS, None, None, None)
     }
 }
 
@@ -626,10 +705,12 @@ mod tests {
 
         let error = frame.expect_err("Expected an error");
         let downcasted_error = downcast_framing_error(&error);
-        assert!(matches!(
-            downcasted_error,
-            ChunkedGelfDecoderError::InvalidChunkHeader { .. }
-        ));
+        assert_eq!(
+            *downcasted_error,
+            ChunkedGelfDecoderError::InvalidChunkHeader {
+                header: Bytes::from_static(&[0x12, 0x34])
+            }
+        );
     }
 
     #[tokio::test]
@@ -644,10 +725,14 @@ mod tests {
         let frame = decoder.decode_eof(&mut chunk);
         let error = frame.expect_err("Expected an error");
         let downcasted_error = downcast_framing_error(&error);
-        assert!(matches!(
-            downcasted_error,
-            ChunkedGelfDecoderError::InvalidTotalChunks { .. }
-        ));
+        assert_eq!(
+            *downcasted_error,
+            ChunkedGelfDecoderError::InvalidTotalChunks {
+                message_id: 1,
+                sequence_number: 1,
+                total_chunks: 129,
+            }
+        );
     }
 
     #[tokio::test]
@@ -662,10 +747,14 @@ mod tests {
         let frame = decoder.decode_eof(&mut chunk);
         let error = frame.expect_err("Expected an error");
         let downcasted_error = downcast_framing_error(&error);
-        assert!(matches!(
-            downcasted_error,
-            ChunkedGelfDecoderError::InvalidSequenceNumber { .. }
-        ));
+        assert_eq!(
+            *downcasted_error,
+            ChunkedGelfDecoderError::InvalidSequenceNumber {
+                message_id: 1,
+                sequence_number: 3,
+                total_chunks: 2,
+            },
+        );
     }
 
     #[rstest]
@@ -674,11 +763,9 @@ mod tests {
         two_chunks_message: ([BytesMut; 2], String),
         three_chunks_message: ([BytesMut; 3], String),
     ) {
-        let pending_messages_limit = 1;
         let (mut two_chunks, _) = two_chunks_message;
         let (mut three_chunks, _) = three_chunks_message;
-        let mut decoder =
-            ChunkedGelfDecoder::new(DEFAULT_TIMEOUT_SECS, Some(pending_messages_limit));
+        let mut decoder = ChunkedGelfDecoder::new(DEFAULT_TIMEOUT_SECS, Some(1), None, None);
 
         let frame = decoder.decode_eof(&mut two_chunks[0]).unwrap();
         assert!(frame.is_none());
@@ -687,10 +774,14 @@ mod tests {
         let frame = decoder.decode_eof(&mut three_chunks[0]);
         let error = frame.expect_err("Expected an error");
         let downcasted_error = downcast_framing_error(&error);
-        assert!(matches!(
-            downcasted_error,
-            ChunkedGelfDecoderError::PendingMessagesLimitReached { .. }
-        ));
+        assert_eq!(
+            *downcasted_error,
+            ChunkedGelfDecoderError::PendingMessagesLimitReached {
+                message_id: 2u64,
+                sequence_number: 0u8,
+                pending_messages_limit: 1,
+            }
+        );
         assert!(decoder.state.lock().unwrap().len() == 1);
     }
 
@@ -712,10 +803,39 @@ mod tests {
         let frame = decoder.decode_eof(&mut second_chunk);
         let error = frame.expect_err("Expected an error");
         let downcasted_error = downcast_framing_error(&error);
-        assert!(matches!(
-            downcasted_error,
-            ChunkedGelfDecoderError::TotalChunksMismatch { .. }
-        ));
+        assert_eq!(
+            *downcasted_error,
+            ChunkedGelfDecoderError::TotalChunksMismatch {
+                message_id: 1,
+                sequence_number: 1,
+                original_total_chunks: 2,
+                received_total_chunks: 3,
+            }
+        );
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn decode_chunk_greater_than_max_chunk_length() {
+        let message_id = 1u64;
+        let sequence_number = 0u8;
+        let total_chunks = 1u8;
+        let payload = "foo";
+        let mut chunk = create_chunk(message_id, sequence_number, total_chunks, &payload);
+        let mut decoder = ChunkedGelfDecoder::new(DEFAULT_TIMEOUT_SECS, None, Some(1), None);
+
+        let frame = decoder.decode_eof(&mut chunk);
+        let error = frame.expect_err("Expected an error");
+        let downcasted_error = downcast_framing_error(&error);
+        assert_eq!(
+            *downcasted_error,
+            ChunkedGelfDecoderError::MaxChunkLengthExceeded {
+                message_id: 1,
+                sequence_number: 0,
+                chunk_length: 3,
+                max_chunk_length: 1,
+            }
+        );
     }
 
     #[rstest]
