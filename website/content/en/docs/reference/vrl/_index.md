@@ -28,12 +28,12 @@ example `remap` transform that contains a VRL program in the `source` field:
 ```YAML {title="vector.yaml"}
 transforms:
   modify:
-  type: remap
-  inputs:
-    - logs
-  source: |
-    del(.user_info)
-    .timestamp = now()
+    type: remap
+    inputs:
+      - logs
+    source: |
+      del(.user_info)
+      .timestamp = now()
 ```
 
 This program changes the contents of each event that passes through this
