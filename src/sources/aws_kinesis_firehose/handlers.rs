@@ -219,22 +219,24 @@ fn decode_record(
             compression: compression.to_owned(),
         }),
         Compression::Auto => {
-            match infer::get(&buf) {
-                Some(filetype) => match filetype.mime_type() {
-                    "application/gzip" => decode_gzip(&buf[..]).or_else(|error| {
-                        emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
-                            compression: Compression::Gzip,
-                            error
-                        });
-                        Ok(Bytes::from(buf))
-                    }),
-                    // only support gzip for now
-                    _ => Ok(Bytes::from(buf)),
-                },
-                None => Ok(Bytes::from(buf)),
+            if is_gzip(&buf) {
+                decode_gzip(&buf[..]).or_else(|error| {
+                    emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
+                        compression: Compression::Gzip,
+                        error
+                    });
+                    Ok(Bytes::from(buf))
+                })
+            } else {
+                // only support gzip for now
+                Ok(Bytes::from(buf))
             }
         }
     }
+}
+
+fn is_gzip(data: &[u8]) -> bool {
+    data.len() > 8 && &data[..3] == b"\x1f\x8b\x08"
 }
 
 fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
@@ -244,4 +246,23 @@ fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
     gz.read_to_end(&mut decoded)?;
 
     Ok(Bytes::from(decoded))
+}
+
+#[cfg(test)]
+mod tests {
+    use flate2::{write::GzEncoder, Compression};
+    use std::io::Write as _;
+
+    use super::*;
+
+    const CONTENT: &[u8] = b"Example";
+
+    #[test]
+    fn correctly_detects_gzipped_content() {
+        assert!(!is_gzip(CONTENT));
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
+        encoder.write_all(CONTENT).unwrap();
+        let compressed = encoder.finish().unwrap();
+        assert!(is_gzip(&compressed));
+    }
 }
