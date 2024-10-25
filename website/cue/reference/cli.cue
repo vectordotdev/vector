@@ -166,7 +166,7 @@ cli: {
 		"watch-config-method": {
 			description: env_vars.VECTOR_WATCH_CONFIG_METHOD.description
 			env_var:     "VECTOR_WATCH_CONFIG_METHOD"
-			default:     env_vars.VECTOR_WATCH_CONFIG_METHOD.default
+			default:     env_vars.VECTOR_WATCH_CONFIG_METHOD.type.string.default
 			type:        "string"
 		}
 	}
@@ -643,7 +643,7 @@ cli: {
                 `recommend` - recommended event based watcher for host OS
                 `poll` - `poll` watcher can be used in cases where event based watcher doesn't work, e.g., when attaching the configuration via NFS.
                 """
-			type: text: default: recommended
+			type: string: default: "recommended"
 		}
 		VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS: {
 			description: """
