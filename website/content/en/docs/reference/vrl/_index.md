@@ -129,7 +129,7 @@ events for which the `severity` field is `"info"`, the `status_code` field is
 greater than or equal to 400, and the `host` field isn't set:
 
 ```coffee
-condition = '.severity != "info" && .status_code < 400 && exists(.host)
+condition = '.severity != "info" && .status_code < 400 && exists(.host)'
 ```
 
 {{< info title="More VRL examples" >}} You can find more VRL examples further
