@@ -1,7 +1,6 @@
 import { typesenseSync } from 'typesense-sync';
 import * as dotenv from 'dotenv';
 const documentsFile = './public/search.json';
-console.log(process.env)
 
 dotenv.config();
 /*
