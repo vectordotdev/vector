@@ -236,7 +236,12 @@ fn decode_record(
 }
 
 fn is_gzip(data: &[u8]) -> bool {
-    data.len() > 8 && &data[..3] == b"\x1f\x8b\x08"
+    // The header length of a GZIP file is 10 bytes. The first two bytes of the constant comes from
+    // the GZIP file format specification, which is the fixed member header identication bytes. The
+    // third byte is the compression method, of which only one is defined which is 8 for "deflate".
+    //
+    // Reference: https://datatracker.ietf.org/doc/html/rfc1952 Section 2.3
+    data.len() >= 10 && &data[..3] == b"\x1f\x8b\x08"
 }
 
 fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
