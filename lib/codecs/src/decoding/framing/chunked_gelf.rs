@@ -276,6 +276,19 @@ impl ChunkedGelfDecoder {
             }
         );
 
+        if let Some(max_chunk_length) = self.max_chunk_length {
+            let chunk_length = chunk.remaining();
+            ensure!(
+                chunk_length <= max_chunk_length,
+                MaxChunkLengthExceededSnafu {
+                    message_id,
+                    sequence_number,
+                    chunk_length,
+                    max_chunk_length
+                }
+            );
+        }
+
         let mut state_lock = self.state.lock().expect("poisoned lock");
 
         if let Some(pending_messages_limit) = self.pending_messages_limit {
@@ -327,19 +340,6 @@ impl ChunkedGelfDecoder {
                 "Received a duplicate chunk. Ignoring it."
             );
             return Ok(None);
-        }
-
-        if let Some(max_chunk_length) = self.max_chunk_length {
-            let chunk_length = chunk.remaining();
-            ensure!(
-                chunk_length <= max_chunk_length,
-                MaxChunkLengthExceededSnafu {
-                    message_id,
-                    sequence_number,
-                    chunk_length,
-                    max_chunk_length
-                }
-            );
         }
 
         message_state.add_chunk(sequence_number, chunk);
