@@ -27,13 +27,13 @@ jobs:
 
       - name: (PR review) Checkout PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.2.0

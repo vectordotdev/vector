@@ -155,7 +155,6 @@ chkptr
 chronosphere
 chunkenc
 cicd
-Cim
 ciphersuites
 CLA
 Claranet
@@ -389,6 +388,8 @@ Fomichev
 fonttbl
 foob
 foobarbaz
+foobarbazqux
+foobarbazquxquux
 foobarfoobarfoo
 FOOBARy
 foobaz
@@ -728,7 +729,6 @@ ndarray
 ndjson
 nearline
 newcerts
-newrelix
 nextest
 nfox
 ngx
@@ -1001,6 +1001,7 @@ smp
 smpl
 smtracking
 snakecase
+Sni
 Soldotna
 somehost
 somejob
@@ -1188,7 +1189,6 @@ vectordir
 vectordotdev
 vectorized
 vendored
-veryyyyyyy
 viceversa
 viewkind
 visualising
@@ -1281,4 +1281,3 @@ zulip
 Zunstable
 zup
 zurp
-sni
