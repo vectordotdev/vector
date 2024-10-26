@@ -200,6 +200,7 @@ mod tests {
         SeedableRng,
     };
     use serde_json::json;
+    use similar_asserts::assert_eq;
     use vector_lib::configurable::component::{
         SinkDescription, SourceDescription, TransformDescription,
     };
@@ -282,7 +283,11 @@ mod tests {
 
     /// Select any 2-4 sources
     fn arb_sources() -> impl Strategy<Value = Vec<&'static str>> {
-        sample::subsequence(SourceDescription::types(), 2..=4)
+        let mut types = SourceDescription::types();
+        // The `file_descriptor` source produces different defaults each time it is used, and so
+        // will never compare equal below.
+        types.retain(|t| *t != "file_descriptor");
+        sample::subsequence(types, 2..=4)
     }
 
     /// Select any 2-4 transforms

@@ -1,32 +1,37 @@
+use std::collections::HashMap;
 use vector_lib::config::LegacyKey;
-use vrl::event_path;
 
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use crate::{
     conditions::Condition,
     event::Event,
     internal_events::SampleEventDiscarded,
-    transforms::{FunctionTransform, OutputBuffer, sample::config::default_sample_rate_key},
+    sinks::prelude::TemplateRenderingError,
+    template::Template,
+    transforms::{FunctionTransform, OutputBuffer},
 };
+use vector_lib::lookup::OwnedTargetPath;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 
 #[derive(Clone)]
 pub struct Sample {
     name: String,
     rate: u64,
     key_field: Option<String>,
+    group_by: Option<Template>,
     exclude: Option<Condition>,
-    count: u64,
     sample_rate_key: OptionalValuePath,
+    counter: HashMap<Option<String>, u64>,
 }
 
 impl Sample {
     // This function is dead code when the feature flag `transforms-impl-sample` is specified but not
     // `transforms-sample`.
     #![allow(dead_code)]
-    pub const fn new(
+    pub fn new(
         name: String,
         rate: u64,
         key_field: Option<String>,
+        group_by: Option<Template>,
         exclude: Option<Condition>,
         sample_rate_key: OptionalValuePath,
     ) -> Self {
@@ -34,9 +39,10 @@ impl Sample {
             name,
             rate,
             key_field,
+            group_by,
             exclude,
-            count: 0,
-            sample_rate_key
+            sample_rate_key,
+            counter: HashMap::new(),
         }
     }
 }
@@ -73,32 +79,61 @@ impl FunctionTransform for Sample {
             })
             .map(|v| v.to_string_lossy());
 
+        // Fetch actual field value if group_by option is set.
+        let group_by_key = self.group_by.as_ref().and_then(|group_by| match &event {
+            Event::Log(event) => group_by
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("group_by"),
+                        drop_event: false,
+                    })
+                })
+                .ok(),
+            Event::Trace(event) => group_by
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("group_by"),
+                        drop_event: false,
+                    })
+                })
+                .ok(),
+            Event::Metric(_) => panic!("component can never receive metric events"),
+        });
+
+        let counter_value: u64 = *self.counter.entry(group_by_key.clone()).or_default();
+
         let num = if let Some(value) = value {
             seahash::hash(value.as_bytes())
         } else {
-            self.count
+            counter_value
         };
 
-        self.count = (self.count + 1) % self.rate;
+        // reset counter for particular key, or default key if group_by option isn't provided
+        let increment: u64 = (counter_value + 1) % self.rate;
+        self.counter.insert(group_by_key.clone(), increment);
 
         if num % self.rate == 0 {
-            match event {
-                Event::Log(ref mut event) => {
-                    event.namespace().insert_source_metadata(
-                        self.name.as_str(),
-                        event,
-                        self.sample_rate_key.path.map(|path| LegacyKey::Overwrite(path)),
-                        self.sample_rate_key.path,
-                        self.rate.to_string(),
-                    );
-                }
-                Event::Trace(ref mut event) => {
-                    if let Some(path) = self.sample_rate_key.path {
-                        event.insert(path, self.rate.to_string());
+            if let Some(path) = &self.sample_rate_key.path {
+                match event {
+                    Event::Log(ref mut event) => {
+                        event.namespace().insert_source_metadata(
+                            self.name.as_str(),
+                            event,
+                            Some(LegacyKey::Overwrite(path)),
+                            path,
+                            self.rate.to_string(),
+                        );
                     }
-                }
-                Event::Metric(_) => panic!("component can never receive metric events"),
-            };
+                    Event::Trace(ref mut event) => {
+                      event.insert(&OwnedTargetPath::event(path.clone()), self.rate.to_string());
+                    }
+                    Event::Metric(_) => panic!("component can never receive metric events"),
+                };
+            }
             output.push(event);
         } else {
             emit!(SampleEventDiscarded);
@@ -109,14 +144,15 @@ impl FunctionTransform for Sample {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vrl::owned_value_path;
 
     use crate::{
         conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
         event::{Event, LogEvent, TraceEvent},
         test_util::random_lines,
+        transforms::sample::config::default_sample_rate_key,
         transforms::test::transform_one,
-        transforms::OutputBuffer,
     };
     use approx::assert_relative_eq;
 
@@ -140,6 +176,7 @@ mod tests {
             "sample".to_string(),
             2,
             log_schema().message_key().map(ToString::to_string),
+            None,
             Some(condition_contains(
                 log_schema().message_key().unwrap().to_string().as_str(),
                 "na",
@@ -163,6 +200,7 @@ mod tests {
             "sample".to_string(),
             25,
             log_schema().message_key().map(ToString::to_string),
+            None,
             Some(condition_contains(
                 log_schema().message_key().unwrap().to_string().as_str(),
                 "na",
@@ -189,6 +227,7 @@ mod tests {
             "sample".to_string(),
             2,
             log_schema().message_key().map(ToString::to_string),
+            None,
             Some(condition_contains(
                 log_schema().message_key().unwrap().to_string().as_str(),
                 "na",
@@ -225,9 +264,38 @@ mod tests {
                 "sample".to_string(),
                 0,
                 key_field.clone(),
+                None,
                 Some(condition_contains(
                     log_schema().message_key().unwrap().to_string().as_str(),
                     "important",
+                )),
+                default_sample_rate_key(),
+            );
+            let iterations = 0..1000;
+            let total_passed = iterations
+                .filter_map(|_| {
+                    transform_one(&mut sampler, event.clone())
+                        .map(|result| assert_eq!(result, event))
+                })
+                .count();
+            assert_eq!(total_passed, 1000);
+        }
+    }
+
+    #[test]
+    fn handles_group_by() {
+        for group_by in &[None, Some(Template::try_from("{{ other_field }}").unwrap())] {
+            let mut event = Event::Log(LogEvent::from("nananana"));
+            let log = event.as_mut_log();
+            log.insert("other_field", "foo");
+            let mut sampler = Sample::new(
+                "sample".to_string(),
+                0,
+                log_schema().message_key().map(ToString::to_string),
+                group_by.clone(),
+                Some(condition_contains(
+                    log_schema().message_key().unwrap().to_string().as_str(),
+                    "na",
                 )),
                 default_sample_rate_key(),
             );
@@ -252,6 +320,7 @@ mod tests {
                 "sample".to_string(),
                 0,
                 key_field.clone(),
+                None,
                 Some(condition_contains("other_field", "foo")),
                 default_sample_rate_key(),
             );
@@ -275,6 +344,7 @@ mod tests {
                 "sample".to_string(),
                 10,
                 key_field.clone(),
+                None,
                 Some(condition_contains(&message_key, "na")),
                 default_sample_rate_key(),
             );
@@ -290,6 +360,7 @@ mod tests {
                 "sample".to_string(),
                 25,
                 key_field.clone(),
+                None,
                 Some(condition_contains(&message_key, "na")),
                 OptionalValuePath::from(owned_value_path!("custom_sample_rate")),
             );
@@ -306,21 +377,23 @@ mod tests {
                 "sample".to_string(),
                 50,
                 key_field.clone(),
+                None,
                 Some(condition_contains(&message_key, "na")),
-                OptionalValuePath::from(""),
+                OptionalValuePath::from(owned_value_path!("")),
             );
             let passing = events
                 .into_iter()
                 .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
                 .find_map(|event| transform_one(&mut sampler, event))
                 .unwrap();
-              assert!(passing.as_log().get("sample_rate").is_none());
+            assert!(passing.as_log().get("sample_rate").is_none());
 
             // If the event passed the regex check, don't include the sampling rate
             let mut sampler = Sample::new(
                 "sample".to_string(),
                 25,
                 key_field.clone(),
+                None,
                 Some(condition_contains(&message_key, "na")),
                 default_sample_rate_key(),
             );
@@ -334,7 +407,16 @@ mod tests {
     fn handles_trace_event() {
         let event: TraceEvent = LogEvent::from("trace").into();
         let trace = Event::Trace(event);
-        let mut sampler = Sample::new("sample".to_string(), 2, None, None, default_sample_rate_key());
+
+        let mut sampler = Sample::new(
+            "sample".to_string(),
+            2,
+            None,
+            None,
+            None,
+            default_sample_rate_key(),
+        );
+
         let iterations = 0..2;
         let total_passed = iterations
             .filter_map(|_| transform_one(&mut sampler, trace.clone()))

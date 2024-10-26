@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
     process::Stdio,
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, LazyLock},
     time::Duration,
 };
 
@@ -15,7 +15,6 @@ use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
 };
-use once_cell::sync::Lazy;
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -71,7 +70,7 @@ const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
 
 const BACKOFF_DURATION: Duration = Duration::from_secs(1);
 
-static JOURNALCTL: Lazy<PathBuf> = Lazy::new(|| "journalctl".into());
+static JOURNALCTL: LazyLock<PathBuf> = LazyLock::new(|| "journalctl".into());
 
 #[derive(Debug, Snafu)]
 enum BuildError {
