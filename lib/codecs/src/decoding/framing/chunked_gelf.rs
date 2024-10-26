@@ -703,7 +703,7 @@ mod tests {
         let mut decoder = ChunkedGelfDecoder::default();
         let frame = decoder.decode_eof(&mut src);
 
-        let error = frame.expect_err("Expected an error");
+        let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert_eq!(
             *downcasted_error,
@@ -723,7 +723,7 @@ mod tests {
         let mut decoder = ChunkedGelfDecoder::default();
 
         let frame = decoder.decode_eof(&mut chunk);
-        let error = frame.expect_err("Expected an error");
+        let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert_eq!(
             *downcasted_error,
@@ -745,7 +745,7 @@ mod tests {
         let mut decoder = ChunkedGelfDecoder::default();
 
         let frame = decoder.decode_eof(&mut chunk);
-        let error = frame.expect_err("Expected an error");
+        let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert_eq!(
             *downcasted_error,
@@ -772,7 +772,7 @@ mod tests {
         assert!(decoder.state.lock().unwrap().len() == 1);
 
         let frame = decoder.decode_eof(&mut three_chunks[0]);
-        let error = frame.expect_err("Expected an error");
+        let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert_eq!(
             *downcasted_error,
@@ -801,7 +801,7 @@ mod tests {
         assert!(frame.is_none());
 
         let frame = decoder.decode_eof(&mut second_chunk);
-        let error = frame.expect_err("Expected an error");
+        let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert_eq!(
             *downcasted_error,
@@ -825,7 +825,7 @@ mod tests {
         let mut decoder = ChunkedGelfDecoder::new(DEFAULT_TIMEOUT_SECS, None, Some(1), None);
 
         let frame = decoder.decode_eof(&mut chunk);
-        let error = frame.expect_err("Expected an error");
+        let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert_eq!(
             *downcasted_error,
@@ -836,6 +836,32 @@ mod tests {
                 max_chunk_length: 1,
             }
         );
+        assert_eq!(decoder.state.lock().unwrap().len(), 0);
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn decode_message_greater_than_max_message_length(
+        two_chunks_message: ([BytesMut; 2], String),
+    ) {
+        let (mut chunks, _) = two_chunks_message;
+        let mut decoder = ChunkedGelfDecoder::new(DEFAULT_TIMEOUT_SECS, None, None, Some(5));
+
+        let frame = decoder.decode_eof(&mut chunks[0]).unwrap();
+        assert!(frame.is_none());
+        let frame = decoder.decode_eof(&mut chunks[1]);
+        let error = frame.unwrap_err();
+        let downcasted_error = downcast_framing_error(&error);
+        assert_eq!(
+            *downcasted_error,
+            ChunkedGelfDecoderError::MaxMessageLengthExceeded {
+                message_id: 1,
+                sequence_number: 1,
+                message_length: 6,
+                max_message_length: 5,
+            }
+        );
+        assert_eq!(decoder.state.lock().unwrap().len(), 0);
     }
 
     #[rstest]
