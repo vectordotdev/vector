@@ -66,7 +66,7 @@ pub struct ChunkedGelfDecoderOptions {
     /// the per-chunk memory is unbounded.
     ///
     /// This limit takes only into account the chunk's payload and the GELF header bytes are excluded from the calculation.
-    #[serde(skip_serializing_if = "vector_core::serde::is_default")]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub max_chunk_length: Option<usize>,
 
     /// The maximum length of a single GELF message, in bytes. Messages longer than this length will
@@ -79,7 +79,7 @@ pub struct ChunkedGelfDecoderOptions {
     ///
     /// This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.
     /// The message's payload is the concatenation of all the chunks' payloads.
-    #[serde(skip_serializing_if = "vector_core::serde::is_default")]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub max_message_length: Option<usize>,
 }
 
