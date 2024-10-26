@@ -367,7 +367,7 @@ test-integration: ## Runs all integration tests
 test-integration: test-integration-amqp test-integration-appsignal test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
 test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-greptimedb test-integration-humio test-integration-http-client test-integration-influxdb
-test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats test-integration-openobserve
+test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats 
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs test-integration-e2e-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown

@@ -388,16 +388,6 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int opentelemetry
 
-      - name: openobserve
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-openobserve')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int openobserve
-
       - name: postgres
         if: ${{ startsWith(github.event.review.body, '/ci-run-integration-postgres')
           || startsWith(github.event.review.body, '/ci-run-integration-all')

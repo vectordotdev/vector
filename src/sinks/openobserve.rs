@@ -83,16 +83,16 @@ fn default_endpoint() -> UriSerde {
     }
 }
 
+/// This sink wraps the Vector HTTP sink to provide official support for OpenObserve's  
+/// native HTTP ingest endpoint. By doing so, it maintains a distinct configuration for 
+/// the OpenObserve sink, separate from the Vector HTTP sink. This approach ensures  
+/// that future changes to OpenObserve's interface can be accommodated without impacting 
+/// the underlying Vector HTTP sink.  
 #[async_trait::async_trait]
 #[typetag::serde(name = "openobserve")]
 impl SinkConfig for OpenObserveConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let request = self.request.clone();
-
-        // OpenObserve supports native HTTP ingest endpoint. This configuration wraps
-        // the vector HTTP sink to provide official support for OpenObserve. This sink will
-        // allow maintaining the vector OpenObserve sink independent of the vector HTTP sink
-        // configuration and will allow to accomodate any future changes to the interface.
         let http_sink_config = HttpSinkConfig {
             uri: self.uri.clone(),
             compression: self.compression,
