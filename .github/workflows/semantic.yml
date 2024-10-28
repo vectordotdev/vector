@@ -163,6 +163,7 @@ jobs:
             redis source
             socket source
             splunk_hec source
+            static_metrics source
             statsd source
             stdin source
             syslog source
