@@ -20,8 +20,9 @@ base: components: transforms: route: configuration: {
 			A map from route identifiers to logical conditions.
 			Each condition represents a filter which is applied to each event.
 
-			The identifies `_unmatched` and `_default`, are reserved output names and thus cannot be used
-			as a route IDs.
+			The following identifiers are reserved output names and thus cannot be used as route IDs:
+			- `_unmatched`
+			- `_default`
 
 			Each route can then be referenced as an input by other components with the name
 			`<transform_name>.<route_id>`. If an event doesn’t match any route, and if `reroute_unmatched`
