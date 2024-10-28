@@ -623,11 +623,7 @@ mod test {
                 log_event!["tags" => vec!["a:bla"]],
             ),
             // Boolean attribute match.
-            (
-                "@a:true",
-                log_event!["a" => true],
-                log_event!["a" => false],
-            ),
+            ("@a:true", log_event!["a" => true], log_event!["a" => false]),
             // Boolean attribute match (negate).
             (
                 "NOT @a:false",
@@ -1185,7 +1181,7 @@ mod test {
                 log_event!["field" => "value1"],
                 log_event!["field" => "value"],
             ),
-            // negate AND bool and string
+            // negate AND of bool and string
             (
                 "NOT (@field:true AND @field2:value2)",
                 log_event!["field" => false, "field2" => "value2"],
