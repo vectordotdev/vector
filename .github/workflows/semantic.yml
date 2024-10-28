@@ -53,9 +53,11 @@ jobs:
             enriching
             enterprise
             exceptions
+            external
             external docs
             filtering
             healthchecks
+            internal
             internal docs
             logs
             metrics
@@ -236,3 +238,4 @@ jobs:
             javascript website
             search website
             template website
+            website
