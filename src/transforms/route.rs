@@ -4,7 +4,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::transform::SyncTransform;
 
 use crate::{
-    conditions::{AnyCondition, Condition, VrlConfig, ConditionConfig},
+    conditions::{AnyCondition, Condition, ConditionConfig, VrlConfig},
     config::{
         DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
         TransformOutput,
@@ -91,14 +91,20 @@ pub struct RouteConfig {
 
 fn route_examples() -> IndexMap<String, AnyCondition> {
     IndexMap::from([
-        ("foo-exists".to_owned(), AnyCondition::Map(ConditionConfig::Vrl(VrlConfig {
-            source: "exists(.foo)".to_owned(),
-            ..Default::default()
-        }))),
-        ("foo-does-not-exist".to_owned(), AnyCondition::Map(ConditionConfig::Vrl(VrlConfig {
-            source: "!exists(.foo)".to_owned(),
-            ..Default::default()
-        }))),
+        (
+            "foo-exists".to_owned(),
+            AnyCondition::Map(ConditionConfig::Vrl(VrlConfig {
+                source: "exists(.foo)".to_owned(),
+                ..Default::default()
+            })),
+        ),
+        (
+            "foo-does-not-exist".to_owned(),
+            AnyCondition::Map(ConditionConfig::Vrl(VrlConfig {
+                source: "!exists(.foo)".to_owned(),
+                ..Default::default()
+            })),
+        ),
     ])
 }
 
