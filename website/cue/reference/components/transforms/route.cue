@@ -101,8 +101,9 @@ components: transforms: route: {
 					title: "Routing to multiple components"
 					body: """
 						The following is an example of how you can creates two routes that feed three downstream components.
+
 						It is worth noting that a single route can feed multiple downstream components.
-						In the following example `rout
+
 						```yaml
 						transforms:
 							my-routes:
@@ -139,13 +140,13 @@ components: transforms: route: {
 											foo: X
 								outputs:
 									- extract_from: remap-route-1
-										my-routess:
+										my-routes:
 											- type: vrl
 												source: |
 													assert!(exists(.foo))
 													assert_eq!(.route, "route 1")
 									- extract_from: remap-route-3
-										my-routess:
+										my-routes:
 											- type: vrl
 												source: |
 													assert!(exists(.foo))
@@ -158,7 +159,7 @@ components: transforms: route: {
 											bar: X
 								outputs:
 									- extract_from: remap-route-2
-										my-routess:
+										my-routes:
 											- type: vrl
 												source: |
 													assert!(!exists(.foo))

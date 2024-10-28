@@ -4,7 +4,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::transform::SyncTransform;
 
 use crate::{
-    conditions::{AnyCondition, Condition},
+    conditions::{AnyCondition, Condition, VrlConfig, ConditionConfig},
     config::{
         DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
         TransformOutput,
@@ -73,25 +73,39 @@ pub struct RouteConfig {
     #[configurable(metadata(docs::human_name = "Reroute Unmatched Events"))]
     reroute_unmatched: bool,
 
-    /// A table of route identifiers to logical conditions representing the filter of the route.
+    /// A map from route identifiers to logical conditions.
+    /// Each condition represents a filter which is applied to each event.
+    ///
+    /// The identifies `_unmatched` and `_default`, are reserved output names and thus cannot be used
+    /// as a route IDs.
     ///
     /// Each route can then be referenced as an input by other components with the name
     /// `<transform_name>.<route_id>`. If an event doesn’t match any route, and if `reroute_unmatched`
     /// is set to `true` (the default), it is sent to the `<transform_name>._unmatched` output.
     /// Otherwise, the unmatched event is instead silently discarded.
-    ///
-    /// Both `_unmatched`, as well as `_default`, are reserved output names and thus cannot be used
-    /// as a route name.
     #[configurable(metadata(docs::additional_props_description = "An individual route."))]
-    #[configurable(metadata(docs::examples = "foo-exists: exists(.foo)"))]
+    #[configurable(metadata(docs::examples = "route_examples()"))]
     route: IndexMap<String, AnyCondition>,
+}
+
+fn route_examples() -> IndexMap<String, AnyCondition> {
+    IndexMap::from([
+        ("foo-exists".to_owned(), AnyCondition::Map(ConditionConfig::Vrl(VrlConfig {
+            source: "exists(.foo)".to_owned(),
+            ..Default::default()
+        }))),
+        ("foo-does-not-exist".to_owned(), AnyCondition::Map(ConditionConfig::Vrl(VrlConfig {
+            source: "!exists(.foo)".to_owned(),
+            ..Default::default()
+        }))),
+    ])
 }
 
 impl GenerateConfig for RouteConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             reroute_unmatched: true,
-            route: IndexMap::new(),
+            route: route_examples(),
         })
         .unwrap()
     }
