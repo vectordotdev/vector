@@ -155,8 +155,8 @@ impl OAuth2Extension
     async fn request_token(&self) -> Result<ExpirableToken, Box<dyn std::error::Error + Send + Sync>> {
         let mut request_body = format!("grant_type=client_credentials&client_id={}", self.client_id);
         
-        //in case of oauth2 with mtls (https://datatracker.ietf.org/doc/html/rfc8705) we only pass client_id,
-        //so secret can be considiered as optional.
+        //in case of oauth2 with mTLS (https://datatracker.ietf.org/doc/html/rfc8705) we only pass client_id,
+        //so secret can be considered as optional.
         if let Some(client_secret) = &self.client_secret {
             let secret_param = format!("&client_secret={}", client_secret.inner());
             request_body.push_str(&secret_param);
@@ -561,7 +561,7 @@ pub enum HttpClientAuthorizationStrategy {
     /// Authentication based on OAuth 2.0 protocol.
     ///
     /// This strategy allows to dynamically acquire and use token based on provided parameters.
-    /// Both standard client_credentials and mtls extension is supported, for standard client_credentials just provide both
+    /// Both standard client_credentials and mTLS extension is supported, for standard client_credentials just provide both
     /// client_id and client_secret parameters:
     /// 
     /// # Example
@@ -573,7 +573,7 @@ pub enum HttpClientAuthorizationStrategy {
     ///  client_secret: "secret-value"
     ///  token_endpoint: "https://yourendpoint.com/oauth/token"
     /// ```
-    /// In case you want to use mtls extension [rfc8705](https://datatracker.ietf.org/doc/html/rfc8705), provide desired key and certificate,
+    /// In case you want to use mTLS extension [rfc8705](https://datatracker.ietf.org/doc/html/rfc8705), provide desired key and certificate,
     /// together with client_id (with no client_secret parameter).
     /// 
     /// # Example
