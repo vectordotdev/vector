@@ -105,7 +105,7 @@ components: transforms: route: {
 						In the following example `rout
 						```yaml
 						transforms:
-							condition:
+							my-routes:
 								inputs: [ some_source ]
 								type: route
 								route:
@@ -114,19 +114,19 @@ components: transforms: route: {
 							remap-route-1:
 								type: remap
 								inputs:
-									- condition.foo-exists
+									- my-routes.foo-exists
 								source: |
 									.route = "route 1"
 							remap-route-2:
 								type: remap
 								inputs:
-									- condition.foo-doesnt-exist
+									- my-routes.foo-doesnt-exist
 								source: |
 									.route = "route 2"
 							remap-route-3:
 								type: remap
 								inputs:
-									- condition.foo-exists
+									- my-routes.foo-exists
 								source: |
 									.route = "route 3"
 
@@ -134,18 +134,18 @@ components: transforms: route: {
 							- name: case-1
 								inputs:
 									- type: log
-										insert_at: condition
+										insert_at: my-routes
 										log_fields:
 											foo: X
 								outputs:
 									- extract_from: remap-route-1
-										conditions:
+										my-routess:
 											- type: vrl
 												source: |
 													assert!(exists(.foo))
 													assert_eq!(.route, "route 1")
 									- extract_from: remap-route-3
-										conditions:
+										my-routess:
 											- type: vrl
 												source: |
 													assert!(exists(.foo))
@@ -153,16 +153,17 @@ components: transforms: route: {
 							- name: case-2
 								inputs:
 									- type: log
-										insert_at: condition
+										insert_at: my-routes
 										log_fields:
 											bar: X
 								outputs:
 									- extract_from: remap-route-2
-										conditions:
+										my-routess:
 											- type: vrl
 												source: |
 													assert!(!exists(.foo))
 													assert_eq!(.route, "route 2")
+
 						```
 						"""
 				}
