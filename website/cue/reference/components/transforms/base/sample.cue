@@ -48,4 +48,12 @@ base: components: transforms: sample: configuration: {
 			1500,
 		]
 	}
+  sample_rate_key: {
+		description: "The event key in which the sample rate is stored. If set to an empty string, the sample rate will not be added to the event."
+		required:    false
+		type: string: {
+			default: "sample_rate"
+			examples: ["sample_rate"]
+		}
+	}
 }
