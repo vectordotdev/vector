@@ -92,7 +92,7 @@ struct OAuth2Extension
 {
     token_endpoint: String,
     client_id: String,
-    client_secret: SensitiveString,
+    client_secret: Option<SensitiveString>,
     grace_period: u32,
     client: Client<HttpProxyConnector, Body>,
     token: Arc<Mutex<Option<ExpirableToken>>>
@@ -153,8 +153,15 @@ impl OAuth2Extension
     }
 
     async fn request_token(&self) -> Result<ExpirableToken, Box<dyn std::error::Error + Send + Sync>> {
-        let request_body = format!("client_secret={}&grant_type=client_credentials&response_type=token&client_id={}", self.client_secret.inner(), self.client_id);
-                
+        let mut request_body = format!("grant_type=client_credentials&client_id={}", self.client_id);
+        
+        //in case of oauth2 with mtls (https://datatracker.ietf.org/doc/html/rfc8705) we only pass client_id,
+        //so secret can be considiered as optional.
+        if let Some(client_secret) = &self.client_secret {
+            let secret_param = format!("&client_secret={}", client_secret.inner());
+            request_body.push_str(&secret_param);
+        }
+        
         let builder = Request::post(self.token_endpoint.clone());
         let builder = builder.header("Content-Type", "application/x-www-form-urlencoded");
         let request = builder.body(Body::from(request_body)).expect("error creating request");
@@ -275,7 +282,7 @@ where
     pub fn new_with_auth_extension(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
-        auth_config: Option<HttpClientAuthorizationConfig>
+        auth_config: Option<AuthorizationConfig>
     ) -> Result<HttpClient<B>, HttpError> {
         HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder(), auth_config)
     }
@@ -284,7 +291,7 @@ where
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
         client_builder: &mut client::Builder,
-        auth_config: Option<HttpClientAuthorizationConfig>,
+        auth_config: Option<AuthorizationConfig>,
     ) -> Result<HttpClient<B>, HttpError> {
         let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
         let auth_extension = build_auth_extension(auth_config, proxy_config, client_builder);
@@ -376,7 +383,7 @@ where
     }
 }
 
-fn build_auth_extension<B>(http_client_authorization_strategy: Option<HttpClientAuthorizationConfig>, 
+fn build_auth_extension<B>(authorization_config: Option<AuthorizationConfig>, 
     proxy_config: &ProxyConfig,
     client_builder: &mut client::Builder,
 ) -> Option<Arc<dyn AuthExtension<B>>>
@@ -385,14 +392,14 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    if let Some(http_client_authorization_strategy) = http_client_authorization_strategy {
-        match http_client_authorization_strategy.auth {
+    if let Some(authorization_config) = authorization_config {
+        match authorization_config.strategy {
             HttpClientAuthorizationStrategy::Basic { user, password } => {
                 let basic_auth_extension = BasicAuthExtension{user, password};
                 return Some(Arc::new(basic_auth_extension));
             },
             HttpClientAuthorizationStrategy::OAuth2 { token_endpoint, client_id, client_secret, grace_period } => {
-                let tls_for_auth = http_client_authorization_strategy.tls.clone();
+                let tls_for_auth = authorization_config.tls.clone();
                 let tls_for_auth: TlsSettings = TlsSettings::from_options(&tls_for_auth).unwrap();
                 let empty_token = Arc::new(Mutex::new(None));
 
@@ -515,10 +522,10 @@ impl<B> fmt::Debug for HttpClient<B> {
 #[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct HttpClientAuthorizationConfig {
+pub struct AuthorizationConfig {
     /// Define how to authorize against an upstream.
     #[configurable]
-    auth: HttpClientAuthorizationStrategy,
+    strategy: HttpClientAuthorizationStrategy,
 
     /// The TLS settings for the http client's connection.
     ///
@@ -554,6 +561,32 @@ pub enum HttpClientAuthorizationStrategy {
     /// Authentication based on OAuth 2.0 protocol.
     ///
     /// This strategy allows to dynamically acquire and use token based on provided parameters.
+    /// Both standard client_credentials and mtls extension is supported, for standard client_credentials just provide both
+    /// client_id and client_secret parameters:
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// strategy:
+    ///  strategy: "o_auth2"
+    ///  client_id: "client.id"
+    ///  client_secret: "secret-value"
+    ///  token_endpoint: "https://yourendpoint.com/oauth/token"
+    /// ```
+    /// In case you want to use mtls extension [rfc8705](https://datatracker.ietf.org/doc/html/rfc8705), provide desired key and certificate,
+    /// together with client_id (with no client_secret parameter).
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// strategy:
+    ///  strategy: "o_auth2"
+    ///  client_id: "client.id"
+    ///  token_endpoint: "https://yourendpoint.com/oauth/token"
+    /// tls:
+    ///  crt_path: cert.pem
+    ///  key_file: key.pem
+    /// ```
     OAuth2 {
         /// Token endpoint location, required for token acquisition.
         #[configurable(metadata(docs::examples = "https://auth.provider/oauth/token"))]
@@ -565,7 +598,7 @@ pub enum HttpClientAuthorizationStrategy {
 
         /// The sensitive client secret.
         #[configurable(metadata(docs::examples = "client_secret"))]
-        client_secret: SensitiveString,
+        client_secret: Option<SensitiveString>,
         
         /// The grace period configuration for a bearer token.
         /// To avoid random authorization failures caused by expired token exception, 

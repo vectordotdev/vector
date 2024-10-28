@@ -11,7 +11,7 @@ use vector_lib::codecs::{
 
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
-    http::{Auth, HttpClient, MaybeAuth, HttpClientAuthorizationConfig},
+    http::{Auth, HttpClient, MaybeAuth, AuthorizationConfig},
     sinks::{
         prelude::*,
         util::{
@@ -92,7 +92,7 @@ pub struct HttpSinkConfig {
     pub tls: Option<TlsConfig>,
 
     #[configurable(derived)]
-    pub http_client_authorization_strategy: Option<HttpClientAuthorizationConfig>,
+    pub authorization_config: Option<AuthorizationConfig>,
 
     #[configurable(derived)]
     #[serde(
@@ -157,7 +157,7 @@ impl From<HttpMethod> for Method {
 impl HttpSinkConfig {
     fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(&self.tls)?;
-        let auth_strategy = self.http_client_authorization_strategy.clone();
+        let auth_strategy = self.authorization_config.clone();
         Ok(HttpClient::new_with_auth_extension(tls, cx.proxy(), auth_strategy)?)
     }
 
