@@ -22,7 +22,7 @@ memchr = { version = "2", default-features = false }
 ordered-float = { version = "4.4.0", default-features = false }
 prost.workspace = true
 prost-reflect.workspace = true
-regex = { version = "1.11.0", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
 serde.workspace = true
 serde_json.workspace = true
 smallvec = { version = "1", default-features = false, features = ["union"] }
