@@ -141,7 +141,7 @@ impl Filter<LogEvent> for EventFilter {
             Field::Attribute(field) => {
                 let to_match = to_match.to_owned();
 
-                bool_string_or_numeric_match(field, move |value| value == to_match)
+                simple_scalar_match(field, move |value| value == to_match)
             }
         })
     }
@@ -303,9 +303,9 @@ impl Filter<LogEvent> for EventFilter {
     }
 }
 
-/// Returns a `Matcher` that returns true if the log event resolves to a string or
-/// numeric which matches the provided `func`.
-fn bool_string_or_numeric_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
+/// Returns a `Matcher` that returns true if the field resolves to a string,
+/// numeric, or boolean which matches the provided `func`.
+fn simple_scalar_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
 where
     S: Into<String>,
     F: Fn(Cow<str>) -> bool + Send + Sync + Clone + 'static,
@@ -323,7 +323,7 @@ where
     })
 }
 
-/// Returns a `Matcher` that returns true if the log event resolves to a string which
+/// Returns a `Matcher` that returns true if the field resolves to a string which
 /// matches the provided `func`.
 fn string_match<S, F>(field: S, func: F) -> Box<dyn Matcher<LogEvent>>
 where
