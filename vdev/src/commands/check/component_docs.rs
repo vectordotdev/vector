@@ -1,4 +1,4 @@
-`use crate::git;
+use crate::git;
 use anyhow::{Ok, Result};
 
 /// Check that component documentation is up-to-date
