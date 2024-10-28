@@ -85,6 +85,7 @@ the provided data needs to conform to various CUE schemas. To check the validity
 of the CUE sources:
 
 ```bash
+cd .. # Change to the repo root directory
 CI=true make check-docs
 ```
 
