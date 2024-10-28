@@ -83,6 +83,7 @@ pub struct RouteConfig {
     /// Both `_unmatched`, as well as `_default`, are reserved output names and thus cannot be used
     /// as a route name.
     #[configurable(metadata(docs::additional_props_description = "An individual route."))]
+    #[configurable(metadata(docs::examples = "foo-exists: exists(.foo)"))]
     route: IndexMap<String, AnyCondition>,
 }
 

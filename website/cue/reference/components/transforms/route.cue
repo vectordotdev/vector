@@ -95,4 +95,76 @@ components: transforms: route: {
 			description: "Each route can be referenced as an input by other components with the name `<transform_name>.<route_id>`."
 		},
 	]
+
+		how_it_works: {
+				routing_to_multiple_components: {
+					title: "Routing to multiple components"
+					body: """
+						The following is an example of how you can creates two routes that feed three downstream components.
+						It is worth noting that a single route can feed multiple downstream components.
+						In the following example `rout
+						```yaml
+						transforms:
+							condition:
+								inputs: [ some_source ]
+								type: route
+								route:
+									foo-exists: exists(.foo)
+									foo-doesnt-exist: '!exists(.foo)'
+							remap-route-1:
+								type: remap
+								inputs:
+									- condition.foo-exists
+								source: |
+									.route = "route 1"
+							remap-route-2:
+								type: remap
+								inputs:
+									- condition.foo-doesnt-exist
+								source: |
+									.route = "route 2"
+							remap-route-3:
+								type: remap
+								inputs:
+									- condition.foo-exists
+								source: |
+									.route = "route 3"
+
+						tests:
+							- name: case-1
+								inputs:
+									- type: log
+										insert_at: condition
+										log_fields:
+											foo: X
+								outputs:
+									- extract_from: remap-route-1
+										conditions:
+											- type: vrl
+												source: |
+													assert!(exists(.foo))
+													assert_eq!(.route, "route 1")
+									- extract_from: remap-route-3
+										conditions:
+											- type: vrl
+												source: |
+													assert!(exists(.foo))
+													assert_eq!(.route, "route 3")
+							- name: case-2
+								inputs:
+									- type: log
+										insert_at: condition
+										log_fields:
+											bar: X
+								outputs:
+									- extract_from: remap-route-2
+										conditions:
+											- type: vrl
+												source: |
+													assert!(!exists(.foo))
+													assert_eq!(.route, "route 2")
+						```
+						"""
+				}
+	}
 }

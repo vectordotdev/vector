@@ -28,10 +28,13 @@ base: components: transforms: route: configuration: {
 			as a route name.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "An individual route."
-			required:    true
-			type: condition: {}
+		type: object: {
+			examples: ["foo-exists: exists(.foo)"]
+			options: "*": {
+				description: "An individual route."
+				required:    true
+				type: condition: {}
+			}
 		}
 	}
 }
