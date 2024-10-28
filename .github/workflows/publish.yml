@@ -348,13 +348,9 @@ jobs:
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       DD_PKG_VERSION: "latest"
-      # https://github.blog/changelog/2024-03-07-github-actions-all-actions-will-run-on-node20-instead-of-node16-by-default/
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
-      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
     strategy:
       matrix:
         container:
-          - ubuntu:16.04
           - ubuntu:18.04
           - ubuntu:20.04
           - ubuntu:22.04
@@ -379,7 +375,7 @@ jobs:
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
@@ -401,9 +397,6 @@ jobs:
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       DD_PKG_VERSION: "latest"
-      # https://github.blog/changelog/2024-03-07-github-actions-all-actions-will-run-on-node20-instead-of-node16-by-default/
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
-      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
     strategy:
       matrix:
         container:
@@ -434,7 +427,7 @@ jobs:
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
