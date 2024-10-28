@@ -90,6 +90,7 @@ CI=true make check-docs
 ```
 
 > When the CI flag is on, then the checker will also run a CUE format validation step.
+> Also, note that when this flag on, CUE files might be modified. See `scripts/check-docs.sh` for details.
 
 #### Tips & tricks
 
