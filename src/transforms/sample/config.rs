@@ -44,8 +44,10 @@ pub struct SampleConfig {
     /// sampled together, but that overall `1/N` transactions are sampled.
     #[configurable(metadata(docs::examples = "message"))]
     pub key_field: Option<String>,
+
+    /// The event key in which the sample rate is stored. If set to an empty string, the sample rate will not be added to the event.
+    #[configurable(metadata(docs::examples = "sample_rate"))]
     #[serde(default = "default_sample_rate_key")]
-    #[configurable(metadata(docs::examples = "sample_rate"), description = "")]
     pub sample_rate_key: OptionalValuePath,
 
     /// The value to group events into separate buckets to be sampled independently.

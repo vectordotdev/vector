@@ -9,8 +9,8 @@ use crate::{
     template::Template,
     transforms::{FunctionTransform, OutputBuffer},
 };
-use vector_lib::lookup::OwnedTargetPath;
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::OwnedTargetPath;
 
 #[derive(Clone)]
 pub struct Sample {
@@ -129,7 +129,7 @@ impl FunctionTransform for Sample {
                         );
                     }
                     Event::Trace(ref mut event) => {
-                      event.insert(&OwnedTargetPath::event(path.clone()), self.rate.to_string());
+                        event.insert(&OwnedTargetPath::event(path.clone()), self.rate.to_string());
                     }
                     Event::Metric(_) => panic!("component can never receive metric events"),
                 };
