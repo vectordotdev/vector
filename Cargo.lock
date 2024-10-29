@@ -5387,9 +5387,9 @@ dependencies = [
 
 [[package]]
 name = "lua-src"
-version = "546.0.2"
+version = "547.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2da0daa7eee611a4c30c8f5ee31af55266e26e573971ba9336d2993e2da129b2"
+checksum = "1edaf29e3517b49b8b746701e5648ccb5785cde1c119062cbabbc5d5cd115e42"
 dependencies = [
  "cc",
 ]
@@ -5667,17 +5667,31 @@ checksum = "d111deb18a9c9bd33e1541309f4742523bfab01d276bfa9a27519f6de9c11dc7"
 dependencies = [
  "bstr 1.10.0",
  "mlua-sys",
- "mlua_derive",
  "num-traits",
  "once_cell",
  "rustc-hash",
 ]
 
 [[package]]
-name = "mlua-sys"
-version = "0.6.1"
+name = "mlua"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a088ed0723df7567f569ba018c5d48c23c501f3878b190b04144dfa5ebfa8abc"
+checksum = "0f6ddbd668297c46be4bdea6c599dcc1f001a129586272d53170b7ac0a62961e"
+dependencies = [
+ "bstr 1.10.0",
+ "either",
+ "mlua-sys",
+ "mlua_derive",
+ "num-traits",
+ "parking_lot",
+ "rustc-hash",
+]
+
+[[package]]
+name = "mlua-sys"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9eebac25c35a13285456c88ee2fde93d9aee8bcfdaf03f9d6d12be3391351ec"
 dependencies = [
  "cc",
  "cfg-if",
@@ -5688,11 +5702,11 @@ dependencies = [
 
 [[package]]
 name = "mlua_derive"
-version = "0.9.3"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09697a6cec88e7f58a02c7ab5c18c611c6907c8654613df9cc0192658a4fb859"
+checksum = "2cfc5faa2e0d044b3f5f0879be2920e0a711c97744c42cf1c295cb183668933e"
 dependencies = [
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "once_cell",
  "proc-macro-error",
  "proc-macro2 1.0.89",
@@ -10598,7 +10612,7 @@ dependencies = [
  "md-5",
  "metrics",
  "metrics-tracing-context",
- "mlua",
+ "mlua 0.10.0",
  "mongodb",
  "nix 0.26.2",
  "nkeys 0.4.4",
@@ -10869,7 +10883,7 @@ dependencies = [
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
- "mlua",
+ "mlua 0.10.0",
  "ndarray",
  "ndarray-stats",
  "no-proxy",
@@ -11111,7 +11125,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util 0.22.0",
  "md-5",
- "mlua",
+ "mlua 0.9.9",
  "nom",
  "ofb",
  "once_cell",
