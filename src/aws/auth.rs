@@ -387,10 +387,7 @@ mod tests {
 
     #[test]
     fn parsing_default() {
-        let config = toml::from_str::<ComponentConfig>(
-            "",
-        )
-        .unwrap();
+        let config = toml::from_str::<ComponentConfig>("").unwrap();
 
         assert!(matches!(config.auth, AwsAuthentication::Default { .. }));
     }
