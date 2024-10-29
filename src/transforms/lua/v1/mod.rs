@@ -377,9 +377,9 @@ mod tests {
         let mut log = LogEvent::default();
         log.insert("name", "Bob");
         let event = transform_one(
-            r#"
+            r"
               event = nil
-            "#,
+            ",
             log,
         );
 
@@ -476,9 +476,9 @@ mod tests {
     fn lua_non_string_key_read() {
         crate::test_util::trace_init();
         let mut transform = Lua::new(
-            r#"
+            r"
               print(event[false])
-            "#
+            "
             .to_string(),
             vec![],
         )
@@ -514,9 +514,9 @@ mod tests {
     fn lua_syntax_error() {
         crate::test_util::trace_init();
         let err = Lua::new(
-            r#"
+            r"
               1234 = sadf <>&*!#@
-            "#
+            "
             .to_string(),
             vec![],
         )
@@ -569,11 +569,11 @@ mod tests {
         event.insert("friend", "Alice");
 
         let event = transform_one(
-            r#"
+            r"
               for k,v in pairs(event) do
                 event[k] = k .. v
               end
-            "#,
+            ",
             event,
         )
         .unwrap();
