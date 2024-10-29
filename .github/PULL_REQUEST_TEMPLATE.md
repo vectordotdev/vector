@@ -34,5 +34,5 @@ Examples:
 `Please describe your testing plan in detail. Sharing information about your setup and the Vector configuration(s) you used (when applicable) is recommended. Providing this information upfront will facilitate a smoother review process.`
 
 ## Checklist
-- [ ] Please add a changelog entry if your PR includes user facing changes. You can find details on [this document](https://github.com/vectordotdev/vector/blob/master/changelog.d/README.md).
+- [ ] Please add a changelog entry if your PR includes user facing changes. Otherwise, apply the "no-changelog" label to this PR. You can find details on [this document](https://github.com/vectordotdev/vector/blob/master/changelog.d/README.md).
 - [ ] Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
