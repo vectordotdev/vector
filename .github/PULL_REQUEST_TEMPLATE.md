@@ -18,7 +18,7 @@ Examples:
 -->
 
 ## Summary
-`Please provide a brief summary about what this PR does. 
+`Please provide a brief summary about what this PR does.
 This should help the reviewers give feedback faster and with higher quality.`
 
 ## Change Type
@@ -32,8 +32,8 @@ This should help the reviewers give feedback faster and with higher quality.`
 - [ ] No
 
 ## How did you test this PR?
-`Please describe your testing plan here. 
-Sharing information about your setup and the Vector configuration(s) you used (when applicable) is highly recommended. 
+`Please describe your testing plan here.
+Sharing information about your setup and the Vector configuration(s) you used (when applicable) is highly recommended.
 Providing this information upfront will facilitate a smoother review process.`
 
 ## Checklist
