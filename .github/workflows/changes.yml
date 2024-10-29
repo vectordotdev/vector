@@ -104,8 +104,6 @@ on:
         value: ${{ jobs.int_tests.outputs.nginx }}
       opentelemetry:
         value: ${{ jobs.int_tests.outputs.opentelemetry }}
-      openobserve:
-        value: ${{ jobs.int_tests.outputs.openobserve }}
       postgres:
         value: ${{ jobs.int_tests.outputs.postgres }}
       prometheus:
@@ -232,7 +230,6 @@ jobs:
       nats: ${{ steps.filter.outputs.nats }}
       nginx: ${{ steps.filter.outputs.nginx }}
       opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
-      openobserve: ${{ steps.filter.outputs.openobserve }}
       postgres: ${{ steps.filter.outputs.postgres }}
       prometheus: ${{ steps.filter.outputs.prometheus }}
       pulsar: ${{ steps.filter.outputs.pulsar }}

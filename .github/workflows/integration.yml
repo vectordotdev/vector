@@ -81,7 +81,6 @@ jobs:
             || needs.changes.outputs.nats == 'true'
             || needs.changes.outputs.nginx == 'true'
             || needs.changes.outputs.opentelemetry == 'true'
-            || needs.changes.outputs.openobserve == 'true'
             || needs.changes.outputs.postgres == 'true'
             || needs.changes.outputs.prometheus == 'true'
             || needs.changes.outputs.pulsar == 'true'
@@ -355,15 +354,6 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  opentelemetry
-
-      - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.openobserve == 'true') &&
-          (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
-        name: openobserve
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int  openobserve
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.postgres == 'true' }}
         name: postgres
