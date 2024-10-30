@@ -134,7 +134,7 @@ impl OAuth2Extension
     fn acquire_token_from_cache(&self) -> Option<ExpirableToken> {
         let now = SystemTime::now();
         let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-        let maybe_token = self.token.lock().unwrap();
+        let maybe_token = self.token.lock().expect("Poisoned token lock");
         match &*maybe_token {
             Some(token) => {
                 if since_the_epoch.as_millis() < token.expires_after_ms {
@@ -149,7 +149,7 @@ impl OAuth2Extension
     }
 
     fn save_into_cache(&self, token: ExpirableToken) {
-        self.token.lock().expect("poisoned token lock").replace(token);
+        self.token.lock().expect("Poisoned token lock").replace(token);
     }
 
     async fn request_token(&self) -> Result<ExpirableToken, Box<dyn std::error::Error + Send + Sync>> {
