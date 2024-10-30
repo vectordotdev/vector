@@ -32,9 +32,9 @@ This should help the reviewers give feedback faster and with higher quality. -->
 - [ ] No
 
 ## How did you test this PR?
-`Please describe your testing plan here.
+<!-- Please describe your testing plan here.
 Sharing information about your setup and the Vector configuration(s) you used (when applicable) is highly recommended.
-Providing this information upfront will facilitate a smoother review process.`
+Providing this information upfront will facilitate a smoother review process. -->
 
 ## Checklist
 - [ ] Please add a changelog entry if your PR includes user facing changes. Otherwise, apply the "no-changelog" label to this PR. You can find details on [this document](https://github.com/vectordotdev/vector/blob/master/changelog.d/README.md).
