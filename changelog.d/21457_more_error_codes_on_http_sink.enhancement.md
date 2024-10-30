@@ -1,3 +1,3 @@
-Added support for retry on 404(not found), 403(forbidden request) and 408(request timeout) in `http sink`.
+The `http sink` will now retry requests when the status is 408(request timeout).
 
-authors: noble-varghese
+authors: noble-varghese pront
