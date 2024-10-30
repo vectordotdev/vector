@@ -21,7 +21,7 @@ pub struct VrlConfig {
     pub(crate) source: String,
 
     #[configurable(derived, metadata(docs::hidden))]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(crate) runtime: VrlRuntime,
 }
 
