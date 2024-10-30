@@ -42,6 +42,10 @@ Providing this information upfront will facilitate a smoother review process. --
 
 ## References
 
-<!-- any related issues or PRs to this one; please list any issues closed by this PR -->
+<!-- Please list any issues closed by this PR. -->
 
-- Closes: #XXXX
+<!--
+- Closes: <issue link>
+-->
+
+<!-- Any other issues or PRs relevant to this PR? Feel free to list them here. -->
