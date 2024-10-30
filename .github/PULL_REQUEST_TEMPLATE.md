@@ -24,7 +24,7 @@ This should help the reviewers give feedback faster and with higher quality. -->
 ## Change Type
 - [ ] Bug fix
 - [ ] New feature
-- [ ] Non-functional changes (chore, refactoring, docs)
+- [ ] Non-functional (chore, refactoring, docs)
 - [ ] Performance
 
 ## Is this a breaking change?
