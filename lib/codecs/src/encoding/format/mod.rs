@@ -5,6 +5,7 @@
 
 mod avro;
 mod common;
+mod cef;
 mod csv;
 mod gelf;
 mod json;
@@ -19,6 +20,7 @@ use std::fmt::Debug;
 
 pub use self::csv::{CsvSerializer, CsvSerializerConfig};
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
+pub use cef::{CefSerializer, CefSerializerConfig};
 use dyn_clone::DynClone;
 pub use gelf::{GelfSerializer, GelfSerializerConfig};
 pub use json::{JsonSerializer, JsonSerializerConfig, JsonSerializerOptions};
