@@ -381,7 +381,7 @@ jobs:
           path: target/artifacts
       - name: Verify install of DEB package.
         run: |
-          curl -o verify-install.sh https://raw.githubusercontent.com/vectordotdev/vector/master/scripts/verify-install.sh
+          curl -o verify-install.sh https://raw.githubusercontent.com/vectordotdev/vector/${{ inputs.git_ref }}/scripts/verify-install.sh
           chmod +x ./verify-install.sh
           ./verify-install.sh target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
 
@@ -431,7 +431,7 @@ jobs:
           path: target/artifacts
       - name: Verify install of RPM package.
         run: |
-          curl -o verify-install.sh https://raw.githubusercontent.com/vectordotdev/vector/master/scripts/verify-install.sh
+          curl -o verify-install.sh https://raw.githubusercontent.com/vectordotdev/vector/${{ inputs.git_ref }}/scripts/verify-install.sh
           chmod +x ./verify-install.sh
           ./verify-install.sh target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
 
