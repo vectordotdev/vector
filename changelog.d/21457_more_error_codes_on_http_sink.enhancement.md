@@ -1,3 +1,3 @@
-The `http sink` will now retry requests when the status is 408(request timeout).
+The `http sink` will now retry requests when the response is a request timeout (HTTP 408).
 
 authors: noble-varghese pront
