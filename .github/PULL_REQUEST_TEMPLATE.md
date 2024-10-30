@@ -36,8 +36,12 @@ This should help the reviewers give feedback faster and with higher quality. -->
 Sharing information about your setup and the Vector configuration(s) you used (when applicable) is highly recommended.
 Providing this information upfront will facilitate a smoother review process. -->
 
+## Does this PR include user facing changes?
+
+- [ ] Yes. Please add a changelog fragment based on our [guidelines](https://github.com/vectordotdev/vector/blob/master/changelog.d/README.md).
+- [ ] No. A maintainer will apply the "no-changelog" label to this PR.
+
 ## Checklist
-- [ ] Please add a changelog entry if your PR includes user facing changes. Otherwise, apply the "no-changelog" label to this PR. You can find details on [this document](https://github.com/vectordotdev/vector/blob/master/changelog.d/README.md).
 - [ ] Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
 
 ## References
