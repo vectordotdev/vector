@@ -206,7 +206,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"reroute_unmatched":true,"route":{"first":{"type":"vrl","source":".message == \"hello world\"","runtime":"ast"}}}"#
+            r#"{"reroute_unmatched":true,"route":{"first":{"type":"vrl","source":".message == \"hello world\""}}}"#
         );
     }
 
