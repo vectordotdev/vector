@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-20.04-4core
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
@@ -463,7 +463,7 @@ jobs:
     runs-on: ubuntu-20.04-8core
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}

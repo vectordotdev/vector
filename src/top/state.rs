@@ -80,7 +80,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
+    pub const fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
         Self {
             connection_status: ConnectionStatus::Pending,
             components,

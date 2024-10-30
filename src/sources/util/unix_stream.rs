@@ -79,7 +79,7 @@ pub fn build_unix_stream_source(
                 .and_then(|addr| {
                     addr.as_pathname().map(|e| e.to_owned()).map({
                         |path| {
-                            span.record("peer_path", &field::debug(&path));
+                            span.record("peer_path", field::debug(&path));
                             path.to_string_lossy().into_owned().into()
                         }
                     })

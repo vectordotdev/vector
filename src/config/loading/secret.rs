@@ -1,11 +1,11 @@
 use std::{
     collections::{HashMap, HashSet},
     io::Read,
+    sync::LazyLock,
 };
 
 use futures::TryFutureExt;
 use indexmap::IndexMap;
-use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use toml::value::Table;
@@ -27,8 +27,8 @@ use crate::{
 // - "SECRET[backend..secret.name]" will match and capture "backend" and ".secret.name"
 // - "SECRET[secret_name]" will not match
 // - "SECRET[.secret.name]" will not match
-pub static COLLECTOR: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
+pub static COLLECTOR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
 
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -199,7 +199,7 @@ mod tests {
     fn collection() {
         let mut keys = HashMap::new();
         collect_secret_keys(
-            indoc! {r#"
+            indoc! {r"
             SECRET[first_backend.secret_key]
             SECRET[first_backend.another_secret_key]
             SECRET[second_backend.secret_key]
@@ -208,7 +208,7 @@ mod tests {
             SECRET[first_backend...an_extra_secret_key]
             SECRET[non_matching_syntax]
             SECRET[.non.matching.syntax]
-        "#},
+        "},
             &mut keys,
         );
         assert_eq!(keys.len(), 2);
@@ -232,10 +232,10 @@ mod tests {
     fn collection_duplicates() {
         let mut keys = HashMap::new();
         collect_secret_keys(
-            indoc! {r#"
+            indoc! {r"
             SECRET[first_backend.secret_key]
             SECRET[first_backend.secret_key]
-        "#},
+        "},
             &mut keys,
         );
 

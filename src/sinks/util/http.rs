@@ -401,9 +401,8 @@ where
         let http_client = self.inner.clone();
 
         Box::pin(async move {
-            let request = request_builder(body).await.map_err(|error| {
-                emit!(SinkRequestBuildError { error: &error });
-                error
+            let request = request_builder(body).await.inspect_err(|error| {
+                emit!(SinkRequestBuildError { error });
             })?;
             let byte_size = request.body().len();
             let request = request.map(Body::from);
@@ -624,7 +623,7 @@ pub struct HttpRequest<T: Send> {
 
 impl<T: Send> HttpRequest<T> {
     /// Creates a new `HttpRequest`.
-    pub fn new(
+    pub const fn new(
         payload: Bytes,
         finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
