@@ -1,6 +1,16 @@
 package metadata
 
 base: components: transforms: route: configuration: {
+	exclusive_match: {
+		description: """
+			Flag for exclusive routing.
+
+			When this flag is enabled, an event will be routed to only the first matching route.
+			The specified [`RouteConfig:route`] order of insertion is therefore significant when this flag is on.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	reroute_unmatched: {
 		description: """
 			Reroutes unmatched events to a named output instead of silently discarding them.
