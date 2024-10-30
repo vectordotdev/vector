@@ -26,10 +26,11 @@ pub struct OpenObserveConfig {
     #[configurable(metadata(docs::examples = "http://localhost:5080/api/default/default/_json"))]
     uri: UriSerde,
 
-    /// The user and password to authenticate with OpenObserve endpoint.
+    /// Authentication configuration for HTTP requests.
     #[configurable(derived)]
     auth: Option<Auth>,
 
+    /// Outbound HTTP request settings.
     #[configurable(derived)]
     #[serde(default)]
     request: RequestConfig,
@@ -39,6 +40,7 @@ pub struct OpenObserveConfig {
     #[serde(default = "Compression::gzip_default")]
     compression: Compression,
 
+    /// Encoding configuration.
     #[configurable(derived)]
     encoding: EncodingConfig,
 
