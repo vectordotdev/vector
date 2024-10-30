@@ -20,6 +20,7 @@ pub(crate) const UNMATCHED_ROUTE: &str = "_unmatched";
 pub struct Route {
     conditions: Vec<(String, Condition)>,
     reroute_unmatched: bool,
+    exclusive_match: bool
 }
 
 impl Route {
@@ -32,22 +33,25 @@ impl Route {
         Ok(Self {
             conditions,
             reroute_unmatched: config.reroute_unmatched,
+            exclusive_match: config.exclusive_match
         })
     }
 }
 
 impl SyncTransform for Route {
     fn transform(&mut self, event: Event, output: &mut vector_lib::transform::TransformOutputsBuf) {
-        let mut check_failed: usize = 0;
+        let mut matched_once = false;
         for (output_name, condition) in &self.conditions {
             let (result, event) = condition.check(event.clone());
             if result {
+                if self.exclusive_match && matched_once {
+                    continue;
+                }
+                matched_once = true;
                 output.push(Some(output_name), event);
-            } else {
-                check_failed += 1;
             }
         }
-        if self.reroute_unmatched && check_failed == self.conditions.len() {
+        if self.reroute_unmatched && !matched_once {
             output.push(Some(UNMATCHED_ROUTE), event);
         }
     }
@@ -84,6 +88,15 @@ pub struct RouteConfig {
     /// as a route name.
     #[configurable(metadata(docs::additional_props_description = "An individual route."))]
     route: IndexMap<String, AnyCondition>,
+
+    /// Flag for exclusive routing.
+    ///
+    /// When this flag is enabled, an event will be routed to only the first matching route.
+    /// The specified [`RouteConfig:route`] order of insertion is therefore significant when this flag is on.
+    #[serde(default = "crate::serde::default_false")]
+    #[configurable(metadata(docs::human_name = "Exclusive Match"))]
+    exclusive_match: bool,
+
 }
 
 impl GenerateConfig for RouteConfig {
@@ -91,6 +104,7 @@ impl GenerateConfig for RouteConfig {
         toml::Value::try_from(Self {
             reroute_unmatched: true,
             route: IndexMap::new(),
+            exclusive_match: false,
         })
         .unwrap()
     }
@@ -167,7 +181,7 @@ mod test {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<super::RouteConfig>();
+        crate::test_util::test_generate_config::<RouteConfig>();
     }
 
     #[test]
