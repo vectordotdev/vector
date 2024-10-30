@@ -118,7 +118,7 @@ struct ExpirableToken {
 
 impl OAuth2Extension
 {
-    async fn get_token(&self) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_token(&self) -> Result<String, vector_lib::Error> {
         if let Some(token) = self.acquire_token_from_cache() {
             return Ok(token.access_token);
         }
@@ -133,7 +133,7 @@ impl OAuth2Extension
 
     fn acquire_token_from_cache(&self) -> Option<ExpirableToken> {
         let now = SystemTime::now();
-        let since_the_epoch = now.duration_since(UNIX_EPOCH).unwrap();
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("time went backwards");
         let maybe_token = self.token.lock().unwrap();
         match &*maybe_token {
             Some(token) => {
@@ -149,14 +149,14 @@ impl OAuth2Extension
     }
 
     fn save_into_cache(&self, token: ExpirableToken) {
-        self.token.lock().unwrap().replace(token);
+        self.token.lock().expect("poisoned token lock").replace(token);
     }
 
     async fn request_token(&self) -> Result<ExpirableToken, Box<dyn std::error::Error + Send + Sync>> {
         let mut request_body = format!("grant_type=client_credentials&client_id={}", self.client_id);
         
-        //in case of oauth2 with mTLS (https://datatracker.ietf.org/doc/html/rfc8705) we only pass client_id,
-        //so secret can be considered as optional.
+        // in case of oauth2 with mTLS (https://datatracker.ietf.org/doc/html/rfc8705) we only pass client_id,
+        // so secret can be considered as optional.
         if let Some(client_secret) = &self.client_secret {
             let secret_param = format!("&client_secret={}", client_secret.inner());
             request_body.push_str(&secret_param);
@@ -189,9 +189,9 @@ impl OAuth2Extension
         let body = hyper::body::aggregate(response).await?;
         let token: Token = serde_json::from_reader(body.reader())?;
 
-        //expires_in means, in seconds, for how long it will be valid, lets say 5min, 
-        //to not cause some random 4xx, because token expired in the meantime, we will make some
-        //room for token refreshing, this room is a grace_period.
+        // expires_in means, in seconds, for how long it will be valid, lets say 5min, 
+        // to not cause some random 4xx, because token expired in the meantime, we will make some
+        // room for token refreshing, this room is a grace_period.
         let (mut grace_period_seconds, overflow) = token.expires_in.overflowing_sub(self.grace_period);
 
         //if time for grace period exceed an expire_in, it basically means: always use new token.
@@ -200,11 +200,11 @@ impl OAuth2Extension
         }
 
         let token_is_valid_for_ms : u128 = grace_period_seconds as u128 * 1000;
-        //we are multiplying by 1000 because expires_in field is in seconds, grace_period also, 
-        //but later we operate on milliseconds. 
+        // we are multiplying by 1000 because expires_in field is in seconds, grace_period also, 
+        // but later we operate on milliseconds. 
         let now = SystemTime::now();
-        let since_the_epoch = now.duration_since(UNIX_EPOCH).unwrap();
-        let token_will_expire_after_ms = since_the_epoch.as_millis() + (token_is_valid_for_ms as u128);
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("time went backwards");
+        let token_will_expire_after_ms = since_the_epoch.as_millis() + token_is_valid_for_ms;
 
         Ok(ExpirableToken{access_token:token.access_token, expires_after_ms: token_will_expire_after_ms})
     }
@@ -230,7 +230,7 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), vector_lib::Error>
     {
         let token = self.get_token().await?;
         let auth = Auth::Bearer{ token: SensitiveString::from(token)};
@@ -247,7 +247,7 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), vector_lib::Error>
     {
         let user = self.user.clone();
         let password = self.password.clone();
@@ -318,13 +318,12 @@ where
         let _enter = span.enter();
 
         default_request_headers(&mut request, &self.user_agent);
-        self.maybe_add_proxy_headers(&mut request); 
+        self.maybe_add_proxy_headers(&mut request);
 
         let client = self.client.clone();
         let auth_extension = self.auth_extension.clone();
 
         let fut = async move {
-            //should request for token influence upstream service latency ?            
             if let Some(auth_extension) = auth_extension {
                 let auth_span = tracing::info_span!("auth_extension");
                 auth_extension.modify_request(&mut request)
@@ -566,7 +565,7 @@ pub enum HttpClientAuthorizationStrategy {
     /// 
     /// # Example
     /// 
-    /// ```
+    /// ```yaml
     /// strategy:
     ///  strategy: "o_auth2"
     ///  client_id: "client.id"
@@ -578,7 +577,7 @@ pub enum HttpClientAuthorizationStrategy {
     /// 
     /// # Example
     /// 
-    /// ```
+    /// ```yaml
     /// strategy:
     ///  strategy: "o_auth2"
     ///  client_id: "client.id"

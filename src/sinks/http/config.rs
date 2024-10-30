@@ -343,6 +343,7 @@ mod tests {
                 batch: BatchConfig::default(),
                 request: RequestConfig::default(),
                 tls: None,
+                authorization_config: None,
                 acknowledgements: AcknowledgementsConfig::default(),
                 payload_prefix: String::new(),
                 payload_suffix: String::new(),
