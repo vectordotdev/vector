@@ -133,7 +133,7 @@ impl OAuth2Extension
 
     fn acquire_token_from_cache(&self) -> Option<ExpirableToken> {
         let now = SystemTime::now();
-        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("time went backwards");
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
         let maybe_token = self.token.lock().unwrap();
         match &*maybe_token {
             Some(token) => {
@@ -164,7 +164,7 @@ impl OAuth2Extension
         
         let builder = Request::post(self.token_endpoint.clone());
         let builder = builder.header("Content-Type", "application/x-www-form-urlencoded");
-        let request = builder.body(Body::from(request_body)).expect("error creating request");
+        let request = builder.body(Body::from(request_body)).expect("Error creating request");
 
         let before = std::time::Instant::now();
         let response_result = self.client.request(request).await;
@@ -203,7 +203,7 @@ impl OAuth2Extension
         // we are multiplying by 1000 because expires_in field is in seconds, grace_period also, 
         // but later we operate on milliseconds. 
         let now = SystemTime::now();
-        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("time went backwards");
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
         let token_will_expire_after_ms = since_the_epoch.as_millis() + token_is_valid_for_ms;
 
         Ok(ExpirableToken{access_token:token.access_token, expires_after_ms: token_will_expire_after_ms})
