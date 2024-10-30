@@ -39,3 +39,9 @@ Providing this information upfront will facilitate a smoother review process. --
 ## Checklist
 - [ ] Please add a changelog entry if your PR includes user facing changes. Otherwise, apply the "no-changelog" label to this PR. You can find details on [this document](https://github.com/vectordotdev/vector/blob/master/changelog.d/README.md).
 - [ ] Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
+
+## References
+
+<!-- any related issues or PRs to this one; please list any issues closed by this PR -->
+
+- Closes: #XXXX
