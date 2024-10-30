@@ -1,12 +1,13 @@
-use once_cell::sync::Lazy;
+use std::{collections::btree_map, fmt::Write as _, iter, slice, sync::LazyLock};
+
 use regex::Regex;
 use serde::{Serialize, Serializer};
-use std::{collections::btree_map, fmt::Write as _, iter, slice};
 use vrl::path::PathPrefix;
 
 use crate::event::{KeyString, ObjectMap, Value};
 
-static IS_VALID_PATH_SEGMENT: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());
+static IS_VALID_PATH_SEGMENT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.

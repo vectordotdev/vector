@@ -139,13 +139,9 @@ where
 
             // Handle the errors and extract the response.
             let response = response_result
-                .map_err(|error| {
+                .inspect_err(|error| {
                     // Emit the error into the internal events system.
-                    emit!(http_client::GotHttpWarning {
-                        error: &error,
-                        roundtrip
-                    });
-                    error
+                    emit!(http_client::GotHttpWarning { error, roundtrip });
                 })
                 .context(CallRequestSnafu)?;
 
@@ -443,9 +439,9 @@ impl Default for KeepaliveConfig {
 ///
 /// **Notes:**
 /// - This is intended to be used in a Hyper server (or similar) that will automatically close
-/// the connection after a response with a `Connection: close` header is sent.
+///   the connection after a response with a `Connection: close` header is sent.
 /// - This layer assumes that it is instantiated once per connection, which is true within the
-/// Hyper framework.
+///   Hyper framework.
 
 pub struct MaxConnectionAgeLayer {
     start_reference: Instant,
@@ -495,9 +491,9 @@ where
 ///
 /// **Notes:**
 /// - This is intended to be used in a Hyper server (or similar) that will automatically close
-/// the connection after a response with a `Connection: close` header is sent.
+///   the connection after a response with a `Connection: close` header is sent.
 /// - This service assumes that it is instantiated once per connection, which is true within the
-/// Hyper framework.
+///   Hyper framework.
 #[derive(Clone)]
 pub struct MaxConnectionAgeService<S> {
     service: S,

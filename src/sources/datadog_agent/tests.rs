@@ -256,7 +256,7 @@ async fn source(
 
 async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, path: &str) -> u16 {
     reqwest::Client::new()
-        .post(&format!("http://{}{}", address, path))
+        .post(format!("http://{}{}", address, path))
         .headers(headers)
         .body(body.to_owned())
         .send()
