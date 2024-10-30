@@ -823,7 +823,6 @@ all-integration-tests = [
   "nats-integration-tests",
   "nginx-integration-tests",
   "opentelemetry-integration-tests",
-  "openobserve-integration-tests",
   "postgresql_metrics-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
