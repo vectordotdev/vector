@@ -20,7 +20,7 @@ pub(crate) const UNMATCHED_ROUTE: &str = "_unmatched";
 pub struct Route {
     conditions: Vec<(String, Condition)>,
     reroute_unmatched: bool,
-    exclusive_match: bool
+    exclusive_match: bool,
 }
 
 impl Route {
@@ -33,7 +33,7 @@ impl Route {
         Ok(Self {
             conditions,
             reroute_unmatched: config.reroute_unmatched,
-            exclusive_match: config.exclusive_match
+            exclusive_match: config.exclusive_match,
         })
     }
 }
@@ -96,10 +96,9 @@ pub struct RouteConfig {
     ///
     /// When this flag is enabled, an event will be routed to only the first matching route.
     /// The specified [`RouteConfig:route`] order of insertion is therefore significant when this flag is on.
-    #[serde(default = "crate::serde::default_false")]
+    #[serde(default)]
     #[configurable(metadata(docs::human_name = "Exclusive Match"))]
     exclusive_match: bool,
-
 }
 
 fn route_examples() -> IndexMap<String, AnyCondition> {
@@ -191,11 +190,11 @@ impl TransformConfig for RouteConfig {
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
-
     use indoc::indoc;
     use vector_lib::transform::TransformOutputsBuf;
 
     use super::*;
+    use crate::event::LogEvent;
     use crate::{
         config::{build_unit_tests, ConfigBuilder},
         test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
@@ -220,7 +219,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"reroute_unmatched":true,"route":{"first":{"type":"vrl","source":".message == \"hello world\""}}}"#
+            r#"{"reroute_unmatched":true,"route":{"first":{"type":"vrl","source":".message == \"hello world\""}},"exclusive_match":false}"#
         );
     }
 
@@ -429,5 +428,51 @@ mod test {
         assert!(tests.remove(0).run().await.errors.is_empty());
         // Check that metrics were emitted with output tag
         COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
+    }
+
+    #[test]
+    fn route_exclusive_match() {
+        let config = toml::from_str::<RouteConfig>(indoc::indoc! {r#"
+            exclusive_match = true
+
+            route.first.type = "vrl"
+            route.first.source = '.message == "a"'
+
+            route.second.type = "vrl"
+            route.second.source = '.message == "a"'
+        "#})
+        .expect("Failed to parse RouteConfig from TOML string.");
+
+        let output_names = vec!["first", "second", UNMATCHED_ROUTE];
+        let mut outputs = TransformOutputsBuf::new_with_capacity(
+            output_names
+                .iter()
+                .map(|output_name| {
+                    TransformOutput::new(DataType::all_bits(), HashMap::new())
+                        .with_port(output_name.to_owned())
+                })
+                .collect(),
+            1,
+        );
+
+        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let event = Event::Log(LogEvent::from("a"));
+        transform.transform(event.clone(), &mut outputs);
+
+        let event = Event::Log(LogEvent::from("c"));
+        transform.transform(event.clone(), &mut outputs);
+
+        for output_name in output_names {
+            let events: Vec<_> = outputs.drain_named(output_name).collect();
+            if output_name == "first" {
+                assert_eq!(events.len(), 1);
+            }
+            else if output_name == UNMATCHED_ROUTE {
+                assert_eq!(events.len(), 1);
+            }
+            else {
+                assert_eq!(events.len(), 0);
+            }
+        }
     }
 }
