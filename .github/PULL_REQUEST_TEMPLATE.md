@@ -18,8 +18,8 @@ Examples:
 -->
 
 ## Summary
-`Please provide a brief summary about what this PR does.
-This should help the reviewers give feedback faster and with higher quality.`
+<!-- Please provide a brief summary about what this PR does.
+This should help the reviewers give feedback faster and with higher quality. -->
 
 ## Change Type
 - [ ] Bug fix
