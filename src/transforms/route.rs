@@ -189,8 +189,8 @@ impl TransformConfig for RouteConfig {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
     use indoc::indoc;
+    use std::collections::HashMap;
     use vector_lib::transform::TransformOutputsBuf;
 
     use super::*;
@@ -466,11 +466,9 @@ mod test {
             let events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == "first" {
                 assert_eq!(events.len(), 1);
-            }
-            else if output_name == UNMATCHED_ROUTE {
+            } else if output_name == UNMATCHED_ROUTE {
                 assert_eq!(events.len(), 1);
-            }
-            else {
+            } else {
                 assert_eq!(events.len(), 0);
             }
         }
