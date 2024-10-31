@@ -1,10 +1,10 @@
-use indexmap::{set::IndexSet, IndexMap};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::fmt;
 use super::{
     schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
     TransformOutput,
 };
+use indexmap::{set::IndexSet, IndexMap};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -31,7 +31,10 @@ impl fmt::Display for Node {
                 Ok(())
             }
             Node::Transform { in_ty, outputs } => {
-                write!(f, "component_kind: source\n  input_types: {in_ty}\n  outputs:")?;
+                write!(
+                    f,
+                    "component_kind: source\n  input_types: {in_ty}\n  outputs:"
+                )?;
                 for output in outputs {
                     write!(f, "\n    {}", output)?;
                 }
@@ -163,14 +166,16 @@ impl Graph {
                 Some(Node::Sink { .. }) => "sink",
                 _ => panic!("only transforms and sinks have inputs"),
             };
-            info!("Available components:\n{}",  self.nodes
+            info!(
+                "Available components:\n{}",
+                self.nodes
                     .iter()
                     .map(|(key, node)| format!("\"{}\":\n  {}", key, node))
                     .collect::<Vec<_>>()
-                    .join("\n"));
+                    .join("\n")
+            );
             Err(format!(
                 "Input \"{from}\" for {output_type} \"{to}\" doesn't match any components.",
-
             ))
         }
     }
