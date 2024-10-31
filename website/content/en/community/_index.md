@@ -3,22 +3,22 @@ title: Vector Community
 description: >
   Join the Vector community. Connect with other Vector users and help make Vector better.
 buttons:
-- title: Discord chat
-  description: Ask questions and get help
-  ionicon: logo-discord
-  icon_classes: text-discord-purple
-  url: https://chat.vector.dev
-- title: "@vectordotdev"
-  description: Follow us in real time
-  ionicon: logo-twitter
-  icon_classes: text-twitter-blue
-  url: https://twitter.com/vectordotdev
-- title: vectordotdev/vector
-  description: Issues, code, and development
-  ionicon: logo-github
-  icon_classes: text-dark dark:text-gray-200
-  url: https://github.com/vectordotdev/vector
-aliases: ["/mailing_list"]
+  - title: vectordotdev/vector
+    description: Issues, code, development, discussions
+    ionicon: logo-github
+    icon_classes: text-dark dark:text-gray-200
+    url: https://github.com/vectordotdev/vector
+  - title: Discord chat
+    description: Engage with the community
+    ionicon: logo-discord
+    icon_classes: text-discord-purple
+    url: https://chat.vector.dev
+  - title: "@vectordotdev"
+    description: Follow us in real time
+    ionicon: logo-twitter
+    icon_classes: text-twitter-blue
+    url: https://twitter.com/vectordotdev
+aliases: [ "/mailing_list" ]
 ---
 
 ### How do I contribute to Vector?

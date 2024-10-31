@@ -271,7 +271,10 @@ impl SourceConfig for SplunkConfig {
             None,
         );
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -1860,7 +1863,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(&format!("http://{}/services/collector/health", address))
+            .get(format!("http://{}/services/collector/health", address))
             .header("Authorization", format!("Splunk {}", "invalid token"))
             .send()
             .await
@@ -1874,7 +1877,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(&format!("http://{}/services/collector/health", address))
+            .get(format!("http://{}/services/collector/health", address))
             .send()
             .await
             .unwrap();

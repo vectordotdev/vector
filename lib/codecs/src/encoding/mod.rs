@@ -10,9 +10,9 @@ use bytes::BytesMut;
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CsvSerializer,
     CsvSerializerConfig, GelfSerializer, GelfSerializerConfig, JsonSerializer,
-    JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer,
-    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, ProtobufSerializer,
-    ProtobufSerializerConfig, ProtobufSerializerOptions, RawMessageSerializer,
+    JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer, LogfmtSerializerConfig,
+    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
+    ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions, RawMessageSerializer,
     RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
 pub use framing::{
@@ -362,12 +362,14 @@ impl SerializerConfig {
                 FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
             }
             SerializerConfig::Csv(_)
-            | SerializerConfig::Gelf
             | SerializerConfig::Json(_)
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
             | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
+            SerializerConfig::Gelf => {
+                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
+            }
         }
     }
 

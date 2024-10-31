@@ -59,6 +59,16 @@ base: components: sources: statsd: configuration: {
 		required:      false
 		type: uint: unit: "bytes"
 	}
+	sanitize: {
+		description: """
+			Whether or not to sanitize incoming statsd key names. When "true", keys are sanitized by:
+			- "/" is replaced with "-"
+			- All whitespace is replaced with "_"
+			- All non alphanumeric characters (A-Z, a-z, 0-9, _, or -) are removed.
+			"""
+		required: false
+		type: bool: default: true
+	}
 	shutdown_timeout_secs: {
 		description:   "The timeout before a connection is forcefully closed during shutdown."
 		relevant_when: "mode = \"tcp\""
@@ -136,6 +146,15 @@ base: components: sources: statsd: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

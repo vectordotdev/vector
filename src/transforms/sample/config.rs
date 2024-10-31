@@ -1,6 +1,6 @@
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
-use vrl::owned_value_path;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use vrl::value::Kind;
 
 use crate::{
@@ -10,6 +10,7 @@ use crate::{
         TransformOutput,
     },
     schema,
+    template::Template,
     transforms::Transform,
 };
 
@@ -44,6 +45,21 @@ pub struct SampleConfig {
     #[configurable(metadata(docs::examples = "message"))]
     pub key_field: Option<String>,
 
+    /// The event key in which the sample rate is stored. If set to an empty string, the sample rate will not be added to the event.
+    #[configurable(metadata(docs::examples = "sample_rate"))]
+    #[serde(default = "default_sample_rate_key")]
+    pub sample_rate_key: OptionalValuePath,
+
+    /// The value to group events into separate buckets to be sampled independently.
+    ///
+    /// If left unspecified, or if the event doesn't have `group_by`, then the event is not
+    /// sampled separately.
+    #[configurable(metadata(
+        docs::examples = "{{ service }}",
+        docs::examples = "{{ hostname }}-{{ service }}"
+    ))]
+    pub group_by: Option<Template>,
+
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
 }
@@ -53,7 +69,9 @@ impl GenerateConfig for SampleConfig {
         toml::Value::try_from(Self {
             rate: 10,
             key_field: None,
+            group_by: None,
             exclude: None::<AnyCondition>,
+            sample_rate_key: default_sample_rate_key(),
         })
         .unwrap()
     }
@@ -67,10 +85,12 @@ impl TransformConfig for SampleConfig {
             Self::NAME.to_string(),
             self.rate,
             self.key_field.clone(),
+            self.group_by.clone(),
             self.exclude
                 .as_ref()
                 .map(|condition| condition.build(&context.enrichment_tables))
                 .transpose()?,
+            default_sample_rate_key(),
         )))
     }
 
@@ -105,6 +125,10 @@ impl TransformConfig for SampleConfig {
     }
 }
 
+pub fn default_sample_rate_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("sample_rate"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -126,7 +150,9 @@ mod tests {
             let config = SampleConfig {
                 rate: 1,
                 key_field: None,
+                group_by: None,
                 exclude: None,
+                sample_rate_key: default_sample_rate_key(),
             };
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;

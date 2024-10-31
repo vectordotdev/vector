@@ -60,7 +60,6 @@ awscli
 awsec
 awslabs
 axum
-Aziz
 azureresourceid
 babim
 badunit
@@ -144,6 +143,7 @@ centiseconds
 cernan
 cfactor
 CFFI
+cfgs
 CGP
 cgroups
 chans
@@ -155,7 +155,6 @@ chkptr
 chronosphere
 chunkenc
 cicd
-Cim
 ciphersuites
 CLA
 Claranet
@@ -315,12 +314,9 @@ endler
 enduml
 eni
 enp
-Ensar
 enumdecl
 enumflags
-ENVARS
 envsubst
-EOIG
 EOL'ed
 Err'ing
 errorf
@@ -392,6 +388,8 @@ Fomichev
 fonttbl
 foob
 foobarbaz
+foobarbazqux
+foobarbazquxquux
 foobarfoobarfoo
 FOOBARy
 foobaz
@@ -445,7 +443,6 @@ Godbolt
 gogoproto
 gohai
 goldberg
-goldmark
 GPB
 gpgcheck
 gpgkey
@@ -518,6 +515,7 @@ imds
 IMSD
 incentivizes
 incrementalize
+indexgateway
 indexmap
 indicatif
 indoc
@@ -570,6 +568,7 @@ jtype
 juchiast
 karppila
 kartar
+kebabcase
 kemmer
 kernelmode
 keybase
@@ -621,6 +620,7 @@ lognamespace
 lognamespacing
 logplex
 logproto
+logql
 logqlmodel
 logsense
 logsev
@@ -630,7 +630,6 @@ losslessly
 lpop
 lpush
 Luc
-luciofranco
 lucperkins
 lukesteensen
 macports
@@ -682,7 +681,6 @@ mlua
 mmdb
 Mmm
 moby
-mockwatchlogs
 modulesloaddir
 mooper
 moosh
@@ -730,9 +728,7 @@ nbase
 ndarray
 ndjson
 nearline
-neuronull
 newcerts
-newrelix
 nextest
 nfox
 ngx
@@ -748,6 +744,7 @@ nodebuginfo
 nodistro
 nofield
 nofree
+nohup
 nomac
 NONALPHANUM
 nonbare
@@ -782,6 +779,7 @@ nullishness
 numbackends
 oahd
 oap
+OIDC
 OKD
 omfwd
 omitempty
@@ -811,6 +809,7 @@ ouicompat
 outputspatterns
 overaligned
 overalignment
+owen
 owo
 oyaml
 pageheap
@@ -818,6 +817,7 @@ paq
 parallelizable
 pareto
 partitionable
+pascalcase
 passthrough
 pathbuf
 pathgen
@@ -825,6 +825,7 @@ peekable
 PEMS
 pgmajfault
 pgrep
+pidof
 PII
 Pitbull
 pkc
@@ -851,7 +852,6 @@ presetdir
 pretrunc
 prettydiff
 primaryfont
-probot
 processname
 procid
 promhttp
@@ -863,13 +863,13 @@ protoc
 protofbuf
 protosizer
 Prt
-psl
 psv
 publickey
 purgecss
 pyld
 Pzb
 qqq
+queryrangebase
 quickcheck
 quix
 quuux
@@ -940,18 +940,18 @@ rxs
 ryangjchandler
 ryu
 sadf
+salvacorts
 samehost
 samenet
 samerole
 sameuser
 sandboxed
 sandboxing
-Saraj
 sccache
 schemaless
 schemars
 schoen
-scl
+screamingsnakecase
 sda
 sdata
 SDID
@@ -976,7 +976,6 @@ shortcode
 shortstat
 should've
 shutsdown
-Sichert
 SIEM
 sighup
 Signsoff
@@ -986,6 +985,7 @@ sigterm
 singlethreaded
 sinkbuilder
 sinknetworkbytessent
+SIV
 sizecache
 Sizefor
 skinparam
@@ -1001,6 +1001,7 @@ smp
 smpl
 smtracking
 snakecase
+Sni
 Soldotna
 somehost
 somejob
@@ -1040,7 +1041,6 @@ stdduration
 stdlog
 Steensen
 stephenwakely
-strat
 strconv
 streamsink
 strng
@@ -1051,6 +1051,7 @@ subfolders
 subfooter
 sublimelinter
 subsec
+subsecond
 substrategies
 subtagline
 subtimer
@@ -1123,7 +1124,6 @@ Tomola
 tonydanza
 toolbars
 toolchains
-toolset
 toor
 topdir
 topojson
@@ -1161,6 +1161,7 @@ undertagline
 underutilized
 underutilizing
 unevictable
+unflatten
 unioning
 unitdir
 unmark
@@ -1189,7 +1190,6 @@ vectordir
 vectordotdev
 vectorized
 vendored
-veryyyyyyy
 viceversa
 viewkind
 visualising
@@ -1209,7 +1209,6 @@ walkthrough
 waninfo
 wasmtime
 watchexec
-watchlogs
 wayfor
 webgraphviz
 webpki

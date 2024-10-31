@@ -117,20 +117,18 @@ pub struct SourceOutput {
 
 impl SourceOutput {
     /// Create a `SourceOutput` of the given data type that contains a single output `Definition`.
+    /// If the data type does not contain logs, the schema definition will be ignored.
     /// Designed for use in log sources.
-    ///
-    ///
-    /// # Panics
-    ///
-    /// Panics if `ty` does not contain [`DataType::Log`].
     #[must_use]
-    pub fn new_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
-        assert!(ty.contains(DataType::Log));
+    pub fn new_maybe_logs(ty: DataType, schema_definition: schema::Definition) -> Self {
+        let schema_definition = ty
+            .contains(DataType::Log)
+            .then(|| Arc::new(schema_definition));
 
         Self {
             port: None,
             ty,
-            schema_definition: Some(Arc::new(schema_definition)),
+            schema_definition,
         }
     }
 
@@ -335,8 +333,8 @@ pub struct AcknowledgementsConfig {
     /// Whether or not end-to-end acknowledgements are enabled.
     ///
     /// When enabled for a sink, any source connected to that sink, where the source supports
-    /// end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-    /// before acknowledging them at the source.
+    /// end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+    /// connected** sinks before acknowledging them at the source.
     ///
     /// Enabling or disabling acknowledgements at the sink level takes precedence over any global
     /// [`acknowledgements`][global_acks] configuration.
@@ -573,7 +571,7 @@ mod test {
         let definition = schema::Definition::empty_legacy_namespace()
             .with_event_field(&owned_value_path!("zork"), Kind::bytes(), Some("zork"))
             .with_event_field(&owned_value_path!("nork"), Kind::integer(), None);
-        let output = SourceOutput::new_logs(DataType::Log, definition);
+        let output = SourceOutput::new_maybe_logs(DataType::Log, definition);
 
         let valid_event = LogEvent::from(Value::from(btreemap! {
             "zork" => "norknoog",
@@ -619,7 +617,7 @@ mod test {
             )
             .with_event_field(&owned_value_path!("nork"), Kind::integer(), None);
 
-        let output = SourceOutput::new_logs(DataType::Log, definition);
+        let output = SourceOutput::new_maybe_logs(DataType::Log, definition);
 
         let mut valid_event = LogEvent::from(Value::from(btreemap! {
             "nork" => 32
@@ -672,5 +670,19 @@ mod test {
         // Events should not have the schema validated.
         new_definition.assert_valid_for_event(&valid_event);
         new_definition.assert_valid_for_event(&invalid_event);
+    }
+
+    #[test]
+    fn test_new_log_source_ignores_definition_with_metric_data_type() {
+        let definition = schema::Definition::any();
+        let output = SourceOutput::new_maybe_logs(DataType::Metric, definition);
+        assert_eq!(output.schema_definition(true), None);
+    }
+
+    #[test]
+    fn test_new_log_source_uses_definition_with_log_data_type() {
+        let definition = schema::Definition::any();
+        let output = SourceOutput::new_maybe_logs(DataType::Log, definition.clone());
+        assert_eq!(output.schema_definition(true), Some(definition));
     }
 }

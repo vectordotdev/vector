@@ -23,6 +23,7 @@ data_dir: "/var/lib/vector"
 
 # Vector's API (disabled by default)
 # Enable and try it out with the `vector top` command
+# NOTE: this is _enabled_ for helm chart deployments, see: https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/examples/datadog-values.yaml#L78-L81
 api:
   enabled: false
 # address = "127.0.0.1:8686"

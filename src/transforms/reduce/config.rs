@@ -80,6 +80,7 @@ pub struct ReduceConfig {
     /// - For timestamp fields the first is kept and a new field `[field-name]_end` is added with
     ///   the last received timestamp value.
     /// - Numeric values are summed.
+    /// - For nested paths, the field value is retrieved and then reduced using the default strategies mentioned above (unless explicitly specified otherwise).
     #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "An individual merge strategy."

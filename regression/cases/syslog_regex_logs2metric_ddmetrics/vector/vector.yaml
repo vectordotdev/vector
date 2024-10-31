@@ -48,6 +48,6 @@ sinks:
   datadog_metrics:
     type:              "datadog_metrics"
     inputs: [ "log2metric" ]
-    endpoint:          "http://localhost:8080"
+    endpoint:          "http://0.0.0.0:8080"
     default_api_key:   "DEADBEEF"
     default_namespace: "vector"

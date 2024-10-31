@@ -132,7 +132,7 @@ format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
 A list of allowed sub-categories is defined
-[here](https://github.com/vectordotdev/vector/tree/master/.github).
+[here](https://github.com/vectordotdev/vector/blob/master/.github/semantic.yml#L21).
 
 The following are all good examples of pull request titles:
 
@@ -241,7 +241,7 @@ first to ensure they pass.
 
 ```sh
 # Run the Clippy linter to catch common mistakes.
-cargo vdev check rust
+cargo vdev check rust --clippy
 # Ensure all code is properly formatted. Code can be run through `rustfmt` using `cargo fmt` to ensure it is properly formatted.
 cargo vdev check fmt
 # Ensure the internal metrics that Vector emits conform to standards.
