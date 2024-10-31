@@ -1,6 +1,6 @@
 use indexmap::{set::IndexSet, IndexMap};
 use std::collections::{HashMap, HashSet, VecDeque};
-
+use std::fmt;
 use super::{
     schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
     TransformOutput,
@@ -18,6 +18,30 @@ pub enum Node {
     Sink {
         ty: DataType,
     },
+}
+
+impl fmt::Display for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Node::Source { outputs } => {
+                write!(f, "component_kind: source\n  outputs:")?;
+                for output in outputs {
+                    write!(f, "\n    {}", output)?;
+                }
+                Ok(())
+            }
+            Node::Transform { in_ty, outputs } => {
+                write!(f, "component_kind: source\n  input_types: {in_ty}\n  outputs:")?;
+                for output in outputs {
+                    write!(f, "\n    {}", output)?;
+                }
+                Ok(())
+            }
+            Node::Sink { ty } => {
+                write!(f, "component_kind: sink\n  types: {ty}")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -139,9 +163,14 @@ impl Graph {
                 Some(Node::Sink { .. }) => "sink",
                 _ => panic!("only transforms and sinks have inputs"),
             };
+            info!("Available components:\n{}",  self.nodes
+                    .iter()
+                    .map(|(key, node)| format!("\"{}\":\n  {}", key, node))
+                    .collect::<Vec<_>>()
+                    .join("\n"));
             Err(format!(
-                "Input \"{}\" for {} \"{}\" doesn't match any components.",
-                from, output_type, to
+                "Input \"{from}\" for {output_type} \"{to}\" doesn't match any components.",
+
             ))
         }
     }
