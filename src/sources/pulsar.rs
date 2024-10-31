@@ -230,7 +230,7 @@ impl SourceConfig for PulsarSourceConfig {
                 Kind::bytes(),
                 Some("producer_name"),
             );
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]

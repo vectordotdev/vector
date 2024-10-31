@@ -15,8 +15,8 @@ base: components: sinks: greptimedb: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -61,7 +61,7 @@ base: components: sinks: greptimedb: configuration: {
 	}
 	dbname: {
 		description: """
-			The GreptimeDB [database][database] name to connect.
+			The [GreptimeDB database][database] name to connect.
 
 			Default to `public`, the default database of GreptimeDB.
 
@@ -90,6 +90,36 @@ base: components: sinks: greptimedb: configuration: {
 			"""
 		required: true
 		type: string: examples: ["example.com:4001", "1nge17d2r3ns.ap-southeast-1.aws.greptime.cloud:4001"]
+	}
+	grpc_compression: {
+		description: """
+			Set gRPC compression encoding for the request
+			Default to none, `gzip` or `zstd` is supported.
+			"""
+		required: false
+		type: string: examples: ["grpc_compression"]
+	}
+	new_naming: {
+		description: """
+			Use Greptime's prefixed naming for time index and value columns.
+
+			This is to keep consistency with GreptimeDB's naming pattern. By
+			default, this sink will use `val` for value column name, and `ts` for
+			time index name. When turned on, `greptime_value` and
+			`greptime_timestamp` will be used for these names.
+
+			If you are using this Vector sink together with other data ingestion
+			sources of GreptimeDB, like Prometheus Remote Write and Influxdb Line
+			Protocol, it is highly recommended to turn on this.
+
+			Also if there is a tag name conflict from your data source, for
+			example, you have a tag named as `val` or `ts`, you need to turn on
+			this option to avoid the conflict.
+
+			Default to `false` for compatibility.
+			"""
+		required: false
+		type: bool: {}
 	}
 	password: {
 		description: """
@@ -338,6 +368,15 @@ base: components: sinks: greptimedb: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

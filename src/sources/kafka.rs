@@ -409,7 +409,7 @@ impl SourceConfig for KafkaSourceConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -442,6 +442,12 @@ async fn kafka_source(
 
     // EOF signal allowing the coordination task to tell the kafka client task when all partitions have reached EOF
     let (eof_tx, eof_rx) = eof.then(oneshot::channel::<()>).unzip();
+
+    let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
+    if let Err(e) = consumer.subscribe(&topics).context(SubscribeSnafu) {
+        error!("{}", e);
+        return Err(());
+    }
 
     let coordination_task = {
         let span = span.clone();
@@ -1196,21 +1202,21 @@ fn create_consumer(
         .set("auto.offset.reset", &config.auto_offset_reset)
         .set(
             "session.timeout.ms",
-            &config.session_timeout_ms.as_millis().to_string(),
+            config.session_timeout_ms.as_millis().to_string(),
         )
         .set(
             "socket.timeout.ms",
-            &config.socket_timeout_ms.as_millis().to_string(),
+            config.socket_timeout_ms.as_millis().to_string(),
         )
         .set(
             "fetch.wait.max.ms",
-            &config.fetch_wait_max_ms.as_millis().to_string(),
+            config.fetch_wait_max_ms.as_millis().to_string(),
         )
         .set("enable.partition.eof", "false")
         .set("enable.auto.commit", "true")
         .set(
             "auto.commit.interval.ms",
-            &config.commit_interval_ms.as_millis().to_string(),
+            config.commit_interval_ms.as_millis().to_string(),
         )
         .set("enable.auto.offset.store", "false")
         .set("statistics.interval.ms", "1000")
@@ -1233,8 +1239,6 @@ fn create_consumer(
             Span::current(),
         ))
         .context(CreateSnafu)?;
-    let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
-    consumer.subscribe(&topics).context(SubscribeSnafu)?;
 
     Ok((consumer, callback_rx))
 }

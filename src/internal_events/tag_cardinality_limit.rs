@@ -16,7 +16,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingEvent<'a> {
             tag_value = self.tag_value,
             internal_log_rate_limit = true,
         );
-        counter!("tag_value_limit_exceeded_total", 1);
+        counter!("tag_value_limit_exceeded_total").increment(1);
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
@@ -40,7 +40,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingTag<'a> {
             tag_value = self.tag_value,
             internal_log_rate_limit = true,
         );
-        counter!("tag_value_limit_exceeded_total", 1);
+        counter!("tag_value_limit_exceeded_total").increment(1);
     }
 }
 
@@ -54,6 +54,6 @@ impl<'a> InternalEvent for TagCardinalityValueLimitReached<'a> {
             message = "Value_limit reached for key. New values for this key will be rejected.",
             key = %self.key,
         );
-        counter!("value_limit_reached_total", 1);
+        counter!("value_limit_reached_total").increment(1);
     }
 }

@@ -125,7 +125,10 @@ impl SourceConfig for FluentConfig {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self.schema_definition(log_namespace);
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -470,13 +473,12 @@ impl Decoder for FluentDecoder {
 
             src.advance(byte_size);
 
-            let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
-                let base64_encoded_message = BASE64_STANDARD.encode(&src);
+            let maybe_item = self.handle_message(res, byte_size).inspect_err(|error| {
+                let base64_encoded_message = BASE64_STANDARD.encode(&src[..]);
                 emit!(FluentMessageDecodeError {
-                    error: &error,
+                    error,
                     base64_encoded_message
                 });
-                error
             })?;
             if let Some(item) = maybe_item {
                 return Ok(Some(item));
@@ -1134,7 +1136,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(format!("http://{}/", test_address))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()
@@ -1215,7 +1217,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(format!("http://{}/", test_address))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()

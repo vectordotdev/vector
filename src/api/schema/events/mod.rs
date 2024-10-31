@@ -1,47 +1,20 @@
-mod encoding;
+pub mod encoding;
 pub mod log;
 pub mod metric;
-pub mod notification;
 pub mod output;
 pub mod trace;
-
-use std::collections::HashSet;
 
 use async_graphql::{Context, Subscription};
 use encoding::EventEncodingType;
 use futures::{stream, Stream, StreamExt};
-use output::OutputEventsPayload;
+use output::{from_tap_payload_to_output_events, OutputEventsPayload};
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{select, sync::mpsc, time};
 use tokio_stream::wrappers::ReceiverStream;
-
-use crate::{api::tap::TapController, topology::WatchRx};
-
-/// Patterns (glob) used by tap to match against components and access events
-/// flowing into (for_inputs) or out of (for_outputs) specified components
-#[derive(Debug)]
-pub struct TapPatterns {
-    pub for_outputs: HashSet<String>,
-    pub for_inputs: HashSet<String>,
-}
-
-impl TapPatterns {
-    pub const fn new(for_outputs: HashSet<String>, for_inputs: HashSet<String>) -> Self {
-        Self {
-            for_outputs,
-            for_inputs,
-        }
-    }
-
-    /// Get all user-specified patterns
-    pub fn all_patterns(&self) -> HashSet<String> {
-        self.for_outputs
-            .iter()
-            .cloned()
-            .chain(self.for_inputs.iter().cloned())
-            .collect()
-    }
-}
+use vector_lib::tap::{
+    controller::{TapController, TapPatterns},
+    topology::WatchRx,
+};
 
 #[derive(Debug, Default)]
 pub struct EventsSubscription;
@@ -81,7 +54,7 @@ pub(crate) fn create_events_stream(
     // interval, this is capped to the same value.
     let (tap_tx, tap_rx) = mpsc::channel(limit);
     let mut tap_rx = ReceiverStream::new(tap_rx)
-        .flat_map(|payload| stream::iter(<Vec<OutputEventsPayload>>::from(payload)));
+        .flat_map(|payload| stream::iter(from_tap_payload_to_output_events(payload)));
 
     // The resulting vector of `Event` sent to the client. Only one result set will be streamed
     // back to the client at a time. This value is set higher than `1` to prevent blocking the event

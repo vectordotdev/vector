@@ -73,6 +73,7 @@ base: components: transforms: reduce: configuration: {
 			- For timestamp fields the first is kept and a new field `[field-name]_end` is added with
 			  the last received timestamp value.
 			- Numeric values are summed.
+			- For nested paths, the field value is retrieved and then reduced using the default strategies mentioned above (unless explicitly specified otherwise).
 			"""
 		required: false
 		type: object: options: "*": {

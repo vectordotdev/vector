@@ -8,7 +8,7 @@ use vector_lib::configurable::configurable_component;
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
 
@@ -149,7 +149,7 @@ impl SinkConfig for SocketSinkConfig {
             #[cfg(unix)]
             Mode::Unix(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
         };
-        Input::new(encoder_input_type & DataType::Log)
+        Input::new(encoder_input_type)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -159,6 +159,8 @@ impl SinkConfig for SocketSinkConfig {
 
 #[cfg(test)]
 mod test {
+    #[cfg(unix)]
+    use std::path::PathBuf;
     use std::{
         future::ready,
         net::{SocketAddr, UdpSocket},
@@ -174,8 +176,12 @@ mod test {
     use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
     use vector_lib::codecs::JsonSerializerConfig;
+    #[cfg(unix)]
+    use vector_lib::codecs::NativeJsonSerializerConfig;
 
     use super::*;
+    #[cfg(unix)]
+    use crate::test_util::random_metrics_with_stream;
     use crate::{
         config::SinkContext,
         event::{Event, LogEvent},
@@ -273,6 +279,46 @@ mod test {
             let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
             let received = json.get("message").unwrap().as_str().unwrap();
             assert_eq!(source, received);
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn metrics_socket() {
+        trace_init();
+
+        let out_path = temp_uds_path("unix_socket_test");
+        let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
+
+        let config = SocketSinkConfig {
+            mode: Mode::Unix(UnixMode {
+                config: UnixSinkConfig::new(out_path),
+                encoding: (None::<FramingConfig>, NativeJsonSerializerConfig).into(),
+            }),
+            acknowledgements: Default::default(),
+        };
+
+        let (expected, events) = random_metrics_with_stream(10, None, None);
+
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let context = SinkContext::default();
+            let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+            sink.run(events).await
+        })
+        .await
+        .expect("Running sink failed");
+
+        // Wait for output to connect
+        receiver.connected().await;
+
+        let output = receiver.await;
+        assert_eq!(expected.len(), output.len());
+        for (source, received) in expected.iter().zip(output) {
+            let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
+            let received = json.get("metric").unwrap();
+            let received_name = received.get("name").unwrap().as_str().unwrap();
+            assert_eq!(source.as_metric().name(), received_name);
         }
     }
 
@@ -495,5 +541,10 @@ mod test {
         .is_ok());
 
         sink_handle.await.unwrap();
+    }
+
+    #[cfg(unix)]
+    fn temp_uds_path(name: &str) -> PathBuf {
+        tempfile::tempdir().unwrap().into_path().join(name)
     }
 }

@@ -105,6 +105,11 @@ base: components: sources: http_client: configuration: {
 															[gelf]: https://docs.graylog.org/docs/gelf
 															[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 															"""
+						influxdb: """
+															Decodes the raw bytes as an [Influxdb Line Protocol][influxdb] message.
+
+															[influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
+															"""
 						json: """
 															Decodes the raw bytes as [JSON][json].
 
@@ -151,6 +156,22 @@ base: components: sources: http_client: configuration: {
 			gelf: {
 				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+						"""
+					required: false
+					type: bool: default: true
+				}
+			}
+			influxdb: {
+				description:   "Influxdb-specific decoding options."
+				relevant_when: "codec = \"influxdb\""
 				required:      false
 				type: object: options: lossy: {
 					description: """
@@ -283,7 +304,7 @@ base: components: sources: http_client: configuration: {
 					delimiter: {
 						description: "The character that delimits byte sequences."
 						required:    true
-						type: uint: {}
+						type: ascii_char: {}
 					}
 					max_length: {
 						description: """
@@ -408,12 +429,13 @@ base: components: sources: http_client: configuration: {
 		type: string: {
 			default: "GET"
 			enum: {
-				DELETE: "HTTP DELETE method."
-				GET:    "HTTP GET method."
-				HEAD:   "HTTP HEAD method."
-				PATCH:  "HTTP PATCH method."
-				POST:   "HTTP POST method."
-				PUT:    "HTTP Put method."
+				DELETE:  "HTTP DELETE method."
+				GET:     "HTTP GET method."
+				HEAD:    "HTTP HEAD method."
+				OPTIONS: "HTTP OPTIONS method."
+				PATCH:   "HTTP PATCH method."
+				POST:    "HTTP POST method."
+				PUT:     "HTTP Put method."
 			}
 		}
 	}
@@ -511,6 +533,15 @@ base: components: sources: http_client: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

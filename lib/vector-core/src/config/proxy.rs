@@ -44,7 +44,7 @@ impl NoProxyInterceptor {
 /// Configure to proxy traffic through an HTTP(S) proxy when making external requests.
 ///
 /// Similar to common proxy configuration convention, you can set different proxies
-/// to use based on the type of traffic being proxied, as well as set specific hosts that
+/// to use based on the type of traffic being proxied. You can also set specific hosts that
 /// should not be proxied.
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
@@ -163,9 +163,13 @@ impl ProxyConfig {
                     let mut proxy = Proxy::new(self.interceptor().intercept(proxy_scheme), parsed);
                     if let Ok(authority) = Url::parse(url) {
                         if let Some(password) = authority.password() {
+                            let decoded_user = urlencoding::decode(authority.username())
+                                .expect("username must be valid UTF-8.");
+                            let decoded_pw = urlencoding::decode(password)
+                                .expect("Password must be valid UTF-8.");
                             proxy.set_authorization(Authorization::basic(
-                                authority.username(),
-                                password,
+                                &decoded_user,
+                                &decoded_pw,
                             ));
                         }
                     }
@@ -397,7 +401,6 @@ mod tests {
         }
     }
 
-    #[ignore]
     #[test]
     fn build_proxy_with_special_chars_url_encoded() {
         let config = ProxyConfig {

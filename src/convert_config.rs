@@ -283,7 +283,7 @@ mod tests {
                 let extension = path.extension().unwrap().to_str().unwrap();
                 if extension == Format::Yaml.to_string() {
                     // Note that here we read the converted string directly.
-                    let converted_config = fs::read_to_string(&output_dir.join(&path)).unwrap();
+                    let converted_config = fs::read_to_string(output_dir.join(&path)).unwrap();
                     assert_eq!(converted_config, original_config);
                     count += 1;
                 }

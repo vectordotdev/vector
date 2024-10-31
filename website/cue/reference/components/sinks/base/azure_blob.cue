@@ -15,8 +15,8 @@ base: components: sinks: azure_blob: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -149,12 +149,23 @@ base: components: sinks: azure_blob: configuration: {
 		description: """
 			The Azure Blob Storage Account connection string.
 
-			Authentication with access key is the only supported authentication method.
+			Authentication with an access key or shared access signature (SAS)
+			are supported authentication methods. If using a non-account SAS,
+			healthchecks will fail and will need to be disabled by setting
+			`healthcheck.enabled` to `false` for this sink
+
+			When generating an account SAS, the following are the minimum required option
+			settings for Vector to access blob storage and pass a health check.
+			| Option                 | Value              |
+			| ---------------------- | ------------------ |
+			| Allowed services       | Blob               |
+			| Allowed resource types | Container & Object |
+			| Allowed permissions    | Read & Create      |
 
 			Either `storage_account`, or this field, must be specified.
 			"""
 		required: false
-		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"]
+		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"]
 	}
 	container_name: {
 		description: "The Azure Blob Storage Account container name."
@@ -275,7 +286,7 @@ base: components: sinks: azure_blob: configuration: {
 					delimiter: {
 						description: "The field delimiter to use when writing CSV."
 						required:    false
-						type: uint: default: 44
+						type: ascii_char: default: ","
 					}
 					double_quote: {
 						description: """
@@ -297,7 +308,7 @@ base: components: sinks: azure_blob: configuration: {
 																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
 																"""
 						required: false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					fields: {
 						description: """
@@ -315,7 +326,7 @@ base: components: sinks: azure_blob: configuration: {
 					quote: {
 						description: "The quote character to use when writing CSV."
 						required:    false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					quote_style: {
 						description: "The quoting style to use when writing CSV data."
@@ -443,7 +454,7 @@ base: components: sinks: azure_blob: configuration: {
 				type: object: options: delimiter: {
 					description: "The ASCII (7-bit) character that delimits byte sequences."
 					required:    true
-					type: uint: {}
+					type: ascii_char: {}
 				}
 			}
 			length_delimited: {

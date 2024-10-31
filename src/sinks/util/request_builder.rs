@@ -14,9 +14,7 @@ pub fn default_request_builder_concurrency_limit() -> NonZeroUsize {
         return limit;
     }
 
-    crate::app::WORKER_THREADS
-        .get()
-        .unwrap_or_else(|| NonZeroUsize::new(8).expect("static"))
+    crate::app::worker_threads().unwrap_or_else(|| NonZeroUsize::new(8).expect("static"))
 }
 
 pub struct EncodeResult<P> {

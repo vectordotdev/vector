@@ -294,7 +294,7 @@ impl SourceConfig for DatadogAgentConfig {
 
         if self.multiple_outputs {
             if !self.disable_logs {
-                output.push(SourceOutput::new_logs(DataType::Log, definition).with_port(LOGS))
+                output.push(SourceOutput::new_maybe_logs(DataType::Log, definition).with_port(LOGS))
             }
             if !self.disable_metrics {
                 output.push(SourceOutput::new_metrics().with_port(METRICS))
@@ -303,7 +303,10 @@ impl SourceConfig for DatadogAgentConfig {
                 output.push(SourceOutput::new_traces().with_port(TRACES))
             }
         } else {
-            output.push(SourceOutput::new_logs(DataType::all_bits(), definition))
+            output.push(SourceOutput::new_maybe_logs(
+                DataType::all_bits(),
+                definition,
+            ))
         }
         output
     }
@@ -458,6 +461,12 @@ impl DatadogAgentSource {
                         let mut decoded = Vec::new();
                         MultiGzDecoder::new(body.reader())
                             .read_to_end(&mut decoded)
+                            .map_err(|error| handle_decode_error(encoding, error))?;
+                        decoded.into()
+                    }
+                    "zstd" => {
+                        let mut decoded = Vec::new();
+                        zstd::stream::copy_decode(body.reader(), &mut decoded)
                             .map_err(|error| handle_decode_error(encoding, error))?;
                         decoded.into()
                     }

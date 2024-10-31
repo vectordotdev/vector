@@ -256,7 +256,10 @@ impl SourceConfig for SyslogConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -850,7 +853,7 @@ mod test {
         let msg = "qwerty";
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r#"[incorrect x]"#, msg
+            r"[incorrect x]", msg
         );
 
         let mut expected = Event::Log(LogEvent::from(msg));
@@ -890,7 +893,7 @@ mod test {
 
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r#"[incorrect x=]"#, msg
+            r"[incorrect x=]", msg
         );
 
         let event = event_from_bytes(
@@ -915,7 +918,7 @@ mod test {
 
         let msg = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
-            r#"[empty]"#
+            r"[empty]"
         );
 
         let event = event_from_bytes("host", None, msg.into(), LogNamespace::Legacy).unwrap();
