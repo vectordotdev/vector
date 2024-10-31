@@ -40,7 +40,9 @@ pub enum DataType {
 impl fmt::Display for DataType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_list()
-            .entries(Self::flags().filter_map(|&(name, value)| self.contains(value).then(|| name)))
+            .entries(
+                Self::flags().filter_map(|&(name, value)| self.contains(value).then_some(name)),
+            )
             .finish()
     }
 }
@@ -199,7 +201,7 @@ fn fmt_helper(
         Some(port) => write!(f, "port: \"{port}\",",),
         None => write!(f, "port: None,"),
     }?;
-    write!(f, " types: {}", data_type)
+    write!(f, " types: {data_type}")
 }
 
 impl fmt::Display for SourceOutput {
