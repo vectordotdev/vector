@@ -143,6 +143,7 @@ centiseconds
 cernan
 cfactor
 CFFI
+cfgs
 CGP
 cgroups
 chans
@@ -154,7 +155,6 @@ chkptr
 chronosphere
 chunkenc
 cicd
-Cim
 ciphersuites
 CLA
 Claranet
@@ -388,6 +388,8 @@ Fomichev
 fonttbl
 foob
 foobarbaz
+foobarbazqux
+foobarbazquxquux
 foobarfoobarfoo
 FOOBARy
 foobaz
@@ -727,7 +729,6 @@ ndarray
 ndjson
 nearline
 newcerts
-newrelix
 nextest
 nfox
 ngx
@@ -851,7 +852,6 @@ presetdir
 pretrunc
 prettydiff
 primaryfont
-probot
 processname
 procid
 promhttp
@@ -985,6 +985,7 @@ sigterm
 singlethreaded
 sinkbuilder
 sinknetworkbytessent
+SIV
 sizecache
 Sizefor
 skinparam
@@ -1000,6 +1001,7 @@ smp
 smpl
 smtracking
 snakecase
+Sni
 Soldotna
 somehost
 somejob
@@ -1049,6 +1051,7 @@ subfolders
 subfooter
 sublimelinter
 subsec
+subsecond
 substrategies
 subtagline
 subtimer
@@ -1187,7 +1190,6 @@ vectordir
 vectordotdev
 vectorized
 vendored
-veryyyyyyy
 viceversa
 viewkind
 visualising
@@ -1280,4 +1282,3 @@ zulip
 Zunstable
 zup
 zurp
-sni

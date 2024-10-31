@@ -149,12 +149,23 @@ base: components: sinks: azure_blob: configuration: {
 		description: """
 			The Azure Blob Storage Account connection string.
 
-			Authentication with access key is the only supported authentication method.
+			Authentication with an access key or shared access signature (SAS)
+			are supported authentication methods. If using a non-account SAS,
+			healthchecks will fail and will need to be disabled by setting
+			`healthcheck.enabled` to `false` for this sink
+
+			When generating an account SAS, the following are the minimum required option
+			settings for Vector to access blob storage and pass a health check.
+			| Option                 | Value              |
+			| ---------------------- | ------------------ |
+			| Allowed services       | Blob               |
+			| Allowed resource types | Container & Object |
+			| Allowed permissions    | Read & Create      |
 
 			Either `storage_account`, or this field, must be specified.
 			"""
 		required: false
-		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"]
+		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"]
 	}
 	container_name: {
 		description: "The Azure Blob Storage Account container name."
