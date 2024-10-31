@@ -7,6 +7,7 @@ adler2,https://github.com/oyvindln/adler2,0BSD OR MIT OR Apache-2.0,"Jonas Schie
 adler32,https://github.com/remram44/adler32-rs,Zlib,Remi Rampin <remirampin@gmail.com>
 aead,https://github.com/RustCrypto/traits,MIT OR Apache-2.0,RustCrypto Developers
 aes,https://github.com/RustCrypto/block-ciphers,MIT OR Apache-2.0,RustCrypto Developers
+aes-siv,https://github.com/RustCrypto/AEADs,Apache-2.0 OR MIT,RustCrypto Developers
 ahash,https://github.com/tkaitchuck/ahash,MIT OR Apache-2.0,Tom Kaitchuck <Tom.Kaitchuck@gmail.com>
 aho-corasick,https://github.com/BurntSushi/aho-corasick,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>
 alloc-no-stdlib,https://github.com/dropbox/rust-alloc-no-stdlib,BSD-3-Clause,Daniel Reiter Horn <danielrh@dropbox.com>
@@ -133,6 +134,7 @@ clap_builder,https://github.com/clap-rs/clap,MIT OR Apache-2.0,The clap_builder 
 clap_derive,https://github.com/clap-rs/clap,MIT OR Apache-2.0,The clap_derive Authors
 clap_lex,https://github.com/clap-rs/clap/tree/master/clap_lex,MIT OR Apache-2.0,The clap_lex Authors
 clipboard-win,https://github.com/DoumanAsh/clipboard-win,BSL-1.0,Douman <douman@gmx.se>
+cmac,https://github.com/RustCrypto/MACs,MIT OR Apache-2.0,RustCrypto Developers
 codespan-reporting,https://github.com/brendanzab/codespan,Apache-2.0,Brendan Zabarauskas <bjzaba@yahoo.com.au>
 colorchoice,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The colorchoice Authors
 colored,https://github.com/mackwic/colored,MPL-2.0,Thomas Wickham <mackwic@gmail.com>
@@ -172,6 +174,7 @@ dashmap,https://github.com/xacrimon/dashmap,MIT,Acrimon <joel.wejdenstal@gmail.c
 data-encoding,https://github.com/ia0/data-encoding,MIT,Julien Cretin <git@ia0.eu>
 data-url,https://github.com/servo/rust-url,MIT OR Apache-2.0,Simon Sapin <simon.sapin@exyr.org>
 databend-client,https://github.com/databendlabs/bendsql,Apache-2.0,Databend Authors <opensource@databend.com>
+dbl,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 der,https://github.com/RustCrypto/formats/tree/master/der,Apache-2.0 OR MIT,RustCrypto Developers
 deranged,https://github.com/jhpratt/deranged,MIT OR Apache-2.0,Jacob Pratt <jacob@jhpratt.dev>
 derivative,https://github.com/mcarton/rust-derivative,MIT OR Apache-2.0,mcarton <cartonmartin+git@gmail.com>

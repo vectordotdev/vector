@@ -67,6 +67,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aes-siv"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e08d0cdb774acd1e4dac11478b1a0c0d203134b2aab0ba25eb430de9b18f8b9"
+dependencies = [
+ "aead",
+ "aes",
+ "cipher",
+ "cmac",
+ "ctr",
+ "dbl",
+ "digest",
+ "zeroize",
+]
+
+[[package]]
 name = "ahash"
 version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2180,6 +2196,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmac"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8543454e3c3f5126effff9cd44d562af4e31fb8ce1cc0d3dcd8f084515dbc1aa"
+dependencies = [
+ "cipher",
+ "dbl",
+ "digest",
+]
+
+[[package]]
 name = "cmake"
 version = "0.1.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2867,6 +2894,15 @@ name = "db-key"
 version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b72465f46d518f6015d9cf07f7f3013a95dd6b9c2747c3d65ae0cce43929d14f"
+
+[[package]]
+name = "dbl"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd2735a791158376708f9347fe8faba9667589d82427ef3aed6794a8981de3d9"
+dependencies = [
+ "generic-array",
+]
 
 [[package]]
 name = "deadpool"
@@ -5661,19 +5697,6 @@ dependencies = [
 
 [[package]]
 name = "mlua"
-version = "0.9.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d111deb18a9c9bd33e1541309f4742523bfab01d276bfa9a27519f6de9c11dc7"
-dependencies = [
- "bstr 1.10.0",
- "mlua-sys",
- "num-traits",
- "once_cell",
- "rustc-hash",
-]
-
-[[package]]
-name = "mlua"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f6ddbd668297c46be4bdea6c599dcc1f001a129586272d53170b7ac0a62961e"
@@ -7288,7 +7311,7 @@ checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes 1.8.0",
  "heck 0.5.0",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "log",
  "multimap",
  "once_cell",
@@ -7321,7 +7344,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81bddcdb20abf9501610992b6759a4c888aef7d1a7247ef75e2404275ac24af1"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "proc-macro2 1.0.89",
  "quote 1.0.37",
  "syn 2.0.85",
@@ -7334,7 +7357,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "proc-macro2 1.0.89",
  "quote 1.0.37",
  "syn 2.0.85",
@@ -10612,7 +10635,7 @@ dependencies = [
  "md-5",
  "metrics",
  "metrics-tracing-context",
- "mlua 0.10.0",
+ "mlua",
  "mongodb",
  "nix 0.26.2",
  "nkeys 0.4.4",
@@ -10883,7 +10906,7 @@ dependencies = [
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
- "mlua 0.10.0",
+ "mlua",
  "ndarray",
  "ndarray-stats",
  "no-proxy",
@@ -11080,9 +11103,10 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.19.0"
-source = "git+https://github.com/vectordotdev/vrl?branch=main#c8c382b903953217656255044318f2ec99c5c65e"
+source = "git+https://github.com/vectordotdev/vrl?branch=main#c69a52e67001cdbe3477dceb6a4532ea23bcdf20"
 dependencies = [
  "aes",
+ "aes-siv",
  "ansi_term",
  "arbitrary",
  "base16",
@@ -11125,7 +11149,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util 0.22.0",
  "md-5",
- "mlua 0.9.9",
+ "mlua",
  "nom",
  "ofb",
  "once_cell",
