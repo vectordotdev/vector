@@ -1,6 +1,6 @@
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
-use vrl::owned_value_path;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use vrl::value::Kind;
 
 use crate::{
@@ -45,6 +45,11 @@ pub struct SampleConfig {
     #[configurable(metadata(docs::examples = "message"))]
     pub key_field: Option<String>,
 
+    /// The event key in which the sample rate is stored. If set to an empty string, the sample rate will not be added to the event.
+    #[configurable(metadata(docs::examples = "sample_rate"))]
+    #[serde(default = "default_sample_rate_key")]
+    pub sample_rate_key: OptionalValuePath,
+
     /// The value to group events into separate buckets to be sampled independently.
     ///
     /// If left unspecified, or if the event doesn't have `group_by`, then the event is not
@@ -66,6 +71,7 @@ impl GenerateConfig for SampleConfig {
             key_field: None,
             group_by: None,
             exclude: None::<AnyCondition>,
+            sample_rate_key: default_sample_rate_key(),
         })
         .unwrap()
     }
@@ -84,6 +90,7 @@ impl TransformConfig for SampleConfig {
                 .as_ref()
                 .map(|condition| condition.build(&context.enrichment_tables))
                 .transpose()?,
+            default_sample_rate_key(),
         )))
     }
 
@@ -118,6 +125,10 @@ impl TransformConfig for SampleConfig {
     }
 }
 
+pub fn default_sample_rate_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("sample_rate"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,6 +152,7 @@ mod tests {
                 key_field: None,
                 group_by: None,
                 exclude: None,
+                sample_rate_key: default_sample_rate_key(),
             };
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
