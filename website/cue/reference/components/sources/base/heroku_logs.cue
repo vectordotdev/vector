@@ -439,12 +439,16 @@ base: components: sources: heroku_logs: configuration: {
 		description: """
 			A list of URL query parameters to include in the log event.
 
+			Accepts the wildcard (`*`) character for query parameters matching a specified pattern.
+
+			Specifying "*" results in all query parameters included in the log event.
+
 			These override any values included in the body with conflicting names.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: examples: ["application", "source"]
+			items: type: string: examples: ["application", "source", "param*", "*"]
 		}
 	}
 	tls: {
@@ -509,6 +513,15 @@ base: components: sources: heroku_logs: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

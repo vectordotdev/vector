@@ -618,7 +618,7 @@ impl From<OutputId> for crate::config::OutputId {
 
 impl From<EventMetadata> for Metadata {
     fn from(value: EventMetadata) -> Self {
-        let EventMetadata {
+        let super::metadata::Inner {
             value,
             secrets,
             source_id,
@@ -627,13 +627,9 @@ impl From<EventMetadata> for Metadata {
             datadog_origin_metadata,
             source_event_id,
             ..
-        } = value;
+        } = value.into_owned();
 
-        let secrets = if secrets.is_empty() {
-            None
-        } else {
-            Some(secrets.into())
-        };
+        let secrets = (!secrets.is_empty()).then(|| secrets.into());
 
         Self {
             value: Some(encode_value(value)),
@@ -642,7 +638,7 @@ impl From<EventMetadata> for Metadata {
             source_type: source_type.map(|s| s.to_string()),
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
-            source_event_id: source_event_id.into(),
+            source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
         }
     }
 }
@@ -675,11 +671,22 @@ impl From<Metadata> for EventMetadata {
             metadata = metadata.with_origin_metadata(origin_metadata.into());
         }
 
-        if let Ok(uuid) = Uuid::from_slice(&value.source_event_id) {
-            metadata = metadata.with_source_event_id(uuid);
+        let maybe_source_event_id = if value.source_event_id.is_empty() {
+            None
         } else {
-            error!("Invalid source_event_id in metadata");
-        }
+            match Uuid::from_slice(&value.source_event_id) {
+                Ok(id) => Some(id),
+                Err(error) => {
+                    error!(
+                        message = "Failed to parse source_event_id: {}",
+                        %error,
+                        internal_log_rate_limit = true
+                    );
+                    None
+                }
+            }
+        };
+        metadata = metadata.with_source_event_id(maybe_source_event_id);
 
         metadata
     }
