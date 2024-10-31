@@ -276,7 +276,7 @@ impl ElasticsearchCommon {
                 status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
             }
         } else {
-            warn!(message = "AWS OpenSearch Serverless does not support healthchecks. Skipping healthcheck...");
+            warn!(message = "Amazon OpenSearch Serverless does not support healthchecks. Skipping healthcheck...");
             Ok(())
         }
     }
@@ -289,6 +289,9 @@ pub async fn sign_request(
     credentials_provider: &aws_credential_types::provider::SharedCredentialsProvider,
     region: &Option<aws_types::region::Region>,
 ) -> crate::Result<()> {
+    // Amazon Opensearch Serverless requires the x-amz-content-sha256 header when calculating
+    // the AWS v4 signature:
+    // https://docs.aws.amazon.com/opensearch-service/latest/developerguide/serverless-clients.html#serverless-signing
     crate::aws::sign_request(aws_service, request, credentials_provider, region, aws_service == "aoss").await
 }
 
@@ -309,6 +312,8 @@ async fn get_version(
     }
 
     let client = HttpClient::new(tls_settings.clone(), proxy_config)?;
+    // Amazon Opensearch Serverless (service "aoss") doesn't support version querying,
+    // so we hardcode service "es" here rather than pass it in
     let response = get(base_url, auth, "es", request, client, "/")
         .await
         .map_err(|error| format!("Failed to get Elasticsearch API version: {}", error))?;

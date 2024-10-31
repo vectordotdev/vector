@@ -169,7 +169,7 @@ pub struct ElasticsearchConfig {
     #[cfg(feature = "aws-core")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
-    /// The AWS OpenSearch Cluster Type "managed"/"serverless".
+    /// The Amazon OpenSearch Cluster Type "managed"/"serverless".
     #[serde(default)]
     pub opensearch_cluster_type: OpenSearchClusterType,
 

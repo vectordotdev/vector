@@ -279,6 +279,9 @@ pub async fn sign_request(
     let identity = Identity::new(credentials, None);
 
     let mut signing_settings = SigningSettings::default();
+
+    // Include the x-amz-content-sha256 header when calculating the AWS v4 signature;
+    // this is required by some AWS services, e.g. S3 and OpenSearch Serverless
     if payload_checksum_sha256 {
         signing_settings.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
     }
