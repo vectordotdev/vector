@@ -9,7 +9,7 @@ use aws_config::{
 };
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::{
-    http_request::{SignableBody, SignableRequest, SigningSettings},
+    http_request::{PayloadChecksumKind, SignableBody, SignableRequest, SigningSettings},
     sign::v4,
 };
 use aws_smithy_async::rt::sleep::TokioSleep;
@@ -255,6 +255,7 @@ pub async fn sign_request(
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
+    payload_checksum_sha256: bool,
 ) -> crate::Result<()> {
     let headers = request
         .headers()
@@ -276,12 +277,18 @@ pub async fn sign_request(
 
     let credentials = credentials_provider.provide_credentials().await?;
     let identity = Identity::new(credentials, None);
+
+    let mut signing_settings = SigningSettings::default();
+    if payload_checksum_sha256 {
+        signing_settings.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+    }
+
     let signing_params_builder = v4::SigningParams::builder()
         .identity(&identity)
         .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
         .name(service_name)
         .time(SystemTime::now())
-        .settings(SigningSettings::default());
+        .settings(signing_settings);
 
     let signing_params = signing_params_builder
         .build()

@@ -93,6 +93,7 @@ impl ElasticsearchService {
 pub struct HttpRequestBuilder {
     pub bulk_uri: Uri,
     pub auth: Option<Auth>,
+    pub aws_service: String,
     pub compression: Compression,
     pub http_request_config: RequestConfig,
 }
@@ -101,9 +102,10 @@ impl HttpRequestBuilder {
     pub fn new(common: &ElasticsearchCommon, config: &ElasticsearchConfig) -> HttpRequestBuilder {
         HttpRequestBuilder {
             bulk_uri: common.bulk_uri.clone(),
-            http_request_config: config.request.clone(),
             auth: common.auth.clone(),
+            aws_service: common.aws_service.clone(),
             compression: config.compression,
+            http_request_config: config.request.clone(),
         }
     }
 
@@ -142,6 +144,7 @@ impl HttpRequestBuilder {
                     region,
                 } => {
                     crate::sinks::elasticsearch::sign_request(
+                        &self.aws_service,
                         &mut request,
                         provider,
                         &Some(region.clone()),

@@ -16,7 +16,7 @@ use crate::{
     http::{HttpClient, MaybeAuth},
     sinks::{
         elasticsearch::{
-            ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig, ParseError,
+            ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig, ParseError, OpenSearchClusterType,
         },
         util::auth::Auth,
         util::{http::RequestConfig, UriSerde},
@@ -31,6 +31,7 @@ pub struct ElasticsearchCommon {
     pub base_url: String,
     pub bulk_uri: Uri,
     pub auth: Option<Auth>,
+    pub aws_service: String,
     pub mode: ElasticsearchCommonMode,
     pub request_builder: ElasticsearchRequestBuilder,
     pub tls_settings: TlsSettings,
@@ -143,8 +144,16 @@ impl ElasticsearchCommon {
             metric_config.metric_tag_values,
         );
 
+        let aws_service = match config.opensearch_cluster_type {
+            OpenSearchClusterType::Managed => "es",
+            OpenSearchClusterType::Serverless => "aoss",
+        }.to_string();
+
         let version = if let Some(version) = *version {
             version
+        } else if aws_service == "aoss" {
+            // if aws_service is "aoss", cluster-version API does not exist
+            8
         } else {
             let ver = match config.api_version {
                 ElasticsearchApiVersion::V6 => 6,
@@ -202,6 +211,7 @@ impl ElasticsearchCommon {
 
         Ok(Self {
             auth,
+            aws_service,
             base_url,
             bulk_uri,
             mode,
@@ -250,29 +260,36 @@ impl ElasticsearchCommon {
     }
 
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
-        match get(
-            &self.base_url,
-            &self.auth,
-            &self.request,
-            client,
-            "/_cluster/health",
-        )
-        .await?
-        .status()
-        {
-            StatusCode::OK => Ok(()),
-            status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        if &self.aws_service != "aoss" {
+            match get(
+                &self.base_url,
+                &self.auth,
+                &self.aws_service,
+                &self.request,
+                client,
+                "/_cluster/health",
+            )
+            .await?
+            .status()
+            {
+                StatusCode::OK => Ok(()),
+                status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+            }
+        } else {
+            warn!(message = "AWS OpenSearch Serverless does not support healthchecks. Skipping healthcheck...");
+            Ok(())
         }
     }
 }
 
 #[cfg(feature = "aws-core")]
 pub async fn sign_request(
+    aws_service: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &aws_credential_types::provider::SharedCredentialsProvider,
     region: &Option<aws_types::region::Region>,
 ) -> crate::Result<()> {
-    crate::aws::sign_request("es", request, credentials_provider, region).await
+    crate::aws::sign_request(aws_service, request, credentials_provider, region, aws_service == "aoss").await
 }
 
 async fn get_version(
@@ -292,7 +309,7 @@ async fn get_version(
     }
 
     let client = HttpClient::new(tls_settings.clone(), proxy_config)?;
-    let response = get(base_url, auth, request, client, "/")
+    let response = get(base_url, auth, "es", request, client, "/")
         .await
         .map_err(|error| format!("Failed to get Elasticsearch API version: {}", error))?;
 
@@ -316,6 +333,7 @@ async fn get_version(
 async fn get(
     base_url: &str,
     auth: &Option<Auth>,
+    aws_service: &str,
     request: &RequestConfig,
     client: HttpClient,
     path: &str,
@@ -338,7 +356,7 @@ async fn get(
                 region,
             } => {
                 let region = region.clone();
-                sign_request(&mut request, provider, &Some(region)).await?;
+                sign_request(&aws_service, &mut request, provider, &Some(region)).await?;
             }
         }
     }

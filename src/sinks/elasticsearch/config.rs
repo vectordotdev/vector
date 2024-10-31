@@ -39,6 +39,23 @@ use vrl::value::Kind;
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
+/// The OpenSearch Cluster Type: "managed" or "serverless", will be used to set aws_service for sign_request.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
+pub enum OpenSearchClusterType {
+    /// Managed OpenSearch.
+    Managed,
+    /// Serverless OpenSearch.
+    Serverless,
+}
+
+impl Default for OpenSearchClusterType {
+    fn default() -> Self {
+        Self::Managed
+    }
+}
+
 /// Configuration for the `elasticsearch` sink.
 #[configurable_component(sink("elasticsearch", "Index observability events in Elasticsearch."))]
 #[derive(Clone, Debug)]
@@ -152,6 +169,10 @@ pub struct ElasticsearchConfig {
     #[cfg(feature = "aws-core")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
+    /// The AWS OpenSearch Cluster Type "managed"/"serverless".
+    #[serde(default)]
+    pub opensearch_cluster_type: OpenSearchClusterType,
+
     #[serde(default)]
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -214,6 +235,7 @@ impl Default for ElasticsearchConfig {
             query: None,
             #[cfg(feature = "aws-core")]
             aws: None,
+            opensearch_cluster_type: Default::default(),
             tls: None,
             endpoint_health: None,
             bulk: BulkConfig::default(), // the default mode is Bulk
