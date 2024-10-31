@@ -1167,6 +1167,7 @@ unitdir
 unmark
 unmarshaler
 unnests
+unresumable
 unstructuredlogentries
 unsync
 untuple
