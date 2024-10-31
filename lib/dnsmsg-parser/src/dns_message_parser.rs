@@ -1034,7 +1034,7 @@ fn parse_loc_rdata_size(data: u8) -> DnsParserResult<f64> {
     let base = (data & 0xF0) >> 4;
     if base > 9 {
         return Err(DnsMessageParserError::SimpleError {
-            cause: format!("The base shouldnt be greater than 9. Base: {}", base),
+            cause: format!("The base shouldn't be greater than 9. Base: {}", base),
         });
     }
 
@@ -1042,7 +1042,7 @@ fn parse_loc_rdata_size(data: u8) -> DnsParserResult<f64> {
     if exponent > 9 {
         return Err(DnsMessageParserError::SimpleError {
             cause: format!(
-                "The exponent shouldnt be greater than 9. Exponent: {}",
+                "The exponent shouldn't be greater than 9. Exponent: {}",
                 exponent
             ),
         });

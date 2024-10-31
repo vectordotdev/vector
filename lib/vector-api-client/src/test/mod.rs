@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use graphql_client::GraphQLQuery;
 
 use crate::{BoxedSubscription, QueryResult};
@@ -48,7 +47,6 @@ pub struct ComponentByComponentKeyQuery;
 )]
 pub struct ComponentsConnectionQuery;
 
-#[async_trait]
 pub trait TestQueryExt {
     async fn component_links_query(
         &self,
@@ -77,7 +75,6 @@ pub trait TestQueryExt {
     ) -> crate::QueryResult<ComponentsConnectionQuery>;
 }
 
-#[async_trait]
 impl TestQueryExt for crate::Client {
     async fn component_links_query(
         &self,

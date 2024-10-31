@@ -49,7 +49,7 @@ mod encoding_transcode;
 mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 mod exec;
-#[cfg(any(feature = "sources-file-descriptor", feature = "sources-stdin"))]
+#[cfg(any(feature = "sources-file_descriptor", feature = "sources-stdin"))]
 mod file_descriptor;
 #[cfg(feature = "transforms-filter")]
 mod filter;
@@ -70,8 +70,6 @@ mod http_client_source;
 mod influxdb;
 #[cfg(feature = "sources-internal_logs")]
 mod internal_logs;
-#[cfg(feature = "sources-internal_metrics")]
-mod internal_metrics;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
@@ -108,7 +106,7 @@ mod prometheus;
 mod pulsar;
 #[cfg(feature = "sources-redis")]
 mod redis;
-#[cfg(feature = "transforms-reduce")]
+#[cfg(feature = "transforms-impl-reduce")]
 mod reduce;
 mod remap;
 mod sample;
@@ -191,7 +189,7 @@ pub(crate) use self::exec::*;
     feature = "sinks-file",
 ))]
 pub(crate) use self::file::*;
-#[cfg(any(feature = "sources-file-descriptor", feature = "sources-stdin"))]
+#[cfg(any(feature = "sources-file_descriptor", feature = "sources-stdin"))]
 pub(crate) use self::file_descriptor::*;
 #[cfg(feature = "transforms-filter")]
 pub(crate) use self::filter::*;
@@ -209,8 +207,6 @@ pub(crate) use self::http_client_source::*;
 pub(crate) use self::influxdb::*;
 #[cfg(feature = "sources-internal_logs")]
 pub(crate) use self::internal_logs::*;
-#[cfg(feature = "sources-internal_metrics")]
-pub(crate) use self::internal_metrics::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
@@ -245,7 +241,7 @@ pub(crate) use self::prometheus::*;
 pub(crate) use self::pulsar::*;
 #[cfg(feature = "sources-redis")]
 pub(crate) use self::redis::*;
-#[cfg(feature = "transforms-reduce")]
+#[cfg(feature = "transforms-impl-reduce")]
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-remap")]
 pub(crate) use self::remap::*;

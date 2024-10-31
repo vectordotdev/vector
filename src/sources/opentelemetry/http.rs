@@ -13,8 +13,9 @@ use tracing::Span;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
 };
-use vector_lib::opentelemetry::proto::collector::logs::v1::{
-    ExportLogsServiceRequest, ExportLogsServiceResponse,
+use vector_lib::opentelemetry::proto::collector::{
+    logs::v1::{ExportLogsServiceRequest, ExportLogsServiceResponse},
+    trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
 };
 use vector_lib::tls::MaybeTlsIncomingStream;
 use vector_lib::{
@@ -39,7 +40,6 @@ use super::{reply::protobuf, status::Status};
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
-    BadRequest,
     ServerShutdown,
 }
 
@@ -87,6 +87,29 @@ pub(crate) fn build_warp_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
 ) -> BoxedFilter<(Response,)> {
+    let log_filters = build_warp_log_filter(
+        acknowledgements,
+        log_namespace,
+        out.clone(),
+        bytes_received.clone(),
+        events_received.clone(),
+    );
+    let trace_filters = build_warp_trace_filter(
+        acknowledgements,
+        out.clone(),
+        bytes_received,
+        events_received,
+    );
+    log_filters.or(trace_filters).unify().boxed()
+}
+
+fn build_warp_log_filter(
+    acknowledgements: bool,
+    log_namespace: LogNamespace,
+    out: SourceSender,
+    bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
+) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "logs"))
         .and(warp::header::exact_ignore_case(
@@ -98,15 +121,77 @@ pub(crate) fn build_warp_filter(
         .and_then(move |encoding_header: Option<String>, body: Bytes| {
             let events = decode(encoding_header.as_deref(), body).and_then(|body| {
                 bytes_received.emit(ByteSize(body.len()));
-                decode_body(body, log_namespace, &events_received)
+                decode_log_body(body, log_namespace, &events_received)
             });
 
-            handle_request(events, acknowledgements, out.clone(), super::LOGS)
+            handle_request(
+                events,
+                acknowledgements,
+                out.clone(),
+                super::LOGS,
+                ExportLogsServiceResponse::default(),
+            )
         })
         .boxed()
 }
 
-fn decode_body(
+fn build_warp_trace_filter(
+    acknowledgements: bool,
+    out: SourceSender,
+    bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
+) -> BoxedFilter<(Response,)> {
+    warp::post()
+        .and(warp::path!("v1" / "traces"))
+        .and(warp::header::exact_ignore_case(
+            "content-type",
+            "application/x-protobuf",
+        ))
+        .and(warp::header::optional::<String>("content-encoding"))
+        .and(warp::body::bytes())
+        .and_then(move |encoding_header: Option<String>, body: Bytes| {
+            let events = decode(encoding_header.as_deref(), body).and_then(|body| {
+                bytes_received.emit(ByteSize(body.len()));
+                decode_trace_body(body, &events_received)
+            });
+
+            handle_request(
+                events,
+                acknowledgements,
+                out.clone(),
+                super::TRACES,
+                ExportTraceServiceResponse::default(),
+            )
+        })
+        .boxed()
+}
+
+fn decode_trace_body(
+    body: Bytes,
+    events_received: &Registered<EventsReceived>,
+) -> Result<Vec<Event>, ErrorMessage> {
+    let request = ExportTraceServiceRequest::decode(body).map_err(|error| {
+        ErrorMessage::new(
+            StatusCode::BAD_REQUEST,
+            format!("Could not decode request: {}", error),
+        )
+    })?;
+
+    let events: Vec<Event> = request
+        .resource_spans
+        .into_iter()
+        .flat_map(|v| v.into_event_iter())
+        .collect();
+
+    events_received.emit(CountByteSize(
+        events.len(),
+        events.estimated_json_encoded_size_of(),
+    ));
+
+    Ok(events)
+}
+
+fn decode_log_body(
     body: Bytes,
     log_namespace: LogNamespace,
     events_received: &Registered<EventsReceived>,
@@ -137,6 +222,7 @@ async fn handle_request(
     acknowledgements: bool,
     mut out: SourceSender,
     output: &str,
+    resp: impl Message,
 ) -> Result<Response, Rejection> {
     match events {
         Ok(mut events) => {
@@ -149,15 +235,9 @@ async fn handle_request(
             })?;
 
             match receiver {
-                None => Ok(protobuf(ExportLogsServiceResponse {
-                    partial_success: None,
-                })
-                .into_response()),
+                None => Ok(protobuf(resp).into_response()),
                 Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => Ok(protobuf(ExportLogsServiceResponse {
-                        partial_success: None,
-                    })
-                    .into_response()),
+                    BatchStatus::Delivered => Ok(protobuf(resp).into_response()),
                     BatchStatus::Errored => Err(warp::reject::custom(Status {
                         code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
                         message: "Error delivering contents to sink".into(),

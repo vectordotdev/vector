@@ -107,6 +107,11 @@ base: components: sources: http: configuration: {
 						[gelf]: https://docs.graylog.org/docs/gelf
 						[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 						"""
+					influxdb: """
+						Decodes the raw bytes as an [Influxdb Line Protocol][influxdb] message.
+
+						[influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
+						"""
 					json: """
 						Decodes the raw bytes as [JSON][json].
 
@@ -152,6 +157,22 @@ base: components: sources: http: configuration: {
 			gelf: {
 				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+						"""
+					required: false
+					type: bool: default: true
+				}
+			}
+			influxdb: {
+				description:   "Influxdb-specific decoding options."
+				relevant_when: "codec = \"influxdb\""
 				required:      false
 				type: object: options: lossy: {
 					description: """
@@ -295,7 +316,7 @@ base: components: sources: http: configuration: {
 					delimiter: {
 						description: "The character that delimits byte sequences."
 						required:    true
-						type: uint: {}
+						type: ascii_char: {}
 					}
 					max_length: {
 						description: """
@@ -313,6 +334,33 @@ base: components: sources: http: configuration: {
 																"""
 						required: false
 						type: uint: {}
+					}
+				}
+			}
+			length_delimited: {
+				description:   "Options for the length delimited decoder."
+				relevant_when: "method = \"length_delimited\""
+				required:      true
+				type: object: options: {
+					length_field_is_big_endian: {
+						description: "Length field byte order (little or big endian)"
+						required:    false
+						type: bool: default: true
+					}
+					length_field_length: {
+						description: "Number of bytes representing the field length"
+						required:    false
+						type: uint: default: 4
+					}
+					length_field_offset: {
+						description: "Number of bytes in the header before the length field"
+						required:    false
+						type: uint: default: 0
+					}
+					max_frame_length: {
+						description: "Maximum frame length"
+						required:    false
+						type: uint: default: 8388608
 					}
 				}
 			}
@@ -381,6 +429,14 @@ base: components: sources: http: configuration: {
 			items: type: string: examples: ["User-Agent", "X-My-Custom-Header", "X-*", "*"]
 		}
 	}
+	host_key: {
+		description: "If set, the name of the log field used to add the remote IP to each event"
+		required:    false
+		type: string: {
+			default: ""
+			examples: ["hostname"]
+		}
+	}
 	keepalive: {
 		description: "Configuration of HTTP server keepalive parameters."
 		required:    false
@@ -421,12 +477,13 @@ base: components: sources: http: configuration: {
 		type: string: {
 			default: "POST"
 			enum: {
-				DELETE: "HTTP DELETE method."
-				GET:    "HTTP GET method."
-				HEAD:   "HTTP HEAD method."
-				PATCH:  "HTTP PATCH method."
-				POST:   "HTTP POST method."
-				PUT:    "HTTP Put method."
+				DELETE:  "HTTP DELETE method."
+				GET:     "HTTP GET method."
+				HEAD:    "HTTP HEAD method."
+				OPTIONS: "HTTP OPTIONS method."
+				PATCH:   "HTTP PATCH method."
+				POST:    "HTTP POST method."
+				PUT:     "HTTP Put method."
 			}
 		}
 	}
@@ -450,12 +507,16 @@ base: components: sources: http: configuration: {
 		description: """
 			A list of URL query parameters to include in the log event.
 
+			Accepts the wildcard (`*`) character for query parameters matching a specified pattern.
+
+			Specifying "*" results in all query parameters included in the log event.
+
 			These override any values included in the body with conflicting names.
 			"""
 		required: false
 		type: array: {
 			default: []
-			items: type: string: examples: ["application", "source"]
+			items: type: string: examples: ["application", "source", "param*", "*"]
 		}
 	}
 	response_code: {
@@ -543,6 +604,15 @@ base: components: sources: http: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

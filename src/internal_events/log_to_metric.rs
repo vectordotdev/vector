@@ -20,12 +20,13 @@ impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "field_null",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
             "null_field" => self.field.to_string(),
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
@@ -49,12 +50,13 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "failed_parsing_float",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
@@ -79,12 +81,13 @@ impl<'a> InternalEvent for MetricMetadataInvalidFieldValueError<'a> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "invalid_field_value",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
@@ -107,12 +110,13 @@ impl<'a> InternalEvent for MetricMetadataParseError<'a> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => format!("failed_parsing_{}", self.kind),
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
@@ -131,11 +135,12 @@ impl InternalEvent for MetricMetadataMetricDetailsNotFoundError {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "missing_metric_details",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }

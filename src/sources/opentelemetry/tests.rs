@@ -9,7 +9,7 @@ use vector_lib::config::LogNamespace;
 use vector_lib::lookup::path;
 use vector_lib::opentelemetry::proto::{
     collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-    common::v1::{any_value, AnyValue, KeyValue},
+    common::v1::{any_value, AnyValue, InstrumentationScope, KeyValue},
     logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     resource::v1::Resource as OtelResource,
 };
@@ -57,7 +57,7 @@ async fn receive_grpc_logs_vector_namespace() {
             .remove(0)
             .schema_definition(true);
 
-        let (sender, logs_output, _) = new_source(EventStatus::Delivered);
+        let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
         let server = source
             .build(SourceContext::new_test(sender, None))
             .await
@@ -81,7 +81,17 @@ async fn receive_grpc_logs_vector_namespace() {
                     dropped_attributes_count: 0,
                 }),
                 scope_logs: vec![ScopeLogs {
-                    scope: None,
+                    scope: Some(InstrumentationScope {
+                        name: "some.scope.name".into(),
+                        version: "1.2.3".into(),
+                        attributes: vec![KeyValue {
+                            key: "scope_attr".into(),
+                            value: Some(AnyValue {
+                                value: Some(any_value::Value::StringValue("scope_val".into())),
+                            }),
+                        }],
+                        dropped_attributes_count: 7,
+                    }),
                     log_records: vec![LogRecord {
                         time_unix_nano: 1,
                         observed_time_unix_nano: 2,
@@ -132,6 +142,25 @@ async fn receive_grpc_logs_vector_namespace() {
         assert_eq!(
             meta.get(path!("opentelemetry", "attributes")).unwrap(),
             &value!({attr_key: "attr_val"})
+        );
+        assert_eq!(
+            meta.get(path!("opentelemetry", "scope", "name")).unwrap(),
+            &value!("some.scope.name")
+        );
+        assert_eq!(
+            meta.get(path!("opentelemetry", "scope", "version"))
+                .unwrap(),
+            &value!("1.2.3")
+        );
+        assert_eq!(
+            meta.get(path!("opentelemetry", "scope", "attributes"))
+                .unwrap(),
+            &value!({scope_attr: "scope_val"})
+        );
+        assert_eq!(
+            meta.get(path!("opentelemetry", "scope", "dropped_attributes_count"))
+                .unwrap(),
+            &value!(7)
         );
         assert_eq!(
             meta.get(path!("opentelemetry", "trace_id")).unwrap(),
@@ -195,7 +224,7 @@ async fn receive_grpc_logs_legacy_namespace() {
             .remove(0)
             .schema_definition(true);
 
-        let (sender, logs_output, _) = new_source(EventStatus::Delivered);
+        let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
         let server = source
             .build(SourceContext::new_test(sender, None))
             .await
@@ -219,7 +248,17 @@ async fn receive_grpc_logs_legacy_namespace() {
                     dropped_attributes_count: 0,
                 }),
                 scope_logs: vec![ScopeLogs {
-                    scope: None,
+                    scope: Some(InstrumentationScope {
+                        name: "some.scope.name".into(),
+                        version: "1.2.3".into(),
+                        attributes: vec![KeyValue {
+                            key: "scope_attr".into(),
+                            value: Some(AnyValue {
+                                value: Some(any_value::Value::StringValue("scope_val".into())),
+                            }),
+                        }],
+                        dropped_attributes_count: 7,
+                    }),
                     log_records: vec![LogRecord {
                         time_unix_nano: 1,
                         observed_time_unix_nano: 2,
@@ -262,6 +301,18 @@ async fn receive_grpc_logs_legacy_namespace() {
                 "resources",
                 Value::Object(vec_into_btmap(vec![("res_key", "res_val".into())])),
             ),
+            (
+                "scope",
+                Value::Object(vec_into_btmap(vec![
+                    ("name", "some.scope.name".into()),
+                    ("version", "1.2.3".into()),
+                    (
+                        "attributes",
+                        Value::Object(vec_into_btmap(vec![("scope_attr", "scope_val".into())])),
+                    ),
+                    ("dropped_attributes_count", 7.into()),
+                ])),
+            ),
             ("message", "log body".into()),
             ("trace_id", "4ac52aadf321c2e531db005df08792f5".into()),
             ("span_id", "0b9e4bda2a55530d".into()),
@@ -285,16 +336,17 @@ async fn receive_grpc_logs_legacy_namespace() {
 
 pub(super) fn new_source(
     status: EventStatus,
+    event_name: String,
 ) -> (
     SourceSender,
     impl Stream<Item = Event>,
     impl Stream<Item = Event>,
 ) {
     let (mut sender, recv) = SourceSender::new_test_finalize(status);
-    let logs_output = sender
-        .add_outputs(status, LOGS.to_string())
+    let output = sender
+        .add_outputs(status, event_name)
         .flat_map(into_event_stream);
-    (sender, logs_output, recv)
+    (sender, output, recv)
 }
 
 fn str_into_hex_bytes(s: &str) -> Vec<u8> {

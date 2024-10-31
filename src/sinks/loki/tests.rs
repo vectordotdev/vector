@@ -7,6 +7,7 @@ use crate::{
     sinks::util::test::{build_test_server, load_sink},
     test_util,
 };
+use vector_lib::config::log_schema;
 
 #[test]
 fn generate_config() {
@@ -145,4 +146,57 @@ async fn healthcheck_grafana_cloud() {
     healthcheck(config, client)
         .await
         .expect("healthcheck failed");
+}
+
+#[tokio::test]
+async fn timestamp_out_of_range() {
+    let (config, cx) = load_sink::<LokiConfig>(
+        r#"
+        endpoint = "http://localhost:3100"
+        labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}", "{{ foo }}" = "{{ foo }}"}
+        encoding.codec = "json"
+    "#,
+    )
+    .unwrap();
+    let client = config.build_client(cx).unwrap();
+    let mut sink = LokiSink::new(config, client).unwrap();
+
+    let mut e1 = LogEvent::from("hello world");
+    if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
+        let date = chrono::NaiveDate::from_ymd_opt(1677, 9, 21)
+            .unwrap()
+            .and_hms_nano_opt(0, 12, 43, 145_224_191)
+            .unwrap()
+            .and_local_timezone(chrono::Utc)
+            .unwrap();
+        e1.insert(timestamp_key, date);
+    }
+    let e1 = Event::Log(e1);
+
+    assert!(sink.encoder.encode_event(e1).is_none());
+}
+
+#[tokio::test]
+async fn structured_metadata_as_json() {
+    let (config, cx) = load_sink::<LokiConfig>(
+        r#"
+        endpoint = "http://localhost:3100"
+        labels = {test = "structured_metadata"}
+        structured_metadata.bar = "{{ foo }}"
+        encoding.codec = "json"
+        encoding.except_fields = ["foo"]
+        "#,
+    )
+    .unwrap();
+    let client = config.build_client(cx).unwrap();
+    let mut sink = LokiSink::new(config, client).unwrap();
+
+    let mut e1 = Event::Log(LogEvent::from("hello world"));
+    e1.as_mut_log().insert("foo", "bar");
+
+    let event = sink.encoder.encode_event(e1).unwrap();
+    let body = serde_json::json!(event.event);
+    let expected_metadata = serde_json::json!({"bar": "bar"});
+
+    assert_eq!(body[2], expected_metadata);
 }

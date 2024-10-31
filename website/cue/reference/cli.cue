@@ -121,10 +121,6 @@ cli: {
 			description: env_vars.VECTOR_ALLOW_EMPTY_CONFIG.description
 			env_var:     "VECTOR_ALLOW_EMPTY_CONFIG"
 		}
-		"strict-env-vars": {
-			description: env_vars.VECTOR_STRICT_ENV_VARS.description
-			env_var:     "VECTOR_STRICT_ENV_VARS"
-		}
 	}
 
 	_core_config_options: {
@@ -310,6 +306,10 @@ cli: {
 				"no-reconnect": {
 					_short:      "n"
 					description: "Whether to reconnect if the underlying Vector API connection drops. By default, tap will attempt to reconnect if the connection drops."
+				}
+				"duration_ms": {
+					_short:      "d"
+					description: "Specifies a duration (in milliseconds) to sample logs (e.g. passing in 10000 will sample logs for 10 seconds then exit)."
 				}
 			}
 

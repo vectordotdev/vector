@@ -15,8 +15,8 @@ base: components: sinks: pulsar: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -118,6 +118,46 @@ base: components: sinks: pulsar: configuration: {
 				snappy: "Snappy."
 				zlib:   "Zlib."
 				zstd:   "Zstandard."
+			}
+		}
+	}
+	connection_retry_options: {
+		description: "Custom connection retry options configuration for the Pulsar client."
+		required:    false
+		type: object: options: {
+			connection_timeout_secs: {
+				description: "Time limit to establish a connection."
+				required:    false
+				type: uint: {
+					examples: [10]
+					unit: "seconds"
+				}
+			}
+			keep_alive_secs: {
+				description: "Keep-alive interval for each broker connection."
+				required:    false
+				type: uint: {
+					examples: [60]
+					unit: "seconds"
+				}
+			}
+			max_backoff_secs: {
+				description: "Maximum delay between reconnection retries."
+				required:    false
+				type: uint: {
+					examples: [30]
+					unit: "seconds"
+				}
+			}
+			max_retries: {
+				description: "Maximum number of connection retries."
+				required:    false
+				type: uint: examples: [12]
+			}
+			min_backoff_ms: {
+				description: "Minimum delay between connection retries."
+				required:    false
+				type: uint: unit: "milliseconds"
 			}
 		}
 	}
@@ -235,7 +275,7 @@ base: components: sinks: pulsar: configuration: {
 					delimiter: {
 						description: "The field delimiter to use when writing CSV."
 						required:    false
-						type: uint: default: 44
+						type: ascii_char: default: ","
 					}
 					double_quote: {
 						description: """
@@ -257,7 +297,7 @@ base: components: sinks: pulsar: configuration: {
 																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
 																"""
 						required: false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					fields: {
 						description: """
@@ -275,7 +315,7 @@ base: components: sinks: pulsar: configuration: {
 					quote: {
 						description: "The quote character to use when writing CSV."
 						required:    false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					quote_style: {
 						description: "The quoting style to use when writing CSV data."
@@ -305,6 +345,16 @@ base: components: sinks: pulsar: configuration: {
 				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			json: {
+				description:   "Options for the JsonSerializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: pretty: {
+					description: "Whether to use pretty JSON formatting."
+					required:    false
+					type: bool: default: false
+				}
 			}
 			metric_tag_values: {
 				description: """

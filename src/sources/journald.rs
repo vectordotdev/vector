@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
     process::Stdio,
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, LazyLock},
     time::Duration,
 };
 
@@ -15,7 +15,6 @@ use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
 };
-use once_cell::sync::Lazy;
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -71,14 +70,12 @@ const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
 
 const BACKOFF_DURATION: Duration = Duration::from_secs(1);
 
-static JOURNALCTL: Lazy<PathBuf> = Lazy::new(|| "journalctl".into());
+static JOURNALCTL: LazyLock<PathBuf> = LazyLock::new(|| "journalctl".into());
 
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("journalctl failed to execute: {}", source))]
     JournalctlSpawn { source: io::Error },
-    #[snafu(display("Cannot use both `units` and `include_units`"))]
-    BothUnitsAndIncludeUnits,
     #[snafu(display(
         "The unit {:?} is duplicated in both include_units and exclude_units",
         unit
@@ -399,7 +396,10 @@ impl SourceConfig for JournaldConfig {
         let schema_definition =
             self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -884,7 +884,7 @@ fn decode_array_as_bytes(array: &[JsonValue]) -> Option<JsonValue> {
         .iter()
         .map(|item| {
             item.as_u64().and_then(|num| match num {
-                num if num <= u8::max_value() as u64 => Some(num as u8),
+                num if num <= u8::MAX as u64 => Some(num as u8),
                 _ => None,
             })
         })

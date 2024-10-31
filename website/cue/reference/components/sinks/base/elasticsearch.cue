@@ -15,8 +15,8 @@ base: components: sinks: elasticsearch: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -259,6 +259,33 @@ base: components: sinks: elasticsearch: configuration: {
 					default: "vector-%Y.%m.%d"
 					examples: ["application-{{ application_id }}-%Y-%m-%d", "{{ index }}"]
 					syntax: "template"
+				}
+			}
+			version: {
+				description: "Version field value."
+				required:    false
+				type: string: {
+					examples: ["{{ obj_version }}-%Y-%m-%d", "123"]
+					syntax: "template"
+				}
+			}
+			version_type: {
+				description: """
+					Version type.
+
+					Possible values are `internal`, `external` or `external_gt` and `external_gte`.
+
+					[es_index_versioning]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html#index-versioning
+					"""
+				required: false
+				type: string: {
+					default: "internal"
+					enum: {
+						external:     "The `external` or `external_gt` type."
+						external_gte: "The `external_gte` type."
+						internal:     "The `internal` type."
+					}
+					examples: ["internal", "external"]
 				}
 			}
 		}
@@ -811,6 +838,15 @@ base: components: sinks: elasticsearch: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

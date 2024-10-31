@@ -2,9 +2,8 @@
 #[allow(unused_imports)]
 use std::collections::HashSet;
 
-use snafu::Snafu;
-
 pub mod dedupe;
+pub mod reduce;
 pub mod sample;
 
 #[cfg(feature = "transforms-aggregate")]
@@ -19,8 +18,6 @@ pub mod log_to_metric;
 pub mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
-#[cfg(feature = "transforms-reduce")]
-pub mod reduce;
 #[cfg(feature = "transforms-remap")]
 pub mod remap;
 #[cfg(feature = "transforms-route")]
@@ -34,15 +31,6 @@ pub use vector_lib::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
     TransformOutputsBuf,
 };
-
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("Invalid regular expression: {}", source))]
-    InvalidRegex { source: regex::Error },
-
-    #[snafu(display("Invalid substring expression: {}", name))]
-    InvalidSubstring { name: String },
-}
 
 #[cfg(test)]
 mod test {

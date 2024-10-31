@@ -1,1 +1,1 @@
-{"log":{"":["\u0019",{"":"􀀀","x:‫":-474752.0}],">":8102361247466185211,"󰀀⎾":-324800.0}}
+{"metric":{"name":"a","namespace":"y","timestamp":"1969-12-31T20:14:52Z","kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":-726208.0,"value":-913536.0},{"quantile":-739904.0,"value":555904.0},{"quantile":107648.0,"value":50496.0}],"count":14665725901750210123,"sum":737344.0}}}

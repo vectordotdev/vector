@@ -251,10 +251,10 @@ mod tests {
     async fn throttle_events() {
         let clock = clock::FakeRelativeClock::default();
         let config = toml::from_str::<ThrottleConfig>(
-            r#"
+            r"
 threshold = 2
 window_secs = 5
-"#,
+",
         )
         .unwrap();
 

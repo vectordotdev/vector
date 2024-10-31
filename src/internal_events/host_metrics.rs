@@ -17,10 +17,11 @@ impl InternalEvent for HostMetricsScrapeError {
         );
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -41,10 +42,11 @@ impl<E: std::fmt::Display> InternalEvent for HostMetricsScrapeDetailError<E> {
         );
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -67,9 +69,10 @@ impl InternalEvent for HostMetricsScrapeFilesystemError {
         );
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }

@@ -59,7 +59,7 @@ jobs:
 
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
-    runs-on: [linux, ubuntu-20.04-4core]
+    runs-on: ubuntu-20.04-4core
     timeout-minutes: 45
     needs: changes
     # Run this job even if `changes` job is skipped (non- pull request trigger)
@@ -70,28 +70,23 @@ jobs:
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
       CARGO_INCREMENTAL: 0
     steps:
-      - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v2
-        id: comment-branch
-
-      - name: (PR comment) Set latest commit status as pending
-        if: ${{ github.event_name == 'issue_comment' }}
+      - name: (PR review) Set latest commit status as pending
+        if: ${{ github.event_name == 'pull_request_review' }}
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-      - name: (PR comment) Checkout PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: actions/checkout@v3
+      - name: (PR review) Checkout PR branch
+        if: ${{ github.event_name == 'pull_request_review' }}
+        uses: actions/checkout@v4
         with:
-          ref: ${{ steps.comment-branch.outputs.head_ref }}
+          ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
-        if: ${{ github.event_name != 'issue_comment' }}
-        uses: actions/checkout@v3
+        if: ${{ github.event_name != 'pull_request_review' }}
+        uses: actions/checkout@v4
 
       - uses: actions/cache@v4
         with:
@@ -105,16 +100,16 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: VECTOR_VERSION="$(cargo vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: e2e-test-deb-package
           path: target/artifacts/*
 
-      - name: (PR comment) Set latest commit status as 'failure'
+      - name: (PR review) Set latest commit status as 'failure'
         uses: myrotvorets/set-commit-status-action@v2.0.1
-        if: failure() && github.event_name == 'issue_comment'
+        if: failure() && github.event_name == 'pull_request_review'
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'failure'
 
@@ -140,7 +135,7 @@ jobs:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.24.0",
+              "v1.33.1",
             ]
 
             // Aim to test against oldest supported k8s cloud-provider versions
@@ -181,7 +176,7 @@ jobs:
 
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
-    runs-on: [linux, ubuntu-20.04-4core]
+    runs-on: ubuntu-20.04-4core
     timeout-minutes: 45
     needs:
       - build-x86_64-unknown-linux-gnu
@@ -192,22 +187,22 @@ jobs:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
     steps:
-      - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
+      - name: (PR review) Get PR branch
+        if: ${{ github.event_name == 'pull_request_review' }}
         uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
 
-      - name: (PR comment) Checkout PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: actions/checkout@v3
+      - name: (PR review) Checkout PR branch
+        if: ${{ github.event_name == 'pull_request_review' }}
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
-        if: ${{ github.event_name != 'issue_comment' }}
-        uses: actions/checkout@v3
+        if: ${{ github.event_name != 'pull_request_review' }}
+        uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: e2e-test-deb-package
           path: target/artifacts
@@ -225,11 +220,11 @@ jobs:
           SKIP_PACKAGE_DEB: "true"
           CARGO_INCREMENTAL: 0
 
-      - name: (PR comment) Set latest commit status as failure
+      - name: (PR review) Set latest commit status as failure
         uses: myrotvorets/set-commit-status-action@v2.0.1
-        if: failure() && github.event_name == 'issue_comment'
+        if: failure() && github.event_name == 'pull_request_review'
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'failure'
 
@@ -246,16 +241,16 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - name: (PR comment) Get PR branch
-        if: github.event_name == 'issue_comment' && env.FAILED != 'true'
+      - name: (PR review) Get PR branch
+        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
         uses: xt0rted/pull-request-comment-branch@v2
         id: comment-branch
 
-      - name: (PR comment) Submit PR result as success
-        if: github.event_name == 'issue_comment' && env.FAILED != 'true'
+      - name: (PR review) Submit PR result as success
+        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
         uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
 

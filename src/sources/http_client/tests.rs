@@ -1,6 +1,7 @@
 use http::Uri;
 use std::collections::HashMap;
 use tokio::time::Duration;
+use vector_lib::config::LogNamespace;
 use warp::{http::HeaderMap, Filter};
 
 use crate::components::validation::prelude::*;
@@ -49,6 +50,7 @@ impl ValidatableComponent for HttpClientConfig {
             decoding: DeserializerConfig::Json(Default::default()),
             ..Default::default()
         };
+        let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
 
         let external_resource = ExternalResource::new(
             ResourceDirection::Pull,
@@ -58,6 +60,7 @@ impl ValidatableComponent for HttpClientConfig {
 
         ValidationConfiguration::from_source(
             Self::NAME,
+            log_namespace,
             vec![ComponentTestCaseConfig::from_source(
                 config,
                 None,
@@ -77,7 +80,7 @@ async fn bytes_decoding() {
     // validates the Accept header is set correctly for the Bytes codec
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::header::exact("Accept", "text/plain"))
-        .map(|| r#"A plain text event"#);
+        .map(|| r"A plain text event");
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 

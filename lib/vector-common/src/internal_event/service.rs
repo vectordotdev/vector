@@ -17,10 +17,11 @@ impl<E: std::fmt::Debug> InternalEvent for PollReadyError<E> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -47,10 +48,11 @@ impl<E: std::fmt::Debug> InternalEvent for CallError<E> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
 
         emit(ComponentEventsDropped::<UNINTENTIONAL> {
             reason,

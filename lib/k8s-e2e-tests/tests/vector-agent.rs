@@ -993,6 +993,8 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
               inputs: [kubernetes_logs]
               encoding:
                 codec: json
+                json:
+                    pretty: false
     "#};
 
     let vector = framework
@@ -1395,6 +1397,8 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
               inputs: [kubernetes_logs]
               encoding:
                 codec: json
+                json:
+                    pretty: false
     "#};
 
     let vector = framework

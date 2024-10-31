@@ -118,7 +118,7 @@ fn test_decode_log_body() {
             assert_eq!(log["ddtags"], msg.ddtags.into());
 
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -175,10 +175,7 @@ fn test_decode_log_body_parse_ddtags() {
     assert_eq!(log["service"], log_msg.service.into());
     assert_eq!(log["ddsource"], log_msg.ddsource.into());
 
-    assert_eq!(
-        log["ddtags"],
-        value!({"env": "staging", "wizard": "the_grey"})
-    );
+    assert_eq!(log["ddtags"], value!(["wizard:the_grey", "env:staging"]));
 }
 
 #[test]
@@ -259,7 +256,7 @@ async fn source(
 
 async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, path: &str) -> u16 {
     reqwest::Client::new()
-        .post(&format!("http://{}{}", address, path))
+        .post(format!("http://{}{}", address, path))
         .headers(headers)
         .body(body.to_owned())
         .send()
@@ -323,7 +320,7 @@ async fn full_payload_v1() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -385,7 +382,7 @@ async fn full_payload_v2() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -447,7 +444,7 @@ async fn no_api_key() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -512,7 +509,7 @@ async fn api_key_in_url() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -577,7 +574,7 @@ async fn api_key_in_query_params() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -648,7 +645,7 @@ async fn api_key_in_header() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -792,7 +789,7 @@ async fn ignores_api_key() {
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -1501,7 +1498,7 @@ async fn split_outputs() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -1593,7 +1590,7 @@ fn test_config_outputs_with_disabled_data_types() {
             assert_eq!(outputs.contains(&DataType::Trace), !disable_traces);
             assert_eq!(outputs.contains(&DataType::Metric), !disable_metrics);
         } else {
-            assert!(outputs.contains(&DataType::all()));
+            assert!(outputs.contains(&DataType::all_bits()));
             assert!(outputs.len() == 1);
         }
     }
@@ -2532,6 +2529,8 @@ impl ValidatableComponent for DatadogAgentConfig {
             keepalive: Default::default(),
         };
 
+        let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
+
         // TODO set up separate test cases for metrics and traces endpoints
 
         let logs_addr = format!("http://{}/api/v2/logs", config.address);
@@ -2551,6 +2550,7 @@ impl ValidatableComponent for DatadogAgentConfig {
 
         ValidationConfiguration::from_source(
             Self::NAME,
+            log_namespace,
             vec![ComponentTestCaseConfig::from_source(
                 config,
                 None,

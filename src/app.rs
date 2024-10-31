@@ -1,20 +1,13 @@
 #![allow(missing_docs)]
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{num::NonZeroUsize, path::PathBuf, process::ExitStatus, time::Duration};
 
 use exitcode::ExitCode;
 use futures::StreamExt;
-#[cfg(feature = "enterprise")]
-use futures_util::future::BoxFuture;
-use once_cell::race::OnceNonZeroUsize;
 use tokio::runtime::{self, Runtime};
 use tokio::sync::{broadcast::error::RecvError, MutexGuard};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-#[cfg(feature = "enterprise")]
-use crate::config::enterprise::{
-    attach_enterprise_components, report_configuration, EnterpriseError, EnterpriseMetadata,
-    EnterpriseReporter,
-};
 use crate::extra_context::ExtraContext;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
@@ -37,7 +30,11 @@ use std::os::unix::process::ExitStatusExt;
 use std::os::windows::process::ExitStatusExt;
 use tokio::runtime::Handle;
 
-pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
+static WORKER_THREADS: AtomicUsize = AtomicUsize::new(0);
+
+pub fn worker_threads() -> Option<NonZeroUsize> {
+    NonZeroUsize::new(WORKER_THREADS.load(Ordering::Relaxed))
+}
 
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
@@ -46,8 +43,6 @@ pub struct ApplicationConfig {
     pub internal_topologies: Vec<RunningTopology>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
-    #[cfg(feature = "enterprise")]
-    pub enterprise: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
     pub extra_context: ExtraContext,
 }
 
@@ -86,14 +81,6 @@ impl ApplicationConfig {
         config: Config,
         extra_context: ExtraContext,
     ) -> Result<Self, ExitCode> {
-        // This is ugly, but needed to allow `config` to be mutable for building the enterprise
-        // features, but also avoid a "does not need to be mutable" warning when the enterprise
-        // feature is not enabled.
-        #[cfg(feature = "enterprise")]
-        let mut config = config;
-        #[cfg(feature = "enterprise")]
-        let enterprise = build_enterprise(&mut config, config_paths.clone())?;
-
         #[cfg(feature = "api")]
         let api = config.api;
 
@@ -109,8 +96,6 @@ impl ApplicationConfig {
             internal_topologies: Vec::new(),
             #[cfg(feature = "api")]
             api,
-            #[cfg(feature = "enterprise")]
-            enterprise,
             extra_context,
         })
     }
@@ -222,7 +207,7 @@ impl Application {
         let config = runtime.block_on(ApplicationConfig::from_opts(
             &opts.root,
             &mut signals.handler,
-            extra_context.clone(),
+            extra_context,
         ))?;
 
         Ok((
@@ -255,8 +240,6 @@ impl Application {
             topology: config.topology,
             config_paths: config.config_paths.clone(),
             require_healthy: root_opts.require_healthy,
-            #[cfg(feature = "enterprise")]
-            enterprise_reporter: config.enterprise,
             extra_context: config.extra_context,
         });
 
@@ -455,12 +438,11 @@ impl FinishedApplication {
 fn get_log_levels(default: &str) -> String {
     std::env::var("VECTOR_LOG")
         .or_else(|_| {
-            std::env::var("LOG").map(|log| {
+            std::env::var("LOG").inspect(|_log| {
                 warn!(
                     message =
                         "DEPRECATED: Use of $LOG is deprecated. Please use $VECTOR_LOG instead."
                 );
-                log
             })
         })
         .unwrap_or_else(|_| default.into())
@@ -472,14 +454,14 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
     rt_builder.enable_all().thread_name(thread_name);
 
     let threads = threads.unwrap_or_else(crate::num_threads);
-    let threads = NonZeroUsize::new(threads).ok_or_else(|| {
+    if threads == 0 {
         error!("The `threads` argument must be greater or equal to 1.");
-        exitcode::CONFIG
-    })?;
+        return Err(exitcode::CONFIG);
+    }
     WORKER_THREADS
-        .set(threads)
-        .expect("double thread initialization");
-    rt_builder.worker_threads(threads.get());
+        .compare_exchange(0, threads, Ordering::Acquire, Ordering::Relaxed)
+        .unwrap_or_else(|_| panic!("double thread initialization"));
+    rt_builder.worker_threads(threads);
 
     debug!(messaged = "Building runtime.", worker_threads = threads);
     Ok(rt_builder.build().expect("Unable to create async runtime"))
@@ -497,22 +479,21 @@ pub async fn load_configs(
 
     if watch_config {
         // Start listening for config changes immediately.
-        config::watcher::spawn_thread(config_paths.iter().map(Into::into), None).map_err(
-            |error| {
-                error!(message = "Unable to start config watcher.", %error);
-                exitcode::CONFIG
-            },
-        )?;
+        config::watcher::spawn_thread(
+            signal_handler.clone_tx(),
+            config_paths.iter().map(Into::into),
+            None,
+        )
+        .map_err(|error| {
+            error!(message = "Unable to start config watcher.", %error);
+            exitcode::CONFIG
+        })?;
     }
 
     info!(
         message = "Loading configs.",
         paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
     );
-
-    // config::init_log_schema should be called before initializing sources.
-    #[cfg(not(feature = "enterprise-tests"))]
-    config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
     let mut config = config::load_from_paths_with_provider_and_secrets(
         &config_paths,
@@ -522,6 +503,7 @@ pub async fn load_configs(
     .await
     .map_err(handle_config_errors)?;
 
+    config::init_log_schema(config.global.log_schema.clone(), true);
     config::init_telemetry(config.global.telemetry.clone(), true);
 
     if !config.healthchecks.enabled {
@@ -531,41 +513,6 @@ pub async fn load_configs(
     config.graceful_shutdown_duration = graceful_shutdown_duration;
 
     Ok(config)
-}
-
-#[cfg(feature = "enterprise")]
-// Enable enterprise features, if applicable.
-fn build_enterprise(
-    config: &mut Config,
-    config_paths: Vec<ConfigPath>,
-) -> Result<Option<EnterpriseReporter<BoxFuture<'static, ()>>>, ExitCode> {
-    use crate::ENTERPRISE_ENABLED;
-
-    ENTERPRISE_ENABLED
-        .set(
-            config
-                .enterprise
-                .as_ref()
-                .map(|e| e.enabled)
-                .unwrap_or_default(),
-        )
-        .expect("double initialization of enterprise enabled flag");
-
-    match EnterpriseMetadata::try_from(&*config) {
-        Ok(metadata) => {
-            let enterprise = EnterpriseReporter::new();
-
-            attach_enterprise_components(config, &metadata);
-            enterprise.send(report_configuration(config_paths, metadata));
-
-            Ok(Some(enterprise))
-        }
-        Err(EnterpriseError::MissingApiKey) => {
-            error!("Enterprise configuration incomplete: missing API key.");
-            Err(exitcode::CONFIG)
-        }
-        Err(_) => Ok(None),
-    }
 }
 
 pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) {

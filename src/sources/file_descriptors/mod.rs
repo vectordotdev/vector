@@ -29,7 +29,7 @@ use crate::{
     SourceSender,
 };
 
-#[cfg(all(unix, feature = "sources-file-descriptor"))]
+#[cfg(all(unix, feature = "sources-file_descriptor"))]
 pub mod file_descriptor;
 #[cfg(feature = "sources-stdin")]
 pub mod stdin;
@@ -222,7 +222,7 @@ fn outputs(
         )
         .with_standard_vector_source_metadata();
 
-    vec![SourceOutput::new_logs(
+    vec![SourceOutput::new_maybe_logs(
         decoding.output_type(),
         schema_definition,
     )]

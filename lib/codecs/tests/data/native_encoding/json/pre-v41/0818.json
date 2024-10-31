@@ -1,0 +1,1 @@
+{"metric":{"name":"_","namespace":"a","tags":{"i":"m","t":"b","x":"j"},"interval_ms":3248152443,"kind":"absolute","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[2206],"n":[1]},"count":1,"min":702656.0,"max":702656.0,"sum":934784.0,"avg":348480.0}}}}}

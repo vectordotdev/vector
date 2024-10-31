@@ -308,6 +308,8 @@ impl SinkConfig for HttpSinkConfig {
 
 #[cfg(test)]
 mod tests {
+    use vector_lib::codecs::encoding::format::JsonSerializerOptions;
+
     use super::*;
     use crate::components::validation::prelude::*;
 
@@ -315,6 +317,7 @@ mod tests {
         fn validation_configuration() -> ValidationConfiguration {
             use std::str::FromStr;
             use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
+            use vector_lib::config::LogNamespace;
 
             let config = HttpSinkConfig {
                 uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
@@ -322,7 +325,11 @@ mod tests {
                 method: HttpMethod::Post,
                 encoding: EncodingConfigWithFraming::new(
                     None,
-                    JsonSerializerConfig::new(MetricTagValues::Full).into(),
+                    JsonSerializerConfig::new(
+                        MetricTagValues::Full,
+                        JsonSerializerOptions::default(),
+                    )
+                    .into(),
                     Transformer::default(),
                 ),
                 auth: None,
@@ -344,6 +351,7 @@ mod tests {
 
             ValidationConfiguration::from_sink(
                 Self::NAME,
+                LogNamespace::Legacy,
                 vec![ComponentTestCaseConfig::from_sink(
                     config,
                     None,

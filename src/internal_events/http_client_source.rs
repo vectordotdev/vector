@@ -23,13 +23,15 @@ impl InternalEvent for HttpClientEventsReceived {
             url = %self.url,
         );
         counter!(
-            "component_received_events_total", self.count as u64,
+            "component_received_events_total",
             "uri" => self.url.clone(),
-        );
+        )
+        .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total", self.byte_size.get() as u64,
+            "component_received_event_bytes_total",
             "uri" => self.url.clone(),
-        );
+        )
+        .increment(self.byte_size.get() as u64);
     }
 }
 
@@ -50,12 +52,13 @@ impl InternalEvent for HttpClientHttpResponseError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "url" => self.url,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
             "error_code" => http_error_code(self.code.as_u16()),
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -76,10 +79,11 @@ impl InternalEvent for HttpClientHttpError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "url" => self.url,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }

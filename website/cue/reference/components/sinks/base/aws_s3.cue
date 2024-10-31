@@ -15,8 +15,8 @@ base: components: sinks: aws_s3: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -421,7 +421,7 @@ base: components: sinks: aws_s3: configuration: {
 					delimiter: {
 						description: "The field delimiter to use when writing CSV."
 						required:    false
-						type: uint: default: 44
+						type: ascii_char: default: ","
 					}
 					double_quote: {
 						description: """
@@ -443,7 +443,7 @@ base: components: sinks: aws_s3: configuration: {
 																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
 																"""
 						required: false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					fields: {
 						description: """
@@ -461,7 +461,7 @@ base: components: sinks: aws_s3: configuration: {
 					quote: {
 						description: "The quote character to use when writing CSV."
 						required:    false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					quote_style: {
 						description: "The quoting style to use when writing CSV data."
@@ -491,6 +491,16 @@ base: components: sinks: aws_s3: configuration: {
 				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			json: {
+				description:   "Options for the JsonSerializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: pretty: {
+					description: "Whether to use pretty JSON formatting."
+					required:    false
+					type: bool: default: false
+				}
 			}
 			metric_tag_values: {
 				description: """
@@ -616,7 +626,34 @@ base: components: sinks: aws_s3: configuration: {
 				type: object: options: delimiter: {
 					description: "The ASCII (7-bit) character that delimits byte sequences."
 					required:    true
-					type: uint: {}
+					type: ascii_char: {}
+				}
+			}
+			length_delimited: {
+				description:   "Options for the length delimited decoder."
+				relevant_when: "method = \"length_delimited\""
+				required:      true
+				type: object: options: {
+					length_field_is_big_endian: {
+						description: "Length field byte order (little or big endian)"
+						required:    false
+						type: bool: default: true
+					}
+					length_field_length: {
+						description: "Number of bytes representing the field length"
+						required:    false
+						type: uint: default: 4
+					}
+					length_field_offset: {
+						description: "Number of bytes in the header before the length field"
+						required:    false
+						type: uint: default: 0
+					}
+					max_frame_length: {
+						description: "Maximum frame length"
+						required:    false
+						type: uint: default: 8388608
+					}
 				}
 			}
 			method: {
@@ -1029,6 +1066,15 @@ base: components: sinks: aws_s3: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

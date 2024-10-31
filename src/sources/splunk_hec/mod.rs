@@ -33,6 +33,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
 };
 use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStream};
+use vrl::path::OwnedTargetPath;
 use vrl::value::{kind::Collection, Kind};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -226,7 +227,8 @@ impl SourceConfig for SplunkConfig {
             LogNamespace::Vector => vector_lib::schema::Definition::new_with_default_metadata(
                 Kind::bytes().or_object(Collection::empty()),
                 [log_namespace],
-            ),
+            )
+            .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE),
         }
         .with_standard_vector_source_metadata()
         .with_source_metadata(
@@ -269,7 +271,10 @@ impl SourceConfig for SplunkConfig {
             None,
         );
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -1260,9 +1265,6 @@ mod tests {
     use vrl::path::PathPrefix;
 
     use super::*;
-    use crate::sinks::splunk_hec::common::{
-        config_host_key_target_path, config_timestamp_key_target_path,
-    };
     use crate::{
         codecs::{DecodingConfig, EncodingConfig},
         components::validation::prelude::*,
@@ -1340,7 +1342,7 @@ mod tests {
         HecLogsSinkConfig {
             default_token: TOKEN.to_owned().into(),
             endpoint: format!("http://{}", address),
-            host_key: config_host_key_target_path(),
+            host_key: None,
             indexed_fields: vec![],
             index: None,
             sourcetype: None,
@@ -1352,7 +1354,7 @@ mod tests {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
-            timestamp_key: config_timestamp_key_target_path(),
+            timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: Default::default(),
         }
@@ -1861,7 +1863,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(&format!("http://{}/services/collector/health", address))
+            .get(format!("http://{}/services/collector/health", address))
             .header("Authorization", format!("Splunk {}", "invalid token"))
             .send()
             .await
@@ -1875,7 +1877,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(&format!("http://{}/services/collector/health", address))
+            .get(format!("http://{}/services/collector/health", address))
             .send()
             .await
             .unwrap();
@@ -2535,6 +2537,7 @@ mod tests {
             Kind::object(Collection::empty()).or_bytes(),
             [LogNamespace::Vector],
         )
+        .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE)
         .with_metadata_field(
             &owned_value_path!("vector", "source_type"),
             Kind::bytes(),
@@ -2623,6 +2626,7 @@ mod tests {
             let listen_addr_http = format!("http://{}/services/collector/event", config.address);
             let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
 
+            let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
             let framing = BytesDecoderConfig::new().into();
             let decoding = DeserializerConfig::Json(Default::default());
 
@@ -2637,6 +2641,7 @@ mod tests {
 
             ValidationConfiguration::from_source(
                 Self::NAME,
+                log_namespace,
                 vec![ComponentTestCaseConfig::from_source(
                     config,
                     None,

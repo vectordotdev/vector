@@ -1,5 +1,5 @@
 use metrics::{counter, gauge};
-use vector_lib::{internal_event::InternalEvent, update_counter};
+use vector_lib::internal_event::InternalEvent;
 use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
@@ -25,11 +25,11 @@ impl<'a> InternalEvent for KafkaBytesReceived<'a> {
         );
         counter!(
             "component_received_bytes_total",
-            self.byte_size as u64,
             "protocol" => self.protocol,
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
-        );
+        )
+        .increment(self.byte_size as u64);
     }
 }
 
@@ -50,13 +50,18 @@ impl<'a> InternalEvent for KafkaEventsReceived<'a> {
             topic = self.topic,
             partition = %self.partition,
         );
-        counter!("component_received_events_total", self.count as u64, "topic" => self.topic.to_string(), "partition" => self.partition.to_string());
         counter!(
-            "component_received_event_bytes_total",
-            self.byte_size.get() as u64,
+            "component_received_events_total",
             "topic" => self.topic.to_string(),
             "partition" => self.partition.to_string(),
-        );
+        )
+        .increment(self.count as u64);
+        counter!(
+            "component_received_event_bytes_total",
+            "topic" => self.topic.to_string(),
+            "partition" => self.partition.to_string(),
+        )
+        .increment(self.byte_size.get() as u64);
     }
 }
 
@@ -76,11 +81,12 @@ impl InternalEvent for KafkaOffsetUpdateError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "kafka_offset_update",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -100,11 +106,12 @@ impl InternalEvent for KafkaReadError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "reading_message",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -116,42 +123,28 @@ pub struct KafkaStatisticsReceived<'a> {
 
 impl InternalEvent for KafkaStatisticsReceived<'_> {
     fn emit(self) {
-        gauge!("kafka_queue_messages", self.statistics.msg_cnt as f64);
-        gauge!(
-            "kafka_queue_messages_bytes",
-            self.statistics.msg_size as f64
-        );
-        update_counter!("kafka_requests_total", self.statistics.tx as u64);
-        update_counter!(
-            "kafka_requests_bytes_total",
-            self.statistics.tx_bytes as u64
-        );
-        update_counter!("kafka_responses_total", self.statistics.rx as u64);
-        update_counter!(
-            "kafka_responses_bytes_total",
-            self.statistics.rx_bytes as u64
-        );
-        update_counter!(
-            "kafka_produced_messages_total",
-            self.statistics.txmsgs as u64
-        );
-        update_counter!(
-            "kafka_produced_messages_bytes_total",
-            self.statistics.txmsg_bytes as u64
-        );
-        update_counter!(
-            "kafka_consumed_messages_total",
-            self.statistics.rxmsgs as u64
-        );
-        update_counter!(
-            "kafka_consumed_messages_bytes_total",
-            self.statistics.rxmsg_bytes as u64
-        );
+        gauge!("kafka_queue_messages").set(self.statistics.msg_cnt as f64);
+        gauge!("kafka_queue_messages_bytes").set(self.statistics.msg_size as f64);
+        counter!("kafka_requests_total").absolute(self.statistics.tx as u64);
+        counter!("kafka_requests_bytes_total").absolute(self.statistics.tx_bytes as u64);
+        counter!("kafka_responses_total").absolute(self.statistics.rx as u64);
+        counter!("kafka_responses_bytes_total").absolute(self.statistics.rx_bytes as u64);
+        counter!("kafka_produced_messages_total").absolute(self.statistics.txmsgs as u64);
+        counter!("kafka_produced_messages_bytes_total")
+            .absolute(self.statistics.txmsg_bytes as u64);
+        counter!("kafka_consumed_messages_total").absolute(self.statistics.rxmsgs as u64);
+        counter!("kafka_consumed_messages_bytes_total")
+            .absolute(self.statistics.rxmsg_bytes as u64);
 
         if self.expose_lag_metrics {
             for (topic_id, topic) in &self.statistics.topics {
                 for (partition_id, partition) in &topic.partitions {
-                    gauge!("kafka_consumer_lag", partition.consumer_lag as f64, "topic_id" => topic_id.clone(), "partition_id" => partition_id.to_string());
+                    gauge!(
+                        "kafka_consumer_lag",
+                        "topic_id" => topic_id.clone(),
+                        "partition_id" => partition_id.to_string(),
+                    )
+                    .set(partition.consumer_lag as f64);
                 }
             }
         }
@@ -173,10 +166,11 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "extracting_header",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }

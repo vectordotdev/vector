@@ -15,7 +15,7 @@ pub struct UnixSocketConnectionEstablished<'a> {
 impl InternalEvent for UnixSocketConnectionEstablished<'_> {
     fn emit(self) {
         debug!(message = "Connected.", path = ?self.path);
-        counter!("connection_established_total", 1, "mode" => "unix");
+        counter!("connection_established_total", "mode" => "unix").increment(1);
     }
 }
 
@@ -32,12 +32,20 @@ impl<E: std::error::Error> InternalEvent for UnixSocketOutgoingConnectionError<E
     }
 }
 
+#[cfg(all(
+    unix,
+    any(feature = "sources-utils-net-unix", feature = "sources-dnstap")
+))]
 #[derive(Debug)]
 pub struct UnixSocketError<'a, E> {
     pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
 }
 
+#[cfg(all(
+    unix,
+    any(feature = "sources-utils-net-unix", feature = "sources-dnstap")
+))]
 impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
     fn emit(self) {
         error!(
@@ -49,19 +57,22 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
+#[cfg(all(unix, any(feature = "sinks-socket", feature = "sinks-statsd")))]
 #[derive(Debug)]
 pub struct UnixSocketSendError<'a, E> {
     pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
 }
 
+#[cfg(all(unix, any(feature = "sinks-socket", feature = "sinks-statsd")))]
 impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
     fn emit(self) {
         let reason = "Unix socket send error.";
@@ -74,10 +85,11 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
@@ -102,10 +114,11 @@ impl InternalEvent for UnixSendIncompleteError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
@@ -129,10 +142,11 @@ impl<'a> InternalEvent for UnixSocketFileDeleteError<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "delete_socket_file",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }

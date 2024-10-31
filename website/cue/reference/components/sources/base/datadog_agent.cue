@@ -93,6 +93,11 @@ base: components: sources: datadog_agent: configuration: {
 															[gelf]: https://docs.graylog.org/docs/gelf
 															[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 															"""
+						influxdb: """
+															Decodes the raw bytes as an [Influxdb Line Protocol][influxdb] message.
+
+															[influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
+															"""
 						json: """
 															Decodes the raw bytes as [JSON][json].
 
@@ -139,6 +144,22 @@ base: components: sources: datadog_agent: configuration: {
 			gelf: {
 				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+						"""
+					required: false
+					type: bool: default: true
+				}
+			}
+			influxdb: {
+				description:   "Influxdb-specific decoding options."
+				relevant_when: "codec = \"influxdb\""
 				required:      false
 				type: object: options: lossy: {
 					description: """
@@ -283,7 +304,7 @@ base: components: sources: datadog_agent: configuration: {
 					delimiter: {
 						description: "The character that delimits byte sequences."
 						required:    true
-						type: uint: {}
+						type: ascii_char: {}
 					}
 					max_length: {
 						description: """
@@ -301,6 +322,33 @@ base: components: sources: datadog_agent: configuration: {
 																"""
 						required: false
 						type: uint: {}
+					}
+				}
+			}
+			length_delimited: {
+				description:   "Options for the length delimited decoder."
+				relevant_when: "method = \"length_delimited\""
+				required:      true
+				type: object: options: {
+					length_field_is_big_endian: {
+						description: "Length field byte order (little or big endian)"
+						required:    false
+						type: bool: default: true
+					}
+					length_field_length: {
+						description: "Number of bytes representing the field length"
+						required:    false
+						type: uint: default: 4
+					}
+					length_field_offset: {
+						description: "Number of bytes in the header before the length field"
+						required:    false
+						type: uint: default: 0
+					}
+					max_frame_length: {
+						description: "Maximum frame length"
+						required:    false
+						type: uint: default: 8388608
 					}
 				}
 			}
@@ -404,7 +452,7 @@ base: components: sources: datadog_agent: configuration: {
 	parse_ddtags: {
 		description: """
 			If this is set to `true`, when log events contain the field `ddtags`, the string value that
-			contains a list of key:value pairs set by the Agent is parsed and expanded into an object.
+			contains a list of key:value pairs set by the Agent is parsed and expanded into an array.
 			"""
 		required: false
 		type: bool: default: false
@@ -479,6 +527,15 @@ base: components: sources: datadog_agent: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

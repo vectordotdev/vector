@@ -105,12 +105,11 @@ pub fn write_all(
     n_events_pending: usize,
     buf: &[u8],
 ) -> io::Result<()> {
-    writer.write_all(buf).map_err(|error| {
+    writer.write_all(buf).inspect_err(|error| {
         emit!(EncoderWriteError {
-            error: &error,
+            error,
             count: n_events_pending,
         });
-        error
     })
 }
 
@@ -252,7 +251,7 @@ mod tests {
         let encoding = (
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::new().into(),
+                NewlineDelimitedEncoder::default().into(),
                 JsonSerializerConfig::default().build().into(),
             ),
         );
@@ -273,7 +272,7 @@ mod tests {
         let encoding = (
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::new().into(),
+                NewlineDelimitedEncoder::default().into(),
                 JsonSerializerConfig::default().build().into(),
             ),
         );
@@ -300,7 +299,7 @@ mod tests {
         let encoding = (
             Transformer::default(),
             crate::codecs::Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::new().into(),
+                NewlineDelimitedEncoder::default().into(),
                 JsonSerializerConfig::default().build().into(),
             ),
         );
@@ -373,7 +372,7 @@ mod tests {
         let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
         assert_eq!(written, 5);
 
-        assert_eq!(String::from_utf8(writer).unwrap(), r#"value"#);
+        assert_eq!(String::from_utf8(writer).unwrap(), r"value");
         assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
     }
 }

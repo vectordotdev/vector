@@ -230,7 +230,7 @@ impl SourceConfig for PulsarSourceConfig {
                 Kind::bytes(),
                 Some("producer_name"),
             );
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -595,7 +595,7 @@ mod integration_tests {
                 acknowledgements,
                 log_namespace,
             ));
-            producer.send(msg).await.unwrap();
+            producer.send_non_blocking(msg).await.unwrap();
 
             collect_n(rx, 1).await
         })

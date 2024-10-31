@@ -20,8 +20,6 @@ apt-get install --yes \
   apt-utils \
   apt-transport-https
 
-apt-get upgrade --yes
-
 # Deps
 apt-get install --yes --no-install-recommends \
     awscli \
@@ -41,7 +39,6 @@ apt-get install --yes --no-install-recommends \
     llvm \
     locales \
     pkg-config \
-    python3-pip \
     rename \
     rpm \
     ruby-bundler \
@@ -53,10 +50,10 @@ apt-get install --yes --no-install-recommends \
 # Cue
 TEMP=$(mktemp -d)
 curl \
-    -L https://github.com/cue-lang/cue/releases/download/v0.7.0/cue_v0.7.0_linux_amd64.tar.gz \
-    -o "${TEMP}/cue_v0.7.0_linux_amd64.tar.gz"
+    -L https://github.com/cue-lang/cue/releases/download/v0.10.0/cue_v0.10.0_linux_amd64.tar.gz \
+    -o "${TEMP}/cue_v0.10.0_linux_amd64.tar.gz"
 tar \
-    -xvf "${TEMP}/cue_v0.7.0_linux_amd64.tar.gz" \
+    -xvf "${TEMP}/cue_v0.10.0_linux_amd64.tar.gz" \
     -C "${TEMP}"
 cp "${TEMP}/cue" /usr/bin/cue
 rm -rf "$TEMP"
@@ -106,12 +103,6 @@ if ! [ -x "$(command -v docker)" ]; then
 
     # ubuntu user doesn't exist in scripts/environment/Dockerfile which runs this
     usermod --append --groups docker ubuntu || true
-fi
-
-# docker-compose
-if ! [ -x "$(command -v docker-compose)" ]; then
-  curl -fsSL "https://github.com/docker/compose/releases/download/v2.20.3/docker-compose-linux-$(uname -m)" -o /usr/local/bin/docker-compose
-  chmod +x /usr/local/bin/docker-compose
 fi
 
 bash scripts/environment/install-protoc.sh

@@ -206,6 +206,33 @@ impl AwsAuthentication {
         }
     }
 
+    /// Create the AssumeRoleProviderBuilder, ensuring we create the HTTP client with
+    /// the correct proxy and TLS options.
+    fn assume_role_provider_builder(
+        proxy: &ProxyConfig,
+        tls_options: &Option<TlsConfig>,
+        region: &Region,
+        assume_role: &str,
+        external_id: Option<&str>,
+    ) -> crate::Result<AssumeRoleProviderBuilder> {
+        let connector = super::connector(proxy, tls_options)?;
+        let config = SdkConfig::builder()
+            .http_client(connector)
+            .region(region.clone())
+            .time_source(SystemTimeSource::new())
+            .build();
+
+        let mut builder = AssumeRoleProviderBuilder::new(assume_role)
+            .region(region.clone())
+            .configure(&config);
+
+        if let Some(external_id) = external_id {
+            builder = builder.external_id(external_id)
+        }
+
+        Ok(builder)
+    }
+
     /// Returns the provider for the credentials based on the authentication mechanism chosen.
     pub async fn credentials_provider(
         &self,
@@ -228,12 +255,13 @@ impl AwsAuthentication {
                 ));
                 if let Some(assume_role) = assume_role {
                     let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                    let mut builder =
-                        AssumeRoleProviderBuilder::new(assume_role).region(auth_region);
-
-                    if let Some(external_id) = external_id {
-                        builder = builder.external_id(external_id)
-                    }
+                    let builder = Self::assume_role_provider_builder(
+                        proxy,
+                        tls_options,
+                        &auth_region,
+                        assume_role,
+                        external_id.as_deref(),
+                    )?;
 
                     let provider = builder.build_from_provider(provider).await;
 
@@ -245,14 +273,20 @@ impl AwsAuthentication {
                 credentials_file,
                 profile,
             } => {
+                let connector = super::connector(proxy, tls_options)?;
+
                 // The SDK uses the default profile out of the box, but doesn't provide an optional
                 // type in the builder. We can just hardcode it so that everything works.
                 let profile_files = ProfileFiles::builder()
                     .with_file(ProfileFileKind::Credentials, credentials_file)
                     .build();
+
+                let provider_config = ProviderConfig::empty().with_http_client(connector);
+
                 let profile_provider = ProfileFileCredentialsProvider::builder()
                     .profile_files(profile_files)
                     .profile_name(profile)
+                    .configure(&provider_config)
                     .build();
                 Ok(SharedCredentialsProvider::new(profile_provider))
             }
@@ -264,20 +298,13 @@ impl AwsAuthentication {
                 ..
             } => {
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
-                let connector = super::connector(proxy, tls_options)?;
-                let config = SdkConfig::builder()
-                    .http_client(connector)
-                    .region(auth_region.clone())
-                    .time_source(SystemTimeSource::new())
-                    .build();
-
-                let mut builder = AssumeRoleProviderBuilder::new(assume_role)
-                    .region(auth_region.clone())
-                    .configure(&config);
-
-                if let Some(external_id) = external_id {
-                    builder = builder.external_id(external_id)
-                }
+                let builder = Self::assume_role_provider_builder(
+                    proxy,
+                    tls_options,
+                    &auth_region,
+                    assume_role,
+                    external_id.as_deref(),
+                )?;
 
                 let provider = builder
                     .build_from_provider(
@@ -360,11 +387,7 @@ mod tests {
 
     #[test]
     fn parsing_default() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-        "#,
-        )
-        .unwrap();
+        let config = toml::from_str::<ComponentConfig>("").unwrap();
 
         assert!(matches!(config.auth, AwsAuthentication::Default { .. }));
     }
@@ -372,9 +395,9 @@ mod tests {
     #[test]
     fn parsing_default_with_load_timeout() {
         let config = toml::from_str::<ComponentConfig>(
-            r#"
+            "
             auth.load_timeout_secs = 10
-        "#,
+        ",
         )
         .unwrap();
 
@@ -408,11 +431,11 @@ mod tests {
     #[test]
     fn parsing_default_with_imds_client() {
         let config = toml::from_str::<ComponentConfig>(
-            r#"
+            "
             auth.imds.max_attempts = 5
             auth.imds.connect_timeout_seconds = 30
             auth.imds.read_timeout_seconds = 10
-        "#,
+        ",
         )
         .unwrap();
 

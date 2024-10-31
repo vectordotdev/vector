@@ -1,6 +1,5 @@
 #![allow(missing_docs)]
 
-use std::sync::atomic::Ordering;
 use std::{num::NonZeroU64, path::PathBuf};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
@@ -212,22 +211,6 @@ pub struct RootOpts {
     /// `--watch-config`.
     #[arg(long, env = "VECTOR_ALLOW_EMPTY_CONFIG", default_value = "false")]
     pub allow_empty_config: bool,
-
-    /// Turn on strict mode for environment variable interpolation. When set, interpolation of
-    /// a missing environment variable in configuration files will cause an error instead of
-    /// a warning, which will result in a failure to load any such configuration file. This option
-    /// is deprecated and will be removed in a future version to remove the ability to downgrade
-    /// missing environment variables to warnings.
-    #[arg(
-        long,
-        env = "VECTOR_STRICT_ENV_VARS",
-        default_value = "true",
-        default_missing_value = "true",
-        num_args = 0..=1,
-        require_equals = true,
-        action = ArgAction::Set
-    )]
-    pub strict_env_vars: bool,
 }
 
 impl RootOpts {
@@ -249,13 +232,10 @@ impl RootOpts {
     }
 
     pub fn init_global(&self) {
-        crate::config::STRICT_ENV_VARS.store(self.strict_env_vars, Ordering::Relaxed);
-
         if !self.openssl_no_probe {
             openssl_probe::init_ssl_cert_env_vars();
         }
 
-        #[cfg(not(feature = "enterprise-tests"))]
         crate::metrics::init_global().expect("metrics initialization failed");
     }
 }

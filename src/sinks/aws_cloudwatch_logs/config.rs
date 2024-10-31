@@ -174,6 +174,7 @@ impl CloudwatchLogsSinkConfig {
             self.region.endpoint(),
             proxy,
             &self.tls,
+            &None,
         )
         .await
     }

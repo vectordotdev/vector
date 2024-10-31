@@ -41,14 +41,16 @@ pub trait HttpEventEncoder<Output> {
     fn encode_event(&mut self, event: Event) -> Option<Output>;
 }
 
-#[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
     type Input;
     type Output;
     type Encoder: HttpEventEncoder<Self::Input>;
 
     fn build_encoder(&self) -> Self::Encoder;
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>>;
+    fn build_request(
+        &self,
+        events: Self::Output,
+    ) -> impl Future<Output = crate::Result<http::Request<Bytes>>> + Send;
 }
 
 /// Provides a simple wrapper around internal tower and
@@ -399,9 +401,8 @@ where
         let http_client = self.inner.clone();
 
         Box::pin(async move {
-            let request = request_builder(body).await.map_err(|error| {
-                emit!(SinkRequestBuildError { error: &error });
-                error
+            let request = request_builder(body).await.inspect_err(|error| {
+                emit!(SinkRequestBuildError { error });
             })?;
             let byte_size = request.body().len();
             let request = request.map(Body::from);
@@ -616,7 +617,7 @@ pub struct HttpRequest<T: Send> {
 
 impl<T: Send> HttpRequest<T> {
     /// Creates a new `HttpRequest`.
-    pub fn new(
+    pub const fn new(
         payload: Bytes,
         finalizers: EventFinalizers,
         request_metadata: RequestMetadata,

@@ -5,7 +5,6 @@
     feature = "sinks-datadog_logs",
     feature = "sinks-datadog_metrics",
     feature = "sinks-datadog_traces",
-    feature = "enterprise"
 ))]
 pub mod datadog;
 

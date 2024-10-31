@@ -177,11 +177,16 @@ mod tests {
 
     #[cfg(feature = "sources-statsd")]
     fn parse_encoded_metrics(metric: &[u8]) -> Vec<Metric> {
-        use crate::sources::statsd::parser::parse as statsd_parse;
+        use crate::sources::statsd::parser::Parser;
+        let statsd_parser = Parser::new(true);
 
         let s = std::str::from_utf8(metric).unwrap().trim();
         s.split('\n')
-            .map(|packet| statsd_parse(packet).expect("should not fail to parse statsd packet"))
+            .map(|packet| {
+                statsd_parser
+                    .parse(packet)
+                    .expect("should not fail to parse statsd packet")
+            })
             .collect()
     }
 

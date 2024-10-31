@@ -5,6 +5,8 @@ use crate::config::ConfigBuilder;
 
 #[tokio::test]
 async fn parse_no_input() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.bar]
           inputs = ["foo"]
@@ -31,9 +33,9 @@ async fn parse_no_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              inputs[0]: unable to locate target transform 'foo'"#}
+              inputs[0]: unable to locate target transform 'foo'"}
         .to_owned(),]
     );
 
@@ -67,15 +69,17 @@ async fn parse_no_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              inputs[1]: unable to locate target transform 'foo'"#}
+              inputs[1]: unable to locate target transform 'foo'"}
         .to_owned(),]
     );
 }
 
 #[tokio::test]
 async fn parse_no_test_input() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.bar]
           inputs = ["foo"]
@@ -98,15 +102,17 @@ async fn parse_no_test_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              must specify at least one input."#}
+              must specify at least one input."}
         .to_owned(),]
     );
 }
 
 #[tokio::test]
 async fn parse_no_outputs() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]
           inputs = ["ignored"]
@@ -127,15 +133,17 @@ async fn parse_no_outputs() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              unit test must contain at least one of `outputs` or `no_outputs_from`."#}
+              unit test must contain at least one of `outputs` or `no_outputs_from`."}
         .to_owned(),]
     );
 }
 
 #[tokio::test]
 async fn parse_invalid_output_targets() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.bar]
           inputs = ["foo"]
@@ -162,9 +170,9 @@ async fn parse_invalid_output_targets() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              Invalid extract_from target in test 'broken test': 'nonexistent' does not exist"#}
+              Invalid extract_from target in test 'broken test': 'nonexistent' does not exist"}
         .to_owned(),]
     );
 
@@ -189,15 +197,17 @@ async fn parse_invalid_output_targets() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              Invalid no_outputs_from target in test 'broken test': 'nonexistent' does not exist"#}
+              Invalid no_outputs_from target in test 'broken test': 'nonexistent' does not exist"}
         .to_owned(),]
     );
 }
 
 #[tokio::test]
 async fn parse_broken_topology() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]
           inputs = ["something"]
@@ -299,6 +309,8 @@ async fn parse_broken_topology() {
 
 #[tokio::test]
 async fn parse_bad_input_event() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]
           inputs = ["ignored"]
@@ -326,15 +338,17 @@ async fn parse_bad_input_event() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r#"
+        vec![indoc! {r"
             Failed to build test 'broken test':
-              unrecognized input type 'nah', expected one of: 'raw', 'log' or 'metric'"#}
+              unrecognized input type 'nah', expected one of: 'raw', 'log' or 'metric'"}
         .to_owned(),]
     );
 }
 
 #[tokio::test]
 async fn test_success_multi_inputs() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]
           inputs = ["ignored"]
@@ -347,7 +361,7 @@ async fn test_success_multi_inputs() {
           inputs = ["ignored"]
           type = "remap"
           source = '''
-          .new_field_two = "string value"
+          .new_field_two = "second string value"
           '''
 
         [transforms.bar]
@@ -437,6 +451,8 @@ async fn test_success_multi_inputs() {
 
 #[tokio::test]
 async fn test_success() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]
           inputs = ["ignored"]
@@ -504,6 +520,8 @@ async fn test_success() {
 
 #[tokio::test]
 async fn test_route() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
           [transforms.foo]
             inputs = ["ignored"]
@@ -566,6 +584,8 @@ async fn test_route() {
 
 #[tokio::test]
 async fn test_fail_no_outputs() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
           [transforms.foo]
             inputs = [ "TODO" ]
@@ -599,6 +619,8 @@ async fn test_fail_no_outputs() {
 
 #[tokio::test]
 async fn test_fail_two_output_events() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
           [transforms.foo]
             inputs = [ "TODO" ]
@@ -678,6 +700,8 @@ async fn test_fail_two_output_events() {
 
 #[tokio::test]
 async fn test_no_outputs_from() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
           [transforms.foo]
             inputs = [ "ignored" ]
@@ -715,6 +739,8 @@ async fn test_no_outputs_from() {
 
 #[tokio::test]
 async fn test_no_outputs_from_chained() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! { r#"
           [transforms.foo]
             inputs = [ "ignored" ]
@@ -759,6 +785,8 @@ async fn test_no_outputs_from_chained() {
 
 #[tokio::test]
 async fn test_log_input() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! { r#"
           [transforms.foo]
             inputs = ["ignored"]
@@ -798,6 +826,8 @@ async fn test_log_input() {
 
 #[tokio::test]
 async fn test_metric_input() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! { r#"
           [transforms.foo]
             inputs = ["ignored"]
@@ -837,6 +867,8 @@ async fn test_metric_input() {
 
 #[tokio::test]
 async fn test_success_over_gap() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! { r#"
           [transforms.foo]
             inputs = ["ignored"]
@@ -885,6 +917,8 @@ async fn test_success_over_gap() {
 
 #[tokio::test]
 async fn test_success_tree() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! { r#"
           [transforms.ignored]
             inputs = ["also_ignored"]
@@ -949,6 +983,8 @@ async fn test_success_tree() {
 
 #[tokio::test]
 async fn test_fails() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! { r#"
           [transforms.foo]
             inputs = ["ignored"]
@@ -1033,6 +1069,8 @@ async fn test_fails() {
 
 #[tokio::test]
 async fn test_dropped_branch() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
     [transforms.droptest]
       type = "remap"
@@ -1117,6 +1155,8 @@ async fn test_dropped_branch() {
 
 #[tokio::test]
 async fn test_task_transform() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.ingress1]
           type = "remap"
@@ -1198,6 +1238,8 @@ async fn test_task_transform() {
 
 #[tokio::test]
 async fn test_glob_input() {
+    crate::test_util::trace_init();
+
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.ingress1]
           type = "remap"
