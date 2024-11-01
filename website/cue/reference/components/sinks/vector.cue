@@ -30,7 +30,7 @@ components: sinks: vector: {
 			}
 			compression: enabled: false
 			encoding: enabled:    false
-			proxy: enabled: true
+			proxy: enabled:       true
 			request: {
 				enabled: true
 				headers: false
