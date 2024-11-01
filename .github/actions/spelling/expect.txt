@@ -28,6 +28,7 @@ apm
 appcypher
 aps
 aqf
+aquaproj
 architecting
 archivable
 ARNOTAREALIDD
@@ -1167,6 +1168,7 @@ unitdir
 unmark
 unmarshaler
 unnests
+unresumable
 unstructuredlogentries
 unsync
 untuple
