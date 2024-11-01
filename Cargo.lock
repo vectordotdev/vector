@@ -2604,7 +2604,7 @@ dependencies = [
  "bitflags 2.4.1",
  "crossterm_winapi",
  "futures-core",
- "mio 1.0.1",
+ "mio",
  "parking_lot",
  "rustix 0.38.37",
  "signal-hook",
@@ -5668,18 +5668,6 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
-dependencies = [
- "libc",
- "log",
- "wasi 0.11.0+wasi-snapshot-preview1",
- "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "mio"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4569e456d394deccd22ce1c1913e6ea0e54519f577285001215d33557431afe4"
@@ -6026,7 +6014,7 @@ dependencies = [
  "kqueue",
  "libc",
  "log",
- "mio 1.0.1",
+ "mio",
  "notify-types",
  "walkdir",
  "windows-sys 0.52.0",
@@ -8872,7 +8860,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34db1a06d485c9142248b7a054f034b349b212551f3dfd19c94d45a754a217cd"
 dependencies = [
  "libc",
- "mio 1.0.1",
+ "mio",
  "signal-hook",
 ]
 
@@ -9565,7 +9553,7 @@ dependencies = [
  "backtrace",
  "bytes 1.8.0",
  "libc",
- "mio 1.0.1",
+ "mio",
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
