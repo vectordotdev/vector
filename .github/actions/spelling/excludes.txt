@@ -1,0 +1,2 @@
+# See https://github.com/check-spelling/check-spelling/wiki/Configuration-Examples:-excludes
+^\.github/actions/spelling/
