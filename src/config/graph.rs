@@ -544,7 +544,7 @@ mod test {
 
         assert_eq!(
             Err(vec![
-                "Data type mismatch between in (Log) and out (Metric)".into()
+                "Data type mismatch between in ([\"Log\"]) and out ([\"Metric\"])".into()
             ]),
             graph.typecheck()
         );
