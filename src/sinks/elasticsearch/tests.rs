@@ -124,7 +124,7 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
         )
         .unwrap();
 
-    let expected = r#"{"create":{"_index":"vector","_type":"_doc","_id":"42","version_type":"external","version":1337}}
+    let expected = r#"{"create":{"_id":"42","_index":"vector","_type":"_doc","version":1337,"version_type":"external"}}
 {"message":"hello there","my_field":"1337","timestamp":"2020-12-01T01:02:03Z"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
@@ -172,7 +172,7 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
         )
         .unwrap();
 
-    let expected = r#"{"create":{"_index":"vector","_type":"_doc","_id":"42","version_type":"external_gte","version":1337}}
+    let expected = r#"{"create":{"_id":"42","_index":"vector","_type":"_doc","version":1337,"version_type":"external_gte"}}
 {"message":"hello there","my_field":"1337","timestamp":"2020-12-01T01:02:03Z"}
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
