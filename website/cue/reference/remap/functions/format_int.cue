@@ -22,7 +22,7 @@ remap: functions: format_int: {
 		},
 	]
 	internal_failure_reasons: [
-		"base is not between 2 and 36",
+		"The base is not between 2 and 36.",
 	]
 	return: types: ["string"]
 

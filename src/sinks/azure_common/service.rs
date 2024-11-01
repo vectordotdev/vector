@@ -17,7 +17,7 @@ pub struct AzureBlobService {
 }
 
 impl AzureBlobService {
-    pub fn new(client: Arc<ContainerClient>) -> AzureBlobService {
+    pub const fn new(client: Arc<ContainerClient>) -> AzureBlobService {
         AzureBlobService { client }
     }
 }

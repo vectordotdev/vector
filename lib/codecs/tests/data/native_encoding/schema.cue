@@ -5,8 +5,8 @@
 #Trace: {...}
 
 #Metric: {
-	name:         string
-	namespace?:   string
+	name:       string
+	namespace?: string
 	tags?: {[string]: #TagValueSet}
 	timestamp?:   #Timestamp
 	interval_ms?: int
@@ -40,11 +40,11 @@
 			sum:   number
 			avg:   number
 		}
-	}
+}
 }
 
-#TagValueSet: { #TagValue | [...#TagValue] }
+#TagValueSet: {#TagValue | [...#TagValue]}
 
-#TagValue: { string | null }
+#TagValue: {string | null}
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(.\\d+)?Z"

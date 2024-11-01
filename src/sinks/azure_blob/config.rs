@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use azure_storage_blobs::prelude::*;
-use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 
 use super::request_builder::AzureBlobRequestOptions;
+use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -24,6 +25,13 @@ use crate::{
     Result,
 };
 
+#[derive(Clone, Copy, Debug)]
+pub struct AzureBlobTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for AzureBlobTowerRequestConfigDefaults {
+    const RATE_LIMIT_NUM: u64 = 250;
+}
+
 /// Configuration for the `azure_blob` sink.
 #[configurable_component(sink(
     "azure_blob",
@@ -34,11 +42,25 @@ use crate::{
 pub struct AzureBlobSinkConfig {
     /// The Azure Blob Storage Account connection string.
     ///
-    /// Authentication with access key is the only supported authentication method.
+    /// Authentication with an access key or shared access signature (SAS)
+    /// are supported authentication methods. If using a non-account SAS,
+    /// healthchecks will fail and will need to be disabled by setting
+    /// `healthcheck.enabled` to `false` for this sink
+    ///
+    /// When generating an account SAS, the following are the minimum required option
+    /// settings for Vector to access blob storage and pass a health check.
+    /// | Option                 | Value              |
+    /// | ---------------------- | ------------------ |
+    /// | Allowed services       | Blob               |
+    /// | Allowed resource types | Container & Object |
+    /// | Allowed permissions    | Read & Create      |
     ///
     /// Either `storage_account`, or this field, must be specified.
     #[configurable(metadata(
         docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
+    ))]
+    #[configurable(metadata(
+        docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
     ))]
     pub connection_string: Option<SensitiveString>,
 
@@ -131,13 +153,13 @@ pub struct AzureBlobSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<AzureBlobTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
 }
@@ -202,9 +224,7 @@ const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 impl AzureBlobSinkConfig {
     pub fn build_processor(&self, client: Arc<ContainerClient>) -> crate::Result<VectorSink> {
-        let request_limits = self
-            .request
-            .unwrap_with(&TowerRequestConfig::default().rate_limit_num(250));
+        let request_limits = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_limits, AzureBlobRetryLogic)
             .service(AzureBlobService::new(client));

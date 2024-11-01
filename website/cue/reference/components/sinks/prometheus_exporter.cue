@@ -127,24 +127,23 @@ components: sinks: prometheus_exporter: {
 			_host: _values.local_host
 			_name: "response_time_s"
 			title: "Histogram"
-			configuration: {
-			}
+			configuration: {}
 			input: metric: {
 				kind: "absolute"
 				name: _name
 				histogram: {
 					buckets: [
 						{upper_limit: 0.005, count: 0},
-						{upper_limit: 0.01, count:  1},
+						{upper_limit: 0.01, count: 1},
 						{upper_limit: 0.025, count: 0},
-						{upper_limit: 0.05, count:  1},
-						{upper_limit: 0.1, count:   0},
-						{upper_limit: 0.25, count:  0},
-						{upper_limit: 0.5, count:   0},
-						{upper_limit: 1.0, count:   0},
-						{upper_limit: 2.5, count:   0},
-						{upper_limit: 5.0, count:   0},
-						{upper_limit: 10.0, count:  0},
+						{upper_limit: 0.05, count: 1},
+						{upper_limit: 0.1, count: 0},
+						{upper_limit: 0.25, count: 0},
+						{upper_limit: 0.5, count: 0},
+						{upper_limit: 1.0, count: 0},
+						{upper_limit: 2.5, count: 0},
+						{upper_limit: 5.0, count: 0},
+						{upper_limit: 10.0, count: 0},
 					]
 					count: 2
 					sum:   0.789
@@ -247,7 +246,7 @@ components: sinks: prometheus_exporter: {
 				summary: {
 					quantiles: [
 						{upper_limit: 0.01, value: 1.5},
-						{upper_limit: 0.5, value:  2.0},
+						{upper_limit: 0.5, value: 2.0},
 						{upper_limit: 0.99, value: 3.0},
 					]
 					count: 6
@@ -313,5 +312,11 @@ components: sinks: prometheus_exporter: {
 				values for each name, Vector will only send the last value specified.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
+		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
+		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total
 	}
 }

@@ -116,7 +116,8 @@ configuration: {
 					type: string: {
 						enum: {
 							"file":  "Enrich data from a CSV file."
-							"geoip": "Enrich data from a [MaxMind](\(urls.maxmind)) database."
+							"geoip": "Enrich data from a [GeoIp](\(urls.maxmind_geoip2)) [MaxMind](\(urls.maxmind)) database."
+							"mmdb":  "Enrich data from any [MaxMind](\(urls.maxmind)) database."
 						}
 					}
 				}
@@ -160,7 +161,7 @@ configuration: {
 									required:    false
 									type: string: {
 										default: ","
-										examples: [ ":"]
+										examples: [":"]
 									}
 								}
 
@@ -220,6 +221,8 @@ configuration: {
 						* [GeoIP2-ISP.mmdb](\(urls.maxmind_geoip2_isp)) (paid) — Determine the Internet
 							Service Provider (ISP), organization name, and autonomous system organization
 							and number associated with an IP address.
+						* [GeoIP2-Anonymous-IP.mmdb](\(urls.maxmind_geoip2_anonymous_ip)) (paid) — Determine
+							proxy, VPN, hosting, and other anonymous IP addresses.	
 
 						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
 
@@ -250,6 +253,29 @@ configuration: {
 					}
 				}
 			}
+			type: object: options: {
+				mmdb: {
+					required:    true
+					description: """
+						Configuration options for generic [MaxMind](\(urls.maxmind)) databases.
+
+						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
+
+						This enrichment table only supports lookup with IP address.
+						"""
+					type: object: options: {
+						path: {
+							description: """
+								Path to the database file.
+								"""
+							required: true
+							type: string: {
+								examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
+							}
+						}
+					}
+				}
+			}
 		}
 		schema: {
 			common: false
@@ -260,7 +286,7 @@ configuration: {
 			type: object: {
 				examples: []
 				options: {
-					log_namespacing: {
+					log_namespace: {
 						common:      false
 						description: """
 							Globally enables / disables log namespacing. See [Log Namespacing](\(urls.log_namespacing_blog))
@@ -449,12 +475,73 @@ configuration: {
 			common: false
 			description: """
 				Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
-				in Vector config. Currently, only the exec backend is supported. Multiple backends can be configured. To signify
-				Vector that it should look for a secret to retrieve use the `SECRET[<backend_name>.<secret_key>]`. This placeholder
-				will then be replaced by the secret retrieved from the relevant backend.
+				in Vector config. Multiple backends can be configured. Use `SECRET[<backend_name>.<secret_key>]` to tell Vector to retrieve the secret. This placeholder is replaced by the secret
+				retrieved from the relevant backend.
 				"""
 			required: false
 			type: object: options: {
+				file: {
+					required: true
+					description: """
+						Retrieve secrets from a file path.
+
+						The secret must be a JSON text string with key/value pairs. For example:
+						```json
+						{
+							"username": "test",
+							"password": "example-password"
+						}
+						```
+
+						If an error occurs while reading the file, Vector will log the error and exit.
+
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						path: {
+							description: "The file path to read."
+							required:    true
+							type: string: {
+								examples: ["/path/to/secret.json"]
+							}
+						}
+					}
+				}
+				directory: {
+					required: true
+					description: """
+						Retrieve secrets from file contents in a directory.
+
+						The directory must contain files with names corresponding to secret keys.
+
+						If an error occurs while reading the file, Vector will log the error and exit.
+
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						path: {
+							description: """
+								The path of the directory with secrets.
+								"""
+							required: true
+							type: string: {
+								examples: [
+									"${CREDENTIALS_DIRECTORY}", // https://systemd.io/CREDENTIALS
+									"/path/to/secrets-directory",
+								]
+							}
+						}
+						remove_trailing_whitespace: {
+							description: """
+								Remove trailing whitespace from file contents.
+								"""
+							required: false
+							type: bool: default: false
+						}
+					}
+				}
 				exec: {
 					required: true
 					description: """
@@ -479,7 +566,7 @@ configuration: {
 						If an `error` is returned for any secrets, or if the command exits with a non-zero status code,
 						Vector will log the errors and exit.
 
-						Secrets will be loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
 						configuration reload process.
 						"""
 					type: object: options: {
@@ -500,6 +587,36 @@ configuration: {
 							type: uint: {
 								default: 5
 								unit:    "seconds"
+							}
+						}
+					}
+				}
+				aws_secrets_manager: {
+					required: true
+					description: """
+						Retrieve secrets from AWS Secrets Manager.
+
+						The secret must be a JSON text string with key/value pairs. For example:
+						```json
+						{
+							"username": "test",
+							"password": "example-password"
+						}
+						```
+
+						If an error occurred retrieving the secrets, Vector logs the error and exits.
+
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						secret_id: {
+							description: """
+								The ID of the secret to be retrieved.
+								"""
+							required: true
+							type: string: {
+								examples: ["/secret/foo-bar"]
 							}
 						}
 					}
@@ -583,13 +700,13 @@ configuration: {
 				Vector interpolates environment variables within your configuration file
 				with the following syntax:
 
-				```toml title="vector.toml"
-				[transforms.add_host]
-				  inputs = ["apache_logs"]
-				  type   = "remap"
-				  source = '''
-				  .host = get_env_var!("HOSTNAME")
-				  '''
+				```toml title="vector.yaml"
+				transforms:
+					add_host:
+						inputs: ["apache_logs"]
+						type: "remap"
+						source: |
+							.host = get_env_var!("HOSTNAME")
 				```
 				"""
 
@@ -639,21 +756,23 @@ configuration: {
 
 				The following example shows a simple configuration with two backends defined:
 
-				```toml title="vector.toml"
-				[secret.backend_1]
-				type = "exec"
-				command = ["/path/to/cmd1", "--some-option"]
-				[secret.backend_2]
-				type = "exec"
-				command = ["/path/to/cmd2"]
+				```toml title="vector.yaml"
+				secret:
+					backend_1:
+						type: "exec"
+						command: ["/path/to/cmd1", "--some-option"]
+					backend_2:
+						type: "exec"
+						command: ["/path/to/cmd2"]
 
-				[sinks.dd_logs]
-				type = "datadog_logs"
-				default_api_key = "SECRET[backend_1.dd_api_key]"
+				sinks:
+					dd_logs:
+						type: "datadog_logs"
+						default_api_key: "SECRET[backend_1.dd_api_key]"
 
-				[sinks.splunk]
-				type = "splunk_hec"
-				default_token = "SECRET[backend_2.splunk_token]"
+					splunk:
+						type: "splunk_hec"
+						default_token: "SECRET[backend_2.splunk_token]"
 				```
 
 				In that example Vector will retrieve the `dd_api_key` from `backen_1` and `splunk_token` from `backend_2`.
@@ -701,7 +820,7 @@ configuration: {
 		formats: {
 			title: "Formats"
 			body:  """
-				Vector supports [TOML](\(urls.toml)), [YAML](\(urls.yaml)), and [JSON](\(urls.json)) to
+				Vector supports [YAML](\(urls.yaml)), [TOML](\(urls.toml)), and [JSON](\(urls.json)) to
 				ensure Vector fits into your workflow. A side benefit of supporting YAML and JSON is that they
 				enable you to use data templating languages such as [ytt](\(urls.ytt)), [Jsonnet](\(urls.jsonnet)) and
 				[Cue](\(urls.cue)).
@@ -711,7 +830,7 @@ configuration: {
 			title: "Location"
 			body: """
 				The location of your Vector configuration file depends on your installation method. For most Linux
-				based systems, the file can be found at `/etc/vector/vector.toml`.
+				based systems, the file can be found at `/etc/vector/vector.yaml`.
 
 				All files in `/etc/vector` are user configuration files and can be safely overridden to craft your
 				desired Vector configuration.
@@ -723,13 +842,13 @@ configuration: {
 				You can pass multiple configuration files when starting Vector:
 
 				```bash
-				vector --config vector1.toml --config vector2.toml
+				vector --config vector1.yaml --config vector2.yaml
 				```
 
 				Or use a [globbing syntax](\(urls.globbing)):
 
 				```bash
-				vector --config /etc/vector/*.toml
+				vector --config /etc/vector/*.yaml
 				```
 				"""
 		}
@@ -742,7 +861,7 @@ configuration: {
 				configure it as follows:
 
 				```toml
-				type = "sink_type"
+				type: "sink_type"
 				# here the sinks options
 				```
 
@@ -763,26 +882,28 @@ configuration: {
 
 				For example:
 
-				```toml
-				[sources.app1_logs]
-				type = "file"
-				includes = ["/var/log/app1.log"]
+				```yaml
+				sources:
+					app1_logs:
+						type: "file"
+						includes: ["/var/log/app1.log"]
 
-				[sources.app2_logs]
-				type = "file"
-				includes = ["/var/log/app.log"]
+					app2_logs:
+						type: "file"
+						includes: ["/var/log/app.log"]
 
-				[sources.system_logs]
-				type = "file"
-				includes = ["/var/log/system.log"]
+					system_logs:
+						type: "file"
+						includes: ["/var/log/system.log"]
 
-				[sinks.app_logs]
-				type = "datadog_logs"
-				inputs = ["app*"]
+				sinks:
+					app_logs:
+						type: "datadog_logs"
+						inputs: ["app*"]
 
-				[sinks.archive]
-				type = "aws_s3"
-				inputs = ["*_logs"]
+					archive:
+						type: "aws_s3"
+						inputs: ["*_logs"]
 				```
 				"""
 		}

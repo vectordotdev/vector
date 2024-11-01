@@ -4,21 +4,24 @@ use std::collections::{HashMap, HashSet};
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
-use vector_config::{
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::{
     configurable_component,
     schema::{SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, NamedComponent,
 };
-use vector_config_common::attributes::CustomAttribute;
-use vector_core::{
+use vector_lib::{
     config::{GlobalOptions, Input, LogNamespace, TransformOutput},
+    id::Inputs,
     schema,
     transform::Transform,
 };
 
+use super::dot_graph::GraphConfig;
 use super::schema::Options as SchemaOptions;
+use super::ComponentKey;
 use super::OutputId;
-use super::{id::Inputs, ComponentKey};
+use crate::extra_context::ExtraContext;
 
 pub type BoxedTransform = Box<dyn TransformConfig>;
 
@@ -36,7 +39,7 @@ impl Configurable for BoxedTransform {
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_config::component::TransformDescription::generate_schemas(gen)
+        vector_lib::configurable::component::TransformDescription::generate_schemas(gen)
     }
 }
 
@@ -54,6 +57,10 @@ pub struct TransformOuter<T>
 where
     T: Configurable + Serialize + 'static,
 {
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub graph: GraphConfig,
+
     #[configurable(derived)]
     pub inputs: Inputs<T>,
 
@@ -73,7 +80,11 @@ where
     {
         let inputs = Inputs::from_iter(inputs);
         let inner = inner.into();
-        TransformOuter { inputs, inner }
+        TransformOuter {
+            inputs,
+            inner,
+            graph: Default::default(),
+        }
     }
 
     pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U>
@@ -92,11 +103,11 @@ where
         TransformOuter {
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
+            graph: self.graph,
         }
     }
 }
 
-#[derive(Debug)]
 pub struct TransformContext {
     // This is optional because currently there are a lot of places we use `TransformContext` that
     // may not have the relevant data available (e.g. tests). In the future it'd be nice to make it
@@ -105,7 +116,7 @@ pub struct TransformContext {
 
     pub globals: GlobalOptions,
 
-    pub enrichment_tables: enrichment::TableRegistry,
+    pub enrichment_tables: vector_lib::enrichment::TableRegistry,
 
     /// Tracks the schema IDs assigned to schemas exposed by the transform.
     ///
@@ -121,6 +132,10 @@ pub struct TransformContext {
     pub merged_schema_definition: schema::Definition,
 
     pub schema: SchemaOptions,
+
+    /// Extra context data provided by the running app and shared across all components. This can be
+    /// used to pass shared settings or other data from outside the components.
+    pub extra_context: ExtraContext,
 }
 
 impl Default for TransformContext {
@@ -132,6 +147,7 @@ impl Default for TransformContext {
             schema_definitions: HashMap::from([(None, HashMap::new())]),
             merged_schema_definition: schema::Definition::any(),
             schema: SchemaOptions::default(),
+            extra_context: Default::default(),
         }
     }
 }
@@ -147,7 +163,7 @@ impl TransformContext {
         }
     }
 
-    #[cfg(any(test, feature = "test"))]
+    #[cfg(test)]
     pub fn new_test(
         schema_definitions: HashMap<Option<String>, HashMap<OutputId, schema::Definition>>,
     ) -> Self {
@@ -193,7 +209,7 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     /// of events flowing through the transform.
     fn outputs(
         &self,
-        enrichment_tables: enrichment::TableRegistry,
+        enrichment_tables: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
 
         // This only exists for transforms that create logs from non-logs, to know which namespace
@@ -250,7 +266,7 @@ pub fn get_transform_output_ids<T: TransformConfig + ?Sized>(
 ) -> impl Iterator<Item = OutputId> + '_ {
     transform
         .outputs(
-            enrichment::TableRegistry::default(),
+            vector_lib::enrichment::TableRegistry::default(),
             &[(key.clone().into(), schema::Definition::any())],
             global_log_namespace,
         )

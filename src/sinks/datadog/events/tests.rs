@@ -9,7 +9,7 @@ use futures::{
 use hyper::StatusCode;
 use indoc::indoc;
 use similar_asserts::assert_eq;
-use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_lib::event::{BatchNotifier, BatchStatus};
 
 use super::*;
 use crate::{

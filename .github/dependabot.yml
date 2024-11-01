@@ -7,16 +7,77 @@ updates:
       time: "04:00" # UTC
     labels:
       - "domain: deps"
+      - "no-changelog"
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
+    groups:
+      patches:
+        applies-to: version-updates
+        patterns:
+        - "*"
+        update-types:
+        - "patch"
+
+      amq:
+        patterns:
+        - "amq-*"
+      aws:
+        patterns:
+        - "aws-*"
+      azure:
+        patterns:
+        - "azure_*"
+      clap:
+        patterns:
+        - "clap*"
+      crossbeam:
+        patterns:
+        - "crossbeam*"
+      csv:
+        patterns:
+        - "csv*"
+      futures:
+        patterns:
+        - "futures"
+        - "futures-util"
+      metrics:
+        patterns:
+        - "metrics"
+        - "metrics-tracing-context"
+        - "metrics-util"
+      graphql:
+        patterns:
+        - "async-graphql*"
+      phf:
+        patterns:
+        - "phf*"
+      prost:
+        patterns:
+        - "prost"
+        - "prost-*"
+      tonic:
+        patterns:
+        - "tonic"
+        - "tonic-*"
+      tower:
+        patterns:
+        - "tower"
+        - "tower-*"
+      wasm-bindgen:
+        patterns:
+        - "wasm-bindgen-*"
+      zstd:
+        patterns:
+        - "zstd*"
   - package-ecosystem: "docker"
     directory: "/distribution/docker/"
     schedule:
       interval: "daily"
       time: "04:00" # UTC
     labels:
-      - "domain: deps"
+      - "domain: releasing"
+      - "no-changelog"
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
@@ -26,5 +87,11 @@ updates:
       interval: "daily"
     labels:
       - "domain: ci"
+      - "no-changelog"
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      artifact:
+        patterns:
+        - "actions/download-artifact"
+        - "actions/upload-artifact"

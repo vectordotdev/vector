@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
-use vector_core::event::{
+use vector_lib::event::{
     metric::{MetricData, MetricSeries},
     EventMetadata, Metric, MetricKind,
 };
@@ -83,10 +83,11 @@ type MetricEntry = (MetricData, EventMetadata);
 
 /// Metric storage for use with normalization.
 ///
-/// This is primarily a wrapper around `HashMap` with convenience methods to make it easier to perform
+/// This is primarily a wrapper around [`IndexMap`] (to ensure insertion order
+/// is maintained) with convenience methods to make it easier to perform
 /// normalization-specific operations.
-#[derive(Clone, Default)]
-pub struct MetricSet(HashMap<MetricSeries, MetricEntry>);
+#[derive(Clone, Default, Debug)]
+pub struct MetricSet(IndexMap<MetricSeries, MetricEntry>);
 
 impl MetricSet {
     /// Creates an empty `MetricSet` with the specified capacity.
@@ -94,7 +95,7 @@ impl MetricSet {
     /// The metric set will be able to hold at least `capacity` elements without reallocating. If `capacity` is 0, the
     /// metric set will not allocate.
     pub fn with_capacity(capacity: usize) -> Self {
-        Self(HashMap::with_capacity(capacity))
+        Self(IndexMap::with_capacity(capacity))
     }
 
     /// Returns the number of elements in the set.
@@ -236,6 +237,6 @@ impl MetricSet {
     ///
     /// If the series existed and was removed, returns `true`.  Otherwise, `false`.
     pub fn remove(&mut self, series: &MetricSeries) -> bool {
-        self.0.remove(series).is_some()
+        self.0.shift_remove(series).is_some()
     }
 }

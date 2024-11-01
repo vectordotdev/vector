@@ -1,1 +1,1 @@
-{"metric":{"name":"p","namespace":"y","timestamp":"1970-01-01T06:19:30.000000670Z","kind":"incremental","distribution":{"samples":[{"value":-519872.0,"rate":1096372440},{"value":141248.0,"rate":3721165395}],"statistic":"histogram"}}}
+{"log":{"!":8337283944978030968}}

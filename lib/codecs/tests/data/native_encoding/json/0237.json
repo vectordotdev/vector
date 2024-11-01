@@ -1,1 +1,1 @@
-{"log":{"O":null,"`\u0012n":" &/"}}
+{"metric":{"name":"x","namespace":"x","tags":{"b":"b","q":"s"},"interval_ms":2246836994,"kind":"absolute","counter":{"value":-661312.0}}}

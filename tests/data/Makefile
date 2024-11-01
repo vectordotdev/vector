@@ -133,6 +133,24 @@ ca/intermediate_server/certs/postgres.cert.pem: ca/intermediate_server/csr/postg
 ca/intermediate_server/certs/postgres-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/postgres.cert.pem
 	cat ca/intermediate_server/certs/postgres.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/postgres-chain.cert.pem
 
+ca/intermediate_server/private/rabbitmq.key.pem:
+	openssl genrsa -out ca/intermediate_server/private/rabbitmq.key.pem 2048
+
+ca/intermediate_server/csr/rabbitmq.csr.pem: ca/intermediate_server/private/rabbitmq.key.pem
+	openssl req -config ca/intermediate_server/openssl.cnf \
+		-key ca/intermediate_server/private/rabbitmq.key.pem \
+		-subj '/CN=rabbitmq/OU=Vector/O=Datadog/ST=New York/L=New York/C=US' \
+		-new -sha256 -out ca/intermediate_server/csr/rabbitmq.csr.pem
+
+ca/intermediate_server/certs/rabbitmq.cert.pem: ca/intermediate_server/csr/rabbitmq.csr.pem
+	openssl ca -batch -config ca/intermediate_server/openssl.cnf \
+		-extensions server_cert -days 3650 -notext -md sha256 \
+		-in ca/intermediate_server/csr/rabbitmq.csr.pem \
+		-out ca/intermediate_server/certs/rabbitmq.cert.pem
+
+ca/intermediate_server/certs/rabbitmq-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/rabbitmq.cert.pem
+	cat ca/intermediate_server/certs/rabbitmq.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/rabbitmq-chain.cert.pem
+
 ca/intermediate_server/private/kafka.key.pem:
 	openssl genrsa -out ca/intermediate_server/private/kafka.key.pem 2048
 

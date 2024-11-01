@@ -15,7 +15,7 @@ cli: {
 		required:    bool | *false
 		name:        Arg
 		type:        #ArgType
-		default?:    string | [...string]
+		default?: string | [...string]
 	}
 
 	#ArgType: "string" | "list"
@@ -113,6 +113,14 @@ cli: {
 			description: env_vars.VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT.description
 			env_var:     "VECTOR_NO_GRACEFUL_SHUTDOWN_LIMIT"
 		}
+		"openssl-no-probe": {
+			description: env_vars.VECTOR_OPENSSL_NO_PROBE.description
+			env_var:     "VECTOR_OPENSSL_NO_PROBE"
+		}
+		"allow-empty-config": {
+			description: env_vars.VECTOR_ALLOW_EMPTY_CONFIG.description
+			env_var:     "VECTOR_ALLOW_EMPTY_CONFIG"
+		}
 	}
 
 	_core_config_options: {
@@ -128,6 +136,11 @@ cli: {
 			type:        "string"
 			env_var:     "VECTOR_CONFIG_DIR"
 		}
+		"config-yaml": {
+			description: env_vars.VECTOR_CONFIG_YAML.description
+			type:        "string"
+			env_var:     "VECTOR_CONFIG_YAML"
+		}
 		"config-toml": {
 			description: env_vars.VECTOR_CONFIG_TOML.description
 			type:        "string"
@@ -137,11 +150,6 @@ cli: {
 			description: env_vars.VECTOR_CONFIG_JSON.description
 			type:        "string"
 			env_var:     "VECTOR_CONFIG_JSON"
-		}
-		"config-yaml": {
-			description: env_vars.VECTOR_CONFIG_YAML.description
-			type:        "string"
-			env_var:     "VECTOR_CONFIG_YAML"
 		}
 		"graceful-shutdown-limit-secs": {
 			description: env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.description
@@ -192,7 +200,7 @@ cli: {
 				You can also visualize the output online at [webgraphviz.com](http://www.webgraphviz.com/).
 				"""
 
-			example: "vector graph --config /etc/vector/vector.toml | dot -Tsvg > graph.svg"
+			example: "vector graph --config /etc/vector/vector.yaml | dot -Tsvg > graph.svg"
 
 			options: _core_options
 		}
@@ -273,7 +281,7 @@ cli: {
 				paths: _paths_arg & {
 					description: """
 						Any number of Vector config files to test. If none are specified
-						the default config path `/etc/vector/vector.toml` will be targeted
+						the default config path `/etc/vector/vector.yaml` will be targeted
 						"""
 				}
 			}
@@ -298,6 +306,10 @@ cli: {
 				"no-reconnect": {
 					_short:      "n"
 					description: "Whether to reconnect if the underlying Vector API connection drops. By default, tap will attempt to reconnect if the connection drops."
+				}
+				"duration_ms": {
+					_short:      "d"
+					description: "Specifies a duration (in milliseconds) to sample logs (e.g. passing in 10000 will sample logs for 10 seconds then exit)."
 				}
 			}
 
@@ -325,8 +337,8 @@ cli: {
 					type:        "enum"
 					default:     "json"
 					enum: {
-						json:   "Output events as JSON"
 						yaml:   "Output events as YAML"
+						json:   "Output events as JSON"
 						logfmt: "Output events as logfmt"
 					}
 				}
@@ -401,6 +413,12 @@ cli: {
 						checks and health checks
 						"""
 				}
+				"skip-healthchecks": {
+					_short: "ne"
+					description: """
+						Disables health checks during validation.
+						"""
+				}
 				"deny-warnings": {
 					_short:      "d"
 					description: "Fail validation on warnings"
@@ -408,6 +426,13 @@ cli: {
 			}
 
 			options: {
+				"config-yaml": {
+					description: """
+						Any number of Vector config files to validate.
+						YAML file format is assumed.
+						"""
+					type: "string"
+				}
 				"config-toml": {
 					description: """
 						Any number of Vector config files to validate.
@@ -422,20 +447,13 @@ cli: {
 						"""
 					type: "string"
 				}
-				"config-yaml": {
-					description: """
-						Any number of Vector config files to validate.
-						YAML file format is assumed.
-						"""
-					type: "string"
-				}
 			}
 
 			args: {
 				paths: _paths_arg & {
 					description: """
 						Any number of Vector config files to validate. If none are specified
-						the default config path `/etc/vector/vector.toml` will be targeted
+						the default config path `/etc/vector/vector.yaml` will be targeted
 						"""
 				}
 			}
@@ -527,13 +545,13 @@ cli: {
 		VECTOR_CONFIG: {
 			description: """
 				Read configuration from one or more files. Wildcard paths are supported. If no files are
-				specified the default config path `/etc/vector/vector.toml` is targeted. TOML, YAML and
+				specified the default config path `/etc/vector/vector.yaml` is targeted. TOML, YAML and
 				JSON file formats are supported. The format to interpret the file with is determined from
-				the file extension (`.toml`, `.yaml`, `.json`). Vector falls back to TOML if it can't
+				the file extension (`.yaml`, `.toml`, `.json`). Vector falls back to YAML if it can't
 				detect a supported format.
 				"""
 			type: string: {
-				default: "/etc/vector/vector.toml"
+				default: "/etc/vector/vector.yaml"
 			}
 		}
 		VECTOR_CONFIG_DIR: {
@@ -624,11 +642,35 @@ cli: {
 			description: "Never time out while waiting for graceful shutdown after SIGINT or SIGTERM received. This is useful when you would like for Vector to attempt to send data until terminated by a SIGKILL. Overrides/cannot be set with `--graceful-shutdown-limit-secs`."
 			type: bool: default: false
 		}
+		VECTOR_OPENSSL_NO_PROBE: {
+			description: """
+				Disable probing and configuration of root certificate locations on the system for OpenSSL.
+
+				The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables in the Vector process. This behavior can be problematic for users of the `exec` source, which by default inherits the environment of the Vector process.
+				"""
+			type: bool: default: false
+		}
+		VECTOR_ALLOW_EMPTY_CONFIG: {
+			description: """
+				Allow the configuration to run without any components. This is useful for loading in an empty stub config that will later be replaced with actual components. Note that this is likely not useful without also watching for config file changes as described in `--watch-config`.
+				"""
+			type: bool: default: false
+		}
+		VECTOR_STRICT_ENV_VARS: {
+			description: """
+				Turn on strict mode for environment variable interpolation. When set, interpolation of a missing
+				environment variable in configuration files will cause an error instead of a warning, which will
+				result in a failure to load any such configuration file. This option is deprecated and will be
+				removed in a future version to remove the ability to downgrade missing environment variables to
+				warnings.
+				"""
+			type: bool: default: true
+		}
 	}
 
 	// Helpers
 	_paths_arg: {
 		type:    "list"
-		default: "/etc/vector/vector.toml"
+		default: "/etc/vector/vector.yaml"
 	}
 }

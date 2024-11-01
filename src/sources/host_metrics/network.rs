@@ -4,8 +4,8 @@ use heim::net::os::linux::IoCountersExt;
 #[cfg(windows)]
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
-use vector_config::configurable_component;
-use vector_core::metric_tags;
+use vector_lib::configurable::configurable_component;
+use vector_lib::metric_tags;
 
 use crate::internal_events::HostMetricsScrapeDetailError;
 

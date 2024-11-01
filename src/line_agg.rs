@@ -15,7 +15,7 @@ use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;
 use tokio_util::time::delay_queue::{DelayQueue, Key};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 /// Mode of operation of the line aggregator.
 #[configurable_component]
@@ -108,7 +108,7 @@ pub struct LineAgg<T, K, C> {
     /// Draining queue. We switch to draining mode when we get `None` from
     /// the inner stream. In this mode we stop polling `inner` for new lines
     /// and just flush all the buffered data.
-    draining: Option<Vec<(K, Bytes, C)>>,
+    draining: Option<Vec<(K, Bytes, C, Option<C>)>>,
 }
 
 /// Core line aggregation logic.
@@ -162,8 +162,9 @@ where
 {
     /// `K` - file name, or other line source,
     /// `Bytes` - the line data,
-    /// `C` - the context related to the line data.
-    type Item = (K, Bytes, C);
+    /// `C` - the initial context related to the first line of data.
+    /// `Option<C>` - context related to the last-seen line data.
+    type Item = (K, Bytes, C, Option<C>);
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
@@ -207,8 +208,8 @@ where
                             .buffers
                             .drain()
                             .map(|(src, (_, aggregate))| {
-                                let (line, context) = aggregate.merge();
-                                (src, line, context)
+                                let (line, initial_context, last_context) = aggregate.merge();
+                                (src, line, initial_context, last_context)
                             })
                             .collect(),
                     );
@@ -220,8 +221,8 @@ where
                     {
                         let key = expired_key.into_inner();
                         if let Some((_, aggregate)) = this.logic.buffers.remove(&key) {
-                            let (line, context) = aggregate.merge();
-                            return Poll::Ready(Some((key, line, context)));
+                            let (line, initial_context, last_context) = aggregate.merge();
+                            return Poll::Ready(Some((key, line, initial_context, last_context)));
                         }
                     }
 
@@ -245,7 +246,7 @@ where
         src: K,
         line: Bytes,
         context: C,
-    ) -> Option<(K, Bytes, C)> {
+    ) -> Option<(K, Bytes, C, Option<C>)> {
         // Stashed line is always consumed at the start of the `poll`
         // loop before entering this line processing logic. If it's
         // non-empty here - it's a bug.
@@ -254,14 +255,22 @@ where
         let val = match val {
             // If we have to emit just one line - that's easy,
             // we just return it.
-            (src, Emit::One((line, context))) => (src, line, context),
+            (src, Emit::One((line, initial_context, last_context))) => {
+                (src, line, initial_context, last_context)
+            }
             // If we have to emit two lines - take the second
             // one and stash it, then return the first one.
             // This way, the stashed line will be returned
             // on the next stream poll.
-            (src, Emit::Two((line, context), (line_to_stash, context_to_stash))) => {
+            (
+                src,
+                Emit::Two(
+                    (line, initial_context, last_context),
+                    (line_to_stash, context_to_stash, _),
+                ),
+            ) => {
                 *this.stashed = Some((src.clone(), line_to_stash, context_to_stash));
-                (src, line, context)
+                (src, line, initial_context, last_context)
             }
         };
         Some(val)
@@ -294,7 +303,7 @@ where
         src: K,
         line: Bytes,
         context: C,
-    ) -> Option<(K, Emit<(Bytes, C)>)> {
+    ) -> Option<(K, Emit<(Bytes, C, Option<C>)>)> {
         // Check if we already have the buffered data for the source.
         match self.buffers.entry(src) {
             Entry::Occupied(mut entry) => {
@@ -334,7 +343,7 @@ where
                     Decision::EndExclude => {
                         let (src, (key, buffered)) = entry.remove_entry();
                         self.timeouts.remove(&key);
-                        Some((src, Emit::Two(buffered.merge(), (line, context))))
+                        Some((src, Emit::Two(buffered.merge(), (line, context, None))))
                     }
                 }
             }
@@ -350,7 +359,7 @@ where
                     None
                 } else {
                     // It's just a regular line we don't really care about.
-                    Some((entry.into_key(), Emit::One((line, context))))
+                    Some((entry.into_key(), Emit::One((line, context, None))))
                 }
             }
         }
@@ -359,23 +368,25 @@ where
 
 struct Aggregate<C> {
     lines: Vec<Bytes>,
-    context: C,
+    initial_context: C,
+    last_context: Option<C>,
 }
 
 impl<C> Aggregate<C> {
-    fn new(first_line: Bytes, context: C) -> Self {
+    fn new(first_line: Bytes, initial_context: C) -> Self {
         Self {
             lines: vec![first_line],
-            context,
+            initial_context,
+            last_context: None,
         }
     }
 
     fn add_next_line(&mut self, line: Bytes, context: C) {
-        self.context = context;
+        self.last_context = Some(context);
         self.lines.push(line);
     }
 
-    fn merge(self) -> (Bytes, C) {
+    fn merge(self) -> (Bytes, C, Option<C>) {
         let capacity = self.lines.iter().map(|line| line.len() + 1).sum::<usize>() - 1;
         let mut bytes_mut = BytesMut::with_capacity(capacity);
         let mut first = true;
@@ -387,7 +398,7 @@ impl<C> Aggregate<C> {
             }
             bytes_mut.extend_from_slice(&line);
         }
-        (bytes_mut.freeze(), self.context)
+        (bytes_mut.freeze(), self.initial_context, self.last_context)
     }
 }
 
@@ -419,16 +430,21 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            ("some usual line", 0),
-            ("some other usual line", 1),
-            (concat!("first part\n", " second part\n", " last part"), 4),
-            ("another normal message", 5),
+            ("some usual line", 0, None),
+            ("some other usual line", 1, None),
+            (
+                concat!("first part\n", " second part\n", " last part"),
+                2,
+                Some(4),
+            ),
+            ("another normal message", 5, None),
             (
                 concat!(
                     "finishing message\n",
                     " last part of the incomplete finishing message"
                 ),
-                7,
+                6,
+                Some(7),
             ),
         ];
         run_and_assert(&lines, config, &expected).await;
@@ -453,19 +469,21 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            ("some usual line", 0),
-            ("some other usual line", 1),
+            ("some usual line", 0, None),
+            ("some other usual line", 1, None),
             (
                 concat!("first part \\\n", "second part \\\n", "last part"),
-                4,
+                2,
+                Some(4),
             ),
-            ("another normal message", 5),
+            ("another normal message", 5, None),
             (
                 concat!(
                     "finishing message \\\n",
                     "last part of the incomplete finishing message \\"
                 ),
-                7,
+                6,
+                Some(7),
             ),
         ];
         run_and_assert(&lines, config, &expected).await;
@@ -490,19 +508,21 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            ("INFO some usual line", 0),
-            ("INFO some other usual line", 1),
+            ("INFO some usual line", 0, None),
+            ("INFO some other usual line", 1, None),
             (
                 concat!("INFO first part\n", "second part\n", "last part"),
-                4,
+                2,
+                Some(4),
             ),
-            ("ERROR another normal message", 5),
+            ("ERROR another normal message", 5, None),
             (
                 concat!(
                     "ERROR finishing message\n",
                     "last part of the incomplete finishing message"
                 ),
-                7,
+                6,
+                Some(7),
             ),
         ];
         run_and_assert(&lines, config, &expected).await;
@@ -527,16 +547,21 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            ("some usual line;", 0),
-            ("some other usual line;", 1),
-            (concat!("first part\n", "second part\n", "last part;"), 4),
-            ("another normal message;", 5),
+            ("some usual line;", 0, None),
+            ("some other usual line;", 1, None),
+            (
+                concat!("first part\n", "second part\n", "last part;"),
+                2,
+                Some(4),
+            ),
+            ("another normal message;", 5, None),
             (
                 concat!(
                     "finishing message\n",
                     "last part of the incomplete finishing message"
                 ),
-                7,
+                6,
+                Some(7),
             ),
         ];
         run_and_assert(&lines, config, &expected).await;
@@ -561,7 +586,8 @@ mod tests {
                 "    at com.foo.bar(bar.java:123)\n",
                 "    at com.foo.baz(baz.java:456)",
             ),
-            2,
+            0,
+            Some(2),
         )];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -587,7 +613,8 @@ mod tests {
                 "\tfrom foobar.rb:2:in `foo'\n",
                 "\tfrom foobar.rb:9:in `<main>'",
             ),
-            3,
+            0,
+            Some(3),
         )];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -618,16 +645,16 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            ("not merged 1", 0),
-            (" merged 1\n merged 2", 2),
-            ("not merged 2", 3),
-            (" merged 3\n merged 4", 5),
-            ("not merged 3", 6),
-            ("not merged 4", 7),
-            (" merged 5", 8),
-            ("not merged 5", 9),
-            (" merged 6\n merged 7\n merged 8", 12),
-            ("not merged 6", 13),
+            ("not merged 1", 0, None),
+            (" merged 1\n merged 2", 1, Some(2)),
+            ("not merged 2", 3, None),
+            (" merged 3\n merged 4", 4, Some(5)),
+            ("not merged 3", 6, None),
+            ("not merged 4", 7, None),
+            (" merged 5", 8, None),
+            ("not merged 5", 9, None),
+            (" merged 6\n merged 7\n merged 8", 10, Some(12)),
+            ("not merged 6", 13, None),
         ];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -656,12 +683,12 @@ mod tests {
             timeout: Duration::from_millis(10),
         };
         let expected = vec![
-            ("part 0.1\npart 0.2", 1),
-            ("START msg 1\npart 1.1\npart 1.2", 4),
-            ("START msg 2", 5),
-            ("START msg 3\npart 3.1", 7),
-            ("START msg 4\npart 4.1\npart 4.2\npart 4.3", 11),
-            ("START msg 5", 12),
+            ("part 0.1\npart 0.2", 0, Some(1)),
+            ("START msg 1\npart 1.1\npart 1.2", 2, Some(4)),
+            ("START msg 2", 5, None),
+            ("START msg 3\npart 3.1", 6, Some(7)),
+            ("START msg 4\npart 4.1\npart 4.2\npart 4.3", 8, Some(11)),
+            ("START msg 5", 12, None),
         ];
         run_and_assert(&lines, config, &expected).await;
     }
@@ -679,19 +706,21 @@ mod tests {
             "last part of the incomplete finishing message",
         ];
         let expected = vec![
-            ("INFO some usual line", 0),
-            ("INFO some other usual line", 1),
+            ("INFO some usual line", 0, None),
+            ("INFO some other usual line", 1, None),
             (
                 concat!("INFO first part\n", "second part\n", "last part"),
-                4,
+                2,
+                Some(4),
             ),
-            ("ERROR another normal message", 5),
+            ("ERROR another normal message", 5, None),
             (
                 concat!(
                     "ERROR finishing message\n",
                     "last part of the incomplete finishing message"
                 ),
-                7,
+                6,
+                Some(7),
             ),
         ];
 
@@ -753,7 +782,7 @@ mod tests {
 
         assert_results(
             results.await.unwrap(),
-            &[(expected.as_str(), lines.len() - 1)],
+            &[(expected.as_str(), 0, Some(lines.len() - 1))],
         );
     }
 
@@ -775,14 +804,18 @@ mod tests {
     }
 
     /// Compare actual output to expected; expected is a list of the expected strings and context
-    fn assert_results(actual: Vec<(Filename, Bytes, usize)>, expected: &[(&str, usize)]) {
-        let expected_mapped: Vec<(Filename, Bytes, usize)> = expected
+    fn assert_results(
+        actual: Vec<(Filename, Bytes, usize, Option<usize>)>,
+        expected: &[(&str, usize, Option<usize>)],
+    ) {
+        let expected_mapped: Vec<(Filename, Bytes, usize, Option<usize>)> = expected
             .iter()
-            .map(|(line, context)| {
+            .map(|(line, context, last_context)| {
                 (
                     "test.log".to_owned(),
                     Bytes::copy_from_slice(line.as_bytes()),
                     *context,
+                    *last_context,
                 )
             })
             .collect();
@@ -796,7 +829,7 @@ mod tests {
     async fn run_and_assert(
         lines: &[&'static str],
         config: Config,
-        expected: &[(&'static str, usize)],
+        expected: &[(&'static str, usize, Option<usize>)],
     ) {
         let stream = stream_from_lines(lines);
         let logic = Logic::new(config);

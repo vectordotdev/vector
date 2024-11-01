@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use clap::Parser;
+use itertools::Itertools;
 
 use crate::config;
 
@@ -11,7 +13,7 @@ pub struct Opts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
     /// If zero files are specified the default config path
-    /// `/etc/vector/vector.toml` will be targeted.
+    /// `/etc/vector/vector.yaml` will be targeted.
     #[arg(
         id = "config",
         short,
@@ -65,6 +67,17 @@ impl Opts {
     }
 }
 
+fn node_attributes_to_string(attributes: &HashMap<String, String>, default_shape: &str) -> String {
+    let mut attrs = attributes.clone();
+    if !attrs.contains_key("shape") {
+        attrs.insert("shape".to_string(), default_shape.to_string());
+    }
+    return attrs
+        .iter()
+        .map(|(k, v)| format!("{}=\"{}\"", k, v))
+        .join(" ");
+}
+
 pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
@@ -85,12 +98,24 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     let mut dot = String::from("digraph {\n");
 
-    for (id, _source) in config.sources() {
-        writeln!(dot, "  \"{}\" [shape=trapezium]", id).expect("write to String never fails");
+    for (id, source) in config.sources() {
+        writeln!(
+            dot,
+            "  \"{}\" [{}]",
+            id,
+            node_attributes_to_string(&source.graph.node_attributes, "trapezium")
+        )
+        .expect("write to String never fails");
     }
 
     for (id, transform) in config.transforms() {
-        writeln!(dot, "  \"{}\" [shape=diamond]", id).expect("write to String never fails");
+        writeln!(
+            dot,
+            "  \"{}\" [{}]",
+            id,
+            node_attributes_to_string(&transform.graph.node_attributes, "diamond")
+        )
+        .expect("write to String never fails");
 
         for input in transform.inputs.iter() {
             if let Some(port) = &input.port {
@@ -108,7 +133,13 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 
     for (id, sink) in config.sinks() {
-        writeln!(dot, "  \"{}\" [shape=invtrapezium]", id).expect("write to String never fails");
+        writeln!(
+            dot,
+            "  \"{}\" [{}]",
+            id,
+            node_attributes_to_string(&sink.graph.node_attributes, "invtrapezium")
+        )
+        .expect("write to String never fails");
 
         for input in &sink.inputs {
             if let Some(port) = &input.port {

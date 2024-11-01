@@ -1,21 +1,21 @@
-use std::{collections::HashSet, error, fmt, future::ready, pin::Pin, sync::Arc};
+use std::sync::{Arc, LazyLock};
+use std::{collections::HashSet, error, fmt, future::ready, pin::Pin};
 
 use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
-use lookup::owned_value_path;
-use lookup::OwnedTargetPath;
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
+use vector_lib::lookup::owned_value_path;
+use vector_lib::lookup::OwnedTargetPath;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 
@@ -44,21 +44,22 @@ const VPC_ID_KEY: &str = "vpc-id";
 const ROLE_NAME_KEY: &str = "role-name";
 const TAGS_KEY: &str = "tags";
 
-static AVAILABILITY_ZONE: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone"));
-static LOCAL_HOSTNAME: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/local-hostname"));
-static LOCAL_IPV4: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/local-ipv4"));
-static PUBLIC_HOSTNAME: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/public-hostname"));
-static PUBLIC_IPV4: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/public-ipv4"));
-static ROLE_NAME: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/iam/security-credentials/"));
-static MAC: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/mac"));
-static DYNAMIC_DOCUMENT: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/dynamic/instance-identity/document"));
+static AVAILABILITY_ZONE: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone"));
+static LOCAL_HOSTNAME: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/local-hostname"));
+static LOCAL_IPV4: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/local-ipv4"));
+static PUBLIC_HOSTNAME: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/public-hostname"));
+static PUBLIC_IPV4: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/public-ipv4"));
+static ROLE_NAME: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/iam/security-credentials/"));
+static MAC: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/mac"));
+static DYNAMIC_DOCUMENT: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/dynamic/instance-identity/document"));
 static DEFAULT_FIELD_ALLOWLIST: &[&str] = &[
     AMI_ID_KEY,
     AVAILABILITY_ZONE_KEY,
@@ -73,8 +74,9 @@ static DEFAULT_FIELD_ALLOWLIST: &[&str] = &[
     VPC_ID_KEY,
     ROLE_NAME_KEY,
 ];
-static API_TOKEN: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/latest/api/token"));
-static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-token"));
+static API_TOKEN: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/api/token"));
+static TOKEN_HEADER: LazyLock<Bytes> = LazyLock::new(|| Bytes::from("X-aws-ec2-metadata-token"));
 
 /// Configuration for the `aws_ec2_metadata` transform.
 #[serde_as]
@@ -123,10 +125,7 @@ pub struct Ec2Metadata {
     refresh_timeout_secs: Duration,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 
     /// Requires the transform to be able to successfully query the EC2 metadata before starting to process the data.
@@ -247,7 +246,7 @@ impl TransformConfig for Ec2Metadata {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
@@ -641,11 +640,6 @@ fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
             OwnedSegment::Index(i) => {
                 output += &i.to_string();
             }
-            OwnedSegment::Coalesce(fields) => {
-                if let Some(first) = fields.first() {
-                    output += first;
-                }
-            }
         }
     }
     output
@@ -719,8 +713,8 @@ mod test {
     use crate::config::schema::Definition;
     use crate::config::{LogNamespace, OutputId, TransformConfig};
     use crate::transforms::aws_ec2_metadata::Ec2Metadata;
-    use enrichment::TableRegistry;
-    use lookup::OwnedTargetPath;
+    use vector_lib::enrichment::TableRegistry;
+    use vector_lib::lookup::OwnedTargetPath;
     use vrl::owned_value_path;
     use vrl::value::Kind;
 
@@ -749,10 +743,10 @@ mod test {
 #[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
-    use lookup::{event_path, PathPrefix};
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
+    use vector_lib::lookup::{event_path, PathPrefix};
 
     use super::*;
     use crate::{
@@ -760,9 +754,8 @@ mod integration_tests {
         test_util::{components::assert_transform_compliance, next_addr},
         transforms::test::create_topology,
     };
-    use std::collections::BTreeMap;
-    use vector_common::assert_event_data_eq;
-    use vrl::value::Value;
+    use vector_lib::assert_event_data_eq;
+    use vrl::value::{ObjectMap, Value};
     use warp::Filter;
 
     fn ec2_metadata_address() -> String {
@@ -1027,9 +1020,9 @@ mod integration_tests {
             expected_log.insert(format!("\"{}\"", REGION_KEY).as_str(), "us-east-1");
             expected_log.insert(
                 format!("\"{}\"", TAGS_KEY).as_str(),
-                BTreeMap::from([
-                    ("Name".to_string(), Value::from("test-instance")),
-                    ("Test".to_string(), Value::from("test-tag")),
+                ObjectMap::from([
+                    ("Name".into(), Value::from("test-instance")),
+                    ("Test".into(), Value::from("test-tag")),
                 ]),
             );
 

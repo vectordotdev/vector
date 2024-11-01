@@ -1,1 +1,1 @@
-{"metric":{"name":"k","namespace":"p","kind":"incremental","gauge":{"value":-167936.0}}}
+{"metric":{"name":"w","namespace":"j","tags":{"a":"l","d":"n","s":"z"},"timestamp":"1970-01-01T00:00:00.000027295Z","kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":538304.0,"value":-106304.0},{"quantile":476736.0,"value":-100352.0},{"quantile":186522.982,"value":989888.0},{"quantile":944960.0,"value":-427968.0}],"count":5618240014776193310,"sum":-981504.0}}}

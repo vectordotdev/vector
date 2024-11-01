@@ -1,11 +1,8 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
-use crate::emit;
 use crate::event::metric::{MetricKind, MetricValue};
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
-};
+use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
 #[derive(Debug)]
 pub struct StatsdInvalidMetricError<'a> {
@@ -26,11 +23,12 @@ impl<'a> InternalEvent for StatsdInvalidMetricError<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "invalid_metric",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { reason, count: 1 });
     }

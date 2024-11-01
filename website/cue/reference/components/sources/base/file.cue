@@ -26,8 +26,10 @@ base: components: sources: file: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the [global `data_dir` option][global_data_dir] is used. Make sure the running user has write
-			permissions to this directory.
+			By default, the [global `data_dir` option][global_data_dir] is used.
+			Make sure the running user has write permissions to this directory.
+
+			If this directory is specified, then Vector will attempt to create it.
 
 			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 			"""
@@ -167,10 +169,7 @@ base: components: sources: file: configuration: {
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: {
-			default: "host"
-			examples: ["hostname"]
-		}
+		type: string: examples: ["hostname"]
 	}
 	ignore_checkpoints: {
 		description: """
@@ -205,6 +204,20 @@ base: components: sources: file: configuration: {
 		required:    true
 		type: array: items: type: string: examples: ["/var/log/**/*.log"]
 	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type: object: options: include_file_tag: {
+			description: """
+				Whether or not to include the "file" tag on the component's corresponding internal metrics.
+
+				This is useful for distinguishing between different files while monitoring. However, the tag's
+				cardinality is unbounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
+	}
 	line_delimiter: {
 		description: "String sequence used to separate one file line from another."
 		required:    false
@@ -228,8 +241,14 @@ base: components: sources: file: configuration: {
 		}
 	}
 	max_read_bytes: {
-		description: "An approximate limit on the amount of data read from a single file at a given time."
-		required:    false
+		description: """
+			Max amount of bytes to read from a single file before switching over to the next file.
+			**Note:** This does not apply when `oldest_first` is `true`.
+
+			This allows distributing the reads more or less evenly across
+			the files.
+			"""
+		required: false
 		type: uint: {
 			default: 2048
 			unit:    "bytes"
@@ -319,7 +338,7 @@ base: components: sources: file: configuration: {
 		]
 	}
 	oldest_first: {
-		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."
+		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files."
 		required:    false
 		type: bool: default: false
 	}
@@ -344,6 +363,17 @@ base: components: sources: file: configuration: {
 		type: uint: {
 			examples: [0, 5, 60]
 			unit: "seconds"
+		}
+	}
+	rotate_wait_secs: {
+		description: """
+			How long to keep an open handle to a rotated log file.
+			The default value represents "no limit"
+			"""
+		required: false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "seconds"
 		}
 	}
 }

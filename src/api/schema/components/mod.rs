@@ -6,12 +6,12 @@ pub mod transform;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
+    sync::LazyLock,
 };
 
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
-use once_cell::sync::Lazy;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
-use vector_core::internal_event::DEFAULT_OUTPUT;
+use vector_lib::internal_event::DEFAULT_OUTPUT;
 
 use crate::{
     api::schema::{
@@ -23,10 +23,11 @@ use crate::{
     filter_check,
 };
 
+#[allow(clippy::duplicated_attributes)] // False positive caused by `ty = "String"`
 #[derive(Debug, Clone, Interface)]
 #[graphql(
-    field(name = "component_id", type = "String"),
-    field(name = "component_type", type = "String")
+    field(name = "component_id", ty = "String"),
+    field(name = "component_type", ty = "String")
 )]
 pub enum Component {
     Source(source::Source),
@@ -222,8 +223,8 @@ enum ComponentChanged {
     Removed(Component),
 }
 
-static COMPONENT_CHANGED: Lazy<tokio::sync::broadcast::Sender<ComponentChanged>> =
-    Lazy::new(|| {
+static COMPONENT_CHANGED: LazyLock<tokio::sync::broadcast::Sender<ComponentChanged>> =
+    LazyLock::new(|| {
         let (tx, _) = tokio::sync::broadcast::channel(10);
         tx
     });

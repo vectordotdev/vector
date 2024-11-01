@@ -7,18 +7,18 @@ use std::{
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
-use codecs::{
+use smallvec::SmallVec;
+use tokio_util::codec::Decoder as _;
+use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use lookup::{lookup_v2::parse_value_path, owned_value_path, path};
-use smallvec::SmallVec;
-use tokio_util::codec::Decoder as _;
+use vector_lib::lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
 };
@@ -30,11 +30,15 @@ use crate::{
         SourceContext, SourceOutput,
     },
     event::{Event, LogEvent},
+    http::KeepaliveConfig,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::util::{
-        http::{add_query_parameters, HttpMethod},
-        ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    sources::{
+        http_server::{build_param_matcher, remove_duplicates, HttpConfigParamKind},
+        util::{
+            http::{add_query_parameters, HttpMethod},
+            ErrorMessage, HttpSource, HttpSourceAuthConfig,
+        },
     },
     tls::TlsEnableableConfig,
 };
@@ -50,9 +54,16 @@ pub struct LogplexConfig {
 
     /// A list of URL query parameters to include in the log event.
     ///
+    /// Accepts the wildcard (`*`) character for query parameters matching a specified pattern.
+    ///
+    /// Specifying "*" results in all query parameters included in the log event.
+    ///
     /// These override any values included in the body with conflicting names.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "application", docs::examples = "source"))]
+    #[configurable(metadata(docs::examples = "application"))]
+    #[configurable(metadata(docs::examples = "source"))]
+    #[configurable(metadata(docs::examples = "param*"))]
+    #[configurable(metadata(docs::examples = "*"))]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
@@ -77,6 +88,10 @@ pub struct LogplexConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl LogplexConfig {
@@ -146,6 +161,7 @@ impl Default for LogplexConfig {
             decoding: default_decoding(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             log_namespace: None,
+            keepalive: KeepaliveConfig::default(),
         }
     }
 }
@@ -163,10 +179,14 @@ impl SourceConfig for LogplexConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let decoder =
-            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
         let source = LogplexSource {
-            query_parameters: self.query_parameters.clone(),
+            query_parameters: build_param_matcher(&remove_duplicates(
+                self.query_parameters.clone(),
+                "query_parameters",
+            ))?,
             decoder,
             log_namespace,
         };
@@ -175,11 +195,13 @@ impl SourceConfig for LogplexConfig {
             self.address,
             "events",
             HttpMethod::Post,
+            StatusCode::OK,
             true,
             &self.tls,
             &self.auth,
             cx,
             self.acknowledgements,
+            self.keepalive.clone(),
         )
     }
 
@@ -187,7 +209,7 @@ impl SourceConfig for LogplexConfig {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let schema_def = self.schema_definition(global_log_namespace.merge(self.log_namespace));
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_def,
         )]
@@ -204,7 +226,7 @@ impl SourceConfig for LogplexConfig {
 
 #[derive(Clone, Default)]
 struct LogplexSource {
-    query_parameters: Vec<String>,
+    query_parameters: Vec<HttpConfigParamKind>,
     decoder: Decoder,
     log_namespace: LogNamespace,
 }
@@ -278,6 +300,7 @@ impl HttpSource for LogplexSource {
         _request_path: &str,
         _headers_config: &HeaderMap,
         query_parameters: &HashMap<String, String>,
+        _source_ip: Option<&SocketAddr>,
     ) {
         add_query_parameters(
             events,
@@ -406,9 +429,9 @@ mod tests {
 
     use chrono::{DateTime, Utc};
     use futures::Stream;
-    use lookup::{owned_value_path, OwnedTargetPath};
     use similar_asserts::assert_eq;
-    use vector_core::{
+    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+    use vector_lib::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},
         schema::Definition,
@@ -450,6 +473,7 @@ mod tests {
                 decoding: default_decoding(),
                 acknowledgements: acknowledgements.into(),
                 log_namespace: None,
+                keepalive: Default::default(),
             }
             .build(context)
             .await
@@ -521,7 +545,7 @@ mod tests {
             let log = event.as_log();
 
             assert_eq!(
-                log[log_schema().message_key()],
+                *log.get_message().unwrap(),
                 r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
             );
             assert_eq!(
@@ -531,10 +555,55 @@ mod tests {
                     .unwrap()
                     .into()
             );
-            assert_eq!(log[log_schema().host_key().unwrap().to_string()], "host".into());
-            assert_eq!(log[log_schema().source_type_key().unwrap().to_string()], "heroku_logs".into());
+            assert_eq!(*log.get_host().unwrap(), "host".into());
+            assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
             assert_eq!(log["appname"], "lumberjack-store".into());
             assert_eq!(log["absent"], Value::Null);
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn logplex_query_parameters_wildcard() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let auth = make_auth();
+
+            let (rx, addr) = source(
+                Some(auth.clone()),
+                vec!["*".to_string()],
+                EventStatus::Delivered,
+                true,
+            )
+            .await;
+
+            let mut events = spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        200,
+                        send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
+                    )
+                },
+                rx,
+                SAMPLE_BODY.lines().count(),
+            )
+            .await;
+
+            let event = events.remove(0);
+            let log = event.as_log();
+
+            assert_eq!(
+                *log.get_message().unwrap(),
+                r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
+            );
+            assert_eq!(
+                log[log_schema().timestamp_key().unwrap().to_string()],
+                "2020-01-08T22:33:57.353034+00:00"
+                    .parse::<DateTime<Utc>>()
+                    .unwrap()
+                    .into()
+            );
+            assert_eq!(*log.get_host().unwrap(), "host".into());
+            assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
+            assert_eq!(log["appname"], "lumberjack-store".into());
         }).await;
     }
 
@@ -606,7 +675,7 @@ mod tests {
         let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
-        assert_eq!(log[log_schema().message_key()], "foo bar baz".into());
+        assert_eq!(*log.get_message().unwrap(), "foo bar baz".into());
         assert_eq!(
             log[log_schema().timestamp_key().unwrap().to_string()],
             "2020-01-08T22:33:57.353034+00:00"
@@ -614,14 +683,8 @@ mod tests {
                 .unwrap()
                 .into()
         );
-        assert_eq!(
-            log[log_schema().host_key().unwrap().to_string().as_str()],
-            "host".into()
-        );
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "heroku_logs".into()
-        );
+        assert_eq!(*log.get_host().unwrap(), "host".into());
+        assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
     }
 
     #[test]
@@ -631,20 +694,9 @@ mod tests {
         let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
-        assert_eq!(
-            log[log_schema().message_key()],
-            "what am i doing here".into()
-        );
-        assert!(log
-            .get((
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap()
-            ))
-            .is_some());
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "heroku_logs".into()
-        );
+        assert_eq!(*log.get_message().unwrap(), "what am i doing here".into());
+        assert!(log.get_timestamp().is_some());
+        assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
     }
 
     #[test]
@@ -654,7 +706,7 @@ mod tests {
         let events = super::line_to_events(Default::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
-        assert_eq!(log[log_schema().message_key()], "i'm not that long".into());
+        assert_eq!(*log.get_message().unwrap(), "i'm not that long".into());
         assert_eq!(
             log[log_schema().timestamp_key().unwrap().to_string()],
             "2020-01-08T22:33:57.353034+00:00"
@@ -662,14 +714,8 @@ mod tests {
                 .unwrap()
                 .into()
         );
-        assert_eq!(
-            log[log_schema().host_key().unwrap().to_string().as_str()],
-            "host".into()
-        );
-        assert_eq!(
-            log[log_schema().source_type_key().unwrap().to_string()],
-            "heroku_logs".into()
-        );
+        assert_eq!(*log.get_host().unwrap(), "host".into());
+        assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
     }
 
     #[test]

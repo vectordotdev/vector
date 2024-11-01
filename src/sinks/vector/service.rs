@@ -8,8 +8,8 @@ use hyper_proxy::ProxyConnector;
 use prost::Message;
 use tonic::{body::BoxBody, IntoRequest};
 use tower::Service;
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::stream::DriverResponse;
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::stream::DriverResponse;
 
 use super::VectorSinkError;
 use crate::{
@@ -119,6 +119,7 @@ impl Service<VectorRequest> for VectorService {
                         protocol: &service.protocol,
                         endpoint: &service.endpoint,
                     });
+
                     VectorResponse { events_byte_size }
                 })
                 .map_err(|source| VectorSinkError::Request { source }.into())

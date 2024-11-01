@@ -1,11 +1,10 @@
-use std::collections::BTreeMap;
-
-use super::{all_fields, Value};
+use super::all_fields;
+use crate::event::{KeyString, ObjectMap};
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order.
 /// It is implemented as a wrapper around `all_fields` to reduce code
 /// duplication.
-pub fn keys(fields: &BTreeMap<String, Value>) -> impl Iterator<Item = String> + '_ {
+pub fn keys(fields: &ObjectMap) -> impl Iterator<Item = KeyString> + '_ {
     all_fields(fields).map(|(k, _)| k)
 }
 
@@ -24,7 +23,7 @@ mod test {
         }));
         let expected: Vec<_> = vec!["field1", "field2", "field3"]
             .into_iter()
-            .map(String::from)
+            .map(KeyString::from)
             .collect();
 
         let collected: Vec<_> = keys(&fields).collect();
@@ -53,7 +52,7 @@ mod test {
             "a.b.c",
         ]
         .into_iter()
-        .map(String::from)
+        .map(KeyString::from)
         .collect();
 
         let collected: Vec<_> = keys(&fields).collect();

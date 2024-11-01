@@ -1,18 +1,12 @@
 //! Handles enrichment tables for `type = file`.
-use std::{
-    collections::{BTreeMap, HashMap},
-    fs,
-    hash::Hasher,
-    path::PathBuf,
-    time::SystemTime,
-};
+use std::{collections::HashMap, fs, hash::Hasher, path::PathBuf, time::SystemTime};
 
 use bytes::Bytes;
-use enrichment::{Case, Condition, IndexHandle, Table};
 use tracing::trace;
-use vector_common::{conversion::Conversion, TimeZone};
-use vector_config::configurable_component;
-use vrl::value::Value;
+use vector_lib::configurable::configurable_component;
+use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use vector_lib::{conversion::Conversion, TimeZone};
+use vrl::value::{ObjectMap, Value};
 
 use crate::config::EnrichmentTableConfig;
 
@@ -20,7 +14,7 @@ use crate::config::EnrichmentTableConfig;
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum Encoding {
+pub enum Encoding {
     /// Decodes the file as a [CSV][csv] (comma-separated values) file.
     ///
     /// [csv]: https://wikipedia.org/wiki/Comma-separated_values
@@ -52,24 +46,26 @@ impl Default for Encoding {
 /// File-specific settings.
 #[configurable_component]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct FileSettings {
+pub struct FileSettings {
     /// The path of the enrichment table file.
     ///
     /// Currently, only [CSV][csv] files are supported.
     ///
     /// [csv]: https://en.wikipedia.org/wiki/Comma-separated_values
-    path: PathBuf,
+    pub path: PathBuf,
 
+    /// File encoding configuration.
     #[configurable(derived)]
-    encoding: Encoding,
+    pub encoding: Encoding,
 }
 
 /// Configuration for the `file` enrichment table.
 #[configurable_component(enrichment_table("file"))]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileConfig {
+    /// File-specific settings.
     #[configurable(derived)]
-    file: FileSettings,
+    pub file: FileSettings,
 
     /// Key/value pairs representing mapped log field names and types.
     ///
@@ -115,7 +111,7 @@ pub struct FileConfig {
     /// [rfc3339]: https://tools.ietf.org/html/rfc3339
     /// [chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
-    schema: HashMap<String, String>,
+    pub schema: HashMap<String, String>,
 }
 
 const fn default_delimiter() -> char {
@@ -184,10 +180,8 @@ impl FileConfig {
         })
     }
 
-    fn load_file(
-        &self,
-        timezone: TimeZone,
-    ) -> crate::Result<(Vec<String>, Vec<Vec<Value>>, SystemTime)> {
+    /// Load the configured file into memory. Required to create a new file enrichment table.
+    pub fn load_file(&self, timezone: TimeZone) -> crate::Result<FileData> {
         let Encoding::Csv {
             include_headers,
             delimiter,
@@ -230,27 +224,41 @@ impl FileConfig {
             headers
         );
 
-        let modified = fs::metadata(&self.file.path)?.modified()?;
+        let file = reader.into_inner();
 
-        Ok((headers, data, modified))
+        Ok(FileData {
+            headers,
+            data,
+            modified: file.metadata()?.modified()?,
+        })
     }
 }
 
-#[async_trait::async_trait]
 impl EnrichmentTableConfig for FileConfig {
     async fn build(
         &self,
         globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        let (headers, data, modified) = self.load_file(globals.timezone())?;
-
-        Ok(Box::new(File::new(self.clone(), modified, data, headers)))
+        Ok(Box::new(File::new(
+            self.clone(),
+            self.load_file(globals.timezone())?,
+        )))
     }
 }
 
 impl_generate_config_from_default!(FileConfig);
 
-/// A struct that implements [enrichment::Table] to handle loading enrichment data from a CSV file.
+/// The data resulting from loading a configured file.
+pub struct FileData {
+    /// The ordered set of headers of the data columns.
+    pub headers: Vec<String>,
+    /// The data contained in the file.
+    pub data: Vec<Vec<Value>>,
+    /// The last modified time of the file.
+    pub modified: SystemTime,
+}
+
+/// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a CSV file.
 #[derive(Clone)]
 pub struct File {
     config: FileConfig,
@@ -266,17 +274,12 @@ pub struct File {
 
 impl File {
     /// Creates a new [File] based on the provided config.
-    pub fn new(
-        config: FileConfig,
-        last_modified: SystemTime,
-        data: Vec<Vec<Value>>,
-        headers: Vec<String>,
-    ) -> Self {
+    pub fn new(config: FileConfig, data: FileData) -> Self {
         Self {
             config,
-            last_modified,
-            data,
-            headers,
+            last_modified: data.modified,
+            data: data.data,
+            headers: data.headers,
             indexes: Vec::new(),
         }
     }
@@ -311,7 +314,7 @@ impl File {
         })
     }
 
-    fn add_columns(&self, select: Option<&[String]>, row: &[Value]) -> BTreeMap<String, Value> {
+    fn add_columns(&self, select: Option<&[String]>, row: &[Value]) -> ObjectMap {
         self.headers
             .iter()
             .zip(row)
@@ -321,7 +324,7 @@ impl File {
                     // If no select is passed, we assume all columns are included
                     .unwrap_or(true)
             })
-            .map(|(header, col)| (header.clone(), col.clone()))
+            .map(|(header, col)| (header.as_str().into(), col.clone()))
             .collect()
     }
 
@@ -399,7 +402,7 @@ impl File {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
-    ) -> impl Iterator<Item = BTreeMap<String, Value>> + 'a
+    ) -> impl Iterator<Item = ObjectMap> + 'a
     where
         I: Iterator<Item = &'a Vec<Value>> + 'a,
     {
@@ -484,7 +487,7 @@ impl Table for File {
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, Value>, String> {
+    ) -> Result<ObjectMap, String> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
@@ -509,7 +512,7 @@ impl Table for File {
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
+    ) -> Result<Vec<ObjectMap>, String> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
@@ -703,12 +706,14 @@ mod tests {
     fn finds_row() {
         let file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let condition = Condition::Equals {
@@ -717,9 +722,9 @@ mod tests {
         };
 
         assert_eq!(
-            Ok(BTreeMap::from([
-                (String::from("field1"), Value::from("zirp")),
-                (String::from("field2"), Value::from("zurp")),
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zirp")),
+                ("field2".into(), Value::from("zurp")),
             ])),
             file.find_table_row(Case::Sensitive, &[condition], None, None)
         );
@@ -729,13 +734,15 @@ mod tests {
     fn duplicate_indexes() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            Vec::new(),
-            vec![
-                "field1".to_string(),
-                "field2".to_string(),
-                "field3".to_string(),
-            ],
+            FileData {
+                modified: SystemTime::now(),
+                data: Vec::new(),
+                headers: vec![
+                    "field1".to_string(),
+                    "field2".to_string(),
+                    "field3".to_string(),
+                ],
+            },
         );
 
         let handle1 = file.add_index(Case::Sensitive, &["field2", "field3"]);
@@ -749,13 +756,15 @@ mod tests {
     fn errors_on_missing_columns() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            Vec::new(),
-            vec![
-                "field1".to_string(),
-                "field2".to_string(),
-                "field3".to_string(),
-            ],
+            FileData {
+                modified: SystemTime::now(),
+                data: Vec::new(),
+                headers: vec![
+                    "field1".to_string(),
+                    "field2".to_string(),
+                    "field3".to_string(),
+                ],
+            },
         );
 
         let error = file.add_index(Case::Sensitive, &["apples", "field2", "bananas"]);
@@ -769,12 +778,14 @@ mod tests {
     fn finds_row_with_index() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
@@ -785,9 +796,9 @@ mod tests {
         };
 
         assert_eq!(
-            Ok(BTreeMap::from([
-                (String::from("field1"), Value::from("zirp")),
-                (String::from("field2"), Value::from("zurp")),
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zirp")),
+                ("field2".into(), Value::from("zurp")),
             ])),
             file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
         );
@@ -797,26 +808,28 @@ mod tests {
     fn finds_rows_with_index_case_sensitive() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-                vec!["zip".into(), "zoop".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                    vec!["zip".into(), "zoop".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
 
         assert_eq!(
             Ok(vec![
-                BTreeMap::from([
-                    (String::from("field1"), Value::from("zip")),
-                    (String::from("field2"), Value::from("zup")),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
                 ]),
-                BTreeMap::from([
-                    (String::from("field1"), Value::from("zip")),
-                    (String::from("field2"), Value::from("zoop")),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
                 ]),
             ]),
             file.find_table_rows(
@@ -848,17 +861,19 @@ mod tests {
     fn selects_columns() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into(), "zoop".into()],
-                vec!["zirp".into(), "zurp".into(), "zork".into()],
-                vec!["zip".into(), "zoop".into(), "zibble".into()],
-            ],
-            vec![
-                "field1".to_string(),
-                "field2".to_string(),
-                "field3".to_string(),
-            ],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into(), "zoop".into()],
+                    vec!["zirp".into(), "zurp".into(), "zork".into()],
+                    vec!["zip".into(), "zoop".into(), "zibble".into()],
+                ],
+                headers: vec![
+                    "field1".to_string(),
+                    "field2".to_string(),
+                    "field3".to_string(),
+                ],
+            },
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
@@ -870,13 +885,13 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                BTreeMap::from([
-                    (String::from("field1"), Value::from("zip")),
-                    (String::from("field3"), Value::from("zoop")),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field3".into(), Value::from("zoop")),
                 ]),
-                BTreeMap::from([
-                    (String::from("field1"), Value::from("zip")),
-                    (String::from("field3"), Value::from("zibble")),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field3".into(), Value::from("zibble")),
                 ]),
             ]),
             file.find_table_rows(
@@ -892,26 +907,28 @@ mod tests {
     fn finds_rows_with_index_case_insensitive() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-                vec!["zip".into(), "zoop".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                    vec!["zip".into(), "zoop".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let handle = file.add_index(Case::Insensitive, &["field1"]).unwrap();
 
         assert_eq!(
             Ok(vec![
-                BTreeMap::from([
-                    (String::from("field1"), Value::from("zip")),
-                    (String::from("field2"), Value::from("zup")),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
                 ]),
-                BTreeMap::from([
-                    (String::from("field1"), Value::from("zip")),
-                    (String::from("field2"), Value::from("zoop")),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
                 ]),
             ]),
             file.find_table_rows(
@@ -927,13 +944,13 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                BTreeMap::from([
-                    (String::from("field1"), Value::from("zip")),
-                    (String::from("field2"), Value::from("zup")),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
                 ]),
-                BTreeMap::from([
-                    (String::from("field1"), Value::from("zip")),
-                    (String::from("field2"), Value::from("zoop")),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
                 ]),
             ]),
             file.find_table_rows(
@@ -952,28 +969,30 @@ mod tests {
     fn finds_row_with_dates() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec![
-                    "zip".into(),
-                    Value::Timestamp(
-                        chrono::Utc
-                            .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
-                            .single()
-                            .expect("invalid timestamp"),
-                    ),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
                 ],
-                vec![
-                    "zip".into(),
-                    Value::Timestamp(
-                        chrono::Utc
-                            .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
-                            .single()
-                            .expect("invalid timestamp"),
-                    ),
-                ],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
@@ -997,10 +1016,10 @@ mod tests {
         ];
 
         assert_eq!(
-            Ok(BTreeMap::from([
-                (String::from("field1"), Value::from("zip")),
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zip")),
                 (
-                    String::from("field2"),
+                    "field2".into(),
                     Value::Timestamp(
                         chrono::Utc
                             .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
@@ -1017,12 +1036,14 @@ mod tests {
     fn doesnt_find_row() {
         let file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let condition = Condition::Equals {
@@ -1040,12 +1061,14 @@ mod tests {
     fn doesnt_find_row_with_index() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();

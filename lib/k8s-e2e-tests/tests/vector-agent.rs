@@ -34,17 +34,24 @@ const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
     metadata:
       name: vector-agent-config
     data:
-      vector.toml: |
-        data_dir = "/vector-data-dir"
-        [api]
-            enabled = false
-        [sources.kubernetes_logs]
-            type = "kubernetes_logs"
-            ingestion_timestamp_field = ".ingest_timestamp"
-        [sinks.stdout]
-            type = "console"
-            inputs = ["kubernetes_logs"]
-            encoding.codec = "json"
+      vector.yaml: |
+        data_dir: "/vector-data-dir"
+
+        api:
+          enabled: false
+
+        sources:
+          kubernetes_logs:
+            type: "kubernetes_logs"
+            ingestion_timestamp_field: ".ingest_timestamp"
+
+        sinks:
+          stdout:
+            type: "console"
+            inputs:
+              - "kubernetes_logs"
+            encoding:
+              codec: "json"
 "#};
 
 /// This test validates that vector picks up logs at the simplest case
@@ -986,6 +993,8 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
               inputs: [kubernetes_logs]
               encoding:
                 codec: json
+                json:
+                    pretty: false
     "#};
 
     let vector = framework
@@ -1388,6 +1397,8 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
               inputs: [kubernetes_logs]
               encoding:
                 codec: json
+                json:
+                    pretty: false
     "#};
 
     let vector = framework
@@ -1607,7 +1618,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
         expected_namespaces.insert(name);
     }
 
-    // Create a pod for our other pods to have an affinity to to ensure they are all deployed on
+    // Create a pod for our other pods to have an affinity to ensure they are all deployed on
     // the same node.
     let affinity_ns_name = format!("{}-affinity", pod_namespace);
     let affinity_ns = framework

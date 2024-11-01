@@ -8,7 +8,7 @@ package metadata
 #Glossary: [#Term, ...#Term]
 
 glossary: #Glossary & [
-		{
+	{
 		term:        "Batch"
 		description: """
 			A [batched payload](\(urls.vector_log)) within a [sink](#sink). It is a batch of events

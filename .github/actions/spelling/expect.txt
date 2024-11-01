@@ -8,7 +8,6 @@ Acq
 AEAD
 agentpayload
 aimd
-akx
 allowerased
 amka
 amping
@@ -33,12 +32,10 @@ aquaproj
 architecting
 archivable
 ARNOTAREALIDD
-arshiyasolei
 asdf
 asdfasdf
 assertverify
 Asterix
-asynk
 atag
 atx
 aty
@@ -55,6 +52,7 @@ autodiscovered
 autodiscovery
 autogen
 autoinstalling
+AUTOPULL
 autospawn
 autospawning
 autotools
@@ -63,13 +61,13 @@ awscli
 awsec
 awslabs
 axum
-Aziz
 azureresourceid
 babim
 badunit
 bak
 barfoo
 barieom
+basearch
 baseof
 basevalue
 baskinc
@@ -146,6 +144,7 @@ centiseconds
 cernan
 cfactor
 CFFI
+cfgs
 CGP
 cgroups
 chans
@@ -157,7 +156,6 @@ chkptr
 chronosphere
 chunkenc
 cicd
-Cim
 ciphersuites
 CLA
 Claranet
@@ -167,7 +165,6 @@ clibtype
 clickhouse
 clonable
 cloudresourcemanager
-cloudsmith
 cloudwatchlogs
 cmark
 CMK
@@ -187,9 +184,10 @@ composability
 concating
 concats
 condrestart
-configkey
+conffiles
 configmap
 confl
+confluentinc
 confy
 consigliere
 CONTEUDO
@@ -198,6 +196,7 @@ copypasta'd
 copypasted
 copytruncate
 corechecks
+corepack
 could've
 counteraaaaaaaaaaa
 cpf
@@ -221,6 +220,7 @@ cwl
 Dailywarehousing
 daschl
 dashmap
+datadir
 dataflows
 datafuselabs
 datasources
@@ -231,6 +231,7 @@ datname
 dbkind
 dbreader
 DBserver
+DCMAKE
 ddagent
 ddev
 ddmetric
@@ -284,7 +285,6 @@ Doop
 downcasted
 droptest
 dsl
-dsmith
 dstat
 dstport
 dtype
@@ -317,13 +317,10 @@ eni
 enp
 enumdecl
 enumflags
-ENVARS
 envsubst
-EOIG
 EOL'ed
 Err'ing
 errorf
-Errorsfor
 esb
 esque
 etheus
@@ -347,6 +344,7 @@ exitcodes
 exprhere
 extendedstatus
 extendee
+extglob
 extr
 extralight
 extrepo
@@ -374,6 +372,7 @@ filecontents
 filterlist
 finalizable
 fingerprinter
+fipsmodule
 fizzaxbbuzz
 fizzbuzz
 fkn
@@ -390,6 +389,8 @@ Fomichev
 fonttbl
 foob
 foobarbaz
+foobarbazqux
+foobarbazquxquux
 foobarfoobarfoo
 FOOBARy
 foobaz
@@ -410,7 +411,6 @@ fsevent
 fslock
 FSTRM
 fsyncdata
-fuchsnj
 fullhuman
 futs
 fuzzcheck
@@ -442,9 +442,11 @@ gnux
 gny
 Godbolt
 gogoproto
+gohai
 goldberg
-goldmark
 GPB
+gpgcheck
+gpgkey
 gqlgen
 graphqlconfig
 grault
@@ -459,6 +461,7 @@ gty
 Guangzhou
 guenter
 gzip'ed
+hadolint
 halfsies
 hannes
 Hashbang
@@ -513,6 +516,7 @@ imds
 IMSD
 incentivizes
 incrementalize
+indexgateway
 indexmap
 indicatif
 indoc
@@ -521,6 +525,7 @@ ingesters
 ingestor
 initdb
 initech
+installdeb
 Instrumentable
 interpolatedstring
 interpretervm
@@ -554,6 +559,7 @@ jmxrmi
 jmxtrans
 Jolokia
 jsn
+JSONAs
 jsonify
 jsonlines
 jstype
@@ -563,12 +569,13 @@ jtype
 juchiast
 karppila
 kartar
+kebabcase
 kemmer
 kernelmode
 keybase
 keyclock
 keyid
-keypair
+keyring
 keyxxxxx
 khvzak
 kib
@@ -614,6 +621,7 @@ lognamespace
 lognamespacing
 logplex
 logproto
+logql
 logqlmodel
 logsense
 logsev
@@ -623,12 +631,12 @@ losslessly
 lpop
 lpush
 Luc
-luciofranco
 lucperkins
 lukesteensen
 macports
 MAINPID
 majorly
+makecache
 MAKECMDGOALS
 Makefiles
 markability
@@ -644,7 +652,6 @@ maybeanothertest
 mbean
 mcache
 mcr
-meh
 meln
 memfd
 memmap
@@ -675,7 +682,6 @@ mlua
 mmdb
 Mmm
 moby
-mockwatchlogs
 modulesloaddir
 mooper
 moosh
@@ -723,9 +729,7 @@ nbase
 ndarray
 ndjson
 nearline
-neuronull
 newcerts
-newrelix
 nextest
 nfox
 ngx
@@ -738,8 +742,10 @@ noauth
 nocapture
 nochild
 nodebuginfo
+nodistro
 nofield
 nofree
+nohup
 nomac
 NONALPHANUM
 nonbare
@@ -774,6 +780,7 @@ nullishness
 numbackends
 oahd
 oap
+OIDC
 OKD
 omfwd
 omitempty
@@ -791,6 +798,7 @@ opinsights
 oplog
 optimizable
 orgid
+OSSL
 ostype
 otel
 otelcol
@@ -802,14 +810,15 @@ ouicompat
 outputspatterns
 overaligned
 overalignment
+owen
 owo
 oyaml
-pablosichert
 pageheap
 paq
 parallelizable
 pareto
 partitionable
+pascalcase
 passthrough
 pathbuf
 pathgen
@@ -817,6 +826,7 @@ peekable
 PEMS
 pgmajfault
 pgrep
+pidof
 PII
 Pitbull
 pkc
@@ -834,6 +844,7 @@ posttrunc
 prebuild
 precpu
 preds
+prefs
 preinst
 preread
 prereqs
@@ -842,7 +853,6 @@ presetdir
 pretrunc
 prettydiff
 primaryfont
-probot
 processname
 procid
 promhttp
@@ -860,6 +870,7 @@ purgecss
 pyld
 Pzb
 qqq
+queryrangebase
 quickcheck
 quix
 quuux
@@ -869,6 +880,7 @@ qwe
 raboof
 rande
 RANDFILE
+ratatui
 rawconfig
 rawstring
 rdkafka
@@ -929,6 +941,7 @@ rxs
 ryangjchandler
 ryu
 sadf
+salvacorts
 samehost
 samenet
 samerole
@@ -939,7 +952,7 @@ sccache
 schemaless
 schemars
 schoen
-scl
+screamingsnakecase
 sda
 sdata
 SDID
@@ -964,7 +977,6 @@ shortcode
 shortstat
 should've
 shutsdown
-Sichert
 SIEM
 sighup
 Signsoff
@@ -974,6 +986,7 @@ sigterm
 singlethreaded
 sinkbuilder
 sinknetworkbytessent
+SIV
 sizecache
 Sizefor
 skinparam
@@ -981,6 +994,7 @@ skywalking
 slashin
 slf
 slideover
+slugified
 smallvec
 smartphone
 Smol
@@ -988,6 +1002,7 @@ smp
 smpl
 smtracking
 snakecase
+Sni
 Soldotna
 somehost
 somejob
@@ -1027,7 +1042,6 @@ stdduration
 stdlog
 Steensen
 stephenwakely
-strat
 strconv
 streamsink
 strng
@@ -1038,6 +1052,7 @@ subfolders
 subfooter
 sublimelinter
 subsec
+subsecond
 substrategies
 subtagline
 subtimer
@@ -1066,6 +1081,7 @@ Takeaways
 targetgroup
 tarpit
 tcmalloc
+teconsent
 telecom
 templatable
 templateable
@@ -1109,11 +1125,11 @@ Tomola
 tonydanza
 toolbars
 toolchains
-toolset
 toor
 topdir
 topojson
 toproto
+towncrier
 Toxiproxy
 Tpng
 Trauring
@@ -1125,7 +1141,8 @@ tripwires
 Trivago
 trivy
 Troutwine
-TRUSTSTORE
+trustarc
+truste
 TSDB
 Tsvg
 turbofish
@@ -1145,11 +1162,13 @@ undertagline
 underutilized
 underutilizing
 unevictable
+unflatten
 unioning
 unitdir
 unmark
 unmarshaler
 unnests
+unresumable
 unstructuredlogentries
 unsync
 untuple
@@ -1163,6 +1182,7 @@ userpass
 uucp
 UVY
 uwtable
+Uyuni
 valfoo
 validpaths
 Varda
@@ -1172,7 +1192,6 @@ vectordir
 vectordotdev
 vectorized
 vendored
-veryyyyyyy
 viceversa
 viewkind
 visualising
@@ -1192,9 +1211,9 @@ walkthrough
 waninfo
 wasmtime
 watchexec
-watchlogs
 wayfor
 webgraphviz
+webpki
 webservers
 websites
 weee
@@ -1214,7 +1233,6 @@ wktpointer
 wmem
 woooooow
 woothee
-wor
 wordlist
 workdir
 workstreams
@@ -1226,8 +1244,6 @@ wtcache
 wtime
 wtimeouts
 wtr
-wurstmeister
-wwang
 xact
 xcatsy
 Xcg

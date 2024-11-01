@@ -1,15 +1,14 @@
 use std::path::{Path, PathBuf};
-use std::{fs, io::ErrorKind};
+use std::{fs, io::ErrorKind, sync::LazyLock};
 
 use anyhow::{anyhow, Context, Result};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 use super::config::Environment;
 use crate::{platform, util};
 
-static DATA_DIR: Lazy<PathBuf> = Lazy::new(|| {
-    [platform::data_dir().as_path(), Path::new("integration")]
+static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    [platform::data_dir(), Path::new("integration")]
         .into_iter()
         .collect()
 });

@@ -16,13 +16,12 @@ remap: functions: remove_secret: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reasons: [
-	]
+	internal_failure_reasons: []
 	return: types: ["null"]
 
 	examples: [
 		{
-			title: "Removes the Datadog API key from the event."
+			title: "Removes the Datadog API key from the event"
 			source: #"""
 				remove_secret("datadog_api_key")
 				"""#

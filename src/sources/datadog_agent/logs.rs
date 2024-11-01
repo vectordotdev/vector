@@ -2,16 +2,20 @@ use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
-use codecs::StreamDecodingError;
 use http::StatusCode;
-use lookup::path;
 use tokio_util::codec::Decoder;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_core::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vector_lib::codecs::StreamDecodingError;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::json_size::JsonSize;
+use vector_lib::lookup::path;
+use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vrl::core::Value;
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
+use crate::common::datadog::DDTAGS;
 use crate::{
     event::Event,
+    internal_events::DatadogAgentJsonParseError,
     sources::{
         datadog_agent::{
             handle_request, ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg,
@@ -67,8 +71,9 @@ pub(crate) fn decode_log_body(
     api_key: Option<Arc<str>>,
     source: &DatadogAgentSource,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    if body.is_empty() {
+    if body.is_empty() || body.as_ref() == b"{}" {
         // The datadog agent may send an empty payload as a keep alive
+        // https://github.com/DataDog/datadog-agent/blob/5a6c5dd75a2233fbf954e38ddcc1484df4c21a35/pkg/logs/client/http/destination.go#L52
         debug!(
             message = "Empty payload ignored.",
             internal_log_rate_limit = true
@@ -77,6 +82,8 @@ pub(crate) fn decode_log_body(
     }
 
     let messages: Vec<LogMsg> = serde_json::from_slice(&body).map_err(|error| {
+        emit!(DatadogAgentJsonParseError { error: &error });
+
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
             format!("Error parsing JSON: {:?}", error),
@@ -85,6 +92,7 @@ pub(crate) fn decode_log_body(
 
     let now = Utc::now();
     let mut decoded = Vec::new();
+    let mut event_bytes_received = JsonSize::zero();
 
     for LogMsg {
         message,
@@ -99,6 +107,7 @@ pub(crate) fn decode_log_body(
         let mut decoder = source.decoder.clone();
         let mut buffer = BytesMut::new();
         buffer.put(message);
+
         loop {
             match decoder.decode_eof(&mut buffer) {
                 Ok(Some((events, _byte_size))) => {
@@ -142,13 +151,23 @@ pub(crate) fn decode_log_body(
                                 path!("ddsource"),
                                 ddsource.clone(),
                             );
+
+                            let ddtags: Value = if source.parse_ddtags {
+                                parse_ddtags(&ddtags)
+                            } else {
+                                ddtags.clone().into()
+                            };
+
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(path!("ddtags"))),
-                                path!("ddtags"),
-                                ddtags.clone(),
+                                Some(LegacyKey::InsertIfEmpty(path!(DDTAGS))),
+                                path!(DDTAGS),
+                                ddtags,
                             );
+
+                            // compute EstimatedJsonSizeOf before enrichment
+                            event_bytes_received += log.estimated_json_encoded_size_of();
 
                             namespace.insert_standard_vector_source_metadata(
                                 log,
@@ -160,8 +179,13 @@ pub(crate) fn decode_log_body(
                                 log.metadata_mut().set_datadog_api_key(Arc::clone(k));
                             }
 
+                            let logs_schema_definition = source
+                                .logs_schema_definition
+                                .as_ref()
+                                .unwrap_or_else(|| panic!("registered log schema required"));
+
                             log.metadata_mut()
-                                .set_schema_definition(&source.logs_schema_definition);
+                                .set_schema_definition(logs_schema_definition);
                         }
 
                         decoded.push(event);
@@ -179,10 +203,86 @@ pub(crate) fn decode_log_body(
         }
     }
 
-    source.events_received.emit(CountByteSize(
-        decoded.len(),
-        decoded.estimated_json_encoded_size_of(),
-    ));
+    source
+        .events_received
+        .emit(CountByteSize(decoded.len(), event_bytes_received));
 
     Ok(decoded)
+}
+
+// ddtags input is a string containing a list of tags which
+// can include both bare tags and key-value pairs.
+// the tag list members are separated by `,` and the
+// tag-value pairs are separated by `:`.
+//
+// The output is an Array regardless of the input string.
+fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
+    if ddtags_raw.is_empty() {
+        return Vec::<Value>::new().into();
+    }
+
+    let ddtags_str = String::from_utf8_lossy(ddtags_raw);
+
+    // There are multiple tags, which could be either bare or pairs
+    let ddtags: Vec<Value> = ddtags_str
+        .split(',')
+        .filter(|kv| !kv.is_empty())
+        .map(|kv| Value::Bytes(Bytes::from(kv.trim().to_string())))
+        .collect();
+
+    if ddtags.is_empty() && !ddtags_str.is_empty() {
+        warn!(message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed.")
+    }
+
+    ddtags.into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use similar_asserts::assert_eq;
+    use vrl::value;
+
+    #[test]
+    fn ddtags_parse_empty() {
+        let raw = Bytes::from(String::from(""));
+        let val = parse_ddtags(&raw);
+
+        assert_eq!(val, value!([]));
+    }
+
+    #[test]
+    fn ddtags_parse_bare() {
+        let raw = Bytes::from(String::from("bare"));
+        let val = parse_ddtags(&raw);
+
+        assert_eq!(val, value!(["bare"]));
+    }
+
+    #[test]
+    fn ddtags_parse_kv_one() {
+        let raw = Bytes::from(String::from("filename:driver.log"));
+        let val = parse_ddtags(&raw);
+
+        assert_eq!(val, value!(["filename:driver.log"]));
+    }
+
+    #[test]
+    fn ddtags_parse_kv_multi() {
+        let raw = Bytes::from(String::from("filename:driver.log,wizard:the_grey"));
+        let val = parse_ddtags(&raw);
+
+        assert_eq!(val, value!(["filename:driver.log", "wizard:the_grey"]));
+    }
+
+    #[test]
+    fn ddtags_parse_kv_bare_combo() {
+        let raw = Bytes::from(String::from("filename:driver.log,debug,wizard:the_grey"));
+        let val = parse_ddtags(&raw);
+
+        assert_eq!(
+            val,
+            value!(["filename:driver.log", "debug", "wizard:the_grey"])
+        );
+    }
 }

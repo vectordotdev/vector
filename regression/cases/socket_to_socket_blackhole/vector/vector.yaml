@@ -1,0 +1,32 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  socket_source:
+    type:    "socket"
+    address: "0.0.0.0:8282"
+    mode:    "tcp"
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  socket_sink:
+    type:    "socket"
+    inputs: [ "socket_source" ]
+    mode:    "tcp"
+    address: "localhost:8080"
+    encoding:
+      codec: "json"

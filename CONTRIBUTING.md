@@ -102,7 +102,11 @@ outputs to reference the filter, and finally update the outputs of `workflow_cal
 ### Git Branches
 
 _All_ changes must be made in a branch and submitted as [pull requests](#github-pull-requests).
-Vector does not adopt any type of branch naming style, but please use something
+
+If you want your branch to have a website preview build created, include the word `website` in the
+branch.
+
+Otherwise, Vector does not adopt any type of branch naming style, but please use something
 descriptive of your changes.
 
 ### Git Commits
@@ -128,7 +132,7 @@ format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
 A list of allowed sub-categories is defined
-[here](https://github.com/vectordotdev/vector/tree/master/.github).
+[here](https://github.com/vectordotdev/vector/blob/master/.github/semantic.yml#L21).
 
 The following are all good examples of pull request titles:
 
@@ -161,6 +165,15 @@ with one of our engineers. This way we can talk through the solution and
 discuss if a change that large is even needed! This will produce a quicker
 response to the change and likely produce code that aligns better with our
 process.
+
+#### Changelog
+
+By default, all pull requests are assumed to include user-facing changes that
+need to be communicated in the project's changelog. If your pull request does
+not contain user-facing changes that warrant describing in the changelog, add
+the label 'no-changelog' to your PR. When in doubt, consult the vector team
+for guidance. The details on how to add a changelog entry for your PR are
+outlined in detail in [changelog.d/README.md](changelog.d/README.md).
 
 ### CI
 
@@ -221,16 +234,37 @@ Integration tests are not run by default when running
 `cargo vdev test`. Instead, they are accessible via the integration subcommand (example:
 `cargo vdev int test aws` runs aws-related integration tests). You can find the list of available integration tests using `cargo vdev int show`. Integration tests require docker or podman to run.
 
+### Running other checks
+
+There are other checks that are run by CI before the PR can be merged. These should be run locally
+first to ensure they pass.
+
+```sh
+# Run the Clippy linter to catch common mistakes.
+cargo vdev check rust --clippy
+# Ensure all code is properly formatted. Code can be run through `rustfmt` using `cargo fmt` to ensure it is properly formatted.
+cargo vdev check fmt
+# Ensure the internal metrics that Vector emits conform to standards.
+cargo vdev check events
+# Ensure the `LICENSE-3rdparty.csv` file is up to date with the licenses each of Vector's dependencies are published under.
+cargo vdev check licenses
+# Vector's documentation for each component is generated from the comments attached to the Component structs and members.
+# Running this ensures that the generated docs are up to date.
+make check-component-docs
+# Generate the code documentation for the Vector project.
+# Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
+cd rust-doc && make docs
+```
 
 ### Deprecations
 
-When deprecating functionality in Vector, see [DEPRECATION.md](DEPRECATION.md).
+When deprecating functionality in Vector, see [DEPRECATION.md](docs/DEPRECATION.md).
 
 ### Dependencies
 
 When adding, modifying, or removing a dependency in Vector you may find that you need to update the
 inventory of third-party licenses maintained in `LICENSE-3rdparty.csv`. This file is generated using
-[rust-license-tool](https://github.com/DataDog/rust-license-tool.git) and can be updated using
+[dd-rust-license-tool](https://github.com/DataDog/rust-license-tool.git) and can be updated using
 `cargo vdev build licenses`.
 
 ## Next steps
@@ -238,9 +272,9 @@ inventory of third-party licenses maintained in `LICENSE-3rdparty.csv`. This fil
 As discussed in the [`README`](README.md), you should continue to the following
 documents:
 
-1. **[DEVELOPING.md](DEVELOPING.md)** - Everything necessary to develop
-2. **[DOCUMENTING.md](DOCUMENTING.md)** - Preparing your change for Vector users
-3. **[DEPRECATION.md](DEPRECATION.md)** - Deprecating functionality in Vector
+1. **[DEVELOPING.md](docs/DEVELOPING.md)** - Everything necessary to develop
+2. **[DOCUMENTING.md](docs/DOCUMENTING.md)** - Preparing your change for Vector users
+3. **[DEPRECATION.md](docs/DEPRECATION.md)** - Deprecating functionality in Vector
 
 ## Legal
 

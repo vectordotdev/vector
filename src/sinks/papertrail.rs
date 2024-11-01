@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vrl::value::Kind;
 
 use crate::{
@@ -45,7 +45,7 @@ pub struct PapertrailConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -131,7 +131,7 @@ struct PapertrailEncoder {
 }
 
 impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
-    type Error = codecs::encoding::Error;
+    type Error = vector_lib::codecs::encoding::Error;
 
     fn encode(
         &mut self,
@@ -186,10 +186,10 @@ mod tests {
     use std::convert::TryFrom;
 
     use bytes::BytesMut;
-    use codecs::JsonSerializerConfig;
     use futures::{future::ready, stream};
     use tokio_util::codec::Encoder as _;
-    use vector_core::event::{Event, LogEvent};
+    use vector_lib::codecs::JsonSerializerConfig;
+    use vector_lib::event::{Event, LogEvent};
 
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},

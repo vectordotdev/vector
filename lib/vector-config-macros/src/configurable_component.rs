@@ -7,7 +7,8 @@ use syn::{
     token::Comma, DeriveInput, Lit, LitStr, Meta, MetaList, Path,
 };
 use vector_config_common::{
-    constants::ComponentType, human_friendly::generate_human_friendly_string,
+    configurable_package_name_hack, constants::ComponentType,
+    human_friendly::generate_human_friendly_string,
 };
 
 use crate::attrs;
@@ -78,24 +79,25 @@ impl TypedComponent {
         &self,
         input: &DeriveInput,
     ) -> Option<proc_macro2::TokenStream> {
+        let vector_config = configurable_package_name_hack();
         self.component_name.as_ref().map(|component_name| {
             let config_ty = &input.ident;
             let desc_ty: syn::Type = match self.component_type {
                 ComponentType::EnrichmentTable => {
-                    parse_quote! { ::vector_config::component::EnrichmentTableDescription }
+                    parse_quote! { #vector_config::component::EnrichmentTableDescription }
                 }
                 ComponentType::Provider => {
-                    parse_quote! { ::vector_config::component::ProviderDescription }
+                    parse_quote! { #vector_config::component::ProviderDescription }
                 }
                 ComponentType::Secrets => {
-                    parse_quote! { ::vector_config::component::SecretsDescription }
+                    parse_quote! { #vector_config::component::SecretsDescription }
                 }
-                ComponentType::Sink => parse_quote! { ::vector_config::component::SinkDescription },
+                ComponentType::Sink => parse_quote! { #vector_config::component::SinkDescription },
                 ComponentType::Source => {
-                    parse_quote! { ::vector_config::component::SourceDescription }
+                    parse_quote! { #vector_config::component::SourceDescription }
                 }
                 ComponentType::Transform => {
-                    parse_quote! { ::vector_config::component::TransformDescription }
+                    parse_quote! { #vector_config::component::TransformDescription }
                 }
             };
 
@@ -129,13 +131,14 @@ impl TypedComponent {
     /// Creates the component name registration code.
     fn get_component_name_registration(&self) -> proc_macro2::TokenStream {
         let helper_attr = get_named_component_helper_ident(self.component_type);
+        let vector_config = configurable_package_name_hack();
         match self.component_name.as_ref() {
             None => quote_spanned! {self.span=>
-                #[derive(::vector_config_macros::NamedComponent)]
+                #[derive(#vector_config::NamedComponent)]
                 #[#helper_attr]
             },
             Some(component_name) => quote_spanned! {self.span=>
-                #[derive(::vector_config_macros::NamedComponent)]
+                #[derive(#vector_config::NamedComponent)]
                 #[#helper_attr(#component_name)]
             },
         }
@@ -306,8 +309,9 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
 
     // Generate and apply all of the necessary derives.
     let mut derives = Punctuated::<Path, Comma>::new();
+    let vector_config = configurable_package_name_hack();
     derives.push(parse_quote_spanned! {input.ident.span()=>
-        ::vector_config_macros::Configurable
+        #vector_config::Configurable
     });
 
     if !options.skip_derive_ser() {

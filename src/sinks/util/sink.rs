@@ -48,11 +48,11 @@ use tokio::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing::Instrument;
-use vector_common::internal_event::{
+use vector_lib::internal_event::{
     CallError, CountByteSize, EventsSent, InternalEventHandle as _, Output,
 };
 // === StreamSink<Event> ===
-pub use vector_core::sink::StreamSink;
+pub use vector_lib::sink::StreamSink;
 
 use super::{
     batch::{Batch, EncodedBatch, FinalizersBatch, PushResult, StatefulBatch},
@@ -576,7 +576,7 @@ mod tests {
     use bytes::Bytes;
     use futures::{future, stream, task::noop_waker_ref, SinkExt, StreamExt};
     use tokio::{task::yield_now, time::Instant};
-    use vector_common::{
+    use vector_lib::{
         finalization::{BatchNotifier, BatchStatus, EventFinalizer, EventFinalizers},
         json_size::JsonSize,
     };
@@ -666,7 +666,7 @@ mod tests {
         // Services future will be spawned and work between `yield_now` calls.
         let svc = tower::service_fn(|req: Vec<Request>| async move {
             let duration = match req[0].0 {
-                1 | 2 | 3 => Duration::from_secs(1),
+                1..=3 => Duration::from_secs(1),
 
                 // The 4th request will introduce some sort of
                 // latency spike to ensure later events don't

@@ -3,7 +3,7 @@ use std::{convert::TryFrom, time::Duration};
 use regex::bytes::Regex;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::line_agg;
 

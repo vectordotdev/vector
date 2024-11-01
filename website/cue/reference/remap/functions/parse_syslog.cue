@@ -25,7 +25,7 @@ remap: functions: parse_syslog: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a properly formatted Syslog message",
+		"`value` is not a properly formatted Syslog message.",
 	]
 	return: types: ["object"]
 

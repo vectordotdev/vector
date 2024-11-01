@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, HashMap};
 
 use chrono::{DateTime, Local};
-use tokio::sync::mpsc;
-use tui::{
+use ratatui::{
     style::{Color, Style},
     text::Span,
 };
-use vector_core::internal_event::DEFAULT_OUTPUT;
+use tokio::sync::mpsc;
+use vector_lib::internal_event::DEFAULT_OUTPUT;
 
 use crate::config::ComponentKey;
 
@@ -80,7 +80,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
+    pub const fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
         Self {
             connection_status: ConnectionStatus::Pending,
             components,

@@ -196,16 +196,26 @@ components: _aws: {
 			body:  """
 				Vector checks for AWS credentials in the following order:
 
-				1. The [`auth.access_key_id`](#auth.access_key_id) and [`auth.secret_access_key`](#auth.secret_access_key) options.
-				2. The [`AWS_ACCESS_KEY_ID`](#auth.access_key_id) and [`AWS_SECRET_ACCESS_KEY`](#auth.secret_access_key) environment variables.
-				3. The [AWS credentials file](\(urls.aws_credentials_file)) (usually located at `~/.aws/credentials`).
-				4. The [IAM instance profile](\(urls.iam_instance_profile)) (only works if running on an EC2 instance
+				1. The [`auth.access_key_id`](#auth.access_key_id) and
+				   [`auth.secret_access_key`](#auth.secret_access_key) options.
+				2. The [`AWS_ACCESS_KEY_ID`](#auth.access_key_id) and
+				   [`AWS_SECRET_ACCESS_KEY`](#auth.secret_access_key) environment variables.
+				3. In [Web Identity
+				   Token](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html)
+				   credentials from the environment or container (including EKS). These credentials
+				   will automatically refresh when expired.
+				4. [ECS credentials (IAM roles for
+				   tasks)](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html).
+				   These credentials will automatically refresh when expired.
+				5. As entries in the credentials file in the `.aws` directory in your home directory
+				   (`~/.aws/credentials` on Linux, OS X, and Unix; `%userprofile%\\.aws\\credentials`
+				   on Microsoft Windows).
+				6. Using a named profile specified in the credentials file via the AWS_PROFILE environment variable.
+				7. The [IAM instance profile](\(urls.iam_instance_profile)) (only works if running on an EC2 instance
 				   with an instance profile/role). Requires IMDSv2 to be enabled. For EKS, you may need to increase the
-				   metadata token response hop limit to 2.
+				   metadata token response hop limit to 2. These credentials will automatically refresh when expired.
 
 				If no credentials are found, Vector's health check fails and an error is [logged](\(urls.vector_monitoring)).
-				If your AWS credentials expire, Vector will automatically search for up-to-date
-				credentials in the places (and order) described above.
 				"""
 			sub_sections: [
 				{

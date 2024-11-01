@@ -1,9 +1,10 @@
-use indexmap::IndexSet;
-
 use super::{
-    builder::ConfigBuilder, graph::Graph, id::Inputs, transform::get_transform_output_ids,
-    validation, Config, OutputId,
+    builder::ConfigBuilder, graph::Graph, transform::get_transform_output_ids, validation, Config,
+    OutputId,
 };
+
+use indexmap::IndexSet;
+use vector_lib::id::Inputs;
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -35,19 +36,11 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(output_errors);
     }
 
-    #[cfg(feature = "enterprise")]
-    let hash = Some(builder.sha256_hash());
-
-    #[cfg(not(feature = "enterprise"))]
-    let hash = None;
-
     let ConfigBuilder {
         global,
         #[cfg(feature = "api")]
         api,
         schema,
-        #[cfg(feature = "enterprise")]
-        enterprise,
         healthchecks,
         enrichment_tables,
         sources,
@@ -57,6 +50,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         provider: _,
         secret,
         graceful_shutdown_duration,
+        allow_empty: _,
     } = builder;
 
     let graph = match Graph::new(&sources, &transforms, &sinks, schema) {
@@ -102,9 +96,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             #[cfg(feature = "api")]
             api,
             schema,
-            #[cfg(feature = "enterprise")]
-            enterprise,
-            hash,
             healthchecks,
             enrichment_tables,
             sources,
@@ -198,7 +189,7 @@ fn expand_globs_inner(inputs: &mut Inputs<String>, id: &str, candidates: &IndexS
 mod test {
     use super::*;
     use crate::test_util::mock::{basic_sink, basic_source, basic_transform};
-    use vector_core::config::ComponentKey;
+    use vector_lib::config::ComponentKey;
 
     #[test]
     fn glob_expansion() {

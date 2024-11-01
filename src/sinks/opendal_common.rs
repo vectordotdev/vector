@@ -8,38 +8,15 @@
 //! - Error handling
 //! - Limitation
 
-use std::{fmt, num::NonZeroUsize, task::Poll};
+use std::{fmt, task::Poll};
 
 use bytes::Bytes;
-use codecs::encoding::Framer;
-use futures::{stream::BoxStream, StreamExt};
 use opendal::Operator;
 use snafu::Snafu;
-use tower::Service;
 use tracing::Instrument;
-use vector_common::{
-    finalization::{EventStatus, Finalizable},
-    json_size::JsonSize,
-    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
-};
-use vector_core::{
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-    EstimatedJsonEncodedSizeOf,
-};
+use vector_lib::codecs::encoding::Framer;
 
-use crate::{
-    codecs::{Encoder, Transformer},
-    event::{Event, EventFinalizers},
-    internal_events::SinkRequestBuildError,
-    sinks::{
-        util::{
-            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
-            request_builder::EncodeResult, Compression, RequestBuilder, SinkBuilderExt,
-        },
-        BoxFuture,
-    },
-};
+use crate::sinks::{prelude::*, util::partitioner::KeyPartitioner};
 
 /// OpenDalSink provides generic a service upon OpenDAL.
 ///
@@ -98,18 +75,17 @@ where
         let partitioner = self.partitioner;
         let settings = self.batcher_settings;
 
-        let builder_limit = NonZeroUsize::new(64);
         let request_builder = self.request_builder;
 
         input
-            .batched_partitioned(partitioner, settings)
+            .batched_partitioned(partitioner, || settings.as_byte_size_config())
             .filter_map(|(key, batch)| async move {
                 // We don't need to emit an error here if the event is dropped since this will occur if the template
                 // couldn't be rendered during the partitioning. A `TemplateRenderingError` is already emitted when
                 // that occurs.
                 key.map(move |k| (k, batch))
             })
-            .request_builder(builder_limit, request_builder)
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {

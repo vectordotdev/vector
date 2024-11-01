@@ -1,1 +1,1 @@
-{"metric":{"name":"t","timestamp":"1969-12-31T21:01:23Z","interval_ms":2440186689,"kind":"incremental","aggregated_histogram":{"buckets":[{"upper_limit":455936.0,"count":13689538409286746821},{"upper_limit":-599104.0,"count":5528863101652480402},{"upper_limit":-941208.3251,"count":12528919980561195244},{"upper_limit":-199808.0,"count":9425024175917961134}],"count":2858632511842543852,"sum":372608.0}}}
+{"log":{"":"","ª":-1377935837319730852}}

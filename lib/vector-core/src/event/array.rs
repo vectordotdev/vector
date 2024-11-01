@@ -9,6 +9,7 @@ use futures::{stream, Stream};
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
 use vector_common::{
+    byte_size_of::ByteSizeOf,
     config::ComponentKey,
     finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
     json_size::JsonSize,
@@ -18,7 +19,6 @@ use super::{
     EstimatedJsonEncodedSizeOf, Event, EventDataEq, EventFinalizer, EventMutRef, EventRef,
     LogEvent, Metric, TraceEvent,
 };
-use crate::ByteSizeOf;
 
 /// The type alias for an array of `LogEvent` elements.
 pub type LogArray = Vec<LogEvent>;
@@ -159,6 +159,15 @@ impl EventArray {
                 for trace in traces {
                     trace.metadata_mut().set_source_id(Arc::clone(output_id));
                 }
+            }
+        }
+    }
+
+    /// Sets the `source_type` in the metadata for all metric events in this array.
+    pub fn set_source_type(&mut self, source_type: &'static str) {
+        if let EventArray::Metrics(metrics) = self {
+            for metric in metrics {
+                metric.metadata_mut().set_source_type(source_type);
             }
         }
     }

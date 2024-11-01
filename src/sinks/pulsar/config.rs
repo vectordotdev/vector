@@ -5,9 +5,7 @@ use crate::{
         pulsar::sink::{healthcheck, PulsarSink},
     },
 };
-use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
-use lookup::lookup_v2::OptionalTargetPath;
 use pulsar::{
     authentication::oauth2::{OAuth2Authentication, OAuth2Params},
     compression,
@@ -17,8 +15,11 @@ use pulsar::{
 };
 use pulsar::{error::AuthenticationError, OperationRetryOptions};
 use snafu::ResultExt;
-use vector_common::sensitive_string::SensitiveString;
-use vector_core::config::DataType;
+use std::time::Duration;
+use vector_lib::codecs::{encoding::SerializerConfig, TextSerializerConfig};
+use vector_lib::config::DataType;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 
 /// Configuration for the `pulsar` sink.
@@ -74,9 +75,13 @@ pub struct PulsarSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub connection_retry_options: Option<CustomConnectionRetryOptions>,
 }
 
 /// Event batching behavior.
@@ -171,6 +176,36 @@ pub enum PulsarCompression {
     Snappy,
 }
 
+#[configurable_component]
+#[configurable(
+    description = "Custom connection retry options configuration for the Pulsar client."
+)]
+#[derive(Clone, Debug)]
+pub struct CustomConnectionRetryOptions {
+    /// Minimum delay between connection retries.
+    #[configurable(metadata(docs::type_unit = "milliseconds"))]
+    pub min_backoff_ms: Option<u64>,
+
+    /// Maximum delay between reconnection retries.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 30))]
+    pub max_backoff_secs: Option<u64>,
+
+    /// Maximum number of connection retries.
+    #[configurable(metadata(docs::examples = 12))]
+    pub max_retries: Option<u32>,
+
+    /// Time limit to establish a connection.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 10))]
+    pub connection_timeout_secs: Option<u64>,
+
+    /// Keep-alive interval for each broker connection.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 60))]
+    pub keep_alive_secs: Option<u64>,
+}
+
 impl Default for PulsarSinkConfig {
     fn default() -> Self {
         Self {
@@ -185,6 +220,7 @@ impl Default for PulsarSinkConfig {
             encoding: TextSerializerConfig::default().into(),
             auth: None,
             acknowledgements: Default::default(),
+            connection_retry_options: None,
         }
     }
 }
@@ -218,8 +254,39 @@ impl PulsarSinkConfig {
         }
 
         // Apply configuration for reconnection exponential backoff.
-        let retry_opts = ConnectionRetryOptions::default();
-        builder = builder.with_connection_retry_options(retry_opts);
+        let default_retry_options = ConnectionRetryOptions::default();
+        let retry_options =
+            self.connection_retry_options
+                .as_ref()
+                .map_or(default_retry_options.clone(), |opts| {
+                    ConnectionRetryOptions {
+                        min_backoff: opts
+                            .min_backoff_ms
+                            .map_or(default_retry_options.min_backoff, |ms| {
+                                Duration::from_millis(ms)
+                            }),
+                        max_backoff: opts
+                            .max_backoff_secs
+                            .map_or(default_retry_options.max_backoff, |secs| {
+                                Duration::from_secs(secs)
+                            }),
+                        max_retries: opts
+                            .max_retries
+                            .unwrap_or(default_retry_options.max_retries),
+                        connection_timeout: opts
+                            .connection_timeout_secs
+                            .map_or(default_retry_options.connection_timeout, |secs| {
+                                Duration::from_secs(secs)
+                            }),
+                        keep_alive: opts
+                            .keep_alive_secs
+                            .map_or(default_retry_options.keep_alive, |secs| {
+                                Duration::from_secs(secs)
+                            }),
+                    }
+                });
+
+        builder = builder.with_connection_retry_options(retry_options);
 
         // Apply configuration for retrying Pulsar operations.
         let operation_retry_opts = OperationRetryOptions::default();

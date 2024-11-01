@@ -14,7 +14,72 @@ The following is an example of a popular Vector configuration that ingests logs
 from a file and routes them to both Elasticsearch and AWS S3. Your configuration
 will differ based on your needs.
 
-{{< tabs default="vector.toml" >}}
+{{< tabs default="vector.yaml" >}}
+{{< tab title="vector.yaml" >}}
+
+```yaml
+# Set global options
+data_dir: "/var/lib/vector"
+
+# Vector's API (disabled by default)
+# Enable and try it out with the `vector top` command
+# NOTE: this is _enabled_ for helm chart deployments, see: https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/examples/datadog-values.yaml#L78-L81
+api:
+  enabled: false
+# address = "127.0.0.1:8686"
+
+# Ingest data by tailing one or more files
+sources:
+  apache_logs:
+    type: "file"
+    include:
+      - "/var/log/apache2/*.log" # supports globbing
+    ignore_older_secs: 86400     # 1 day
+
+# Structure and parse via Vector's Remap Language
+transforms:
+  apache_parser:
+    inputs:
+      - "apache_logs"
+    type: "remap"
+    source: ". = parse_apache_log(.message)"
+
+  # Sample the data to save on cost
+  apache_sampler:
+    inputs:
+      - "apache_parser"
+    type: "sample"
+    rate: 2 # only keep 50% (1/`rate`)
+
+# Send structured data to a short-term storage
+sinks:
+  es_cluster:
+    inputs:
+      - "apache_sampler"       # only take sampled data
+    type: "elasticsearch"
+    endpoints:
+      - "http://79.12.221.222:9200"
+    bulk:
+      index: "vector-%Y-%m-%d" # daily indices
+
+  # Send structured data to a cost-effective long-term storage
+  s3_archives:
+    inputs:
+      - "apache_parser" # don't sample for S3
+    type: "aws_s3"
+    region: "us-east-1"
+    bucket: "my-log-archives"
+    key_prefix: "date=%Y-%m-%d"   # daily partitions, hive friendly format
+    compression: "gzip"           # compress final objects
+    framing:
+      method: "newline_delimited" # new line delimited...
+    encoding:
+      codec: "json"               # ...JSON
+    batch:
+      max_bytes: 10000000         # 10mb uncompressed
+```
+
+{{< /tab >}}
 {{< tab title="vector.toml" >}}
 
 ```toml
@@ -29,9 +94,9 @@ enabled = false
 
 # Ingest data by tailing one or more files
 [sources.apache_logs]
-type         = "file"
-include      = ["/var/log/apache2/*.log"]    # supports globbing
-ignore_older = 86400                         # 1 day
+type              = "file"
+include           = ["/var/log/apache2/*.log"]    # supports globbing
+ignore_older_secs = 86400                         # 1 day
 
 # Structure and parse via Vector's Remap Language
 [transforms.apache_parser]
@@ -65,53 +130,6 @@ compression     = "gzip"               # compress final objects
 framing.method  = "newline_delimited"  # new line delimited...
 encoding.codec  = "json"               # ...JSON
 batch.max_bytes = 10000000             # 10mb uncompressed
-```
-
-{{< /tab >}}
-{{< tab title="vector.yaml" >}}
-
-```yaml
-data_dir: /var/lib/vector
-sources:
-  apache_logs:
-    type: file
-    include:
-      - /var/log/apache2/*.log
-    ignore_older: 86400
-transforms:
-  apache_parser:
-    inputs:
-      - apache_logs
-    type: remap
-    source: |
-      . = parse_apache_log(.message)
-  apache_sampler:
-    inputs:
-      - apache_parser
-    type: sample
-    rate: 50
-sinks:
-  es_cluster:
-    inputs:
-      - apache_sampler
-    type: elasticsearch
-    endpoints: ['http://79.12.221.222:9200']
-    bulk:
-      index: vector-%Y-%m-%d
-  s3_archives:
-    inputs:
-      - apache_parser
-    type: aws_s3
-    region: us-east-1
-    bucket: my-log-archives
-    key_prefix: date=%Y-%m-%d
-    compression: gzip
-    framing:
-      method: newline_delimited
-    encoding:
-      codec: json
-    batch:
-      max_bytes: 10000000
 ```
 
 {{< /tab >}}
@@ -185,18 +203,18 @@ sinks:
 To use this configuration file, specify it with the `--config` flag when
 starting Vector:
 
-{{< tabs default="TOML" >}}
-{{< tab title="TOML" >}}
-
-```shell
-vector --config /etc/vector/vector.toml
-```
-
-{{< /tab >}}
+{{< tabs default="YAML" >}}
 {{< tab title="YAML" >}}
 
 ```shell
 vector --config /etc/vector/vector.yaml
+```
+
+{{< /tab >}}
+{{< tab title="TOML" >}}
+
+```shell
+vector --config /etc/vector/vector.toml
 ```
 
 {{< /tab >}}
@@ -229,37 +247,37 @@ vector --config /etc/vector/vector.json
 Vector interpolates environment variables within your configuration file with
 the following syntax:
 
-```toml
-[transforms.add_host]
-type = "remap"
-source = '''
-# Basic usage. "$HOSTNAME" also works.
-.host = "${HOSTNAME}" # or "$HOSTNAME"
+```yaml
+transforms:
+  add_host:
+    type: "remap"
+    source: |
+      # Basic usage. "$HOSTNAME" also works.
+      .host = "${HOSTNAME}" # or "$HOSTNAME"
 
-# Setting a default value when not present.
-.environment = "${ENV:-development}"
+      # Setting a default value when not present.
+      .environment = "${ENV:-development}"
 
-# Requiring an environment variable to be present.
-.tenant = "${TENANT:?tenant must be supplied}"
-'''
+      # Requiring an environment variable to be present.
+      .tenant = "${TENANT:?tenant must be supplied}"
 ```
 
 #### Default values
 
 Default values can be supplied using `:-` or `-` syntax:
 
-```toml
-option = "${ENV_VAR:-default}" # default value if variable is unset or empty
-option = "${ENV_VAR-default}" # default value only if variable is unset
+```yaml
+option: "${ENV_VAR:-default}" # default value if variable is unset or empty
+option: "${ENV_VAR-default}" # default value only if variable is unset
 ```
 
 #### Required variables
 
 Environment variables that are required can be specified using `:?` or `?` syntax:
 
-```toml
-option = "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
-option = "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
+```yaml
+option: "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
+option: "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
 ```
 
 #### Escaping
@@ -270,7 +288,7 @@ environment variable example.
 
 ### Formats
 
-Vector supports [TOML], [YAML], and [JSON] to ensure that Vector fits into your
+Vector supports [YAML], [TOML], and [JSON] to ensure that Vector fits into your
 workflow. A side benefit of supporting YAML and JSON is that they enable you to use
 data templating languages such as [ytt], [Jsonnet] and [Cue].
 
@@ -278,96 +296,105 @@ data templating languages such as [ytt], [Jsonnet] and [Cue].
 
 The location of your Vector configuration file depends on your installation
 method. For most Linux-based systems, the file can be found at
-`/etc/vector/vector.toml`.
+`/etc/vector/vector.yaml`.
 
 ### Multiple files
 
 You can pass multiple configuration files when starting Vector:
 
 ```shell
-vector --config vector1.toml --config vector2.toml
+vector --config vector1.yaml --config vector2.yaml
 ```
 
 Or using a [globbing syntax][glob]:
 
 ```shell
-vector --config /etc/vector/*.toml
+vector --config /etc/vector/*.yaml
 ```
 
 #### Automatic namespacing
 
 You can also split your configuration by grouping the components by their type, one directory per component type, where the file name is used as the component id. For example:
 
-{{< tabs default="vector.toml" >}}
-{{< tab title="vector.toml" >}}
+{{< tabs default="vector.yaml" >}}
+{{< tab title="vector.yaml" >}}
 
-```toml
+```yaml
 # Set global options
-data_dir = "/var/lib/vector"
+data_dir: "/var/lib/vector"
 
 # Vector's API (disabled by default)
 # Enable and try it out with the `vector top` command
-[api]
-enabled = false
-# address = "127.0.0.1:8686"
+api:
+  enabled: false
+  # address: "127.0.0.1:8686"
 ```
 
 {{< /tab >}}
-{{< tab title="sources/apache_logs.toml" >}}
+{{< tab title="sources/apache_logs.yaml" >}}
 
-```toml
+```yaml
 # Ingest data by tailing one or more files
-type         = "file"
-include      = ["/var/log/apache2/*.log"]    # supports globbing
-ignore_older = 86400                         # 1 day
+type: "file"
+include: ["/var/log/apache2/*.log"]    # supports globbing
+ignore_older: 86400                    # 1 day
 ```
 
 {{< /tab >}}
-{{< tab title="transforms/apache_parser.toml" >}}
+{{< tab title="transforms/apache_parser.yaml" >}}
 
-```toml
+```yaml
 # Structure and parse via Vector Remap Language
-inputs = ["apache_logs"]
-type   = "remap"
-source = '''
-. = parse_apache_log(.message)
+inputs:
+  - "apache_logs"
+type: "remap"
+source: |
+  . = parse_apache_log(.message)
 ```
 
 {{< /tab >}}
-{{< tab title="transforms/apache_sampler.toml" >}}
+{{< tab title="transforms/apache_sampler.yaml" >}}
 
-```toml
+```yaml
 # Sample the data to save on cost
-inputs = ["apache_parser"]
-type   = "sample"
-rate   = 2                    # only keep 50% (1/`rate`)
+inputs:
+  - "apache_parser"
+type: "sample"
+rate: 2 # only keep 50% (1/`rate`)
 ```
 
 {{< /tab >}}
-{{< tab title="sinks/es_cluster.toml" >}}
+{{< tab title="sinks/es_cluster.yaml" >}}
 
-```toml
+```yaml
 # Send structured data to a short-term storage
-inputs     = ["apache_sampler"]             # only take sampled data
-type       = "elasticsearch"
-endpoints  = ["http://79.12.221.222:9200"]  # local or external host
-bulk.index = "vector-%Y-%m-%d"              # daily indices
+inputs:
+  - "apache_sampler"             # only take sampled data
+type: "elasticsearch"
+endpoints:
+  - "http://79.12.221.222:9200"  # local or external host
+bulk:
+  index: "vector-%Y-%m-%d"      # daily indices
 ```
 
 {{< /tab >}}
-{{< tab title="sinks/s3_archives.toml" >}}
+{{< tab title="sinks/s3_archives.yaml" >}}
 
-```toml
+```yaml
 # Send structured data to a cost-effective long-term storage
-inputs          = ["apache_parser"]    # don't sample for S3
-type            = "aws_s3"
-region          = "us-east-1"
-bucket          = "my-log-archives"
-key_prefix      = "date=%Y-%m-%d"      # daily partitions, hive friendly format
-compression     = "gzip"               # compress final objects
-framing.method  = "newline_delimited"  # new line delimited...
-encoding.codec  = "json"               # ...JSON
-batch.max_bytes = 10000000             # 10mb uncompressed
+inputs:
+  - "apache_parser"           # don't sample for S3
+type: "aws_s3"
+region: "us-east-1"
+bucket: "my-log-archives"
+key_prefix: "date=%Y-%m-%d"   # daily partitions, hive-friendly format
+compression: "gzip"           # compress final objects
+framing:
+  method: "newline_delimited" # new line delimited...
+encoding:
+  codec: "json"               # ...JSON
+batch:
+  max_bytes: 10000000         # 10mb uncompressed
 ```
 
 {{< /tab >}}
@@ -384,26 +411,28 @@ vector --config-dir /etc/vector
 Vector supports wildcards (`*`) in component IDs when building your topology.
 For example:
 
-```toml
-[sources.app1_logs]
-type = "file"
-includes = ["/var/log/app1.log"]
+```yaml
+sources:
+  app1_logs:
+    type: "file"
+    includes: ["/var/log/app1.log"]
 
-[sources.app2_logs]
-type = "file"
-includes = ["/var/log/app.log"]
+  app2_logs:
+    type: "file"
+    includes: ["/var/log/app.log"]
 
-[sources.system_logs]
-type = "file"
-includes = ["/var/log/system.log"]
+  system_logs:
+    type: "file"
+    includes: ["/var/log/system.log"]
 
-[sinks.app_logs]
-type = "datadog_logs"
-inputs = ["app*"]
+sinks:
+  app_logs:
+    type: "datadog_logs"
+    inputs: ["app*"]
 
-[sinks.archive]
-type = "aws_s3"
-inputs = ["app*", "system_logs"]
+  archive:
+    type: "aws_s3"
+    inputs: ["app*", "system_logs"]
 ```
 
 ## Sections

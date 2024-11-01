@@ -1,1 +1,1 @@
-{"log":{">A":null}}
+{"metric":{"name":"a","interval_ms":1492352263,"kind":"absolute","gauge":{"value":527616.0}}}

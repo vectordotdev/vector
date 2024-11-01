@@ -6,7 +6,7 @@ use tokio::{
     fs::{self, File},
     io::AsyncReadExt,
 };
-use vector_core::metric_tags;
+use vector_lib::metric_tags;
 
 use super::{filter_result_sync, CGroupsConfig, HostMetrics, MetricsBuffer};
 use crate::event::MetricTags;
@@ -116,7 +116,7 @@ impl<'a> CGroupRecurser<'a> {
             if self.load_cpu {
                 self.load_cpu(&cgroup, &tags).await;
             }
-            if self.load_memory && !cgroup.is_root() {
+            if self.load_memory {
                 self.load_memory(&cgroup, &tags).await;
             }
 
@@ -271,10 +271,6 @@ struct CGroup {
 }
 
 impl CGroup {
-    fn is_root(&self) -> bool {
-        self.name == Path::new("/")
-    }
-
     fn tags(&self) -> MetricTags {
         metric_tags! {
             "cgroup" => self.name.to_string_lossy(),
@@ -438,7 +434,7 @@ mod tests {
     use rand::{rngs::ThreadRng, Rng};
     use similar_asserts::assert_eq;
     use tempfile::TempDir;
-    use vector_core::event::Metric;
+    use vector_lib::event::Metric;
 
     use super::{
         super::{
@@ -599,11 +595,11 @@ mod tests {
             );
             assert_eq!(
                 count_name(&metrics, "cgroup_memory_anon_bytes"),
-                SUBDIRS.len() - 1
+                SUBDIRS.len()
             );
             assert_eq!(
                 count_name(&metrics, "cgroup_memory_file_bytes"),
-                SUBDIRS.len() - 1
+                SUBDIRS.len()
             );
         }
 

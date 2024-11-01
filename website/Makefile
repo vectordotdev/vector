@@ -1,10 +1,19 @@
 CUE = ./scripts/cue.sh
 
+# Override to specify which network address to use in Hugo/HTTP servers for binding
+export SERVER_BIND ?= 127.0.0.1
+# Override to specify which port to use in Hugo/HTTP servers for listening
+export SERVER_PORT ?= 1313
+
 clean:
-	rm -rf public resources data/docs.json
+	rm -rf public resources data/cargo-lock.toml data/docs.json
 
 setup:
 	yarn
+
+# Copy Cargo data such as the dependency information file
+cargo-data:
+	cp -f ../Cargo.lock data/cargo-lock.toml
 
 # Build JSON from CUE sources
 cue-build:
@@ -31,8 +40,10 @@ config-examples:
 
 structured-data: cue-build config-examples
 
-serve: clean setup structured-data
+serve: clean setup cargo-data structured-data
 	hugo server \
+	--bind $(SERVER_BIND) \
+	--port $(SERVER_PORT) \
 	--buildDrafts \
 	--buildFuture \
 	--environment "development"
@@ -43,18 +54,18 @@ production-build:
 	--environment "production" \
 	--minify
 
-ci-production-build: setup structured-data production-build run-link-checker algolia
+ci-production-build: setup cargo-data structured-data production-build run-link-checker typesense-production
 
 # Preview site
 preview-build:
 	hugo \
-	--baseURL $(DEPLOY_PRIME_URL) \
+	$(if $(DEPLOY_PRIME_URL),--baseURL $(DEPLOY_PRIME_URL),) \
 	--buildFuture \
 	--environment "preview" \
 	--minify
 	cp ./custom-headers/_preview ./public/_headers
 
-ci-preview-build: setup structured-data preview-build run-link-checker algolia
+ci-preview-build: setup cargo-data structured-data preview-build run-link-checker typesense-preview
 
 run-link-checker:
 	htmltest
@@ -66,23 +77,26 @@ run-external-link-checker:
 check-links: production-build run-link-checker
 
 # Search
-algolia:
-	yarn algolia-config
-	yarn algolia-index
-	yarn algolia-upload
+typesense-preview:
+	yarn typesense-index
+	yarn typesense-sync:preview
+
+typesense-production:
+	yarn typesense-index
+	yarn typesense-sync:production
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
-	make setup structured-data production-build
-	python3 -m http.server 1313 --directory ./public --bind 127.0.0.1
+	make setup cargo-data structured-data production-build
+	python3 -m http.server $(SERVER_PORT) --bind $(SERVER_BIND) --directory ./public
 
 # Local dev build with no link checking and no Yarn dependency fetching
-quick-build: clean structured-data production-build
+quick-build: clean cargo-data structured-data production-build
 
 # Full local builds without Algolia updates (for debugging, link checking, etc.)
-local-production-build: clean setup structured-data production-build run-link-checker
+local-production-build: clean setup cargo-data structured-data production-build run-link-checker
 
-local-preview-build: clean setup structured-data preview-build run-link-checker
+local-preview-build: clean setup cargo-data structured-data preview-build run-link-checker
 
 # Generate Lighthouse scores locally
 lighthouse-report:

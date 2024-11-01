@@ -16,7 +16,7 @@ remap: functions: parse_aws_cloudwatch_log_subscription_message: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a properly formatted AWS Cloudwatch Log subscription message",
+		"`value` is not a properly formatted AWS CloudWatch Log subscription message.",
 	]
 	return: types: ["object"]
 
@@ -49,7 +49,7 @@ remap: functions: parse_aws_cloudwatch_log_subscription_message: {
 				message_type: "DATA_MESSAGE"
 				log_group:    "test"
 				log_stream:   "test"
-				subscription_filters: [ "Destination"]
+				subscription_filters: ["Destination"]
 				log_events: [{
 					id:        "35683658089614582423604394983260738922885519999578275840"
 					message:   "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"

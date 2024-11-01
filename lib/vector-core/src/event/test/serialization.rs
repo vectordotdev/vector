@@ -73,7 +73,7 @@ fn serialization() {
         "timestamp": event.get(log_schema().timestamp_key().unwrap().to_string().as_str()),
     });
 
-    let actual_all = serde_json::to_value(event.all_fields().unwrap()).unwrap();
+    let actual_all = serde_json::to_value(event.all_event_fields().unwrap()).unwrap();
     assert_eq!(expected_all, actual_all);
 
     let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
@@ -90,7 +90,7 @@ fn type_serialization() {
     event.insert("bool", true);
     event.insert("string", "thisisastring");
 
-    let map = serde_json::to_value(event.all_fields().unwrap()).unwrap();
+    let map = serde_json::to_value(event.all_event_fields().unwrap()).unwrap();
     assert_eq!(map["float"], json!(5.5));
     assert_eq!(map["int"], json!(4));
     assert_eq!(map["bool"], json!(true));

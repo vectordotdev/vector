@@ -1,5 +1,6 @@
 use std::{
-    collections::BTreeMap,
+    collections::HashMap,
+    hash::Hash,
     sync::{Arc, RwLock},
 };
 
@@ -22,7 +23,7 @@ pub struct RegisteredEventCache<T, Event: RegisterTaggedInternalEvent> {
     fixed_tags: T,
     cache: Arc<
         RwLock<
-            BTreeMap<
+            HashMap<
                 <Event as RegisterTaggedInternalEvent>::Tags,
                 <Event as RegisterInternalEvent>::Handle,
             >,
@@ -48,7 +49,7 @@ impl<Event, EventHandle, Data, Tags, FixedTags> RegisteredEventCache<FixedTags, 
 where
     Data: Sized,
     EventHandle: InternalEventHandle<Data = Data>,
-    Tags: Ord + Clone,
+    Tags: Clone + Eq + Hash,
     FixedTags: Clone,
     Event: RegisterInternalEvent<Handle = EventHandle>
         + RegisterTaggedInternalEvent<Tags = Tags, Fixed = FixedTags>,
@@ -90,7 +91,7 @@ where
 #[cfg(test)]
 mod tests {
     #![allow(unreachable_pub)]
-    use metrics::{register_counter, Counter};
+    use metrics::{counter, Counter};
 
     use super::*;
 
@@ -100,7 +101,7 @@ mod tests {
             dynamic: String,
         } => {
             event: Counter = {
-                register_counter!("test_event_total", "fixed" => self.fixed, "dynamic" => self.dynamic)
+                counter!("test_event_total", "fixed" => self.fixed, "dynamic" => self.dynamic)
             },
         }
 

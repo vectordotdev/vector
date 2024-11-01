@@ -1,0 +1,163 @@
+diff --git a/lib/vector-core/Cargo.toml b/lib/vector-core/Cargo.toml
+index 0f51fc830..aadf99841 100644
+--- a/lib/vector-core/Cargo.toml
++++ b/lib/vector-core/Cargo.toml
+@@ -95,7 +95,7 @@ rand = "0.8.5"
+ rand_distr = "0.4.3"
+ tracing-subscriber = { version = "0.3.17", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
+ vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
+-vrl = { version = "0.9.0", features = ["cli", "test", "test_framework", "arbitrary"] }
++vrl = { path = "../../../vrl", features = ["cli", "test", "test_framework", "arbitrary"] }
+ 
+ [features]
+ api = ["dep:async-graphql"]
+diff --git a/lib/vector-core/src/event/test/common.rs b/lib/vector-core/src/event/test/common.rs
+index c7ccca952..f851288ce 100644
+--- a/lib/vector-core/src/event/test/common.rs
++++ b/lib/vector-core/src/event/test/common.rs
+@@ -26,6 +26,15 @@ const ALPHABET: [&str; 27] = [
+     "t", "u", "v", "w", "x", "y", "z", "_",
+ ];
+ 
++fn make_simple_f64(g: &mut Gen) -> f64 {
++    let mut value = f64::arbitrary(g) % MAX_F64_SIZE;
++    while value.is_nan() || value == -0.0 {
++        value = f64::arbitrary(g) % MAX_F64_SIZE;
++    }
++    value = (value * 10_000.0).round() / 10_000.0;
++    value
++}
++
+ #[derive(Debug, Clone)]
+ pub struct Name {
+     inner: String,
+@@ -34,7 +43,7 @@ pub struct Name {
+ impl Arbitrary for Name {
+     fn arbitrary(g: &mut Gen) -> Self {
+         let mut name = String::with_capacity(MAX_STR_SIZE);
+-        for _ in 0..(g.size() % MAX_STR_SIZE) {
++        for _ in 0..(usize::max(1, g.size() % MAX_STR_SIZE)) {
+             let idx: usize = usize::arbitrary(g) % ALPHABET.len();
+             name.push_str(ALPHABET[idx]);
+         }
+@@ -182,10 +191,10 @@ impl Arbitrary for MetricValue {
+         // here toward `MetricValue::Counter` and `MetricValue::Gauge`.
+         match u8::arbitrary(g) % 7 {
+             0 => MetricValue::Counter {
+-                value: f64::arbitrary(g) % MAX_F64_SIZE,
++                value: make_simple_f64(g),
+             },
+             1 => MetricValue::Gauge {
+-                value: f64::arbitrary(g) % MAX_F64_SIZE,
++                value: make_simple_f64(g),
+             },
+             2 => MetricValue::Set {
+                 values: BTreeSet::arbitrary(g),
+@@ -197,19 +206,20 @@ impl Arbitrary for MetricValue {
+             4 => MetricValue::AggregatedHistogram {
+                 buckets: Vec::arbitrary(g),
+                 count: u64::arbitrary(g),
+-                sum: f64::arbitrary(g) % MAX_F64_SIZE,
++                sum: make_simple_f64(g),
+             },
+             5 => MetricValue::AggregatedSummary {
+                 quantiles: Vec::arbitrary(g),
+                 count: u64::arbitrary(g),
+-                sum: f64::arbitrary(g) % MAX_F64_SIZE,
++                sum: make_simple_f64(g),
+             },
+             6 => {
+                 // We're working around quickcheck's limitations here, and
+                 // should really migrate the tests in question to use proptest
+                 let num_samples = u8::arbitrary(g);
+                 let samples = std::iter::repeat_with(|| loop {
+-                    let f = f64::arbitrary(g);
++                    // let f = f64::arbitrary(g);
++                    let f = make_simple_f64(g);
+                     if f.is_normal() {
+                         return f;
+                     }
+@@ -219,6 +229,8 @@ impl Arbitrary for MetricValue {
+ 
+                 let mut sketch = AgentDDSketch::with_agent_defaults();
+                 sketch.insert_many(&samples);
++                sketch.sum = make_simple_f64(g);
++                sketch.avg = make_simple_f64(g);
+ 
+                 MetricValue::Sketch {
+                     sketch: MetricSketch::AgentDDSketch(sketch),
+@@ -368,7 +380,7 @@ impl Arbitrary for MetricValue {
+ impl Arbitrary for Sample {
+     fn arbitrary(g: &mut Gen) -> Self {
+         Sample {
+-            value: f64::arbitrary(g) % MAX_F64_SIZE,
++            value: make_simple_f64(g),
+             rate: u32::arbitrary(g),
+         }
+     }
+@@ -398,8 +410,8 @@ impl Arbitrary for Sample {
+ impl Arbitrary for Quantile {
+     fn arbitrary(g: &mut Gen) -> Self {
+         Quantile {
+-            quantile: f64::arbitrary(g) % MAX_F64_SIZE,
+-            value: f64::arbitrary(g) % MAX_F64_SIZE,
++            quantile: make_simple_f64(g),
++            value: make_simple_f64(g),
+         }
+     }
+ 
+@@ -428,7 +440,7 @@ impl Arbitrary for Quantile {
+ impl Arbitrary for Bucket {
+     fn arbitrary(g: &mut Gen) -> Self {
+         Bucket {
+-            upper_limit: f64::arbitrary(g) % MAX_F64_SIZE,
++            upper_limit: make_simple_f64(g),
+             count: u64::arbitrary(g),
+         }
+     }
+diff --git a/lib/vector-core/src/event/test/serialization.rs b/lib/vector-core/src/event/test/serialization.rs
+index aaab559da..5db6c0613 100644
+--- a/lib/vector-core/src/event/test/serialization.rs
++++ b/lib/vector-core/src/event/test/serialization.rs
+@@ -96,3 +96,24 @@ fn type_serialization() {
+     assert_eq!(map["bool"], json!(true));
+     assert_eq!(map["string"], json!("thisisastring"));
+ }
++
++#[test]
++fn roundtrip() {
++    use prost::Message;
++    use quickcheck::{Arbitrary, Gen};
++    use std::{fs::File, io::Write};
++
++    let mut gen = Gen::new(128);
++    for n in 0..1024 {
++        let mut json_out = File::create(format!("_json/{n:04}.json")).unwrap();
++        let mut proto_out = File::create(format!("_proto/{n:04}.pb")).unwrap();
++        let event = Event::arbitrary(&mut gen);
++        serde_json::to_writer(&mut json_out, &event).unwrap();
++
++        let array = EventArray::from(event);
++        let proto = proto::EventArray::from(array);
++        let mut buf = BytesMut::new();
++        proto.encode(&mut buf).unwrap();
++        proto_out.write_all(&buf).unwrap();
++    }
++}
+diff --git a/lib/vector-core/src/metrics/ddsketch.rs b/lib/vector-core/src/metrics/ddsketch.rs
+index 3d0f80bb5..fcc6bcc97 100644
+--- a/lib/vector-core/src/metrics/ddsketch.rs
++++ b/lib/vector-core/src/metrics/ddsketch.rs
+@@ -229,10 +229,10 @@ pub struct AgentDDSketch {
+     max: f64,
+ 
+     /// The sum of all observations within the sketch.
+-    sum: f64,
++    pub sum: f64,
+ 
+     /// The average value of all observations within the sketch.
+-    avg: f64,
++    pub avg: f64,
+ }
+ 
+ impl AgentDDSketch {

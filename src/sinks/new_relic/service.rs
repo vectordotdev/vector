@@ -5,21 +5,15 @@ use std::{
 };
 
 use bytes::Bytes;
-use futures::future::BoxFuture;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
     Request,
 };
 use hyper::Body;
-use tower::Service;
 use tracing::Instrument;
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    stream::DriverResponse,
-};
 
 use super::{NewRelicCredentials, NewRelicSinkError};
+use crate::sinks::prelude::*;
 use crate::{http::HttpClient, sinks::util::Compression};
 
 #[derive(Debug, Clone)]

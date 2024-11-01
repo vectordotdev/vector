@@ -1,1 +1,1 @@
-{"log":{"'§]":true}}
+{"metric":{"name":"y","namespace":"h","timestamp":"1969-12-31T18:15:23.000016369Z","interval_ms":1196282325,"kind":"incremental","counter":{"value":556480.0}}}

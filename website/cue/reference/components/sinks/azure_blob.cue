@@ -123,9 +123,4 @@ components: sinks: azure_blob: {
 				"""
 		}
 	}
-
-	telemetry: metrics: {
-		http_error_response_total: components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-	}
 }

@@ -1,10 +1,6 @@
-use crate::emit;
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
-};
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
 #[derive(Debug)]
 pub struct DatadogMetricsEncodingError<'a> {
@@ -24,11 +20,12 @@ impl<'a> InternalEvent for DatadogMetricsEncodingError<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => self.error_code,
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
 
         if self.dropped_events > 0 {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {

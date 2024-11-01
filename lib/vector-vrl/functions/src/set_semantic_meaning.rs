@@ -62,8 +62,7 @@ impl Function for SetSemanticMeaning {
         let query = arguments.required_query("target")?;
 
         let meaning = arguments
-            .required_literal("meaning")?
-            .to_value()
+            .required_literal("meaning", state)?
             .try_bytes_utf8_lossy()
             .expect("meaning not bytes")
             .into_owned();

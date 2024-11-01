@@ -1,12 +1,13 @@
 use std::time::Duration;
+use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use chrono::Utc;
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use serde_with::serde_as;
 use smallvec::SmallVec;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 
 use crate::{
     codecs::Decoder,
@@ -45,8 +46,7 @@ pub struct TcpConfig {
     /// Set to `""` to suppress this key.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
-    host_key: OptionalValuePath,
+    host_key: Option<OptionalValuePath>,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
     ///
@@ -57,6 +57,9 @@ pub struct TcpConfig {
     /// Set to `""` to suppress this key.
     #[serde(default = "default_port_key")]
     port_key: OptionalValuePath,
+
+    #[configurable(derived)]
+    pub permit_origin: Option<IpAllowlistConfig>,
 
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
@@ -102,8 +105,9 @@ impl TcpConfig {
             address,
             keepalive: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
-            host_key: default_host_key(),
+            host_key: None,
             port_key: default_port_key(),
+            permit_origin: None,
             tls: None,
             receive_buffer_bytes: None,
             max_connection_duration_secs: None,
@@ -114,8 +118,8 @@ impl TcpConfig {
         }
     }
 
-    pub const fn host_key(&self) -> &OptionalValuePath {
-        &self.host_key
+    pub(super) fn host_key(&self) -> OptionalValuePath {
+        self.host_key.clone().unwrap_or(default_host_key())
     }
 
     pub const fn port_key(&self) -> &OptionalValuePath {
@@ -203,7 +207,7 @@ impl RawTcpSource {
 }
 
 impl TcpSource for RawTcpSource {
-    type Error = codecs::decoding::Error;
+    type Error = vector_lib::codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = Decoder;
     type Acker = TcpNullAcker;
@@ -223,7 +227,12 @@ impl TcpSource for RawTcpSource {
                     now,
                 );
 
-                let legacy_host_key = self.config.host_key.clone().path;
+                let legacy_host_key = self
+                    .config
+                    .host_key
+                    .clone()
+                    .unwrap_or(default_host_key())
+                    .path;
 
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,

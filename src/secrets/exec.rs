@@ -6,7 +6,7 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, time};
 use tokio_util::codec;
-use vector_config::{component::GenerateConfig, configurable_component};
+use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 
 use crate::{config::SecretBackend, signal};
 
@@ -58,7 +58,7 @@ struct ExecResponse {
 }
 
 impl SecretBackend for ExecBackend {
-    fn retrieve(
+    async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
         signal_rx: &mut signal::SignalRx,
@@ -134,7 +134,7 @@ async fn query_backend(
     loop {
         tokio::select! {
             biased;
-            Ok(signal::SignalTo::Shutdown | signal::SignalTo::Quit) = signal_rx.recv() => {
+            Ok(signal::SignalTo::Shutdown(_) | signal::SignalTo::Quit) = signal_rx.recv() => {
                 drop(command);
                 return Err("Secret retrieval was interrupted.".into());
             }

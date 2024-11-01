@@ -84,6 +84,22 @@ representing multiple endpoints. If a component uses multiple options to
 automatically build the endpoint, then the `endpoint(s)` option MUST
 override that process.
 
+#### `listen`
+
+When a component listens for incoming connections, it SHOULD expose a `listen` configuration option that takes
+a `string` representing an address with `<protocol>:<address>`.
+
+Options for `protocol` are:
+
+- `unix+stream`, where `address` should be a file path
+- `unix+datagram`, where `address` should be a file path
+- `unix`, same as `unix+stream`
+- `tcp`, where `address` should be `<host>:<port>`
+- `udp`, where `address` should be `<host>:<port>`
+
+Components MAY have a default protocol. For example, a `statsd` component may default the protocol
+to `udp` and only require the `<host>:<port>` to bind to.
+
 ## Instrumentation
 
 **Extends the [Instrumentation Specification].**
@@ -110,6 +126,8 @@ of these events:
 
 #### ComponentEventsReceived
 
+**Note**: Will be deprecated once `SourceNetworkBytesReceived` exists.
+
 _All components_ MUST emit a `ComponentEventsReceived` event that represents
 the reception of Vector events from an upstream component.
 
@@ -131,6 +149,8 @@ the reception of Vector events from an upstream component.
 
 #### ComponentBytesReceived
 
+**Note**: Will be deprecated once `SourceNetworkBytesSent` exists.
+
 *Sources* MUST emit a `ComponentBytesReceived` event that represent the reception of bytes.
 
 - Emission
@@ -140,14 +160,12 @@ the reception of Vector events from an upstream component.
   - `byte_size`
     - For UDP, TCP, and Unix protocols, the total number of bytes received from
       the socket excluding the delimiter.
-    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
-      represented by the `Content-Length` header.
+    - For HTTP-based protocols, the total number of bytes in the HTTP body, after decompression
     - For files, the total number of bytes read from the file excluding the
       delimiter.
   - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
     `unix`, `http`, `https`, `file`, etc.).
   - `http_path` - If relevant, the HTTP path, excluding query strings.
-  - `socket` - If relevant, the socket number that bytes were received from.
 - Metrics
   - MUST increment the `component_received_bytes_total` counter by the defined value with
     the defined properties as metric tags.
@@ -169,8 +187,7 @@ the reception of Vector events from an upstream component.
   - `byte_size`
     - For UDP, TCP, and Unix protocols, the total number of bytes placed on the
       socket excluding the delimiter.
-    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
-      represented by the `Content-Length` header.
+    - For HTTP-based protocols, the total number of bytes in the HTTP body before compression
     - For files, the total number of bytes written to the file excluding the
       delimiter.
   - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,

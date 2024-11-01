@@ -1,6 +1,7 @@
 use bytes::Bytes;
-use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
-use vector_core::partition::Partitioner;
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use vector_lib::partition::Partitioner;
+use vector_lib::request_metadata::GroupedCountByteSize;
 
 use super::config::WebHdfsConfig;
 use crate::{
@@ -66,7 +67,8 @@ fn build_request(compression: Compression) -> OpenDalRequest {
     let request_builder = request_builder(&sink_config);
     let (metadata, metadata_request_builder, _events) =
         request_builder.split_input((key, vec![log]));
-    let payload = EncodeResult::uncompressed(Bytes::new());
+    let byte_size = GroupedCountByteSize::new_untagged();
+    let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = metadata_request_builder.build(&payload);
 
     request_builder.build_request(metadata, request_metadata, payload)

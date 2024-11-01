@@ -19,12 +19,12 @@ pub struct NativeDeserializerConfig;
 impl NativeDeserializerConfig {
     /// Build the `NativeDeserializer` from this configuration.
     pub fn build(&self) -> NativeDeserializer {
-        NativeDeserializer::default()
+        NativeDeserializer
     }
 
     /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
-        DataType::all()
+        DataType::all_bits()
     }
 
     /// The schema produced by the deserializer.

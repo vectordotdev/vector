@@ -8,7 +8,7 @@
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
-use vector_core::event::TraceEvent;
+use vector_lib::event::TraceEvent;
 
 pub use self::aggregation::Aggregator;
 pub use self::flusher::flush_apm_stats_thread;

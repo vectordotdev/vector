@@ -1,8 +1,8 @@
 #[cfg(feature = "sources-amqp")]
 pub mod source {
     use metrics::counter;
-    use vector_common::internal_event::{error_stage, error_type};
-    use vector_core::internal_event::InternalEvent;
+    use vector_lib::internal_event::InternalEvent;
+    use vector_lib::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct AmqpBytesReceived {
@@ -19,9 +19,9 @@ pub mod source {
             );
             counter!(
                 "component_received_bytes_total",
-                self.byte_size as u64,
                 "protocol" => self.protocol,
-            );
+            )
+            .increment(self.byte_size as u64);
         }
     }
 
@@ -39,10 +39,11 @@ pub mod source {
                    internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -60,10 +61,11 @@ pub mod source {
                    internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::RECEIVING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -81,74 +83,11 @@ pub mod source {
                    internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
-            );
-        }
-    }
-}
-
-#[cfg(feature = "sinks-amqp")]
-pub mod sink {
-    use crate::emit;
-    use metrics::counter;
-    use vector_common::internal_event::{
-        error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
-    };
-    use vector_core::internal_event::InternalEvent;
-
-    #[derive(Debug)]
-    pub struct AmqpDeliveryError<'a> {
-        pub error: &'a lapin::Error,
-    }
-
-    impl InternalEvent for AmqpDeliveryError<'_> {
-        fn emit(self) {
-            let deliver_reason = "Unable to deliver.";
-
-            error!(message = deliver_reason,
-                   error = ?self.error,
-                   error_type = error_type::REQUEST_FAILED,
-                   stage = error_stage::SENDING,
-                   internal_log_rate_limit = true,
-            );
-            counter!(
-                "component_errors_total", 1,
-                "error_type" => error_type::REQUEST_FAILED,
-                "stage" => error_stage::SENDING,
-            );
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: 1,
-                reason: deliver_reason
-            });
-        }
-    }
-
-    #[derive(Debug)]
-    pub struct AmqpAcknowledgementError<'a> {
-        pub error: &'a lapin::Error,
-    }
-
-    impl InternalEvent for AmqpAcknowledgementError<'_> {
-        fn emit(self) {
-            let ack_reason = "Acknowledgement failed.";
-
-            error!(message = ack_reason,
-                   error = ?self.error,
-                   error_type = error_type::REQUEST_FAILED,
-                   stage = error_stage::SENDING,
-                   internal_log_rate_limit = true,
-            );
-            counter!(
-                "component_errors_total", 1,
-                "error_type" => error_type::REQUEST_FAILED,
-                "stage" => error_stage::SENDING,
-            );
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: 1,
-                reason: ack_reason
-            });
+            )
+            .increment(1);
         }
     }
 }

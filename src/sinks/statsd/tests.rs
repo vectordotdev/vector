@@ -4,7 +4,7 @@ use futures_util::stream;
 use tokio::{net::UdpSocket, sync::mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-use vector_core::{
+use vector_lib::{
     event::{metric::TagValue, Event, Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
     metric_tags,
 };
@@ -62,7 +62,7 @@ async fn test_send_to_statsd() {
                 "histogram",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![2.0 => 100],
+                    samples: vector_lib::samples![2.0 => 100],
                     statistic: StatisticKind::Histogram,
                 },
             )

@@ -3,14 +3,14 @@ package metadata
 remap: functions: is_nullish: {
 	category: "Type"
 	description: """
-		Determines whether the `value` is "nullish," where nullish denotes the absence of a
+		Determines whether `value` is nullish, where nullish denotes the absence of a
 		meaningful value.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check for "nullishness," i.e. a useless value."#
+			description: #"The value to check for nullishness, for example, a useless value."#
 			required:    true
 			type: ["any"]
 		},

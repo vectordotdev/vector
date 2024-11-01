@@ -149,9 +149,4 @@ components: sources: journald: {
 				"""
 		}
 	}
-
-	telemetry: metrics: {
-		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
-		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
-	}
 }

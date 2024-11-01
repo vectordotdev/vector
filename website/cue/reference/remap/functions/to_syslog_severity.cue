@@ -16,7 +16,7 @@ remap: functions: to_syslog_severity: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a valid Syslog level keyword",
+		"`value` is not a valid Syslog level keyword.",
 	]
 	return: {
 		types: ["integer"]

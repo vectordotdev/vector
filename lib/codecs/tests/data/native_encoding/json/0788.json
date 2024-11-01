@@ -1,1 +1,1 @@
-{"metric":{"name":"t","tags":{"_":"b","i":"d","w":"y"},"interval_ms":4294967295,"kind":"absolute","counter":{"value":-876352.0}}}
+{"metric":{"name":"w","interval_ms":870813348,"kind":"incremental","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[],"n":[]},"count":0,"min":1.7976931348623157e308,"max":-1.7976931348623157e308,"sum":-356992.0,"avg":-572800.0}}}}}

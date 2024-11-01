@@ -20,8 +20,8 @@ pub struct Opts {
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
-    /// If zero files are specified the default config path
-    /// `/etc/vector/vector.toml` will be targeted.
+    /// If zero files are specified, the deprecated default config path
+    /// `/etc/vector/vector.yaml` is targeted.
     #[arg(
         id = "config",
         short,
@@ -168,7 +168,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     // builder fields which we'll use to error out if required.
     let (paths, builder) = match process_paths(&paths) {
         Some(paths) => match load_builder_from_paths(&paths) {
-            Ok((builder, _)) => (paths, builder),
+            Ok(builder) => (paths, builder),
             Err(errs) => return handle_config_errors(errs),
         },
         None => return exitcode::CONFIG,
@@ -176,7 +176,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     // Load source TOML.
     let source = match load_source_from_paths(&paths) {
-        Ok((map, _)) => map,
+        Ok(map) => map,
         Err(errs) => return handle_config_errors(errs),
     };
 
@@ -200,10 +200,15 @@ mod tests {
         SeedableRng,
     };
     use serde_json::json;
-    use vector_config::component::{SinkDescription, SourceDescription, TransformDescription};
+    use similar_asserts::assert_eq;
+    use vector_lib::configurable::component::{
+        SinkDescription, SourceDescription, TransformDescription,
+    };
 
+    use crate::config::Format;
     use crate::{
         config::{cmd::serialize_to_json, vars, ConfigBuilder},
+        generate,
         generate::{generate_example, TransformInputsStrategy},
     };
 
@@ -245,7 +250,7 @@ mod tests {
         "#,
             env_var, env_var_in_arr
         );
-        let (interpolated_config_source, _) = vars::interpolate(
+        let interpolated_config_source = vars::interpolate(
             config_source.as_ref(),
             &HashMap::from([
                 (env_var.to_string(), "syslog".to_string()),
@@ -278,7 +283,11 @@ mod tests {
 
     /// Select any 2-4 sources
     fn arb_sources() -> impl Strategy<Value = Vec<&'static str>> {
-        sample::subsequence(SourceDescription::types(), 2..=4)
+        let mut types = SourceDescription::types();
+        // The `file_descriptor` source produces different defaults each time it is used, and so
+        // will never compare equal below.
+        types.retain(|t| *t != "file_descriptor");
+        sample::subsequence(types, 2..=4)
     }
 
     /// Select any 2-4 transforms
@@ -325,13 +334,13 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join(","),
         );
-        generate_example(
-            false,
-            generate_config_str.as_ref(),
-            &None,
-            TransformInputsStrategy::All,
-        )
-        .expect("invalid config generated")
+        let opts = generate::Opts {
+            fragment: true,
+            expression: generate_config_str.to_string(),
+            file: None,
+            format: Format::Toml,
+        };
+        generate_example(&opts, TransformInputsStrategy::All).expect("invalid config generated")
     }
 
     proptest! {

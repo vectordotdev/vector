@@ -6,7 +6,7 @@ use super::{
     aggregation::{AggregationKey, PayloadAggregationKey},
     ddsketch_full, ClientGroupedStats, ClientStatsBucket,
 };
-use crate::{event::Value, metrics::AgentDDSketch};
+use crate::{event::ObjectMap, event::Value, metrics::AgentDDSketch};
 
 pub(crate) struct GroupedStats {
     hits: f64,
@@ -94,7 +94,7 @@ fn convert_stores(agent_sketch: &AgentDDSketch) -> (BTreeMap<i32, f64>, BTreeMap
     bin_map
         .keys
         .into_iter()
-        .zip(bin_map.counts.into_iter())
+        .zip(bin_map.counts)
         .for_each(|(k, n)| {
             match k.signum() {
                 0 => zeroes = n as f64,
@@ -142,7 +142,7 @@ impl Bucket {
 
     pub(crate) fn add(
         &mut self,
-        span: &BTreeMap<String, Value>,
+        span: &ObjectMap,
         weight: f64,
         is_top: bool,
         aggkey: AggregationKey,
@@ -159,7 +159,7 @@ impl Bucket {
 
     /// Update a bucket with a new span. Computed statistics include the number of hits and the actual distribution of
     /// execution time, with isolated measurements for spans flagged as errored and spans without error.
-    fn update(span: &BTreeMap<String, Value>, weight: f64, is_top: bool, gs: &mut GroupedStats) {
+    fn update(span: &ObjectMap, weight: f64, is_top: bool, gs: &mut GroupedStats) {
         is_top.then(|| {
             gs.top_level_hits += weight;
         });

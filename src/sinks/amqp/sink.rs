@@ -43,6 +43,7 @@ impl AmqpSink {
             .await
             .map_err(|e| BuildError::AmqpCreateFailed { source: e })?;
 
+        // Enable confirmations on the channel.
         channel
             .confirm_select(ConfirmSelectOptions::default())
             .await
@@ -119,7 +120,7 @@ impl AmqpSink {
 
         input
             .filter_map(|event| std::future::ready(self.make_amqp_event(event)))
-            .request_builder(None, request_builder)
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {

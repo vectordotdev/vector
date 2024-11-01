@@ -1,10 +1,9 @@
 use std::sync::{atomic::Ordering, Arc, RwLock};
-use std::time::Duration;
+use std::{cell::OnceCell, time::Duration};
 
 use chrono::Utc;
-use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, SharedString, Unit};
+use metrics::{Counter, Gauge, Histogram, Key, KeyName, Metadata, Recorder, SharedString, Unit};
 use metrics_util::{registry::Registry as MetricsRegistry, MetricKindMask};
-use once_cell::unsync::OnceCell;
 use quanta::Clock;
 
 use super::recency::{GenerationalStorage, Recency};
@@ -94,6 +93,17 @@ impl Registry {
 
 /// [`VectorRecorder`] is a [`metrics::Recorder`] implementation that's suitable
 /// for the advanced usage that we have in Vector.
+///
+/// TODO: The latest version of the `metrics` crate has a test recorder interface that could be used
+/// to replace this whole global/local switching mechanism, as it effectively does the exact same
+/// thing internally. However, it is only available through a `with_test_recorder` function that
+/// takes a closure and cleans up the test recorder once the closure finishes. This is a much
+/// cleaner interface, but interacts poorly with async code as used by the component tests. The best
+/// path forward to make async tests work, then, is to replace the standard `#[tokio::test]` proc
+/// macro wrapper with an alternate wrapper that does the normal tokio setup from within the
+/// `with_test_recorder` closure, and use it across all the tests that require a test
+/// recorder. Given the large number of such tests, we are retaining this global test recorder hack
+/// here, but some day we should refactor the tests to eliminate it.
 #[derive(Clone)]
 pub(super) enum VectorRecorder {
     Global(Arc<Registry>),
@@ -125,15 +135,15 @@ impl VectorRecorder {
 }
 
 impl Recorder for VectorRecorder {
-    fn register_counter(&self, key: &Key) -> Counter {
+    fn register_counter(&self, key: &Key, _: &Metadata<'_>) -> Counter {
         self.with_registry(|r| r.get_counter(key))
     }
 
-    fn register_gauge(&self, key: &Key) -> Gauge {
+    fn register_gauge(&self, key: &Key, _: &Metadata<'_>) -> Gauge {
         self.with_registry(|r| r.get_gauge(key))
     }
 
-    fn register_histogram(&self, key: &Key) -> Histogram {
+    fn register_histogram(&self, key: &Key, _: &Metadata<'_>) -> Histogram {
         self.with_registry(|r| r.get_histogram(key))
     }
 

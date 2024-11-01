@@ -61,10 +61,8 @@ components: transforms: tag_cardinality_limit: {
 				because it exceeded the `value_limit`.
 				"""
 			configuration: {
-				fields: {
-					value_limit:           1
-					limit_exceeded_action: "drop_tag"
-				}
+				value_limit:           1
+				limit_exceeded_action: "drop_tag"
 			}
 			input: [
 				{metric: {
@@ -150,15 +148,15 @@ components: transforms: tag_cardinality_limit: {
 				```text
 				(number of distinct field names in the tags for your metrics * average length of
 				the field names for the tags) + (number of distinct field names in the tags of
-				-your metrics * `cache_size_per_tag`)
+				-your metrics * `cache_size_per_key`)
 				```
 
-				The `cache_size_per_tag` option controls the size of the bloom filter used
+				The `cache_size_per_key` option controls the size of the bloom filter used
 				for storing the set of acceptable values for any single key. The larger the
 				bloom filter the lower the false positive rate, which in our case means the less
 				likely we are to allow a new tag value that would otherwise violate a
 				configured limit. If you want to know the exact false positive rate for a given
-				`cache_size_per_tag` and `value_limit`, there are many free on-line bloom filter
+				`cache_size_per_key` and `value_limit`, there are many free on-line bloom filter
 				calculators that can answer this. The formula is generally presented in terms of
 				'n', 'p', 'k', and 'm' where 'n' is the number of items in the filter
 				(`value_limit` in our case), 'p' is the probability of false positives (what we

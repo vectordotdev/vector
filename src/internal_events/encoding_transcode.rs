@@ -1,5 +1,5 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct DecoderBomRemoval {
@@ -13,7 +13,7 @@ impl InternalEvent for DecoderBomRemoval {
             from_encoding = %self.from_encoding,
             internal_log_rate_limit = true
         );
-        counter!("decoder_bom_removals_total", 1);
+        counter!("decoder_bom_removals_total").increment(1);
     }
 }
 
@@ -31,7 +31,7 @@ impl InternalEvent for DecoderMalformedReplacement {
         );
         // NOT the actual number of replacements in the output: there's no easy
         // way to get that from the lib we use here (encoding_rs)
-        counter!("decoder_malformed_replacement_warnings_total", 1);
+        counter!("decoder_malformed_replacement_warnings_total").increment(1);
     }
 }
 
@@ -49,6 +49,6 @@ impl InternalEvent for EncoderUnmappableReplacement {
         );
         // NOT the actual number of replacements in the output: there's no easy
         // way to get that from the lib we use here (encoding_rs)
-        counter!("encoder_unmappable_replacement_warnings_total", 1);
+        counter!("encoder_unmappable_replacement_warnings_total").increment(1);
     }
 }

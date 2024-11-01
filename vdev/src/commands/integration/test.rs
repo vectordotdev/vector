@@ -1,7 +1,7 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Args;
 
-use crate::testing::{config::IntegrationTestConfig, integration::IntegrationTest, state::EnvsDir};
+use crate::testing::integration::IntegrationTest;
 
 /// Execute integration tests
 ///
@@ -34,32 +34,12 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let (_test_dir, config) = IntegrationTestConfig::load(&self.integration)?;
-        let envs = config.environments();
-
-        let active = EnvsDir::new(&self.integration).active()?;
-
-        let retries = self.retries.unwrap_or_default();
-
-        match (self.environment, active) {
-            (Some(environment), Some(active)) if environment != active => {
-                bail!("Requested environment {environment:?} does not match active one {active:?}")
-            }
-            (Some(environment), _) => {
-                IntegrationTest::new(self.integration, environment, self.build_all, retries)?
-                    .test(self.args)
-            }
-            (None, Some(active)) => {
-                IntegrationTest::new(self.integration, active, self.build_all, retries)?
-                    .test(self.args)
-            }
-            (None, None) => {
-                for env_name in envs.keys() {
-                    IntegrationTest::new(&self.integration, env_name, self.build_all, retries)?
-                        .test(self.args.clone())?;
-                }
-                Ok(())
-            }
-        }
+        crate::commands::compose_tests::test::exec::<IntegrationTest>(
+            &self.integration,
+            &self.environment,
+            self.build_all,
+            self.retries.unwrap_or_default(),
+            &self.args,
+        )
     }
 }

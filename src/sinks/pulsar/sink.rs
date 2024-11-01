@@ -4,13 +4,13 @@ use pulsar::{Error as PulsarError, Pulsar, TokioExecutor};
 use serde::Serialize;
 use snafu::Snafu;
 use std::collections::HashMap;
-
-use crate::sinks::prelude::*;
+use vrl::value::KeyString;
 
 use super::{
     config::PulsarSinkConfig, encoder::PulsarEncoder, request_builder::PulsarRequestBuilder,
     service::PulsarService, util,
 };
+use crate::sinks::prelude::*;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
@@ -37,7 +37,7 @@ pub(super) struct PulsarEvent {
     pub(super) event: Event,
     pub(super) topic: String,
     pub(super) key: Option<Bytes>,
-    pub(super) properties: Option<HashMap<String, Bytes>>,
+    pub(super) properties: Option<HashMap<KeyString, Bytes>>,
     pub(super) timestamp_millis: Option<i64>,
 }
 
@@ -56,7 +56,7 @@ impl ByteSizeOf for PulsarEvent {
             + self.properties.as_ref().map_or(0, |props| {
                 props
                     .iter()
-                    .map(|(key, val)| key.capacity() + val.size_of())
+                    .map(|(key, val)| key.allocated_bytes() + val.size_of())
                     .sum()
             })
     }
@@ -112,7 +112,7 @@ impl PulsarSink {
                     event,
                 ))
             })
-            .request_builder(None, request_builder)
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 request
                     .map_err(|e| error!("Failed to build Pulsar request: {:?}.", e))

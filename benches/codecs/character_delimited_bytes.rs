@@ -1,16 +1,15 @@
 use std::{fmt, time::Duration};
 
 use bytes::BytesMut;
-use codecs::{
-    self,
-    decoding::{Deserializer, Framer},
-    BytesDeserializer, CharacterDelimitedDecoder,
-};
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
     SamplingMode, Throughput,
 };
 use tokio_util::codec::Decoder;
+use vector_lib::codecs::{
+    decoding::{Deserializer, Framer},
+    BytesDeserializer, CharacterDelimitedDecoder,
+};
 
 #[derive(Debug)]
 struct Param {
@@ -55,7 +54,7 @@ fn decoding(c: &mut Criterion) {
                                 .map(|ml| CharacterDelimitedDecoder::new_with_max_length(b'a', ml))
                                 .unwrap_or(CharacterDelimitedDecoder::new(b'a')),
                         );
-                        let deserializer = Deserializer::Bytes(BytesDeserializer::new());
+                        let deserializer = Deserializer::Bytes(BytesDeserializer);
                         let decoder = vector::codecs::Decoder::new(framer, deserializer);
 
                         (Box::new(decoder), param.input.clone())

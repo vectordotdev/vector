@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 extern crate vector;
-use vector::app::Application;
+use vector::{app::Application, extra_context::ExtraContext};
 
 use std::process::ExitCode;
 
@@ -37,7 +37,9 @@ fn main() -> ExitCode {
         }
     }
 
-    let exit_code = Application::run().code().unwrap_or(exitcode::UNAVAILABLE) as u8;
+    let exit_code = Application::run(ExtraContext::default())
+        .code()
+        .unwrap_or(exitcode::UNAVAILABLE) as u8;
     ExitCode::from(exit_code)
 }
 
@@ -47,7 +49,10 @@ pub fn main() -> ExitCode {
     // to run vector as a service. If we fail, we consider that we are in
     // interactive mode and then fallback to console mode.  See
     // https://docs.microsoft.com/en-us/dotnet/api/system.environment.userinteractive?redirectedfrom=MSDN&view=netcore-3.1#System_Environment_UserInteractive
-    let exit_code = vector::vector_windows::run()
-        .unwrap_or_else(|_| Application::run().code().unwrap_or(exitcode::UNAVAILABLE));
+    let exit_code = vector::vector_windows::run().unwrap_or_else(|_| {
+        Application::run(ExtraContext::default())
+            .code()
+            .unwrap_or(exitcode::UNAVAILABLE)
+    });
     ExitCode::from(exit_code as u8)
 }

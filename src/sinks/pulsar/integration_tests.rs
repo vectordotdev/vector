@@ -1,9 +1,8 @@
 use crate::sinks::pulsar::{config::PulsarSinkConfig, sink::PulsarSink};
 use futures::StreamExt;
 use pulsar::SubType;
-use std::collections::BTreeMap;
 
-use crate::event::Value;
+use crate::event::{ObjectMap, Value};
 use crate::sinks::VectorSink;
 use crate::template::Template;
 use crate::test_util::{
@@ -29,11 +28,8 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
         // if a property_key is defined, add some properties!
         if let Some(properties_key) = &prop_key_opt {
             if let Some(properties_key) = &properties_key.path {
-                let mut property_values = BTreeMap::new();
-                property_values.insert(
-                    prop_1_key.to_owned(),
-                    Value::Bytes(Bytes::from(prop_1_value)),
-                );
+                let mut property_values = ObjectMap::new();
+                property_values.insert(prop_1_key.into(), Value::Bytes(Bytes::from(prop_1_value)));
                 events.iter_logs_mut().for_each(move |log| {
                     log.insert(properties_key, property_values.clone());
                 });

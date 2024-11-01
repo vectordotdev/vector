@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
-use aws_sdk_cloudwatchlogs::error::{
-    CreateLogStreamErrorKind, DescribeLogStreamsErrorKind, PutLogEventsErrorKind,
-};
-use aws_sdk_cloudwatchlogs::types::SdkError;
+use aws_sdk_cloudwatchlogs::operation::create_log_stream::CreateLogStreamError;
+use aws_sdk_cloudwatchlogs::operation::describe_log_streams::DescribeLogStreamsError;
+use aws_sdk_cloudwatchlogs::operation::put_log_events::PutLogEventsError;
+use aws_smithy_runtime_api::client::result::SdkError;
 
 use crate::aws::is_retriable_error;
 use crate::sinks::{aws_cloudwatch_logs::service::CloudwatchError, util::retries::RetryLogic};
@@ -39,16 +39,16 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
             CloudwatchError::Put(err) => {
                 if let SdkError::ServiceError(inner) = err {
                     let err = inner.err();
-                    if let PutLogEventsErrorKind::ServiceUnavailableException(_) = err.kind {
+                    if matches!(err, PutLogEventsError::ServiceUnavailableException(_)) {
                         return true;
                     }
                 }
                 is_retriable_error(err)
             }
-            CloudwatchError::Describe(err) => {
+            CloudwatchError::DescribeLogStreams(err) => {
                 if let SdkError::ServiceError(inner) = err {
                     let err = inner.err();
-                    if let DescribeLogStreamsErrorKind::ServiceUnavailableException(_) = err.kind {
+                    if matches!(err, DescribeLogStreamsError::ServiceUnavailableException(_)) {
                         return true;
                     }
                 }
@@ -57,7 +57,7 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
             CloudwatchError::CreateStream(err) => {
                 if let SdkError::ServiceError(inner) = err {
                     let err = inner.err();
-                    if let CreateLogStreamErrorKind::ServiceUnavailableException(_) = err.kind {
+                    if matches!(err, CreateLogStreamError::ServiceUnavailableException(_)) {
                         return true;
                     }
                 }
@@ -70,31 +70,33 @@ impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
 
 #[cfg(test)]
 mod test {
-    use aws_sdk_cloudwatchlogs::error::PutLogEventsError;
-    use aws_sdk_cloudwatchlogs::types::SdkError;
-    use aws_smithy_http::body::SdkBody;
-    use aws_smithy_http::operation::Response;
+    use aws_sdk_cloudwatchlogs::operation::put_log_events::PutLogEventsError;
+    use aws_smithy_runtime_api::{
+        client::{orchestrator::HttpResponse, result::SdkError},
+        http::StatusCode,
+    };
+    use aws_smithy_types::body::SdkBody;
 
-    use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
-    use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
+    use crate::sinks::aws_cloudwatch_logs::{
+        retry::CloudwatchRetryLogic, service::CloudwatchError,
+    };
     use crate::sinks::util::retries::RetryLogic;
 
     #[test]
     fn test_throttle_retry() {
         let retry_logic: CloudwatchRetryLogic<()> = CloudwatchRetryLogic::new();
 
-        let meta_err = aws_smithy_types::Error::builder()
+        let meta_err = aws_smithy_types::error::ErrorMetadata::builder()
             .code("ThrottlingException")
             .message("Rate exceeded for logStreamName log-test-1.us-east-1.compute.internal")
-            .request_id("0ac34e43-f6ff-4e1b-96be-7d03b2be8376")
             .build();
 
-        let mut http_response = http::Response::new(SdkBody::from("{\"__type\":\"ThrottlingException\",\"message\":\"Rate exceeded for logStreamName log-test-1.us-east-1.compute.internal\"}"));
-        *http_response.status_mut() = http::StatusCode::BAD_REQUEST;
-        let raw = Response::new(http_response);
+        let body = SdkBody::from("{\"__type\":\"ThrottlingException\",\"message\":\"Rate exceeded for logStreamName log-test-1.us-east-1.compute.internal\"}");
+
+        let raw = HttpResponse::new(StatusCode::try_from(400_u16).unwrap(), body);
 
         let err = CloudwatchError::Put(SdkError::service_error(
-            PutLogEventsError::unhandled(meta_err),
+            PutLogEventsError::generic(meta_err),
             raw,
         ));
         assert!(retry_logic.is_retriable_error(&err));

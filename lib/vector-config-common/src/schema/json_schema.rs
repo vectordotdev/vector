@@ -563,7 +563,7 @@ impl<T: Clone> Extend<T> for SingleOrVec<T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         match self {
             Self::Single(item) => {
-                *self = Self::Vec(iter::once(*item.clone()).chain(iter.into_iter()).collect());
+                *self = Self::Vec(iter::once(*item.clone()).chain(iter).collect());
             }
             Self::Vec(items) => items.extend(iter),
         }

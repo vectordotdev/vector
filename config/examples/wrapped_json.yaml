@@ -1,0 +1,42 @@
+# JSON Configuration Example
+# ------------------------------------------------------------------------------
+# A simple example that parses incoming data as JSON. This example also
+# demonstrated wrapped JSON, showing that you can chain VRL expressions
+# together to quickly traverse nested objects with simple path notation.
+
+data_dir: "/var/lib/vector"
+
+# Ingest data
+# Example: {"message": "{\"parent\": \"{\\\"child\\\": \\\"value2\\\"}\"}"}
+# Docs: https://vector.dev/docs/reference/sources/file
+sources:
+  logs:
+    type: "file"
+    include: [ "/var/log/*.log" ]
+    ignore_older_secs: 86400 # 1 day
+
+# Parse the data as JSON
+# Docs: https://vector.dev/docs/reference/transforms/remap
+transforms:
+  parse_json:
+    inputs: [ "logs" ]
+    type: "remap"
+    drop_on_error: false
+    source: |
+      message = del(.message)
+      . |= parse_json!(string!(message))
+
+      parent = del(.parent)
+      . |= parse_json!(string!(parent))
+
+      child = del(.child)
+      . |= parse_json!(string!(child))
+
+# Print the data to STDOUT for inspection
+# Docs: https://vector.dev/docs/reference/sinks/console
+sinks:
+  out:
+    inputs: [ "parse_json" ]
+    type: "console"
+    encoding:
+      codec: "json"

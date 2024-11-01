@@ -9,11 +9,9 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::{
-    event::{EventFinalizers, EventStatus, Finalizable},
-    stream::DriverResponse,
-};
+use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::stream::DriverResponse;
 
 use crate::{
     http::{BuildRequestSnafu, CallRequestSnafu, HttpClient, HttpError},
@@ -38,7 +36,7 @@ impl RetryLogic for TraceApiRetry {
             // forbidden requests.
             //
             // This retry logic will be expanded further, but specifically retrying unauthorized
-            // requests for now. I verified using `curl` that `403` is the respose code for this.
+            // requests for now. I verified using `curl` that `403` is the response code for this.
             //
             // https://github.com/vectordotdev/vector/issues/10870
             // https://github.com/vectordotdev/vector/issues/12220

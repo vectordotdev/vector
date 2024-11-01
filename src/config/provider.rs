@@ -1,11 +1,9 @@
-use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use vector_config::NamedComponent;
+use vector_lib::configurable::NamedComponent;
 
 use crate::{providers::BuildResult, signal};
 
 /// Generalized interface for constructing a configuration from a provider.
-#[async_trait]
 #[enum_dispatch]
 pub trait ProviderConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds a configuration.

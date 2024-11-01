@@ -12,12 +12,12 @@ use heim::units::time::second;
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::internal_event::{
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -71,7 +71,7 @@ pub enum Collector {
 /// Filtering configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-pub(self) struct FilterList {
+struct FilterList {
     /// Any patterns which should be included.
     ///
     /// The patterns are matched using globbing.
@@ -483,7 +483,7 @@ impl MetricsBuffer {
     }
 }
 
-pub(self) fn filter_result_sync<T, E>(result: Result<T, E>, message: &'static str) -> Option<T>
+fn filter_result_sync<T, E>(result: Result<T, E>, message: &'static str) -> Option<T>
 where
     E: std::error::Error,
 {
@@ -492,7 +492,7 @@ where
         .ok()
 }
 
-pub(self) async fn filter_result<T, E>(result: Result<T, E>, message: &'static str) -> Option<T>
+async fn filter_result<T, E>(result: Result<T, E>, message: &'static str) -> Option<T>
 where
     E: std::error::Error,
 {
@@ -627,7 +627,7 @@ impl From<PatternWrapper> for String {
 }
 
 #[cfg(test)]
-pub(self) mod tests {
+mod tests {
     use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
     use std::{collections::HashSet, future::Future, time::Duration};
 

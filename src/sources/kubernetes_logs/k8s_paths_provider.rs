@@ -4,9 +4,9 @@
 
 use std::path::PathBuf;
 
-use file_source::paths_provider::PathsProvider;
 use k8s_openapi::api::core::v1::{Namespace, Pod};
 use kube::runtime::reflector::{store::Store, ObjectRef};
+use vector_lib::file_source::paths_provider::PathsProvider;
 
 use super::path_helpers::build_pod_logs_directory;
 use crate::kubernetes::pod_manager_logic::extract_static_pod_config_hashsum;
@@ -16,19 +16,22 @@ use crate::kubernetes::pod_manager_logic::extract_static_pod_config_hashsum;
 pub struct K8sPathsProvider {
     pod_state: Store<Pod>,
     namespace_state: Store<Namespace>,
+    include_paths: Vec<glob::Pattern>,
     exclude_paths: Vec<glob::Pattern>,
 }
 
 impl K8sPathsProvider {
     /// Create a new [`K8sPathsProvider`].
-    pub fn new(
+    pub const fn new(
         pod_state: Store<Pod>,
         namespace_state: Store<Namespace>,
+        include_paths: Vec<glob::Pattern>,
         exclude_paths: Vec<glob::Pattern>,
     ) -> Self {
         Self {
             pod_state,
             namespace_state,
+            include_paths,
             exclude_paths,
         }
     }
@@ -57,7 +60,12 @@ impl PathsProvider for K8sPathsProvider {
             .flat_map(|pod| {
                 trace!(message = "Providing log paths for pod.", pod = ?pod.metadata.name);
                 let paths_iter = list_pod_log_paths(real_glob, pod.as_ref());
-                exclude_paths(paths_iter, &self.exclude_paths).collect::<Vec<_>>()
+                filter_paths(
+                    filter_paths(paths_iter, &self.include_paths, true),
+                    &self.exclude_paths,
+                    false,
+                )
+                .collect::<Vec<_>>()
             })
             .collect()
     }
@@ -159,7 +167,7 @@ where
                 build_container_exclusion_patterns(dir, excluded_containers).collect();
 
             // Return paths filtered with container exclusion.
-            exclude_paths(path_iter, exclusion_patterns)
+            filter_paths(path_iter, exclusion_patterns, false)
         })
 }
 
@@ -175,12 +183,13 @@ fn real_glob(pattern: &str) -> impl Iterator<Item = PathBuf> {
     .flat_map(|paths| paths.into_iter())
 }
 
-fn exclude_paths<'a>(
+fn filter_paths<'a>(
     iter: impl Iterator<Item = PathBuf> + 'a,
     patterns: impl AsRef<[glob::Pattern]> + 'a,
+    include: bool,
 ) -> impl Iterator<Item = PathBuf> + 'a {
     iter.filter(move |path| {
-        !patterns.as_ref().iter().any(|pattern| {
+        let m = patterns.as_ref().iter().any(|pattern| {
             pattern.matches_path_with(
                 path,
                 glob::MatchOptions {
@@ -188,7 +197,12 @@ fn exclude_paths<'a>(
                     ..Default::default()
                 },
             )
-        })
+        });
+        if include {
+            m
+        } else {
+            !m
+        }
     })
 }
 
@@ -199,8 +213,8 @@ mod tests {
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 
     use super::{
-        build_container_exclusion_patterns, exclude_paths, extract_excluded_containers_for_pod,
-        extract_pod_logs_directory, list_pod_log_paths,
+        build_container_exclusion_patterns, extract_excluded_containers_for_pod,
+        extract_pod_logs_directory, filter_paths, list_pod_log_paths,
     };
 
     #[test]
@@ -508,7 +522,59 @@ mod tests {
                 .map(|pattern| glob::Pattern::new(pattern).unwrap())
                 .collect();
             let actual_paths: Vec<_> =
-                exclude_paths(input_paths.into_iter().map(Into::into), &patterns).collect();
+                filter_paths(input_paths.into_iter().map(Into::into), &patterns, false).collect();
+            let expected_paths: Vec<_> = expected_paths.into_iter().map(PathBuf::from).collect();
+            assert_eq!(
+                actual_paths, expected_paths,
+                "failed for patterns {:?}",
+                &str_patterns
+            )
+        }
+    }
+
+    #[test]
+    fn test_include_paths() {
+        let cases = vec![
+            (
+                vec![
+                    "/var/log/pods/a.log",
+                    "/var/log/pods/b.log",
+                    "/var/log/pods/c.log.foo",
+                    "/var/log/pods/d.logbar",
+                    "/tmp/foo",
+                ],
+                vec!["/var/log/pods/*"],
+                vec![
+                    "/var/log/pods/a.log",
+                    "/var/log/pods/b.log",
+                    "/var/log/pods/c.log.foo",
+                    "/var/log/pods/d.logbar",
+                ],
+            ),
+            (
+                vec![
+                    "/var/log/pods/a.log",
+                    "/var/log/pods/b.log",
+                    "/var/log/pods/c.log.foo",
+                    "/var/log/pods/d.logbar",
+                ],
+                vec!["/tmp/*"],
+                vec![],
+            ),
+            (
+                vec!["/var/log/pods/a.log", "/tmp/foo"],
+                vec!["**/*"],
+                vec!["/var/log/pods/a.log", "/tmp/foo"],
+            ),
+        ];
+
+        for (input_paths, str_patterns, expected_paths) in cases {
+            let patterns: Vec<_> = str_patterns
+                .iter()
+                .map(|pattern| glob::Pattern::new(pattern).unwrap())
+                .collect();
+            let actual_paths: Vec<_> =
+                filter_paths(input_paths.into_iter().map(Into::into), &patterns, true).collect();
             let expected_paths: Vec<_> = expected_paths.into_iter().map(PathBuf::from).collect();
             assert_eq!(
                 actual_paths, expected_paths,

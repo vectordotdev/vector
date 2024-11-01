@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use snafu::Snafu;
-use vector_core::config::SourceOutput;
+use vector_lib::config::SourceOutput;
 
 pub(super) use crate::schema::Definition;
 
@@ -22,7 +22,7 @@ type Cache = HashMap<(bool, Vec<OutputId>), Vec<(OutputId, Definition)>>;
 pub fn possible_definitions(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
-    enrichment_tables: enrichment::TableRegistry,
+    enrichment_tables: vector_lib::enrichment::TableRegistry,
     cache: &mut Cache,
 ) -> Result<Vec<(OutputId, Definition)>, Error> {
     if inputs.is_empty() {
@@ -109,7 +109,7 @@ pub fn possible_definitions(
 /// 5` being expanded into two individual routes (So1 -> T3 -> T5 -> Si1 AND So1 -> T4 -> T5 ->
 /// Si1).
 pub(super) fn expanded_definitions(
-    enrichment_tables: enrichment::TableRegistry,
+    enrichment_tables: vector_lib::enrichment::TableRegistry,
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
     cache: &mut Cache,
@@ -210,7 +210,7 @@ pub(super) fn expanded_definitions(
 pub(crate) fn input_definitions(
     inputs: &[OutputId],
     config: &Config,
-    enrichment_tables: enrichment::TableRegistry,
+    enrichment_tables: vector_lib::enrichment::TableRegistry,
     cache: &mut Cache,
 ) -> Result<Vec<(OutputId, Definition)>, Error> {
     if inputs.is_empty() {
@@ -301,7 +301,7 @@ pub(super) fn validate_sink_expectations(
     key: &ComponentKey,
     sink: &SinkOuter<OutputId>,
     config: &topology::Config,
-    enrichment_tables: enrichment::TableRegistry,
+    enrichment_tables: vector_lib::enrichment::TableRegistry,
 ) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
@@ -352,7 +352,7 @@ pub trait ComponentContainer {
     fn transform_outputs(
         &self,
         key: &ComponentKey,
-        enrichment_tables: enrichment::TableRegistry,
+        enrichment_tables: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
     ) -> Option<Vec<TransformOutput>>;
 
@@ -365,7 +365,7 @@ pub trait ComponentContainer {
         &self,
         key: &ComponentKey,
         port: &Option<String>,
-        enrichment_tables: enrichment::TableRegistry,
+        enrichment_tables: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
     ) -> Result<Option<TransformOutput>, ()> {
         if let Some(outputs) = self.transform_outputs(key, enrichment_tables, input_definitions) {
@@ -424,7 +424,7 @@ impl ComponentContainer for Config {
     fn transform_outputs(
         &self,
         key: &ComponentKey,
-        enrichment_tables: enrichment::TableRegistry,
+        enrichment_tables: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
     ) -> Option<Vec<TransformOutput>> {
         self.transform(key).map(|source| {
@@ -442,9 +442,9 @@ mod tests {
     use std::collections::HashMap;
 
     use indexmap::IndexMap;
-    use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use vector_core::config::{DataType, SourceOutput, TransformOutput};
+    use vector_lib::config::{DataType, SourceOutput, TransformOutput};
+    use vector_lib::lookup::owned_value_path;
     use vrl::value::Kind;
 
     use super::*;
@@ -474,7 +474,7 @@ mod tests {
             fn transform_outputs(
                 &self,
                 key: &ComponentKey,
-                _: enrichment::TableRegistry,
+                _: vector_lib::enrichment::TableRegistry,
                 _: &[(OutputId, Definition)],
             ) -> Option<Vec<TransformOutput>> {
                 self.transforms.get(key.id()).cloned().map(|v| v.1)
@@ -497,8 +497,8 @@ mod tests {
                     inputs: vec![("foo", None)],
                     sources: IndexMap::from([(
                         "foo",
-                        vec![SourceOutput::new_logs(
-                            DataType::all(),
+                        vec![SourceOutput::new_maybe_logs(
+                            DataType::all_bits(),
                             Definition::default_legacy_namespace(),
                         )],
                     )]),
@@ -512,8 +512,8 @@ mod tests {
                     inputs: vec![("source-foo", None)],
                     sources: IndexMap::from([(
                         "source-foo",
-                        vec![SourceOutput::new_logs(
-                            DataType::all(),
+                        vec![SourceOutput::new_maybe_logs(
+                            DataType::all_bits(),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("foo"),
                                 Kind::integer().or_bytes(),
@@ -539,8 +539,8 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "source-foo",
-                            vec![SourceOutput::new_logs(
-                                DataType::all(),
+                            vec![SourceOutput::new_maybe_logs(
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
                                     Kind::integer().or_bytes(),
@@ -550,8 +550,8 @@ mod tests {
                         ),
                         (
                             "source-bar",
-                            vec![SourceOutput::new_logs(
-                                DataType::all(),
+                            vec![SourceOutput::new_maybe_logs(
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
                                     Kind::timestamp(),
@@ -588,8 +588,8 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "source-foo",
-                            vec![SourceOutput::new_logs(
-                                DataType::all(),
+                            vec![SourceOutput::new_maybe_logs(
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("foo"),
                                     Kind::boolean(),
@@ -599,8 +599,8 @@ mod tests {
                         ),
                         (
                             "source-bar",
-                            vec![SourceOutput::new_logs(
-                                DataType::all(),
+                            vec![SourceOutput::new_maybe_logs(
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("bar"),
                                     Kind::integer(),
@@ -614,7 +614,7 @@ mod tests {
                         (
                             vec![OutputId::from("source-foo")],
                             vec![TransformOutput::new(
-                                DataType::all(),
+                                DataType::all_bits(),
                                 [(
                                     "source-foo".into(),
                                     Definition::empty_legacy_namespace().with_event_field(
@@ -662,8 +662,8 @@ mod tests {
                     sources: IndexMap::from([
                         (
                             "Source 1",
-                            vec![SourceOutput::new_logs(
-                                DataType::all(),
+                            vec![SourceOutput::new_maybe_logs(
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("source-1"),
                                     Kind::boolean(),
@@ -673,8 +673,8 @@ mod tests {
                         ),
                         (
                             "Source 2",
-                            vec![SourceOutput::new_logs(
-                                DataType::all(),
+                            vec![SourceOutput::new_maybe_logs(
+                                DataType::all_bits(),
                                 Definition::empty_legacy_namespace().with_event_field(
                                     &owned_value_path!("source-2"),
                                     Kind::integer(),
@@ -689,7 +689,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 1")],
                                 vec![TransformOutput::new(
-                                    DataType::all(),
+                                    DataType::all_bits(),
                                     [(
                                         "Source 1".into(),
                                         Definition::empty_legacy_namespace().with_event_field(
@@ -707,7 +707,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![TransformOutput::new(
-                                    DataType::all(),
+                                    DataType::all_bits(),
                                     [(
                                         "Source 2".into(),
                                         Definition::empty_legacy_namespace().with_event_field(
@@ -725,7 +725,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![TransformOutput::new(
-                                    DataType::all(),
+                                    DataType::all_bits(),
                                     [(
                                         "Source 2".into(),
                                         Definition::empty_legacy_namespace().with_event_field(
@@ -743,7 +743,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![TransformOutput::new(
-                                    DataType::all(),
+                                    DataType::all_bits(),
                                     [(
                                         "Source 2".into(),
                                         Definition::empty_legacy_namespace().with_event_field(
@@ -761,7 +761,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Transform 3"), OutputId::from("Transform 4")],
                                 vec![TransformOutput::new(
-                                    DataType::all(),
+                                    DataType::all_bits(),
                                     [(
                                         "Transform 3".into(),
                                         Definition::empty_legacy_namespace().with_event_field(
@@ -818,7 +818,7 @@ mod tests {
                 .collect::<Vec<_>>();
 
             let got = expanded_definitions(
-                enrichment::TableRegistry::default(),
+                vector_lib::enrichment::TableRegistry::default(),
                 &inputs,
                 &case,
                 &mut HashMap::default(),

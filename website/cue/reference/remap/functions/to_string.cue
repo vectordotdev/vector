@@ -15,7 +15,7 @@ remap: functions: to_string: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not an integer, float, boolean, string, timestamp, or null",
+		"`value` is not an integer, float, boolean, string, timestamp, or null.",
 	]
 	return: {
 		types: ["string"]

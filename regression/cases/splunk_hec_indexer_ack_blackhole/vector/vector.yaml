@@ -1,0 +1,30 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  splunk_hec:
+    type:    "splunk_hec"
+    address: "0.0.0.0:8282"
+    acknowledgements:
+      enabled: true
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  blackhole:
+    type:                "blackhole"
+    print_interval_secs: 0
+    inputs: [ "splunk_hec" ]

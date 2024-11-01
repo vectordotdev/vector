@@ -9,7 +9,7 @@ use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
     pkcs12::{ParsedPkcs12_2, Pkcs12},
     pkey::{PKey, Private},
-    ssl::{ConnectConfiguration, SslContextBuilder, SslVerifyMode},
+    ssl::{select_next_proto, AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode},
     stack::Stack,
     x509::{store::X509StoreBuilder, X509},
 };
@@ -85,14 +85,14 @@ pub struct TlsSourceConfig {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct TlsConfig {
-    /// Enables certificate verification.
+    /// Enables certificate verification. For components that create a server, this requires that the
+    /// client connections have a valid client certificate. For components that initiate requests,
+    /// this validates that the upstream has a valid certificate.
     ///
     /// If enabled, certificates must not be expired and must be issued by a trusted
     /// issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
     /// certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
     /// so on until the verification process reaches a root certificate.
-    ///
-    /// Relevant for both incoming and outgoing connections.
     ///
     /// Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
     pub verify_certificate: Option<bool>,
@@ -148,6 +148,14 @@ pub struct TlsConfig {
     #[configurable(metadata(docs::examples = "PassWord1"))]
     #[configurable(metadata(docs::human_name = "Key File Password"))]
     pub key_pass: Option<String>,
+
+    /// Server name to use when using Server Name Indication (SNI).
+    ///
+    /// Only relevant for outgoing connections.
+    #[serde(alias = "server_name")]
+    #[configurable(metadata(docs::examples = "www.example.com"))]
+    #[configurable(metadata(docs::human_name = "Server Name"))]
+    pub server_name: Option<String>,
 }
 
 impl TlsConfig {
@@ -169,6 +177,7 @@ pub struct TlsSettings {
     authorities: Vec<X509>,
     pub(super) identity: Option<IdentityStore>, // openssl::pkcs12::ParsedPkcs12 doesn't impl Clone yet
     alpn_protocols: Option<Vec<u8>>,
+    server_name: Option<String>,
 }
 
 #[derive(Clone)]
@@ -203,9 +212,15 @@ impl TlsSettings {
             authorities: options.load_authorities()?,
             identity: options.load_identity()?,
             alpn_protocols: options.parse_alpn_protocols()?,
+            server_name: options.server_name.clone(),
         })
     }
 
+    /// Returns the identity as PKCS12
+    ///
+    /// # Panics
+    ///
+    /// Panics if the identity is invalid.
     fn identity(&self) -> Option<ParsedPkcs12_2> {
         // This data was test-built previously, so we can just use it
         // here and expect the results will not fail. This can all be
@@ -219,6 +234,11 @@ impl TlsSettings {
         })
     }
 
+    /// Returns the identity as PEM data
+    ///
+    /// # Panics
+    ///
+    /// Panics if the identity is missing, invalid, or the authorities to chain are invalid.
     pub fn identity_pem(&self) -> Option<(Vec<u8>, Vec<u8>)> {
         self.identity().map(|identity| {
             let mut cert = identity
@@ -244,6 +264,11 @@ impl TlsSettings {
         })
     }
 
+    /// Returns the authorities as PEM data
+    ///
+    /// # Panics
+    ///
+    /// Panics if the authority is invalid.
     pub fn authorities_pem(&self) -> impl Iterator<Item = Vec<u8>> + '_ {
         self.authorities.iter().map(|authority| {
             authority
@@ -253,6 +278,14 @@ impl TlsSettings {
     }
 
     pub(super) fn apply_context(&self, context: &mut SslContextBuilder) -> Result<()> {
+        self.apply_context_base(context, false)
+    }
+
+    pub(super) fn apply_context_base(
+        &self,
+        context: &mut SslContextBuilder,
+        for_server: bool,
+    ) -> Result<()> {
         context.set_verify(if self.verify_certificate {
             SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
         } else {
@@ -295,16 +328,32 @@ impl TlsSettings {
         }
 
         if let Some(alpn) = &self.alpn_protocols {
-            context
-                .set_alpn_protos(alpn.as_slice())
-                .context(SetAlpnProtocolsSnafu)?;
+            if for_server {
+                let server_proto = alpn.clone();
+                context.set_alpn_select_callback(move |_, client_proto| {
+                    select_next_proto(server_proto.as_slice(), client_proto).ok_or(AlpnError::NOACK)
+                });
+            } else {
+                context
+                    .set_alpn_protos(alpn.as_slice())
+                    .context(SetAlpnProtocolsSnafu)?;
+            }
         }
 
         Ok(())
     }
 
-    pub fn apply_connect_configuration(&self, connection: &mut ConnectConfiguration) {
+    pub fn apply_connect_configuration(
+        &self,
+        connection: &mut ConnectConfiguration,
+    ) -> std::result::Result<(), openssl::error::ErrorStack> {
         connection.set_verify_hostname(self.verify_hostname);
+        if let Some(server_name) = &self.server_name {
+            // Prevent native TLS lib from inferring default SNI using domain name from url.
+            connection.set_use_server_name_indication(false);
+            connection.set_hostname(server_name)?;
+        }
+        Ok(())
     }
 }
 
@@ -351,7 +400,7 @@ impl TlsConfig {
             None => Ok(None),
             Some(protocols) => {
                 let mut data: Vec<u8> = Vec::new();
-                for str in protocols.iter() {
+                for str in protocols {
                     data.push(str.len().try_into().context(EncodeAlpnProtocolsSnafu)?);
                     data.append(&mut str.clone().into_bytes());
                 }
@@ -498,7 +547,7 @@ impl fmt::Debug for TlsSettings {
         f.debug_struct("TlsSettings")
             .field("verify_certificate", &self.verify_certificate)
             .field("verify_hostname", &self.verify_hostname)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -541,7 +590,7 @@ impl MaybeTlsSettings {
 
     pub const fn http_protocol_name(&self) -> &'static str {
         match self {
-            MaybeTls::Raw(_) => "http",
+            MaybeTls::Raw(()) => "http",
             MaybeTls::Tls(_) => "https",
         }
     }
@@ -630,6 +679,7 @@ mod test {
 
     #[test]
     fn from_options_pkcs12() {
+        let _provider = openssl::provider::Provider::try_load(None, "legacy", true).unwrap();
         let options = TlsConfig {
             crt_file: Some(TEST_PKCS12_PATH.into()),
             key_pass: Some("NOPASS".into()),

@@ -13,12 +13,12 @@ remap: functions: to_int: {
 				The value to convert to an integer.
 				"""
 			required: true
-			type: ["integer", "float", "boolean", "string", "timestamp"]
+			type: ["integer", "float", "boolean", "string", "timestamp", "null"]
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is a string but the text is not an integer",
-		"`value` is not a string, int, or timestamp",
+		"`value` is a string but the text is not an integer.",
+		"`value` is not a string, int, or timestamp.",
 	]
 	return: {
 		types: ["integer"]
@@ -28,6 +28,7 @@ remap: functions: to_int: {
 			"If `value` is a string, it must be the string representation of an integer or else an error is raised.",
 			"If `value` is a boolean, `0` is returned for `false` and `1` is returned for `true`.",
 			"If `value` is a timestamp, a [Unix timestamp](\(urls.unix_timestamp)) (in seconds) is returned.",
+			"If `value` is null, `0` is returned.",
 		]
 	}
 

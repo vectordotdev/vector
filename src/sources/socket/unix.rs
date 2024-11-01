@@ -2,11 +2,11 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::{lookup_v2::OptionalValuePath, path};
-use vector_common::shutdown::ShutdownSignal;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, path};
+use vector_lib::shutdown::ShutdownSignal;
 
 use crate::{
     codecs::Decoder,
@@ -99,20 +99,20 @@ fn handle_events(
     let now = Utc::now();
 
     for event in events {
-        let log = event.as_mut_log();
+        if let Event::Log(ref mut log) = event {
+            log_namespace.insert_standard_vector_source_metadata(log, SocketConfig::NAME, now);
 
-        log_namespace.insert_standard_vector_source_metadata(log, SocketConfig::NAME, now);
+            if let Some(ref host) = received_from {
+                let legacy_host_key = host_key.clone().path;
 
-        if let Some(ref host) = received_from {
-            let legacy_host_key = host_key.clone().path;
-
-            log_namespace.insert_source_metadata(
-                SocketConfig::NAME,
-                log,
-                legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                path!("host"),
-                host.clone(),
-            );
+                log_namespace.insert_source_metadata(
+                    SocketConfig::NAME,
+                    log,
+                    legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
+                    path!("host"),
+                    host.clone(),
+                );
+            }
         }
     }
 }

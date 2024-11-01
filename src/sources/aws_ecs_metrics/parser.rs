@@ -560,8 +560,8 @@ pub(super) fn parse(
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
-    use vector_common::assert_event_data_eq;
-    use vector_core::metric_tags;
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::metric_tags;
 
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
@@ -579,7 +579,7 @@ mod test {
 
     #[test]
     fn parse_block_io_metrics() {
-        let json = r##"
+        let json = r#"
         {
             "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352": {
                 "read": "2018-11-14T08:09:10.000000011Z",
@@ -609,7 +609,7 @@ mod test {
                     "sectors_recursive": []
                 }
             }
-        }"##;
+        }"#;
 
         assert_event_data_eq!(
             parse(json.as_bytes(), Some(namespace())).unwrap(),
@@ -646,7 +646,7 @@ mod test {
 
     #[test]
     fn parse_cpu_metrics() {
-        let json = r##"
+        let json = r#"
         {
             "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352": {
                 "read": "2018-11-14T08:09:10.000000011Z",
@@ -673,7 +673,7 @@ mod test {
                     }
                 }
             }
-        }"##;
+        }"#;
 
         assert_event_data_eq!(
             parse(json.as_bytes(), Some(namespace())).unwrap(),
@@ -804,7 +804,7 @@ mod test {
 
     #[test]
     fn parse_precpu_metrics() {
-        let json = r##"
+        let json = r#"
         {
             "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352": {
                 "read": "2018-11-14T08:09:10.000000011Z",
@@ -831,7 +831,7 @@ mod test {
                     }
                 }
             }
-        }"##;
+        }"#;
 
         assert_event_data_eq!(
             parse(json.as_bytes(), Some(namespace())).unwrap(),
@@ -962,7 +962,7 @@ mod test {
 
     #[test]
     fn parse_memory_metrics() {
-        let json = r##"
+        let json = r#"
         {
             "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352": {
                 "read": "2018-11-14T08:09:10.000000011Z",
@@ -1008,7 +1008,7 @@ mod test {
                     "limit": 9223372036854771712
                 }
             }
-        }"##;
+        }"#;
 
         let metrics = parse(json.as_bytes(), Some(namespace())).unwrap();
 
@@ -1087,7 +1087,7 @@ mod test {
 
     #[test]
     fn parse_network_metrics() {
-        let json = r##"
+        let json = r#"
         {
             "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352": {
                 "read": "2018-11-14T08:09:10.000000011Z",
@@ -1106,7 +1106,7 @@ mod test {
                     }
                 }
             }
-        }"##;
+        }"#;
 
         let metrics = parse(json.as_bytes(), Some(namespace())).unwrap();
 

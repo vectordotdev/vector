@@ -20,17 +20,68 @@ base: components: sources: redis: configuration: {
 		description: "Configures how events are decoded from raw bytes."
 		required:    false
 		type: object: options: {
+			avro: {
+				description:   "Apache Avro-specific encoder options."
+				relevant_when: "codec = \"avro\""
+				required:      true
+				type: object: options: {
+					schema: {
+						description: """
+																The Avro schema definition.
+																Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+																* `Date`
+																* `Decimal`
+																* `Duration`
+																* `Fixed`
+																* `TimeMillis`
+																"""
+						required: true
+						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
+					}
+					strip_schema_id_prefix: {
+						description: """
+																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to true to strip the schema ID prefix.
+																According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
+																"""
+						required: true
+						type: bool: {}
+					}
+				}
+			}
 			codec: {
 				description: "The codec to use for decoding events."
 				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
+						avro: """
+															Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+
+															[apache_avro]: https://avro.apache.org/
+															"""
 						bytes: "Uses the raw bytes as-is."
 						gelf: """
 															Decodes the raw bytes as a [GELF][gelf] message.
 
+															This codec is experimental for the following reason:
+
+															The GELF specification is more strict than the actual Graylog receiver.
+															Vector's decoder currently adheres more strictly to the GELF spec, with
+															the exception that some characters such as `@`  are allowed in field names.
+
+															Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
+															by Graylog, and is much more relaxed than the GELF spec.
+
+															Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
+															the codec may continue to relax the enforcement of specification.
+
 															[gelf]: https://docs.graylog.org/docs/gelf
+															[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
+															"""
+						influxdb: """
+															Decodes the raw bytes as an [Influxdb Line Protocol][influxdb] message.
+
+															[influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
 															"""
 						json: """
 															Decodes the raw bytes as [JSON][json].
@@ -38,7 +89,7 @@ base: components: sources: redis: configuration: {
 															[json]: https://www.json.org/
 															"""
 						native: """
-															Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
 															This codec is **[experimental][experimental]**.
 
@@ -46,12 +97,17 @@ base: components: sources: redis: configuration: {
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
 						native_json: """
-															Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+															Decodes the raw bytes as [native JSON format][vector_native_json].
 
 															This codec is **[experimental][experimental]**.
 
 															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
+															"""
+						protobuf: """
+															Decodes the raw bytes as [protobuf][protobuf].
+
+															[protobuf]: https://protobuf.dev/
 															"""
 						syslog: """
 															Decodes the raw bytes as a Syslog message.
@@ -62,12 +118,33 @@ base: components: sources: redis: configuration: {
 															[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
 															[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
 															"""
+						vrl: """
+															Decodes the raw bytes as a string and passes them as input to a [VRL][vrl] program.
+
+															[vrl]: https://vector.dev/docs/reference/vrl
+															"""
 					}
 				}
 			}
 			gelf: {
 				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+						"""
+					required: false
+					type: bool: default: true
+				}
+			}
+			influxdb: {
+				description:   "Influxdb-specific decoding options."
+				relevant_when: "codec = \"influxdb\""
 				required:      false
 				type: object: options: lossy: {
 					description: """
@@ -113,6 +190,23 @@ base: components: sources: redis: configuration: {
 					type: bool: default: true
 				}
 			}
+			protobuf: {
+				description:   "Protobuf-specific decoding options."
+				relevant_when: "codec = \"protobuf\""
+				required:      false
+				type: object: options: {
+					desc_file: {
+						description: "Path to desc file"
+						required:    false
+						type: string: default: ""
+					}
+					message_type: {
+						description: "message type. e.g package.message"
+						required:    false
+						type: string: default: ""
+					}
+				}
+			}
 			syslog: {
 				description:   "Syslog-specific decoding options."
 				relevant_when: "codec = \"syslog\""
@@ -127,6 +221,37 @@ base: components: sources: redis: configuration: {
 						"""
 					required: false
 					type: bool: default: true
+				}
+			}
+			vrl: {
+				description:   "VRL-specific decoding options."
+				relevant_when: "codec = \"vrl\""
+				required:      true
+				type: object: options: {
+					source: {
+						description: """
+																The [Vector Remap Language][vrl] (VRL) program to execute for each event.
+																Note that the final contents of the `.` target will be used as the decoding result.
+																Compilation error or use of 'abort' in a program will result in a decoding error.
+
+																[vrl]: https://vector.dev/docs/reference/vrl
+																"""
+						required: true
+						type: string: {}
+					}
+					timezone: {
+						description: """
+																The name of the timezone to apply to timestamp conversions that do not contain an explicit
+																time zone. The time zone name may be any name in the [TZ database][tz_database], or `local`
+																to indicate system local time.
+
+																If not set, `local` will be used.
+
+																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+																"""
+						required: false
+						type: string: examples: ["local", "America/New_York", "EST5EDT"]
+					}
 				}
 			}
 		}
@@ -149,7 +274,7 @@ base: components: sources: redis: configuration: {
 					delimiter: {
 						description: "The character that delimits byte sequences."
 						required:    true
-						type: uint: {}
+						type: ascii_char: {}
 					}
 					max_length: {
 						description: """
@@ -167,6 +292,33 @@ base: components: sources: redis: configuration: {
 																"""
 						required: false
 						type: uint: {}
+					}
+				}
+			}
+			length_delimited: {
+				description:   "Options for the length delimited decoder."
+				relevant_when: "method = \"length_delimited\""
+				required:      true
+				type: object: options: {
+					length_field_is_big_endian: {
+						description: "Length field byte order (little or big endian)"
+						required:    false
+						type: bool: default: true
+					}
+					length_field_length: {
+						description: "Number of bytes representing the field length"
+						required:    false
+						type: uint: default: 4
+					}
+					length_field_offset: {
+						description: "Number of bytes in the header before the length field"
+						required:    false
+						type: uint: default: 0
+					}
+					max_frame_length: {
+						description: "Maximum frame length"
+						required:    false
+						type: uint: default: 8388608
 					}
 				}
 			}

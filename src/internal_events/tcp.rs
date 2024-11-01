@@ -1,10 +1,9 @@
 use std::net::SocketAddr;
 
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type, InternalEvent};
 
-use crate::{emit, internal_events::SocketOutgoingConnectionError, tls::TlsError};
+use crate::{internal_events::SocketOutgoingConnectionError, tls::TlsError};
 
 #[derive(Debug)]
 pub struct TcpSocketConnectionEstablished {
@@ -18,7 +17,7 @@ impl InternalEvent for TcpSocketConnectionEstablished {
         } else {
             debug!(message = "Connected.", peer_addr = "unknown");
         }
-        counter!("connection_established_total", 1, "mode" => "tcp");
+        counter!("connection_established_total", "mode" => "tcp").increment(1);
     }
 }
 
@@ -32,8 +31,6 @@ impl<E: std::error::Error> InternalEvent for TcpSocketOutgoingConnectionError<E>
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
         emit!(SocketOutgoingConnectionError { error: self.error });
-        // deprecated
-        counter!("connection_failed_total", 1, "mode" => "tcp");
     }
 }
 
@@ -43,7 +40,34 @@ pub struct TcpSocketConnectionShutdown;
 impl InternalEvent for TcpSocketConnectionShutdown {
     fn emit(self) {
         warn!(message = "Received EOF from the server, shutdown.");
-        counter!("connection_shutdown_total", 1, "mode" => "tcp");
+        counter!("connection_shutdown_total", "mode" => "tcp").increment(1);
+    }
+}
+
+#[cfg(all(unix, feature = "sources-dnstap"))]
+#[derive(Debug)]
+pub struct TcpSocketError<'a, E> {
+    pub(crate) error: &'a E,
+    pub peer_addr: SocketAddr,
+}
+
+#[cfg(all(unix, feature = "sources-dnstap"))]
+impl<E: std::fmt::Display> InternalEvent for TcpSocketError<'_, E> {
+    fn emit(self) {
+        error!(
+            message = "TCP socket error.",
+            error = %self.error,
+            peer_addr = ?self.peer_addr,
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total",
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
     }
 }
 
@@ -77,20 +101,16 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                     stage = error_stage::SENDING,
                     internal_log_rate_limit = true,
                 );
+                counter!(
+                    "component_errors_total",
+                    "error_code" => "connection_failed",
+                    "error_type" => error_type::WRITER_FAILED,
+                    "stage" => error_stage::SENDING,
+                    "mode" => "tcp",
+                )
+                .increment(1);
             }
         }
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "connection_failed",
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-            "mode" => "tcp",
-        );
-        // deprecated
-        counter!(
-            "connection_errors_total", 1,
-            "mode" => "tcp",
-        );
     }
 }
 
@@ -110,21 +130,13 @@ impl InternalEvent for TcpSendAckError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "ack_failed",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
             "mode" => "tcp",
-        );
-        // deprecated
-        counter!(
-            "connection_errors_total", 1,
-            "mode" => "tcp",
-        );
-        counter!(
-            "connection_send_ack_errors_total", 1,
-            "mode" => "tcp",
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -143,9 +155,8 @@ impl InternalEvent for TcpBytesReceived {
             peer_addr = %self.peer_addr,
         );
         counter!(
-            "component_received_bytes_total", self.byte_size as u64,
-            "protocol" => "tcp",
-            "peer_addr" => self.peer_addr.to_string()
-        );
+            "component_received_bytes_total", "protocol" => "tcp"
+        )
+        .increment(self.byte_size as u64);
     }
 }

@@ -4,7 +4,7 @@ remap: functions: get_enrichment_table_record: {
 	category:    "Enrichment"
 	description: """
 		Searches an [enrichment table](\(urls.enrichment_tables_concept)) for a row that matches the
-		provided condition. A single row must be matched. If either no rows or more than one row is
+		provided condition. A single row must be matched. If no rows are found or more than one row is
 		found, an error is returned.
 
 		\(remap._enrichment_table_explainer)
@@ -37,15 +37,15 @@ remap: functions: get_enrichment_table_record: {
 		},
 		{
 			name:        "case_sensitive"
-			description: "Should text fields match case exactly."
+			description: "Whether the text fields match the case exactly."
 			required:    false
 			type: ["boolean"]
 			default: true
 		},
 	]
 	internal_failure_reasons: [
-		"The row isn't found",
-		"Multiple rows are found that match the condition",
+		"The row is not found.",
+		"Multiple rows are found that match the condition.",
 	]
 	return: types: ["object"]
 

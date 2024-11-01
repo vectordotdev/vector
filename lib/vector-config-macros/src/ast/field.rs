@@ -6,7 +6,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use serde_derive_internals::ast as serde_ast;
 use syn::{parse_quote, ExprPath, Ident};
-use vector_config_common::validation::Validation;
+use vector_config_common::{configurable_package_name_hack, validation::Validation};
 
 use super::{
     util::{
@@ -33,7 +33,7 @@ impl<'a> Field<'a> {
     ) -> darling::Result<Field<'a>> {
         let original = serde.original;
 
-        let name = serde.attrs.name().deserialize_name();
+        let name = serde.attrs.name().deserialize_name().to_string();
         let default_value = get_serde_default_value(&serde.ty, serde.attrs.default());
 
         Attributes::from_attributes(&original.attrs)
@@ -352,7 +352,8 @@ impl Attributes {
             // serialize wrapper, since we know we'll have to do that in a few different places
             // during codegen, so it's cleaner to do it here.
             let field_ty = field.ty;
-            parse_quote! { ::vector_config::ser::Delegated<#field_ty, #virtual_ty> }
+            let vector_config = configurable_package_name_hack();
+            parse_quote! { #vector_config::ser::Delegated<#field_ty, #virtual_ty> }
         });
 
         Ok(self)

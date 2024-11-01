@@ -1,7 +1,6 @@
-use crate::emit;
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
-use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
+use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
 
 #[derive(Debug)]
 pub struct LokiEventUnlabeledError;
@@ -17,11 +16,12 @@ impl InternalEvent for LokiEventUnlabeledError {
         );
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "unlabeled_event",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -48,11 +48,12 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
         });
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "out_of_order",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -69,6 +70,33 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
             reason = "out_of_order",
             internal_log_rate_limit = true,
         );
-        counter!("rewritten_timestamp_events_total", self.count as u64);
+        counter!("rewritten_timestamp_events_total").increment(self.count as u64);
+    }
+}
+
+#[derive(Debug)]
+pub struct LokiTimestampNonParsableEventsDropped;
+
+impl InternalEvent for LokiTimestampNonParsableEventsDropped {
+    fn emit(self) {
+        let reason = "Dropping timestamp non-parsable event(s).";
+
+        error!(
+            message = "Event timestamp non-parsable.",
+            error_code = "non-parsable_timestamp",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
+        );
+
+        emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
+
+        counter!(
+            "component_errors_total",
+            "error_code" => "non-parsable_timestamp",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
     }
 }

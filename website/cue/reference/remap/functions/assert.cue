@@ -14,6 +14,8 @@ remap: functions: assert: {
 			""",
 	]
 
+	pure: false
+
 	arguments: [
 		{
 			name:        "condition"
@@ -26,14 +28,14 @@ remap: functions: assert: {
 			description: """
 				An optional custom error message. If the equality assertion fails, `message` is
 				appended to the default message prefix. See the [examples](#assert-examples) below
-				for a sample fully formed log message.
+				for a fully formed log message sample.
 				"""
 			required: false
 			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
-		"`condition` evaluates to `false`",
+		"`condition` evaluates to `false`.",
 	]
 	return: types: ["null"]
 
@@ -41,7 +43,7 @@ remap: functions: assert: {
 		{
 			title: "Assertion (true)"
 			source: #"""
-				ok, err = assert("foo" == "foo", message: "\"foo\" must be \"foo\"!")
+				assert!("foo" == "foo", message: "\"foo\" must be \"foo\"!")
 				"""#
 			return: true
 		},

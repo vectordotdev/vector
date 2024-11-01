@@ -4,7 +4,7 @@ remap: functions: seahash: {
 	category:    "Cryptography"
 	description: """
 		Calculates a [Seahash](\(urls.seahash)) hash of the `value`.
-		Note: Due to limitations in the underlying VRL data types, this function converts the unsigned 64-bit integer seahash result to a signed 64-bit integer. Results higher than the signed 64-bit integer maximum value wrap around to negative values.
+		**Note**: Due to limitations in the underlying VRL data types, this function converts the unsigned 64-bit integer SeaHash result to a signed 64-bit integer. Results higher than the signed 64-bit integer maximum value wrap around to negative values.
 		"""
 
 	arguments: [

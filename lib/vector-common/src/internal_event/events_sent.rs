@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use metrics::{register_counter, Counter};
+use metrics::{counter, Counter};
 use tracing::trace;
 
-use crate::{config::ComponentKey, request_metadata::EventCountTags};
+use crate::config::ComponentKey;
 
 use super::{CountByteSize, OptionalTag, Output, SharedString};
 
@@ -14,14 +14,14 @@ crate::registered_event!(
         output: Option<SharedString>,
     } => {
         events: Counter = if let Some(output) = &self.output {
-            register_counter!("component_sent_events_total", "output" => output.clone())
+            counter!("component_sent_events_total", "output" => output.clone())
         } else {
-            register_counter!("component_sent_events_total")
+            counter!("component_sent_events_total")
         },
         event_bytes: Counter = if let Some(output) = &self.output {
-            register_counter!("component_sent_event_bytes_total", "output" => output.clone())
+            counter!("component_sent_event_bytes_total", "output" => output.clone())
         } else {
-            register_counter!("component_sent_event_bytes_total")
+            counter!("component_sent_event_bytes_total")
         },
         output: Option<SharedString> = self.output,
     }
@@ -76,10 +76,10 @@ crate::registered_event!(
         service: OptionalTag<String>,
     } => {
         events: Counter = {
-            register_counter!("component_sent_events_total", &make_tags(&self.source, &self.service))
+            counter!("component_sent_events_total", &make_tags(&self.source, &self.service))
         },
         event_bytes: Counter = {
-            register_counter!("component_sent_event_bytes_total", &make_tags(&self.source, &self.service))
+            counter!("component_sent_event_bytes_total", &make_tags(&self.source, &self.service))
         },
     }
 
@@ -91,19 +91,25 @@ crate::registered_event!(
         self.event_bytes.increment(byte_size.get() as u64);
     }
 
-    fn register(_fixed: (), tags: EventCountTags) {
-        super::register(TaggedEventsSent::new(
-            tags,
-        ))
+    fn register(_fixed: (), tags: TaggedEventsSent) {
+        super::register(tags)
     }
 );
 
 impl TaggedEventsSent {
     #[must_use]
-    pub fn new(tags: EventCountTags) -> Self {
+    pub fn new_empty() -> Self {
         Self {
-            source: tags.source,
-            service: tags.service,
+            source: OptionalTag::Specified(None),
+            service: OptionalTag::Specified(None),
+        }
+    }
+
+    #[must_use]
+    pub fn new_unspecified() -> Self {
+        Self {
+            source: OptionalTag::Ignored,
+            service: OptionalTag::Ignored,
         }
     }
 }

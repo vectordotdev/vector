@@ -15,7 +15,7 @@ remap: functions: to_bool: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a supported boolean representation",
+		"`value` is not a supported boolean representation.",
 	]
 	return: {
 		types: ["boolean"]

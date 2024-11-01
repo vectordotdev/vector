@@ -147,6 +147,8 @@ impl Protocol {
     pub const TCP: Protocol = Protocol(SharedString::const_str("tcp"));
     pub const UDP: Protocol = Protocol(SharedString::const_str("udp"));
     pub const UNIX: Protocol = Protocol(SharedString::const_str("unix"));
+    pub const INTERNAL: Protocol = Protocol(SharedString::const_str("internal"));
+    pub const STATIC: Protocol = Protocol(SharedString::const_str("static"));
 }
 
 impl From<&'static str> for Protocol {
@@ -171,7 +173,7 @@ impl From<Protocol> for SharedString {
 ///     Event {
 ///         event_field: &'static str,
 ///     } => {
-///         handle_field: Counter = register_counter!("name", "tag" => self.event_field),
+///         handle_field: Counter = counter!("name", "tag" => self.event_field),
 ///     }
 ///     fn emit(&self, data: DataType) {
 ///         self.handle_field.increment(data.0);
@@ -194,7 +196,7 @@ impl From<Protocol> for SharedString {
 macro_rules! registered_event {
     // A registered event struct with no fields (zero-sized type).
     ($event:ident => $($tail:tt)*) => {
-        #[derive(Debug)]
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct $event;
 
         $crate::registered_event!(=> $event $($tail)*);
@@ -202,7 +204,7 @@ macro_rules! registered_event {
 
     // A normal registered event struct.
     ($event:ident { $( $field:ident: $type:ty, )* } => $($tail:tt)*) => {
-        #[derive(Debug)]
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct $event {
             $( pub $field: $type, )*
         }

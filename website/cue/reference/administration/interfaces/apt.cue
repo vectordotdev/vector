@@ -7,9 +7,7 @@ administration: interfaces: apt: {
 		installation and removal of software on [Debian](\(urls.debian)), [Ubuntu](\(urls.ubuntu)),
 		and other Linux distributions.
 
-		Our APT repositories are provided by [Cloudsmith](\(urls.cloudsmith)). We recommend
-		consulting the official instructions for [manually adding
-		repositories](\(urls.cloudsmith_apt)).
+		Our APT repositories are provided by [Datadog](\(urls.datadog)).
 		"""
 
 	archs: ["x86_64", "ARM64", "ARMv7"]

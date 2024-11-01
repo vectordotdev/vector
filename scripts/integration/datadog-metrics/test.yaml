@@ -1,7 +1,7 @@
 features:
 - datadog-metrics-integration-tests
 
-test_filter: '::datadog::metrics::'
+test_filter: '::datadog::metrics::integration_tests'
 
 runner:
   env:

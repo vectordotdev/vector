@@ -1,7 +1,7 @@
 ---
 title: Redis
 description: Publish observability data to [Redis](https://redis.io).
-kind: sink
+component_kind: sink
 layout: component
 tags: ["redis", "pubsub", "component", "sink"]
 ---

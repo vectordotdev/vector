@@ -8,7 +8,7 @@ Vector provides a subcommand, [`validate`][validate], that checks the validity o
 Here's an example:
 
 ```bash
-vector validate /etc/vector/vector.toml
+vector validate /etc/vector/vector.yaml
 ```
 
 You can also check multiple files:
@@ -52,8 +52,20 @@ configured topology:
 These environment checks can be disabled using the [`--no-environment`][no_environment] flag:
 
 ```bash
-vector validate --no-environment /etc/vector/vector.toml
+vector validate --no-environment /etc/vector/vector.yaml
 ```
+
+#### Skipping health checks
+
+To validate the vector configuration even if the health-checked endpoints are not reachable
+(for example, from a local workstation), but still run all the other environment checks, use
+the [`--skip-healthchecks`][skip_healthchecks] flag:
+
+```bash
+vector validate --skip-healthchecks /etc/vector/vector.yaml
+```
+
+**Note:** The configured `data_dir` must still be writeable.
 
 [components]: /components
 [no_environment]: /docs/reference/cli/#validate-no-environment

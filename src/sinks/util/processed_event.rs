@@ -1,11 +1,10 @@
 use serde::Serialize;
-use vector_common::{
-    json_size::JsonSize,
-    request_metadata::{EventCountTags, GetEventCountTags},
-};
-use vector_core::{
+use vector_lib::{
     event::{EventFinalizers, Finalizable, LogEvent, MaybeAsLogMut},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
+};
+use vector_lib::{
+    internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
 };
 
 /// An event alongside metadata from preprocessing. This is useful for sinks
@@ -57,7 +56,7 @@ impl<E, M> GetEventCountTags for ProcessedEvent<E, M>
 where
     E: GetEventCountTags,
 {
-    fn get_tags(&self) -> EventCountTags {
+    fn get_tags(&self) -> TaggedEventsSent {
         self.event.get_tags()
     }
 }

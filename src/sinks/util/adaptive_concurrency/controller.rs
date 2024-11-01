@@ -6,7 +6,7 @@ use std::{
 
 use tokio::sync::OwnedSemaphorePermit;
 use tower::timeout::error::Elapsed;
-use vector_common::internal_event::{InternalEventHandle as _, Registered};
+use vector_lib::internal_event::{InternalEventHandle as _, Registered};
 
 use super::{instant_now, semaphore::ShrinkableSemaphore, AdaptiveConcurrencySettings};
 #[cfg(test)]
@@ -68,8 +68,8 @@ impl<L> Controller<L> {
         // If a `concurrency` is specified, it becomes both the
         // current limit and the maximum, effectively bypassing all the
         // mechanisms. Otherwise, the current limit is set to 1 and the
-        // maximum to MAX_CONCURRENCY.
-        let current_limit = concurrency.unwrap_or(1);
+        // maximum to `settings.max_concurrency_limit`.
+        let current_limit = concurrency.unwrap_or(settings.initial_concurrency);
         Self {
             semaphore: Arc::new(ShrinkableSemaphore::new(current_limit)),
             concurrency,
@@ -226,7 +226,7 @@ impl<L> Controller<L> {
         // concurrency limit. Note that we only check this if we had
         // requests to go beyond the current limit to prevent
         // increasing the limit beyond what we have evidence for.
-        if inner.current_limit < super::MAX_CONCURRENCY
+        if inner.current_limit < self.settings.max_concurrency_limit
             && inner.reached_limit
             && !inner.had_back_pressure
             && current_rtt.is_some()
@@ -242,11 +242,14 @@ impl<L> Controller<L> {
         else if inner.current_limit > 1
             && (inner.had_back_pressure || current_rtt.unwrap_or(0.0) >= past_rtt.mean + threshold)
         {
-            // Decrease (multiplicative) the current concurrency limit
-            let to_forget = inner.current_limit
-                - (inner.current_limit as f64 * self.settings.decrease_ratio) as usize;
-            self.semaphore.forget_permits(to_forget);
-            inner.current_limit -= to_forget;
+            // Decrease (multiplicative) the current concurrency limit. The floor rounding in the
+            // `usize` conversion guarantees the new limit is smaller than the current limit, and
+            // the `.max` ensures the new limit is above zero.
+            let new_limit =
+                ((inner.current_limit as f64 * self.settings.decrease_ratio) as usize).max(1);
+            self.semaphore
+                .forget_permits(inner.current_limit - new_limit);
+            inner.current_limit = new_limit;
         }
         self.limit.emit(AdaptiveConcurrencyLimitData {
             concurrency: inner.current_limit as u64,

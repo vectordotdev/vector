@@ -15,8 +15,12 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Make sure the running user has write
-			permissions to this directory.
+			By default, the [global `data_dir` option][global_data_dir] is used.
+			Make sure the running user has write permissions to this directory.
+
+			If this directory is specified, then Vector will attempt to create it.
+
+			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 			"""
 		required: false
 		type: string: examples: ["/var/local/lib/vector/"]
@@ -129,6 +133,16 @@ base: components: sources: kubernetes_logs: configuration: {
 			unit: "seconds"
 		}
 	}
+	include_paths_glob_patterns: {
+		description: "A list of glob patterns to include while reading the files."
+		required:    false
+		type: array: {
+			default: [
+				"**/*",
+			]
+			items: type: string: examples: ["**/include/**"]
+		}
+	}
 	ingestion_timestamp_field: {
 		description: """
 			Overrides the name of the log field used to add the ingestion timestamp to each event.
@@ -139,6 +153,20 @@ base: components: sources: kubernetes_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: [".ingest_timestamp", "ingest_ts"]
+	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type: object: options: include_file_tag: {
+			description: """
+				Whether or not to include the "file" tag on the component's corresponding internal metrics.
+
+				This is useful for distinguishing between different files while monitoring. However, the tag's
+				cardinality is unbounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
 	}
 	kube_config_file: {
 		description: """
@@ -165,8 +193,8 @@ base: components: sources: kubernetes_logs: configuration: {
 	}
 	max_read_bytes: {
 		description: """
-			Max amount of bytes to read from a single file before switching over
-			to the next file.
+			Max amount of bytes to read from a single file before switching over to the next file.
+			**Note:** This does not apply when `oldest_first` is `true`.
 
 			This allows distributing the reads more or less evenly across
 			the files.
@@ -208,6 +236,11 @@ base: components: sources: kubernetes_logs: configuration: {
 				examples: [".k8s.node_labels", "k8s.node_labels", ""]
 			}
 		}
+	}
+	oldest_first: {
+		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files."
+		required:    false
+		type: bool: default: true
 	}
 	pod_annotation_fields: {
 		description: "Configuration for how the events are enriched with Pod metadata."
@@ -380,6 +413,17 @@ base: components: sources: kubernetes_logs: configuration: {
 				beginning: "Read from the beginning of the file."
 				end:       "Start reading from the current end of the file."
 			}
+		}
+	}
+	rotate_wait_secs: {
+		description: """
+			How long to keep an open handle to a rotated log file.
+			The default value represents "no limit"
+			"""
+		required: false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "seconds"
 		}
 	}
 	self_node_name: {

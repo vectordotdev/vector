@@ -2,9 +2,9 @@ use std::error::Error;
 use std::fmt::Debug;
 
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct WsConnectionEstablished;
@@ -12,7 +12,7 @@ pub struct WsConnectionEstablished;
 impl InternalEvent for WsConnectionEstablished {
     fn emit(self) {
         debug!(message = "Connected.");
-        counter!("connection_established_total", 1);
+        counter!("connection_established_total").increment(1);
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -36,11 +36,12 @@ impl InternalEvent for WsConnectionFailedError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "ws_connection_failed",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -54,7 +55,7 @@ pub struct WsConnectionShutdown;
 impl InternalEvent for WsConnectionShutdown {
     fn emit(self) {
         warn!(message = "Closed by the server.");
-        counter!("connection_shutdown_total", 1);
+        counter!("connection_shutdown_total").increment(1);
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -78,11 +79,12 @@ impl InternalEvent for WsConnectionError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "ws_connection_error",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
     }
 
     fn name(&self) -> Option<&'static str> {

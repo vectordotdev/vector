@@ -1,11 +1,15 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use async_recursion::async_recursion;
+use derivative::Derivative;
 use tokio::sync::Mutex;
+use tracing::Span;
+use vector_common::internal_event::{register, InternalEventHandle, Registered};
 
 use super::limited_queue::LimitedSender;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
+    internal_events::BufferSendDuration,
     variants::disk_v2::{self, ProductionFilesystem},
     Bufferable, WhenFull,
 };
@@ -17,7 +21,7 @@ pub enum SenderAdapter<T: Bufferable> {
     InMemory(LimitedSender<T>),
 
     /// The disk v2 buffer.
-    DiskV2(Arc<Mutex<disk_v2::Writer<T, ProductionFilesystem>>>),
+    DiskV2(Arc<Mutex<disk_v2::BufferWriter<T, ProductionFilesystem>>>),
 }
 
 impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
@@ -26,8 +30,8 @@ impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
     }
 }
 
-impl<T: Bufferable> From<disk_v2::Writer<T, ProductionFilesystem>> for SenderAdapter<T> {
-    fn from(v: disk_v2::Writer<T, ProductionFilesystem>) -> Self {
+impl<T: Bufferable> From<disk_v2::BufferWriter<T, ProductionFilesystem>> for SenderAdapter<T> {
+    fn from(v: disk_v2::BufferWriter<T, ProductionFilesystem>) -> Self {
         Self::DiskV2(Arc::new(Mutex::new(v)))
     }
 }
@@ -124,12 +128,15 @@ where
 /// linearize the nesting instead, so that `BufferSender` would only ever be calling the underlying
 /// `SenderAdapter` instances instead... which would let us get rid of the boxing and
 /// `#[async_recursion]` stuff.
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,
     overflow: Option<Box<BufferSender<T>>>,
     when_full: WhenFull,
     instrumentation: Option<BufferUsageHandle>,
+    #[derivative(Debug = "ignore")]
+    send_duration: Option<Registered<BufferSendDuration>>,
 }
 
 impl<T: Bufferable> BufferSender<T> {
@@ -140,6 +147,7 @@ impl<T: Bufferable> BufferSender<T> {
             overflow: None,
             when_full,
             instrumentation: None,
+            send_duration: None,
         }
     }
 
@@ -150,6 +158,7 @@ impl<T: Bufferable> BufferSender<T> {
             overflow: Some(Box::new(overflow)),
             when_full: WhenFull::Overflow,
             instrumentation: None,
+            send_duration: None,
         }
     }
 
@@ -164,8 +173,14 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     /// Configures this sender to instrument the items passing through it.
-    pub fn with_instrumentation(&mut self, handle: BufferUsageHandle) {
+    pub fn with_usage_instrumentation(&mut self, handle: BufferUsageHandle) {
         self.instrumentation = Some(handle);
+    }
+
+    /// Configures this sender to instrument the send duration.
+    pub fn with_send_duration_instrumentation(&mut self, stage: usize, span: &Span) {
+        let _enter = span.enter();
+        self.send_duration = Some(register(BufferSendDuration { stage }));
     }
 }
 
@@ -181,7 +196,7 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[async_recursion]
-    pub async fn send(&mut self, item: T) -> crate::Result<()> {
+    pub async fn send(&mut self, item: T, send_reference: Option<Instant>) -> crate::Result<()> {
         let item_sizing = self
             .instrumentation
             .as_ref()
@@ -201,12 +216,20 @@ impl<T: Bufferable> BufferSender<T> {
                     sent_to_base = false;
                     self.overflow
                         .as_mut()
-                        .expect("overflow must exist")
-                        .send(item)
+                        .unwrap_or_else(|| unreachable!("overflow must exist"))
+                        .send(item, send_reference)
                         .await?;
                 }
             }
         };
+
+        if sent_to_base || was_dropped {
+            if let (Some(send_duration), Some(send_reference)) =
+                (self.send_duration.as_ref(), send_reference)
+            {
+                send_duration.emit(send_reference.elapsed());
+            }
+        }
 
         if let Some(instrumentation) = self.instrumentation.as_ref() {
             if let Some((item_count, item_size)) = item_sizing {

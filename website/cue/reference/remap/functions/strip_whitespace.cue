@@ -3,8 +3,8 @@ package metadata
 remap: functions: strip_whitespace: {
 	category:    "String"
 	description: """
-		Strips whitespace from the start and end of the `value`, where whitespace is defined by the [Unicode
-		`White_Space` property](\(urls.unicode_whitespace))
+		Strips whitespace from the start and end of `value`, where whitespace is defined by the [Unicode
+		`White_Space` property](\(urls.unicode_whitespace)).
 		"""
 
 	arguments: [

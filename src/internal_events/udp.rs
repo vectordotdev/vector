@@ -1,10 +1,9 @@
 use metrics::counter;
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+use vector_lib::internal_event::{
+    error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
 };
-use vector_core::internal_event::InternalEvent;
 
-use crate::{emit, internal_events::SocketOutgoingConnectionError};
+use crate::internal_events::SocketOutgoingConnectionError;
 
 // TODO: Get rid of this. UDP is connectionless, so there's no "successful" connect event, only
 // successfully binding a socket that can be used for receiving.
@@ -14,7 +13,7 @@ pub struct UdpSocketConnectionEstablished;
 impl InternalEvent for UdpSocketConnectionEstablished {
     fn emit(self) {
         debug!(message = "Connected.");
-        counter!("connection_established_total", 1, "mode" => "udp");
+        counter!("connection_established_total", "mode" => "udp").increment(1);
     }
 }
 
@@ -29,8 +28,6 @@ impl<E: std::error::Error> InternalEvent for UdpSocketOutgoingConnectionError<E>
         // ## skip check-duplicate-events ##
         // ## skip check-validity-events ##
         emit!(SocketOutgoingConnectionError { error: self.error });
-        // deprecated
-        counter!("connection_failed_total", 1, "mode" => "udp");
     }
 }
 
@@ -53,12 +50,13 @@ impl InternalEvent for UdpSendIncompleteError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
         // deprecated
-        counter!("connection_send_errors_total", 1, "mode" => "udp");
+        counter!("connection_send_errors_total", "mode" => "udp").increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }

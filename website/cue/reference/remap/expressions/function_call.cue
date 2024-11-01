@@ -134,6 +134,22 @@ remap: expressions: function_call: {
 				failures.
 				"""
 		}
+		deprecation: {
+			title: "Deprecation"
+			description: """
+				VRL functions can be marked as "deprecated". When a function
+				is deprecated, a warning will be shown at runtime.
+
+				Suggestions on how to update the VRL program can usually be found in the actual warning and the function documentation.
+				"""
+		}
+		purity: {
+			title: "Purity"
+			description: """
+				VRL functions can be marked as "pure" or "impure". When a function
+				is pure, it is idempotent and has no side-effects. Otherwise, it is impure.
+				"""
+		}
 	}
 
 	examples: [
@@ -157,6 +173,22 @@ remap: expressions: function_call: {
 				split(pattern: ", ", value: "hello, world!")
 				"""#
 			return: ["hello", "world!"]
+		},
+		{
+			title: "Infallible function invocation"
+			source: #"""
+				split("apples and pears and bananas", " and ")
+				"""#
+			return: ["apples", "pears", "bananas"]
+		},
+		{
+			title: "Fallible function invocation"
+			input: log: message: "apples and pears and bananas"
+			source: #"""
+				# The compiler cannot determine the argument type thus we need to do error handling.
+				split!(.message, " and ")
+				"""#
+			return: ["apples", "pears", "bananas"]
 		},
 	]
 }

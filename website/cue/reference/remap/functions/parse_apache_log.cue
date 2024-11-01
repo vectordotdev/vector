@@ -4,7 +4,7 @@ remap: functions: parse_apache_log: {
 	category:    "Parse"
 	description: """
 		Parses Apache access and error log lines. Lines can be in [`common`](\(urls.apache_common)),
-		[`combined`](\(urls.apache_combined)), or default [`error`](\(urls.apache_error)) format.
+		[`combined`](\(urls.apache_combined)), or the default [`error`](\(urls.apache_error)) format.
 		"""
 	notices: [
 		"""
@@ -23,7 +23,7 @@ remap: functions: parse_apache_log: {
 			name: "timestamp_format"
 			description: """
 				The [date/time format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html) to use for
-				encoding the timestamp. The time is parsed in local time if the timestamp doesn't specify a timezone.
+				encoding the timestamp. The time is parsed in local time if the timestamp does not specify a timezone.
 				"""
 			required: false
 			default:  "%d/%b/%Y:%T %z"
@@ -43,15 +43,15 @@ remap: functions: parse_apache_log: {
 	]
 
 	internal_failure_reasons: [
-		"`value` doesn't match the specified format",
-		"`timestamp_format` isn't a valid format string",
-		"The timestamp in `value` fails to parse using the provided `timestamp_format`",
+		"`value` does not match the specified format.",
+		"`timestamp_format` is not a valid format string.",
+		"The timestamp in `value` fails to parse using the provided `timestamp_format`.",
 	]
 	return: types: ["object"]
 
 	examples: [
 		{
-			title: "Parse via Apache log format (common)"
+			title: "Parse using Apache log format (common)"
 			source: #"""
 				parse_apache_log!("127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] \"GET /apache_pb.gif HTTP/1.0\" 200 2326", format: "common")
 				"""#
@@ -69,7 +69,7 @@ remap: functions: parse_apache_log: {
 			}
 		},
 		{
-			title: "Parse via Apache log format (combined)"
+			title: "Parse using Apache log format (combined)"
 			source: #"""
 				parse_apache_log!(
 					s'127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth" "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0"',
@@ -92,7 +92,7 @@ remap: functions: parse_apache_log: {
 			}
 		},
 		{
-			title: "Parse via Apache log format (error)"
+			title: "Parse using Apache log format (error)"
 			source: #"""
 				parse_apache_log!(
 					s'[01/Mar/2021:12:00:19 +0000] [ab:alert] [pid 4803:tid 3814] [client 147.159.108.175:24259] I will bypass the haptic COM bandwidth, that should matrix the CSS driver!',

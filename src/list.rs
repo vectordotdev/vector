@@ -2,7 +2,7 @@
 use clap::Parser;
 use serde::Serialize;
 
-use vector_config::component::{
+use vector_lib::configurable::component::{
     EnrichmentTableDescription, SinkDescription, SourceDescription, TransformDescription,
 };
 

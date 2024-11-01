@@ -76,7 +76,7 @@ impl EventFinalizers {
 
     /// Merges the event finalizers from `other` into the collection.
     pub fn merge(&mut self, other: Self) {
-        self.0.extend(other.0.into_iter());
+        self.0.extend(other.0);
     }
 
     /// Updates the status of all event finalizers in the collection.

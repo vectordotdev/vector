@@ -30,7 +30,7 @@ administration: interfaces: docker_cli: {
 			start:        #"""
 				docker run \
 				  -d \
-				  -v \#(paths.config):/etc/vector/vector.toml:ro \
+				  -v \#(paths.config):/etc/vector/vector.yaml:ro \
 				  -p \#(_api_port):\#(_api_port) \{flags}
 				  timberio/vector:{version}-{variant}
 				"""#

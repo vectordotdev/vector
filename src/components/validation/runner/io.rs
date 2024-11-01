@@ -5,12 +5,13 @@ use hyper::Body;
 use tokio::{pin, select, sync::mpsc};
 use tonic::{
     body::BoxBody,
-    transport::{Channel, Endpoint, NamedService},
+    server::NamedService,
+    transport::{Channel, Endpoint},
     Status,
 };
 use tower::Service;
-use vector_common::shutdown::ShutdownSignal;
-use vector_core::{event::Event, tls::MaybeTlsSettings};
+use vector_lib::shutdown::ShutdownSignal;
+use vector_lib::{event::Event, tls::MaybeTlsSettings};
 
 use crate::{
     components::validation::{
@@ -27,11 +28,11 @@ use crate::{
 
 #[derive(Clone)]
 pub struct EventForwardService {
-    tx: mpsc::Sender<Event>,
+    tx: mpsc::Sender<Vec<Event>>,
 }
 
-impl From<mpsc::Sender<Event>> for EventForwardService {
-    fn from(tx: mpsc::Sender<Event>) -> Self {
+impl From<mpsc::Sender<Vec<Event>>> for EventForwardService {
+    fn from(tx: mpsc::Sender<Vec<Event>>) -> Self {
         Self { tx }
     }
 }
@@ -42,14 +43,17 @@ impl VectorService for EventForwardService {
         &self,
         request: tonic::Request<PushEventsRequest>,
     ) -> Result<tonic::Response<PushEventsResponse>, Status> {
-        let events = request.into_inner().events.into_iter().map(Event::from);
+        let events = request
+            .into_inner()
+            .events
+            .into_iter()
+            .map(Event::from)
+            .collect();
 
-        for event in events {
-            self.tx
-                .send(event)
-                .await
-                .expect("event forward rx should not close first");
-        }
+        self.tx
+            .send(events)
+            .await
+            .expect("event forward rx should not close first");
 
         Ok(tonic::Response::new(PushEventsResponse {}))
     }
@@ -74,7 +78,7 @@ pub struct InputEdge {
 pub struct OutputEdge {
     listen_addr: GrpcAddress,
     service: VectorServer<EventForwardService>,
-    rx: mpsc::Receiver<Event>,
+    rx: mpsc::Receiver<Vec<Event>>,
 }
 
 impl InputEdge {
@@ -129,7 +133,7 @@ impl OutputEdge {
     pub fn spawn_output_server(
         self,
         task_coordinator: &TaskCoordinator<Configuring>,
-    ) -> mpsc::Receiver<Event> {
+    ) -> mpsc::Receiver<Vec<Event>> {
         spawn_grpc_server(self.listen_addr, self.service, task_coordinator);
         self.rx
     }
@@ -184,5 +188,5 @@ pub fn spawn_grpc_server<S>(
 
 pub struct ControlledEdges {
     pub input: Option<mpsc::Sender<TestEvent>>,
-    pub output: Option<mpsc::Receiver<Event>>,
+    pub output: Option<mpsc::Receiver<Vec<Event>>>,
 }

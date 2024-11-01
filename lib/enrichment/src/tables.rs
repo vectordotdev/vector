@@ -30,12 +30,12 @@
 //! can be searched.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     sync::{Arc, Mutex},
 };
 
 use arc_swap::ArcSwap;
-use vrl::value::Value;
+use vrl::value::ObjectMap;
 
 use super::{Condition, IndexHandle, Table};
 use crate::Case;
@@ -48,6 +48,18 @@ pub struct TableRegistry {
     loading: Arc<Mutex<Option<TableMap>>>,
     tables: Arc<ArcSwap<Option<TableMap>>>,
 }
+
+/// Pessimistic Eq implementation for caching purposes
+impl PartialEq for TableRegistry {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.tables, &other.tables) && Arc::ptr_eq(&self.loading, &other.loading)
+            || self.tables.load().is_none()
+                && other.tables.load().is_none()
+                && self.loading.lock().expect("lock poison").is_none()
+                && other.loading.lock().expect("lock poison").is_none()
+    }
+}
+impl Eq for TableRegistry {}
 
 impl TableRegistry {
     /// Load the given Enrichment Tables into the registry. This can be new tables
@@ -205,7 +217,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, Value>, String> {
+    ) -> Result<ObjectMap, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -227,7 +239,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
+    ) -> Result<Vec<ObjectMap>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -357,7 +369,7 @@ mod tests {
         registry.finish_load();
 
         assert_eq!(
-            Ok(BTreeMap::from([("field".into(), Value::from("result"))])),
+            Ok(ObjectMap::from([("field".into(), Value::from("result"))])),
             tables_search.find_table_row(
                 "dummy1",
                 Case::Sensitive,
@@ -410,8 +422,8 @@ mod tests {
         // After we finish load there are no tables in the list
         assert!(registry.table_ids().is_empty());
 
-        let mut new_data = BTreeMap::new();
-        new_data.insert("thing".to_string(), Value::Null);
+        let mut new_data = ObjectMap::new();
+        new_data.insert("thing".into(), Value::Null);
 
         let mut tables: TableMap = HashMap::new();
         tables.insert(

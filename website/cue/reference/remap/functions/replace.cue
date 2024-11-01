@@ -3,9 +3,16 @@ package metadata
 remap: functions: replace: {
 	category: "String"
 	description: """
-		Replaces all matching instances of `pattern` in the `value`.
+		Replaces all matching instances of `pattern` in `value`.
 
-		The `pattern` argument accepts regular expression capture groups. Note that `$foo` is interpreted in a Vector configuration file, instead use `$$foo`.
+		The `pattern` argument accepts regular expression capture groups.
+
+		**Note when using capture groups**:
+		- You will need to escape the `$` by using `$$` to avoid Vector interpreting it as an
+		  [environment variable when loading configuration](/docs/reference/configuration/#escaping)
+		- If you want a literal `$` in the replacement pattern, you will also need to escape this
+		  with `$$`. When combined with environment variable interpolation in config files this
+		  means you will need to use `$$$$` to have a literal `$` in the replacement pattern.
 		"""
 
 	arguments: [
@@ -29,7 +36,7 @@ remap: functions: replace: {
 		},
 		{
 			name:        "count"
-			description: "The maximum number of replacements to perform. -1 means replace all matches."
+			description: "The maximum number of replacements to perform. `-1` means replace all matches."
 			required:    false
 			default:     -1
 			type: ["integer"]
@@ -48,7 +55,7 @@ remap: functions: replace: {
 			return: "Apples not Bananas"
 		},
 		{
-			title: "Replace via regular expression"
+			title: "Replace using regular expression"
 			source: #"""
 				replace("Apples and Bananas", r'(?i)bananas', "Pineapples")
 				"""#
@@ -62,7 +69,7 @@ remap: functions: replace: {
 			return: "Pineapples and Bananas"
 		},
 		{
-			title: "Replace with capture groups"
+			title: "Replace with capture groups (Note: Use `$$num` in config files)"
 			source: #"""
 				replace("foo123bar", r'foo(?P<num>\d+)bar', "$num")
 				"""#

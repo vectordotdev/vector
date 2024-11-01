@@ -75,7 +75,7 @@ If you see an exception in Vector's logs then we've clearly found the issue.
 Before you report a bug, please enable backtraces:
 
 ```bash
-RUST_BACKTRACE=full vector --config=/etc/vector/vector.toml
+RUST_BACKTRACE=full vector --config=/etc/vector/vector.yaml
 ```
 
 Backtraces are _critical_ for debugging errors. Once you have the backtrace
@@ -95,14 +95,14 @@ Vector rate limits logs in the hot path. As a result, dropping to the
 {{< tab title="Env Var" >}}
 
 ```shell
-VECTOR_LOG=debug vector --config=/etc/vector/vector.toml
+VECTOR_LOG=debug vector --config=/etc/vector/vector.yaml
 ```
 
 {{< /tab >}}
 {{< tab title="Flag" >}}
 
 ```bash
-vector --verbose --config=/etc/vector/vector.toml
+vector --verbose --config=/etc/vector/vector.yaml
 ```
 
 {{< /tab >}}

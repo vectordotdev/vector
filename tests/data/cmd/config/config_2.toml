@@ -1,0 +1,43 @@
+# Comments are dropped.
+#[api]
+#enabled = true
+#address = "127.0.0.1:8686"
+
+data_dir = "/var/lib/vector/"
+
+[sources.source0]
+count = 9223372036854775807
+format = "json"
+interval = 1.0
+type = "demo_logs"
+
+[sources.source0.decoding]
+codec = "bytes"
+
+[sources.source0.framing]
+method = "bytes"
+
+[transforms.transform0]
+inputs = ["source0"]
+drop_on_abort = false
+drop_on_error = false
+metric_tag_values = "single"
+reroute_dropped = false
+runtime = "ast"
+type = "remap"
+
+[sinks.sink0]
+inputs = ["transform0"]
+target = "stdout"
+type = "console"
+
+[sinks.sink0.encoding]
+codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
+
+[sinks.sink0.buffer]
+type = "memory"
+max_events = 500
+when_full = "block"

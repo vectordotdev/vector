@@ -15,8 +15,8 @@ base: components: sinks: aws_s3: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -124,6 +124,15 @@ base: components: sinks: aws_s3: configuration: {
 				description: "Path to the credentials file."
 				required:    true
 				type: string: examples: ["/my/aws/credentials"]
+			}
+			external_id: {
+				description: """
+					The optional unique external ID in conjunction with role to assume.
+
+					[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+					"""
+				required: false
+				type: string: examples: ["randomEXAMPLEidString"]
 			}
 			imds: {
 				description: "Configuration for authenticating with AWS through IMDS."
@@ -255,6 +264,11 @@ base: components: sinks: aws_s3: configuration: {
 					[gzip]: https://www.gzip.org/
 					"""
 				none: "No compression."
+				snappy: """
+					[Snappy][snappy] compression.
+
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+					"""
 				zlib: """
 					[Zlib][zlib] compression.
 
@@ -324,7 +338,20 @@ base: components: sinks: aws_s3: configuration: {
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
+						This codec is experimental for the following reason:
+
+						The GELF specification is more strict than the actual Graylog receiver.
+						Vector's encoder currently adheres more strictly to the GELF spec, with
+						the exception that some characters such as `@`  are allowed in field names.
+
+						Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
+						by Graylog, and is much more relaxed than the GELF spec.
+
+						Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
+						the codec may continue to relax the enforcement of specification.
+
 						[gelf]: https://docs.graylog.org/docs/gelf
+						[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 						"""
 					json: """
 						Encodes an event as [JSON][json].
@@ -352,6 +379,11 @@ base: components: sinks: aws_s3: configuration: {
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
+					protobuf: """
+						Encodes an event as a [Protobuf][protobuf] message.
+
+						[protobuf]: https://protobuf.dev/
+						"""
 					raw_message: """
 						No encoding.
 
@@ -377,24 +409,98 @@ base: components: sinks: aws_s3: configuration: {
 				description:   "The CSV Serializer Options."
 				relevant_when: "codec = \"csv\""
 				required:      true
-				type: object: options: fields: {
-					description: """
-						Configures the fields that will be encoded, as well as the order in which they
-						appear in the output.
+				type: object: options: {
+					capacity: {
+						description: """
+																Set the capacity (in bytes) of the internal buffer used in the CSV writer.
+																This defaults to a reasonable setting.
+																"""
+						required: false
+						type: uint: default: 8192
+					}
+					delimiter: {
+						description: "The field delimiter to use when writing CSV."
+						required:    false
+						type: ascii_char: default: ","
+					}
+					double_quote: {
+						description: """
+																Enable double quote escapes.
 
-						If a field is not present in the event, the output will be an empty string.
+																This is enabled by default, but it may be disabled. When disabled, quotes in
+																field data are escaped instead of doubled.
+																"""
+						required: false
+						type: bool: default: true
+					}
+					escape: {
+						description: """
+																The escape character to use when writing CSV.
 
-						Values of type `Array`, `Object`, and `Regex` are not supported and the
-						output will be an empty string.
-						"""
-					required: true
-					type: array: items: type: string: {}
+																In some variants of CSV, quotes are escaped using a special escape character
+																like \\ (instead of escaping quotes by doubling them).
+
+																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+																"""
+						required: false
+						type: ascii_char: default: "\""
+					}
+					fields: {
+						description: """
+																Configures the fields that will be encoded, as well as the order in which they
+																appear in the output.
+
+																If a field is not present in the event, the output will be an empty string.
+
+																Values of type `Array`, `Object`, and `Regex` are not supported and the
+																output will be an empty string.
+																"""
+						required: true
+						type: array: items: type: string: {}
+					}
+					quote: {
+						description: "The quote character to use when writing CSV."
+						required:    false
+						type: ascii_char: default: "\""
+					}
+					quote_style: {
+						description: "The quoting style to use when writing CSV data."
+						required:    false
+						type: string: {
+							default: "necessary"
+							enum: {
+								always: "Always puts quotes around every field."
+								necessary: """
+																			Puts quotes around fields only when necessary.
+																			They are necessary when fields contain a quote, delimiter, or record terminator.
+																			Quotes are also necessary when writing an empty record
+																			(which is indistinguishable from a record with one empty field).
+																			"""
+								never: "Never writes quotes, even if it produces invalid CSV data."
+								non_numeric: """
+																			Puts quotes around all fields that are non-numeric.
+																			Namely, when writing a field that does not parse as a valid float or integer,
+																			then quotes are used even if they aren't strictly necessary.
+																			"""
+							}
+						}
+					}
 				}
 			}
 			except_fields: {
 				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			json: {
+				description:   "Options for the JsonSerializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: pretty: {
+					description: "Whether to use pretty JSON formatting."
+					required:    false
+					type: bool: default: false
+				}
 			}
 			metric_tag_values: {
 				description: """
@@ -422,12 +528,37 @@ base: components: sinks: aws_s3: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			protobuf: {
+				description:   "Options for the Protobuf serializer."
+				relevant_when: "codec = \"protobuf\""
+				required:      true
+				type: object: options: {
+					desc_file: {
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -o <path> ...`
+																"""
+						required: true
+						type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
+					}
+					message_type: {
+						description: "The name of the message type to use for serializing."
+						required:    true
+						type: string: examples: ["package.Message"]
+					}
+				}
+			}
 			timestamp_format: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
@@ -495,7 +626,34 @@ base: components: sinks: aws_s3: configuration: {
 				type: object: options: delimiter: {
 					description: "The ASCII (7-bit) character that delimits byte sequences."
 					required:    true
-					type: uint: {}
+					type: ascii_char: {}
+				}
+			}
+			length_delimited: {
+				description:   "Options for the length delimited decoder."
+				relevant_when: "method = \"length_delimited\""
+				required:      true
+				type: object: options: {
+					length_field_is_big_endian: {
+						description: "Length field byte order (little or big endian)"
+						required:    false
+						type: bool: default: true
+					}
+					length_field_length: {
+						description: "Number of bytes representing the field length"
+						required:    false
+						type: uint: default: 4
+					}
+					length_field_offset: {
+						description: "Number of bytes in the header before the length field"
+						required:    false
+						type: uint: default: 0
+					}
+					max_frame_length: {
+						description: "Maximum frame length"
+						required:    false
+						type: uint: default: 8388608
+					}
 				}
 			}
 			method: {
@@ -587,7 +745,9 @@ base: components: sinks: aws_s3: configuration: {
 		description: """
 			Middleware settings for outbound requests.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+			Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+
+			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
 		type: object: options: {
@@ -625,6 +785,26 @@ base: components: sinks: aws_s3: configuration: {
 						required: false
 						type: float: default: 0.4
 					}
+					initial_concurrency: {
+						description: """
+																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+
+																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+																`adaptive_concurrency_limit` metric.
+																"""
+						required: false
+						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
+					}
 					rtt_deviation_scale: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
@@ -642,11 +822,16 @@ base: components: sinks: aws_s3: configuration: {
 				}
 			}
 			concurrency: {
-				description: "Configuration for outbound request concurrency."
-				required:    false
+				description: """
+					Configuration for outbound request concurrency.
+
+					This can be set either to one of the below enum values or to a positive integer, which denotes
+					a fixed concurrency limit.
+					"""
+				required: false
 				type: {
 					string: {
-						default: "none"
+						default: "adaptive"
 						enum: {
 							adaptive: """
 															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
@@ -680,12 +865,8 @@ base: components: sinks: aws_s3: configuration: {
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The default, for all intents and purposes, represents an infinite number of retries.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -703,11 +884,31 @@ base: components: sinks: aws_s3: configuration: {
 					unit:    "seconds"
 				}
 			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
 			retry_max_duration_secs: {
 				description: "The maximum amount of time to wait between retries."
 				required:    false
 				type: uint: {
-					default: 3600
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -776,6 +977,7 @@ base: components: sinks: aws_s3: configuration: {
 			default: "STANDARD"
 			enum: {
 				DEEP_ARCHIVE:        "Glacier Deep Archive."
+				EXPRESS_ONEZONE:     "High Performance (single Availability zone)."
 				GLACIER:             "Glacier Flexible Retrieval."
 				INTELLIGENT_TIERING: "Intelligent Tiering."
 				ONEZONE_IA:          "Infrequently Accessed (single Availability zone)."
@@ -800,6 +1002,17 @@ base: components: sinks: aws_s3: configuration: {
 				type: string: {}
 			}
 		}
+	}
+	timezone: {
+		description: """
+			Timezone to use for any date specifiers in template strings.
+
+			This can refer to any valid timezone as defined in the [TZ database][tzdb], or "local" which refers to the system local timezone. It will default to the [globally configured timezone](https://vector.dev/docs/reference/configuration/global-options/#timezone).
+
+			[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+			"""
+		required: false
+		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
 	tls: {
 		description: "TLS configuration."
@@ -854,16 +1067,25 @@ base: components: sinks: aws_s3: configuration: {
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

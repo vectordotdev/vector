@@ -3,9 +3,9 @@ use std::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 use derivative::Derivative;
 use serde_with::serde_as;
 use snafu::Snafu;
-use vector_common::json_size::JsonSize;
-use vector_config::configurable_component;
-use vector_core::stream::BatcherSettings;
+use vector_lib::configurable::configurable_component;
+use vector_lib::json_size::JsonSize;
+use vector_lib::stream::BatcherSettings;
 
 use super::EncodedEvent;
 use crate::{event::EventFinalizers, internal_events::LargeEventDroppedError};
@@ -285,8 +285,8 @@ pub struct BatchSize<B> {
 impl<B> BatchSize<B> {
     pub const fn const_default() -> Self {
         BatchSize {
-            bytes: usize::max_value(),
-            events: usize::max_value(),
+            bytes: usize::MAX,
+            events: usize::MAX,
             _type_marker: PhantomData,
         }
     }

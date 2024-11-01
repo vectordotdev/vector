@@ -1,6 +1,6 @@
 use chrono::{offset::TimeZone, Timelike, Utc};
 use rand::seq::SliceRandom;
-use vector_core::metric_tags;
+use vector_lib::metric_tags;
 
 use super::*;
 use crate::{
@@ -18,7 +18,7 @@ fn cloudwatch_address() -> String {
 fn config() -> CloudWatchMetricsSinkConfig {
     CloudWatchMetricsSinkConfig {
         default_namespace: "vector".into(),
-        region: RegionOrEndpoint::with_both("local", cloudwatch_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         ..Default::default()
     }
 }
@@ -75,7 +75,7 @@ async fn cloudwatch_metrics_put_data() {
                 format!("distribution-{}", distribution_name),
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![i as f64 => 100],
+                    samples: vector_lib::samples![i as f64 => 100],
                     statistic: StatisticKind::Histogram,
                 },
             )

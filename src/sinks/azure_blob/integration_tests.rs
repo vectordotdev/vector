@@ -6,14 +6,14 @@ use std::{
 use azure_core::{error::HttpError, prelude::Range};
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
-use codecs::{
-    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
-    TextSerializerConfig,
-};
 use flate2::read::GzDecoder;
 use futures::{stream, Stream, StreamExt};
 use http::StatusCode;
-use vector_core::ByteSizeOf;
+use vector_lib::codecs::{
+    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+    TextSerializerConfig,
+};
+use vector_lib::ByteSizeOf;
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
@@ -40,9 +40,10 @@ async fn azure_blob_healthcheck_passed() {
     )
     .expect("Failed to create client");
 
-    let response = azure_common::config::build_healthcheck(config.container_name, client);
-
-    response.expect("Failed to pass healthcheck");
+    azure_common::config::build_healthcheck(config.container_name, client)
+        .expect("Failed to build healthcheck")
+        .await
+        .expect("Failed to pass healthcheck");
 }
 
 #[tokio::test]
@@ -111,10 +112,14 @@ async fn azure_blob_insert_json_into_blob() {
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-    assert_eq!(blob.properties.content_type, String::from("text/plain"));
+    assert_eq!(blob.properties.content_encoding, None);
+    assert_eq!(
+        blob.properties.content_type,
+        String::from("application/x-ndjson")
+    );
     let expected = events
         .iter()
-        .map(|event| serde_json::to_string(&event.as_log().all_fields().unwrap()).unwrap())
+        .map(|event| serde_json::to_string(&event.as_log().all_event_fields().unwrap()).unwrap())
         .collect::<Vec<_>>();
     assert_eq!(expected, blob_lines);
 }
@@ -138,10 +143,8 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log.gz"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-    assert_eq!(
-        blob.properties.content_type,
-        String::from("application/gzip")
-    );
+    assert_eq!(blob.properties.content_encoding, Some(String::from("gzip")));
+    assert_eq!(blob.properties.content_type, String::from("text/plain"));
     assert_eq!(lines, blob_lines);
 }
 
@@ -170,13 +173,14 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log.gz"));
     let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
+    assert_eq!(blob.properties.content_encoding, Some(String::from("gzip")));
     assert_eq!(
         blob.properties.content_type,
-        String::from("application/gzip")
+        String::from("application/x-ndjson")
     );
     let expected = events
         .iter()
-        .map(|event| serde_json::to_string(&event.as_log().all_fields().unwrap()).unwrap())
+        .map(|event| serde_json::to_string(&event.as_log().all_event_fields().unwrap()).unwrap())
         .collect::<Vec<_>>();
     assert_eq!(expected, blob_lines);
 }

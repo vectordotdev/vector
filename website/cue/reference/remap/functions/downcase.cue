@@ -3,7 +3,7 @@ package metadata
 remap: functions: downcase: {
 	category: "String"
 	description: """
-		Downcases the `value` string, where "downcase" is defined according to the terms of the
+		Downcases the `value` string, where downcase is defined according to the
 		Unicode Derived Core Property Lowercase.
 		"""
 

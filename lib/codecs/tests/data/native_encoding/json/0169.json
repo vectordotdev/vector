@@ -1,1 +1,1 @@
-{"metric":{"name":"v","timestamp":"1969-12-31T15:32:41.000000001Z","kind":"incremental","gauge":{"value":900352.0}}}
+{"metric":{"name":"o","namespace":"y","timestamp":"1969-12-31T15:12:39.000024987Z","kind":"absolute","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[-2222,-2211,2118,2178,2193,2206,2216,2219],"n":[1,1,1,1,1,1,1,1]},"count":8,"min":-894464.0,"max":858368.0,"sum":-275264.0,"avg":-851072.0}}}}}

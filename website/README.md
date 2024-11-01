@@ -32,6 +32,10 @@ The `master` branch, on the other hand, often contains unreleased, "nightly" cha
 
 vector.dev is built using the [Hugo] static site generator. The site configuration is in [`config.toml`](./config.toml). The standard Hugo [directory structure] is obeyed.
 
+### Cargo data
+
+Some pages in the Vector documentation rely on dependency information such as version numbers found in the [`../Cargo.lock`](../Cargo.lock) file. Whenever you build the Vector site, the `../Cargo.lock` file is copied into `data/cargo-lock.toml` so it can be used in conjunction with Hugo's templating system to build HTML.
+
 ### Structured data
 
 The Vector documentation relies heavily on structured data supplied using the [CUE] configuration and data validation language. Uses of CUE data include the docs for Vector's many [components] and the docs for [Vector Remap Language][vrl].
@@ -67,14 +71,13 @@ In addition to Tailwind classes, some CSS is built from [Sass] (all Sass files a
 
 ### Search
 
-Search for vector.dev is provided by [Algolia]. Our search solution is largely custom:
+Search for vector.dev is provided by [Typesense]. Our search solution is largely custom:
 
-* The [`algolia-index.ts`](./scripts/algolia-index.ts) script indexes all of the relevant pages on the site and stores the entire index in a single JSON file (output to `public/search.json`).
-* The [`atomic-algolia`][atomic-algolia] tool syncs the generated JSON index with the Algolia backend, performing all the necessary create, update, and delete operations.
+* The [`typesense-index.ts`](./scripts/typesense-index.ts) script generates an index of all of the relevant pages on the site and stores the result in a single JSON file (output to `public/search.json`).
+* The [`typesense-sync.ts`](./scripts/typesense-sync.ts) script syncs the generated JSON index with the Typesense backend, performing all the necessary create, update, and delete operations, using a custom package, `typesense-sync`. Reach out in #websites for more details.
 
-The Algolia configuration for the site is controlled via the [`algolia.json`](./algolia.json) file. The Algolia CLI syncs this config with the Algolia API.
+The Typesense configuration for the site is captured via the [`typesense.config.json`](./typesense.config.json) file.
 
-> Everything needed to configure Algolia search for vector.dev is in this repo; you should never make manual configuration changes through the Algolia dashboard.
 
 #### De-indexing pages
 
@@ -203,10 +206,9 @@ description: """
         """
 ```
 
-[algolia]: https://algolia.com
+[typesense]: https://typesense.org
 [aliases]: https://gohugo.io/content-management/urls
 [alpine]: https://alpinejs.dev
-[atomic-algolia]: https://github.com/chrisdmacrae/atomic-algolia
 [components]: https://vector.dev/components
 [cue]: https://cuelang.org
 [deploy previews]: https://docs.netlify.com/site-deploys/deploy-previews

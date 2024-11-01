@@ -35,12 +35,14 @@ message Log {
   // Deprecated, use value instead
   map<string, Value> fields = 1;
   Value value = 2;
-  Value metadata = 3;
+  Value metadata = 3 [deprecated = true];
+  Metadata metadata_full = 4;
 }
 
 message Trace {
   map<string, Value> fields = 1;
-  Value metadata = 2;
+  Value metadata = 2 [deprecated = true];
+  Metadata metadata_full = 3;
 }
 
 message ValueMap {
@@ -69,6 +71,31 @@ message Value {
   }
 }
 
+message DatadogOriginMetadata {
+  optional uint32 origin_product = 1;
+  optional uint32 origin_category = 2;
+  optional uint32 origin_service = 3;
+}
+
+message Secrets {
+  map<string, string> entries = 1;
+}
+
+message OutputId {
+  string component = 1;
+  optional string port = 2;
+}
+
+message Metadata {
+  Value value = 1;
+  DatadogOriginMetadata datadog_origin_metadata = 2;
+  optional string source_id = 3;
+  optional string source_type = 4;
+  OutputId upstream_id = 5;
+  Secrets secrets = 6;
+  bytes source_event_id = 7;
+}
+
 message Metric {
   string name = 1;
   google.protobuf.Timestamp timestamp = 2;
@@ -95,7 +122,8 @@ message Metric {
   }
   string namespace = 11;
   uint32 interval_ms = 18;
-  Value metadata = 19;
+  Value metadata = 19 [deprecated = true];
+  Metadata metadata_full = 21;
 }
 
 message TagValues {

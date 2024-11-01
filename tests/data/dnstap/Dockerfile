@@ -1,4 +1,4 @@
-FROM docker.io/library/debian:bullseye
+FROM docker.io/library/debian:bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \

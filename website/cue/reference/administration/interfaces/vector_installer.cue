@@ -18,7 +18,7 @@ administration: interfaces: vector_installer: {
 
 	role_implementations: [Name=string]: {
 		commands: {
-			install:   "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash"
+			install:   "curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash"
 			logs:      null
 			reload:    "killall -s SIGHUP vector"
 			restart:   null

@@ -1,9 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::config::{log_schema, LegacyKey, LogNamespace};
 use lookup::lookup_v2::TargetPath;
 use lookup::{owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
 use vrl::value::{kind::Collection, Kind};
+
+use crate::config::{log_schema, LegacyKey, LogNamespace};
 
 /// The definition of a schema.
 ///
@@ -380,7 +381,7 @@ impl Definition {
     /// # Panics
     ///
     /// This method panics if the provided path points to an unknown location in the collection.
-    fn add_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
+    pub fn add_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
         self.try_with_meaning(target_path, meaning)
             .unwrap_or_else(|err| panic!("{}", err));
     }
@@ -536,7 +537,7 @@ impl Definition {
 
 #[cfg(any(test, feature = "test"))]
 mod test_utils {
-    use super::*;
+    use super::{Definition, Kind};
     use crate::event::{Event, LogEvent};
 
     impl Definition {

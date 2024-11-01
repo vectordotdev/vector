@@ -17,7 +17,7 @@ and create our first observability data pipeline so you can begin to see what Ve
 Installing Vector is quick and easy. We can use this handy installation script:
 
 ```shell
-curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
+curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash
 ```
 
 Or you can [choose your preferred installation method][docs.installation].

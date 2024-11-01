@@ -1,11 +1,11 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
-use crate::sources::nginx_metrics::parser::ParseError;
-use vector_common::{
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
+
+use crate::sources::nginx_metrics::parser::ParseError;
 
 #[derive(Debug)]
 pub struct NginxMetricsEventsReceived<'a> {
@@ -23,13 +23,15 @@ impl<'a> InternalEvent for NginxMetricsEventsReceived<'a> {
             endpoint = self.endpoint,
         );
         counter!(
-            "component_received_events_total", self.count as u64,
+            "component_received_events_total",
             "endpoint" => self.endpoint.to_owned(),
-        );
+        )
+        .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total", self.byte_size.get() as u64,
+            "component_received_event_bytes_total",
             "endpoint" => self.endpoint.to_owned(),
-        );
+        )
+        .increment(self.byte_size.get() as u64);
     }
 }
 
@@ -49,13 +51,12 @@ impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "endpoint" => self.endpoint.to_owned(),
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
-        // deprecated
-        counter!("http_request_errors_total", 1);
+        )
+        .increment(1);
     }
 }
 
@@ -75,12 +76,11 @@ impl<'a> InternalEvent for NginxMetricsStubStatusParseError<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "endpoint" => self.endpoint.to_owned(),
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("parse_errors_total", 1);
+        )
+        .increment(1);
     }
 }

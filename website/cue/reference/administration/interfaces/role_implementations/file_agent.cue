@@ -4,7 +4,7 @@ administration: interfaces: [string]: role_implementations: _file_agent: {
 	variables: config: {
 		sources: {
 			logs: {
-				type:    components.sources.file.type
+				type: components.sources.file.type
 				include: [string, ...string] | *["/var/log/**/*.log"]
 			}
 			host_metrics: type:     components.sources.host_metrics.type

@@ -15,7 +15,7 @@ remap: functions: encode_percent: {
 		},
 		{
 			name:        "ascii_set"
-			description: "The ascii set to use when encoding the data."
+			description: "The ASCII set to use when encoding the data."
 			required:    false
 			type: ["string"]
 			default: "NON_ALPHANUMERIC"

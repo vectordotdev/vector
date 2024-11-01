@@ -11,6 +11,7 @@
     - [Panics](#panics)
   - [Feature flags](#feature-flags)
   - [Dependencies](#dependencies)
+  - [Minimum Supported Rust Version](#minimum-supported-rust-version)
 - [Guidelines](#guidelines)
   - [Sink healthchecks](#sink-healthchecks)
 - [Testing](#testing)
@@ -124,12 +125,12 @@ Loosely, you'll need the following:
 - **To run `make test`:** Install [`cargo-nextest`](https://nexte.st/)
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
 - **To run `make check-component-features`:** Have `remarshal` installed.
-- **To run `make check-licenses` or `cargo vdev build licenses`:** Have `rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
+- **To run `make check-licenses` or `cargo vdev build licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
 - **To run `cargo vdev build component-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
 
 If you find yourself needing to run something inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
 
-We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd to hear of your successes and failures!
+We're interested in reducing our dependencies if simple options exist. Got an idea? Try it out, we'd love to hear of your successes and failures!
 
 In order to do your development on Vector, you'll primarily use a few commands, such as `cargo` and `make` tasks you can use ordered from most to least frequently run:
 
@@ -262,6 +263,14 @@ see how dependencies are reviewed in the
 If a dependency is required only by one or multiple components, but not by
 Vector's core, make it optional and add it to the list of dependencies of
 the features corresponding to these components in `Cargo.toml`.
+
+### Minimum Supported Rust Version
+
+Vector's Minimum Supported Rust Version (MSRV) is indicated by the `rust-version` specified in
+`Cargo.toml`.
+
+Currently, Vector has no policy around MSRV. It can be bumped at any time if required by
+a dependency or to take advantage of a new language feature in Vector's codebase.
 
 ## Guidelines
 

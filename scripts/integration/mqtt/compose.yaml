@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  emqx:
+    image: docker.io/emqx:${CONFIG_VERSION}
+    ports:
+    - 1883:1883
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}

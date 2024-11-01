@@ -318,7 +318,7 @@
 
   {{/* Source/transform/sink examples */}}
   {{ with .component_examples }}
-  {{ $formats := slice "toml" "yaml" "json" }}
+  {{ $formats := slice "yaml"  "toml" "json" }}
   {{ $defaultFormat := index $formats 0 }}
   <div class="no-prose flex flex-col divide-y dark:divide-gray-700">
     {{ range . }}
@@ -688,6 +688,16 @@
           {{ else }}
           {{ partial "badge.html" (dict "word" "fallible" "color" "yellow" "inline" true "href" $href) }}
           {{ end }}
+          {{/* Deprecation Badge */}}
+          {{ if $func.deprecated }}
+          {{ partial "badge.html" (dict "word" "deprecated" "color" "red" "inline" true "href" $href) }}
+          {{ end }}
+          {{/* Pure Badge */}}
+          {{ if $func.pure }}
+          {{ partial "badge.html" (dict "word" "pure" "color" "green" "inline" true "href" $href) }}
+          {{ else }}
+          {{ partial "badge.html" (dict "word" "impure" "color" "yellow" "inline" true "href" $href) }}
+          {{ end }}
         </span>
       </span>
 
@@ -712,8 +722,8 @@
             {{- .name -}}
           </span>:
           <span class="text-gray-200">
-            <{{ delimit .type `<span class="text-grey-500"> |
-          </span>` }}></span>{{ if not $isLast }}, {{ end -}}
+            &lt;{{ delimit .type `<span class="text-grey-500"> | </span>` | safeHTML}}&gt;
+          </span>{{ if not $isLast }}, {{ end -}}
           {{ end -}}
           {{- if gt (len $optionalArgs) 0 -}},
           [{{- $lastArg := sub (len $optionalArgs) 1 -}}
@@ -723,14 +733,14 @@
             {{- .name -}}
           </span>:
           <span class="text-gray-200">
-            <{{ delimit .type `<span class="text-grey-500"> |
-          </span>` }}></span>{{ if not $isLast }}, {{ end -}}
+            &lt;{{ delimit .type `<span class="text-grey-500"> | </span>`  | safeHTML}}&gt;
+          </span>{{ if not $isLast }}, {{ end -}}
           {{ end -}}]{{ end }})
           {{- with $return -}}
           <div class="ml-3">
             <span class="font-extrabold">::</span> <span class="text-gray-200">
-              <{{ delimit .types " | " }}>
-            </span>{{ if not $infallible }}, &lt;error>{{ end }}
+              &lt;{{ delimit .types " | " }}&gt;
+            </span>{{ if not $infallible }}, &lt;error&gt;{{ end }}
           </div>
           {{- end -}}
         </div>
@@ -2189,7 +2199,7 @@
             {{ partial "heading.html" (dict "text" .title "level" 4) }}
           </span>
 
-          {{ $formats := slice "toml" "yaml" "json" }}
+          {{ $formats := slice "yaml"  "toml" "json" }}
           <div class="flex space-x-2">
             {{ range $formats }}
             <button @click="$store.global.setFormat('{{ . }}')"

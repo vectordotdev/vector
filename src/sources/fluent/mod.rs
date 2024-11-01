@@ -6,17 +6,18 @@ use std::time::Duration;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
-use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::MultiGzDecoder;
-use lookup::lookup_v2::parse_value_path;
-use lookup::{metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix};
 use rmp_serde::{decode, Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::schema::Definition;
+use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::ipallowlist::IpAllowlistConfig;
+use vector_lib::lookup::lookup_v2::parse_value_path;
+use vector_lib::lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
+use vector_lib::schema::Definition;
 use vrl::value::kind::Collection;
 use vrl::value::{Kind, Value};
 
@@ -50,6 +51,9 @@ pub struct FluentConfig {
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
+    #[configurable(derived)]
+    pub permit_origin: Option<IpAllowlistConfig>,
+
     /// The size of the receive buffer used for each connection.
     ///
     /// This generally should not need to be changed.
@@ -75,6 +79,7 @@ impl GenerateConfig for FluentConfig {
         toml::Value::try_from(Self {
             address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
             keepalive: None,
+            permit_origin: None,
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
@@ -110,6 +115,7 @@ impl SourceConfig for FluentConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            self.permit_origin.clone().map(Into::into),
             FluentConfig::NAME,
             log_namespace,
         )
@@ -119,7 +125,10 @@ impl SourceConfig for FluentConfig {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self.schema_definition(log_namespace);
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -464,13 +473,12 @@ impl Decoder for FluentDecoder {
 
             src.advance(byte_size);
 
-            let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
-                let base64_encoded_message = BASE64_STANDARD.encode(&src);
+            let maybe_item = self.handle_message(res, byte_size).inspect_err(|error| {
+                let base64_encoded_message = BASE64_STANDARD.encode(&src[..]);
                 emit!(FluentMessageDecodeError {
-                    error: &error,
+                    error,
                     base64_encoded_message
                 });
-                error
             })?;
             if let Some(item) = maybe_item {
                 return Ok(Some(item));
@@ -599,9 +607,7 @@ impl From<FluentEvent<'_>> for LogEvent {
                 log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
             }
             LogNamespace::Legacy => {
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
-                    log.insert((PathPrefix::Event, timestamp_key), timestamp);
-                }
+                log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
             }
         }
 
@@ -631,18 +637,17 @@ impl From<FluentEvent<'_>> for LogEvent {
 mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
-    use lookup::OwnedTargetPath;
     use rmp_serde::Serializer;
     use serde::Serialize;
-    use std::collections::BTreeMap;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use vector_common::assert_event_data_eq;
-    use vector_core::{event::Value, schema::Definition};
-    use vrl::value::kind::Collection;
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::lookup::OwnedTargetPath;
+    use vector_lib::schema::Definition;
+    use vrl::value::{kind::Collection, ObjectMap, Value};
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
@@ -663,15 +668,15 @@ mod tests {
     // Decode base64: https://toolslick.com/conversion/data/messagepack-to-json
 
     fn mock_event(name: &str, timestamp: &str) -> Event {
-        Event::Log(LogEvent::from(BTreeMap::from([
-            (String::from("message"), Value::from(name)),
+        Event::Log(LogEvent::from(ObjectMap::from([
+            ("message".into(), Value::from(name)),
             (
-                log_schema().source_type_key().unwrap().to_string(),
+                log_schema().source_type_key().unwrap().to_string().into(),
                 Value::from(FluentConfig::NAME),
             ),
-            (String::from("tag"), Value::from("tag.name")),
+            ("tag".into(), Value::from("tag.name")),
             (
-                String::from("timestamp"),
+                "timestamp".into(),
                 Value::Timestamp(DateTime::parse_from_rfc3339(timestamp).unwrap().into()),
             ),
         ])))
@@ -858,7 +863,7 @@ mod tests {
     #[tokio::test]
     async fn ack_delivered_without_chunk() {
         let (result, output) = check_acknowledgements(EventStatus::Delivered, false).await;
-        assert!(matches!(result, Err(_))); // the `_` inside this error is `Elapsed`
+        assert!(result.is_err()); // the `_` inside this error is `Elapsed`
         assert!(output.is_empty());
     }
 
@@ -897,6 +902,7 @@ mod tests {
             address: address.into(),
             tls: None,
             keepalive: None,
+            permit_origin: None,
             receive_buffer_bytes: None,
             acknowledgements: true.into(),
             connection_limit: None,
@@ -961,6 +967,7 @@ mod tests {
             address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
             tls: None,
             keepalive: None,
+            permit_origin: None,
             receive_buffer_bytes: None,
             acknowledgements: false.into(),
             connection_limit: None,
@@ -1016,6 +1023,7 @@ mod tests {
             address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
             tls: None,
             keepalive: None,
+            permit_origin: None,
             receive_buffer_bytes: None,
             acknowledgements: false.into(),
             connection_limit: None,
@@ -1052,7 +1060,7 @@ mod integration_tests {
 
     use futures::Stream;
     use tokio::time::sleep;
-    use vector_core::event::{Event, EventStatus};
+    use vector_lib::event::{Event, EventStatus};
 
     use crate::{
         config::{SourceConfig, SourceContext},
@@ -1128,7 +1136,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(format!("http://{}/", test_address))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()
@@ -1209,7 +1217,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(format!("http://{}/", test_address))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()
@@ -1237,6 +1245,7 @@ mod integration_tests {
                 address: address.into(),
                 tls: None,
                 keepalive: None,
+                permit_origin: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
                 connection_limit: None,

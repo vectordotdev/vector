@@ -1,6 +1,5 @@
 use std::{fmt, iter::IntoIterator, pin::Pin};
 
-use async_trait::async_trait;
 use futures::{stream, task::Context, task::Poll, Sink, SinkExt, Stream, StreamExt};
 
 use crate::event::{into_event_stream, Event, EventArray, EventContainer};
@@ -86,7 +85,7 @@ impl fmt::Debug for VectorSink {
 
 // === StreamSink ===
 
-#[async_trait]
+#[async_trait::async_trait]
 pub trait StreamSink<T> {
     async fn run(self: Box<Self>, input: stream::BoxStream<'_, T>) -> Result<(), ()>;
 }
@@ -131,7 +130,9 @@ impl<S: Sink<Event> + Send + Unpin> EventSink<S> {
     fn flush_queue(self: &mut Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
         while self.queue.is_some() {
             poll_ready_ok!(self.sink.poll_ready_unpin(cx));
-            let Some(event) = self.next_event() else {break};
+            let Some(event) = self.next_event() else {
+                break;
+            };
             if let Err(err) = self.sink.start_send_unpin(event) {
                 return Poll::Ready(Err(err));
             }
@@ -170,7 +171,7 @@ struct EventStream<T> {
     sink: Box<T>,
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl<T: StreamSink<Event> + Send> StreamSink<EventArray> for EventStream<T> {
     async fn run(self: Box<Self>, input: stream::BoxStream<'_, EventArray>) -> Result<(), ()> {
         let input = Box::pin(input.flat_map(into_event_stream));

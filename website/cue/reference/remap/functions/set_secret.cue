@@ -20,13 +20,12 @@ remap: functions: set_secret: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reasons: [
-	]
+	internal_failure_reasons: []
 	return: types: ["null"]
 
 	examples: [
 		{
-			title: "Set the Datadog API key to the given value."
+			title: "Set the Datadog API key to the given value"
 			source: #"""
 				set_secret("datadog_api_key", "abc122")
 				"""#

@@ -8,11 +8,11 @@ use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
-use vector_common::{
+use vector_lib::stream::DriverResponse;
+use vector_lib::{
     json_size::JsonSize,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
 };
-use vector_core::stream::DriverResponse;
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -140,10 +140,12 @@ pub fn build_client(
                 // that account_name is not required to exist in the connection_string since
                 // account_name is only used with the default CloudLocation in the Azure SDK to
                 // generate the storage API endpoint
-                Some(uri) => ClientBuilder::with_location(CloudLocation::Custom {
-                    uri: uri.to_string(),
-                    credentials: connection_string.storage_credentials()?,
-                }),
+                Some(uri) => ClientBuilder::with_location(
+                    CloudLocation::Custom {
+                        uri: uri.to_string(),
+                    },
+                    connection_string.storage_credentials()?,
+                ),
                 // Without a valid blob_endpoint in the connection_string, assume we are in Azure
                 // Commercial (AzureCloud location) and create a default Blob Storage Client that
                 // builds the API endpoint location using the account_name as input
@@ -160,15 +162,15 @@ pub fn build_client(
         (None, Some(storage_account_p)) => {
             let creds = std::sync::Arc::new(DefaultAzureCredential::default());
             let auto_creds = std::sync::Arc::new(AutoRefreshingTokenCredential::new(creds));
-            let storage_credentials = StorageCredentials::TokenCredential(auto_creds);
+            let storage_credentials = StorageCredentials::token_credential(auto_creds);
 
             client = match endpoint {
                 // If a blob_endpoint is provided in the configuration, use it with a Custom
                 // CloudLocation, to allow overriding the blob storage API endpoint
-                Some(endpoint) => ClientBuilder::with_location(CloudLocation::Custom {
-                    uri: endpoint,
-                    credentials: storage_credentials,
-                }),
+                Some(endpoint) => ClientBuilder::with_location(
+                    CloudLocation::Custom { uri: endpoint },
+                    storage_credentials,
+                ),
                 // Use the storage_account configuration parameter and assume we are in Azure
                 // Commercial (AzureCloud location) and build the blob storage API endpoint using
                 // the storage_account as input.

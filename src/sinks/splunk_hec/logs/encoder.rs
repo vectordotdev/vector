@@ -3,6 +3,8 @@ use std::borrow::Cow;
 use bytes::BytesMut;
 use serde::Serialize;
 use tokio_util::codec::Encoder as _;
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{config::telemetry, EstimatedJsonEncodedSizeOf};
 
 use super::sink::HecProcessedEvent;
 use crate::{
@@ -63,14 +65,17 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
         &self,
         input: Vec<HecProcessedEvent>,
         writer: &mut dyn std::io::Write,
-    ) -> std::io::Result<usize> {
+    ) -> std::io::Result<(usize, GroupedCountByteSize)> {
         let mut encoder = self.encoder.clone();
+        let mut byte_size = telemetry().create_request_count_byte_size();
         let encoded_input: Vec<u8> = input
             .into_iter()
             .filter_map(|processed_event| {
                 let mut event = Event::from(processed_event.event);
                 let metadata = processed_event.metadata;
                 self.transformer.transform(&mut event);
+
+                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
 
                 let mut bytes = BytesMut::new();
 
@@ -128,6 +133,6 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
 
         let encoded_size = encoded_input.len();
         writer.write_all(encoded_input.as_slice())?;
-        Ok(encoded_size)
+        Ok((encoded_size, byte_size))
     }
 }

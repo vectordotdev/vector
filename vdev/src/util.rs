@@ -1,13 +1,13 @@
 use std::ffi::{OsStr, OsString};
+use std::io::IsTerminal;
 use std::process::{Command, Output};
-use std::{collections::BTreeMap, fmt::Debug, fs, io::ErrorKind, path::Path};
+use std::{collections::BTreeMap, fmt::Debug, fs, io::ErrorKind, path::Path, sync::LazyLock};
 
 use anyhow::{Context as _, Result};
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::Value;
 
-pub static IS_A_TTY: Lazy<bool> = Lazy::new(|| atty::is(atty::Stream::Stdout));
+pub static IS_A_TTY: LazyLock<bool> = LazyLock::new(|| std::io::stdout().is_terminal());
 
 #[derive(Deserialize)]
 pub struct CargoTomlPackage {
@@ -61,9 +61,6 @@ pub fn exists(path: impl AsRef<Path> + Debug) -> Result<bool> {
 
 pub trait ChainArgs {
     fn chain_args<I: Into<OsString>>(&self, args: impl IntoIterator<Item = I>) -> Vec<OsString>;
-    fn chain_arg(&self, arg: impl Into<OsString>) -> Vec<OsString> {
-        self.chain_args([arg])
-    }
 }
 
 impl<T: AsRef<OsStr>> ChainArgs for Vec<T> {

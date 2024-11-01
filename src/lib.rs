@@ -7,6 +7,7 @@
 #![deny(warnings)]
 #![deny(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg), deny(rustdoc::broken_intra_doc_links))]
+#![allow(async_fn_in_trait)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]
@@ -24,6 +25,8 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
+#[macro_use]
+extern crate vector_lib;
 
 #[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation-tracing")))]
 #[global_allocator]
@@ -66,9 +69,11 @@ pub mod async_read;
 pub mod aws;
 #[allow(unreachable_pub)]
 pub mod codecs;
-pub(crate) mod common;
+pub mod common;
+mod convert_config;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
+pub mod extra_context;
 #[cfg(feature = "gcp")]
 pub mod gcp;
 pub(crate) mod graph;
@@ -92,7 +97,7 @@ pub mod serde;
 #[cfg(windows)]
 pub mod service;
 pub mod signal;
-pub(crate) mod sink;
+pub(crate) mod sink_ext;
 #[allow(unreachable_pub)]
 pub mod sinks;
 pub mod source_sender;
@@ -101,12 +106,12 @@ pub mod sources;
 pub mod stats;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-mod tap;
+pub mod tap;
 pub mod template;
 pub mod test_util;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
-pub(crate) mod top;
+pub mod top;
 #[allow(unreachable_pub)]
 pub mod topology;
 pub mod trace;
@@ -120,8 +125,27 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_common::{shutdown, Error, Result};
-pub use vector_core::{event, metrics, schema, tcp, tls};
+pub use vector_lib::{event, metrics, schema, tcp, tls};
+pub use vector_lib::{shutdown, Error, Result};
+
+static APP_NAME_SLUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// The name used to identify this Vector application.
+///
+/// This can be set at compile-time through the VECTOR_APP_NAME env variable.
+/// Defaults to "Vector".
+pub fn get_app_name() -> &'static str {
+    option_env!("VECTOR_APP_NAME").unwrap_or("Vector")
+}
+
+/// Returns a slugified version of the name used to identify this Vector application.
+///
+/// Defaults to "vector".
+pub fn get_slugified_app_name() -> String {
+    APP_NAME_SLUG
+        .get_or_init(|| get_app_name().to_lowercase().replace(' ', "-"))
+        .clone()
+}
 
 /// The current version of Vector in simplified format.
 /// `<version-number>-nightly`.
@@ -190,7 +214,10 @@ where
     T: Send + 'static,
 {
     #[cfg(tokio_unstable)]
-    return tokio::task::Builder::new().name(_name).spawn(task);
+    return tokio::task::Builder::new()
+        .name(_name)
+        .spawn(task)
+        .expect("tokio task should spawn");
 
     #[cfg(not(tokio_unstable))]
     tokio::spawn(task)

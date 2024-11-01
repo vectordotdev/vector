@@ -51,7 +51,7 @@ suitable for complex data definitions.
 
 Cue can be [installed](https://cuelang.org/docs/install/) from package managers,
 however it may be necessary to install it from source in order to use the correct
-version that Vector depends on. Currently Vector is using `v0.5.0`. Using a CUE
+version that Vector depends on. Currently Vector is using `v0.7.0`. Using a CUE
 version different than this may result in CUE check/build errors. We are aiming
 to improve the developer experience around external tool dependencies ([#15909](https://github.com/vectordotdev/vector/issues/15909)).
 
@@ -61,7 +61,7 @@ Much of Vector's reference documentation is automatically compiled from source c
 To regenerate this content, run:
 
 ```bash
-cargo vdev build component-docs
+make generate-component-docs
 ```
 
 ### Formatting
@@ -72,7 +72,7 @@ properly formatted. To run CUE's autoformatting, first [install cue](https://cue
 then run this command from the `vector` root:
 
 ```bash
-cue fmt ./website/**/*.cue
+./website/scripts/cue.sh fmt
 ```
 
 If that rewrites any files, make sure to commit your changes or else you'll see
@@ -85,8 +85,12 @@ the provided data needs to conform to various CUE schemas. To check the validity
 of the CUE sources:
 
 ```bash
-make check-docs
+cd .. # Change to the repo root directory
+CI=true make check-docs
 ```
+
+> When the CI flag is on, then the checker will also run a CUE format validation step.
+> Also, note that when this flag on, CUE files might be modified. See `scripts/check-docs.sh` for details.
 
 #### Tips & tricks
 

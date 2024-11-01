@@ -23,7 +23,7 @@ pub struct Opts {
     paths_yaml: Vec<PathBuf>,
 
     /// Any number of Vector config files to test. If none are specified the
-    /// default config path `/etc/vector/vector.toml` will be targeted.
+    /// default config path `/etc/vector/vector.yaml` will be targeted.
     #[arg(value_delimiter(','))]
     paths: Vec<PathBuf>,
 

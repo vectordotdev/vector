@@ -1,6 +1,43 @@
-use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
-use vector_core::internal_event::InternalEvent;
+use std::time::Duration;
+
+use http::response::Response;
+use metrics::{counter, histogram};
+use tonic::Code;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type};
+
+const GRPC_STATUS_LABEL: &str = "grpc_status";
+
+#[derive(Debug)]
+pub struct GrpcServerRequestReceived;
+
+impl InternalEvent for GrpcServerRequestReceived {
+    fn emit(self) {
+        counter!("grpc_server_messages_received_total").increment(1);
+    }
+}
+
+#[derive(Debug)]
+pub struct GrpcServerResponseSent<'a, B> {
+    pub response: &'a Response<B>,
+    pub latency: Duration,
+}
+
+impl<'a, B> InternalEvent for GrpcServerResponseSent<'a, B> {
+    fn emit(self) {
+        let grpc_code = self
+            .response
+            .headers()
+            .get("grpc-status")
+            // The header value is missing on success.
+            .map_or(tonic::Code::Ok, |v| tonic::Code::from_bytes(v.as_bytes()));
+        let grpc_code = grpc_code_to_name(grpc_code);
+
+        let labels = &[(GRPC_STATUS_LABEL, grpc_code)];
+        counter!("grpc_server_messages_sent_total", labels).increment(1);
+        histogram!("grpc_server_handler_duration_seconds", labels).record(self.latency);
+    }
+}
 
 #[derive(Debug)]
 pub struct GrpcInvalidCompressionSchemeError<'a> {
@@ -17,10 +54,11 @@ impl InternalEvent for GrpcInvalidCompressionSchemeError<'_> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -42,9 +80,32 @@ where
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
+    }
+}
+
+const fn grpc_code_to_name(code: Code) -> &'static str {
+    match code {
+        Code::Ok => "Ok",
+        Code::Cancelled => "Cancelled",
+        Code::Unknown => "Unknown",
+        Code::InvalidArgument => "InvalidArgument",
+        Code::DeadlineExceeded => "DeadlineExceeded",
+        Code::NotFound => "NotFound",
+        Code::AlreadyExists => "AlreadyExists",
+        Code::PermissionDenied => "PermissionDenied",
+        Code::ResourceExhausted => "ResourceExhausted",
+        Code::FailedPrecondition => "FailedPrecondition",
+        Code::Aborted => "Aborted",
+        Code::OutOfRange => "OutOfRange",
+        Code::Unimplemented => "Unimplemented",
+        Code::Internal => "Internal",
+        Code::Unavailable => "Unavailable",
+        Code::DataLoss => "DataLoss",
+        Code::Unauthenticated => "Unauthenticated",
     }
 }

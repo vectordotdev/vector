@@ -1,1 +1,1 @@
-{"log":{"":"-","O":null}}
+{"metric":{"name":"j","namespace":"y","tags":{"l":"u"},"timestamp":"1970-01-01T07:52:25.000000001Z","interval_ms":2220331502,"kind":"absolute","counter":{"value":604992.0}}}

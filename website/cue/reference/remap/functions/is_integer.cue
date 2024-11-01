@@ -3,13 +3,13 @@ package metadata
 remap: functions: is_integer: {
 	category: "Type"
 	description: """
-		Check if the type of a `value` is an integer or not.
+		Check if the value`'s type is an integer.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check"#
+			description: #"The value to check if it is an integer."#
 			required:    true
 			type: ["any"]
 		},

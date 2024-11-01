@@ -1,4 +1,4 @@
-use vector_core::ByteSizeOf;
+use vector_lib::ByteSizeOf;
 
 use super::super::{
     batch::{Batch, BatchConfig, BatchError, PushResult},

@@ -35,7 +35,7 @@ remap: functions: parse_groks: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` fails to parse using the provided `pattern`",
+		"`value` fails to parse using the provided `pattern`.",
 	]
 	return: types: ["object"]
 

@@ -1,0 +1,53 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  syslog:
+    type:       "syslog"
+    address:    "0.0.0.0:8282"
+    max_length: 1500000
+    mode:       "tcp"
+
+##
+## Transforms
+##
+
+transforms:
+  remap:
+    type:   "remap"
+    inputs: [ "syslog" ]
+    source: ". |= parse_regex!(.host, r'^(?P<hostname>[a-z]+)\\.(?P<tld>[a-z]+)')"
+
+  log2metric:
+    type: "log_to_metric"
+    inputs: [ "remap" ]
+    metrics:
+      - type:  "counter"
+        field: "procid"
+        tags:
+          hostname: "{{ hostname }}"
+          facility: "{{ facility }}"
+          severity: "{{ severity }}"
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  datadog_metrics:
+    type:              "datadog_metrics"
+    inputs: [ "log2metric" ]
+    endpoint:          "http://0.0.0.0:8080"
+    default_api_key:   "DEADBEEF"
+    default_namespace: "vector"

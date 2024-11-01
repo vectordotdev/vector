@@ -1,7 +1,7 @@
 //! Functionality to handle enrichment tables.
-pub use enrichment::{Condition, IndexHandle, Table};
 use enum_dispatch::enum_dispatch;
-use vector_config::{configurable_component, NamedComponent};
+use vector_lib::configurable::{configurable_component, NamedComponent};
+pub use vector_lib::enrichment::{Condition, IndexHandle, Table};
 
 use crate::config::{EnrichmentTableConfig, GlobalOptions};
 
@@ -9,6 +9,9 @@ pub mod file;
 
 #[cfg(feature = "enrichment-tables-geoip")]
 pub mod geoip;
+
+#[cfg(feature = "enrichment-tables-mmdb")]
+pub mod mmdb;
 
 /// Configurable enrichment tables.
 #[configurable_component]
@@ -25,6 +28,12 @@ pub enum EnrichmentTables {
     /// [geoip2]: https://www.maxmind.com/en/geoip2-databases
     #[cfg(feature = "enrichment-tables-geoip")]
     Geoip(geoip::GeoipConfig),
+
+    /// Exposes data from a [MaxMind][maxmind] database as an enrichment table.
+    ///
+    /// [maxmind]: https://www.maxmind.com/
+    #[cfg(feature = "enrichment-tables-mmdb")]
+    Mmdb(mmdb::MmdbConfig),
 }
 
 // TODO: Use `enum_dispatch` here.
@@ -34,6 +43,8 @@ impl NamedComponent for EnrichmentTables {
             Self::File(config) => config.get_component_name(),
             #[cfg(feature = "enrichment-tables-geoip")]
             Self::Geoip(config) => config.get_component_name(),
+            #[cfg(feature = "enrichment-tables-mmdb")]
+            Self::Mmdb(config) => config.get_component_name(),
             #[allow(unreachable_patterns)]
             _ => unimplemented!(),
         }

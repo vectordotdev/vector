@@ -5,13 +5,16 @@ mod error;
 pub mod format;
 pub mod framing;
 
+use crate::decoding::format::{VrlDeserializer, VrlDeserializerConfig};
 use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
-    GelfDeserializerConfig, GelfDeserializerOptions, JsonDeserializer, JsonDeserializerConfig,
-    JsonDeserializerOptions, NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
-    NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,
+    GelfDeserializerConfig, GelfDeserializerOptions, InfluxdbDeserializer,
+    InfluxdbDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions,
+    NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
+    NativeJsonDeserializerConfig, NativeJsonDeserializerOptions, ProtobufDeserializer,
+    ProtobufDeserializerConfig, ProtobufDeserializerOptions,
 };
 #[cfg(feature = "syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
@@ -30,6 +33,8 @@ use vector_core::{
     event::Event,
     schema,
 };
+
+use self::format::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
 
 /// An error that occurred while decoding structured events from a byte stream /
 /// byte messages.
@@ -85,7 +90,7 @@ pub enum FramingConfig {
     CharacterDelimited(CharacterDelimitedDecoderConfig),
 
     /// Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length.
-    LengthDelimited,
+    LengthDelimited(LengthDelimitedDecoderConfig),
 
     /// Byte frames which are delimited by a newline character.
     NewlineDelimited(NewlineDelimitedDecoderConfig),
@@ -109,8 +114,8 @@ impl From<CharacterDelimitedDecoderConfig> for FramingConfig {
 }
 
 impl From<LengthDelimitedDecoderConfig> for FramingConfig {
-    fn from(_: LengthDelimitedDecoderConfig) -> Self {
-        Self::LengthDelimited
+    fn from(config: LengthDelimitedDecoderConfig) -> Self {
+        Self::LengthDelimited(config)
     }
 }
 
@@ -132,9 +137,7 @@ impl FramingConfig {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesDecoderConfig.build()),
             FramingConfig::CharacterDelimited(config) => Framer::CharacterDelimited(config.build()),
-            FramingConfig::LengthDelimited => {
-                Framer::LengthDelimited(LengthDelimitedDecoderConfig.build())
-            }
+            FramingConfig::LengthDelimited(config) => Framer::LengthDelimited(config.build()),
             FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
             FramingConfig::OctetCounting(config) => Framer::OctetCounting(config.build()),
         }
@@ -200,6 +203,11 @@ pub enum DeserializerConfig {
     /// [json]: https://www.json.org/
     Json(JsonDeserializerConfig),
 
+    /// Decodes the raw bytes as [protobuf][protobuf].
+    ///
+    /// [protobuf]: https://protobuf.dev/
+    Protobuf(ProtobufDeserializerConfig),
+
     #[cfg(feature = "syslog")]
     /// Decodes the raw bytes as a Syslog message.
     ///
@@ -210,7 +218,7 @@ pub enum DeserializerConfig {
     /// [rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
     Syslog(SyslogDeserializerConfig),
 
-    /// Decodes the raw bytes as Vector’s [native Protocol Buffers format][vector_native_protobuf].
+    /// Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
     ///
     /// This codec is **[experimental][experimental]**.
     ///
@@ -218,7 +226,7 @@ pub enum DeserializerConfig {
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     Native,
 
-    /// Decodes the raw bytes as Vector’s [native JSON format][vector_native_json].
+    /// Decodes the raw bytes as [native JSON format][vector_native_json].
     ///
     /// This codec is **[experimental][experimental]**.
     ///
@@ -228,8 +236,40 @@ pub enum DeserializerConfig {
 
     /// Decodes the raw bytes as a [GELF][gelf] message.
     ///
+    /// This codec is experimental for the following reason:
+    ///
+    /// The GELF specification is more strict than the actual Graylog receiver.
+    /// Vector's decoder currently adheres more strictly to the GELF spec, with
+    /// the exception that some characters such as `@`  are allowed in field names.
+    ///
+    /// Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
+    /// by Graylog, and is much more relaxed than the GELF spec.
+    ///
+    /// Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
+    /// the codec may continue to relax the enforcement of specification.
+
+    ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
+    /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
     Gelf(GelfDeserializerConfig),
+
+    /// Decodes the raw bytes as an [Influxdb Line Protocol][influxdb] message.
+    ///
+    /// [influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
+    Influxdb(InfluxdbDeserializerConfig),
+
+    /// Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+    ///
+    /// [apache_avro]: https://avro.apache.org/
+    Avro {
+        /// Apache Avro-specific encoder options.
+        avro: AvroDeserializerOptions,
+    },
+
+    /// Decodes the raw bytes as a string and passes them as input to a [VRL][vrl] program.
+    ///
+    /// [vrl]: https://vector.dev/docs/reference/vrl
+    Vrl(VrlDeserializerConfig),
 }
 
 impl From<BytesDeserializerConfig> for DeserializerConfig {
@@ -269,58 +309,95 @@ impl From<NativeJsonDeserializerConfig> for DeserializerConfig {
     }
 }
 
+impl From<InfluxdbDeserializerConfig> for DeserializerConfig {
+    fn from(config: InfluxdbDeserializerConfig) -> Self {
+        Self::Influxdb(config)
+    }
+}
+
 impl DeserializerConfig {
     /// Build the `Deserializer` from this configuration.
-    pub fn build(&self) -> Deserializer {
+    pub fn build(&self) -> vector_common::Result<Deserializer> {
         match self {
-            DeserializerConfig::Bytes => Deserializer::Bytes(BytesDeserializerConfig.build()),
-            DeserializerConfig::Json(config) => Deserializer::Json(config.build()),
+            DeserializerConfig::Avro { avro } => Ok(Deserializer::Avro(
+                AvroDeserializerConfig {
+                    avro_options: avro.clone(),
+                }
+                .build(),
+            )),
+            DeserializerConfig::Bytes => Ok(Deserializer::Bytes(BytesDeserializerConfig.build())),
+            DeserializerConfig::Json(config) => Ok(Deserializer::Json(config.build())),
+            DeserializerConfig::Protobuf(config) => Ok(Deserializer::Protobuf(config.build()?)),
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog(config) => Deserializer::Syslog(config.build()),
-            DeserializerConfig::Native => Deserializer::Native(NativeDeserializerConfig.build()),
-            DeserializerConfig::NativeJson(config) => Deserializer::NativeJson(config.build()),
-            DeserializerConfig::Gelf(config) => Deserializer::Gelf(config.build()),
+            DeserializerConfig::Syslog(config) => Ok(Deserializer::Syslog(config.build())),
+            DeserializerConfig::Native => {
+                Ok(Deserializer::Native(NativeDeserializerConfig.build()))
+            }
+            DeserializerConfig::NativeJson(config) => Ok(Deserializer::NativeJson(config.build())),
+            DeserializerConfig::Gelf(config) => Ok(Deserializer::Gelf(config.build())),
+            DeserializerConfig::Influxdb(config) => Ok(Deserializer::Influxdb(config.build())),
+            DeserializerConfig::Vrl(config) => Ok(Deserializer::Vrl(config.build()?)),
         }
     }
 
     /// Return an appropriate default framer for the given deserializer
     pub fn default_stream_framing(&self) -> FramingConfig {
         match self {
-            DeserializerConfig::Native => FramingConfig::LengthDelimited,
+            DeserializerConfig::Avro { .. } => FramingConfig::Bytes,
+            DeserializerConfig::Native => FramingConfig::LengthDelimited(Default::default()),
             DeserializerConfig::Bytes
             | DeserializerConfig::Json(_)
-            | DeserializerConfig::Gelf(_)
+            | DeserializerConfig::Influxdb(_)
             | DeserializerConfig::NativeJson(_) => {
                 FramingConfig::NewlineDelimited(Default::default())
             }
+            DeserializerConfig::Protobuf(_) => FramingConfig::Bytes,
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(_) => FramingConfig::NewlineDelimited(Default::default()),
+            DeserializerConfig::Vrl(_) => FramingConfig::Bytes,
+            DeserializerConfig::Gelf(_) => {
+                FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig::new(0))
+            }
         }
     }
 
     /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
         match self {
+            DeserializerConfig::Avro { avro } => AvroDeserializerConfig {
+                avro_options: avro.clone(),
+            }
+            .output_type(),
             DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
             DeserializerConfig::Json(config) => config.output_type(),
+            DeserializerConfig::Protobuf(config) => config.output_type(),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => config.output_type(),
             DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
             DeserializerConfig::NativeJson(config) => config.output_type(),
             DeserializerConfig::Gelf(config) => config.output_type(),
+            DeserializerConfig::Vrl(config) => config.output_type(),
+            DeserializerConfig::Influxdb(config) => config.output_type(),
         }
     }
 
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match self {
+            DeserializerConfig::Avro { avro } => AvroDeserializerConfig {
+                avro_options: avro.clone(),
+            }
+            .schema_definition(log_namespace),
             DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::Json(config) => config.schema_definition(log_namespace),
+            DeserializerConfig::Protobuf(config) => config.schema_definition(log_namespace),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::NativeJson(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Gelf(config) => config.schema_definition(log_namespace),
+            DeserializerConfig::Influxdb(config) => config.schema_definition(log_namespace),
+            DeserializerConfig::Vrl(config) => config.schema_definition(log_namespace),
         }
     }
 
@@ -343,12 +420,17 @@ impl DeserializerConfig {
                         },
                 }),
             ) => "application/json",
-            (DeserializerConfig::Native, _) => "application/octet-stream",
+            (DeserializerConfig::Native, _) | (DeserializerConfig::Avro { .. }, _) => {
+                "application/octet-stream"
+            }
+            (DeserializerConfig::Protobuf(_), _) => "application/octet-stream",
             (
                 DeserializerConfig::Json(_)
                 | DeserializerConfig::NativeJson(_)
                 | DeserializerConfig::Bytes
-                | DeserializerConfig::Gelf(_),
+                | DeserializerConfig::Gelf(_)
+                | DeserializerConfig::Influxdb(_)
+                | DeserializerConfig::Vrl(_),
                 _,
             ) => "text/plain",
             #[cfg(feature = "syslog")]
@@ -360,10 +442,14 @@ impl DeserializerConfig {
 /// Parse structured events from bytes.
 #[derive(Clone)]
 pub enum Deserializer {
+    /// Uses a `AvroDeserializer` for deserialization.
+    Avro(AvroDeserializer),
     /// Uses a `BytesDeserializer` for deserialization.
     Bytes(BytesDeserializer),
     /// Uses a `JsonDeserializer` for deserialization.
     Json(JsonDeserializer),
+    /// Uses a `ProtobufDeserializer` for deserialization.
+    Protobuf(ProtobufDeserializer),
     #[cfg(feature = "syslog")]
     /// Uses a `SyslogDeserializer` for deserialization.
     Syslog(SyslogDeserializer),
@@ -375,6 +461,10 @@ pub enum Deserializer {
     Boxed(BoxedDeserializer),
     /// Uses a `GelfDeserializer` for deserialization.
     Gelf(GelfDeserializer),
+    /// Uses a `InfluxdbDeserializer` for deserialization.
+    Influxdb(InfluxdbDeserializer),
+    /// Uses a `VrlDeserializer` for deserialization.
+    Vrl(VrlDeserializer),
 }
 
 impl format::Deserializer for Deserializer {
@@ -384,14 +474,38 @@ impl format::Deserializer for Deserializer {
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         match self {
+            Deserializer::Avro(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Bytes(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Json(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Protobuf(deserializer) => deserializer.parse(bytes, log_namespace),
             #[cfg(feature = "syslog")]
             Deserializer::Syslog(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Native(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::NativeJson(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Boxed(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Gelf(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Influxdb(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Vrl(deserializer) => deserializer.parse(bytes, log_namespace),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gelf_stream_default_framing_is_null_delimited() {
+        let deserializer_config = DeserializerConfig::from(GelfDeserializerConfig::default());
+        let framing_config = deserializer_config.default_stream_framing();
+        assert!(matches!(
+            framing_config,
+            FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
+                character_delimited: CharacterDelimitedDecoderOptions {
+                    delimiter: 0,
+                    max_length: None,
+                }
+            })
+        ));
     }
 }

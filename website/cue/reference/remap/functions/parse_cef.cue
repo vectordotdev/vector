@@ -20,13 +20,13 @@ remap: functions: parse_cef: {
 		},
 		{
 			name:        "translate_custom_fields"
-			description: "Toggles translation of custom field pairs to `key: value`."
+			description: "Toggles translation of custom field pairs to `key:value`."
 			required:    false
 			type: ["boolean"]
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a properly formatted CEF string",
+		"`value` is not a properly formatted CEF string.",
 	]
 	return: types: ["object"]
 

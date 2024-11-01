@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -8,16 +8,19 @@ use indoc::indoc;
 use ordered_float::NotNan;
 use prost::Message;
 use rmp_serde;
-use vector_core::event::{BatchNotifier, BatchStatus, Event};
+use vector_lib::event::{BatchNotifier, BatchStatus, Event};
+use vrl::event_path;
 
 use super::{apm_stats::StatsPayload, dd_proto, ddsketch_full, DatadogTracesConfig};
 
 use crate::{
-    config::SinkConfig,
-    event::{TraceEvent, Value},
-    sinks::util::test::{build_test_server_status, load_sink},
+    common::datadog,
+    config::{SinkConfig, SinkContext},
+    event::{ObjectMap, TraceEvent, Value},
+    extra_context::ExtraContext,
+    sinks::util::test::{build_test_server_status, load_sink, load_sink_with_context},
     test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{assert_sink_compliance, run_and_assert_sink_compliance, SINK_TAGS},
         map_event_batch_stream, next_addr,
     },
 };
@@ -55,39 +58,33 @@ async fn start_test(
     .await
 }
 
-fn simple_span(resource: String) -> BTreeMap<String, Value> {
-    BTreeMap::<String, Value>::from([
-        ("service".to_string(), Value::from("a_service")),
-        ("name".to_string(), Value::from("a_name")),
-        ("resource".to_string(), Value::from(resource)),
-        ("type".to_string(), Value::from("a_type")),
-        ("trace_id".to_string(), Value::Integer(123)),
-        ("span_id".to_string(), Value::Integer(456)),
-        ("parent_id".to_string(), Value::Integer(789)),
+fn simple_span(resource: String) -> ObjectMap {
+    ObjectMap::from([
+        ("service".into(), Value::from("a_service")),
+        ("name".into(), Value::from("a_name")),
+        ("resource".into(), Value::from(resource)),
+        ("type".into(), Value::from("a_type")),
+        ("trace_id".into(), Value::Integer(123)),
+        ("span_id".into(), Value::Integer(456)),
+        ("parent_id".into(), Value::Integer(789)),
         (
-            "start".to_string(),
+            "start".into(),
             Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64)),
         ),
-        ("duration".to_string(), Value::Integer(1_000_000)),
-        ("error".to_string(), Value::Integer(404)),
+        ("duration".into(), Value::Integer(1_000_000)),
+        ("error".into(), Value::Integer(404)),
         (
-            "meta".to_string(),
-            Value::Object(BTreeMap::<String, Value>::from([
-                ("foo".to_string(), Value::from("bar")),
-                ("bar".to_string(), Value::from("baz")),
+            "meta".into(),
+            Value::Object(ObjectMap::from([
+                ("foo".into(), Value::from("bar")),
+                ("bar".into(), Value::from("baz")),
             ])),
         ),
         (
-            "metrics".to_string(),
-            Value::Object(BTreeMap::<String, Value>::from([
-                (
-                    "a_metric".to_string(),
-                    Value::Float(NotNan::new(0.577).unwrap()),
-                ),
-                (
-                    "_top_level".to_string(),
-                    Value::Float(NotNan::new(1.0).unwrap()),
-                ),
+            "metrics".into(),
+            Value::Object(ObjectMap::from([
+                ("a_metric".into(), Value::Float(NotNan::new(0.577).unwrap())),
+                ("_top_level".into(), Value::Float(NotNan::new(1.0).unwrap())),
             ])),
         ),
     ])
@@ -95,15 +92,15 @@ fn simple_span(resource: String) -> BTreeMap<String, Value> {
 
 pub fn simple_trace_event(resource: String) -> TraceEvent {
     let mut t = TraceEvent::default();
-    t.insert("language", "a_language");
-    t.insert("agent_version", "1.23456");
-    t.insert("host", "a_host");
-    t.insert("env", "an_env");
-    t.insert("trace_id", Value::Integer(123));
-    t.insert("target_tps", Value::Integer(10));
-    t.insert("error_tps", Value::Integer(5));
+    t.insert(event_path!("language"), "a_language");
+    t.insert(event_path!("agent_version"), "1.23456");
+    t.insert(event_path!("host"), "a_host");
+    t.insert(event_path!("env"), "an_env");
+    t.insert(event_path!("trace_id"), Value::Integer(123));
+    t.insert(event_path!("target_tps"), Value::Integer(10));
+    t.insert(event_path!("error_tps"), Value::Integer(5));
     t.insert(
-        "spans",
+        event_path!("spans"),
         Value::Array(vec![Value::from(simple_span(resource))]),
     );
     t
@@ -312,4 +309,89 @@ async fn multiple_traces() {
     assert_eq!(cgs_trace_1.name, "a_name");
     assert_eq!(cgs_trace_1.resource, "trace_1");
     assert_eq!(cgs_trace_1.service, "a_service");
+}
+
+#[tokio::test]
+async fn global_options() {
+    let config = indoc! {r#"
+            compression = "none"
+        "#};
+    let cx = SinkContext {
+        extra_context: ExtraContext::single_value(datadog::Options {
+            api_key: Some("global-key".to_string().into()),
+            ..Default::default()
+        }),
+        ..SinkContext::default()
+    };
+    let (mut config, cx) = load_sink_with_context::<DatadogTracesConfig>(config, cx).unwrap();
+
+    let addr = next_addr();
+    // Swap out the endpoint so we can force send it
+    // to our local server
+    let endpoint = format!("http://{}", addr);
+    config.local_dd_common.endpoint = Some(endpoint.clone());
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
+    tokio::spawn(server);
+
+    let t = simple_trace_event("a_resource".to_string());
+    let events = stream::iter(vec![Event::Trace(t)]);
+
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+
+    let keys = rx
+        .take(1)
+        .map(|r| r.0.headers.get("DD-API-KEY").unwrap().clone())
+        .collect::<Vec<_>>()
+        .await;
+
+    assert!(keys
+        .iter()
+        .all(|value| value.to_str().unwrap() == "global-key"));
+}
+
+#[tokio::test]
+async fn override_global_options() {
+    let config = indoc! {r#"
+            default_api_key = "local-key"
+            compression = "none"
+        "#};
+
+    // Set a global key option, which should be overridden by the option in the component configuration.
+    let cx = SinkContext {
+        extra_context: ExtraContext::single_value(datadog::Options {
+            api_key: Some("global-key".to_string().into()),
+            ..Default::default()
+        }),
+        ..SinkContext::default()
+    };
+    let (mut config, cx) = load_sink_with_context::<DatadogTracesConfig>(config, cx).unwrap();
+
+    let addr = next_addr();
+    // Swap out the endpoint so we can force send it
+    // to our local server
+    let endpoint = format!("http://{}", addr);
+    config.local_dd_common.endpoint = Some(endpoint.clone());
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
+    tokio::spawn(server);
+
+    let t = simple_trace_event("a_resource".to_string());
+    let events = stream::iter(vec![Event::Trace(t)]);
+
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+
+    let keys = rx
+        .take(1)
+        .map(|r| r.0.headers.get("DD-API-KEY").unwrap().clone())
+        .collect::<Vec<_>>()
+        .await;
+
+    assert!(keys
+        .iter()
+        .all(|value| value.to_str().unwrap() == "local-key"));
 }

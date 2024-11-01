@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, sync::Arc};
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
 use serde_json::{json, Value as JsonValue};
-use vector_core::{
+use vector_lib::{
     event::{Event, Metric, MetricKind, MetricValue},
     metric_tags, ByteSizeOf,
 };

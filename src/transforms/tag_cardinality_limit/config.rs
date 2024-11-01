@@ -6,8 +6,8 @@ use crate::config::{
 use crate::schema;
 use crate::transforms::tag_cardinality_limit::TagCardinalityLimit;
 use crate::transforms::Transform;
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
 
 /// Configuration for the `tag_cardinality_limit` transform.
 #[configurable_component(transform(
@@ -47,7 +47,7 @@ pub enum Mode {
     /// This mode has lower memory requirements than `exact`, but may occasionally allow metric
     /// events to pass through the transform even when they contain new tags that exceed the
     /// configured limit. The rate at which this happens can be controlled by changing the value of
-    /// `cache_size_per_tag`.
+    /// `cache_size_per_key`.
     Probabilistic(BloomFilterConfig),
 }
 
@@ -86,7 +86,7 @@ const fn default_value_limit() -> usize {
 }
 
 pub(crate) const fn default_cache_size() -> usize {
-    5000 * 1024 // 5KB
+    5 * 1024 // 5KB
 }
 
 impl GenerateConfig for TagCardinalityLimitConfig {
@@ -115,7 +115,7 @@ impl TransformConfig for TagCardinalityLimitConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _: vector_lib::enrichment::TableRegistry,
         _: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {

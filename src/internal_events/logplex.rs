@@ -1,6 +1,6 @@
 use metrics::counter;
-use vector_common::internal_event::{error_stage, error_type};
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type};
 
 use super::prelude::io_error_code;
 
@@ -13,14 +13,13 @@ pub struct HerokuLogplexRequestReceived<'a> {
 
 impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
     fn emit(self) {
-        info!(
+        debug!(
             message = "Handling logplex request.",
             msg_count = %self.msg_count,
             frame_id = %self.frame_id,
             drain_token = %self.drain_token,
             internal_log_rate_limit = true
         );
-        counter!("requests_received_total", 1);
     }
 }
 
@@ -40,12 +39,11 @@ impl InternalEvent for HerokuLogplexRequestReadError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::READER_FAILED,
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("request_read_errors_total", 1);
+        )
+        .increment(1);
     }
 }

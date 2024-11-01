@@ -16,7 +16,7 @@ remap: functions: map_values: {
 		   - Any mutation done on a collection *before* recursing into it,
 		     are preserved.
 
-		The function uses the "function closure syntax" to allow mutating
+		The function uses the function closure syntax to allow mutating
 		the value for each item in the collection.
 
 		The same scoping rules apply to closure blocks as they do for

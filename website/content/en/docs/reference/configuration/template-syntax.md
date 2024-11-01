@@ -1,6 +1,6 @@
 ---
 title: Template syntax
-weight: 6
+weight: 7
 aliases: ["/docs/reference/templates", "/docs/reference/configuration/templates"]
 ---
 

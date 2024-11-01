@@ -1,0 +1,41 @@
+# Elasticsearch / S3 Hybrid Vector Configuration Example
+# ------------------------------------------------------------------------------
+# This demonstrates a hybrid pipeline, writing data to both Elasticsearch and
+# AWS S3. This is advantageous because each storage helps to offset its
+# counterpart's weaknesses. You can provision Elasticsearch for performance
+# and delegate durability to S3.
+
+data_dir: "/var/lib/vector"
+
+# Ingest data by tailing one or more files
+# Docs: https://vector.dev/docs/reference/sources/file
+sources:
+  apache_logs:
+    type: "file"
+    include: ["/var/log/*.log"]
+    ignore_older_secs: 86400 # 1 day
+
+# Optionally parse, structure and transform data here.
+# Docs: https://vector.dev/docs/reference/transforms
+
+# Send structured data to Elasticsearch for searching of recent data
+sinks:
+  es_cluster:
+    inputs: ["apache_logs"]
+    type: "elasticsearch"
+    endpoint: "79.12.221.222:9200"
+    doc_type: "_doc"
+
+  # Send structured data to S3, a durable long-term storage
+  s3_archives:
+    inputs: ["apache_logs"] # don't sample
+    type: "aws_s3"
+    region: "us-east-1"
+    bucket: "my_log_archives"
+    framing:
+      method: "newline_delimited"
+    encoding:
+      codec: "json"
+    compression: "gzip"
+    batch:
+      max_size: 10000000 # 10mb uncompressed

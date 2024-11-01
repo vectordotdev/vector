@@ -1,1 +1,1 @@
-{"metric":{"name":"g","kind":"absolute","gauge":{"value":-895488.0}}}
+{"metric":{"name":"c","namespace":"u","interval_ms":2460024179,"kind":"incremental","gauge":{"value":-143616.0}}}

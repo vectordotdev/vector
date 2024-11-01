@@ -1,1 +1,1 @@
-{"metric":{"name":"l","kind":"absolute","gauge":{"value":-57728.0}}}
+{"metric":{"name":"p","namespace":"i","tags":{"_":"j","w":"n"},"kind":"absolute","counter":{"value":-718272.0}}}

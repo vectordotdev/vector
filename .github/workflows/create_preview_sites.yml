@@ -1,0 +1,106 @@
+name: Create Preview Sites
+
+on:
+  workflow_call:
+    inputs:
+      APP_ID:
+        description: "App ID for the associated website"
+        required: true
+        type: string
+      APP_NAME:
+        description: "Application name for the comment"
+        required: true
+        type: string
+    secrets:
+      REQUEST_TOKEN:
+        description: "Token for the request"
+        required: true
+      REQUEST_MESSAGE:
+        description: "Message for the request"
+        required: true
+      ENDPOINT:
+        description: "Request endpoint"
+        required: true
+
+jobs:
+  create_preview_site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+
+    # Get the artifacts with the PR number and branch name
+    - name: Download artifact
+      uses: actions/github-script@v7.0.1
+      with:
+        script: |
+          const fs = require('fs');
+          const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+             owner: context.repo.owner,
+             repo: context.repo.repo,
+             run_id: ${{ github.event.workflow_run.id }},
+          });
+          const matchArtifact = artifacts.data.artifacts.filter(artifact => artifact.name == "pr")[0];
+          const download = await github.rest.actions.downloadArtifact({
+             owner: context.repo.owner,
+             repo: context.repo.repo,
+             artifact_id: matchArtifact.id,
+             archive_format: 'zip',
+          });
+          fs.writeFileSync('${{ github.workspace }}/pr.zip', Buffer.from(download.data));
+
+    # Extract the info from the artifact and set variables
+    - name: Extract PR info from artifact
+      run: |
+        unzip pr.zip -d pr
+        BRANCH_NAME=$(cat ./pr/branch)
+        SANITIZED_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/[\/\.]/-/g')
+        echo "SANITIZED_BRANCH_NAME=$SANITIZED_BRANCH_NAME" >> $GITHUB_ENV
+        echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
+    # Kick off the job in amplify
+    - name: Deploy Site
+      env:
+        APP_ID: ${{ inputs.APP_ID }}
+        APP_NAME: ${{ inputs.APP_NAME }}
+        REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
+        REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
+        ENDPOINT: ${{ secrets.ENDPOINT }}
+      run: |
+        sleep 20
+        HMAC_KEY=$(echo -n $REQUEST_MESSAGE | openssl dgst -sha256 -hmac "$REQUEST_TOKEN" | cut -d" " -f2)
+        SIGNATURE="sha256=$HMAC_KEY"
+        RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+             -H "Content-Type: application/json" \
+             -H "X-Hub-Signature: $SIGNATURE" \
+             -d "{\"app_id\": \"$APP_ID\", \"branch_name\": \"$BRANCH_NAME\"}" \
+          "$ENDPOINT")
+
+        # check the response code and fail if not 200
+        if [ "$RESPONSE_CODE" != "200" ]; then
+          echo "Request failed with response code $RESPONSE_CODE"
+          exit 1
+        fi
+
+    # Add preview link to comment if all 3 sites successfully start
+    - name: Comment Preview Link
+      if: success()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        APP_ID: ${{ inputs.APP_ID }}
+        APP_NAME: ${{ inputs.APP_NAME }}
+      uses: actions/github-script@v7.0.1
+      with:
+        script: |
+          const fs = require('fs');
+          const prNumber = fs.readFileSync('./pr/number', 'utf8');
+          const issueNumber = parseInt(prNumber);
+          const { APP_ID, APP_NAME, SANITIZED_BRANCH_NAME } = process.env
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issueNumber,
+            body: `Your preview site for the **${APP_NAME}** will be ready in a few minutes, please allow time for it to build. \n \n Heres your preview link: \n [${APP_NAME} preview](https://${SANITIZED_BRANCH_NAME}.${APP_ID}.amplifyapp.com)`
+          });
+
+

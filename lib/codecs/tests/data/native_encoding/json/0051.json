@@ -1,1 +1,1 @@
-{"log":{"":-727744.0,"$㹤-":0.0,"P":true}}
+{"metric":{"name":"q","namespace":"a","tags":{"q":"m"},"kind":"incremental","counter":{"value":594752.0}}}

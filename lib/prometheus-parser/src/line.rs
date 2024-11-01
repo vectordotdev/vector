@@ -373,7 +373,7 @@ fn parse_name(input: &str) -> IResult<String> {
 }
 
 fn trim_space(input: &str) -> &str {
-    input.trim_start_matches(|c| c == ' ' || c == '\t')
+    input.trim_start_matches([' ', '\t'])
 }
 
 fn sp<'a, E: ParseError<&'a str>>(i: &'a str) -> nom::IResult<&'a str, &'a str, E> {
@@ -412,7 +412,7 @@ mod test {
         assert_eq!(left, tail);
         assert_eq!(r, "");
 
-        let input = wrap(r#"a\\ asdf"#);
+        let input = wrap(r"a\\ asdf");
         let (left, r) = Metric::parse_escaped_string(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "a\\ asdf");
@@ -427,7 +427,7 @@ mod test {
         assert_eq!(left, tail);
         assert_eq!(r, "\"\\\n");
 
-        let input = wrap(r#"\\n"#);
+        let input = wrap(r"\\n");
         let (left, r) = Metric::parse_escaped_string(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "\\n");
@@ -671,7 +671,7 @@ mod test {
 
     #[test]
     fn test_parse_line() {
-        let input = r##"
+        let input = r#"
             # HELP http_requests_total The total number of HTTP requests.
             # TYPE http_requests_total counter
             http_requests_total{method="post",code="200"} 1027 1395066363000
@@ -708,7 +708,7 @@ mod test {
             rpc_duration_seconds{quantile="0.99"} 76656
             rpc_duration_seconds_sum 1.7560473e+07
             rpc_duration_seconds_count 2693
-            "##;
+            "#;
         assert!(input.lines().map(Line::parse).all(|r| r.is_ok()));
     }
 }

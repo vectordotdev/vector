@@ -7,9 +7,9 @@ use crate::event::Metric;
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
-    field(name = "received_events_total", type = "Option<ReceivedEventsTotal>"),
-    field(name = "sent_bytes_total", type = "Option<SentBytesTotal>"),
-    field(name = "sent_events_total", type = "Option<SentEventsTotal>")
+    field(name = "received_events_total", ty = "Option<ReceivedEventsTotal>"),
+    field(name = "sent_bytes_total", ty = "Option<SentBytesTotal>"),
+    field(name = "sent_events_total", ty = "Option<SentEventsTotal>")
 )]
 pub enum SinkMetrics {
     GenericSinkMetrics(generic::GenericSinkMetrics),

@@ -2,7 +2,7 @@
 title: Splunk HTTP Event Collector (HEC)
 description: Receive logs from [Splunk](https://splunk.com)
 short: Splunk HEC
-kind: source
+component_kind: source
 layout: component
 tags: ["splunk", "hec", "http event collector", "component", "source", "logs"]
 ---

@@ -1,0 +1,32 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  file:
+    type: "file"
+    include:
+      - "/tmp/file-gen-*.log"
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  socket_sink:
+    type:    "socket"
+    inputs: [ "file" ]
+    mode:    "tcp"
+    address: "127.0.0.1:15400"
+    encoding:
+      codec: "json"

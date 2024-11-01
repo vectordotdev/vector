@@ -283,7 +283,7 @@ where
 
     variant
         .add_to_builder(&mut builder, Some(data_dir), id)
-        .expect("should not fail to to add variant to builder");
+        .expect("should not fail to add variant to builder");
 
     builder
         .build(String::from("buffer_perf"), Span::none())
@@ -352,14 +352,20 @@ async fn main() {
                 0 => unreachable!(),
                 1 => {
                     let record = records.next().expect("should never be empty");
-                    writer.send(record).await.expect("failed to write record");
+                    writer
+                        .send(record, None)
+                        .await
+                        .expect("failed to write record");
                     1
                 }
                 n => {
                     let count = cmp::min(n, remaining);
                     let record_chunk = (&mut records).take(count);
                     for record in record_chunk {
-                        writer.send(record).await.expect("failed to write record");
+                        writer
+                            .send(record, None)
+                            .await
+                            .expect("failed to write record");
                     }
                     count
                 }
