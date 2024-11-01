@@ -28,6 +28,7 @@ apm
 appcypher
 aps
 aqf
+aquaproj
 architecting
 archivable
 ARNOTAREALIDD
@@ -143,6 +144,7 @@ centiseconds
 cernan
 cfactor
 CFFI
+cfgs
 CGP
 cgroups
 chans
@@ -154,7 +156,6 @@ chkptr
 chronosphere
 chunkenc
 cicd
-Cim
 ciphersuites
 CLA
 Claranet
@@ -317,7 +318,6 @@ enp
 enumdecl
 enumflags
 envsubst
-EOIG
 EOL'ed
 Err'ing
 errorf
@@ -389,6 +389,8 @@ Fomichev
 fonttbl
 foob
 foobarbaz
+foobarbazqux
+foobarbazquxquux
 foobarfoobarfoo
 FOOBARy
 foobaz
@@ -442,7 +444,6 @@ Godbolt
 gogoproto
 gohai
 goldberg
-goldmark
 GPB
 gpgcheck
 gpgkey
@@ -729,7 +730,6 @@ ndarray
 ndjson
 nearline
 newcerts
-newrelix
 nextest
 nfox
 ngx
@@ -745,6 +745,7 @@ nodebuginfo
 nodistro
 nofield
 nofree
+nohup
 nomac
 NONALPHANUM
 nonbare
@@ -825,6 +826,7 @@ peekable
 PEMS
 pgmajfault
 pgrep
+pidof
 PII
 Pitbull
 pkc
@@ -851,7 +853,6 @@ presetdir
 pretrunc
 prettydiff
 primaryfont
-probot
 processname
 procid
 promhttp
@@ -985,6 +986,7 @@ sigterm
 singlethreaded
 sinkbuilder
 sinknetworkbytessent
+SIV
 sizecache
 Sizefor
 skinparam
@@ -1000,6 +1002,7 @@ smp
 smpl
 smtracking
 snakecase
+Sni
 Soldotna
 somehost
 somejob
@@ -1049,6 +1052,7 @@ subfolders
 subfooter
 sublimelinter
 subsec
+subsecond
 substrategies
 subtagline
 subtimer
@@ -1164,6 +1168,7 @@ unitdir
 unmark
 unmarshaler
 unnests
+unresumable
 unstructuredlogentries
 unsync
 untuple
@@ -1187,7 +1192,6 @@ vectordir
 vectordotdev
 vectorized
 vendored
-veryyyyyyy
 viceversa
 viewkind
 visualising

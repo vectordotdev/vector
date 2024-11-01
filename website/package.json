@@ -2,7 +2,8 @@
   "private": true,
   "scripts": {
     "typesense-index": "ts-node scripts/typesense-index.ts",
-    "typesense-sync": "ts-node scripts/typesense-sync.ts",
+    "typesense-sync:preview": "NODE_ENV=preview ts-node scripts/typesense-sync.ts",
+    "typesense-sync:production": "NODE_ENV=production ts-node scripts/typesense-sync.ts",
     "config-examples": "node scripts/create-config-examples.js",
     "lighthouse": "lighthouse --output html --output-path ./reports/lighthouse.html --view https://vector.dev"
   },
@@ -49,7 +50,7 @@
     "react-spring": "^9.2.3",
     "react-use": "^17.2.4",
     "regenerator-runtime": "^0.13.7",
-    "typesense-sync": "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v1.0.0.tgz",
+    "typesense-sync": "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v1.0.5.tgz",
     "tailwindcss": "^2.2.4",
     "tocbot": "^4.12.2",
     "topojson-client": "^3.1.0",

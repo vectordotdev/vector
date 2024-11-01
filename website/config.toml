@@ -161,14 +161,14 @@ identifier = "about"
 weight = 1
 
 [[languages.en.menus.footer]]
-name = "What is Vector?"
+name = "Vector"
 url = "/docs/about"
 parent = "about"
 weight = 1
 
 [[languages.en.menus.footer]]
-name = "What is Observability Pipelines?"
-url = "/docs/about/what-is-observability-pipelines"
+name = "Observability Pipelines"
+url = "/docs/about/observability-pipelines"
 parent = "about"
 weight = 2
 
