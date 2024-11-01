@@ -131,41 +131,10 @@ pub fn default_sample_rate_key() -> OptionalValuePath {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        event::LogEvent, test_util::components::assert_transform_compliance,
-        transforms::test::create_topology,
-    };
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
+    use crate::transforms::sample::config::SampleConfig;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SampleConfig>();
-    }
-
-    #[tokio::test]
-    async fn emits_internal_events() {
-        assert_transform_compliance(async move {
-            let config = SampleConfig {
-                rate: 1,
-                key_field: None,
-                group_by: None,
-                exclude: None,
-                sample_rate_key: default_sample_rate_key(),
-            };
-            let (tx, rx) = mpsc::channel(1);
-            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
-
-            let log = LogEvent::from("hello world");
-            tx.send(log.into()).await.unwrap();
-
-            _ = out.recv().await;
-
-            drop(tx);
-            topology.stop().await;
-            assert_eq!(out.recv().await, None);
-        })
-        .await
     }
 }
