@@ -46,6 +46,8 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
+use super::http_server::{build_param_matcher, remove_duplicates};
+
 pub const LOGS: &str = "logs";
 pub const TRACES: &str = "traces";
 
@@ -113,6 +115,20 @@ struct HttpConfig {
     #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
+
+    /// A list of HTTP headers to include in the log event.
+    ///
+    /// Accepts the wildcard (`*`) character for headers matching a specified pattern.
+    ///
+    /// Specifying "*" results in all headers included in the log event.
+    ///
+    /// These override any values included in the JSON payload with conflicting names.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "User-Agent"))]
+    #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
+    #[configurable(metadata(docs::examples = "X-*"))]
+    #[configurable(metadata(docs::examples = "*"))]
+    headers: Vec<String>,
 }
 
 fn example_http_config() -> HttpConfig {
@@ -120,6 +136,7 @@ fn example_http_config() -> HttpConfig {
         address: "0.0.0.0:4318".parse().unwrap(),
         tls: None,
         keepalive: KeepaliveConfig::default(),
+        headers: vec![],
     }
 }
 
@@ -178,12 +195,15 @@ impl SourceConfig for OpentelemetryConfig {
         let http_tls_settings = MaybeTlsSettings::from_config(&self.http.tls, true)?;
         let protocol = http_tls_settings.http_protocol_name();
         let bytes_received = register!(BytesReceived::from(Protocol::from(protocol)));
+        let headers =
+            build_param_matcher(&remove_duplicates(self.http.headers.clone(), "headers"))?;
         let filters = build_warp_filter(
             acknowledgements,
             log_namespace,
             cx.out,
             bytes_received,
             events_received,
+            headers,
         );
         let http_source = run_http_server(
             self.http.address,
