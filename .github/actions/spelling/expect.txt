@@ -21,6 +21,7 @@ ansicpg
 anumber
 anycondition
 anypb
+aoss
 apievent
 apipodspec
 apk
@@ -1243,6 +1244,7 @@ wtime
 wtimeouts
 wtr
 xact
+XAmz
 xcatsy
 Xcg
 xlarge
