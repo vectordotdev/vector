@@ -96,6 +96,14 @@ help:
 	@printf -- "\n"
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make ${FORMATTING_BEGIN_BLUE}<target>${FORMATTING_END}\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  ${FORMATTING_BEGIN_BLUE}%-46s${FORMATTING_END} %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
+define target_to_profile
+	$(if $(filter-out debug,$(1)),$(1),dev)
+endef
+
+define profile_to_target
+	$(if $(filter-out dev,$(1)),$(1),debug)
+endef
+
 ##@ Environment
 
 # These are some predefined macros, please use them!
@@ -272,31 +280,36 @@ cross-%: export CFLAGS += -g0 -O3
 cross-%: cargo-install-cross
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross ${COMMAND} \
-		$(if $(findstring release,$(PROFILE)),--release,) \
+		--profile $(PROFILE) \
 		--target ${TRIPLE} \
 		--no-default-features \
 		--features target-${TRIPLE}
 
 target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
 target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
-target/%/vector: export PROFILE ?=$(word 2,${PAIR})
+target/%/vector: export TARGET_SUBDIR ?=$(word 2,${PAIR})
+target/%/vector: export PROFILE ?=$(if $(filter-out debug,$(TARGET_SUBDIR)),$(TARGET_SUBDIR),dev)
 target/%/vector: export CFLAGS += -g0 -O3
 target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
+	echo $(PAIR)
+	echo $(TARGET_SUBDIR)
+	echo $(PROFILE)
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
-		$(if $(findstring release,$(PROFILE)),--release,) \
+		--profile $(PROFILE) \
 		--target ${TRIPLE} \
 		--no-default-features \
 		--features target-${TRIPLE}
 
 target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
 target/%/vector.tar.gz: export TRIPLE ?=$(word 1,${PAIR})
-target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
+target/%/vector.tar.gz: export TARGET_SUBDIR ?=$(word 2,${PAIR})
+target/%/vector.tar.gz: export PROFILE ?=$(if $(filter-out debug,$(TARGET_SUBDIR)),$(TARGET_SUBDIR),dev)
 target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 	rm -rf target/scratch/vector-${TRIPLE} || true
 	mkdir -p target/scratch/vector-${TRIPLE}/bin target/scratch/vector-${TRIPLE}/etc
 	cp -R -f -v \
-		target/${TRIPLE}/${PROFILE}/vector \
+		target/${TRIPLE}/${TARGET_SUBDIR}/vector \
 		target/scratch/vector-${TRIPLE}/bin/vector
 	cp -R -f -v \
 		README.md \
@@ -312,7 +325,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 	tar --create \
 		--gzip \
 		--verbose \
-		--file target/${TRIPLE}/${PROFILE}/vector.tar.gz \
+		--file target/${TRIPLE}/${TARGET_SUBDIR}/vector.tar.gz \
 		--directory target/scratch/ \
 		./vector-${TRIPLE}
 	rm -rf target/scratch/
@@ -510,8 +523,9 @@ build-rustdoc: ## Build Vector's Rustdocs
 
 # archives
 target/artifacts/vector-${VERSION}-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-${VERSION}-%.tar.gz=%)
-target/artifacts/vector-${VERSION}-%.tar.gz: override PROFILE =release
-target/artifacts/vector-${VERSION}-%.tar.gz: target/%/release/vector.tar.gz
+target/artifacts/vector-${VERSION}-%.tar.gz: export PROFILE ?= release
+target/artifacts/vector-${VERSION}-%.tar.gz: export TARGET_SUBDIR ?=$(if $(filter-out dev,$(PROFILE)),$(PROFILE),debug)
+target/artifacts/vector-${VERSION}-%.tar.gz: target/%/$(TARGET_SUBDIR)/vector.tar.gz
 	@echo "Built to ${<}, relocating to ${@}"
 	@mkdir -p target/artifacts/
 	@cp -v \

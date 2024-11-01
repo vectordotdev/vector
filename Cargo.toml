@@ -41,11 +41,17 @@ path = "tests/integration/lib.rs"
 name = "e2e"
 path = "tests/e2e/mod.rs"
 
-# CI-based builds use full release optimization.  See scripts/environment/release-flags.sh.
-# This results in roughly a 5% reduction in performance when compiling locally vs when
-# compiled via the CI pipeline.
 [profile.release]
-debug = false # Do not include debug symbols in the executable.
+lto = true
+codegen-units = 1
+
+# This profile is useful for local performance testing. It results in roughly a 5% reduction in
+# performance compared with the full release profile but compiles much more quickly.
+[profile.dev-perf]
+inherits = "release"
+lto = false
+codegen-units = 16
+debug = true
 
 [profile.bench]
 debug = true

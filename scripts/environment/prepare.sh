@@ -37,6 +37,3 @@ fi
 # ci image to install a newer version of node.
 sudo npm -g install markdownlint-cli@0.30
 sudo npm -g install @datadog/datadog-ci
-
-# Make sure our release build settings are present.
-. scripts/environment/release-flags.sh
