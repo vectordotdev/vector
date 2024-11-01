@@ -359,7 +359,7 @@ mod tests {
         dd2: Option<P>,
         result: impl Fn(GlobalOptions) -> T,
     ) -> Result<T, Vec<String>> {
-        //// Use TOML parsing to match the behavior of what a user would actually configure.
+        // Use TOML parsing to match the behavior of what a user would actually configure.
         make_config(name, dd1)
             .merge(make_config(name, dd2))
             .map(result)
