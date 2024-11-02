@@ -6,7 +6,7 @@ use http::StatusCode;
 use http_serde;
 use tokio_util::codec::Decoder as _;
 use vrl::value::{kind::Collection, Kind};
-use warp::http::{HeaderMap, HeaderValue};
+use warp::http::HeaderMap;
 
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
@@ -26,11 +26,11 @@ use crate::{
         GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
         SourceOutput,
     },
-    event::{Event, Value},
+    event::Event,
     http::KeepaliveConfig,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
-        http::{add_query_parameters, HttpMethod},
+        http::{add_headers, add_query_parameters, HttpMethod},
         Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
     },
     tls::TlsEnableableConfig,
@@ -429,7 +429,7 @@ impl HttpSource for SimpleHttpSource {
         &self,
         events: &mut [Event],
         request_path: &str,
-        headers_config: &HeaderMap,
+        headers: &HeaderMap,
         query_parameters: &HashMap<String, String>,
         source_ip: Option<&SocketAddr>,
     ) {
@@ -445,50 +445,6 @@ impl HttpSource for SimpleHttpSource {
                         path!("path"),
                         request_path.to_owned(),
                     );
-
-                    for h in &self.headers {
-                        match h {
-                            // Add each non-wildcard containing header that was specified
-                            // in the `headers` config option to the event if an exact match
-                            // is found.
-                            HttpConfigParamKind::Exact(header_name) => {
-                                let value =
-                                    headers_config.get(header_name).map(HeaderValue::as_bytes);
-
-                                self.log_namespace.insert_source_metadata(
-                                    SimpleHttpConfig::NAME,
-                                    log,
-                                    Some(LegacyKey::InsertIfEmpty(path!(header_name))),
-                                    path!("headers", header_name),
-                                    Value::from(value.map(Bytes::copy_from_slice)),
-                                );
-                            }
-                            // Add all headers that match against wildcard pattens specified
-                            // in the `headers` config option to the event.
-                            HttpConfigParamKind::Glob(header_pattern) => {
-                                for header_name in headers_config.keys() {
-                                    if header_pattern.matches_with(
-                                        header_name.as_str(),
-                                        glob::MatchOptions::default(),
-                                    ) {
-                                        let value = headers_config
-                                            .get(header_name)
-                                            .map(HeaderValue::as_bytes);
-
-                                        self.log_namespace.insert_source_metadata(
-                                            SimpleHttpConfig::NAME,
-                                            log,
-                                            Some(LegacyKey::InsertIfEmpty(path!(
-                                                header_name.as_str()
-                                            ))),
-                                            path!("headers", header_name.as_str()),
-                                            Value::from(value.map(Bytes::copy_from_slice)),
-                                        );
-                                    }
-                                }
-                            }
-                        };
-                    }
 
                     self.log_namespace.insert_standard_vector_source_metadata(
                         log,
@@ -511,6 +467,14 @@ impl HttpSource for SimpleHttpSource {
                 }
             }
         }
+
+        add_headers(
+            events,
+            &self.headers,
+            headers,
+            self.log_namespace,
+            SimpleHttpConfig::NAME,
+        );
 
         add_query_parameters(
             events,
