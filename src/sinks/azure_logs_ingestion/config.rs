@@ -22,8 +22,9 @@ use super::{
 /// Max number of bytes in request body
 const MAX_BATCH_SIZE: usize = 30 * 1024 * 1024;
 
-// Log Ingestion API version
-// const API_VERSION: &str = "2023-01-01";
+pub(super) fn default_scope() -> String {
+    "https://monitor.azure.com/.default".into()
+}
 
 /// Configuration for the `azure_logs_ingestion` sink.
 #[configurable_component(sink(
@@ -50,6 +51,14 @@ pub struct AzureLogsIngestionConfig {
     /// [stream_name]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
     #[configurable(metadata(docs::examples = "Custom-MyTable"))]
     pub stream_name: String,
+
+    /// [Token scope][token_scope] for dedicated Azure regions.
+    ///
+    /// [token_scope]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
+    #[configurable(metadata(docs::examples = "https://monitor.azure.us/.default"))]
+    #[configurable(metadata(docs::examples = "https://monitor.azure.cn/.default"))]
+    #[serde(default = "default_scope")]
+    pub(super) token_scope: String,
 
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
@@ -81,6 +90,7 @@ impl Default for AzureLogsIngestionConfig {
             endpoint: Default::default(),
             dcr: Default::default(),
             stream_name: Default::default(),
+            token_scope: default_scope(),
             encoding: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -96,6 +106,7 @@ impl AzureLogsIngestionConfig {
         &self,
         cx: SinkContext,
         endpoint: UriSerde,
+        token_scope: String,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = endpoint.with_default_parts().uri;
         let protocol = get_http_scheme_from_uri(&endpoint).to_string();
@@ -117,6 +128,7 @@ impl AzureLogsIngestionConfig {
             client,
             endpoint,
             credential,
+            token_scope,
         )?;
         let healthcheck = service.healthcheck();
 
