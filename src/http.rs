@@ -198,7 +198,7 @@ impl OAuth2Extension {
                     return Some(token.clone());
                 }
 
-                return None;
+                None
             }
             _ => None,
         }
@@ -262,7 +262,7 @@ impl OAuth2Extension {
         })
     }
 
-    fn calculate_valid_until(now: Duration, grace_period: u32, token: &Token) -> u128 {
+    const fn calculate_valid_until(now: Duration, grace_period: u32, token: &Token) -> u128 {
         // 'expires_in' means, in seconds, for how long it will be valid, lets say 5min,
         // to not cause some random 4xx, because token expired in the meantime, we will make some
         // room for token refreshing, this room is a grace_period.
@@ -1317,10 +1317,10 @@ mod tests {
         // Each value (index) in vec, means invocation of get_now_fn by OAuth2Extension, so
         // first call returns Duration::from_secs(11), second, Duration::from_secs(12) and so on,
         // because of that we have full controll over time here.
-        let mocked_seconds_since_epoch = vec![11, 12, 20, 21, 22, 23];
+        let mocked_seconds_since_epoch = [11, 12, 20, 21, 22, 23];
         let counter = Arc::new(Mutex::new(0));
         let get_now_fn = move || {
-            let counter = counter.clone();
+            let counter = Arc::clone(&counter);
             let mut counter = counter.lock().unwrap();
             let i = *counter;
             *counter += 1;
