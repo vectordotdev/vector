@@ -150,7 +150,7 @@ impl AzureLogsIngestionService {
             }
 
             if res.status() == StatusCode::UNAUTHORIZED {
-                return Err("Azure returned 401 Unauthorised. Check that the token_scope matches the soverign cloud endpoint.".into());
+                return Err("Azure returned 401 Unauthorised. Check that the token_scope matches the sovereign cloud endpoint.".into());
             }
 
             if res.status() == StatusCode::FORBIDDEN {
