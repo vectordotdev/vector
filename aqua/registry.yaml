@@ -1,0 +1,22 @@
+packages:
+  - name: crates.io/wasm-pack
+    type: cargo
+    crate: wasm-pack
+  - name: crates.io/cargo-deb
+    type: cargo
+    crate: cargo-deb
+  - name: crates.io/cross
+    type: cargo
+    crate: cross
+  - name: crates.io/cargo-nextest
+    type: cargo
+    crate: cargo-nextest
+  - name: crates.io/cargo-deny
+    type: cargo
+    crate: cargo-deny
+  - name: crates.io/cargo-msrv
+    type: cargo
+    crate: cargo-msrv
+  - name: crates.io/dd-rust-license-tool
+    type: cargo
+    crate: dd-rust-license-tool

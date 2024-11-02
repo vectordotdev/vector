@@ -12,7 +12,7 @@ default-run = "vector"
 autobenches = false # our benchmarks are not runnable on their own either way
 # Minimum supported rust version
 # See docs/DEVELOPING.md for policy
-rust-version = "1.80"
+rust-version = "1.81"
 
 [[bin]]
 name = "vector"
@@ -265,7 +265,7 @@ async-graphql-warp = { version = "7.0.7", default-features = false, optional = t
 crossterm = { version = "0.28.1", default-features = false, features = ["event-stream", "windows"], optional = true }
 num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
-ratatui = { version = "0.27.0", optional = true, default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.28.1", optional = true, default-features = false, features = ["crossterm"] }
 
 # Opentelemetry
 
@@ -299,7 +299,7 @@ exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.34", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob.workspace = true
-governor = { version = "0.6.3", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
+governor = { version = "0.7.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.4.6", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
@@ -369,7 +369,7 @@ arr_macro = { version = "0.2.1" }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.9.9", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
+mlua = { version = "0.10.0", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7.0"
