@@ -53,13 +53,15 @@ impl DeviceSettings {
 #[derive(Debug, Snafu)]
 pub enum CefSerializerError {
     #[snafu(display(
-        r#"LogEvent field "{}" exceed {} characters limit: actual {}"#,
+        r#"LogEvent field "{}" with the value "{}" exceed {} characters limit: actual {}"#,
+        field_name,
         field,
         max_length,
         actual_length
     ))]
     ExceededLength {
         field: String,
+        field_name: String,
         max_length: usize,
         actual_length: usize,
     },
@@ -91,57 +93,41 @@ impl CefSerializerConfig {
 
     /// Build the `CefSerializer` from this configuration.
     pub fn build(&self) -> Result<CefSerializer, BuildError> {
-        let device_vendor = escape_header(self.cef.device_vendor.as_str());
-        if device_vendor.len() > DEVICE_VENDOR_MAX_LENGTH {
-            return ExceededLengthSnafu {
-                field: device_vendor.clone(),
-                max_length: DEVICE_VENDOR_MAX_LENGTH,
-                actual_length: device_vendor.len(),
+        let device_vendor = validate_length(
+            &self.cef.device_vendor,
+            "device_vendor",
+            DEVICE_VENDOR_MAX_LENGTH,
+        )?;
+        let device_product = validate_length(
+            &self.cef.device_product,
+            "device_product",
+            DEVICE_PRODUCT_MAX_LENGTH,
+        )?;
+        let device_version = validate_length(
+            &self.cef.device_version,
+            "device_version",
+            DEVICE_VERSION_MAX_LENGTH,
+        )?;
+        let device_event_class_id = validate_length(
+            &self.cef.device_event_class_id,
+            "device_event_class_id",
+            DEVICE_EVENT_CLASS_ID_MAX_LENGTH,
+        )?;
+
+        let invalid_keys: Vec<String> = self
+            .cef
+            .extensions
+            .keys()
+            .filter(|key| !key.chars().all(|c| c.is_ascii_alphabetic()))
+            .cloned()
+            .collect();
+
+        if !invalid_keys.is_empty() {
+            return ExtensionNonASCIIKeySnafu {
+                key: invalid_keys.join(", "),
             }
             .fail()
             .map_err(|e| e.to_string().into());
-        };
-
-        let device_product = escape_header(self.cef.device_product.as_str());
-        if device_product.len() > DEVICE_PRODUCT_MAX_LENGTH {
-            return ExceededLengthSnafu {
-                field: device_product.clone(),
-                max_length: DEVICE_PRODUCT_MAX_LENGTH,
-                actual_length: device_product.len(),
-            }
-            .fail()
-            .map_err(|e| e.to_string().into());
-        };
-
-        let device_version = escape_header(self.cef.device_version.as_str());
-        if device_version.len() > DEVICE_VERSION_MAX_LENGTH {
-            return ExceededLengthSnafu {
-                field: device_version.clone(),
-                max_length: DEVICE_VERSION_MAX_LENGTH,
-                actual_length: device_version.len(),
-            }
-            .fail()
-            .map_err(|e| e.to_string().into());
-        };
-
-        let device_event_class_id = escape_header(self.cef.device_event_class_id.as_str());
-        if device_event_class_id.len() > DEVICE_EVENT_CLASS_ID_MAX_LENGTH {
-            return ExceededLengthSnafu {
-                field: device_event_class_id.clone(),
-                max_length: DEVICE_EVENT_CLASS_ID_MAX_LENGTH,
-                actual_length: device_event_class_id.len(),
-            }
-            .fail()
-            .map_err(|e| e.to_string().into());
-        };
-
-        for key in self.cef.extensions.keys() {
-            if !key.chars().all(|c| c.is_ascii_alphabetic()) {
-                // TODO: Output all invalid keys
-                return ExtensionNonASCIIKeySnafu { key: key.clone() }
-                    .fail()
-                    .map_err(|e| e.to_string().into());
-            }
         }
 
         let device = DeviceSettings::new(
@@ -190,6 +176,12 @@ impl Version {
             Version::V0 => "0",
             Version::V1 => "1",
         }
+    }
+}
+
+impl std::fmt::Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -250,8 +242,9 @@ impl Default for CefSerializerOptions {
             device_product: String::from(DEFAULT_DEVICE_PRODUCT),
             device_version: String::from(DEFAULT_DEVICE_VERSION),
             device_event_class_id: String::from(DEFAULT_EVENT_CLASS_ID),
-            severity: ConfigTargetPath::try_from("cef.severity".to_string()).unwrap(),
-            name: ConfigTargetPath::try_from("cef.name".to_string()).unwrap(),
+            severity: ConfigTargetPath::try_from("cef.severity".to_string())
+                .expect("could not parse path"),
+            name: ConfigTargetPath::try_from("cef.name".to_string()).expect("could not parse path"),
             extensions: HashMap::new(),
         }
     }
@@ -312,16 +305,8 @@ impl Encoder<Event> for CefSerializer {
             }
         };
 
-        let name: String = escape_header(&get_log_event_value(&log, &self.name));
-        if name.len() > NAME_MAX_LENGTH {
-            return ExceededLengthSnafu {
-                field: name.clone(),
-                max_length: NAME_MAX_LENGTH,
-                actual_length: name.len(),
-            }
-            .fail()
-            .map_err(|e| e.to_string().into());
-        };
+        let name: String = get_log_event_value(&log, &self.name);
+        let name = validate_length(&name, "name", NAME_MAX_LENGTH)?;
 
         let mut formatted_extensions = Vec::with_capacity(self.extensions.len());
         for (extension, field) in &self.extensions {
@@ -335,7 +320,7 @@ impl Encoder<Event> for CefSerializer {
 
         buffer.write_fmt(format_args!(
             "CEF:{}|{}|{}|{}|{}|{}|{}",
-            &self.version.as_str(),
+            &self.version,
             &self.device.vendor,
             &self.device.product,
             &self.device.version,
@@ -370,14 +355,29 @@ fn get_log_event_value(log: &LogEvent, field: &ConfigTargetPath) -> String {
 }
 
 fn escape_header(s: &str) -> String {
-    let s = s.replace('\\', r#"\\"#);
-    let s = s.replace('|', r#"\|"#);
-    String::from_utf8_lossy(s.as_bytes()).to_string()
+    escape_special_chars(s, '|')
 }
 fn escape_extension(s: &str) -> String {
-    let s = s.replace('\\', r#"\\"#);
-    let s = s.replace('=', r#"\="#);
-    String::from_utf8_lossy(s.as_bytes()).to_string()
+    escape_special_chars(s, '=')
+}
+
+fn escape_special_chars(s: &str, extra_char: char) -> String {
+    s.replace('\\', r#"\\"#)
+        .replace(extra_char, &format!(r#"\{}"#, extra_char))
+}
+
+fn validate_length(field: &str, field_name: &str, max_length: usize) -> Result<String, BuildError> {
+    let escaped = escape_header(field);
+    if escaped.len() > max_length {
+        ExceededLengthSnafu {
+            field: escaped.clone(),
+            field_name,
+            max_length,
+            actual_length: escaped.len(),
+        }
+        .fail()?;
+    }
+    Ok(escaped)
 }
 
 #[cfg(test)]
@@ -385,6 +385,7 @@ mod tests {
     use bytes::BytesMut;
     use chrono::DateTime;
     use ordered_float::NotNan;
+    use std::iter;
     use vector_common::btreemap;
     use vector_core::event::{Event, LogEvent, Value};
 
@@ -405,6 +406,25 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "LogEvent extension keys can only contain ascii alphabetical characters: invalid key \"foo.test\""
+        );
+    }
+
+    #[test]
+    fn build_error_max_length() {
+        let extensions = HashMap::from([(
+            String::from("foo-test"),
+            ConfigTargetPath::try_from("foo".to_string()).unwrap(),
+        )]);
+        let opts: CefSerializerOptions = CefSerializerOptions {
+            device_vendor: iter::repeat("Repeat").take(11).collect(), // more than max length
+            extensions,
+            ..CefSerializerOptions::default()
+        };
+        let config = CefSerializerConfig::new(opts);
+        let err = config.build().unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "LogEvent field \"device_vendor\" with the value \"RepeatRepeatRepeatRepeatRepeatRepeatRepeatRepeatRepeatRepeatRepeat\" exceed 63 characters limit: actual 66"
         );
     }
 
