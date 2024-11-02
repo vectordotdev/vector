@@ -96,11 +96,11 @@ impl<'a> InternalEvent for GotHttpWarning<'a> {
 }
 
 #[derive(Debug)]
-pub struct AuthExtensionError<'a>  {
+pub struct AuthExtensionError<'a> {
     pub error: &'a Box<dyn std::error::Error + Send + Sync>,
 }
 
-impl<'a> InternalEvent for AuthExtensionError<'a>  {
+impl<'a> InternalEvent for AuthExtensionError<'a> {
     fn emit(self) {
         error!(
             message = "HTTP Auth extension error.",

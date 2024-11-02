@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 use async_trait::async_trait;
+use bytes::Buf;
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
@@ -18,9 +19,13 @@ use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use std::{
-    error::Error, fmt, net::SocketAddr, sync::{Arc, Mutex}, task::{Context, Poll}, time::{Duration, SystemTime, UNIX_EPOCH}
+    error::Error,
+    fmt,
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+    task::{Context, Poll},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use bytes::Buf;
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -28,8 +33,11 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
-use vector_lib::{configurable::configurable_component, tls::{TlsConfig, TlsSettings}};
 use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
+    configurable::configurable_component,
+    tls::{TlsConfig, TlsSettings},
+};
 
 use crate::{
     config::ProxyConfig,
@@ -78,8 +86,8 @@ pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future
 type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
 
 #[async_trait]
-trait AuthExtension<B>: Send + Sync 
-where 
+trait AuthExtension<B>: Send + Sync
+where
     B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
@@ -88,15 +96,14 @@ where
 }
 
 #[derive(Clone)]
-struct OAuth2Extension
-{
+struct OAuth2Extension {
     token_endpoint: String,
     client_id: String,
     client_secret: Option<SensitiveString>,
     grace_period: u32,
     client: Client<HttpProxyConnector, Body>,
     token: Arc<Mutex<Option<ExpirableToken>>>,
-    get_time_now_fn: Arc<dyn Fn() -> Duration + Send + Sync + 'static>
+    get_time_now_fn: Arc<dyn Fn() -> Duration + Send + Sync + 'static>,
 }
 
 #[derive(Clone)]
@@ -108,20 +115,29 @@ struct BasicAuthExtension {
 #[derive(Debug, Deserialize)]
 struct Token {
     access_token: String,
-    expires_in: u32 
+    expires_in: u32,
 }
 
 #[derive(Debug, Clone)]
 struct ExpirableToken {
     access_token: String,
-    expires_after_ms: u128
+    expires_after_ms: u128,
 }
 
-impl OAuth2Extension
-{
+impl OAuth2Extension {
     /// Creates a new `OAuth2Extension`.
-    fn new(token_endpoint: String, client_id: String, client_secret: Option<SensitiveString>, grace_period: u32, client: Client<HttpProxyConnector, Body>) -> OAuth2Extension {
-        let get_time_now_fn = || SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards");
+    fn new(
+        token_endpoint: String,
+        client_id: String,
+        client_secret: Option<SensitiveString>,
+        grace_period: u32,
+        client: Client<HttpProxyConnector, Body>,
+    ) -> OAuth2Extension {
+        let get_time_now_fn = || {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+        };
 
         OAuth2Extension::new_internal(
             token_endpoint,
@@ -129,13 +145,20 @@ impl OAuth2Extension
             client_secret,
             grace_period,
             client,
-            Arc::new(get_time_now_fn)
+            Arc::new(get_time_now_fn),
         )
     }
 
     /// Creates a new `OAuth2Extension` without default get_time_now_fn argument.
     /// This method should be used only in tests.
-    fn new_internal(token_endpoint: String, client_id: String, client_secret: Option<SensitiveString>, grace_period: u32, client: Client<HttpProxyConnector, Body>, get_time_now_fn: Arc<dyn Fn() -> Duration + Send + Sync + 'static>) -> OAuth2Extension {
+    fn new_internal(
+        token_endpoint: String,
+        client_id: String,
+        client_secret: Option<SensitiveString>,
+        grace_period: u32,
+        client: Client<HttpProxyConnector, Body>,
+        get_time_now_fn: Arc<dyn Fn() -> Duration + Send + Sync + 'static>,
+    ) -> OAuth2Extension {
         let initial_empty_token = Arc::new(Mutex::new(None));
 
         OAuth2Extension {
@@ -145,9 +168,9 @@ impl OAuth2Extension
             grace_period,
             client,
             token: initial_empty_token,
-            get_time_now_fn
+            get_time_now_fn,
         }
-    }    
+    }
 
     fn get_time_now(&self) -> Duration {
         (self.get_time_now_fn)()
@@ -160,7 +183,7 @@ impl OAuth2Extension
 
         //no valid token in cache (or no token at all)
         let new_token = self.request_token().await?;
-        let token_to_return = new_token.access_token.clone(); 
+        let token_to_return = new_token.access_token.clone();
         self.save_into_cache(new_token);
 
         Ok(token_to_return)
@@ -175,36 +198,43 @@ impl OAuth2Extension
                     return Some(token.clone());
                 }
 
-                return None
-            },
+                return None;
+            }
             _ => None,
         }
     }
 
     fn save_into_cache(&self, token: ExpirableToken) {
-        self.token.lock().expect("Poisoned token lock").replace(token);
+        self.token
+            .lock()
+            .expect("Poisoned token lock")
+            .replace(token);
     }
 
-    async fn request_token(&self) -> Result<ExpirableToken, Box<dyn std::error::Error + Send + Sync>> {
-        let mut request_body = format!("grant_type=client_credentials&client_id={}", self.client_id);
-        
+    async fn request_token(
+        &self,
+    ) -> Result<ExpirableToken, Box<dyn std::error::Error + Send + Sync>> {
+        let mut request_body =
+            format!("grant_type=client_credentials&client_id={}", self.client_id);
+
         // in case of oauth2 with mTLS (https://datatracker.ietf.org/doc/html/rfc8705) we only pass client_id,
         // so secret can be considered as optional.
         if let Some(client_secret) = &self.client_secret {
             let secret_param = format!("&client_secret={}", client_secret.inner());
             request_body.push_str(&secret_param);
         }
-        
+
         let builder = Request::post(self.token_endpoint.clone());
         let builder = builder.header("Content-Type", "application/x-www-form-urlencoded");
-        let request = builder.body(Body::from(request_body)).expect("Error creating request");
+        let request = builder
+            .body(Body::from(request_body))
+            .expect("Error creating request");
 
         let before = std::time::Instant::now();
         let response_result = self.client.request(request).await;
         let roundtrip = before.elapsed();
 
-        let response = response_result
-        .inspect_err(|error| {
+        let response = response_result.inspect_err(|error| {
             emit!(http_client::GotHttpWarning { error, roundtrip });
         })?;
 
@@ -216,20 +246,24 @@ impl OAuth2Extension
         if !response.status().is_success() {
             let body_bytes = hyper::body::aggregate(response).await?;
             let body_str = std::str::from_utf8(body_bytes.chunk())?.to_string();
-            return Err(Box::new(AcquireTokenError{message: body_str}));
+            return Err(Box::new(AcquireTokenError { message: body_str }));
         }
 
         let body = hyper::body::aggregate(response).await?;
         let token: Token = serde_json::from_reader(body.reader())?;
 
         let now = self.get_time_now();
-        let token_will_expire_after_ms = OAuth2Extension::calculate_valid_until(now, self.grace_period, &token);
+        let token_will_expire_after_ms =
+            OAuth2Extension::calculate_valid_until(now, self.grace_period, &token);
 
-        Ok(ExpirableToken{access_token:token.access_token, expires_after_ms: token_will_expire_after_ms})
+        Ok(ExpirableToken {
+            access_token: token.access_token,
+            expires_after_ms: token_will_expire_after_ms,
+        })
     }
 
     fn calculate_valid_until(now: Duration, grace_period: u32, token: &Token) -> u128 {
-        // 'expires_in' means, in seconds, for how long it will be valid, lets say 5min, 
+        // 'expires_in' means, in seconds, for how long it will be valid, lets say 5min,
         // to not cause some random 4xx, because token expired in the meantime, we will make some
         // room for token refreshing, this room is a grace_period.
         let (mut grace_period_seconds, overflow) = token.expires_in.overflowing_sub(grace_period);
@@ -239,9 +273,9 @@ impl OAuth2Extension
             grace_period_seconds = 0;
         }
 
-        // We are multiplying by 1000 because expires_in field is in seconds(oauth standard), grace_period also, 
-        // but later we operate on milliseconds. 
-        let token_is_valid_until_ms : u128 = grace_period_seconds as u128 * 1000;
+        // We are multiplying by 1000 because expires_in field is in seconds(oauth standard), grace_period also,
+        // but later we operate on milliseconds.
+        let token_is_valid_until_ms: u128 = grace_period_seconds as u128 * 1000;
         let now_millis = now.as_millis();
 
         now_millis + token_is_valid_until_ms
@@ -250,28 +284,33 @@ impl OAuth2Extension
 
 #[derive(Debug)]
 pub struct AcquireTokenError {
-    message: String
+    message: String,
 }
 
 impl fmt::Display for AcquireTokenError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Server error from authentication server: {}", self.message)
+        write!(
+            f,
+            "Server error from authentication server: {}",
+            self.message
+        )
     }
 }
 
 impl Error for AcquireTokenError {}
 
 #[async_trait]
-impl <B> AuthExtension<B> for OAuth2Extension
-where 
+impl<B> AuthExtension<B> for OAuth2Extension
+where
     B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), vector_lib::Error>
-    {
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), vector_lib::Error> {
         let token = self.get_token().await?;
-        let auth = Auth::Bearer{ token: SensitiveString::from(token)};
+        let auth = Auth::Bearer {
+            token: SensitiveString::from(token),
+        };
         auth.apply(req);
 
         Ok(())
@@ -279,18 +318,17 @@ where
 }
 
 #[async_trait]
-impl <B> AuthExtension<B> for BasicAuthExtension
-where 
+impl<B> AuthExtension<B> for BasicAuthExtension
+where
     B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), vector_lib::Error>
-    {
+    async fn modify_request(&self, req: &mut Request<B>) -> Result<(), vector_lib::Error> {
         let user = self.user.clone();
         let password = self.password.clone();
 
-        let auth = Auth::Basic{ user, password };
+        let auth = Auth::Basic { user, password };
         auth.apply(req);
 
         Ok(())
@@ -301,7 +339,7 @@ pub struct HttpClient<B = Body> {
     client: Client<HttpProxyConnector, B>,
     user_agent: HeaderValue,
     proxy_connector: HttpProxyConnector,
-    auth_extension: Option<Arc<dyn AuthExtension<B>>>
+    auth_extension: Option<Arc<dyn AuthExtension<B>>>,
 }
 
 impl<B> HttpClient<B>
@@ -320,9 +358,14 @@ where
     pub fn new_with_auth_extension(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
-        auth_config: Option<AuthorizationConfig>
+        auth_config: Option<AuthorizationConfig>,
     ) -> Result<HttpClient<B>, HttpError> {
-        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder(), auth_config)
+        HttpClient::new_with_custom_client(
+            tls_settings,
+            proxy_config,
+            &mut Client::builder(),
+            auth_config,
+        )
     }
 
     pub fn new_with_custom_client(
@@ -344,7 +387,7 @@ where
             client,
             user_agent,
             proxy_connector,
-            auth_extension
+            auth_extension,
         })
     }
 
@@ -364,12 +407,13 @@ where
         let fut = async move {
             if let Some(auth_extension) = auth_extension {
                 let auth_span = tracing::info_span!("auth_extension");
-                auth_extension.modify_request(&mut request)
+                auth_extension
+                    .modify_request(&mut request)
                     .instrument(auth_span.clone().or_current())
                     .await
                     .inspect_err(|error| {
                         // Emit the error into the internal events system.
-                        emit!(http_client::AuthExtensionError{error});
+                        emit!(http_client::AuthExtensionError { error });
                     })
                     .context(AuthenticationExtensionSnafu)?;
             }
@@ -420,11 +464,12 @@ where
     }
 }
 
-fn build_auth_extension<B>(authorization_config: Option<AuthorizationConfig>, 
+fn build_auth_extension<B>(
+    authorization_config: Option<AuthorizationConfig>,
     proxy_config: &ProxyConfig,
     client_builder: &mut client::Builder,
 ) -> Option<Arc<dyn AuthExtension<B>>>
-where 
+where
     B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
@@ -432,19 +477,31 @@ where
     if let Some(authorization_config) = authorization_config {
         match authorization_config.strategy {
             HttpClientAuthorizationStrategy::Basic { user, password } => {
-                let basic_auth_extension = BasicAuthExtension{user, password};
+                let basic_auth_extension = BasicAuthExtension { user, password };
                 return Some(Arc::new(basic_auth_extension));
-            },
-            HttpClientAuthorizationStrategy::OAuth2 { token_endpoint, client_id, client_secret, grace_period } => {
+            }
+            HttpClientAuthorizationStrategy::OAuth2 {
+                token_endpoint,
+                client_id,
+                client_secret,
+                grace_period,
+            } => {
                 let tls_for_auth = authorization_config.tls.clone();
                 let tls_for_auth: TlsSettings = TlsSettings::from_options(&tls_for_auth).unwrap();
 
-                let auth_proxy_connector = build_proxy_connector(tls_for_auth.into(), proxy_config).unwrap();
+                let auth_proxy_connector =
+                    build_proxy_connector(tls_for_auth.into(), proxy_config).unwrap();
                 let auth_client = client_builder.build(auth_proxy_connector.clone());
 
-                let oauth2_extension = OAuth2Extension::new(token_endpoint, client_id, client_secret, grace_period, auth_client);
+                let oauth2_extension = OAuth2Extension::new(
+                    token_endpoint,
+                    client_id,
+                    client_secret,
+                    grace_period,
+                    auth_client,
+                );
                 return Some(Arc::new(oauth2_extension));
-            },
+            }
         }
     }
 
@@ -531,7 +588,7 @@ impl<B> Clone for HttpClient<B> {
             client: self.client.clone(),
             user_agent: self.user_agent.clone(),
             proxy_connector: self.proxy_connector.clone(),
-            auth_extension: self.auth_extension.clone()
+            auth_extension: self.auth_extension.clone(),
         }
     }
 }
@@ -545,7 +602,7 @@ impl<B> fmt::Debug for HttpClient<B> {
     }
 }
 
-/// Configuration for HTTP client providing an authentication mechanism. 
+/// Configuration for HTTP client providing an authentication mechanism.
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug)]
@@ -591,9 +648,9 @@ pub enum HttpClientAuthorizationStrategy {
     /// This strategy allows to dynamically acquire and use token based on provided parameters.
     /// Both standard client_credentials and mTLS extension is supported, for standard client_credentials just provide both
     /// client_id and client_secret parameters:
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```yaml
     /// strategy:
     ///  strategy: "o_auth2"
@@ -603,9 +660,9 @@ pub enum HttpClientAuthorizationStrategy {
     /// ```
     /// In case you want to use mTLS extension [rfc8705](https://datatracker.ietf.org/doc/html/rfc8705), provide desired key and certificate,
     /// together with client_id (with no client_secret parameter).
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```yaml
     /// strategy:
     ///  strategy: "o_auth2"
@@ -627,9 +684,9 @@ pub enum HttpClientAuthorizationStrategy {
         /// The sensitive client secret.
         #[configurable(metadata(docs::examples = "client_secret"))]
         client_secret: Option<SensitiveString>,
-        
+
         /// The grace period configuration for a bearer token.
-        /// To avoid random authorization failures caused by expired token exception, 
+        /// To avoid random authorization failures caused by expired token exception,
         /// we will acquire new token, some time (grace period) before current token will be expired,
         /// because of that, we will always execute request with fresh enough token.
         #[serde(default = "default_oauth2_token_grace_period")]
@@ -1195,7 +1252,7 @@ mod tests {
         let response = client.send(req).await.unwrap();
         assert_eq!(response.headers().get("Connection"), None);
     }
-        
+
     #[tokio::test]
     async fn test_caching_of_tokens_in_oauth2extension_with_hyper_server() {
         let addr: SocketAddr = next_addr();
@@ -1203,7 +1260,7 @@ mod tests {
         // bearer token, where expires_in property is 5seconds.
         let make_svc = make_service_fn(move |_: &AddrStream| {
             let svc = ServiceBuilder::new()
-                .service(tower::service_fn(|req: Request<Body>| async move {     
+                .service(tower::service_fn(|req: Request<Body>| async move {
                     assert_eq!(
                         req.headers().get("Content-Type"),
                         Some(&HeaderValue::from_static("application/x-www-form-urlencoded")),
@@ -1238,10 +1295,11 @@ mod tests {
         });
 
         // Wait for the server to start.
-        tokio::time::sleep(Duration::from_millis(10)).await;        
-        
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
         // Simplest possible configuration for oauth's client connector.
-        let tls: vector_lib::tls::MaybeTls<(), TlsSettings> = MaybeTlsSettings::from_config(&None, false).unwrap();
+        let tls: vector_lib::tls::MaybeTls<(), TlsSettings> =
+            MaybeTlsSettings::from_config(&None, false).unwrap();
         let proxy_connector = build_proxy_connector(tls, &ProxyConfig::default()).unwrap();
         let auth_client = Client::builder().build(proxy_connector);
 
@@ -1252,7 +1310,7 @@ mod tests {
         // we will have each token cached for next 3seconds (after this time token will be treat as expired).
         let two_seconds_grace_period: u32 = 2;
 
-        // That can looks tricky for the first time, but idea is simple, we mock get_now_fn, 
+        // That can looks tricky for the first time, but idea is simple, we mock get_now_fn,
         // which is used internally by OAuth2Extension to decidy whether token is eligible for refreshing.
         // In real life Duration since epoch in seconds, can be for example 1730460289 (November 1, 2024),
         // but to simplify understanding we wil start with 11 seconds sicne epoch, and can progress.
@@ -1263,7 +1321,7 @@ mod tests {
         let counter = Arc::new(Mutex::new(0));
         let get_now_fn = move || {
             let counter = counter.clone();
-            let mut counter  = counter.lock().unwrap();
+            let mut counter = counter.lock().unwrap();
             let i = *counter;
             *counter += 1;
             Duration::from_secs(mocked_seconds_since_epoch[i])
@@ -1271,47 +1329,43 @@ mod tests {
 
         // Setup an OAuth2Extension and mocked time function
         let get_now_fn = Arc::new(get_now_fn);
-        let extension = OAuth2Extension::new_internal(token_endpoint, client_id, client_secret, two_seconds_grace_period, auth_client, get_now_fn);
-        
+        let extension = OAuth2Extension::new_internal(
+            token_endpoint,
+            client_id,
+            client_secret,
+            two_seconds_grace_period,
+            auth_client,
+            get_now_fn,
+        );
+
         // First token is acquired because cache is empty.
         let first_acquisition = extension.get_token().await.unwrap();
-        // Seconds will be taken from cache because first valid until (in ms) is 
-        // 14000ms = (11000ms + (5000ms - 2000ms)) 
+        // Seconds will be taken from cache because first valid until (in ms) is
+        // 14000ms = (11000ms + (5000ms - 2000ms))
         // where 5000ms because of token is valid 5seconds,
         // and grace period is 2seconds.
         let second_acquisition = extension.get_token().await.unwrap();
-        assert_eq!(
-            first_acquisition,
-            second_acquisition,
-        );
+        assert_eq!(first_acquisition, second_acquisition,);
 
         // This time 20000ms since epoch is after 14000ms (until token is valid)
         // so we expect new token acquired.
         let third_acquisition = extension.get_token().await.unwrap();
         let fourth_acquisition = extension.get_token().await.unwrap();
         // Ensure new token requested.
-        assert_ne!(
-            first_acquisition,
-            third_acquisition,
-        );
-        assert_eq!(
-            third_acquisition,
-            fourth_acquisition,
-        );
+        assert_ne!(first_acquisition, third_acquisition,);
+        assert_eq!(third_acquisition, fourth_acquisition,);
 
         // Becuase third token is valid until 24000ms all acquisitions should return from cache.
         let fifth_acquisition = extension.get_token().await.unwrap();
-        assert_eq!(
-            fourth_acquisition,
-            fifth_acquisition,
-        );
+        assert_eq!(fourth_acquisition, fifth_acquisition,);
     }
-     
+
     #[tokio::test]
     async fn test_oauth2extension_handle_errors_gently_with_hyper_server() {
-        let addr: SocketAddr = next_addr(); 
+        let addr: SocketAddr = next_addr();
         // Simplest possible configuration for oauth's client connector.
-        let tls: vector_lib::tls::MaybeTls<(), TlsSettings> = MaybeTlsSettings::from_config(&None, false).unwrap();
+        let tls: vector_lib::tls::MaybeTls<(), TlsSettings> =
+            MaybeTlsSettings::from_config(&None, false).unwrap();
         let proxy_connector = build_proxy_connector(tls, &ProxyConfig::default()).unwrap();
         let auth_client = Client::builder().build(proxy_connector);
 
@@ -1321,8 +1375,14 @@ mod tests {
         let two_seconds_grace_period: u32 = 2;
 
         // Setup an OAuth2Extension.
-        let extension = OAuth2Extension::new(token_endpoint, client_id, client_secret, two_seconds_grace_period, auth_client);
-        
+        let extension = OAuth2Extension::new(
+            token_endpoint,
+            client_id,
+            client_secret,
+            two_seconds_grace_period,
+            auth_client,
+        );
+
         // First token is acquired because cache is empty.
         let failed_acquisition = extension.get_token().await;
         assert!(failed_acquisition.is_err());
@@ -1330,8 +1390,8 @@ mod tests {
         assert!(err_msg.contains("Connection refused"));
 
         let make_svc = make_service_fn(move |_: &AddrStream| {
-            let svc = ServiceBuilder::new()
-                .service(tower::service_fn(|_req: Request<Body>| async move {     
+            let svc = ServiceBuilder::new().service(tower::service_fn(
+                |_req: Request<Body>| async move {
                     let not_a_valid_token = r#"
                     {
                         "definetly" : "not a vald response"
@@ -1339,16 +1399,17 @@ mod tests {
                     "#;
 
                     Ok::<Response<Body>, hyper::Error>(Response::new(Body::from(not_a_valid_token)))
-                }));
+                },
+            ));
             futures_util::future::ok::<_, Infallible>(svc)
         });
-        
+
         tokio::spawn(async move {
             Server::bind(&addr).serve(make_svc).await.unwrap();
         });
 
         // Wait for the server to start.
-        tokio::time::sleep(Duration::from_millis(10)).await;       
+        tokio::time::sleep(Duration::from_millis(10)).await;
 
         let failed_acquisition = extension.get_token().await;
         assert!(failed_acquisition.is_err());
@@ -1361,7 +1422,7 @@ mod tests {
         let oauth_addr: SocketAddr = next_addr();
         let oauth_make_svc = make_service_fn(move |_: &AddrStream| {
             let svc = ServiceBuilder::new()
-                .service(tower::service_fn(|req: Request<Body>| async move {     
+                .service(tower::service_fn(|req: Request<Body>| async move {
                     assert_eq!(
                         req.headers().get("Content-Type"),
                         Some(&HeaderValue::from_static("application/x-www-form-urlencoded")),
@@ -1393,8 +1454,8 @@ mod tests {
         // Server a Http client will request together with acquired bearer token.
         let addr: SocketAddr = next_addr();
         let make_svc = make_service_fn(move |_conn: &AddrStream| {
-            let svc = ServiceBuilder::new()
-                .service(tower::service_fn(|req: Request<Body>| async move {
+            let svc =
+                ServiceBuilder::new().service(tower::service_fn(|req: Request<Body>| async move {
                     assert_eq!(
                         req.headers().get("authorization"),
                         Some(&HeaderValue::from_static("Bearer some.jwt.token")),
@@ -1406,7 +1467,10 @@ mod tests {
         });
 
         tokio::spawn(async move {
-            Server::bind(&oauth_addr).serve(oauth_make_svc).await.unwrap();
+            Server::bind(&oauth_addr)
+                .serve(oauth_make_svc)
+                .await
+                .unwrap();
         });
 
         tokio::spawn(async move {
@@ -1414,32 +1478,34 @@ mod tests {
         });
 
         // Wait for the server to start.
-        tokio::time::sleep(Duration::from_millis(10)).await;        
-        
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
         // Http client to test
         let token_endpoint = format!("http://{}", oauth_addr);
         let client_id: String = String::from("some_client_secret");
         let client_secret = Some(SensitiveString::from(String::from("some_secret")));
         let grace_period = 5;
-        
+
         let oauth2_strategy = HttpClientAuthorizationStrategy::OAuth2 {
             token_endpoint,
             client_id,
             client_secret,
-            grace_period
+            grace_period,
         };
 
         let auth_config = AuthorizationConfig {
             strategy: oauth2_strategy,
-            tls: None
+            tls: None,
         };
 
-        let client = HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(auth_config)).unwrap();
+        let client =
+            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(auth_config))
+                .unwrap();
 
         let req = Request::get(format!("http://{}/", addr))
             .body(Body::empty())
             .unwrap();
-        
+
         let response = client.send(req).await.unwrap();
         assert!(response.status().is_success());
     }
@@ -1449,8 +1515,8 @@ mod tests {
         // Server a Http client will request together with acquired bearer token.
         let addr: SocketAddr = next_addr();
         let make_svc = make_service_fn(move |_conn: &AddrStream| {
-            let svc = ServiceBuilder::new()
-                .service(tower::service_fn(|req: Request<Body>| async move {
+            let svc =
+                ServiceBuilder::new().service(tower::service_fn(|req: Request<Body>| async move {
                     assert_eq!(
                         req.headers().get("authorization"),
                         Some(&HeaderValue::from_static("Basic dXNlcjpwYXNzd29yZA==")),
@@ -1466,28 +1532,27 @@ mod tests {
         });
 
         // Wait for the server to start.
-        tokio::time::sleep(Duration::from_millis(10)).await;        
-        
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
         // Http client to test
         let user = String::from("user");
         let password = SensitiveString::from(String::from("password"));
 
-        let basic_strategy = HttpClientAuthorizationStrategy::Basic {
-            user,
-            password
-        };
+        let basic_strategy = HttpClientAuthorizationStrategy::Basic { user, password };
 
         let auth_config = AuthorizationConfig {
             strategy: basic_strategy,
-            tls: None
+            tls: None,
         };
 
-        let client = HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(auth_config)).unwrap();
+        let client =
+            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(auth_config))
+                .unwrap();
 
         let req = Request::get(format!("http://{}/", addr))
             .body(Body::empty())
             .unwrap();
-        
+
         let response = client.send(req).await.unwrap();
         assert!(response.status().is_success());
     }

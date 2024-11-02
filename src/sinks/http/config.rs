@@ -8,10 +8,9 @@ use vector_lib::codecs::{
     CharacterDelimitedEncoder,
 };
 
-
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
-    http::{Auth, HttpClient, MaybeAuth, AuthorizationConfig},
+    http::{Auth, AuthorizationConfig, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
@@ -158,7 +157,11 @@ impl HttpSinkConfig {
     fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(&self.tls)?;
         let auth_strategy = self.authorization_config.clone();
-        Ok(HttpClient::new_with_auth_extension(tls, cx.proxy(), auth_strategy)?)
+        Ok(HttpClient::new_with_auth_extension(
+            tls,
+            cx.proxy(),
+            auth_strategy,
+        )?)
     }
 
     pub(super) fn build_encoder(&self) -> crate::Result<Encoder<Framer>> {
