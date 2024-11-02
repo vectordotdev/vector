@@ -1728,6 +1728,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "azure_identity"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f07bb0ee212021e75c3645e82d078e436b4b4184bde1295e9e81fcbcef923af"
+dependencies = [
+ "async-lock 3.4.0",
+ "async-trait",
+ "azure_core",
+ "futures 0.3.31",
+ "pin-project",
+ "serde",
+ "time",
+ "tracing 0.1.41",
+ "url",
+]
+
+[[package]]
 name = "azure_storage_blob"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2577,7 +2594,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -12531,6 +12548,7 @@ dependencies = [
  "aws-types",
  "axum 0.6.20",
  "azure_core",
+ "azure_identity",
  "azure_storage_blob",
  "base64 0.22.1",
  "bloomy",

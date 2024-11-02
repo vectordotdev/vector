@@ -212,6 +212,7 @@ jobs:
             aws_sqs sink
             axiom sink
             azure_blob sink
+            azure_logs_ingestion sink
             azure_monitor_logs sink
             blackhole sink
             clickhouse sink
