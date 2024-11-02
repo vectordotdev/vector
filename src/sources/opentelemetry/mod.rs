@@ -122,7 +122,7 @@ struct HttpConfig {
     ///
     /// Specifying "*" results in all headers included in the log event.
     ///
-    /// These override any values included in the JSON payload with conflicting names.
+    /// These headers are not included in the JSON payload if a field with a conflicting name exists.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "User-Agent"))]
     #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]

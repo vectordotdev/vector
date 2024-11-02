@@ -91,7 +91,7 @@ pub struct SimpleHttpConfig {
     ///
     /// Specifying "*" results in all headers included in the log event.
     ///
-    /// These override any values included in the JSON payload with conflicting names.
+    /// These headers are not included in the JSON payload if a field with a conflicting name exists.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "User-Agent"))]
     #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
@@ -1084,6 +1084,8 @@ mod tests {
             let mut headers = HeaderMap::new();
             headers.insert("User-Agent", "test_client".parse().unwrap());
             headers.insert("X-Case-Sensitive-Value", "CaseSensitive".parse().unwrap());
+            // Header that conflicts with an existing field.
+            headers.insert("key1", "value_from_header".parse().unwrap());
 
             let (rx, addr) = source(
                 vec!["*".to_string()],
@@ -1183,7 +1185,11 @@ mod tests {
             .await;
 
             spawn_ok_collect_n(
-                send_with_query(addr, "{\"key1\":\"value1\"}", "source=staging&region=gb"),
+                send_with_query(
+                    addr,
+                    "{\"key1\":\"value1\",\"key2\":\"value2\"}",
+                    "source=staging&region=gb&key1=value_from_query",
+                ),
                 rx,
                 1,
             )
@@ -1194,7 +1200,8 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log["key1"], "value1".into());
+            assert_eq!(log["key1"], "value_from_query".into());
+            assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
             assert_event_metadata(log).await;

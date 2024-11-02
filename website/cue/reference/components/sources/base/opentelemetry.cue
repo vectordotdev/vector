@@ -176,7 +176,7 @@ base: components: sources: opentelemetry: configuration: {
 
 						Specifying "*" results in all headers included in the log event.
 
-						These headers are not included in the JSON payload if field with conflicting names exists.
+						These headers are not included in the JSON payload if a field with a conflicting name exists.
 						"""
 					required: false
 					type: array: {
