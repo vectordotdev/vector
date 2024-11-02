@@ -15,7 +15,10 @@ use tracing::Instrument;
 
 use crate::{http::HttpClient, sinks::prelude::*};
 
-// JSON content type of logs
+/// Log Ingestion API version
+const API_VERSION: &str = "2023-01-01";
+
+/// JSON content type of logs
 const CONTENT_TYPE: &str = "application/json";
 
 static CONTENT_TYPE_VALUE: LazyLock<HeaderValue> =
@@ -84,16 +87,19 @@ impl AzureLogsIngestionService {
     pub fn new(
         client: HttpClient,
         endpoint: Uri,
+        dcr_immutable_id: String,
+        stream_name: String,
         credential: Arc<dyn TokenCredential>,
         token_scope: String,
     ) -> crate::Result<Self> {
-        // let mut parts = endpoint.into_parts();
-        // parts.path_and_query = Some(
-        //     format!("a9ee8e5b-ed0e-4980-9b9c-15e1f939db7f?api-version={API_VERSION}")
-        //         .parse()
-        //         .expect("query should never fail to parse"),
-        // );
-        // let endpoint = Uri::from_parts(parts)?;
+        let mut parts = endpoint.into_parts();
+        parts.path_and_query = Some(
+            // https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com/dataCollectionRules/dcr-000a00a000a00000a000000aa000a0aa/streams/Custom-MyTable?api-version=2023-01-01
+            format!("/dataCollectionRules/{dcr_immutable_id}/streams/{stream_name}?api-version={API_VERSION}")
+                .parse()
+                .expect("path and query should never fail to parse"),
+        );
+        let endpoint = Uri::from_parts(parts)?;
 
         let default_headers = {
             let mut headers = HeaderMap::new();
