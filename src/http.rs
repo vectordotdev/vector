@@ -222,23 +222,29 @@ impl OAuth2Extension
         let body = hyper::body::aggregate(response).await?;
         let token: Token = serde_json::from_reader(body.reader())?;
 
-        // expires_in means, in seconds, for how long it will be valid, lets say 5min, 
+        let now = self.get_time_now();
+        let token_will_expire_after_ms = OAuth2Extension::calculate_valid_until(now, self.grace_period, &token);
+
+        Ok(ExpirableToken{access_token:token.access_token, expires_after_ms: token_will_expire_after_ms})
+    }
+
+    fn calculate_valid_until(now: Duration, grace_period: u32, token: &Token) -> u128 {
+        // 'expires_in' means, in seconds, for how long it will be valid, lets say 5min, 
         // to not cause some random 4xx, because token expired in the meantime, we will make some
         // room for token refreshing, this room is a grace_period.
-        let (mut grace_period_seconds, overflow) = token.expires_in.overflowing_sub(self.grace_period);
+        let (mut grace_period_seconds, overflow) = token.expires_in.overflowing_sub(grace_period);
 
-        //if time for grace period exceed an expire_in, it basically means: always use new token.
+        // If time for grace period exceed an expire_in, it basically means: always use new token.
         if overflow {
             grace_period_seconds = 0;
         }
 
-        // we are multiplying by 1000 because expires_in field is in seconds(oauth standard), grace_period also, 
+        // We are multiplying by 1000 because expires_in field is in seconds(oauth standard), grace_period also, 
         // but later we operate on milliseconds. 
         let token_is_valid_until_ms : u128 = grace_period_seconds as u128 * 1000;
-        let now_millis = self.get_time_now().as_millis();
-        let token_will_expire_after_ms = now_millis + token_is_valid_until_ms;
+        let now_millis = now.as_millis();
 
-        Ok(ExpirableToken{access_token:token.access_token, expires_after_ms: token_will_expire_after_ms})
+        now_millis + token_is_valid_until_ms
     }
 }
 
@@ -1348,5 +1354,141 @@ mod tests {
         assert!(failed_acquisition.is_err());
         let err_msg = failed_acquisition.err().unwrap().to_string();
         assert!(err_msg.contains("missing field"));
+    }
+
+    #[tokio::test]
+    async fn test_oauth2_strategy_with_hyper_server() {
+        let oauth_addr: SocketAddr = next_addr();
+        let oauth_make_svc = make_service_fn(move |_: &AddrStream| {
+            let svc = ServiceBuilder::new()
+                .service(tower::service_fn(|req: Request<Body>| async move {     
+                    assert_eq!(
+                        req.headers().get("Content-Type"),
+                        Some(&HeaderValue::from_static("application/x-www-form-urlencoded")),
+                    );
+
+                    let body_bytes = hyper::body::to_bytes(req.into_body()).await.unwrap();
+                    let request_body = String::from_utf8(body_bytes.to_vec()).unwrap();
+
+                    assert_eq!(
+                        // Based on the (later) OAuth2Extension configuration.
+                        "grant_type=client_credentials&client_id=some_client_secret&client_secret=some_secret",
+                        request_body,
+                    );
+
+                    let token = r#"
+                    {
+                        "access_token": "some.jwt.token",
+                        "token_type": "bearer",
+                        "expires_in": 60,
+                        "scope": "some-scope"
+                    }
+                    "#;
+
+                    Ok::<Response<Body>, hyper::Error>(Response::new(Body::from(token)))
+                }));
+            futures_util::future::ok::<_, Infallible>(svc)
+        });
+
+        // Server a Http client will request together with acquired bearer token.
+        let addr: SocketAddr = next_addr();
+        let make_svc = make_service_fn(move |_conn: &AddrStream| {
+            let svc = ServiceBuilder::new()
+                .service(tower::service_fn(|req: Request<Body>| async move {
+                    assert_eq!(
+                        req.headers().get("authorization"),
+                        Some(&HeaderValue::from_static("Bearer some.jwt.token")),
+                    );
+
+                    Ok::<Response<Body>, hyper::Error>(Response::new(Body::empty()))
+                }));
+            futures_util::future::ok::<_, Infallible>(svc)
+        });
+
+        tokio::spawn(async move {
+            Server::bind(&oauth_addr).serve(oauth_make_svc).await.unwrap();
+        });
+
+        tokio::spawn(async move {
+            Server::bind(&addr).serve(make_svc).await.unwrap();
+        });
+
+        // Wait for the server to start.
+        tokio::time::sleep(Duration::from_millis(10)).await;        
+        
+        // Http client to test
+        let token_endpoint = format!("http://{}", oauth_addr);
+        let client_id: String = String::from("some_client_secret");
+        let client_secret = Some(SensitiveString::from(String::from("some_secret")));
+        let grace_period = 5;
+        
+        let oauth2_strategy = HttpClientAuthorizationStrategy::OAuth2 {
+            token_endpoint,
+            client_id,
+            client_secret,
+            grace_period
+        };
+
+        let auth_config = AuthorizationConfig {
+            strategy: oauth2_strategy,
+            tls: None
+        };
+
+        let client = HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(auth_config)).unwrap();
+
+        let req = Request::get(format!("http://{}/", addr))
+            .body(Body::empty())
+            .unwrap();
+        
+        let response = client.send(req).await.unwrap();
+        assert!(response.status().is_success());
+    }
+
+    #[tokio::test]
+    async fn test_basic_auth_strategy_with_hyper_server() {
+        // Server a Http client will request together with acquired bearer token.
+        let addr: SocketAddr = next_addr();
+        let make_svc = make_service_fn(move |_conn: &AddrStream| {
+            let svc = ServiceBuilder::new()
+                .service(tower::service_fn(|req: Request<Body>| async move {
+                    assert_eq!(
+                        req.headers().get("authorization"),
+                        Some(&HeaderValue::from_static("Basic dXNlcjpwYXNzd29yZA==")),
+                    );
+
+                    Ok::<Response<Body>, hyper::Error>(Response::new(Body::empty()))
+                }));
+            futures_util::future::ok::<_, Infallible>(svc)
+        });
+
+        tokio::spawn(async move {
+            Server::bind(&addr).serve(make_svc).await.unwrap();
+        });
+
+        // Wait for the server to start.
+        tokio::time::sleep(Duration::from_millis(10)).await;        
+        
+        // Http client to test
+        let user = String::from("user");
+        let password = SensitiveString::from(String::from("password"));
+
+        let basic_strategy = HttpClientAuthorizationStrategy::Basic {
+            user,
+            password
+        };
+
+        let auth_config = AuthorizationConfig {
+            strategy: basic_strategy,
+            tls: None
+        };
+
+        let client = HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(auth_config)).unwrap();
+
+        let req = Request::get(format!("http://{}/", addr))
+            .body(Body::empty())
+            .unwrap();
+        
+        let response = client.send(req).await.unwrap();
+        assert!(response.status().is_success());
     }
 }
