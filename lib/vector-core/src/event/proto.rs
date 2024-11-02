@@ -618,7 +618,7 @@ impl From<OutputId> for crate::config::OutputId {
 
 impl From<EventMetadata> for Metadata {
     fn from(value: EventMetadata) -> Self {
-        let EventMetadata {
+        let super::metadata::Inner {
             value,
             secrets,
             source_id,
@@ -627,13 +627,9 @@ impl From<EventMetadata> for Metadata {
             datadog_origin_metadata,
             source_event_id,
             ..
-        } = value;
+        } = value.into_owned();
 
-        let secrets = if secrets.is_empty() {
-            None
-        } else {
-            Some(secrets.into())
-        };
+        let secrets = (!secrets.is_empty()).then(|| secrets.into());
 
         Self {
             value: Some(encode_value(value)),

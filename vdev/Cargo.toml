@@ -8,11 +8,11 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-anyhow = "1.0.89"
+anyhow = "1.0.91"
 chrono.workspace = true
 clap.workspace = true
 clap-verbosity-flag = "2.2.2"
-clap_complete = "4.5.33"
+clap_complete = "4.5.36"
 confy = "0.6.1"
 directories = "5.0.1"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
@@ -27,7 +27,7 @@ os_info = { version = "3.8.2", default-features = false }
 # watch https://github.com/epage/anstyle for official interop with Clap
 owo-colors = { version = "4.1.0", features = ["supports-colors"] }
 paste = "1.0.15"
-regex = { version = "1.11.0", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 serde.workspace = true
 serde_json.workspace = true
