@@ -75,6 +75,7 @@ pub struct AzureLogsIngestionService {
     client: HttpClient,
     endpoint: Uri,
     credential: Arc<dyn TokenCredential>,
+    token_scope: String,
     default_headers: HeaderMap,
 }
 
@@ -84,6 +85,7 @@ impl AzureLogsIngestionService {
         client: HttpClient,
         endpoint: Uri,
         credential: Arc<dyn TokenCredential>,
+        token_scope: String,
     ) -> crate::Result<Self> {
         // let mut parts = endpoint.into_parts();
         // parts.path_and_query = Some(
@@ -104,6 +106,7 @@ impl AzureLogsIngestionService {
             client,
             endpoint,
             credential,
+            token_scope,
             default_headers,
         })
     }
@@ -113,7 +116,7 @@ impl AzureLogsIngestionService {
 
         // TODO: make this an option, for soverign clouds
         let access_token = executor::block_on(self.credential
-            .get_token(&["https://monitor.azure.com/.default"]))
+            .get_token(&[&self.token_scope]))
             .expect("failed to get access token from credential");
         
         let bearer = format!("Bearer {}", access_token.token.secret());
