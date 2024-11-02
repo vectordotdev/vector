@@ -40,11 +40,11 @@ pub struct AzureLogsIngestionConfig {
     #[configurable(metadata(docs::examples = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"))]
     pub endpoint: String,
 
-    /// The [Data collection rule][dcr] for the Data collection endpoint.
+    /// The [Data collection rule immutable ID][dcr_immutable_id] for the Data collection endpoint.
     ///
-    /// [dcr]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
+    /// [dcr_immutable_id]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
     #[configurable(metadata(docs::examples = "dcr-000a00a000a00000a000000aa000a0aa"))]
-    pub dcr: String,
+    pub dcr_immutable_id: String,
 
     /// The [Stream name][stream_name] for the Data collection rule.
     ///
@@ -88,7 +88,7 @@ impl Default for AzureLogsIngestionConfig {
     fn default() -> Self {
         Self {
             endpoint: Default::default(),
-            dcr: Default::default(),
+            dcr_immutable_id: Default::default(),
             stream_name: Default::default(),
             token_scope: default_scope(),
             encoding: Default::default(),
@@ -106,6 +106,8 @@ impl AzureLogsIngestionConfig {
         &self,
         cx: SinkContext,
         endpoint: UriSerde,
+        dcr_immutable_id: String,
+        stream_name: String,
         token_scope: String,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = endpoint.with_default_parts().uri;
@@ -127,6 +129,8 @@ impl AzureLogsIngestionConfig {
         let service = AzureLogsIngestionService::new(
             client,
             endpoint,
+            dcr_immutable_id,
+            stream_name,
             credential,
             token_scope,
         )?;
@@ -156,10 +160,15 @@ impl_generate_config_from_default!(AzureLogsIngestionConfig);
 #[typetag::serde(name = "azure_logs_ingestion")]
 impl SinkConfig for AzureLogsIngestionConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com/dataCollectionRules/dcr-000a00a000a00000a000000aa000a0aa/streams/Custom-MyTable?api-version=2023-01-01
-        // let endpoint = format!("{}/dataCollectionRules/{}/streams/{}", self.endpoint, self.dcr, self.stream_name).parse()?;
-        let endpoint = self.endpoint.parse()?;
-        self.build_inner(cx, endpoint).await
+
+        let endpoint: UriSerde = self.endpoint.parse()?;
+        self.build_inner(
+            cx,
+            endpoint,
+            self.dcr_immutable_id.clone(),
+            self.stream_name.clone(),
+            self.token_scope.clone(),
+        ).await
     }
 
     fn input(&self) -> Input {
