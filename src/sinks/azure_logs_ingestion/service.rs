@@ -137,21 +137,26 @@ impl AzureLogsIngestionService {
             let res = client.call(request).in_current_span().await?;
 
             if res.status().is_server_error() {
-                return Err("Server returned a server error".into());
+                return Err("Azure returned a server error".into());
+            }
+
+            if res.status() == StatusCode::UNAUTHORIZED {
+                return Err("Azure returned 401 Unauthorised. Check that the token_scope matches the soverign cloud endpoint.".into());
             }
 
             if res.status() == StatusCode::FORBIDDEN {
-                return Err("The service failed to authenticate the request. Verify that the workspace ID and connection key are valid".into());
+                return Err("Azure returned 403 Forbidden. Verify that the credential has the Monitoring Metrics Publisher role on the Data Collection Rule.".into());
             }
 
             if res.status() == StatusCode::NOT_FOUND {
-                return Err(
-                    "Either the URL provided is incorrect, or the request is too large".into(),
-                );
+                return Err("Azure returned 404 Not Found. Either the URL provided is incorrect, or the request is too large".into());
             }
 
             if res.status() == StatusCode::BAD_REQUEST {
-                return Err("The workspace has been closed or the request was invalid".into());
+                let body_bytes: Bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+                let body_string: String = String::from_utf8(body_bytes.to_vec()).unwrap();
+                let err_string: String = format!("Azure returned 400 Bad Request: {body_string}");
+                return Err(err_string.into());
             }
 
             Ok(())
@@ -176,12 +181,8 @@ impl Service<AzureLogsIngestionRequest> for AzureLogsIngestionService {
         Box::pin(async move {
             let http_request = http_request?;
             let response = client.call(http_request).in_current_span().await?;
-            let response_status = response.status();
-            // let body_bytes: Bytes = hyper::body::to_bytes(response.into_body()).await.unwrap();
-            // let body_string: String = String::from_utf8(body_bytes.to_vec()).unwrap();
-            // println!("response: {}", body_string);
             Ok(AzureLogsIngestionResponse {
-                http_status: response_status,
+                http_status: response.status(),
                 raw_byte_size: request.metadata.request_encoded_size(),
                 events_byte_size: request
                     .metadata
