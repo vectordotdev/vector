@@ -1556,4 +1556,35 @@ mod tests {
         let response = client.send(req).await.unwrap();
         assert!(response.status().is_success());
     }
+
+    #[tokio::test]
+    async fn test_grace_period_calculation() {
+        let now = Duration::from_secs(100);
+        let grace_period_seconds = 5;
+        let fake_token = Token {
+            access_token: String::from("some-jwt"),
+            expires_in: 20,
+        };
+
+        let expires_after_ms =
+            OAuth2Extension::calculate_valid_until(now, grace_period_seconds, &fake_token);
+
+        assert_eq!(115000, expires_after_ms);
+    }
+
+    #[tokio::test]
+    async fn test_grace_period_calculation_with_overflow() {
+        let now = Duration::from_secs(100);
+        let grace_period_seconds = 30;
+        let fake_token = Token {
+            access_token: String::from("some-jwt"),
+            expires_in: 20,
+        };
+
+        let expires_after_ms =
+            OAuth2Extension::calculate_valid_until(now, grace_period_seconds, &fake_token);
+
+        // When overflow, we expect grace_period be 0 (so, now + grace = now)
+        assert_eq!(100000, expires_after_ms);
+    }
 }
