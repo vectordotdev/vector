@@ -635,7 +635,7 @@ components: sinks: [Name=string]: {
 
 				retry_policy: {
 					title: "Retry policy"
-					body: """
+					body: *"""
 						Vector will retry failed requests (status in [408, 429], >= 500, and != 501).
 						Other responses will not be retried. You can control the number of
 						retry attempts and backoff rate with the `request.retry_attempts` and
