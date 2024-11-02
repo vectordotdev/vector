@@ -10,7 +10,6 @@ use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_lib::config::LegacyKey;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
 };
@@ -22,21 +21,17 @@ use vector_lib::tls::MaybeTlsIncomingStream;
 use vector_lib::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus},
-    lookup::path,
     EstimatedJsonEncodedSizeOf,
 };
 use warp::{
-    filters::BoxedFilter,
-    http::{HeaderMap, HeaderValue},
-    reject::Rejection,
-    reply::Response,
-    Filter, Reply,
+    filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response, Filter, Reply,
 };
 
 use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
-use crate::sources::http_server::{HttpConfigParamKind, SimpleHttpConfig};
+use crate::sources::http_server::HttpConfigParamKind;
+use crate::sources::util::add_headers;
 use crate::{
-    event::{Event, Value},
+    event::Event,
     http::build_http_trace_layer,
     internal_events::{EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -45,6 +40,7 @@ use crate::{
     SourceSender,
 };
 
+use super::OpentelemetryConfig;
 use super::{reply::protobuf, status::Status};
 
 #[derive(Clone, Copy, Debug, Snafu)]
@@ -116,58 +112,17 @@ pub(crate) fn build_warp_filter(
 
 fn enrich_events(
     events: &mut [Event],
-    headers: &Vec<HttpConfigParamKind>,
-    headers_config: &HeaderMap,
+    headers_config: &[HttpConfigParamKind],
+    headers: &HeaderMap,
     log_namespace: LogNamespace,
 ) {
-    for event in events.iter_mut() {
-        match event {
-            Event::Log(log) => {
-                for h in headers {
-                    match h {
-                        // Add each non-wildcard containing header that was specified
-                        // in the `headers` config option to the event if an exact match
-                        // is found.
-                        HttpConfigParamKind::Exact(header_name) => {
-                            let value = headers_config.get(header_name).map(HeaderValue::as_bytes);
-
-                            log_namespace.insert_source_metadata(
-                                SimpleHttpConfig::NAME,
-                                log,
-                                Some(LegacyKey::InsertIfEmpty(path!(header_name))),
-                                path!("headers", header_name),
-                                Value::from(value.map(Bytes::copy_from_slice)),
-                            );
-                        }
-                        // Add all headers that match against wildcard pattens specified
-                        // in the `headers` config option to the event.
-                        HttpConfigParamKind::Glob(header_pattern) => {
-                            for header_name in headers_config.keys() {
-                                if header_pattern.matches_with(
-                                    header_name.as_str(),
-                                    glob::MatchOptions::default(),
-                                ) {
-                                    let value =
-                                        headers_config.get(header_name).map(HeaderValue::as_bytes);
-
-                                    log_namespace.insert_source_metadata(
-                                        SimpleHttpConfig::NAME,
-                                        log,
-                                        Some(LegacyKey::InsertIfEmpty(path!(header_name.as_str()))),
-                                        path!("headers", header_name.as_str()),
-                                        Value::from(value.map(Bytes::copy_from_slice)),
-                                    );
-                                }
-                            }
-                        }
-                    };
-                }
-            }
-            _ => {
-                continue;
-            }
-        }
-    }
+    add_headers(
+        events,
+        headers_config,
+        headers,
+        log_namespace,
+        OpentelemetryConfig::NAME,
+    );
 }
 
 fn build_warp_log_filter(

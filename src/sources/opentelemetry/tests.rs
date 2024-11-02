@@ -3,6 +3,7 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 use futures::Stream;
 use futures_util::StreamExt;
+use prost::Message;
 use similar_asserts::assert_eq;
 use tonic::Request;
 use vector_lib::config::LogNamespace;
@@ -14,6 +15,7 @@ use vector_lib::opentelemetry::proto::{
     resource::v1::Resource as OtelResource,
 };
 use vrl::value;
+use warp::http::HeaderMap;
 
 use crate::config::OutputId;
 use crate::{
@@ -322,6 +324,113 @@ async fn receive_grpc_logs_legacy_namespace() {
             ("severity_text", "info".into()),
             ("flags", 4.into()),
             ("dropped_attributes_count", 3.into()),
+            ("timestamp", Utc.timestamp_nanos(1).into()),
+            ("observed_timestamp", Utc.timestamp_nanos(2).into()),
+            ("source_type", "opentelemetry".into()),
+        ]);
+        let mut expect_event = Event::from(LogEvent::from(expect_vec));
+        expect_event.set_upstream_id(Arc::new(OutputId {
+            component: "test".into(),
+            port: Some("logs".into()),
+        }));
+        assert_eq!(actual_event, expect_event);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn http_headers() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let grpc_addr = next_addr();
+        let http_addr = next_addr();
+
+        let mut headers = HeaderMap::new();
+        headers.insert("User-Agent", "test_client".parse().unwrap());
+        headers.insert("Upgrade-Insecure-Requests", "false".parse().unwrap());
+        headers.insert("X-Test-Header", "true".parse().unwrap());
+
+        let source = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: grpc_addr,
+                tls: Default::default(),
+            },
+            http: HttpConfig {
+                address: http_addr,
+                tls: Default::default(),
+                keepalive: Default::default(),
+                headers: vec![
+                    "User-Agent".to_string(),
+                    "X-*".to_string(),
+                    "AbsentHeader".to_string(),
+                ],
+            },
+            acknowledgements: Default::default(),
+            log_namespace: Default::default(),
+        };
+        let schema_definitions = source
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
+
+        let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
+        let server = source
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(http_addr).await;
+
+        let client = reqwest::Client::new();
+        let req = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                resource: None,
+                scope_logs: vec![ScopeLogs {
+                    scope: None,
+                    log_records: vec![LogRecord {
+                        time_unix_nano: 1,
+                        observed_time_unix_nano: 2,
+                        severity_number: 9,
+                        severity_text: "info".into(),
+                        body: Some(AnyValue {
+                            value: Some(any_value::Value::StringValue("log body".into())),
+                        }),
+                        attributes: vec![],
+                        dropped_attributes_count: 0,
+                        flags: 4,
+                        // opentelemetry sdk will hex::decode the given trace_id and span_id
+                        trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
+                        span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
+                    }],
+                    schema_url: "v1".into(),
+                }],
+                schema_url: "v1".into(),
+            }],
+        };
+        let _res = client
+            .post(format!("http://{}/v1/logs", http_addr))
+            .header("Content-Type", "application/x-protobuf")
+            .header("User-Agent", "Test")
+            .body(req.encode_to_vec())
+            .send()
+            .await
+            .expect("Failed to send log to Opentelemetry Collector.");
+
+        let mut output = test_util::collect_ready(logs_output).await;
+        assert_eq!(output.len(), 1);
+        let actual_event = output.pop().unwrap();
+        schema_definitions
+            .unwrap()
+            .assert_valid_for_event(&actual_event);
+        let expect_vec = vec_into_btmap(vec![
+            ("AbsentHeader", Value::Null),
+            ("User-Agent", "Test".into()),
+            ("message", "log body".into()),
+            ("trace_id", "4ac52aadf321c2e531db005df08792f5".into()),
+            ("span_id", "0b9e4bda2a55530d".into()),
+            ("severity_number", 9.into()),
+            ("severity_text", "info".into()),
+            ("flags", 4.into()),
+            ("dropped_attributes_count", 0.into()),
             ("timestamp", Utc.timestamp_nanos(1).into()),
             ("observed_timestamp", Utc.timestamp_nanos(2).into()),
             ("source_type", "opentelemetry".into()),
