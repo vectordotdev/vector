@@ -45,12 +45,12 @@ Filename rules:
 
 #### Fragment types
 
-- breaking: A change that is incompatible with prior versions which requires users to make adjustments.
-- security: A change that is has implications for security.
-- deprecation: A change that is introducing a deprecation.
-- feature: A change that is introducing a new feature.
-- enhancement: A change that is enhancing existing functionality in a user perceivable way.
-- fix: A change that is fixing a bug.
+- `breaking`: A change that is incompatible with prior versions which requires users to make adjustments.
+- `security`: A change that is has implications for security.
+- `deprecation`: A change that is introducing a deprecation.
+- `feature`: A change that is introducing a new feature.
+- `enhancement`: A change that is enhancing existing functionality in a user perceivable way.
+- `fix`: A change that is fixing a bug.
 
 #### Fragment contents
 

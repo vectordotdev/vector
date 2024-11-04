@@ -597,8 +597,8 @@ mod tests {
 
     #[test]
     fn test_influxdb_settings_missing() {
-        let config = r#"
-    "#;
+        let config = r"
+    ";
         let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
