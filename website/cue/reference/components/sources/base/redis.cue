@@ -300,26 +300,14 @@ base: components: sources: redis: configuration: {
 				relevant_when: "method = \"chunked_gelf\""
 				required:      false
 				type: object: options: {
-					max_chunk_length: {
-						description: """
-																The maximum length of a single GELF chunk, in bytes. Chunks longer than this length will
-																be dropped. If this option is not set, the decoder does not limit the length of chunks and
-																the per-chunk memory is unbounded.
-
-																This limit takes only into account the chunk's payload and the GELF header bytes are excluded from the calculation.
-																"""
-						required: false
-						type: uint: {}
-					}
-					max_message_length: {
+					max_length: {
 						description: """
 																The maximum length of a single GELF message, in bytes. Messages longer than this length will
 																be dropped. If this option is not set, the decoder does not limit the length of messages and
 																the per-message memory is unbounded.
 
 																Note that a message can be composed of multiple chunks and this limit is applied to the whole
-																message, not to individual chunks. This length should always be greater than the `max_chunk_length`.
-																This option is useful to limit the memory usage of the decoders's chunk buffer.
+																message, not to individual chunks.
 
 																This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.
 																The message's payload is the concatenation of all the chunks' payloads.
