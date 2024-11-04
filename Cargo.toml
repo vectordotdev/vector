@@ -144,7 +144,7 @@ metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 pin-project = { version = "1.1.7", default-features = false }
 proptest = { version = "1.5" }
-proptest-derive = { version = "0.4.0" }
+proptest-derive = { version = "0.5.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
