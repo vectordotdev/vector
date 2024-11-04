@@ -23,7 +23,7 @@ aliases: [ "/mailing_list" ]
 
 ### Support
 
-For questions and support please use [GitHub Discussions][discussion].
+For questions and support, please use [GitHub Discussions][discussion].
 
 ### How do I contribute to Vector?
 
