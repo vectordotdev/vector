@@ -17,6 +17,7 @@ cfg_if! {
         /// # Panics
         ///
         /// If deny is set, will panic if telemetry has already been set.
+        /// Also, panics if the lock is poisoned.
         pub fn init_telemetry(telemetry: Telemetry, deny_if_set: bool) {
             TELEMETRY.with(|tl| {
                 let mut tl = tl.lock().expect("telemetry lock poisoned");
@@ -25,6 +26,11 @@ cfg_if! {
             });
         }
 
+        /// Test implementation.
+        ///
+        /// # Panics
+        ///
+        /// If the lock is poisoned.
          pub fn telemetry() -> Telemetry {
             TELEMETRY.with(|tl| {
                let mut tl = tl.lock().expect("telemetry lock poisoned");
