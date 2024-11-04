@@ -359,7 +359,7 @@ toml.workspace = true
 tonic = { workspace = true, optional = true }
 hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.18", default-features = false }
-url = { version = "2.5.2", default-features = false, features = ["serde"] }
+url = { version = "2.5.3", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }
 zstd = { version = "0.13.0", default-features = false }
 arr_macro = { version = "0.2.1" }
