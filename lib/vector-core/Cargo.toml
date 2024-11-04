@@ -70,6 +70,7 @@ vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vector-config-macros = { path = "../vector-config-macros" }
 vrl.workspace = true
+cfg-if.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "2.10.0"

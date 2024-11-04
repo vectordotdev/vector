@@ -133,6 +133,7 @@ members = [
 ]
 
 [workspace.dependencies]
+cfg-if = { version = "1.0.0", default-features = false }
 chrono = { version = "0.4.38", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.0", default-features = false, features = ["serde"] }
 clap = { version = "4.5.20", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
