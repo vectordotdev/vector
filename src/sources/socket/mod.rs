@@ -9,7 +9,6 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use vrl::value::{kind::Collection, Kind};
 
-#[cfg(unix)]
 use crate::{
     codecs::DecodingConfig,
     config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
