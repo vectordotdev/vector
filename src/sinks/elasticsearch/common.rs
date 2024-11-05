@@ -149,7 +149,7 @@ impl ElasticsearchCommon {
         let version = if let Some(version) = *version {
             version
         } else if service_type == OpenSearchServiceType::Serverless {
-            // Amazon OpenSearch Serverless does not support cluster-version API
+            // Amazon OpenSearch Serverless does not support the cluster-version API
             8
         } else {
             let ver = match config.api_version {

@@ -556,7 +556,7 @@ base: components: sinks: elasticsearch: configuration: {
 		type: string: {
 			default: "managed"
 			enum: {
-				managed:    "Elasticsearch or Opensearch Managed cluster"
+				managed:    "Elasticsearch or Opensearch Managed domain"
 				serverless: "OpenSearch Serverless collection"
 			}
 		}
