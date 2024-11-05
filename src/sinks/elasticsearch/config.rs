@@ -46,7 +46,7 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub enum OpenSearchServiceType {
-    /// Elasticsearch or Opensearch Managed domain
+    /// Elasticsearch or OpenSearch Managed domain
     Managed,
     /// OpenSearch Serverless collection
     Serverless,
