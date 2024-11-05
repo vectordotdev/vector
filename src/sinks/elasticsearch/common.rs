@@ -16,7 +16,7 @@ use crate::{
     http::{HttpClient, MaybeAuth},
     sinks::{
         elasticsearch::{
-            ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig, ParseError, OpenSearchClusterType,
+            ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig, ParseError, OpenSearchServiceType,
         },
         util::auth::Auth,
         util::{http::RequestConfig, UriSerde},
@@ -31,7 +31,7 @@ pub struct ElasticsearchCommon {
     pub base_url: String,
     pub bulk_uri: Uri,
     pub auth: Option<Auth>,
-    pub cluster_type: OpenSearchClusterType,
+    pub service_type: OpenSearchServiceType,
     pub mode: ElasticsearchCommonMode,
     pub request_builder: ElasticsearchRequestBuilder,
     pub tls_settings: TlsSettings,
@@ -144,11 +144,11 @@ impl ElasticsearchCommon {
             metric_config.metric_tag_values,
         );
 
-        let cluster_type = config.opensearch_cluster_type;
+        let service_type = config.opensearch_service_type;
 
         let version = if let Some(version) = *version {
             version
-        } else if cluster_type == OpenSearchClusterType::Serverless {
+        } else if service_type == OpenSearchServiceType::Serverless {
             // Amazon OpenSearch Serverless does not support cluster-version API
             8
         } else {
@@ -157,7 +157,7 @@ impl ElasticsearchCommon {
                 ElasticsearchApiVersion::V7 => 7,
                 ElasticsearchApiVersion::V8 => 8,
                 ElasticsearchApiVersion::Auto => {
-                    match get_version(&base_url, &auth, &cluster_type, &request, &tls_settings, proxy_config).await
+                    match get_version(&base_url, &auth, &service_type, &request, &tls_settings, proxy_config).await
                     {
                         Ok(version) => {
                             debug!(message = "Auto-detected Elasticsearch API version.", %version);
@@ -208,7 +208,7 @@ impl ElasticsearchCommon {
 
         Ok(Self {
             auth,
-            cluster_type,
+            service_type,
             base_url,
             bulk_uri,
             mode,
@@ -257,14 +257,14 @@ impl ElasticsearchCommon {
     }
 
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
-        if self.cluster_type == OpenSearchClusterType::Serverless {
+        if self.service_type == OpenSearchServiceType::Serverless {
             warn!(message = "Amazon OpenSearch Serverless does not support healthchecks. Skipping healthcheck...");
             Ok(())
         } else {
             match get(
                 &self.base_url,
                 &self.auth,
-                &self.cluster_type,
+                &self.service_type,
                 &self.request,
                 client,
                 "/_cluster/health",
@@ -281,7 +281,7 @@ impl ElasticsearchCommon {
 
 #[cfg(feature = "aws-core")]
 pub async fn sign_request(
-    cluster_type: &OpenSearchClusterType,
+    service_type: &OpenSearchServiceType,
     request: &mut http::Request<Bytes>,
     credentials_provider: &aws_credential_types::provider::SharedCredentialsProvider,
     region: &Option<aws_types::region::Region>,
@@ -289,13 +289,13 @@ pub async fn sign_request(
     // Amazon Opensearch Serverless requires the x-amz-content-sha256 header when calculating
     // the AWS v4 signature:
     // https://docs.aws.amazon.com/opensearch-service/latest/developerguide/serverless-clients.html#serverless-signing
-    crate::aws::sign_request(cluster_type.as_str(), request, credentials_provider, region, *cluster_type == OpenSearchClusterType::Serverless).await
+    crate::aws::sign_request(service_type.as_str(), request, credentials_provider, region, *service_type == OpenSearchServiceType::Serverless).await
 }
 
 async fn get_version(
     base_url: &str,
     auth: &Option<Auth>,
-    cluster_type: &OpenSearchClusterType,
+    service_type: &OpenSearchServiceType,
     request: &RequestConfig,
     tls_settings: &TlsSettings,
     proxy_config: &ProxyConfig,
@@ -310,7 +310,7 @@ async fn get_version(
     }
 
     let client = HttpClient::new(tls_settings.clone(), proxy_config)?;
-    let response = get(base_url, auth, cluster_type, request, client, "/")
+    let response = get(base_url, auth, service_type, request, client, "/")
         .await
         .map_err(|error| format!("Failed to get Elasticsearch API version: {}", error))?;
 
@@ -334,7 +334,7 @@ async fn get_version(
 async fn get(
     base_url: &str,
     auth: &Option<Auth>,
-    cluster_type: &OpenSearchClusterType,
+    service_type: &OpenSearchServiceType,
     request: &RequestConfig,
     client: HttpClient,
     path: &str,
@@ -357,7 +357,7 @@ async fn get(
                 region,
             } => {
                 let region = region.clone();
-                sign_request(&cluster_type, &mut request, provider, &Some(region)).await?;
+                sign_request(&service_type, &mut request, provider, &Some(region)).await?;
             }
         }
     }

@@ -44,23 +44,23 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
-pub enum OpenSearchClusterType {
+pub enum OpenSearchServiceType {
     /// Managed OpenSearch.
     Managed,
     /// Serverless OpenSearch.
     Serverless,
 }
 
-impl OpenSearchClusterType {
+impl OpenSearchServiceType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            OpenSearchClusterType::Managed => "es",
-            OpenSearchClusterType::Serverless => "aoss"
+            OpenSearchServiceType::Managed => "es",
+            OpenSearchServiceType::Serverless => "aoss"
         }
     }
 }
 
-impl Default for OpenSearchClusterType {
+impl Default for OpenSearchServiceType {
     fn default() -> Self {
         Self::Managed
     }
@@ -181,7 +181,7 @@ pub struct ElasticsearchConfig {
 
     /// The Amazon OpenSearch Cluster Type "managed"/"serverless".
     #[serde(default)]
-    pub opensearch_cluster_type: OpenSearchClusterType,
+    pub opensearch_service_type: OpenSearchServiceType,
 
     #[serde(default)]
     #[configurable(derived)]
@@ -245,7 +245,7 @@ impl Default for ElasticsearchConfig {
             query: None,
             #[cfg(feature = "aws-core")]
             aws: None,
-            opensearch_cluster_type: Default::default(),
+            opensearch_service_type: Default::default(),
             tls: None,
             endpoint_health: None,
             bulk: BulkConfig::default(), // the default mode is Bulk
