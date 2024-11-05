@@ -506,7 +506,7 @@ dependencies = [
  "proc-macro-crate 3.2.0",
  "proc-macro2 1.0.89",
  "quote 1.0.37",
- "strum 0.26.2",
+ "strum 0.26.3",
  "syn 2.0.87",
  "thiserror",
 ]
@@ -2261,7 +2261,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3538270d33cc669650c4b093848450d380def10c331d38c768e34cac80576e6e"
 dependencies = [
  "termcolor",
- "unicode-width",
+ "unicode-width 0.1.13",
 ]
 
 [[package]]
@@ -2365,7 +2365,7 @@ dependencies = [
  "encode_unicode 0.3.6",
  "lazy_static",
  "libc",
- "unicode-width",
+ "unicode-width 0.1.13",
  "windows-sys 0.45.0",
 ]
 
@@ -4913,7 +4913,7 @@ dependencies = [
  "number_prefix",
  "portable-atomic",
  "unicode-segmentation",
- "unicode-width",
+ "unicode-width 0.1.13",
 ]
 
 [[package]]
@@ -6727,7 +6727,7 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2ad9b889f1b12e0b9ee24db044b5129150d5eada288edc800f789928dc8c0e3"
 dependencies = [
- "unicode-width",
+ "unicode-width 0.1.13",
 ]
 
 [[package]]
@@ -7241,7 +7241,7 @@ dependencies = [
  "is-terminal",
  "lazy_static",
  "term",
- "unicode-width",
+ "unicode-width 0.1.13",
 ]
 
 [[package]]
@@ -7808,23 +7808,23 @@ dependencies = [
 
 [[package]]
 name = "ratatui"
-version = "0.28.1"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdef7f9be5c0122f890d58bdf4d964349ba6a6161f705907526d891efabba57d"
+checksum = "eabd94c2f37801c20583fc49dd5cd6b0ba68c716787c2dd6ed18571e1e63117b"
 dependencies = [
  "bitflags 2.4.1",
  "cassowary",
  "compact_str",
  "crossterm",
+ "indoc",
  "instability",
  "itertools 0.13.0",
  "lru",
  "paste",
- "strum 0.26.2",
- "strum_macros 0.26.4",
+ "strum 0.26.3",
  "unicode-segmentation",
  "unicode-truncate",
- "unicode-width",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]
@@ -8536,7 +8536,7 @@ dependencies = [
  "memchr",
  "nix 0.28.0",
  "unicode-segmentation",
- "unicode-width",
+ "unicode-width 0.1.13",
  "utf8parse",
  "windows-sys 0.52.0",
 ]
@@ -9322,9 +9322,9 @@ checksum = "290d54ea6f91c969195bdbcd7442c8c2a2ba87da8bf60a7ee86a235d4bc1e125"
 
 [[package]]
 name = "strum"
-version = "0.26.2"
+version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d8cec3501a5194c432b2b7976db6b7d10ec95c253208b45f83f7136aa985e29"
+checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
 dependencies = [
  "strum_macros 0.26.4",
 ]
@@ -10521,7 +10521,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5fbabedabe362c618c714dbefda9927b5afc8e2a8102f47f081089a9019226"
 dependencies = [
  "itertools 0.12.1",
- "unicode-width",
+ "unicode-width 0.1.13",
 ]
 
 [[package]]
@@ -10529,6 +10529,12 @@ name = "unicode-width"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0336d538f7abc86d282a4189614dfaa90810dfc2c6f6427eaf88e16311dd225d"
+
+[[package]]
+name = "unicode-width"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
 
 [[package]]
 name = "unicode-xid"
