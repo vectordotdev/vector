@@ -39,8 +39,9 @@ use vrl::value::Kind;
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
-/// The OpenSearch Cluster Type: "managed" or "serverless"; among other things, selects the AWS
-/// service to use when calculating the AWS v4 signature
+/// The Amazon OpenSearch service type, either managed or serverless; primarily, selects the
+/// correct AWS service to use when calculating the AWS v4 signature + disables Elasticsearch
+/// version autodetection and health checks (unsupported) when serverless
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
