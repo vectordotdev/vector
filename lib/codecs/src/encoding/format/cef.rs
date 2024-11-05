@@ -464,8 +464,6 @@ mod tests {
         assert_eq!(s4, r#"Test \\| \\| test"#);
     }
 
-    // TODO: more tests for edge cases.
-
     #[test]
     fn serialize_extensions() {
         let event = Event::Log(LogEvent::from(btreemap! {
