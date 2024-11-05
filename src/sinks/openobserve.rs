@@ -85,11 +85,11 @@ fn default_endpoint() -> UriSerde {
     }
 }
 
-/// This sink wraps the Vector HTTP sink to provide official support for OpenObserve's  
-/// native HTTP ingest endpoint. By doing so, it maintains a distinct configuration for 
-/// the OpenObserve sink, separate from the Vector HTTP sink. This approach ensures  
-/// that future changes to OpenObserve's interface can be accommodated without impacting 
-/// the underlying Vector HTTP sink.  
+/// This sink wraps the Vector HTTP sink to provide official support for OpenObserve's
+/// native HTTP ingest endpoint. By doing so, it maintains a distinct configuration for
+/// the OpenObserve sink, separate from the Vector HTTP sink. This approach ensures
+/// that future changes to OpenObserve's interface can be accommodated without impacting
+/// the underlying Vector HTTP sink.
 #[async_trait::async_trait]
 #[typetag::serde(name = "openobserve")]
 impl SinkConfig for OpenObserveConfig {
