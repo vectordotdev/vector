@@ -97,7 +97,7 @@ impl<'a> InternalEvent for GotHttpWarning<'a> {
 
 #[derive(Debug)]
 pub struct AuthExtensionError<'a> {
-    pub error: &'a Box<dyn std::error::Error + Send + Sync>,
+    pub error: &'a vector_lib::Error,
 }
 
 impl<'a> InternalEvent for AuthExtensionError<'a> {

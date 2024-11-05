@@ -29,7 +29,7 @@ jobs:
             revert
 
           scopes: |
-            http         
+            http
             new source
             new transform
             new sink
