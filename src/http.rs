@@ -995,12 +995,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::convert::Infallible;
+    use std::{convert::Infallible, fs::File, io::BufReader};
 
-    use hyper::{server::conn::AddrStream, service::make_service_fn, Server};
+    use hyper::{
+        server::conn::AddrStream,
+        service::{make_service_fn, service_fn},
+        Server,
+    };
     use proptest::prelude::*;
     use rand::distributions::DistString;
     use rand_distr::Alphanumeric;
+    use rustls::{Certificate, PrivateKey, RootCertStore, ServerConfig};
+    use tokio::net::TcpListener;
+    use tokio_rustls::TlsAcceptor;
     use tower::ServiceBuilder;
 
     use crate::test_util::next_addr;
@@ -1496,6 +1503,150 @@ mod tests {
         let auth_config = AuthorizationConfig {
             strategy: oauth2_strategy,
             tls: None,
+        };
+
+        let client =
+            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(auth_config))
+                .unwrap();
+
+        let req = Request::get(format!("http://{}/", addr))
+            .body(Body::empty())
+            .unwrap();
+
+        let response = client.send(req).await.unwrap();
+        assert!(response.status().is_success());
+    }
+
+    #[tokio::test]
+    async fn test_oauth2_with_mtls_strategy_with_hyper_server() {
+        let oauth_addr: SocketAddr = next_addr();
+        let addr: SocketAddr = next_addr();
+        let make_svc = make_service_fn(move |_conn: &AddrStream| {
+            let svc =
+                ServiceBuilder::new().service(tower::service_fn(|req: Request<Body>| async move {
+                    assert_eq!(
+                        req.headers().get("authorization"),
+                        Some(&HeaderValue::from_static("Bearer some.jwt.token")),
+                    );
+
+                    Ok::<Response<Body>, hyper::Error>(Response::new(Body::empty()))
+                }));
+            futures_util::future::ok::<_, Infallible>(svc)
+        });
+
+        // Load a certificates.
+        fn load_certs(path: &str) -> Vec<Certificate> {
+            let certfile = File::open(path).unwrap();
+            let mut reader = BufReader::new(certfile);
+            rustls_pemfile::certs(&mut reader)
+                .unwrap()
+                .into_iter()
+                .map(Certificate)
+                .collect()
+        }
+
+        // Load a private key.
+        fn load_private_key(path: &str) -> PrivateKey {
+            let keyfile = File::open(path).unwrap();
+            let mut reader = BufReader::new(keyfile);
+            let keys = rustls_pemfile::rsa_private_keys(&mut reader).unwrap();
+            PrivateKey(keys[0].clone())
+        }
+
+        // Load a server tls context to validate client.
+        let certs = load_certs("tests/data/ca/certs/ca.cert.pem");
+        let key = load_private_key("tests/data/ca/private/ca.key.pem");
+        let client_certs = load_certs("tests/data/ca/intermediate_client/certs/ca-chain.cert.pem");
+        let mut root_store = RootCertStore::empty();
+        for cert in client_certs {
+            root_store.add(&cert).unwrap();
+        }
+
+        tokio::spawn(async move {
+            let tls_config = ServerConfig::builder()
+                .with_safe_defaults()
+                .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(
+                    root_store,
+                ))
+                .with_single_cert(certs, key)
+                .unwrap();
+
+            let tls_acceptor = TlsAcceptor::from(Arc::new(tls_config));
+            let acceptor = Arc::new(tls_acceptor);
+            let http = hyper::server::conn::Http::new();
+            let listener: TcpListener = TcpListener::bind(&oauth_addr).await.unwrap();
+
+            loop {
+                let (conn, _) = listener.accept().await.unwrap();
+                let acceptor = Arc::<tokio_rustls::TlsAcceptor>::clone(&acceptor);
+                let http = http.clone();
+                let fut = async move {
+                    let stream = acceptor.accept(conn).await.unwrap();
+                    let service = service_fn(|req: Request<Body>| async {
+                        assert_eq!(
+                            req.headers().get("Content-Type"),
+                            Some(&HeaderValue::from_static(
+                                "application/x-www-form-urlencoded"
+                            )),
+                        );
+
+                        let body_bytes = hyper::body::to_bytes(req.into_body()).await.unwrap();
+                        let request_body = String::from_utf8(body_bytes.to_vec()).unwrap();
+
+                        assert_eq!(
+                            // Based on the (later) OAuth2Extension configuration.
+                            "grant_type=client_credentials&client_id=some_client_secret",
+                            request_body,
+                        );
+
+                        let token = r#"
+                        {
+                            "access_token": "some.jwt.token",
+                            "token_type": "bearer",
+                            "expires_in": 60,
+                            "scope": "some-scope"
+                        }
+                        "#;
+
+                        Ok::<_, hyper::Error>(Response::new(Body::from(token)))
+                    });
+
+                    http.serve_connection(stream, service).await.unwrap();
+                };
+                tokio::spawn(fut);
+            }
+        });
+
+        tokio::spawn(async move {
+            Server::bind(&addr).serve(make_svc).await.unwrap();
+        });
+
+        // Wait for the server to start.
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // Http client to test
+        let token_endpoint = format!("https://{}", oauth_addr);
+        let client_id: String = String::from("some_client_secret");
+        let grace_period = 5;
+
+        let oauth2_strategy = HttpClientAuthorizationStrategy::OAuth2 {
+            token_endpoint,
+            client_id,
+            client_secret: None,
+            grace_period,
+        };
+
+        let auth_config = AuthorizationConfig {
+            strategy: oauth2_strategy,
+            tls: Some(TlsConfig {
+                verify_hostname: Some(false),
+                ca_file: Some("tests/data/ca/certs/ca.cert.pem".into()),
+                crt_file: Some("tests/data/ca/intermediate_client/certs/localhost.cert.pem".into()),
+                key_file: Some(
+                    "tests/data/ca/intermediate_client/private/localhost.key.pem".into(),
+                ),
+                ..Default::default()
+            }),
         };
 
         let client =
