@@ -4,8 +4,8 @@
 #![deny(missing_docs)]
 
 mod avro;
-mod common;
 mod cef;
+mod common;
 mod csv;
 mod gelf;
 mod json;

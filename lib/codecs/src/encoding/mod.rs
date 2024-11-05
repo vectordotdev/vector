@@ -8,12 +8,13 @@ use std::fmt::Debug;
 
 use bytes::BytesMut;
 pub use format::{
-    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer, CefSerializerConfig,
-    CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig, JsonSerializer,
-    JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer, LogfmtSerializerConfig,
-    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
-    ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions, RawMessageSerializer,
-    RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
+    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
+    CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
+    JsonSerializer, JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer,
+    LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
+    NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
+    ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
+    TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
