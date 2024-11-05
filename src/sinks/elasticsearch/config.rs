@@ -45,9 +45,9 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub enum OpenSearchServiceType {
-    /// Managed OpenSearch.
+    /// Elasticsearch or Opensearch Managed cluster
     Managed,
-    /// Serverless OpenSearch.
+    /// OpenSearch Serverless collection
     Serverless,
 }
 
@@ -179,7 +179,7 @@ pub struct ElasticsearchConfig {
     #[cfg(feature = "aws-core")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
-    /// Amazon OpenSearch service type: "managed" (default), or "serverless"
+    /// Amazon OpenSearch service type
     #[serde(default)]
     pub opensearch_service_type: OpenSearchServiceType,
 

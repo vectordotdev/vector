@@ -550,6 +550,17 @@ base: components: sinks: elasticsearch: configuration: {
 			}
 		}
 	}
+	opensearch_service_type: {
+		description: "Amazon OpenSearch service type"
+		required:    false
+		type: string: {
+			default: "managed"
+			enum: {
+				managed:    "Elasticsearch or Opensearch Managed cluster"
+				serverless: "OpenSearch Serverless collection"
+			}
+		}
+	}
 	pipeline: {
 		description: "The name of the pipeline to apply."
 		required:    false
