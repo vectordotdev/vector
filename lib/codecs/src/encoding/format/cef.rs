@@ -14,7 +14,10 @@ use vector_core::{
 
 const DEFAULT_DEVICE_VENDOR: &str = "Datadog";
 const DEFAULT_DEVICE_PRODUCT: &str = "Vector";
-const DEFAULT_DEVICE_VERSION: &str = "0"; // Major version. TODO: find a way to get the actual vector version.
+const DEFAULT_DEVICE_VERSION: &str = "0"; // Major version.
+// TODO: find a way to get the actual vector version.
+//  The version should be the actual vector version, but it's not possible
+//  to get it from the config.
 const DEFAULT_EVENT_CLASS_ID: &str = "Telemetry Event";
 const DEVICE_VENDOR_MAX_LENGTH: usize = 63;
 const DEVICE_PRODUCT_MAX_LENGTH: usize = 63;
@@ -231,7 +234,8 @@ pub struct CefSerializerOptions {
     ))]
     pub extensions: HashMap<String, ConfigTargetPath>,
     // TODO: use Template instead of ConfigTargetPath.
-    // Templates are in the src/ package, and codes are in the lib/codecs.
+    //   Templates are in the src/ package, and codes are in the lib/codecs.
+    //   Moving the Template to the lib/ package in order to prevent the circular dependency.
 }
 
 impl Default for CefSerializerOptions {
@@ -345,7 +349,6 @@ fn get_log_event_value(log: &LogEvent, field: &ConfigTargetPath) -> String {
         Some(Value::Integer(int)) => int.to_string(),
         Some(Value::Float(float)) => float.to_string(),
         Some(Value::Boolean(bool)) => bool.to_string(),
-        // TODO: support other timestamp options.
         Some(Value::Timestamp(timestamp)) => timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true),
         Some(Value::Null) => String::from(""),
         // Other value types: Array, Regex, Object are not supported by the CEF format.
