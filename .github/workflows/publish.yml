@@ -400,7 +400,6 @@ jobs:
       matrix:
         container:
           - "quay.io/centos/centos:stream9"
-          - "amazonlinux:2"
           - "amazonlinux:2023"
           - "fedora:39"
           - "fedora:40"
