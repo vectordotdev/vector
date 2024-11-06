@@ -14,10 +14,11 @@ use vector_core::{
 
 const DEFAULT_DEVICE_VENDOR: &str = "Datadog";
 const DEFAULT_DEVICE_PRODUCT: &str = "Vector";
-const DEFAULT_DEVICE_VERSION: &str = "0"; // Major version.
+// Major version.
 // TODO: find a way to get the actual vector version.
 //  The version should be the actual vector version, but it's not possible
 //  to get it from the config.
+const DEFAULT_DEVICE_VERSION: &str = "0";
 const DEFAULT_EVENT_CLASS_ID: &str = "Telemetry Event";
 const DEVICE_VENDOR_MAX_LENGTH: usize = 63;
 const DEVICE_PRODUCT_MAX_LENGTH: usize = 63;
