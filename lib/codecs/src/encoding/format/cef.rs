@@ -389,7 +389,6 @@ mod tests {
     use bytes::BytesMut;
     use chrono::DateTime;
     use ordered_float::NotNan;
-    use std::iter;
     use vector_common::btreemap;
     use vector_core::event::{Event, LogEvent, Value};
 
@@ -420,7 +419,7 @@ mod tests {
             ConfigTargetPath::try_from("foo".to_string()).unwrap(),
         )]);
         let opts: CefSerializerOptions = CefSerializerOptions {
-            device_vendor: iter::repeat("Repeat").take(11).collect(), // more than max length
+            device_vendor: "Repeat".repeat(11), // more than max length
             extensions,
             ..CefSerializerOptions::default()
         };
