@@ -115,8 +115,7 @@ struct BasicAuthExtension {
 #[derive(Debug, Deserialize)]
 struct Token {
     access_token: String,
-    #[serde(rename = "expires_in")] 
-    expires_after_secs: u32,
+    expires_in: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -267,7 +266,7 @@ impl OAuth2Extension {
         // 'expires_in' means, in seconds, for how long it will be valid, lets say 5min,
         // to not cause some random 4xx, because token expired in the meantime, we will make some
         // room for token refreshing, this room is a grace_period.
-        let (mut grace_period_seconds, overflow) = token.expires_after_secs.overflowing_sub(grace_period);
+        let (mut grace_period_seconds, overflow) = token.expires_in.overflowing_sub(grace_period);
 
         // If time for grace period exceed an expire_in, it basically means: always use new token.
         if overflow {
@@ -1715,7 +1714,7 @@ mod tests {
         let grace_period_seconds = 5;
         let fake_token = Token {
             access_token: String::from("some-jwt"),
-            expires_after_secs: 20,
+            expires_in: 20,
         };
 
         let expires_after_ms =
@@ -1730,7 +1729,7 @@ mod tests {
         let grace_period_seconds = 30;
         let fake_token = Token {
             access_token: String::from("some-jwt"),
-            expires_after_secs: 20,
+            expires_in: 20,
         };
 
         let expires_after_ms =
