@@ -186,10 +186,6 @@ tokio-stream = { version = "0.1.16", default-features = false, features = ["net"
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
 console-subscriber = { version = "0.4.1", default-features = false, optional = true }
 
-tokio-rustls = "0.23" # where should I put this ?
-rustls = "0.20" # where should I put this ?
-rustls-pemfile = "0.3" # where should I put this ?
-
 # Tracing
 tracing = { version = "0.1.34", default-features = false }
 tracing-core = { version = "0.1.26", default-features = false }
@@ -414,6 +410,10 @@ vrl.workspace = true
 
 wiremock = "0.6.2"
 zstd = { version = "0.13.0", default-features = false }
+
+tokio-rustls = "0.23"
+rustls = "0.20"
+rustls-pemfile = "0.3"
 
 [patch.crates-io]
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
