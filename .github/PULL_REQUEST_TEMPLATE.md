@@ -45,6 +45,8 @@ Providing this information upfront will facilitate a smoother review process. --
 - [ ] Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
 - [ ] If this PR introduces changes to [LICENSE-3rdparty.csv](https://github.com/vectordotdev/vrl/blob/main/LICENSE-3rdparty.csv), please
   run `dd-rust-license-tool write` and commit the changes. More details [here](https://crates.io/crates/dd-rust-license-tool).
+-
+
 ## References
 
 <!-- Please list any issues closed by this PR. -->
