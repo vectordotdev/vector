@@ -103,7 +103,6 @@ impl Memory {
                 },
             );
             emit!(MemoryEnrichmentTableInserted {
-                table: "table".to_string(),
                 key: k.as_str().to_string()
             });
         }
@@ -119,10 +118,7 @@ impl Memory {
                     if let Some(entry) = v.get_one() {
                         if entry.expired(now, self.config.ttl) {
                             handle.empty(k.clone());
-                            emit!(MemoryEnrichmentTableTtlExpired {
-                                table: "table".to_string(),
-                                key: k.to_string()
-                            });
+                            emit!(MemoryEnrichmentTableTtlExpired { key: k.to_string() });
                             needs_flush = true;
                         }
                     }
@@ -141,7 +137,6 @@ impl Memory {
                     byte_size += k.size_of() + v.get_one().size_of();
                 }
                 emit!(MemoryEnrichmentTableFlushed {
-                    table: "table".to_string(),
                     new_objects_count: reader.len(),
                     new_byte_size: byte_size
                 });
@@ -194,14 +189,12 @@ impl Table for Memory {
                 match self.get_read_handle().get_one(key.as_ref()) {
                     Some(row) => {
                         emit!(MemoryEnrichmentTableRead {
-                            table: "table".to_string(),
                             key: key.to_string()
                         });
                         Ok(vec![row.as_object_map(Instant::now(), self.config.ttl)])
                     }
                     None => {
                         emit!(MemoryEnrichmentTableReadFailed {
-                            table: "table".to_string(),
                             key: key.to_string()
                         });
                         Ok(Default::default())
