@@ -115,7 +115,7 @@ struct BasicAuthExtension {
 #[derive(Debug, Deserialize)]
 struct Token {
     access_token: String,
-    #[serde(rename = "expires_in")] 
+    #[serde(rename = "expires_in")]
     expires_after_secs: u32,
 }
 
@@ -267,7 +267,8 @@ impl OAuth2Extension {
         // 'expires_in' means, in seconds, for how long it will be valid, lets say 5min,
         // to not cause some random 4xx, because token expired in the meantime, we will make some
         // room for token refreshing, this room is a grace_period.
-        let (mut grace_period_seconds, overflow) = token.expires_after_secs.overflowing_sub(grace_period);
+        let (mut grace_period_seconds, overflow) =
+            token.expires_after_secs.overflowing_sub(grace_period);
 
         // If time for grace period exceed an expire_in, it basically means: always use new token.
         if overflow {
