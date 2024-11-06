@@ -11044,6 +11044,7 @@ dependencies = [
  "base64 0.22.1",
  "bitmask-enum",
  "bytes 1.8.0",
+ "cfg-if",
  "chrono",
  "chrono-tz",
  "criterion",
