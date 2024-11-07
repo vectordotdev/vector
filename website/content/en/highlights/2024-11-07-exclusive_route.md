@@ -11,7 +11,7 @@ badges:
   domains: [ "transforms" ]
 ---
 
-The `ExclusiveRoute` transform splits an event stream into multiple sub-streams based on user-defined conditions. Each event will only be
+The `ExclusiveRoute` transform splits an event stream into unique sub-streams based on user-defined conditions. Each event will only be
 routed to a single stream. This transforms complements the existing [Route transform][docs.transforms.route].
 
 [docs.transforms.route]: https://vector.dev/docs/reference/configuration/transforms/route/

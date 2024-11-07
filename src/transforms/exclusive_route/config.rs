@@ -7,7 +7,6 @@ use crate::schema;
 use crate::sinks::prelude::configurable_component;
 use crate::transforms::exclusive_route::transform::ExclusiveRoute;
 use crate::transforms::Transform;
-use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use vector_lib::config::clone_input_definitions;
 
@@ -47,7 +46,7 @@ impl Eq for Route {}
 /// Configuration for the `route` transform.
 #[configurable_component(transform(
     "exclusive_route",
-    "Split a stream of events into multiple sub-streams based on user-supplied conditions."
+    "Split a stream of events into unique sub-streams based on user-supplied conditions."
 ))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -98,14 +97,31 @@ impl TransformConfig for ExclusiveRouteConfig {
     }
 
     fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
-        let set: HashSet<Route> = self.routes.iter().cloned().collect();
         let mut errors = Vec::new();
 
-        if self.routes.len() != set.len() {
-            errors.push("Found routes with identical names.".into());
+        let mut counts = std::collections::HashMap::new();
+        for route in &self.routes {
+            *counts.entry(route.name.clone()).or_insert(0) += 1;
         }
 
-        if set.iter().any(|route| route.name == UNMATCHED_ROUTE) {
+        let duplicates: Vec<String> = counts
+            .iter()
+            .filter(|&(_, &count)| count > 1)
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        if !duplicates.is_empty() {
+            errors.push(format!(
+                "Found routes with duplicate names: {:?}",
+                duplicates
+            ));
+        }
+
+        if self
+            .routes
+            .iter()
+            .any(|route| route.name == UNMATCHED_ROUTE)
+        {
             errors.push(format!("Using reserved '{UNMATCHED_ROUTE}' name."));
         }
 
