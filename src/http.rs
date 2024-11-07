@@ -115,6 +115,7 @@ struct BasicAuthExtension {
 #[derive(Debug, Deserialize)]
 struct Token {
     access_token: String,
+    // This property, according to RFC, is expected to be in seconds.
     expires_in: u32,
 }
 
