@@ -295,6 +295,46 @@ base: components: sources: redis: configuration: {
 					}
 				}
 			}
+			chunked_gelf: {
+				description:   "Options for the chunked GELF decoder."
+				relevant_when: "method = \"chunked_gelf\""
+				required:      false
+				type: object: options: {
+					max_length: {
+						description: """
+																The maximum length of a single GELF message, in bytes. Messages longer than this length will
+																be dropped. If this option is not set, the decoder does not limit the length of messages and
+																the per-message memory is unbounded.
+
+																Note that a message can be composed of multiple chunks and this limit is applied to the whole
+																message, not to individual chunks.
+
+																This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.
+																The message's payload is the concatenation of all the chunks' payloads.
+																"""
+						required: false
+						type: uint: {}
+					}
+					pending_messages_limit: {
+						description: """
+																The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
+																dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
+																If this option is not set, the decoder does not limit the number of pending messages and the memory usage
+																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
+																"""
+						required: false
+						type: uint: {}
+					}
+					timeout_secs: {
+						description: """
+																The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
+																decoder drops all the received chunks of the timed out message.
+																"""
+						required: false
+						type: float: default: 5.0
+					}
+				}
+			}
 			length_delimited: {
 				description:   "Options for the length delimited decoder."
 				relevant_when: "method = \"length_delimited\""
@@ -330,8 +370,13 @@ base: components: sources: redis: configuration: {
 					enum: {
 						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
 						character_delimited: "Byte frames which are delimited by a chosen character."
-						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
-						newline_delimited:   "Byte frames which are delimited by a newline character."
+						chunked_gelf: """
+															Byte frames which are chunked GELF messages.
+
+															[chunked_gelf]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html
+															"""
+						length_delimited:  "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+						newline_delimited: "Byte frames which are delimited by a newline character."
 						octet_counting: """
 															Byte frames according to the [octet counting][octet_counting] format.
 
