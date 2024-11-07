@@ -103,6 +103,8 @@ pub struct ElasticsearchConfig {
     pub doc_type: String,
 
     /// The API version of Elasticsearch.
+    ///
+    /// Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
     #[serde(default)]
     #[configurable(derived)]
     pub api_version: ElasticsearchApiVersion,

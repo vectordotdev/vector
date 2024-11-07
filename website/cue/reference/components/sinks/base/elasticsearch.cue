@@ -28,8 +28,12 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	api_version: {
-		description: "The API version of Elasticsearch."
-		required:    false
+		description: """
+			The API version of Elasticsearch.
+
+			Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
+			"""
+		required: false
 		type: string: {
 			default: "auto"
 			enum: {
@@ -166,8 +170,12 @@ base: components: sinks: elasticsearch: configuration: {
 				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
 			strategy: {
-				description: "The authentication strategy to use."
-				required:    true
+				description: """
+					The authentication strategy to use.
+
+					Amazon OpenSearch Serverless requires this option to be set to `aws`.
+					"""
+				required: true
 				type: string: enum: {
 					aws:   "Amazon OpenSearch Service-specific authentication."
 					basic: "HTTP Basic Authentication."

@@ -88,6 +88,13 @@ impl ElasticsearchCommon {
             None => None,
         };
 
+        if config.opensearch_service_type == OpenSearchServiceType::Serverless {
+            match &config.auth {
+                Some(ElasticsearchAuthConfig::Aws(_)) => (),
+                _ => return Err(ParseError::OpenSearchServerlessRequiresAwsAuth.into()),
+            }
+        }
+
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
         let mode = config.common_mode()?;
@@ -146,11 +153,15 @@ impl ElasticsearchCommon {
 
         let service_type = config.opensearch_service_type;
 
-        let version = if let Some(version) = *version {
-            version
-        } else if service_type == OpenSearchServiceType::Serverless {
-            // Amazon OpenSearch Serverless does not support the cluster-version API
+        let version = if service_type == OpenSearchServiceType::Serverless {
+            if config.api_version != ElasticsearchApiVersion::Auto {
+                return Err(ParseError::ServerlessElasticsearchApiVersionMustBeAuto.into());
+            }
+            // Amazon OpenSearch Serverless does not support the cluster-version API; hardcode
+            // well-known API version
             8
+        } else if let Some(version) = *version {
+            version
         } else {
             let ver = match config.api_version {
                 ElasticsearchApiVersion::V6 => 6,

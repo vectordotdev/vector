@@ -34,7 +34,7 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
-#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
+#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use.\n\nAmazon OpenSearch Serverless requires this option to be set to `aws`."))]
 pub enum ElasticsearchAuthConfig {
     /// HTTP Basic Authentication.
     Basic {
@@ -319,4 +319,8 @@ pub enum ParseError {
     ExternalVersioningWithoutDocumentID,
     #[snafu(display("Your version field will be ignored because you use internal versioning"))]
     ExternalVersionIgnoredWithInternalVersioning,
+    #[snafu(display("Amazon OpenSearch Serverless requires `api_version` value to be `auto`"))]
+    ServerlessElasticsearchApiVersionMustBeAuto,
+    #[snafu(display("Amazon OpenSearch Serverless requires `auth.strategy` value to be `aws`"))]
+    OpenSearchServerlessRequiresAwsAuth,
 }
