@@ -98,9 +98,29 @@ jobs:
         use_sarif: ${{ (!github.event.pull_request || (github.event.pull_request.head.repo.full_name == github.repository)) && 1 }}
         extra_dictionary_limit: 20
         extra_dictionaries:
-          cspell:software-terms/dict/softwareTerms.txt
           cspell:aws/aws.txt
-          cspell:php/dict/php.txt
+          cspell:cpp/src/compiler-clang-attributes.txt
+          cspell:cpp/src/ecosystem.txt
+          cspell:cpp/src/stdlib-cpp.txt
+          cspell:css/dict/css.txt
+          cspell:django/dict/django.txt
+          cspell:dotnet/dict/dotnet.txt
+          cspell:elixir/dict/elixir.txt
+          cspell:filetypes/filetypes.txt
+          cspell:fullstack/dict/fullstack.txt
+          cspell:golang/dict/go.txt
+          cspell:html-symbol-entities/entities.txt
+          cspell:html/dict/html.txt
+          cspell:java/src/java-terms.txt
+          cspell:java/src/java.txt
+          cspell:k8s/dict/k8s.txt
           cspell:node/dict/node.txt
           cspell:npm/dict/npm.txt
+          cspell:php/dict/php.txt
+          cspell:python/src/common/extra.txt
+          cspell:python/src/python/python-lib.txt
+          cspell:python/src/python/python.txt
+          cspell:rust/dict/rust.txt
+          cspell:software-terms/dict/softwareTerms.txt
+          cspell:typescript/dict/typescript.txt
         #check_extra_dictionaries: ''
