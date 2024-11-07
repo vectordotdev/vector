@@ -133,4 +133,4 @@ jobs:
           cspell:software-terms/dict/softwareTerms.txt
           cspell:swift/src/swift.txt
           cspell:typescript/dict/typescript.txt
-        #check_extra_dictionaries: ''
+        check_extra_dictionaries: ''
