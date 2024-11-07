@@ -53,7 +53,7 @@ pub enum OpenSearchServiceType {
 }
 
 impl OpenSearchServiceType {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             OpenSearchServiceType::Managed => "es",
             OpenSearchServiceType::Serverless => "aoss",

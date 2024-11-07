@@ -384,7 +384,7 @@ async fn get(
                 region,
             } => {
                 let region = region.clone();
-                sign_request(&service_type, &mut request, provider, &Some(region)).await?;
+                sign_request(service_type, &mut request, provider, &Some(region)).await?;
             }
         }
     }
