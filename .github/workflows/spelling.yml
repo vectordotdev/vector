@@ -57,7 +57,7 @@ name: Check Spelling
 #     ... otherwise adjust the `with:` as you wish
 
 on:
-  pull_request_target:
+  pull_request:
     branches:
     - "**"
     tags-ignore:
@@ -87,7 +87,7 @@ jobs:
     steps:
     - name: check-spelling
       id: spelling
-      uses: check-spelling/check-spelling@v0.0.23
+      uses: check-spelling/check-spelling@v0.0.24
       with:
         suppress_push_for_open_pull_request: ${{ github.actor != 'dependabot[bot]' && 1 }}
         checkout: true
