@@ -100,10 +100,13 @@ jobs:
         extra_dictionaries:
           cspell:aws/aws.txt
           cspell:cpp/src/compiler-clang-attributes.txt
+          cspell:cpp/src/compiler-msvc.txt
           cspell:cpp/src/ecosystem.txt
+          cspell:cpp/src/lang-jargon.txt
           cspell:cpp/src/stdlib-cpp.txt
           cspell:css/dict/css.txt
           cspell:django/dict/django.txt
+          cspell:docker/src/docker-words.txt
           cspell:dotnet/dict/dotnet.txt
           cspell:elixir/dict/elixir.txt
           cspell:filetypes/filetypes.txt
@@ -114,13 +117,20 @@ jobs:
           cspell:java/src/java-terms.txt
           cspell:java/src/java.txt
           cspell:k8s/dict/k8s.txt
+          cspell:lorem-ipsum/dictionary.txt
+          cspell:lua/dict/lua.txt
           cspell:node/dict/node.txt
           cspell:npm/dict/npm.txt
           cspell:php/dict/php.txt
+          cspell:public-licenses/src/generated/public-licenses.txt
           cspell:python/src/common/extra.txt
           cspell:python/src/python/python-lib.txt
           cspell:python/src/python/python.txt
+          cspell:r/src/r.txt
+          cspell:ruby/dict/ruby.txt
           cspell:rust/dict/rust.txt
+          cspell:shell/dict/shell-all-words.txt
           cspell:software-terms/dict/softwareTerms.txt
+          cspell:swift/src/swift.txt
           cspell:typescript/dict/typescript.txt
         #check_extra_dictionaries: ''
