@@ -150,8 +150,10 @@ prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
 prost-types = { version = "0.12", default-features = false }
+rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 serde_json = { version = "1.0.132", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.214", default-features = false, features = ["alloc", "derive", "rc"] }
+tokio = { version = "1.39.2", default-features = false, features = ["full"] }
 toml = { version = "0.8.19", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
@@ -337,7 +339,7 @@ paste = "1.0.15"
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "6.3.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
-rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
+rand.workspace = true
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.35.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.24.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
