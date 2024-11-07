@@ -29,7 +29,6 @@ jobs:
             revert
 
           scopes: |
-            http
             new source
             new transform
             new sink
