@@ -14,7 +14,7 @@ use vector_core::{
 
 const DEFAULT_DEVICE_VENDOR: &str = "Datadog";
 const DEFAULT_DEVICE_PRODUCT: &str = "Vector";
-// Major version.
+// Major version of Vector.
 // TODO: find a way to get the actual vector version.
 //  The version should be the actual vector version, but it's not possible
 //  to get it from the config.
@@ -255,8 +255,8 @@ impl Default for CefSerializerOptions {
     }
 }
 
-/// Serializer that converts an `Event` to bytes using the CEF format.
-/// CEF:<version>|<device_vendor>|<device_product>|<device_version>|<device_event_class>|<name>|<severity>|<encoded_fields>
+/// Serializer that converts an `Event` to the bytes using the CEF format.
+/// CEF:{version}|{device_vendor}|{device_product}|{device_version>|{device_event_class}|{name}|{severity}|{encoded_fields}
 #[derive(Debug, Clone)]
 pub struct CefSerializer {
     version: Version,
