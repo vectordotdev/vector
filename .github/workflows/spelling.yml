@@ -103,4 +103,4 @@ jobs:
           cspell:php/dict/php.txt
           cspell:node/dict/node.txt
           cspell:npm/dict/npm.txt
-        check_extra_dictionaries: ''
+        #check_extra_dictionaries: ''
