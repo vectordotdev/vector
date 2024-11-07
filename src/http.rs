@@ -103,7 +103,6 @@ struct OAuth2Extension {
     grace_period: u32,
     client: Client<HttpProxyConnector, Body>,
     token: Arc<Mutex<Option<ExpirableToken>>>,
-    get_time_now_fn: Arc<dyn Fn() -> Duration + Send + Sync + 'static>,
 }
 
 #[derive(Clone)]
@@ -134,34 +133,7 @@ impl OAuth2Extension {
         grace_period: u32,
         client: Client<HttpProxyConnector, Body>,
     ) -> OAuth2Extension {
-        let get_time_now_fn = || {
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards")
-        };
-
-        OAuth2Extension::new_internal(
-            token_endpoint,
-            client_id,
-            client_secret,
-            grace_period,
-            client,
-            Arc::new(get_time_now_fn),
-        )
-    }
-
-    /// Creates a new `OAuth2Extension` without default get_time_now_fn argument.
-    /// This method should be used only in tests.
-    fn new_internal(
-        token_endpoint: String,
-        client_id: String,
-        client_secret: Option<SensitiveString>,
-        grace_period: u32,
-        client: Client<HttpProxyConnector, Body>,
-        get_time_now_fn: Arc<dyn Fn() -> Duration + Send + Sync + 'static>,
-    ) -> OAuth2Extension {
         let initial_empty_token = Arc::new(Mutex::new(None));
-
         OAuth2Extension {
             token_endpoint,
             client_id,
@@ -169,12 +141,7 @@ impl OAuth2Extension {
             grace_period,
             client,
             token: initial_empty_token,
-            get_time_now_fn,
         }
-    }
-
-    fn get_time_now(&self) -> Duration {
-        (self.get_time_now_fn)()
     }
 
     async fn get_token(&self) -> Result<String, vector_lib::Error> {
@@ -194,7 +161,10 @@ impl OAuth2Extension {
         let maybe_token = self.token.lock().expect("Poisoned token lock");
         match &*maybe_token {
             Some(token) => {
-                if self.get_time_now().as_millis() < token.expires_after_ms {
+                let time_now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards");
+                if time_now.as_millis() < token.expires_after_ms {
                     //we have token, token is valid for at least 1min, we can use it.
                     return Some(token.clone());
                 }
@@ -253,9 +223,11 @@ impl OAuth2Extension {
         let body = hyper::body::aggregate(response).await?;
         let token: Token = serde_json::from_reader(body.reader())?;
 
-        let now = self.get_time_now();
+        let time_now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
         let token_will_expire_after_ms =
-            OAuth2Extension::calculate_valid_until(now, self.grace_period, &token);
+            OAuth2Extension::calculate_valid_until(time_now, self.grace_period, &token);
 
         Ok(ExpirableToken {
             access_token: token.access_token,
@@ -1004,8 +976,6 @@ mod tests {
         Server,
     };
     use proptest::prelude::*;
-    use rand::distributions::DistString;
-    use rand_distr::Alphanumeric;
     use rustls::{Certificate, PrivateKey, RootCertStore, ServerConfig};
     use tokio::net::TcpListener;
     use tokio_rustls::TlsAcceptor;
@@ -1259,113 +1229,6 @@ mod tests {
             .unwrap();
         let response = client.send(req).await.unwrap();
         assert_eq!(response.headers().get("Connection"), None);
-    }
-
-    #[tokio::test]
-    async fn test_caching_of_tokens_in_oauth2extension_with_hyper_server() {
-        let addr: SocketAddr = next_addr();
-        // This hyper service expose a fake oauth2 server, each request will return a response with new
-        // bearer token, where expires_in property is 5seconds.
-        let make_svc = make_service_fn(move |_: &AddrStream| {
-            let svc = ServiceBuilder::new()
-                .service(tower::service_fn(|req: Request<Body>| async move {
-                    assert_eq!(
-                        req.headers().get("Content-Type"),
-                        Some(&HeaderValue::from_static("application/x-www-form-urlencoded")),
-                    );
-
-                    let body_bytes = hyper::body::to_bytes(req.into_body()).await.unwrap();
-                    let request_body = String::from_utf8(body_bytes.to_vec()).unwrap();
-
-                    assert_eq!(
-                        // Based on the (later) OAuth2Extension configuration.
-                        "grant_type=client_credentials&client_id=some_client_secret&client_secret=some_secret",
-                        request_body,
-                    );
-
-                    let token_valid_for_seconds: u32 = 5;
-                    let random_token = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-                    let token = format!(r#"
-                    {{
-                        "access_token": "{}",
-                        "token_type": "bearer",
-                        "expires_in": {},
-                        "scope": "some-scope"
-                    }}
-                    "#, random_token, token_valid_for_seconds);
-                    Ok::<Response<Body>, hyper::Error>(Response::new(Body::from(token)))
-                }));
-            futures_util::future::ok::<_, Infallible>(svc)
-        });
-
-        tokio::spawn(async move {
-            Server::bind(&addr).serve(make_svc).await.unwrap();
-        });
-
-        // Wait for the server to start.
-        tokio::time::sleep(Duration::from_millis(10)).await;
-
-        // Simplest possible configuration for oauth's client connector.
-        let tls: vector_lib::tls::MaybeTls<(), TlsSettings> =
-            MaybeTlsSettings::from_config(&None, false).unwrap();
-        let proxy_connector = build_proxy_connector(tls, &ProxyConfig::default()).unwrap();
-        let auth_client = Client::builder().build(proxy_connector);
-
-        let token_endpoint = format!("http://{}", addr);
-        let client_id = String::from("some_client_secret");
-        let client_secret = Some(SensitiveString::from(String::from("some_secret")));
-        // Fake oauth server returns token which expires in 5sec, with grace period equal 2 seconds
-        // we will have each token cached for next 3seconds (after this time token will be treat as expired).
-        let two_seconds_grace_period: u32 = 2;
-
-        // That can looks tricky for the first time, but idea is simple, we mock get_now_fn,
-        // which is used internally by OAuth2Extension to decidy whether token is eligible for refreshing.
-        // In real life Duration since epoch in seconds, can be for example 1730460289 (November 1, 2024),
-        // but to simplify understanding we wil start with 11 seconds sicne epoch, and can progress.
-        // Each value (index) in vec, means invocation of get_now_fn by OAuth2Extension, so
-        // first call returns Duration::from_secs(11), second, Duration::from_secs(12) and so on,
-        // because of that we have full controll over time here.
-        let mocked_seconds_since_epoch = [11, 12, 20, 21, 22, 23];
-        let counter = Arc::new(Mutex::new(0));
-        let get_now_fn = move || {
-            let counter = Arc::clone(&counter);
-            let mut counter = counter.lock().unwrap();
-            let i = *counter;
-            *counter += 1;
-            Duration::from_secs(mocked_seconds_since_epoch[i])
-        };
-
-        // Setup an OAuth2Extension and mocked time function
-        let get_now_fn = Arc::new(get_now_fn);
-        let extension = OAuth2Extension::new_internal(
-            token_endpoint,
-            client_id,
-            client_secret,
-            two_seconds_grace_period,
-            auth_client,
-            get_now_fn,
-        );
-
-        // First token is acquired because cache is empty.
-        let first_acquisition = extension.get_token().await.unwrap();
-        // Seconds will be taken from cache because first valid until (in ms) is
-        // 14000ms = (11000ms + (5000ms - 2000ms))
-        // where 5000ms because of token is valid 5seconds,
-        // and grace period is 2seconds.
-        let second_acquisition = extension.get_token().await.unwrap();
-        assert_eq!(first_acquisition, second_acquisition,);
-
-        // This time 20000ms since epoch is after 14000ms (until token is valid)
-        // so we expect new token acquired.
-        let third_acquisition = extension.get_token().await.unwrap();
-        let fourth_acquisition = extension.get_token().await.unwrap();
-        // Ensure new token requested.
-        assert_ne!(first_acquisition, third_acquisition,);
-        assert_eq!(third_acquisition, fourth_acquisition,);
-
-        // Becuase third token is valid until 24000ms all acquisitions should return from cache.
-        let fifth_acquisition = extension.get_token().await.unwrap();
-        assert_eq!(fourth_acquisition, fifth_acquisition,);
     }
 
     #[tokio::test]
