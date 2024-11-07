@@ -40,8 +40,8 @@ use vrl::value::Kind;
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
 /// The Amazon OpenSearch service type, either managed or serverless; primarily, selects the
-/// correct AWS service to use when calculating the AWS v4 signature + disables Elasticsearch
-/// version autodetection and health checks (unsupported) when serverless
+/// correct AWS service to use when calculating the AWS v4 signature + disables features
+/// unsupported by serverless: Elasticsearch API version autodetection, health checks
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
