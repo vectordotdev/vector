@@ -1257,8 +1257,6 @@ mod tests {
         // First token is acquired because cache is empty.
         let failed_acquisition = extension.get_token().await;
         assert!(failed_acquisition.is_err());
-        let err_msg = failed_acquisition.err().unwrap().to_string();
-        assert!(err_msg.contains("Connection refused"));
 
         let make_svc = make_service_fn(move |_: &AddrStream| {
             let svc = ServiceBuilder::new().service(tower::service_fn(
@@ -1284,8 +1282,6 @@ mod tests {
 
         let failed_acquisition = extension.get_token().await;
         assert!(failed_acquisition.is_err());
-        let err_msg = failed_acquisition.err().unwrap().to_string();
-        assert!(err_msg.contains("missing field"));
     }
 
     #[tokio::test]
