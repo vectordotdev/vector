@@ -52,7 +52,7 @@ impl Eq for Route {}
 #[serde(deny_unknown_fields)]
 pub struct ExclusiveRouteConfig {
     /// An array of named routes. The route names are expected to be unique.
-    #[configurable(metadata(docs::examples = "routes_example"))]
+    #[configurable(metadata(docs::examples = "routes_example()"))]
     pub routes: Vec<Route>,
 }
 

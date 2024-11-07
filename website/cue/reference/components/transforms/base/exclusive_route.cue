@@ -4,7 +4,19 @@ base: components: transforms: exclusive_route: configuration: routes: {
 	description: "An array of named routes. The route names are expected to be unique."
 	required:    true
 	type: array: items: type: object: {
-		examples: ["routes_example"]
+		examples: [{
+			condition: {
+				source: "exists(.foo) && exists(.bar)"
+				type:   "vrl"
+			}
+			name: "foo-and-bar-exist"
+		}, {
+			condition: {
+				source: "exists(.foo)"
+				type:   "vrl"
+			}
+			name: "only-foo-exists"
+		}]
 		options: {
 			condition: {
 				description: "Each condition represents a filter which is applied to each event."

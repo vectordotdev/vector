@@ -602,6 +602,7 @@ urls: {
 	vector_repo:                                "\(github)/vectordotdev/vector"
 	vector_roles:                               "/docs/setup/deployment/roles"
 	vector_route_transform:                     "/docs/reference/configuration/transforms/route"
+	vector_exclusive_route_transform:           "/docs/reference/configuration/transforms/exclusive_route"
 	vector_rpm_source_files:                    "\(vector_repo)/tree/master/distribution/rpm"
 	vector_security_policy:                     "\(vector_repo)/security/policy"
 	vector_semantic_yml:                        "\(vector_repo)/blob/master/.github/semantic.yml"
