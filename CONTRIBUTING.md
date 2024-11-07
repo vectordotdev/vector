@@ -256,6 +256,15 @@ make check-component-docs
 cd rust-doc && make docs
 ```
 
+### Updating licences
+
+```sh
+cargo install dd-rust-license-tool --locked
+dd-rust-license-tool write
+git commit -am "dd-rust-license-tool write"
+git push
+```
+
 ### Deprecations
 
 When deprecating functionality in Vector, see [DEPRECATION.md](docs/DEPRECATION.md).

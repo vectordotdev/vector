@@ -144,7 +144,7 @@ metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 pin-project = { version = "1.1.7", default-features = false }
 proptest = { version = "1.5" }
-proptest-derive = { version = "0.4.0" }
+proptest-derive = { version = "0.5.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
@@ -216,8 +216,8 @@ aws-sigv4 = { version = "1.2.5", default-features = false, features = ["sign-htt
 aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest", "credentials-process", "sso", "rt-tokio"], optional = true }
 aws-credential-types = { version = "1.2.1", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream", "rt-tokio"], optional = true }
-aws-smithy-types = { version = "1.2.7", default-features = false, features = ["rt-tokio"], optional = true }
-aws-smithy-runtime-api = { version = "1.7.2", default-features = false, optional = true }
+aws-smithy-types = { version = "1.2.9", default-features = false, features = ["rt-tokio"], optional = true }
+aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional = true }
 aws-smithy-runtime = { version = "1.7.3", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
 aws-smithy-async = { version = "1.2.1", default-features = false, features = ["rt-tokio"], optional = true }
 
@@ -265,7 +265,7 @@ async-graphql-warp = { version = "7.0.7", default-features = false, optional = t
 crossterm = { version = "0.28.1", default-features = false, features = ["event-stream", "windows"], optional = true }
 num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
-ratatui = { version = "0.28.1", optional = true, default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.29.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Opentelemetry
 
@@ -331,7 +331,7 @@ nom = { version = "7.1.3", default-features = false, optional = true }
 notify = { version = "7.0.0", default-features = false, features = ["macos_fsevent"] }
 openssl = { version = "0.10.68", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
-ordered-float = { version = "4.4.0", default-features = false }
+ordered-float = { version = "4.5.0", default-features = false }
 paste = "1.0.15"
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
@@ -359,7 +359,7 @@ toml.workspace = true
 tonic = { workspace = true, optional = true }
 hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.18", default-features = false }
-url = { version = "2.5.2", default-features = false, features = ["serde"] }
+url = { version = "2.5.3", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }
 zstd = { version = "0.13.0", default-features = false }
 arr_macro = { version = "0.2.1" }
@@ -583,7 +583,7 @@ sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "protobuf
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http_server"]
 sources-host_metrics = ["heim/cpu", "heim/host", "heim/memory", "heim/net"]
 sources-http_client = ["sources-utils-http-client"]
-sources-http_server = ["sources-utils-http", "sources-utils-http-query"]
+sources-http_server = ["sources-utils-http", "sources-utils-http-headers", "sources-utils-http-query"]
 sources-internal_logs = []
 sources-internal_metrics = []
 sources-static_metrics = []
@@ -594,7 +594,7 @@ sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
-sources-opentelemetry = ["dep:hex", "vector-lib/opentelemetry", "dep:prost", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-vector"]
+sources-opentelemetry = ["dep:hex", "vector-lib/opentelemetry", "dep:prost", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-utils-http-headers", "sources-vector"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["sources-prometheus-scrape", "sources-prometheus-remote-write", "sources-prometheus-pushgateway"]
 sources-prometheus-scrape = ["sinks-prometheus", "sources-utils-http-client", "vector-lib/prometheus"]
@@ -611,6 +611,7 @@ sources-utils-http = ["sources-utils-http-auth", "sources-utils-http-encoding", 
 sources-utils-http-auth = ["sources-utils-http-error"]
 sources-utils-http-encoding = ["sources-utils-http-error"]
 sources-utils-http-error = []
+sources-utils-http-headers = []
 sources-utils-http-prelude = ["sources-utils-http", "sources-utils-http-auth", "sources-utils-http-encoding", "sources-utils-http-error"]
 sources-utils-http-query = []
 sources-utils-http-client = ["sources-utils-http", "sources-http_server"]

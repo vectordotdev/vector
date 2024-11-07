@@ -59,7 +59,7 @@ jobs:
 
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-20.04
     timeout-minutes: 45
     needs: changes
     # Run this job even if `changes` job is skipped (non- pull request trigger)
@@ -95,6 +95,7 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      - run: sudo -E bash scripts/ci-free-disk-space.sh
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
@@ -176,7 +177,7 @@ jobs:
 
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-20.04
     timeout-minutes: 45
     needs:
       - build-x86_64-unknown-linux-gnu
