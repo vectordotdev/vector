@@ -56,7 +56,7 @@ impl OpenSearchServiceType {
     pub fn as_str(&self) -> &'static str {
         match self {
             OpenSearchServiceType::Managed => "es",
-            OpenSearchServiceType::Serverless => "aoss"
+            OpenSearchServiceType::Serverless => "aoss",
         }
     }
 }

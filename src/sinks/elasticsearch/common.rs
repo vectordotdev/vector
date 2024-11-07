@@ -16,7 +16,8 @@ use crate::{
     http::{HttpClient, MaybeAuth},
     sinks::{
         elasticsearch::{
-            ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig, ParseError, OpenSearchServiceType,
+            ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig,
+            OpenSearchServiceType, ParseError,
         },
         util::auth::Auth,
         util::{http::RequestConfig, UriSerde},
@@ -168,7 +169,15 @@ impl ElasticsearchCommon {
                 ElasticsearchApiVersion::V7 => 7,
                 ElasticsearchApiVersion::V8 => 8,
                 ElasticsearchApiVersion::Auto => {
-                    match get_version(&base_url, &auth, &service_type, &request, &tls_settings, proxy_config).await
+                    match get_version(
+                        &base_url,
+                        &auth,
+                        &service_type,
+                        &request,
+                        &tls_settings,
+                        proxy_config,
+                    )
+                    .await
                     {
                         Ok(version) => {
                             debug!(message = "Auto-detected Elasticsearch API version.", %version);
@@ -300,7 +309,14 @@ pub async fn sign_request(
     // Amazon OpenSearch Serverless requires the x-amz-content-sha256 header when calculating
     // the AWS v4 signature:
     // https://docs.aws.amazon.com/opensearch-service/latest/developerguide/serverless-clients.html#serverless-signing
-    crate::aws::sign_request(service_type.as_str(), request, credentials_provider, region, *service_type == OpenSearchServiceType::Serverless).await
+    crate::aws::sign_request(
+        service_type.as_str(),
+        request,
+        credentials_provider,
+        region,
+        *service_type == OpenSearchServiceType::Serverless,
+    )
+    .await
 }
 
 async fn get_version(

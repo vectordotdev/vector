@@ -34,7 +34,9 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
-#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use.\n\nAmazon OpenSearch Serverless requires this option to be set to `aws`."))]
+#[configurable(metadata(
+    docs::enum_tag_description = "The authentication strategy to use.\n\nAmazon OpenSearch Serverless requires this option to be set to `aws`."
+))]
 pub enum ElasticsearchAuthConfig {
     /// HTTP Basic Authentication.
     Basic {
