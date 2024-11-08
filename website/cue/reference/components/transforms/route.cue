@@ -105,65 +105,65 @@ components: transforms: route: {
 				It is worth noting that a single route can feed multiple downstream components.
 
 				```yaml
-				transforms:
-					my-routes:
-						inputs: [ some_source ]
-						type: route
-						route:
-							foo-exists: exists(.foo)
-							foo-doesnt-exist: '!exists(.foo)'
-					remap-route-1:
-						type: remap
-						inputs:
-							- my-routes.foo-exists
-						source: |
-							.route = "route 1"
-					remap-route-2:
-						type: remap
-						inputs:
-							- my-routes.foo-doesnt-exist
-						source: |
-							.route = "route 2"
-					remap-route-3:
-						type: remap
-						inputs:
-							- my-routes.foo-exists
-						source: |
-							.route = "route 3"
+transforms:
+  my-routes:
+    inputs: [ some_source ]
+    type: route
+    route:
+      foo-exists: 'exists(.foo)'
+      foo-doesnt-exist: '!exists(.foo)'
+  remap-route-1:
+    type: remap
+    inputs:
+      - my-routes.foo-exists
+    source: |
+      .route = "route 1"
+  remap-route-2:
+    type: remap
+    inputs:
+      - my-routes.foo-doesnt-exist
+    source: |
+      .route = "route 2"
+  remap-route-3:
+    type: remap
+    inputs:
+      - my-routes.foo-exists
+    source: |
+      .route = "route 3"
 
-				tests:
-					- name: case-1
-						inputs:
-							- type: log
-								insert_at: my-routes
-								log_fields:
-									foo: X
-						outputs:
-							- extract_from: remap-route-1
-								my-routes:
-									- type: vrl
-										source: |
-											assert!(exists(.foo))
-											assert_eq!(.route, "route 1")
-							- extract_from: remap-route-3
-								my-routes:
-									- type: vrl
-										source: |
-											assert!(exists(.foo))
-											assert_eq!(.route, "route 3")
-					- name: case-2
-						inputs:
-							- type: log
-								insert_at: my-routes
-								log_fields:
-									bar: X
-						outputs:
-							- extract_from: remap-route-2
-								my-routes:
-									- type: vrl
-										source: |
-											assert!(!exists(.foo))
-											assert_eq!(.route, "route 2")
+tests:
+  - name: case-1
+    inputs:
+      - type: log
+        insert_at: my-routes
+        log_fields:
+          foo: X
+    outputs:
+      - extract_from: remap-route-1
+        conditions:
+          - type: vrl
+            source: |
+              assert!(exists(.foo))
+              assert_eq!(.route, "route 1")
+      - extract_from: remap-route-3
+        conditions:
+          - type: vrl
+            source: |
+              assert!(exists(.foo))
+              assert_eq!(.route, "route 3")
+  - name: case-2
+    inputs:
+      - type: log
+        insert_at: my-routes
+        log_fields:
+          bar: X
+    outputs:
+      - extract_from: remap-route-2
+        conditions:
+          - type: vrl
+            source: |
+              assert!(!exists(.foo))
+              assert_eq!(.route, "route 2")
 
 				```
 				"""
