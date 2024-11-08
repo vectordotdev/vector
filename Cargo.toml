@@ -414,6 +414,10 @@ vrl.workspace = true
 wiremock = "0.6.2"
 zstd = { version = "0.13.0", default-features = false }
 
+tokio-rustls = "0.23"
+rustls = "0.20"
+rustls-pemfile = "0.3"
+
 [patch.crates-io]
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
 tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.11-framed-read-continue-on-error" }
