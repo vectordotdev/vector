@@ -66,7 +66,15 @@ impl ElasticsearchCommon {
                 Auth::Aws {
                     credentials_provider: provider,
                     region,
-                } => sign_request(&OpenSearchServiceType::Managed, &mut request, provider, &Some(region.clone())).await?,
+                } => {
+                    sign_request(
+                        &OpenSearchServiceType::Managed,
+                        &mut request,
+                        provider,
+                        &Some(region.clone()),
+                    )
+                    .await?
+                }
             }
         }
 
