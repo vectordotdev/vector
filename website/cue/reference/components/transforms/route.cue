@@ -100,7 +100,7 @@ components: transforms: route: {
 		routing_to_multiple_components: {
 			title: "Routing to multiple components"
 			body: """
-				The following is an example of how you can creates two routes that feed three downstream components.
+				The following is an example of how you can create two routes that feed three downstream components.
 
 				It is worth noting that a single route can feed multiple downstream components.
 
