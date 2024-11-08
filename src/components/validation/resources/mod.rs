@@ -210,6 +210,7 @@ fn serializer_config_to_deserializer(
 ) -> vector_lib::Result<decoding::Deserializer> {
     let deserializer_config = match config {
         SerializerConfig::Avro { .. } => todo!(),
+        SerializerConfig::Cef { .. } => todo!(),
         SerializerConfig::Csv { .. } => todo!(),
         SerializerConfig::Gelf => DeserializerConfig::Gelf(Default::default()),
         SerializerConfig::Json(_) => DeserializerConfig::Json(Default::default()),
