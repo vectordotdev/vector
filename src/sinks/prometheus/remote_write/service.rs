@@ -94,10 +94,14 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
 #[cfg(feature = "aws-core")]
 async fn sign_request(
     request: &mut http::Request<Bytes>,
-    credentials_provider: &SharedCredentialsProvider,
+    credentials_provider: &Option<SharedCredentialsProvider>,
     region: &Option<Region>,
 ) -> crate::Result<()> {
-    crate::aws::sign_request("aps", request, credentials_provider, region).await
+    if let Some(credentials_provider) = credentials_provider {
+        crate::aws::sign_request("aps", request, credentials_provider, region).await
+    } else {
+        Ok(())
+    }
 }
 
 pub(super) async fn build_request(
