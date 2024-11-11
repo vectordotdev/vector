@@ -551,7 +551,9 @@ impl HttpSource for SimpleHttpSource {
 
         for (key, values) in &self.custom_response_headers {
             for value in values {
-                header_map.append(key.clone(), value.clone());
+                header_map
+                    .try_append(key.clone(), value.clone())
+                    .expect("Failed to append header. Too many custom http headers specified in custom_response_headers config.");
             }
         }
         Box::new(response)
