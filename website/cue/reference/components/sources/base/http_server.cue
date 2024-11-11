@@ -55,7 +55,7 @@ base: components: sources: http_server: configuration: {
 				"Access-Control-Allow-Origin": ["my-cool-server", "my-other-server"]
 			}]
 			options: "*": {
-				description: "A custom response header key-value pair"
+				description: "A custom response header key-values pair"
 				required:    true
 				type: array: items: type: string: {}
 			}
