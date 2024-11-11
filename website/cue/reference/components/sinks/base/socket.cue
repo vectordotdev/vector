@@ -588,4 +588,16 @@ base: components: sinks: socket: configuration: {
 			}
 		}
 	}
+	unix_mode: {
+		description:   "The Unix socket mode to use."
+		relevant_when: "mode = \"unix\""
+		required:      false
+		type: string: {
+			default: "Stream"
+			enum: {
+				Datagram: "Datagram-oriented (`SOCK_DGRAM`)."
+				Stream:   "Stream-oriented (`SOCK_STREAM`)."
+			}
+		}
+	}
 }
