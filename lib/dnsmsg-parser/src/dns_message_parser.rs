@@ -3,12 +3,11 @@ use std::{fmt::Write as _, ops::Deref};
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
 use hickory_proto::{
-    error::ProtoError,
     op::{message::Message as TrustDnsMessage, Query},
     rr::{
         dnssec::{
             rdata::{DNSSECRData, DNSKEY, DS},
-            Algorithm, SupportedAlgorithms,
+            SupportedAlgorithms,
         },
         rdata::{
             caa::Value,
@@ -20,6 +19,7 @@ use hickory_proto::{
         Name, RecordType,
     },
     serialize::binary::{BinDecodable, BinDecoder},
+    ProtoError,
 };
 use thiserror::Error;
 
@@ -186,11 +186,9 @@ impl DnsMessageParser {
 
     pub(crate) fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
         let record_data = match record.data() {
-            Some(RData::Unknown { code, rdata }) => {
-                self.format_unknown_rdata((*code).into(), rdata)
-            }
-            Some(rdata) => self.format_rdata(rdata),
-            None => Ok((Some(String::from("")), None)), // NULL record
+            RData::Unknown { code, rdata } => self.format_unknown_rdata((*code).into(), rdata),
+            RData::Update0(_) => Ok((Some(String::from("")), None)), // Previously none value
+            rdata => self.format_rdata(rdata),
         }?;
 
         Ok(DnsRecord {
@@ -498,20 +496,6 @@ impl DnsMessageParser {
                 Ok((Some(format!("{} {}", preference, exchanger)), None))
             }
 
-            dns_message::RTYPE_CERT => {
-                let raw_rdata = rdata.anything();
-                let mut decoder = BinDecoder::new(raw_rdata);
-                let cert_type = parse_u16(&mut decoder)?;
-                let key_tag = parse_u16(&mut decoder)?;
-                let algorithm = Algorithm::from_u8(parse_u8(&mut decoder)?).as_str();
-                let crl_len = raw_rdata.len() as u16 - 5;
-                let crl = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, crl_len)?);
-                Ok((
-                    Some(format!("{} {} {} {}", cert_type, key_tag, algorithm, crl)),
-                    None,
-                ))
-            }
-
             dns_message::RTYPE_A6 => self.parse_a6_rdata(rdata.anything()),
 
             dns_message::RTYPE_SINK => {
@@ -560,6 +544,20 @@ impl DnsMessageParser {
             RData::AAAA(ip) => Ok((Some(ip.to_string()), None)),
             RData::ANAME(name) => Ok((Some(name.to_string_with_options(&self.options)), None)),
             RData::CNAME(name) => Ok((Some(name.to_string_with_options(&self.options)), None)),
+            RData::CERT(cert) => {
+                let crl = BASE64.encode(&cert.cert_data());
+                Ok((
+                    Some(format!(
+                        "{} {} {} {}",
+                        u16::from(cert.cert_type()),
+                        cert.key_tag(),
+                        cert.algorithm(),
+                        crl
+                    )),
+                    None,
+                ))
+            }
+
             RData::CSYNC(csync) => {
                 // Using CSYNC's formatter since not all data is exposed otherwise
                 let csync_rdata = format!("{}", csync);
@@ -796,8 +794,8 @@ impl DnsMessageParser {
                         u8::from(sig.algorithm()),
                         sig.num_labels(),
                         sig.original_ttl(),
-                        sig.sig_expiration(), // currently in epoch convert to human readable ?
-                        sig.sig_inception(),  // currently in epoch convert to human readable ?
+                        sig.sig_expiration().get(), // currently in epoch convert to human readable ?
+                        sig.sig_inception().get(), // currently in epoch convert to human readable ?
                         sig.key_tag(),
                         sig.signer_name().to_string_with_options(&self.options),
                         BASE64.encode(sig.sig())
@@ -816,8 +814,8 @@ impl DnsMessageParser {
                         u8::from(sig.algorithm()),
                         sig.num_labels(),
                         sig.original_ttl(),
-                        sig.sig_expiration(), // currently in epoch convert to human readable ?
-                        sig.sig_inception(),  // currently in epoch convert to human readable ?
+                        sig.sig_expiration().get(), // currently in epoch convert to human readable ?
+                        sig.sig_inception().get(), // currently in epoch convert to human readable ?
                         sig.key_tag(),
                         sig.signer_name().to_string_with_options(&self.options),
                         BASE64.encode(sig.sig())
@@ -966,7 +964,7 @@ fn parse_edns(dns_message: &TrustDnsMessage) -> Option<DnsParserResult<OptPseudo
         parse_edns_options(edns.options()).map(|(ede, rest)| OptPseudoSection {
             extended_rcode: edns.rcode_high(),
             version: edns.version(),
-            dnssec_ok: edns.dnssec_ok(),
+            dnssec_ok: edns.flags().dnssec_ok,
             udp_max_payload_size: edns.max_payload(),
             ede,
             options: rest,
@@ -993,7 +991,7 @@ fn parse_edns_options(edns: &OPT) -> DnsParserResult<(Vec<EDE>, Vec<EdnsOptionEn
     let rest: Vec<EdnsOptionEntry> = edns
         .as_ref()
         .iter()
-        .filter(|(&code, _)| u16::from(code) != EDE_OPTION_CODE)
+        .filter(|(code, _)| u16::from(*code) != EDE_OPTION_CODE)
         .map(|(code, option)| match option {
             EdnsOption::DAU(algorithms)
             | EdnsOption::DHU(algorithms)
@@ -1268,7 +1266,6 @@ fn format_bytes_as_hex_string(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashMap,
         net::{Ipv4Addr, Ipv6Addr},
         str::FromStr,
     };
@@ -1297,7 +1294,13 @@ mod tests {
             CAA, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
         },
     };
-    use hickory_proto::serialize::binary::Restrict;
+    use hickory_proto::{
+        rr::rdata::{
+            cert::{Algorithm as CertAlgorithm, CertType},
+            CERT,
+        },
+        serialize::binary::Restrict,
+    };
 
     use super::*;
 
@@ -1380,6 +1383,29 @@ mod tests {
             opt_pseudo_section.ede[0].extra_text(),
             Some("no SEP matching the DS found for dnssec-failed.org.".to_string())
         );
+    }
+
+    #[test]
+    fn test_parse_as_query_message_with_multiple_ede() {
+        let raw_dns_message =
+            "szgAAAABAAAAAAABAmg1B2V4YW1wbGUDY29tAAAGAAEAACkAAAEBQAAADAAPAAIAFQAPAAIAFA==";
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let parse_result = DnsMessageParser::new(raw_query_message).parse_as_query_message();
+        assert!(parse_result.is_ok());
+        let message = parse_result.expect("Message is not parsed.");
+        let opt_pseudo_section = message.opt_pseudo_section.expect("OPT section was missing");
+        assert_eq!(opt_pseudo_section.ede.len(), 2);
+        assert_eq!(opt_pseudo_section.ede[0].info_code(), 21u16);
+        assert_eq!(opt_pseudo_section.ede[0].purpose(), Some("Not Supported"));
+        assert_eq!(opt_pseudo_section.ede[0].extra_text(), None);
+        assert_eq!(opt_pseudo_section.ede[1].info_code(), 20u16);
+        assert_eq!(
+            opt_pseudo_section.ede[1].purpose(),
+            Some("Not Authoritative")
+        );
+        assert_eq!(opt_pseudo_section.ede[1].extra_text(), None);
     }
 
     #[test]
@@ -1985,17 +2011,41 @@ mod tests {
 
     #[test]
     fn test_format_rdata_for_opt_type() {
-        let mut options = HashMap::new();
-        options.insert(
+        let options = vec![(
             EdnsCode::LLQ,
             EdnsOption::Unknown(u16::from(EdnsCode::LLQ), vec![0x01; 18]),
-        );
+        )];
         let rdata = RData::OPT(OPT::new(options));
         let rdata_text = format_rdata(&rdata);
         assert!(rdata_text.is_ok());
         if let Ok((parsed, raw_rdata)) = rdata_text {
             assert!(raw_rdata.is_none());
             assert_eq!("LLQ=AQEBAQEBAQEBAQEBAQEBAQEB", parsed.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_cert_type() {
+        let rdata = RData::CERT(CERT::new(
+            CertType::Experimental(65534),
+            65535,
+            CertAlgorithm::RSASHA1,
+            BASE64
+                .decode(
+                    b"MxFcby9k/yvedMfQgKzhH5er0Mu/vILz4\
+                5IkskceFGgiWCn/GxHhai6VAuHAoNUz4YoU1tVfSCSqQYn6//11U6Nld80jEeC8aTrO+KKmCaY=",
+                )
+                .unwrap(),
+        ));
+        let rdata_text = format_rdata(&rdata);
+        assert!(rdata_text.is_ok());
+        if let Ok((parsed, raw_rdata)) = rdata_text {
+            assert!(raw_rdata.is_none());
+            assert_eq!(
+                "65534 65535 RSASHA1 MxFcby9k/yvedMfQgKzhH5er0Mu/vILz4\
+                5IkskceFGgiWCn/GxHhai6VAuHAoNUz4YoU1tVfSCSqQYn6//11U6Nld80jEeC8aTrO+KKmCaY=",
+                parsed.unwrap()
+            );
         }
     }
 
@@ -2127,17 +2177,6 @@ mod tests {
             "AAoCYWEHZXhhbXBsZQNjb20A",
             36,
             "10 aa.example.com.",
-        );
-    }
-
-    #[test]
-    fn test_format_rdata_for_cert_type() {
-        test_format_rdata(
-            "//7//wUzEVxvL2T/K950x9CArOEfl6vQy7+8gvPjkiSyRx4UaCJYKf8bEeFq\
-            LpUC4cCg1TPhihTW1V9IJKpBifr//XVTo2V3zSMR4LxpOs74oqYJpg==",
-            37,
-            "65534 65535 RSASHA1 MxFcby9k/yvedMfQgKzhH5er0Mu/vILz4\
-            5IkskceFGgiWCn/GxHhai6VAuHAoNUz4YoU1tVfSCSqQYn6//11U6Nld80jEeC8aTrO+KKmCaY=",
         );
     }
 
