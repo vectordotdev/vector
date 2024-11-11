@@ -371,7 +371,9 @@ impl SourceConfig for SimpleHttpConfig {
 
         let source = SimpleHttpSource {
             headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"))?,
-            custom_response_headers: self.custom_response_headers.clone(),
+            custom_response_headers: self.custom_response_headers.clone().into_iter().map(|(k, v)| {
+                (k.parse().unwrap(), v.into_iter().map(|v| v.parse().unwrap()).collect())
+            }).collect(),
             query_parameters: remove_duplicates(self.query_parameters.clone(), "query_parameters"),
             path_key: self.path_key.clone(),
             host_key: self.host_key.clone(),
@@ -420,7 +422,7 @@ impl SourceConfig for SimpleHttpConfig {
 #[derive(Clone)]
 struct SimpleHttpSource {
     headers: Vec<HttpConfigParamKind>,
-    custom_response_headers: HashMap<String, Vec<String>>,
+    custom_response_headers: HashMap<HeaderName, Vec<HeaderValue>>,
     query_parameters: Vec<String>,
     path_key: OptionalValuePath,
     host_key: OptionalValuePath,
@@ -572,12 +574,8 @@ impl HttpSource for SimpleHttpSource {
         let header_map = response.headers_mut();
 
         for (key, values) in &self.custom_response_headers {
-            let header_name: HeaderName = key.parse().unwrap();
-            if let Some((first, rest)) = values.split_first() {
-                header_map.insert(header_name.clone(), first.parse().unwrap());
-                for value in rest {
-                    header_map.append(header_name.clone(), value.parse().unwrap());
-                }
+            for value in values {
+                header_map.append(key.clone(), value.clone());
             }
         }
         Box::new(response)
