@@ -14,7 +14,6 @@ fi
 if [[ "$(cargo-nextest --version)" != "cargo-nextest 0.9.72" ]] ; then
   rustup run stable cargo install cargo-nextest --version 0.9.72 --force --locked
 fi
-if ! cargo deny --version >& /dev/null ; then
 if [[ "$(cargo-deny --version)" != "cargo-deny 0.16.1" ]] ; then
   rustup run stable cargo install cargo-deny --version 0.16.1 --force --locked
 fi
