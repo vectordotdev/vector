@@ -12,6 +12,7 @@ badges:
 ---
 
 ### Functionality
+
 The `ExclusiveRoute` transform splits an event stream into unique sub-streams based on user-defined conditions. Each event will only be
 routed to a single stream. This transforms complements the existing [Route transform][docs.transforms.route].
 
@@ -20,6 +21,7 @@ A visual representation:
 <img src="../../../static/img/exclusive_route.svg" alt="Vector">
 
 ### Config Example
+
 Let's see an example that demonstrates the above:
 
 ```yaml
