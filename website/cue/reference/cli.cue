@@ -638,18 +638,18 @@ cli: {
 		}
 		VECTOR_WATCH_CONFIG_METHOD: {
 			description: """
-                Method for watching config files.
+				Method for watching config files.
 
-                `recommend` - recommended event based watcher for host OS
-                `poll` - `poll` watcher can be used in cases where event based watcher doesn't work, e.g., when attaching the configuration via NFS.
-                """
+				`recommend` - recommended event based watcher for host OS
+				`poll` - `poll` watcher can be used in cases where event based watcher doesn't work, e.g., when attaching the configuration via NFS.
+				"""
 			type: string: default: "recommended"
 		}
 		VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS: {
 			description: """
-                Poll for config changes at given interval
-                only applicable if `poll` is set in `--watch-config-method`
-                """
+				Poll for config changes at given interval
+				only applicable if `poll` is set in `--watch-config-method`
+				"""
 			type: uint: {
 				default: 30
 				unit:    "seconds"
