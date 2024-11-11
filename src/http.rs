@@ -976,7 +976,8 @@ mod tests {
         Server,
     };
     use proptest::prelude::*;
-    use rustls::{Certificate, PrivateKey, RootCertStore, ServerConfig};
+    use rustls::{RootCertStore, ServerConfig};
+    use rustls_pki_types::{CertificateDer, PrivateKeyDer};
     use tokio::net::TcpListener;
     use tokio_rustls::TlsAcceptor;
     use tower::ServiceBuilder;
@@ -1395,22 +1396,22 @@ mod tests {
         });
 
         // Load a certificates.
-        fn load_certs(path: &str) -> Vec<Certificate> {
+        fn load_certs(path: &str) -> Vec<CertificateDer> {
             let certfile = File::open(path).unwrap();
             let mut reader = BufReader::new(certfile);
             rustls_pemfile::certs(&mut reader)
                 .unwrap()
                 .into_iter()
-                .map(Certificate)
+                .map(CertificateDer::from)
                 .collect()
         }
 
         // Load a private key.
-        fn load_private_key(path: &str) -> PrivateKey {
+        fn load_private_key(path: &str) -> PrivateKeyDer {
             let keyfile = File::open(path).unwrap();
             let mut reader = BufReader::new(keyfile);
             let keys = rustls_pemfile::rsa_private_keys(&mut reader).unwrap();
-            PrivateKey(keys[0].clone())
+            PrivateKeyDer::try_from(keys[0].clone()).unwrap()
         }
 
         // Load a server tls context to validate client.
@@ -1419,15 +1420,17 @@ mod tests {
         let client_certs = load_certs("tests/data/ca/intermediate_client/certs/ca-chain.cert.pem");
         let mut root_store = RootCertStore::empty();
         for cert in client_certs {
-            root_store.add(&cert).unwrap();
+            root_store.add(cert).unwrap();
         }
 
         tokio::spawn(async move {
             let tls_config = ServerConfig::builder()
-                .with_safe_defaults()
-                .with_client_cert_verifier(rustls::server::AllowAnyAuthenticatedClient::new(
-                    root_store,
-                ))
+                .with_client_cert_verifier(
+                    rustls::server::WebPkiClientVerifier::builder(root_store.into())
+                        .allow_unauthenticated()
+                        .build()
+                        .unwrap(),
+                )
                 .with_single_cert(certs, key)
                 .unwrap();
 

@@ -414,9 +414,10 @@ vrl.workspace = true
 wiremock = "0.6.2"
 zstd = { version = "0.13.0", default-features = false }
 
-tokio-rustls = "0.23"
-rustls = "0.20"
+tokio-rustls = "0.26"
+rustls = "0.23"
 rustls-pemfile = "0.3"
+rustls-pki-types = "1.9"
 
 [patch.crates-io]
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
