@@ -119,7 +119,7 @@ pub(crate) fn generate_example(
 ) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = opts
         .expression
-        .split(|c| c == '|' || c == '/')
+        .split(['|', '/'])
         .map(|s| {
             s.split(',')
                 .map(|s| s.trim().to_string())
@@ -667,7 +667,7 @@ mod tests {
 
         assert_eq!(
             generate_example(&opts, TransformInputsStrategy::Auto).unwrap(),
-            indoc::indoc! {r#"
+            indoc::indoc! {r"
             data_dir: /var/lib/vector/
             sources:
               source0:
@@ -706,7 +706,7 @@ mod tests {
                   type: memory
                   max_events: 500
                   when_full: block
-            "#}
+            "}
         );
     }
 

@@ -52,6 +52,7 @@ pub struct MqttSink {
     encoder: Encoder<()>,
     connector: MqttConnector,
     quality_of_service: MqttQoS,
+    retain: bool,
 }
 
 pub(super) struct MqttEvent {
@@ -70,6 +71,7 @@ impl MqttSink {
             encoder,
             connector,
             quality_of_service: config.quality_of_service,
+            retain: config.retain,
         })
     }
 
@@ -115,6 +117,7 @@ impl MqttSink {
         let service = ServiceBuilder::new().service(MqttService {
             client,
             quality_of_service: self.quality_of_service,
+            retain: self.retain,
         });
 
         let request_builder = MqttRequestBuilder {

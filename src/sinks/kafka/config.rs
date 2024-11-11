@@ -149,7 +149,7 @@ impl KafkaSinkConfig {
             .set("bootstrap.servers", &self.bootstrap_servers)
             .set(
                 "socket.timeout.ms",
-                &self.socket_timeout_ms.as_millis().to_string(),
+                self.socket_timeout_ms.as_millis().to_string(),
             )
             .set("statistics.interval.ms", "1000");
 
@@ -157,10 +157,10 @@ impl KafkaSinkConfig {
 
         // All batch options are producer only.
         client_config
-            .set("compression.codec", &to_string(self.compression))
+            .set("compression.codec", to_string(self.compression))
             .set(
                 "message.timeout.ms",
-                &self.message_timeout_ms.as_millis().to_string(),
+                self.message_timeout_ms.as_millis().to_string(),
             );
 
         if let Some(value) = self.batch.timeout_secs {
@@ -181,7 +181,7 @@ impl KafkaSinkConfig {
                 value,
                 "Applying batch option as librdkafka option."
             );
-            client_config.set(key, &((value * 1000.0).round().to_string()));
+            client_config.set(key, (value * 1000.0).round().to_string());
         }
         if let Some(value) = self.batch.max_events {
             // Maximum number of messages batched in one MessageSet. The total MessageSet size is
@@ -199,7 +199,7 @@ impl KafkaSinkConfig {
                 value,
                 "Applying batch option as librdkafka option."
             );
-            client_config.set(key, &value.to_string());
+            client_config.set(key, value.to_string());
         }
         if let Some(value) = self.batch.max_bytes {
             // Maximum size (in bytes) of all messages batched in one MessageSet, including protocol
@@ -220,7 +220,7 @@ impl KafkaSinkConfig {
                 value,
                 "Applying batch option as librdkafka option."
             );
-            client_config.set(key, &value.to_string());
+            client_config.set(key, value.to_string());
         }
 
         for (key, value) in self.librdkafka_options.iter() {

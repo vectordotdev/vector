@@ -1,6 +1,3 @@
-use crate::event::util::log::all_fields_skip_array_elements;
-use bytes::Bytes;
-use chrono::Utc;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
@@ -8,12 +5,15 @@ use std::{
     iter::FromIterator,
     mem::size_of,
     num::NonZeroUsize,
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
+
+use crate::event::util::log::all_fields_skip_array_elements;
+use bytes::Bytes;
+use chrono::Utc;
 
 use crossbeam_utils::atomic::AtomicCell;
 use lookup::{lookup_v2::TargetPath, metadata_path, path, PathPrefix};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
     byte_size_of::ByteSizeOf,
@@ -36,7 +36,7 @@ use crate::config::{log_schema, telemetry};
 use crate::event::util::log::{all_fields, all_metadata_fields};
 use crate::event::MaybeAsLogMut;
 
-static VECTOR_SOURCE_TYPE_PATH: Lazy<Option<OwnedTargetPath>> = Lazy::new(|| {
+static VECTOR_SOURCE_TYPE_PATH: LazyLock<Option<OwnedTargetPath>> = LazyLock::new(|| {
     Some(OwnedTargetPath::metadata(owned_value_path!(
         "vector",
         "source_type"
@@ -455,11 +455,24 @@ impl LogEvent {
         }
     }
 
-    /// Returns an iterator of all fields if the value is an Object. Otherwise,
-    /// a single field is returned with a "message" key
+    /// Returns an iterator of all fields if the value is an Object. Otherwise, a single field is
+    /// returned with a "message" key. Field names that are could be interpreted as alternate paths
+    /// (i.e. containing periods, square brackets, etc) are quoted.
     pub fn convert_to_fields(&self) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
         if let Some(map) = self.as_map() {
             util::log::all_fields(map)
+        } else {
+            util::log::all_fields_non_object_root(self.value())
+        }
+    }
+
+    /// Returns an iterator of all fields if the value is an Object. Otherwise, a single field is
+    /// returned with a "message" key. Field names are not quoted.
+    pub fn convert_to_fields_unquoted(
+        &self,
+    ) -> impl Iterator<Item = (KeyString, &Value)> + Serialize {
+        if let Some(map) = self.as_map() {
+            util::log::all_fields_unquoted(map)
         } else {
             util::log::all_fields_non_object_root(self.value())
         }
@@ -612,7 +625,7 @@ impl EventDataEq for LogEvent {
 
 #[cfg(any(test, feature = "test"))]
 mod test_utils {
-    use super::*;
+    use super::{log_schema, Bytes, LogEvent, Utc};
 
     // these rely on the global log schema, which is no longer supported when using the
     // "LogNamespace::Vector" namespace.
@@ -748,7 +761,7 @@ struct TracingTargetPaths {
 }
 
 /// Lazily initialized singleton.
-static TRACING_TARGET_PATHS: Lazy<TracingTargetPaths> = Lazy::new(|| TracingTargetPaths {
+static TRACING_TARGET_PATHS: LazyLock<TracingTargetPaths> = LazyLock::new(|| TracingTargetPaths {
     timestamp: OwnedTargetPath::event(owned_value_path!("timestamp")),
     kind: OwnedTargetPath::event(owned_value_path!("metadata", "kind")),
     level: OwnedTargetPath::event(owned_value_path!("metadata", "level")),
@@ -820,6 +833,7 @@ mod test {
     use super::*;
     use crate::test_util::open_fixture;
     use lookup::event_path;
+    use uuid::Version;
     use vrl::{btreemap, value};
 
     // The following two tests assert that renaming a key has no effect if the
@@ -1177,6 +1191,26 @@ mod test {
                 ("arr".into(), [1].into()),
                 ("obj.arr".into(), [1, 2, 3].into())
             ]
+        );
+    }
+
+    #[test]
+    fn metadata_set_unique_uuid_v7_source_event_id() {
+        // Check if event id is UUID v7
+        let log1 = LogEvent::default();
+        assert_eq!(
+            log1.metadata()
+                .source_event_id()
+                .expect("source_event_id should be auto-generated for new events")
+                .get_version(),
+            Some(Version::SortRand)
+        );
+
+        // Check if event id is unique on creation
+        let log2 = LogEvent::default();
+        assert_ne!(
+            log1.metadata().source_event_id(),
+            log2.metadata().source_event_id()
         );
     }
 }

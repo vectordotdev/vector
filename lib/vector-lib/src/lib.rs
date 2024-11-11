@@ -9,7 +9,7 @@ pub use vector_buffers as buffers;
 pub use vector_common::event_test_util;
 pub use vector_common::{
     assert_event_data_eq, btreemap, byte_size_of, byte_size_of::ByteSizeOf, conversion,
-    encode_logfmt, finalization, finalizer, impl_event_data_eq, internal_event, json_size,
+    encode_logfmt, finalization, finalizer, id, impl_event_data_eq, internal_event, json_size,
     registered_event, request_metadata, sensitive_string, shutdown, trigger, Error, Result,
     TimeZone,
 };
@@ -25,6 +25,8 @@ pub use vector_core::{
 pub use vector_lookup as lookup;
 pub use vector_stream as stream;
 pub use vector_tap as tap;
+#[cfg(feature = "vrl")]
+pub use vrl;
 
 pub mod config {
     pub use vector_common::config::ComponentKey;

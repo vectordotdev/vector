@@ -1,0 +1,17 @@
+{
+  "collections": [
+    {
+      "name": "vector_docs_v1",
+      "synonyms": [],
+      "presets": [
+        {
+          "name": "vector_docs_search",
+          "search_parameters": {
+            "sort_by": "level:desc,ranking:desc,_text_match:desc",
+            "query_by": "content,hierarchy,title,tags"
+          }
+        }
+      ]
+    }
+  ]
+}

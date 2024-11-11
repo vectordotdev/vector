@@ -1,14 +1,11 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::{
-    error::Error as _, future::Future, pin::Pin, sync::Arc, task::Context, task::Poll,
-    time::Duration,
-};
+use std::sync::{Arc, LazyLock};
+use std::{error::Error as _, future::Future, pin::Pin, task::Context, task::Poll, time::Duration};
 
 use chrono::DateTime;
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
-use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
@@ -108,7 +105,7 @@ pub(crate) enum PubsubError {
     InvalidAckDeadline,
 }
 
-static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
+static CLIENT_ID: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
 
 /// Configuration for the `gcp_pubsub` source.
 #[serde_as]
@@ -829,13 +826,13 @@ mod tests {
 #[cfg(all(test, feature = "gcp-integration-tests"))]
 mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
+    use std::sync::LazyLock;
 
     use base64::prelude::{Engine as _, BASE64_STANDARD};
     use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
     use http::method::Method;
     use hyper::{Request, StatusCode};
-    use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
     use vrl::btreemap;
@@ -847,9 +844,9 @@ mod integration_tests {
     use crate::{event::EventStatus, gcp, http::HttpClient, shutdown, SourceSender};
 
     const PROJECT: &str = "sourceproject";
-    static PROJECT_URI: Lazy<String> =
-        Lazy::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
-    static ACK_DEADLINE: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
+    static PROJECT_URI: LazyLock<String> =
+        LazyLock::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
+    static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
     #[tokio::test]
     async fn oneshot() {
@@ -1109,7 +1106,7 @@ mod integration_tests {
             let response = self.client.send(request).await.unwrap();
             assert_eq!(response.status(), StatusCode::OK);
             let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-            serde_json::from_str(&String::from_utf8(body.to_vec()).unwrap()).unwrap()
+            serde_json::from_str(core::str::from_utf8(&body).unwrap()).unwrap()
         }
 
         async fn shutdown_check(&self, shutdown: shutdown::SourceShutdownCoordinator) {

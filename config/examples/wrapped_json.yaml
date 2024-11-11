@@ -24,13 +24,13 @@ transforms:
     drop_on_error: false
     source: |
       message = del(.message)
-      . |= parse_json!(string!(message))
+      . |= object!(parse_json!(string!(message)))
 
       parent = del(.parent)
-      . |= parse_json!(string!(parent))
+      . |= object!(parse_json!(string!(parent)))
 
       child = del(.child)
-      . |= parse_json!(string!(child))
+      . |= object!(parse_json!(string!(child)))
 
 # Print the data to STDOUT for inspection
 # Docs: https://vector.dev/docs/reference/sinks/console

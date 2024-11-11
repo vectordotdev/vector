@@ -1,0 +1,1 @@
+{"metric":{"name":"p","namespace":"b","tags":{"b":"c","c":"p","z":"n"},"interval_ms":1581128618,"kind":"absolute","counter":{"value":308480.0}}}
