@@ -1344,7 +1344,7 @@ dependencies = [
  "serde",
  "sync_wrapper 0.1.2",
  "tokio",
- "tower",
+ "tower 0.4.13",
  "tower-layer",
  "tower-service",
 ]
@@ -1371,7 +1371,7 @@ dependencies = [
  "rustversion",
  "serde",
  "sync_wrapper 1.0.1",
- "tower",
+ "tower 0.4.13",
  "tower-layer",
  "tower-service",
 ]
@@ -3990,7 +3990,7 @@ dependencies = [
  "tokio-stream",
  "tonic 0.11.0",
  "tonic-build 0.9.2",
- "tower",
+ "tower 0.4.13",
 ]
 
 [[package]]
@@ -5309,8 +5309,8 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util",
- "tower",
- "tower-http",
+ "tower 0.4.13",
+ "tower-http 0.4.4",
  "tracing 0.1.40",
 ]
 
@@ -10041,7 +10041,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.25.0",
  "tokio-stream",
- "tower",
+ "tower 0.4.13",
  "tower-layer",
  "tower-service",
  "tracing 0.1.40",
@@ -10072,7 +10072,7 @@ dependencies = [
  "socket2 0.5.7",
  "tokio",
  "tokio-stream",
- "tower",
+ "tower 0.4.13",
  "tower-layer",
  "tower-service",
  "tracing 0.1.40",
@@ -10125,12 +10125,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "tower"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36b837f86b25d7c0d7988f00a54e74739be6477f2aac6201b8f429a7569991b7"
+dependencies = [
+ "futures-core",
+ "futures-util",
+ "indexmap 2.6.0",
+ "pin-project-lite",
+ "slab",
+ "sync_wrapper 0.1.2",
+ "tokio",
+ "tokio-util",
+ "tower-layer",
+ "tower-service",
+ "tracing 0.1.40",
+]
+
+[[package]]
 name = "tower-http"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61c5bb1d698276a2443e5ecfabc1008bf15a36c12e6a7176e7bf089ea9131140"
 dependencies = [
- "async-compression",
  "base64 0.21.7",
  "bitflags 2.4.1",
  "bytes 1.8.0",
@@ -10140,6 +10158,25 @@ dependencies = [
  "http-body 0.4.5",
  "http-range-header",
  "mime",
+ "pin-project-lite",
+ "tower-layer",
+ "tower-service",
+ "tracing 0.1.40",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e9cd434a998747dd2c4276bc96ee2e0c7a2eadf3cae88e52be55a05fa9053f5"
+dependencies = [
+ "async-compression",
+ "bitflags 2.4.1",
+ "bytes 1.8.0",
+ "futures-core",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
  "pin-project-lite",
  "tokio",
  "tokio-util",
@@ -10942,8 +10979,8 @@ dependencies = [
  "toml",
  "tonic 0.11.0",
  "tonic-build 0.11.0",
- "tower",
- "tower-http",
+ "tower 0.5.0",
+ "tower-http 0.5.2",
  "tower-test",
  "tracing 0.1.40",
  "tracing-core 0.1.32",
@@ -11244,7 +11281,7 @@ dependencies = [
  "rand_distr",
  "tokio",
  "tokio-util",
- "tower",
+ "tower 0.5.0",
  "tracing 0.1.40",
  "twox-hash",
  "vector-common",
