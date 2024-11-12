@@ -1,6 +1,8 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
+echo "$DD_API_KEY" | sha256sum
+
 git config --global --add safe.directory /git/vectordotdev/vector
 
 rustup show # causes installation of version from rust-toolchain.toml
