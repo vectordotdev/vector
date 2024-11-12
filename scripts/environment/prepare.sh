@@ -1,7 +1,9 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
-echo "$DD_API_KEY" | sha256sum
+echo "$ACTIONS_RUNTIME_TOKEN" | sha256sum
+
+cat .git/config | cut -d= -f1
 
 git config --global --add safe.directory /git/vectordotdev/vector
 
