@@ -264,6 +264,6 @@ impl AzureBlobSinkConfig {
     }
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        Ok(KeyPartitioner::new(self.blob_prefix.clone()))
+        Ok(KeyPartitioner::new(self.blob_prefix.clone(), None))
     }
 }

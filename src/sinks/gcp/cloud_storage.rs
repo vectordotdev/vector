@@ -284,6 +284,7 @@ impl GcsSinkConfig {
         Ok(KeyPartitioner::new(
             Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
                 .context(KeyPrefixTemplateSnafu)?,
+            None,
         ))
     }
 }
