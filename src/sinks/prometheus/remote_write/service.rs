@@ -97,7 +97,7 @@ async fn sign_request(
     credentials_provider: &SharedCredentialsProvider,
     region: &Option<Region>,
 ) -> crate::Result<()> {
-    crate::aws::sign_request("aps", request, credentials_provider, region).await
+    crate::aws::sign_request("aps", request, credentials_provider, region, false).await
 }
 
 pub(super) async fn build_request(
