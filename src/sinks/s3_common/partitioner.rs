@@ -9,7 +9,11 @@ pub struct S3PartitionKey {
 }
 
 /// Partitions items based on the generated key for the given event.
-pub struct S3KeyPartitioner(Template, Option<Template>, Option<String>);
+pub struct S3KeyPartitioner {
+    key_prefix_template: Template,
+    ssekms_key_id_template: Option<Template>,
+    dead_letter_key_prefix: Option<String>,
+}
 
 impl S3KeyPartitioner {
     pub const fn new(
@@ -17,11 +21,11 @@ impl S3KeyPartitioner {
         ssekms_key_id_template: Option<Template>,
         dead_letter_key_prefix: Option<String>,
     ) -> Self {
-        Self(
+        Self {
             key_prefix_template,
             ssekms_key_id_template,
             dead_letter_key_prefix,
-        )
+        }
     }
 }
 
@@ -31,10 +35,10 @@ impl Partitioner for S3KeyPartitioner {
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
         let key_prefix = self
-            .0
+            .key_prefix_template
             .render_string(item)
             .or_else(|error| {
-                if let Some(dead_letter_key_prefix) = &self.2 {
+                if let Some(dead_letter_key_prefix) = &self.dead_letter_key_prefix {
                     emit!(TemplateRenderingError {
                         error,
                         field: Some("key_prefix"),
@@ -52,7 +56,7 @@ impl Partitioner for S3KeyPartitioner {
             .ok()?;
 
         let ssekms_key_id = self
-            .1
+            .ssekms_key_id_template
             .as_ref()
             .map(|ssekms_key_id| {
                 ssekms_key_id.render_string(item).map_err(|error| {
