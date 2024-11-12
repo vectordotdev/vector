@@ -6,6 +6,7 @@ pub mod batch;
 pub mod buffer;
 pub mod builder;
 pub mod compressor;
+pub mod datagram;
 pub mod encoding;
 pub mod http;
 pub mod metadata;

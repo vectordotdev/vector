@@ -9,11 +9,10 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
-use vector_lib::event::EventStatus;
 use vector_lib::json_size::JsonSize;
 use vector_lib::{
     configurable::configurable_component,
-    internal_event::{ByteSize, BytesSent, InternalEventHandle, Protocol},
+    internal_event::{BytesSent, Protocol},
 };
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
@@ -21,8 +20,8 @@ use crate::{
     codecs::Transformer,
     event::{Event, Finalizable},
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketEventsSent, SocketMode, UnixSendIncompleteError,
-        UnixSocketConnectionEstablished, UnixSocketOutgoingConnectionError, UnixSocketSendError,
+        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
+        UnixSocketOutgoingConnectionError, UnixSocketSendError,
     },
     sink_ext::VecSinkExt,
     sinks::{
@@ -35,6 +34,8 @@ use crate::{
         Healthcheck, VectorSink,
     },
 };
+
+use super::datagram::{send_datagrams, DatagramSocket};
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
@@ -249,62 +250,25 @@ where
 
         let mut encoder = self.encoder.clone();
         while Pin::new(&mut input).peek().await.is_some() {
-            let mut socket = match self.connector.connect_backoff().await {
+            let socket = match self.connector.connect_backoff().await {
                 UnixEither::Datagram(datagram) => datagram,
                 UnixEither::Stream(_) => {
                     unreachable!("run_datagram is only called with Datagram mode")
                 }
             };
 
-            while let Some(mut event) = input.next().await {
-                let byte_size = event.estimated_json_encoded_size_of();
-
-                self.transformer.transform(&mut event);
-
-                let finalizers = event.take_finalizers();
-                let mut bytes = BytesMut::new();
-
-                // Errors are handled by `Encoder`.
-                if encoder.encode(event, &mut bytes).is_err() {
-                    continue;
-                }
-
-                match udp_send(&mut socket, &bytes).await {
-                    Ok(()) => {
-                        emit!(SocketEventsSent {
-                            mode: SocketMode::Unix,
-                            count: 1,
-                            byte_size,
-                        });
-
-                        bytes_sent.emit(ByteSize(bytes.len()));
-                        finalizers.update_status(EventStatus::Delivered);
-                    }
-                    Err(error) => {
-                        emit!(UnixSocketSendError {
-                            path: &self.connector.path,
-                            error: &error
-                        });
-                        finalizers.update_status(EventStatus::Errored);
-                        break;
-                    }
-                }
-            }
+            send_datagrams(
+                &mut input,
+                DatagramSocket::Unix(socket, self.connector.path.clone()),
+                &self.transformer,
+                &mut encoder,
+                &bytes_sent,
+            )
+            .await;
         }
 
         Ok(())
     }
-}
-
-async fn udp_send(socket: &mut UnixDatagram, buf: &[u8]) -> tokio::io::Result<()> {
-    let sent = socket.send(buf).await?;
-    if sent != buf.len() {
-        emit!(UnixSendIncompleteError {
-            data_size: buf.len(),
-            sent,
-        });
-    }
-    Ok(())
 }
 
 #[async_trait]
