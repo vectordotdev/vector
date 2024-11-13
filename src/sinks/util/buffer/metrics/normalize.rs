@@ -182,25 +182,7 @@ impl MetricSet {
         // introducing a small amount of lag before a metric is emitted by having to wait to see it
         // again, but this is a behavior we have to observe for sinks that can only handle
         // incremental updates.
-        match self.0.get_mut(metric.series()) {
-            Some(reference) => {
-                let new_value = metric.value().clone();
-                // From the stored reference value, emit an increment
-                if metric.subtract(&reference.0) {
-                    reference.0.value = new_value;
-                    Some(metric.into_incremental())
-                } else {
-                    // Metric changed type, store this and emit nothing
-                    self.insert(metric);
-                    None
-                }
-            }
-            None => {
-                // No reference so store this and emit nothing
-                self.insert(metric);
-                None
-            }
-        }
+        Some(metric.into_incremental())
     }
 
     fn insert(&mut self, metric: Metric) {
