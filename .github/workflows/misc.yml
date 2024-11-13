@@ -3,6 +3,9 @@ name: Miscellaneous - Linux
 on:
   workflow_call:
 
+permissions:
+  statuses: write
+
 jobs:
   test-misc:
     runs-on: ubuntu-20.04
