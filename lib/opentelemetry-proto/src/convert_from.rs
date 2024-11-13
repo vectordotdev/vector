@@ -1,3 +1,13 @@
+use super::proto::{
+    common::v1::{any_value::Value as PBValue, KeyValue},
+    logs::v1::{ResourceLogs, SeverityNumber}
+    ,
+    trace::v1::{
+        span::{Event as SpanEvent, Link},
+        ResourceSpans, Status as SpanStatus,
+    },
+};
+use crate::types::{ResourceLog, ResourceSpan, ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, NAME_KEY, OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY, SCOPE_KEY, SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SOURCE_NAME, SPAN_ID_KEY, TRACE_ID_KEY, VERSION_KEY};
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use lookup::path;
@@ -8,35 +18,7 @@ use vector_core::{
     event::{Event, LogEvent, TraceEvent},
 };
 use vrl::value::KeyString;
-use vrl::{
-    event_path,
-    value::{ObjectMap, Value},
-};
-
-use super::proto::{
-    common::v1::{any_value::Value as PBValue, InstrumentationScope, KeyValue},
-    logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
-    resource::v1::Resource,
-    trace::v1::{
-        span::{Event as SpanEvent, Link},
-        ResourceSpans, Span, Status as SpanStatus,
-    },
-};
-
-const SOURCE_NAME: &str = "opentelemetry";
-
-pub const RESOURCE_KEY: &str = "resources";
-pub const ATTRIBUTES_KEY: &str = "attributes";
-pub const SCOPE_KEY: &str = "scope";
-pub const NAME_KEY: &str = "name";
-pub const VERSION_KEY: &str = "version";
-pub const TRACE_ID_KEY: &str = "trace_id";
-pub const SPAN_ID_KEY: &str = "span_id";
-pub const SEVERITY_TEXT_KEY: &str = "severity_text";
-pub const SEVERITY_NUMBER_KEY: &str = "severity_number";
-pub const OBSERVED_TIMESTAMP_KEY: &str = "observed_timestamp";
-pub const DROPPED_ATTRIBUTES_COUNT_KEY: &str = "dropped_attributes_count";
-pub const FLAGS_KEY: &str = "flags";
+use vrl::{event_path, value::{ObjectMap, Value}};
 
 impl ResourceLogs {
     pub fn into_event_iter(self, log_namespace: LogNamespace) -> impl Iterator<Item = Event> {
@@ -54,146 +36,6 @@ impl ResourceLogs {
                 .into_event(log_namespace, now)
             })
         })
-    }
-}
-
-impl ResourceSpans {
-    pub fn into_event_iter(self) -> impl Iterator<Item = Event> {
-        let resource = self.resource;
-        let now = Utc::now();
-
-        self.scope_spans
-            .into_iter()
-            .flat_map(|instrumentation_library_spans| instrumentation_library_spans.spans)
-            .map(move |span| {
-                ResourceSpan {
-                    resource: resource.clone(),
-                    span,
-                }
-                .into_event(now)
-            })
-    }
-}
-
-impl From<PBValue> for Value {
-    fn from(av: PBValue) -> Self {
-        match av {
-            PBValue::StringValue(v) => Value::Bytes(Bytes::from(v)),
-            PBValue::BoolValue(v) => Value::Boolean(v),
-            PBValue::IntValue(v) => Value::Integer(v),
-            PBValue::DoubleValue(v) => Value::Float(NotNan::new(v).unwrap()),
-            PBValue::BytesValue(v) => Value::Bytes(Bytes::from(v)),
-            PBValue::ArrayValue(arr) => Value::Array(
-                arr.values
-                    .into_iter()
-                    .map(|av| av.value.map(Into::into).unwrap_or(Value::Null))
-                    .collect::<Vec<Value>>(),
-            ),
-            PBValue::KvlistValue(arr) => kv_list_into_value(arr.values),
-        }
-    }
-}
-
-struct ResourceLog {
-    resource: Option<Resource>,
-    scope: Option<InstrumentationScope>,
-    log_record: LogRecord,
-}
-
-struct ResourceSpan {
-    resource: Option<Resource>,
-    span: Span,
-}
-
-fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
-    Value::Object(
-        arr.into_iter()
-            .filter_map(|kv| {
-                kv.value.map(|av| {
-                    (
-                        kv.key.into(),
-                        av.value.map(Into::into).unwrap_or(Value::Null),
-                    )
-                })
-            })
-            .collect::<ObjectMap>(),
-    )
-}
-
-fn to_hex(d: &[u8]) -> String {
-    if d.is_empty() {
-        return "".to_string();
-    }
-    hex::encode(d)
-}
-
-// Unlike log events(log body + metadata), trace spans are just metadata, so we don't handle log_namespace here,
-// insert all attributes into log root, just like what datadog_agent/traces does.
-impl ResourceSpan {
-    fn into_event(self, now: DateTime<Utc>) -> Event {
-        let mut trace = TraceEvent::default();
-        let span = self.span;
-        trace.insert(
-            event_path!(TRACE_ID_KEY),
-            Value::from(to_hex(&span.trace_id)),
-        );
-        trace.insert(event_path!(SPAN_ID_KEY), Value::from(to_hex(&span.span_id)));
-        trace.insert(event_path!("trace_state"), span.trace_state);
-        trace.insert(
-            event_path!("parent_span_id"),
-            Value::from(to_hex(&span.parent_span_id)),
-        );
-        trace.insert(event_path!("name"), span.name);
-        trace.insert(event_path!("kind"), span.kind);
-        trace.insert(
-            event_path!("start_time_unix_nano"),
-            Value::from(Utc.timestamp_nanos(span.start_time_unix_nano as i64)),
-        );
-        trace.insert(
-            event_path!("end_time_unix_nano"),
-            Value::from(Utc.timestamp_nanos(span.end_time_unix_nano as i64)),
-        );
-        if !span.attributes.is_empty() {
-            trace.insert(
-                event_path!(ATTRIBUTES_KEY),
-                kv_list_into_value(span.attributes),
-            );
-        }
-        trace.insert(
-            event_path!(DROPPED_ATTRIBUTES_COUNT_KEY),
-            Value::from(span.dropped_attributes_count),
-        );
-        if !span.events.is_empty() {
-            trace.insert(
-                event_path!("events"),
-                Value::Array(span.events.into_iter().map(Into::into).collect()),
-            );
-        }
-        trace.insert(
-            event_path!("dropped_events_count"),
-            Value::from(span.dropped_events_count),
-        );
-        if !span.links.is_empty() {
-            trace.insert(
-                event_path!("links"),
-                Value::Array(span.links.into_iter().map(Into::into).collect()),
-            );
-        }
-        trace.insert(
-            event_path!("dropped_links_count"),
-            Value::from(span.dropped_links_count),
-        );
-        trace.insert(event_path!("status"), Value::from(span.status));
-        if let Some(resource) = self.resource {
-            if !resource.attributes.is_empty() {
-                trace.insert(
-                    event_path!(RESOURCE_KEY),
-                    kv_list_into_value(resource.attributes),
-                );
-            }
-        }
-        trace.insert(event_path!("ingest_timestamp"), Value::from(now));
-        trace.into()
     }
 }
 
@@ -382,6 +224,113 @@ impl ResourceLog {
     }
 }
 
+impl ResourceSpans {
+    pub fn into_event_iter(self) -> impl Iterator<Item=Event> {
+        let resource = self.resource;
+        let now = Utc::now();
+
+        self.scope_spans
+            .into_iter()
+            .flat_map(|instrumentation_library_spans| instrumentation_library_spans.spans)
+            .map(move |span| {
+                ResourceSpan {
+                    resource: resource.clone(),
+                    span,
+                }
+                    .into_event(now)
+            })
+    }
+}
+
+// Unlike log events(log body + metadata), trace spans are just metadata, so we don't handle log_namespace here,
+// insert all attributes into log root, just like what datadog_agent/traces does.
+impl ResourceSpan {
+    fn into_event(self, now: DateTime<Utc>) -> Event {
+        let mut trace = TraceEvent::default();
+        let span = self.span;
+        trace.insert(
+            event_path!(TRACE_ID_KEY),
+            Value::from(to_hex(&span.trace_id)),
+        );
+        trace.insert(event_path!(SPAN_ID_KEY), Value::from(to_hex(&span.span_id)));
+        trace.insert(event_path!("trace_state"), span.trace_state);
+        trace.insert(
+            event_path!("parent_span_id"),
+            Value::from(to_hex(&span.parent_span_id)),
+        );
+        trace.insert(event_path!("name"), span.name);
+        trace.insert(event_path!("kind"), span.kind);
+        trace.insert(
+            event_path!("start_time_unix_nano"),
+            Value::from(Utc.timestamp_nanos(span.start_time_unix_nano as i64)),
+        );
+        trace.insert(
+            event_path!("end_time_unix_nano"),
+            Value::from(Utc.timestamp_nanos(span.end_time_unix_nano as i64)),
+        );
+        if !span.attributes.is_empty() {
+            trace.insert(
+                event_path!(ATTRIBUTES_KEY),
+                kv_list_into_value(span.attributes),
+            );
+        }
+        trace.insert(
+            event_path!(DROPPED_ATTRIBUTES_COUNT_KEY),
+            Value::from(span.dropped_attributes_count),
+        );
+        if !span.events.is_empty() {
+            trace.insert(
+                event_path!("events"),
+                Value::Array(span.events.into_iter().map(Into::into).collect()),
+            );
+        }
+        trace.insert(
+            event_path!("dropped_events_count"),
+            Value::from(span.dropped_events_count),
+        );
+        if !span.links.is_empty() {
+            trace.insert(
+                event_path!("links"),
+                Value::Array(span.links.into_iter().map(Into::into).collect()),
+            );
+        }
+        trace.insert(
+            event_path!("dropped_links_count"),
+            Value::from(span.dropped_links_count),
+        );
+        trace.insert(event_path!("status"), Value::from(span.status));
+        if let Some(resource) = self.resource {
+            if !resource.attributes.is_empty() {
+                trace.insert(
+                    event_path!(RESOURCE_KEY),
+                    kv_list_into_value(resource.attributes),
+                );
+            }
+        }
+        trace.insert(event_path!("ingest_timestamp"), Value::from(now));
+        trace.into()
+    }
+}
+
+impl From<PBValue> for Value {
+    fn from(av: PBValue) -> Self {
+        match av {
+            PBValue::StringValue(v) => Value::Bytes(Bytes::from(v)),
+            PBValue::BoolValue(v) => Value::Boolean(v),
+            PBValue::IntValue(v) => Value::Integer(v),
+            PBValue::DoubleValue(v) => Value::Float(NotNan::new(v).unwrap()),
+            PBValue::BytesValue(v) => Value::Bytes(Bytes::from(v)),
+            PBValue::ArrayValue(arr) => Value::Array(
+                arr.values
+                    .into_iter()
+                    .map(|av| av.value.map(Into::into).unwrap_or(Value::Null))
+                    .collect::<Vec<Value>>(),
+            ),
+            PBValue::KvlistValue(arr) => kv_list_into_value(arr.values),
+        }
+    }
+}
+
 impl From<SpanEvent> for Value {
     fn from(ev: SpanEvent) -> Self {
         let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
@@ -421,4 +370,26 @@ impl From<SpanStatus> for Value {
         obj.insert("code".into(), status.code.into());
         Value::Object(obj)
     }
+}
+
+fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
+    Value::Object(
+        arr.into_iter()
+            .filter_map(|kv| {
+                kv.value.map(|av| {
+                    (
+                        kv.key.into(),
+                        av.value.map(Into::into).unwrap_or(Value::Null),
+                    )
+                })
+            })
+            .collect::<ObjectMap>(),
+    )
+}
+
+fn to_hex(d: &[u8]) -> String {
+    if d.is_empty() {
+        return "".to_string();
+    }
+    hex::encode(d)
 }

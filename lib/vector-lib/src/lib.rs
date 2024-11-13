@@ -40,7 +40,7 @@ pub mod config {
 
 #[cfg(feature = "opentelemetry")]
 pub mod opentelemetry {
-    pub use opentelemetry_proto::{convert, proto};
+    pub use opentelemetry_proto::{convert_from, convert_to, proto, types};
 }
 
 #[cfg(feature = "prometheus")]
