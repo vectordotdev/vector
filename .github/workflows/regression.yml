@@ -22,6 +22,9 @@
 
 name: Regression Detection Suite
 
+permissions:
+  statuses: write
+
 on:
   workflow_dispatch:
     inputs:
