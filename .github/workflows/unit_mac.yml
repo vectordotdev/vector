@@ -3,6 +3,9 @@ name: Unit - Mac
 on:
   workflow_call:
 
+permissions:
+  statuses: write
+
 jobs:
   unit-mac:
     runs-on: macos-13
