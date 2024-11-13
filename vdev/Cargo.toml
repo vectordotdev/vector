@@ -20,7 +20,7 @@ dunce = "1.0.5"
 glob.workspace = true
 hex = "0.4.3"
 indexmap.workspace = true
-indicatif = { version = "0.17.8", features = ["improved_unicode"] }
+indicatif = { version = "0.17.9", features = ["improved_unicode"] }
 itertools = "0.13.0"
 log = "0.4.22"
 os_info = { version = "3.8.2", default-features = false }
