@@ -22,9 +22,6 @@
 
 name: Regression Detection Suite
 
-permissions:
-  statuses: write
-
 on:
   workflow_dispatch:
     inputs:
@@ -376,19 +373,6 @@ jobs:
       - upload-baseline-image-to-ecr
       - upload-comparison-image-to-ecr
     steps:
-      - name: Check status, in-progress
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='pending' \
-            -f description='Experiments submitted to the Regression Detection cluster.' \
-            -f context='Regression Detection Suite / submission' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
@@ -450,47 +434,6 @@ jobs:
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job cancel \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
-      - name: Check status, cancelled
-        if: ${{ cancelled() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='failure' \
-            -f description='Experiments submitted to the Regression Detection cluster cancelled.' \
-            -f context='Regression Detection Suite / submission' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, success
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='success' \
-            -f description='Experiments submitted to the Regression Detection cluster successfully.' \
-            -f context='Regression Detection Suite / submission' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, failure
-        if: ${{ failure() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='success' \
-            -f description='Experiments submitted to the Regression Detection Suite failed.' \
-            -f context='Regression Detection Suite / submission' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
   ##
   ## ANALYZE
   ##
@@ -532,47 +475,6 @@ jobs:
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job result \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
-      - name: Check status, cancelled
-        if: ${{ cancelled() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='failure' \
-            -f description='Analyze experimental results from Regression Detection Suite cancelled.' \
-            -f context='Regression Detection Suite / detect-regression' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, success
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='success' \
-            -f description='Analyze experimental results from Regression Detection Suite succeeded.' \
-            -f context='Regression Detection Suite / detect-regression' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, failure
-        if: ${{ failure() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='failure' \
-            -f description='Analyze experimental results from Regression Detection Suite failed.' \
-            -f context='Regression Detection Suite / detect-regression' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
   analyze-experiment:
     name: Download regression analysis & upload report
     runs-on: ubuntu-22.04
@@ -582,19 +484,6 @@ jobs:
       - submit-job
       - resolve-inputs
     steps:
-      - name: Check status, in-progress
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='pending' \
-            -f description='Analyze experimental results from Regression Detection Suite.' \
-            -f context='Regression Detection Suite / analyze-experiment' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
@@ -637,47 +526,6 @@ jobs:
         with:
           name: capture-artifacts
           path: ${{ runner.temp }}/outputs/*
-
-      - name: Check status, cancelled
-        if: ${{ cancelled() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='failure' \
-            -f description='Analyze experimental results from Regression Detection Suite cancelled.' \
-            -f context='Regression Detection Suite / analyze-experiment' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, success
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='success' \
-            -f description='Analyze experimental results from Regression Detection Suite succeeded.' \
-            -f context='Regression Detection Suite / analyze-experiment' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, failure
-        if: ${{ failure() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='failure' \
-            -f description='Analyze experimental results from Regression Detection Suite failed.' \
-            -f context='Regression Detection Suite / analyze-experiment' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   regression-detection-suite:
     name: Set final result
