@@ -198,7 +198,12 @@ pub mod built_info {
 
 /// Returns the host name of the current system.
 pub fn get_hostname() -> std::io::Result<String> {
-    Ok(hostname::get()?.to_string_lossy().into())
+    let hn = option_env!("VECTOR_HOSTNAME").unwrap_or("");
+    Ok(if !hn.is_empty() {
+        hn.to_string()
+    } else {
+        hostname::get()?.to_string_lossy().into()
+    })
 }
 
 /// Spawn a task with the given name. The name is only used if
