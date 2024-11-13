@@ -24,7 +24,7 @@ default-features = false
 features = []
 
 [dependencies.bytes]
-version = "1.7.2"
+version = "1.8.0"
 default-features = false
 features = []
 
@@ -69,7 +69,7 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.40.0"
+version = "1.41.1"
 default-features = false
 features = ["full"]
 

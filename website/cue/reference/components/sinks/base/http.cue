@@ -74,6 +74,209 @@ base: components: sinks: http: configuration: {
 			}
 		}
 	}
+	authorization_config: {
+		description: "Configuration for HTTP client providing an authentication mechanism."
+		required:    false
+		type: object: options: {
+			strategy: {
+				description: """
+					Configuration of the authentication strategy for HTTP requests.
+
+					Define how to authorize against an upstream.
+					"""
+				required: true
+				type: object: options: {
+					client_id: {
+						description:   "The client id."
+						relevant_when: "strategy = \"o_auth2\""
+						required:      true
+						type: string: examples: ["client_id"]
+					}
+					client_secret: {
+						description:   "The sensitive client secret."
+						relevant_when: "strategy = \"o_auth2\""
+						required:      false
+						type: string: examples: ["client_secret"]
+					}
+					grace_period: {
+						description: """
+																The grace period configuration for a bearer token.
+																To avoid random authorization failures caused by expired token exception,
+																we will acquire new token, some time (grace period) before current token will be expired,
+																because of that, we will always execute request with fresh enough token.
+																"""
+						relevant_when: "strategy = \"o_auth2\""
+						required:      false
+						type: uint: {
+							default: 300
+							examples: [300]
+							unit: "seconds"
+						}
+					}
+					password: {
+						description:   "The basic authentication password."
+						relevant_when: "strategy = \"basic\""
+						required:      true
+						type: string: examples: ["password"]
+					}
+					strategy: {
+						description: "The authentication strategy to use."
+						required:    true
+						type: string: enum: {
+							basic: """
+																			Basic authentication.
+
+																			The username and password are concatenated and encoded via [base64][base64].
+
+																			[base64]: https://en.wikipedia.org/wiki/Base64
+																			"""
+							o_auth2: """
+																			Authentication based on OAuth 2.0 protocol.
+
+																			This strategy allows to dynamically acquire and use token based on provided parameters.
+																			Both standard client_credentials and mTLS extension is supported, for standard client_credentials just provide both
+																			client_id and client_secret parameters:
+
+																			# Example
+
+																			```yaml
+																			strategy:
+																			 strategy: "o_auth2"
+																			 client_id: "client.id"
+																			 client_secret: "secret-value"
+																			 token_endpoint: "https://yourendpoint.com/oauth/token"
+																			```
+																			In case you want to use mTLS extension [rfc8705](https://datatracker.ietf.org/doc/html/rfc8705), provide desired key and certificate,
+																			together with client_id (with no client_secret parameter).
+
+																			# Example
+
+																			```yaml
+																			strategy:
+																			 strategy: "o_auth2"
+																			 client_id: "client.id"
+																			 token_endpoint: "https://yourendpoint.com/oauth/token"
+																			tls:
+																			 crt_path: cert.pem
+																			 key_file: key.pem
+																			```
+																			"""
+						}
+					}
+					token_endpoint: {
+						description:   "Token endpoint location, required for token acquisition."
+						relevant_when: "strategy = \"o_auth2\""
+						required:      true
+						type: string: examples: ["https://auth.provider/oauth/token"]
+					}
+					user: {
+						description:   "The basic authentication username."
+						relevant_when: "strategy = \"basic\""
+						required:      true
+						type: string: examples: ["username"]
+					}
+				}
+			}
+			tls: {
+				description: """
+					The TLS settings for the http client's connection.
+
+					Optional, constrains TLS settings for this http client.
+					"""
+				required: false
+				type: object: options: {
+					alpn_protocols: {
+						description: """
+																Sets the list of supported ALPN protocols.
+
+																Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+																that they are defined.
+																"""
+						required: false
+						type: array: items: type: string: examples: ["h2"]
+					}
+					ca_file: {
+						description: """
+																Absolute path to an additional CA certificate file.
+
+																The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+																"""
+						required: false
+						type: string: examples: ["/path/to/certificate_authority.crt"]
+					}
+					crt_file: {
+						description: """
+																Absolute path to a certificate file used to identify this server.
+
+																The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+																an inline string in PEM format.
+
+																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+																"""
+						required: false
+						type: string: examples: ["/path/to/host_certificate.crt"]
+					}
+					key_file: {
+						description: """
+																Absolute path to a private key file used to identify this server.
+
+																The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+																"""
+						required: false
+						type: string: examples: ["/path/to/host_certificate.key"]
+					}
+					key_pass: {
+						description: """
+																Passphrase used to unlock the encrypted key file.
+
+																This has no effect unless `key_file` is set.
+																"""
+						required: false
+						type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+					}
+					server_name: {
+						description: """
+																Server name to use when using Server Name Indication (SNI).
+
+																Only relevant for outgoing connections.
+																"""
+						required: false
+						type: string: examples: ["www.example.com"]
+					}
+					verify_certificate: {
+						description: """
+																Enables certificate verification. For components that create a server, this requires that the
+																client connections have a valid client certificate. For components that initiate requests,
+																this validates that the upstream has a valid certificate.
+
+																If enabled, certificates must not be expired and must be issued by a trusted
+																issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+																certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+																so on until the verification process reaches a root certificate.
+
+																Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+																"""
+						required: false
+						type: bool: {}
+					}
+					verify_hostname: {
+						description: """
+																Enables hostname verification.
+
+																If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+																the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+
+																Only relevant for outgoing connections.
+
+																Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+																"""
+						required: false
+						type: bool: {}
+					}
+				}
+			}
+		}
+	}
 	batch: {
 		description: "Event batching behavior."
 		required:    false
@@ -154,6 +357,91 @@ base: components: sinks: http: configuration: {
 					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 				}
 			}
+			cef: {
+				description:   "The CEF Serializer Options."
+				relevant_when: "codec = \"cef\""
+				required:      true
+				type: object: options: {
+					device_event_class_id: {
+						description: """
+																Unique identifier for each event type. Identifies the type of event reported.
+																The value length must be less than or equal to 1023.
+																"""
+						required: true
+						type: string: {}
+					}
+					device_product: {
+						description: """
+																Identifies the product of a vendor.
+																The part of a unique device identifier. No two products can use the same combination of device vendor and device product.
+																The value length must be less than or equal to 63.
+																"""
+						required: true
+						type: string: {}
+					}
+					device_vendor: {
+						description: """
+																Identifies the vendor of the product.
+																The part of a unique device identifier. No two products can use the same combination of device vendor and device product.
+																The value length must be less than or equal to 63.
+																"""
+						required: true
+						type: string: {}
+					}
+					device_version: {
+						description: """
+																Identifies the version of the problem. In combination with device product and vendor, it composes the unique id of the device that sends messages.
+																The value length must be less than or equal to 31.
+																"""
+						required: true
+						type: string: {}
+					}
+					extensions: {
+						description: """
+																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
+																The event can have any number of key-value pairs in any order.
+																"""
+						required: false
+						type: object: options: "*": {
+							description: "This is a path that points to the extension value of a log event."
+							required:    true
+							type: string: {}
+						}
+					}
+					name: {
+						description: """
+																This is a path that points to the human-readable description of a log event.
+																The value length must be less than or equal to 512.
+																Equals "cef.name" by default.
+																"""
+						required: true
+						type: string: {}
+					}
+					severity: {
+						description: """
+																This is a path that points to the field of a log event that reflects importance of the event.
+																Reflects importance of the event.
+
+																It must point to a number from 0 to 10.
+																0 = Lowest, 10 = Highest.
+																Equals to "cef.severity" by default.
+																"""
+						required: true
+						type: string: {}
+					}
+					version: {
+						description: """
+																CEF Version. Can be either 0 or 1.
+																Equals to "0" by default.
+																"""
+						required: true
+						type: string: enum: {
+							V0: "CEF specification version 0.1."
+							V1: "CEF specification version 1.x."
+						}
+					}
+				}
+			}
 			codec: {
 				description: "The codec to use for encoding events."
 				required:    true
@@ -163,6 +451,7 @@ base: components: sinks: http: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					cef: "Encodes an event as a CEF (Common Event Format) formatted message."
 					csv: """
 						Encodes an event as a CSV message.
 

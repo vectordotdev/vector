@@ -7,26 +7,32 @@ Take a look at those mediums listed at <https://vector.dev/community>
 
 ## How to ask a question about Vector
 
-Whether in our community [Discord][discord] server or [GitHub Discussions][discussions], framing
-your question well and providing the right level of details will improve your chances of getting
+Framing your question well and providing the right level of details will improve your chances of getting
 your question answered. Here are some tips:
 
 ### Before asking
 
-Check the [Vector documentation](https://vector.dev/docs/) first to see if it answers your question.
+Check the [Vector documentation](https://vector.dev/docs/) first to see if it answers your question. If you use a search
+engine
+and provide a query like the following
+`site:vector.dev releases`, you might get better results than the built-in search.
 If your question is about [VRL](https://vector.dev/docs/reference/vrl/#learn), you can also try out
 the [VRL playground][vrl_playground].
 
-If the docs do not answer your question, try using the search feature on [Discord][discord] or
-[GitHub][vector], to search for keywords related to your issue. It is quite possible someone has
+If the docs do not answer your question, try the following:
+
+* Use the search feature on [GitHub][vector], to search for keywords related to your issue. It is
+  quite possible someone has
 already asked your question before. This is especially useful if you have a specific error message
 you are observing.
+* You can also search [Discord][discord] threads. Note that the #support channel is no longer active because we migrated
+  to GitHub Issues/Discussions.
 
 ### Provide details
 
 Essential details to include:
 
-- Errors- for each error, please provide the full error message snippet, and
+- Errors: for each error, please provide the full error message snippet, and
   details such as where the error is observed, at what stage in the process
   (e.g. at boot time, after some specific condition etc.).
 - What is the version of Vector (and the Helm chart if deploying via Helm) and
@@ -94,12 +100,12 @@ for an explanation.
 For example:
 
 > We upgraded from v24 to 25.1 and are seeing the following error output from
-kafka.
+> kafka.
 
 should be written as
 
 > We upgraded from `v0.24.0` to `v0.25.1` and are seeing the following error
-output from the `kafka` sink.
+> output from the `kafka` sink.
 
 [discord]: https://chat.vector.dev
 [discussions]: https://github.com/vectordotdev/vector/discussions

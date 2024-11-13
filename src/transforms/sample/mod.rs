@@ -1,5 +1,7 @@
 #[cfg(feature = "transforms-sample")]
 pub mod config;
 
-#[cfg(feature = "transforms-impl-sample")]
 pub mod transform;
+
+#[cfg(all(test, feature = "transforms-sample"))]
+mod tests;
