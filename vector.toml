@@ -1,8 +1,0 @@
-[sources.host]
-type = "host_metrics"
-collectors = ["process"]
-
-[sinks.my_sink_id]
-type = "console"
-encoding.codec = "json"
-inputs = ["host"]

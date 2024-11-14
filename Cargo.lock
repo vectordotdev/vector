@@ -11817,9 +11817,9 @@ version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9107ddc059d5b6fbfbffdfa7a7fe3e22a226def0b2608f72e9d552763d3e1ad7"
 dependencies = [
- "proc-macro2 1.0.86",
+ "proc-macro2 1.0.89",
  "quote 1.0.37",
- "syn 2.0.79",
+ "syn 2.0.87",
 ]
 
 [[package]]
@@ -11828,9 +11828,9 @@ version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29bee4b38ea3cde66011baa44dba677c432a78593e202392d1e9070cf2a7fca7"
 dependencies = [
- "proc-macro2 1.0.86",
+ "proc-macro2 1.0.89",
  "quote 1.0.37",
- "syn 2.0.79",
+ "syn 2.0.87",
 ]
 
 [[package]]
