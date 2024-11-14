@@ -153,6 +153,7 @@ prost-types = { version = "0.12", default-features = false }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 serde_json = { version = "1.0.132", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.215", default-features = false, features = ["alloc", "derive", "rc"] }
+snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
 tokio = { version = "1.41.1", default-features = false, features = ["full"] }
 toml = { version = "0.8.19", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
@@ -168,7 +169,7 @@ uuid.workspace = true
 vrl.workspace = true
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
-
+snafu.workspace = true
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
@@ -349,7 +350,6 @@ rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustl
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.23", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
-snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
 snap = { version = "1.1.1", default-features = false }
 socket2 = { version = "0.5.7", default-features = false }
 stream-cancel = { version = "0.8.2", default-features = false }
