@@ -21,12 +21,10 @@ byte_size_of = ["dep:bytes"]
 
 conversion = [
   "dep:bytes",
-  "dep:snafu",
 ]
 
 encoding = [
   "dep:nom",
-  "dep:snafu",
   "btreemap"
 ]
 

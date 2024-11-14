@@ -21,6 +21,7 @@ use hickory_proto::{
     },
     serialize::binary::{BinDecodable, BinDecoder},
 };
+use snafu::Snafu;
 
 use crate::ede::{EDE, EDE_OPTION_CODE};
 
@@ -41,7 +42,6 @@ pub enum DnsMessageParserError {
     #[snafu(display("UTF8Error: {}", source))]
     Utf8ParsingError { source: Utf8Error },
 }
-
 
 /// Result alias for parsing
 pub type DnsParserResult<T> = Result<T, DnsMessageParserError>;
