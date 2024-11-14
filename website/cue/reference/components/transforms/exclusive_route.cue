@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: exclusive_route: {
-	title: "Route"
+	title: "Exclusive Route"
 
 	description: """
 		Routes events from one or more streams to unique sub-streams based on a set of user-defined conditions.
@@ -44,7 +44,7 @@ components: transforms: exclusive_route: {
 	outputs: [
 		{
 			name:        "<route_id>"
-			description: "Each exclusive_route can be referenced as an input by other components with the name `<transform_name>.<route_id>`."
+			description: "Each route can be referenced as an input by other components with the name `<transform_name>.<route_id>`."
 		},
 	]
 
