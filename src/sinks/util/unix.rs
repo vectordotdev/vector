@@ -1,10 +1,17 @@
-use std::{path::PathBuf, pin::Pin, time::Duration};
+use std::{
+    io,
+    os::fd::{AsFd, BorrowedFd},
+    path::PathBuf,
+    pin::Pin,
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use futures::{stream::BoxStream, SinkExt, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{
+    io::AsyncWriteExt,
     net::{UnixDatagram, UnixStream},
     time::sleep,
 };
@@ -91,9 +98,27 @@ impl UnixSinkConfig {
     }
 }
 
-enum UnixEither {
+pub enum UnixEither {
     Datagram(UnixDatagram),
     Stream(UnixStream),
+}
+
+impl UnixEither {
+    pub(super) async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::Datagram(datagram) => datagram.send(buf).await,
+            Self::Stream(stream) => stream.write_all(buf).await.map(|_| buf.len()),
+        }
+    }
+}
+
+impl AsFd for UnixEither {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        match self {
+            Self::Datagram(datagram) => datagram.as_fd(),
+            Self::Stream(stream) => stream.as_fd(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -243,7 +268,6 @@ where
         Ok(())
     }
 
-    // Same as UdpSink
     async fn run_datagram(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let bytes_sent = register!(BytesSent::from(Protocol::UNIX));
         let mut input = input.peekable();
