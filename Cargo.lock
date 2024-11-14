@@ -3092,7 +3092,7 @@ dependencies = [
  "criterion",
  "data-encoding",
  "hickory-proto",
- "thiserror",
+ "snafu 0.7.5",
 ]
 
 [[package]]
@@ -10912,7 +10912,6 @@ dependencies = [
  "similar-asserts",
  "smallvec",
  "smpl_jwt",
- "snafu 0.7.5",
  "snap",
  "socket2 0.5.7",
  "stream-cancel",
