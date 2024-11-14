@@ -3,6 +3,9 @@ name: Unit - Windows
 on:
   workflow_call:
 
+permissions:
+  statuses: write
+
 jobs:
 
   test-windows:

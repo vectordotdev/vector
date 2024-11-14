@@ -42,10 +42,9 @@ Vector team member will find this document useful.
 
 ## Your First Contribution
 
-1. Ensure your change has an issue! Find an
+1. For large PRs or for breaking changes, ensure your change has an issue! Find an
    [existing issue][urls.existing_issues] or [open a new issue][urls.new_issue].
    - This is where you can get a feel if the change will be accepted or not.
-     Changes that are questionable will have a `needs: approval` label.
 2. Once approved, [fork the Vector repository][urls.fork_repo] in your own
    GitHub account (only applicable to outside contributors).
 3. [Create a new Git branch][urls.create_branch].
@@ -254,6 +253,15 @@ make check-component-docs
 # Generate the code documentation for the Vector project.
 # Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
 cd rust-doc && make docs
+```
+
+### Updating licences
+
+```sh
+cargo install dd-rust-license-tool --locked
+dd-rust-license-tool write
+git commit -am "dd-rust-license-tool write"
+git push
 ```
 
 ### Deprecations

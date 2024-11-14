@@ -65,6 +65,8 @@ pub struct GlobalOptions {
     /// The time zone name may be any name in the [TZ database][tzdb] or `local` to indicate system
     /// local time.
     ///
+    /// Note that in Vector/VRL all timestamps are represented in UTC.
+    ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub timezone: Option<TimeZone>,
