@@ -180,6 +180,7 @@ jobs:
             reduce transform
             remap transform
             route transform
+            exclusive_route transform
             sample transform
             tag_cardinality_limit transform
             throttle transform
