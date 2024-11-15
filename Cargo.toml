@@ -414,7 +414,7 @@ vrl.workspace = true
 wiremock = "0.6.2"
 zstd = { version = "0.13.0", default-features = false }
 
-tokio-rustls = "0.23"
+tokio-rustls = "0.25"
 rustls = "0.20"
 rustls-pemfile = "0.3"
 
