@@ -87,6 +87,10 @@ pub enum BulkAction {
 
     /// The `create` action.
     Create,
+
+    /// The `update` action.
+    Update
+
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -95,6 +99,7 @@ impl BulkAction {
         match self {
             BulkAction::Index => "index",
             BulkAction::Create => "create",
+            BulkAction::Update => "update",
         }
     }
 
@@ -102,6 +107,7 @@ impl BulkAction {
         match self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
+            BulkAction::Update => "/update",
         }
     }
 }
@@ -113,6 +119,7 @@ impl TryFrom<&str> for BulkAction {
         match input {
             "index" => Ok(BulkAction::Index),
             "create" => Ok(BulkAction::Create),
+            "update" => Ok(BulkAction::Update),
             _ => Err(format!("Invalid bulk action: {}", input)),
         }
     }
