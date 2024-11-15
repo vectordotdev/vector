@@ -148,6 +148,12 @@ pub struct GcsSinkConfig {
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
 
+    /// Compression configuration.
+    ///
+    /// All compression algorithms use the default compression level unless otherwise specified.
+    ///
+    /// Some cloud storage API clients and browsers handle decompression transparently, so
+    /// depending on how they are accessed, files may not always appear to be compressed.
     #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
