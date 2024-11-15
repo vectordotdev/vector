@@ -19,6 +19,9 @@ on:
   merge_group:
     types: [checks_requested]
 
+permissions:
+  statuses: write
+
 concurrency:
   # `github.ref` is unique for MQ runs and PRs
   group: ${{ github.workflow }}-${{ github.ref }}

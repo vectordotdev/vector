@@ -3,6 +3,9 @@ name: Cross
 on:
   workflow_call:
 
+permissions:
+  statuses: write
+
 jobs:
   cross-linux:
     name: Cross - ${{ matrix.target }}

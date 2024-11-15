@@ -3,7 +3,7 @@ package metadata
 remap: functions: encode_punycode: {
 	category:    "Codec"
 	description: """
-		Encodes a `value` to [punycode](\(urls.punycode)). Useful for internationalized domain names ([IDN](\(urls.idn))).
+		Encodes a `value` to [punycode](\(urls.punycode)). Useful for internationalized domain names ([IDN](\(urls.idn))). This function assumes that the value passed is meant to be used in IDN context and that it is either a domain name or a part of it.
 		"""
 
 	arguments: [

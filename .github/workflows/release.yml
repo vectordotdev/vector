@@ -1,5 +1,9 @@
 name: Release Suite
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   push:
     tags:

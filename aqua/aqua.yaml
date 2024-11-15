@@ -16,7 +16,7 @@ packages:
     registry: local
   - name: crates.io/cargo-nextest@0.9.47
     registry: local
-  - name: crates.io/cargo-deny@0.13.9
+  - name: crates.io/cargo-deny@0.16.1
     registry: local
   - name: crates.io/cargo-msrv@0.15.1
     registry: local
