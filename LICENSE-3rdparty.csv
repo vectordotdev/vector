@@ -28,6 +28,7 @@ arc-swap,https://github.com/vorner/arc-swap,MIT OR Apache-2.0,Michal 'vorner' Va
 arr_macro,https://github.com/JoshMcguigan/arr_macro,MIT OR Apache-2.0,Josh Mcguigan
 arrayvec,https://github.com/bluss/arrayvec,MIT OR Apache-2.0,bluss
 ascii,https://github.com/tomprogrammer/rust-ascii,Apache-2.0  OR  MIT,"Thomas Bahn <thomas@thomas-bahn.net>, Torbjørn Birch Moltu <t.b.moltu@lyse.net>, Simon Sapin <simon.sapin@exyr.org>"
+async-broadcast,https://github.com/smol-rs/async-broadcast,MIT OR Apache-2.0,"Stjepan Glavina <stjepang@gmail.com>, Yoshua Wuyts <yoshuawuyts@gmail.com>, Zeeshan Ali Khan <zeeshanak@gnome.org>"
 async-channel,https://github.com/smol-rs/async-channel,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 async-compression,https://github.com/Nullus157/async-compression,MIT OR Apache-2.0,"Wim Looman <wim@nemo157.com>, Allen Bui <fairingrey@gmail.com>"
 async-executor,https://github.com/smol-rs/async-executor,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
@@ -224,6 +225,7 @@ finl_unicode,https://github.com/dahosek/finl_unicode,MIT OR Apache-2.0,The finl_
 flagset,https://github.com/enarx/flagset,Apache-2.0,Nathaniel McCallum <nathaniel@profian.com>
 flate2,https://github.com/rust-lang/flate2-rs,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Josh Triplett <josh@joshtriplett.org>"
 float_eq,https://github.com/jtempest/float_eq-rs,MIT OR Apache-2.0,jtempest
+fluent-uri,https://github.com/yescallop/fluent-uri-rs,MIT,Scallop Ye <yescallop@gmail.com>
 flume,https://github.com/zesterer/flume,Apache-2.0 OR MIT,Joshua Barretto <joshua.s.barretto@gmail.com>
 fnv,https://github.com/servo/rust-fnv,Apache-2.0  OR  MIT,Alex Crichton <alex@alexcrichton.com>
 foldhash,https://github.com/orlp/foldhash,Zlib,Orson Peters <orsonpeters@gmail.com>
@@ -325,15 +327,14 @@ jni,https://github.com/jni-rs/jni-rs,MIT OR Apache-2.0,Josh Chase <josh@prevoty.
 jni-sys,https://github.com/sfackler/rust-jni-sys,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 js-sys,https://github.com/rustwasm/wasm-bindgen/tree/master/crates/js-sys,MIT OR Apache-2.0,The wasm-bindgen Developers
 json-patch,https://github.com/idubrov/json-patch,MIT OR Apache-2.0,Ivan Dubrov <dubrov.ivan@gmail.com>
-jsonpath_lib,https://github.com/freestrings/jsonpath,MIT,Changseok Han <freestrings@gmail.com>
-k8s-openapi,https://github.com/Arnavion/k8s-openapi,Apache-2.0,Arnavion <me@arnavion.dev>
+jsonpath-rust,https://github.com/besok/jsonpath-rust,MIT,BorisZhguchev <zhguchev@gmail.com>
+jsonptr,https://github.com/chanced/jsonptr,MIT OR Apache-2.0,chance dinkins
+k8s-openapi,https://github.com/Arnavion/k8s-openapi,Apache-2.0,Arnav Singh <me@arnavion.dev>
 keccak,https://github.com/RustCrypto/sponges/tree/master/keccak,Apache-2.0 OR MIT,RustCrypto Developers
 kqueue,https://gitlab.com/rust-kqueue/rust-kqueue,MIT,William Orr <will@worrbase.com>
 kqueue-sys,https://gitlab.com/rust-kqueue/rust-kqueue-sys,MIT,"William Orr <will@worrbase.com>, Daniel (dmilith) Dettlaff <dmilith@me.com>"
 krb5-src,https://github.com/MaterializeInc/rust-krb5-src,Apache-2.0,"Materialize, Inc."
 kube,https://github.com/kube-rs/kube,Apache-2.0,"clux <sszynrae@gmail.com>, Natalie Klestrup Röijezon <nat@nullable.se>, kazk <kazk.dev@gmail.com>"
-kube-core,https://github.com/kube-rs/kube,Apache-2.0,"clux <sszynrae@gmail.com>, kazk <kazk.dev@gmail.com>"
-kube-runtime,https://github.com/kube-rs/kube,Apache-2.0,"Natalie Klestrup Röijezon <nat@nullable.se>, clux <sszynrae@gmail.com>"
 lalrpop-util,https://github.com/lalrpop/lalrpop,Apache-2.0 OR MIT,Niko Matsakis <niko@alum.mit.edu>
 lapin,https://github.com/amqp-rs/lapin,MIT,"Geoffroy Couprie <geo.couprie@gmail.com>, Marc-Antoine Perennou <Marc-Antoine@Perennou.com>"
 lazy_static,https://github.com/rust-lang-nursery/lazy-static.rs,MIT OR Apache-2.0,Marvin Löbel <loebel.marvin@gmail.com>
@@ -632,7 +633,6 @@ tracing-log,https://github.com/tokio-rs/tracing,MIT,Tokio Contributors <team@tok
 tracing-serde,https://github.com/tokio-rs/tracing,MIT,Tokio Contributors <team@tokio.rs>
 tracing-subscriber,https://github.com/tokio-rs/tracing,MIT,"Eliza Weisman <eliza@buoyant.io>, David Barsky <me@davidbarsky.com>, Tokio Contributors <team@tokio.rs>"
 tracing-tower,https://github.com/tokio-rs/tracing,MIT,Eliza Weisman <eliza@buoyant.io>
-treediff,https://github.com/Byron/treediff-rs,MIT OR Apache-2.0,Sebastian Thiel <byronimo@gmail.com>
 triomphe,https://github.com/Manishearth/triomphe,MIT OR Apache-2.0,"Manish Goregaokar <manishsmail@gmail.com>, The Servo Project Developers"
 trust-dns-proto,https://github.com/bluejekyll/trust-dns,MIT OR Apache-2.0,Benjamin Fry <benjaminfry@me.com>
 trust-dns-resolver,https://github.com/bluejekyll/trust-dns,MIT OR Apache-2.0,Benjamin Fry <benjaminfry@me.com>

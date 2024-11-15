@@ -1,6 +1,7 @@
 //! Authentication settings for AWS components.
 use std::time::Duration;
 
+#[allow(deprecated)]
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain,
     identity::IdentityCache,
@@ -275,6 +276,7 @@ impl AwsAuthentication {
             } => {
                 let connector = super::connector(proxy, tls_options)?;
 
+                #[allow(deprecated)]
                 // The SDK uses the default profile out of the box, but doesn't provide an optional
                 // type in the builder. We can just hardcode it so that everything works.
                 let profile_files = ProfileFiles::builder()
