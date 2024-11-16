@@ -46,7 +46,7 @@ impl ChunkedGelfDecoderConfig {
             self.chunked_gelf.timeout_secs,
             self.chunked_gelf.pending_messages_limit,
             self.chunked_gelf.max_length,
-            self.chunked_gelf.decompression.clone(),
+            self.chunked_gelf.decompression,
         )
     }
 }
@@ -88,7 +88,7 @@ pub struct ChunkedGelfDecoderOptions {
 
 /// Decompression options for ChunkedGelfDecoder.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq, Eq, Derivative)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Derivative)]
 #[derivative(Default)]
 pub enum ChunkedGelfDecompressionConfig {
     /// Automatically detect the decompression method based on the magic bytes of the message.
@@ -175,6 +175,7 @@ pub enum ChunkedGelfDecompression {
 }
 
 impl ChunkedGelfDecompression {
+    // TODO: add tests for compression detection
     pub fn from_magic(data: &Bytes) -> Self {
         if data.starts_with(GZIP_MAGIC) {
             debug!("Detected Gzip compression");
