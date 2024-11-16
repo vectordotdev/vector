@@ -198,7 +198,7 @@ impl ChunkedGelfDecompression {
                 let mut decompressed = Vec::new();
                 decoder
                     .read_to_end(&mut decompressed)
-                    .expect("TODO: handle error");
+                    .context(GzipDecompressionSnafu)?;
                 Bytes::from(decompressed)
             }
             Self::Zlib => {
@@ -206,7 +206,7 @@ impl ChunkedGelfDecompression {
                 let mut decompressed = Vec::new();
                 decoder
                     .read_to_end(&mut decompressed)
-                    .expect("TODO: handle error");
+                    .context(ZlibDecompressionSnafu)?;
                 Bytes::from(decompressed)
             }
             Self::None => data,
@@ -215,18 +215,15 @@ impl ChunkedGelfDecompression {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Snafu)]
+#[derive(Debug, Snafu)]
 pub enum ChunkedGelfDecompressionError {
-    #[snafu(display("Gzip decompression error: {error_message}"))]
-    // TODO:flate2::DecompressError does not implement PartialEq
-    // GzipDecompressionError { source: flate2::DecompressError },
-    GzipDecompressionError { error_message: String },
-    #[snafu(display("Zlib decompression error: {error_message}"))]
-    // ZlibDecompressionError { source: flate2::DecompressError },
-    ZlibDecompressionError { error_message: String },
+    #[snafu(display("Gzip decompression error: {source}"))]
+    GzipDecompressionError { source: std::io::Error },
+    #[snafu(display("Zlib decompression error: {source}"))]
+    ZlibDecompressionError { source: std::io::Error },
 }
 
-#[derive(Debug, Snafu, PartialEq, Eq)]
+#[derive(Debug, Snafu)]
 pub enum ChunkedGelfDecoderError {
     #[snafu(display("Invalid chunk header with less than 10 bytes: 0x{header:0x}"))]
     InvalidChunkHeader { header: Bytes },
@@ -262,7 +259,7 @@ pub enum ChunkedGelfDecoderError {
         length: usize,
         max_length: usize,
     },
-    #[snafu(display("Error while decompressing message: {source}"))]
+    #[snafu(display("Error while decompressing message. {source}"))]
     Decompression {
         source: ChunkedGelfDecompressionError,
     },
@@ -511,24 +508,53 @@ impl Decoder for ChunkedGelfDecoder {
 #[cfg(test)]
 mod tests {
 
+    use std::io::Write;
+
     use super::*;
     use bytes::{BufMut, BytesMut};
+    use flate2::{write::GzEncoder, write::ZlibEncoder};
     use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
     use rstest::{fixture, rstest};
     use tracing_test::traced_test;
+
+    pub enum Compression {
+        Gzip,
+        Zlib,
+    }
+
+    impl Compression {
+        pub fn compress<'a>(&self, payload: &impl AsRef<[u8]>) -> Bytes {
+            match self {
+                Compression::Gzip => {
+                    let mut encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
+                    encoder
+                        .write_all(payload.as_ref())
+                        .expect("failed to write to encoder");
+                    encoder.finish().expect("failed to finish encoder").into()
+                }
+                Compression::Zlib => {
+                    let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+                    encoder
+                        .write_all(payload.as_ref())
+                        .expect("failed to write to encoder");
+                    encoder.finish().expect("failed to finish encoder").into()
+                }
+            }
+        }
+    }
 
     fn create_chunk(
         message_id: u64,
         sequence_number: u8,
         total_chunks: u8,
-        payload: &str,
+        payload: &impl AsRef<[u8]>,
     ) -> BytesMut {
         let mut chunk = BytesMut::new();
         chunk.put_slice(GELF_MAGIC);
         chunk.put_u64(message_id);
         chunk.put_u8(sequence_number);
         chunk.put_u8(total_chunks);
-        chunk.extend_from_slice(payload.as_bytes());
+        chunk.extend_from_slice(payload.as_ref());
         chunk
     }
 
@@ -549,7 +575,7 @@ mod tests {
             message_id,
             first_sequence_number,
             total_chunks,
-            first_payload,
+            &first_payload,
         );
 
         let second_sequence_number = 1u8;
@@ -558,7 +584,7 @@ mod tests {
             message_id,
             second_sequence_number,
             total_chunks,
-            second_payload,
+            &second_payload,
         );
 
         (
@@ -578,7 +604,7 @@ mod tests {
             message_id,
             first_sequence_number,
             total_chunks,
-            first_payload,
+            &first_payload,
         );
 
         let second_sequence_number = 1u8;
@@ -587,7 +613,7 @@ mod tests {
             message_id,
             second_sequence_number,
             total_chunks,
-            second_payload,
+            &second_payload,
         );
 
         let third_sequence_number = 2u8;
@@ -596,7 +622,7 @@ mod tests {
             message_id,
             third_sequence_number,
             total_chunks,
-            third_payload,
+            &third_payload,
         );
 
         (
@@ -707,7 +733,7 @@ mod tests {
                 first_message_id,
                 sequence_number,
                 total_chunks,
-                first_payload,
+                &first_payload,
             )
         });
         let second_message_chunks = (0..total_chunks).map(|sequence_number| {
@@ -715,7 +741,7 @@ mod tests {
                 second_message_id,
                 sequence_number,
                 total_chunks,
-                second_payload,
+                &second_payload,
             )
         });
         let expected_first_message = first_payload.repeat(total_chunks as usize);
@@ -797,12 +823,10 @@ mod tests {
 
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
-        assert_eq!(
+        assert!(matches!(
             *downcasted_error,
-            ChunkedGelfDecoderError::InvalidChunkHeader {
-                header: Bytes::from_static(&[0x12, 0x34])
-            }
-        );
+            ChunkedGelfDecoderError::InvalidChunkHeader { .. }
+        ));
     }
 
     #[tokio::test]
@@ -811,20 +835,20 @@ mod tests {
         let sequence_number = 1u8;
         let invalid_total_chunks = GELF_MAX_TOTAL_CHUNKS + 1;
         let payload = "foo";
-        let mut chunk = create_chunk(message_id, sequence_number, invalid_total_chunks, payload);
+        let mut chunk = create_chunk(message_id, sequence_number, invalid_total_chunks, &payload);
         let mut decoder = ChunkedGelfDecoder::default();
 
         let frame = decoder.decode_eof(&mut chunk);
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
-        assert_eq!(
+        assert!(matches!(
             *downcasted_error,
             ChunkedGelfDecoderError::InvalidTotalChunks {
                 message_id: 1,
                 sequence_number: 1,
                 total_chunks: 129,
             }
-        );
+        ));
     }
 
     #[tokio::test]
@@ -833,20 +857,20 @@ mod tests {
         let total_chunks = 2u8;
         let invalid_sequence_number = total_chunks + 1;
         let payload = "foo";
-        let mut chunk = create_chunk(message_id, invalid_sequence_number, total_chunks, payload);
+        let mut chunk = create_chunk(message_id, invalid_sequence_number, total_chunks, &payload);
         let mut decoder = ChunkedGelfDecoder::default();
 
         let frame = decoder.decode_eof(&mut chunk);
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
-        assert_eq!(
+        assert!(matches!(
             *downcasted_error,
             ChunkedGelfDecoderError::InvalidSequenceNumber {
                 message_id: 1,
                 sequence_number: 3,
                 total_chunks: 2,
-            },
-        );
+            }
+        ));
     }
 
     #[rstest]
@@ -869,14 +893,14 @@ mod tests {
         let frame = decoder.decode_eof(&mut three_chunks[0]);
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
-        assert_eq!(
+        assert!(matches!(
             *downcasted_error,
             ChunkedGelfDecoderError::PendingMessagesLimitReached {
                 message_id: 2u64,
                 sequence_number: 0u8,
                 pending_messages_limit: 1,
             }
-        );
+        ));
         assert!(decoder.state.lock().unwrap().len() == 1);
     }
 
@@ -887,9 +911,9 @@ mod tests {
         let sequence_number = 0u8;
         let total_chunks = 2u8;
         let payload = "foo";
-        let mut first_chunk = create_chunk(message_id, sequence_number, total_chunks, payload);
+        let mut first_chunk = create_chunk(message_id, sequence_number, total_chunks, &payload);
         let mut second_chunk =
-            create_chunk(message_id, sequence_number + 1, total_chunks + 1, payload);
+            create_chunk(message_id, sequence_number + 1, total_chunks + 1, &payload);
         let mut decoder = ChunkedGelfDecoder::default();
 
         let frame = decoder.decode_eof(&mut first_chunk).unwrap();
@@ -898,7 +922,7 @@ mod tests {
         let frame = decoder.decode_eof(&mut second_chunk);
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
-        assert_eq!(
+        assert!(matches!(
             *downcasted_error,
             ChunkedGelfDecoderError::TotalChunksMismatch {
                 message_id: 1,
@@ -906,7 +930,7 @@ mod tests {
                 original_total_chunks: 2,
                 received_total_chunks: 3,
             }
-        );
+        ));
     }
 
     #[rstest]
@@ -923,7 +947,7 @@ mod tests {
         let frame = decoder.decode_eof(&mut chunks[1]);
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
-        assert_eq!(
+        assert!(matches!(
             *downcasted_error,
             ChunkedGelfDecoderError::MaxLengthExceed {
                 message_id: 1,
@@ -931,7 +955,7 @@ mod tests {
                 length: 6,
                 max_length: 5,
             }
-        );
+        ));
         assert_eq!(decoder.state.lock().unwrap().len(), 0);
     }
 
@@ -949,4 +973,55 @@ mod tests {
         assert!(frame.is_none());
         assert!(logs_contain("Received a duplicate chunk. Ignoring it."));
     }
+
+    #[tokio::test]
+    #[rstest]
+    #[case::gzip(Compression::Gzip)]
+    #[case::zlib(Compression::Zlib)]
+    async fn decode_compressed_unchunked_message(#[case] compression: Compression) {
+        let payload = "foo";
+        let compressed_payload = compression.compress(&payload);
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        let frame = decoder
+            .decode_eof(&mut compressed_payload.into())
+            .expect("decoding should not fail")
+            .expect("decoding should return a frame");
+
+        assert_eq!(frame, payload);
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case::gzip(Compression::Gzip)]
+    #[case::zlib(Compression::Zlib)]
+    async fn decode_compressed_chunked_message(#[case] compression: Compression) {
+        let message_id = 1u64;
+        let max_chunk_size = 5;
+        let payload = (0..100).map(|n| format!("foo{n}")).collect::<String>();
+        let compressed_payload = compression.compress(&payload);
+        let total_chunks = compressed_payload.len().div_ceil(max_chunk_size) as u8;
+        assert!(total_chunks < GELF_MAX_TOTAL_CHUNKS);
+        let mut chunks = compressed_payload
+            .chunks(max_chunk_size)
+            .enumerate()
+            .map(|(i, chunk)| create_chunk(message_id, i as u8, total_chunks, &chunk))
+            .collect::<Vec<_>>();
+        let (last_chunk, first_chunks) =
+            chunks.split_last_mut().expect("chunks should not be empty");
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        for chunk in first_chunks {
+            let frame = decoder.decode_eof(chunk).expect("decoding should not fail");
+            assert!(frame.is_none());
+        }
+        let frame = decoder
+            .decode_eof(last_chunk)
+            .expect("decoding should not fail")
+            .expect("decoding should return a frame");
+
+        assert_eq!(frame, payload);
+    }
+
+    //TODO: compression error tests
 }
