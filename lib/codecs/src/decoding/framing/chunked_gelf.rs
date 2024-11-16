@@ -263,7 +263,7 @@ pub enum ChunkedGelfDecoderError {
         max_length: usize,
     },
     #[snafu(display("Error while decompressing message: {source}"))]
-    DecompressionError {
+    Decompression {
         source: ChunkedGelfDecompressionError,
     },
 }
