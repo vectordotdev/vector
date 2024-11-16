@@ -508,6 +508,8 @@ impl Decoder for ChunkedGelfDecoder {
     }
 }
 
+// TODO: should I add compression tests in the UDP socket module tests?
+// as we did with the initial chunked gelf implementation.
 #[cfg(test)]
 mod tests {
 
