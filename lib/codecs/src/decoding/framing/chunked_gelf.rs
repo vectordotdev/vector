@@ -223,6 +223,9 @@ pub enum ChunkedGelfDecompressionError {
     ZlibDecompression { source: std::io::Error },
 }
 
+// TODO: add a comment that I removed the PartialEq and Eq derive due to
+// std::io::Error not implementing them. I had to refactor assert_eq to
+// assert!(matches!(..)) in tests due to this.
 #[derive(Debug, Snafu)]
 pub enum ChunkedGelfDecoderError {
     #[snafu(display("Invalid chunk header with less than 10 bytes: 0x{header:0x}"))]
