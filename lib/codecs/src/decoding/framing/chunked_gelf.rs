@@ -979,7 +979,7 @@ mod tests {
     #[case::gzip(Compression::Gzip)]
     #[case::zlib(Compression::Zlib)]
     async fn decode_compressed_unchunked_message(#[case] compression: Compression) {
-        let payload = "foo";
+        let payload = (0..100).map(|n| format!("foo{n}")).collect::<String>();
         let compressed_payload = compression.compress(&payload);
         let mut decoder = ChunkedGelfDecoder::default();
 
