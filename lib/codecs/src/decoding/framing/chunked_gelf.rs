@@ -218,9 +218,9 @@ impl ChunkedGelfDecompression {
 #[derive(Debug, Snafu)]
 pub enum ChunkedGelfDecompressionError {
     #[snafu(display("Gzip decompression error: {source}"))]
-    GzipDecompressionError { source: std::io::Error },
+    GzipDecompression { source: std::io::Error },
     #[snafu(display("Zlib decompression error: {source}"))]
-    ZlibDecompressionError { source: std::io::Error },
+    ZlibDecompression { source: std::io::Error },
 }
 
 #[derive(Debug, Snafu)]
@@ -824,7 +824,7 @@ mod tests {
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert!(matches!(
-            *downcasted_error,
+            downcasted_error,
             ChunkedGelfDecoderError::InvalidChunkHeader { .. }
         ));
     }
@@ -842,7 +842,7 @@ mod tests {
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert!(matches!(
-            *downcasted_error,
+            downcasted_error,
             ChunkedGelfDecoderError::InvalidTotalChunks {
                 message_id: 1,
                 sequence_number: 1,
@@ -864,7 +864,7 @@ mod tests {
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert!(matches!(
-            *downcasted_error,
+            downcasted_error,
             ChunkedGelfDecoderError::InvalidSequenceNumber {
                 message_id: 1,
                 sequence_number: 3,
@@ -894,7 +894,7 @@ mod tests {
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert!(matches!(
-            *downcasted_error,
+            downcasted_error,
             ChunkedGelfDecoderError::PendingMessagesLimitReached {
                 message_id: 2u64,
                 sequence_number: 0u8,
@@ -923,7 +923,7 @@ mod tests {
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert!(matches!(
-            *downcasted_error,
+            downcasted_error,
             ChunkedGelfDecoderError::TotalChunksMismatch {
                 message_id: 1,
                 sequence_number: 1,
@@ -948,7 +948,7 @@ mod tests {
         let error = frame.unwrap_err();
         let downcasted_error = downcast_framing_error(&error);
         assert!(matches!(
-            *downcasted_error,
+            downcasted_error,
             ChunkedGelfDecoderError::MaxLengthExceed {
                 message_id: 1,
                 sequence_number: 1,
@@ -1023,5 +1023,185 @@ mod tests {
         assert_eq!(frame, payload);
     }
 
-    //TODO: compression error tests
+    #[tokio::test]
+    async fn decode_malformed_gzip_message() {
+        let mut compressed_payload = BytesMut::new();
+        compressed_payload.extend(GZIP_MAGIC);
+        compressed_payload.extend(&[0x12, 0x34, 0x56, 0x78]);
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        let error = decoder
+            .decode_eof(&mut compressed_payload)
+            .expect_err("decoding should fail");
+
+        let downcasted_error = downcast_framing_error(&error);
+        assert!(matches!(
+            downcasted_error,
+            ChunkedGelfDecoderError::Decompression {
+                source: ChunkedGelfDecompressionError::GzipDecompression { .. }
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn decode_malformed_zlib_message() {
+        let mut compressed_payload = BytesMut::new();
+        compressed_payload.extend(ZLIB_MAGIC);
+        compressed_payload.extend(&[0x12, 0x34, 0x56, 0x78]);
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        let error = decoder
+            .decode_eof(&mut compressed_payload)
+            .expect_err("decoding should fail");
+
+        let downcasted_error = downcast_framing_error(&error);
+        assert!(matches!(
+            downcasted_error,
+            ChunkedGelfDecoderError::Decompression {
+                source: ChunkedGelfDecompressionError::ZlibDecompression { .. }
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn decode_zlib_payload_with_zlib_decoder() {
+        let payload = "foo";
+        let compressed_payload = Compression::Zlib.compress(&payload);
+        let mut decoder = ChunkedGelfDecoder {
+            decompression_config: ChunkedGelfDecompressionConfig::Zlib,
+            ..Default::default()
+        };
+
+        let frame = decoder
+            .decode_eof(&mut compressed_payload.into())
+            .expect("decoding should not fail")
+            .expect("decoding should return a frame");
+
+        assert_eq!(frame, payload);
+    }
+
+    #[tokio::test]
+    async fn decode_gzip_payload_with_zlib_decoder() {
+        let payload = "foo";
+        let compressed_payload = Compression::Gzip.compress(&payload);
+        let mut decoder = ChunkedGelfDecoder {
+            decompression_config: ChunkedGelfDecompressionConfig::Zlib,
+            ..Default::default()
+        };
+
+        let error = decoder
+            .decode_eof(&mut compressed_payload.into())
+            .expect_err("decoding should fail");
+
+        let downcasted_error = downcast_framing_error(&error);
+        assert!(matches!(
+            downcasted_error,
+            ChunkedGelfDecoderError::Decompression {
+                source: ChunkedGelfDecompressionError::ZlibDecompression { .. }
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn decode_uncompressed_payload_with_zlib_decoder() {
+        let payload = "foo";
+        let mut decoder = ChunkedGelfDecoder {
+            decompression_config: ChunkedGelfDecompressionConfig::Zlib,
+            ..Default::default()
+        };
+
+        let error = decoder
+            .decode_eof(&mut payload.into())
+            .expect_err("decoding should fail");
+
+        let downcasted_error = downcast_framing_error(&error);
+        assert!(matches!(
+            downcasted_error,
+            ChunkedGelfDecoderError::Decompression {
+                source: ChunkedGelfDecompressionError::ZlibDecompression { .. }
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn decode_gzip_payload_with_gzip_decoder() {
+        let payload = "foo";
+        let compressed_payload = Compression::Gzip.compress(&payload);
+        let mut decoder = ChunkedGelfDecoder {
+            decompression_config: ChunkedGelfDecompressionConfig::Gzip,
+            ..Default::default()
+        };
+
+        let frame = decoder
+            .decode_eof(&mut compressed_payload.into())
+            .expect("decoding should not fail")
+            .expect("decoding should return a frame");
+
+        assert_eq!(frame, payload);
+    }
+
+    #[tokio::test]
+    async fn decode_zlib_payload_with_gzip_decoder() {
+        let payload = "foo";
+        let compressed_payload = Compression::Zlib.compress(&payload);
+        let mut decoder = ChunkedGelfDecoder {
+            decompression_config: ChunkedGelfDecompressionConfig::Gzip,
+            ..Default::default()
+        };
+
+        let error = decoder
+            .decode_eof(&mut compressed_payload.into())
+            .expect_err("decoding should fail");
+
+        let downcasted_error = downcast_framing_error(&error);
+        assert!(matches!(
+            downcasted_error,
+            ChunkedGelfDecoderError::Decompression {
+                source: ChunkedGelfDecompressionError::GzipDecompression { .. }
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn decode_uncompressed_payload_with_gzip_decoder() {
+        let payload = "foo";
+        let mut decoder = ChunkedGelfDecoder {
+            decompression_config: ChunkedGelfDecompressionConfig::Gzip,
+            ..Default::default()
+        };
+
+        let error = decoder
+            .decode_eof(&mut payload.into())
+            .expect_err("decoding should fail");
+
+        let downcasted_error = downcast_framing_error(&error);
+        assert!(matches!(
+            downcasted_error,
+            ChunkedGelfDecoderError::Decompression {
+                source: ChunkedGelfDecompressionError::GzipDecompression { .. }
+            }
+        ));
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case::gzip(Compression::Gzip)]
+    #[case::zlib(Compression::Zlib)]
+    async fn decode_compressed_payload_with_no_decompression_decoder(
+        #[case] compression: Compression,
+    ) {
+        let payload = "foo";
+        let compressed_payload = compression.compress(&payload);
+        let mut decoder = ChunkedGelfDecoder {
+            decompression_config: ChunkedGelfDecompressionConfig::None,
+            ..Default::default()
+        };
+
+        let frame = decoder
+            .decode_eof(&mut compressed_payload.clone().into())
+            .expect("decoding should not fail")
+            .expect("decoding should return a frame");
+
+        assert_eq!(frame, compressed_payload);
+    }
 }
