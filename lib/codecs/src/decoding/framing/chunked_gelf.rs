@@ -1262,8 +1262,6 @@ mod tests {
 
         let detected_compression = ChunkedGelfDecompression::from_magic(&compressed_payload);
 
-        dbg!(format!("{compressed_payload:0x}"));
-
         assert_eq!(detected_compression, ChunkedGelfDecompression::Zlib);
     }
 
