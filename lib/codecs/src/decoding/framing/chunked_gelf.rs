@@ -999,7 +999,7 @@ mod tests {
     #[case::gzip(Compression::Gzip)]
     #[case::zlib(Compression::Zlib)]
     async fn decode_compressed_unchunked_message(#[case] compression: Compression) {
-        let payload = (0..100).fold(String::new(), |payload, n| {
+        let payload = (0..100).fold(String::new(), |mut payload, n| {
             write!(payload, "foo{n}").unwrap();
             payload
         });
