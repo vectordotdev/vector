@@ -521,13 +521,13 @@ impl Decoder for ChunkedGelfDecoder {
 #[cfg(test)]
 mod tests {
 
-    use std::io::Write;
-
     use super::*;
     use bytes::{BufMut, BytesMut};
     use flate2::{write::GzEncoder, write::ZlibEncoder};
     use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
     use rstest::{fixture, rstest};
+    use std::fmt::Write;
+    use std::io::Write;
     use tracing_test::traced_test;
 
     pub enum Compression {
@@ -999,7 +999,9 @@ mod tests {
     #[case::gzip(Compression::Gzip)]
     #[case::zlib(Compression::Zlib)]
     async fn decode_compressed_unchunked_message(#[case] compression: Compression) {
-        let payload = (0..100).map(|n| format!("foo{n}")).collect::<String>();
+        let payload = (0..100).fold(String::new(), |payload, n| {
+            write!(payload, "foo{n}").unwrap()
+        });
         let compressed_payload = compression.compress(&payload);
         let mut decoder = ChunkedGelfDecoder::default();
 
