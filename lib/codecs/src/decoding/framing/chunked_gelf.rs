@@ -17,10 +17,7 @@ use vector_config::configurable_component;
 
 const GELF_MAGIC: &[u8] = &[0x1e, 0x0f];
 const GZIP_MAGIC: &[u8] = &[0x1f, 0x8b];
-// TODO: zlib detection should be improved, as we are checking a "most common" default header
-// see https://stackoverflow.com/questions/9050260/what-does-a-zlib-header-look-like/54915442#54915442
-// and the zlib rfc
-const ZLIB_MAGIC: &[u8] = &[0x78, 0x9c];
+const ZLIB_MAGIC: &[u8] = &[0x78];
 // TODO: add lz4 compression detection?
 // TODO: add zstd compression detect?
 const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
@@ -168,6 +165,7 @@ impl MessageState {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum ChunkedGelfDecompression {
     Gzip,
     Zlib,
@@ -179,17 +177,26 @@ impl ChunkedGelfDecompression {
     pub fn from_magic(data: &Bytes) -> Self {
         if data.starts_with(GZIP_MAGIC) {
             debug!("Detected Gzip compression");
-            Self::Gzip
-        } else if data.starts_with(ZLIB_MAGIC) {
-            debug!("Detected Zlib compression");
-            Self::Zlib
-        } else {
-            debug!(
-                "No compression detected. First two bytes of data: {:?}",
-                data.get(0..2)
-            );
-            Self::None
+            return Self::Gzip;
         }
+
+        if data.starts_with(ZLIB_MAGIC) {
+            if let Some([first_byte, second_byte]) = data.get(0..2) {
+                // TODO: add inspired from https://github.com/grafana/go-gelf/blob/25db8704bcf3f484c958312cd0cc49e5c768dcf1/gelf/reader.go#L120
+                // and https://github.com/Graylog2/graylog2-server/blob/1bdeca5f8ad3d31ff0c1c7981978ae8c4d300ebc/graylog2-server/src/main/java/org/graylog2/inputs/codecs/gelf/GELFMessage.java#L157
+                if (*first_byte as u16 * 256 + *second_byte as u16) % 31 == 0 {
+                    debug!("Detected Zlib compression");
+                    return Self::Zlib;
+                }
+            };
+            // TODO: should we return and error if the data starts with de ZLIB MAGIC
+            // but does not match the previous branches?
+            // for example, take a look to the graylog2server implementation
+            // https://github.com/Graylog2/graylog2-server/blob/1bdeca5f8ad3d31ff0c1c7981978ae8c4d300ebc/graylog2-server/src/main/java/org/graylog2/inputs/codecs/gelf/GELFMessage.java#L160
+        };
+
+        debug!("No compression detected",);
+        Self::None
     }
 
     pub fn decompress(&self, data: Bytes) -> Result<Bytes, ChunkedGelfDecompressionError> {
@@ -530,16 +537,23 @@ mod tests {
 
     impl Compression {
         pub fn compress<'a>(&self, payload: &impl AsRef<[u8]>) -> Bytes {
+            self.compress_with_level(payload, flate2::Compression::default())
+        }
+        pub fn compress_with_level<'a>(
+            &self,
+            payload: &impl AsRef<[u8]>,
+            level: flate2::Compression,
+        ) -> Bytes {
             match self {
                 Compression::Gzip => {
-                    let mut encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
+                    let mut encoder = GzEncoder::new(Vec::new(), level);
                     encoder
                         .write_all(payload.as_ref())
                         .expect("failed to write to encoder");
                     encoder.finish().expect("failed to finish encoder").into()
                 }
                 Compression::Zlib => {
-                    let mut encoder = ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+                    let mut encoder = ZlibEncoder::new(Vec::new(), level);
                     encoder
                         .write_all(payload.as_ref())
                         .expect("failed to write to encoder");
@@ -1053,7 +1067,7 @@ mod tests {
     async fn decode_malformed_zlib_message() {
         let mut compressed_payload = BytesMut::new();
         compressed_payload.extend(ZLIB_MAGIC);
-        compressed_payload.extend(&[0x12, 0x34, 0x56, 0x78]);
+        compressed_payload.extend(&[0x9c, 0x12, 0x34, 0x56]);
         let mut decoder = ChunkedGelfDecoder::default();
 
         let error = decoder
@@ -1209,5 +1223,56 @@ mod tests {
             .expect("decoding should return a frame");
 
         assert_eq!(frame, compressed_payload);
+    }
+
+    #[rstest]
+    #[case::level_zero(flate2::Compression::new(0))]
+    #[case::level_one(flate2::Compression::new(1))]
+    #[case::level_two(flate2::Compression::new(2))]
+    #[case::level_three(flate2::Compression::new(3))]
+    #[case::level_four(flate2::Compression::new(4))]
+    #[case::level_five(flate2::Compression::new(5))]
+    #[case::level_six(flate2::Compression::new(6))]
+    #[case::level_seven(flate2::Compression::new(7))]
+    #[case::level_eight(flate2::Compression::new(8))]
+    #[case::level_nine(flate2::Compression::new(9))]
+    fn detect_gzip_compression(#[case] level: flate2::Compression) {
+        let payload = "foo";
+        let compressed_payload = Compression::Gzip.compress_with_level(&payload, level);
+
+        let detected_compression = ChunkedGelfDecompression::from_magic(&compressed_payload);
+
+        assert_eq!(detected_compression, ChunkedGelfDecompression::Gzip);
+    }
+
+    #[rstest]
+    #[case::level_zero(flate2::Compression::new(0))]
+    #[case::level_one(flate2::Compression::new(1))]
+    #[case::level_two(flate2::Compression::new(2))]
+    #[case::level_three(flate2::Compression::new(3))]
+    #[case::level_four(flate2::Compression::new(4))]
+    #[case::level_five(flate2::Compression::new(5))]
+    #[case::level_six(flate2::Compression::new(6))]
+    #[case::level_seven(flate2::Compression::new(7))]
+    #[case::level_eight(flate2::Compression::new(8))]
+    #[case::level_nine(flate2::Compression::new(9))]
+    fn detect_zlib_compression(#[case] level: flate2::Compression) {
+        let payload = "foo";
+        let compressed_payload = Compression::Zlib.compress_with_level(&payload, level);
+
+        let detected_compression = ChunkedGelfDecompression::from_magic(&compressed_payload);
+
+        dbg!(format!("{compressed_payload:0x}"));
+
+        assert_eq!(detected_compression, ChunkedGelfDecompression::Zlib);
+    }
+
+    #[test]
+    fn detect_no_compression() {
+        let payload = "foo";
+
+        let detected_compression = ChunkedGelfDecompression::from_magic(&payload.into());
+
+        assert_eq!(detected_compression, ChunkedGelfDecompression::None);
     }
 }
