@@ -526,8 +526,8 @@ mod tests {
     use flate2::{write::GzEncoder, write::ZlibEncoder};
     use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
     use rstest::{fixture, rstest};
-    use std::fmt::Write;
-    use std::io::Write;
+    use std::fmt::Write as FmtWrite;
+    use std::io::Write as IoWrite;
     use tracing_test::traced_test;
 
     pub enum Compression {
@@ -1000,7 +1000,8 @@ mod tests {
     #[case::zlib(Compression::Zlib)]
     async fn decode_compressed_unchunked_message(#[case] compression: Compression) {
         let payload = (0..100).fold(String::new(), |payload, n| {
-            write!(payload, "foo{n}").unwrap()
+            write!(payload, "foo{n}").unwrap();
+            payload
         });
         let compressed_payload = compression.compress(&payload);
         let mut decoder = ChunkedGelfDecoder::default();
