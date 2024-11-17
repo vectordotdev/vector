@@ -18,8 +18,6 @@ use vector_config::configurable_component;
 const GELF_MAGIC: &[u8] = &[0x1e, 0x0f];
 const GZIP_MAGIC: &[u8] = &[0x1f, 0x8b];
 const ZLIB_MAGIC: &[u8] = &[0x78];
-// TODO: add lz4 compression detection?
-// TODO: add zstd compression detect?
 const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
 const DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 
@@ -173,7 +171,6 @@ pub enum ChunkedGelfDecompression {
 }
 
 impl ChunkedGelfDecompression {
-    // TODO: add tests for compression detection
     pub fn from_magic(data: &Bytes) -> Self {
         if data.starts_with(GZIP_MAGIC) {
             debug!("Detected Gzip compression");
@@ -182,17 +179,11 @@ impl ChunkedGelfDecompression {
 
         if data.starts_with(ZLIB_MAGIC) {
             if let Some([first_byte, second_byte]) = data.get(0..2) {
-                // TODO: add inspired from https://github.com/grafana/go-gelf/blob/25db8704bcf3f484c958312cd0cc49e5c768dcf1/gelf/reader.go#L120
-                // and https://github.com/Graylog2/graylog2-server/blob/1bdeca5f8ad3d31ff0c1c7981978ae8c4d300ebc/graylog2-server/src/main/java/org/graylog2/inputs/codecs/gelf/GELFMessage.java#L157
                 if (*first_byte as u16 * 256 + *second_byte as u16) % 31 == 0 {
                     debug!("Detected Zlib compression");
                     return Self::Zlib;
                 }
             };
-            // TODO: should we return and error if the data starts with de ZLIB MAGIC
-            // but does not match the previous branches?
-            // for example, take a look to the graylog2server implementation
-            // https://github.com/Graylog2/graylog2-server/blob/1bdeca5f8ad3d31ff0c1c7981978ae8c4d300ebc/graylog2-server/src/main/java/org/graylog2/inputs/codecs/gelf/GELFMessage.java#L160
         };
 
         debug!("No compression detected",);
@@ -231,9 +222,6 @@ pub enum ChunkedGelfDecompressionError {
     ZlibDecompression { source: std::io::Error },
 }
 
-// TODO: add a comment that I removed the PartialEq and Eq derive due to
-// std::io::Error not implementing them. I had to refactor assert_eq to
-// assert!(matches!(..)) in tests due to this.
 #[derive(Debug, Snafu)]
 pub enum ChunkedGelfDecoderError {
     #[snafu(display("Invalid chunk header with less than 10 bytes: 0x{header:0x}"))]
@@ -516,8 +504,6 @@ impl Decoder for ChunkedGelfDecoder {
     }
 }
 
-// TODO: should I add compression tests in the UDP socket module tests?
-// as we did with the initial chunked gelf implementation.
 #[cfg(test)]
 mod tests {
 
