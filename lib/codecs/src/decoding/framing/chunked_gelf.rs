@@ -1021,7 +1021,10 @@ mod tests {
     async fn decode_compressed_chunked_message(#[case] compression: Compression) {
         let message_id = 1u64;
         let max_chunk_size = 5;
-        let payload = (0..100).map(|n| format!("foo{n}")).collect::<String>();
+        let payload = (0..100).fold(String::new(), |mut payload, n| {
+            write!(payload, "foo{n}").unwrap();
+            payload
+        });
         let compressed_payload = compression.compress(&payload);
         let total_chunks = compressed_payload.len().div_ceil(max_chunk_size) as u8;
         assert!(total_chunks < GELF_MAX_TOTAL_CHUNKS);
