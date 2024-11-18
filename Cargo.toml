@@ -160,6 +160,9 @@ tonic = { version = "0.11", default-features = false, features = ["transport", "
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 uuid = { version = "1.11.0", features = ["v4", "v7", "serde"] }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
+vector-config = { path = "lib/vector-config" }
+vector-config-common = { path = "lib/vector-config-common" }
+vector-config-macros = { path = "lib/vector-config-macros" }
 vrl = { git = "https://github.com/vectordotdev/vrl", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
@@ -177,6 +180,9 @@ fakedata = { path = "lib/fakedata", optional = true }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-lib.workspace = true
+vector-config.workspace = true
+vector-config-common.workspace = true
+vector-config-macros.workspace = true
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
