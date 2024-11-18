@@ -170,9 +170,14 @@ base: components: sinks: greptimedb_logs: configuration: {
 		type: string: examples: ["password"]
 	}
 	pipeline_name: {
-		description: "Pipeline name to be used for the logs."
-		required:    true
+		description: """
+			Pipeline name to be used for the logs.
+
+			Default to `greptime_identity`, use the original log structure
+			"""
+		required: false
 		type: string: {
+			default: "greptime_identity"
 			examples: ["pipeline_name"]
 			syntax: "template"
 		}
