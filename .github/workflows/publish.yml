@@ -470,7 +470,7 @@ jobs:
   publish-docker:
     name: Publish to Docker
     runs-on: ubuntu-20.04
-    timeout-minutes: 15
+    timeout-minutes: 45
     needs:
       - generate-publish-metadata
       - build-aarch64-unknown-linux-gnu-packages
@@ -549,8 +549,11 @@ jobs:
       - name: Build and publish Docker images
         env:
           PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
-        run: |
-          make release-docker
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          command: make release-docker
 
   publish-s3:
     name: Publish to S3
