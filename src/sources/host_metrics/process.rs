@@ -41,7 +41,7 @@ impl HostMetrics {
         }) {
             let tags = || {
                 metric_tags!(
-                "pid" => pid.as_u32().to_string(), 
+                "pid" => pid.as_u32().to_string(),
                 "name" => process.name().to_str().unwrap_or("unknown"),
                 "command" => process.cmd().join(sep).to_str().unwrap_or(""))
             };
