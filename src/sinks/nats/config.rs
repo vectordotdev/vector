@@ -66,6 +66,9 @@ pub struct NatsSinkConfig {
     /// [nats_url]: https://docs.nats.io/using-nats/developer/connecting#nats-url
     #[configurable(metadata(docs::examples = "nats://demo.nats.io"))]
     #[configurable(metadata(docs::examples = "nats://127.0.0.1:4242"))]
+    #[configurable(metadata(
+        docs::examples = "nats://localhost:4222,nats://localhost:5222,nats://localhost:6222"
+    ))]
     pub(super) url: String,
 
     #[configurable(derived)]
