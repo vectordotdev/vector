@@ -140,6 +140,9 @@ base: components: sinks: gcp_cloud_storage: configuration: {
 			Compression configuration.
 
 			All compression algorithms use the default compression level unless otherwise specified.
+
+			Some cloud storage API clients and browsers handle decompression transparently, so
+			depending on how they are accessed, files may not always appear to be compressed.
 			"""
 		required: false
 		type: string: {
