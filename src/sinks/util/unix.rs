@@ -413,13 +413,15 @@ mod tests {
 
         // Set up listener to receive events from the Sink.
         let receiver = std::os::unix::net::UnixDatagram::bind(out_path.clone()).unwrap();
+        let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
 
         // Listen in the background to avoid blocking
         let handle = tokio::task::spawn_blocking(move || {
             let mut output_lines = Vec::<String>::with_capacity(num_lines);
 
+            ready_tx.send(()).expect("failed to signal readiness");
             for _ in 0..num_lines {
-                let mut buf = [0; 100];
+                let mut buf = [0; 101];
                 let (size, _) = receiver
                     .recv_from(&mut buf)
                     .expect("Did not receive message");
@@ -429,6 +431,8 @@ mod tests {
 
             output_lines
         });
+        ready_rx.await.expect("failed to receive ready signal");
+
         // Set up Sink
         let config = UnixSinkConfig::new(out_path.clone(), UnixMode::Datagram);
         let (sink, _healthcheck) = config
