@@ -1,4 +1,3 @@
-Allows for process metrics collection on host metrics
-This process metrics can be configured via the `process` option for sources with `type = "host_metrics"`.
+The `host_metrics` now supports process metrics collection, configurable via the `process` option.
 
 authors: leeteng2001
