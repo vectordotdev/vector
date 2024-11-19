@@ -66,13 +66,12 @@ where
 {
     match format {
         Format::Toml => toml::from_str(content).map_err(|e| vec![e.to_string()]),
-        Format::Yaml => {
-            serde_yaml::from_str::<serde_yaml::Value>(content).and_then(|mut v| {
+        Format::Yaml => serde_yaml::from_str::<serde_yaml::Value>(content)
+            .and_then(|mut v| {
                 v.apply_merge()?;
                 serde_yaml::from_value(v)
             })
-            .map_err(|e| vec![e.to_string()])
-        }
+            .map_err(|e| vec![e.to_string()]),
         Format::Json => serde_json::from_str(content).map_err(|e| vec![e.to_string()]),
     }
 }
