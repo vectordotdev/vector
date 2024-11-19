@@ -412,17 +412,16 @@ mod tests {
         let out_path = temp_uds_path("unix_datagram_test");
 
         // Set up listener to receive events from the Sink.
-        let receiver = UnixDatagram::bind(out_path.clone()).unwrap();
+        let receiver = std::os::unix::net::UnixDatagram::bind(out_path.clone()).unwrap();
 
         // Listen in the background to avoid blocking
-        let handle = tokio::spawn(async move {
+        let handle = tokio::task::spawn_blocking(move || {
             let mut output_lines = Vec::<String>::with_capacity(num_lines);
 
             for _ in 0..num_lines {
-                let mut buf = [0; 256];
-                let size = receiver
-                    .recv(&mut buf)
-                    .await
+                let mut buf = [0; 100];
+                let (size, _) = receiver
+                    .recv_from(&mut buf)
                     .expect("Did not receive message");
                 let line = String::from_utf8_lossy(&buf[..size]).to_string();
                 output_lines.push(line);
@@ -430,7 +429,6 @@ mod tests {
 
             output_lines
         });
-
         // Set up Sink
         let config = UnixSinkConfig::new(out_path.clone(), UnixMode::Datagram);
         let (sink, _healthcheck) = config
