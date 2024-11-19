@@ -11,6 +11,9 @@ env:
   VERBOSE: true
   CI: true
 
+permissions:
+  statuses: write
+
 jobs:
   publish-new-environment:
     runs-on: ubuntu-20.04

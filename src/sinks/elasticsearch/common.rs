@@ -91,6 +91,7 @@ impl ElasticsearchCommon {
 
         if config.opensearch_service_type == OpenSearchServiceType::Serverless {
             match &config.auth {
+                #[cfg(feature = "aws-core")]
                 Some(ElasticsearchAuthConfig::Aws(_)) => (),
                 _ => return Err(ParseError::OpenSearchServerlessRequiresAwsAuth.into()),
             }
@@ -172,6 +173,7 @@ impl ElasticsearchCommon {
                     match get_version(
                         &base_url,
                         &auth,
+                        #[cfg(feature = "aws-core")]
                         &service_type,
                         &request,
                         &tls_settings,
@@ -284,6 +286,7 @@ impl ElasticsearchCommon {
             match get(
                 &self.base_url,
                 &self.auth,
+                #[cfg(feature = "aws-core")]
                 &self.service_type,
                 &self.request,
                 client,
@@ -322,7 +325,7 @@ pub async fn sign_request(
 async fn get_version(
     base_url: &str,
     auth: &Option<Auth>,
-    service_type: &OpenSearchServiceType,
+    #[cfg(feature = "aws-core")] service_type: &OpenSearchServiceType,
     request: &RequestConfig,
     tls_settings: &TlsSettings,
     proxy_config: &ProxyConfig,
@@ -337,9 +340,17 @@ async fn get_version(
     }
 
     let client = HttpClient::new(tls_settings.clone(), proxy_config)?;
-    let response = get(base_url, auth, service_type, request, client, "/")
-        .await
-        .map_err(|error| format!("Failed to get Elasticsearch API version: {}", error))?;
+    let response = get(
+        base_url,
+        auth,
+        #[cfg(feature = "aws-core")]
+        service_type,
+        request,
+        client,
+        "/",
+    )
+    .await
+    .map_err(|error| format!("Failed to get Elasticsearch API version: {}", error))?;
 
     let (_, body) = response.into_parts();
     let mut body = body::aggregate(body).await?;
@@ -361,7 +372,7 @@ async fn get_version(
 async fn get(
     base_url: &str,
     auth: &Option<Auth>,
-    service_type: &OpenSearchServiceType,
+    #[cfg(feature = "aws-core")] service_type: &OpenSearchServiceType,
     request: &RequestConfig,
     client: HttpClient,
     path: &str,

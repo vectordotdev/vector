@@ -19,7 +19,7 @@ vector-config-common = { path = "../vector-config-common", default-features = fa
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
 
 [dependencies.bstr]
-version = "1.10"
+version = "1.11"
 default-features = false
 features = []
 
@@ -76,7 +76,7 @@ features = ["full"]
 [dev-dependencies]
 criterion = "0.5"
 quickcheck = "1"
-tempfile = "3.13.0"
+tempfile = "3.14.0"
 similar-asserts = "1.6.0"
 
 [[bench]]

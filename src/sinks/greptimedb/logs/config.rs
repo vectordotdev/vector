@@ -2,7 +2,7 @@ use crate::{
     http::{Auth, HttpClient},
     sinks::{
         greptimedb::{
-            default_dbname_template,
+            default_dbname_template, default_pipeline_template,
             logs::{
                 http_request_builder::{
                     http_healthcheck, GreptimeDBHttpRetryLogic, GreptimeDBLogsHttpRequestBuilder,
@@ -56,7 +56,11 @@ pub struct GreptimeDBLogsConfig {
     pub dbname: Template,
 
     /// Pipeline name to be used for the logs.
+    ///
+    /// Default to `greptime_identity`, use the original log structure
     #[configurable(metadata(docs::examples = "pipeline_name"))]
+    #[derivative(Default(value = "default_pipeline_template()"))]
+    #[serde(default = "default_pipeline_template")]
     pub pipeline_name: Template,
 
     /// Pipeline version to be used for the logs.

@@ -293,6 +293,10 @@ configuration: {
 							Globally enables / disables log namespacing. See [Log Namespacing](\(urls.log_namespacing_blog))
 							for more details. If you want to enable individual sources, there is a config
 							option in the source configuration.
+
+							Known issues:
+
+							- Enabling log namespacing doesn't work when disk buffers are used (see [#18574](https://github.com/vectordotdev/vector/issues/18574))
 							"""
 						required:    false
 						warnings: []
