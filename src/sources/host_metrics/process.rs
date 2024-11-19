@@ -9,8 +9,7 @@ use vector_lib::metric_tags;
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct ProcessConfig {
-    /// Lists of device name patterns to include or exclude in gathering
-    /// network utilization metrics.
+    /// Lists of process name patterns to include or exclude.
     #[serde(default = "default_all_processes")]
     #[configurable(metadata(docs::examples = "example_processes()"))]
     processes: FilterList,
