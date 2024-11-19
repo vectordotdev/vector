@@ -151,7 +151,7 @@ prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
 prost-types = { version = "0.12", default-features = false }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
-serde_json = { version = "1.0.132", default-features = false, features = ["raw_value", "std"] }
+serde_json = { version = "1.0.133", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.215", default-features = false, features = ["alloc", "derive", "rc"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
 tokio = { version = "1.41.1", default-features = false, features = ["full"] }
@@ -160,6 +160,9 @@ tonic = { version = "0.11", default-features = false, features = ["transport", "
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 uuid = { version = "1.11.0", features = ["v4", "v7", "serde"] }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
+vector-config = { path = "lib/vector-config" }
+vector-config-common = { path = "lib/vector-config-common" }
+vector-config-macros = { path = "lib/vector-config-macros" }
 vrl = { git = "https://github.com/vectordotdev/vrl", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
@@ -177,6 +180,9 @@ fakedata = { path = "lib/fakedata", optional = true }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-lib.workspace = true
+vector-config.workspace = true
+vector-config-common.workspace = true
+vector-config-macros.workspace = true
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
@@ -300,7 +306,7 @@ dyn-clone = { version = "1.0.17", default-features = false }
 encoding_rs = { version = "0.8.35", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.13", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.0.34", default-features = false, features = ["default"] }
+flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures-util = { version = "0.3.29", default-features = false }
 glob.workspace = true
 governor = { version = "0.7.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
@@ -397,7 +403,7 @@ azure_storage = { version = "0.17", default-features = false }
 base64 = "0.22.1"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
-libc = "0.2.162"
+libc = "0.2.164"
 similar-asserts = "1.6.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
