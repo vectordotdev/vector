@@ -1,3 +1,3 @@
-Add possibility to provide multiple urls in NATS sink.
+The NATS sink can now parse comma separated urls.
 
 authors: whatcouldbepizza
