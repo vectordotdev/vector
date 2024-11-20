@@ -8,6 +8,8 @@ on:
 
 permissions:
   issues: write
+  pull_requests: write
+  statuses: write
 
 jobs:
   deploy_vector_preview_site:

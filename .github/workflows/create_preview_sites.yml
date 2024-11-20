@@ -24,6 +24,8 @@ on:
 
 permissions:
   issues: write
+  pull_requests: write
+  statuses: write
 
 jobs:
   create_preview_site:
