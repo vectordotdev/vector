@@ -24,7 +24,7 @@ on:
 
 permissions:
   issues: write
-  pull_requests: write
+  pull-requests: write
   statuses: write
 
 jobs:
