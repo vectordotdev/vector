@@ -296,11 +296,8 @@ base: components: sources: host_metrics: configuration: {
 		description: "Options for the process metrics collector."
 		required:    false
 		type: object: options: processes: {
-			description: """
-				Lists of device name patterns to include or exclude in gathering
-				network utilization metrics.
-				"""
-			required: false
+			description: "Lists of process name patterns to include or exclude."
+			required:    false
 			type: object: {
 				examples: [{
 					excludes: null
