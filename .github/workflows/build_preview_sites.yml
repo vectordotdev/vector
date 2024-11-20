@@ -6,6 +6,9 @@ on:
     types:
       - completed
 
+permissions:
+  statuses: write
+
 jobs:
   deploy_vector_preview_site:
     if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
