@@ -575,7 +575,7 @@ impl<B> fmt::Debug for HttpClient<B> {
     }
 }
 
-/// Configuration for HTTP client providing an authentication mechanism.
+/// Test Configuration for HTTP client providing an authentication mechanism.
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug)]
