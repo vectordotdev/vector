@@ -587,7 +587,7 @@ mod tests {
                                                 password: _password,
                                             } => { /* Not needed for tests at the moment */ }
                                             Auth::OAuth2 { .. } => {
-                                                panic!("Bearer authentication is not supported currently.")
+                                                panic!("OAuth2 authentication is not supported currently.")
                                             }
                                         }
                                     }
