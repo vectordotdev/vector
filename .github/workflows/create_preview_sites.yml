@@ -23,7 +23,7 @@ on:
         required: true
 
 permissions:
-  statuses: write
+  issues: write
 
 jobs:
   create_preview_site:
