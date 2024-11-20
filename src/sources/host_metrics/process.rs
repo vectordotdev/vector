@@ -53,6 +53,8 @@ impl HostMetrics {
 
 #[cfg(test)]
 mod tests {
+    use crate::sources::host_metrics::tests::count_tag;
+
     use super::super::{HostMetrics, HostMetricsConfig, MetricsBuffer};
 
     #[tokio::test]
@@ -68,5 +70,10 @@ mod tests {
         assert!(!metrics
             .iter()
             .any(|metric| !metric.name().starts_with("process_")));
+
+        // They should all have the required tag
+        assert_eq!(count_tag(&metrics, "pid"), metrics.len());
+        assert_eq!(count_tag(&metrics, "name"), metrics.len());
+        assert_eq!(count_tag(&metrics, "command"), metrics.len());
     }
 }
