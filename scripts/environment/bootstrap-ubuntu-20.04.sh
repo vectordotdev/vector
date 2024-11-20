@@ -124,30 +124,6 @@ if ! [ -x "$(command -v node)" ]; then
     corepack enable
 fi
 
-# Hugo (static site generator).
-# Hugo is used to build the website content.
-# Note: the installed version should match the version specified in 'netlify.toml'
-TEMP=$(mktemp -d)
-curl \
-    -L https://github.com/gohugoio/hugo/releases/download/v0.84.0/hugo_extended_0.84.0_Linux-64bit.tar.gz \
-    -o "${TEMP}/hugo_extended_0.84.0_Linux-64bit.tar.gz"
-tar \
-    -xvf "${TEMP}/hugo_extended_0.84.0_Linux-64bit.tar.gz" \
-    -C "${TEMP}"
-cp "${TEMP}/hugo" /usr/bin/hugo
-rm -rf "$TEMP"
-
-# htmltest (HTML checker for the website content)
-TEMP=$(mktemp -d)
-curl \
-    -L https://github.com/wjdp/htmltest/releases/download/v0.17.0/htmltest_0.17.0_linux_amd64.tar.gz \
-    -o "${TEMP}/htmltest_0.17.0_linux_amd64.tar.gz"
-tar \
-    -xvf "${TEMP}/htmltest_0.17.0_linux_amd64.tar.gz" \
-    -C "${TEMP}"
-cp "${TEMP}/htmltest" /usr/bin/htmltest
-rm -rf "$TEMP"
-
 # Apt cleanup
 apt-get clean
 
