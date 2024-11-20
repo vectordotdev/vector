@@ -66,7 +66,12 @@ where
 {
     match format {
         Format::Toml => toml::from_str(content).map_err(|e| vec![e.to_string()]),
-        Format::Yaml => serde_yaml::from_str(content).map_err(|e| vec![e.to_string()]),
+        Format::Yaml => serde_yaml::from_str::<serde_yaml::Value>(content)
+            .and_then(|mut v| {
+                v.apply_merge()?;
+                serde_yaml::from_value(v)
+            })
+            .map_err(|e| vec![e.to_string()]),
         Format::Json => serde_json::from_str(content).map_err(|e| vec![e.to_string()]),
     }
 }
@@ -171,6 +176,10 @@ mod tests {
             type = "socket"
             mode = "tcp"
             address = "127.0.0.1:1235"
+            [sources.in2]
+            type = "socket"
+            mode = "tcp"
+            address = "127.0.0.1:1234"
             [transforms.sample]
             type = "sample"
             inputs = ["in"]
@@ -208,10 +217,13 @@ mod tests {
                     r#"      encoding:"#,
                     r#"        type: "csv""#,
                     r#"sources:"#,
-                    r#"  in:"#,
+                    r#"  in: &a"#,
                     r#"    type: "socket""#,
-                    r#"    mode: "tcp""#,
+                    r#"    mode: &b "tcp""#,
                     r#"    address: "127.0.0.1:1235""#,
+                    r#"  in2:"#,
+                    r#"    <<: *a"#,
+                    r#"    address: "127.0.0.1:1234""#,
                     r#"transforms:"#,
                     r#"  sample:"#,
                     r#"    type: "sample""#,
@@ -220,7 +232,7 @@ mod tests {
                     r#"sinks:"#,
                     r#"  out:"#,
                     r#"    type: "socket""#,
-                    r#"    mode: "tcp""#,
+                    r#"    mode: *b"#,
                     r#"    inputs: ["sample"]"#,
                     r#"    encoding:"#,
                     r#"      codec: "text""#,
@@ -248,6 +260,11 @@ mod tests {
                             "type": "socket",
                             "mode": "tcp",
                             "address": "127.0.0.1:1235"
+                        },
+                        "in2": {
+                            "type": "socket",
+                            "mode": "tcp",
+                            "address": "127.0.0.1:1234"
                         }
                     },
                     "transforms": {
