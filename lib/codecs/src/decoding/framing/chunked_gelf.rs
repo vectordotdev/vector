@@ -184,6 +184,11 @@ impl ChunkedGelfDecompression {
                     return Self::Zlib;
                 }
             };
+
+            warn!(
+                "Detected Zlib magic bytes but the header is invalid: {:?}",
+                data.get(0..2)
+            );
         };
 
         debug!("No compression detected",);
