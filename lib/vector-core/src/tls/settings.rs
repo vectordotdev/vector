@@ -82,7 +82,7 @@ pub struct TlsSourceConfig {
 /// TLS configuration.
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct TlsConfig {
     /// Enables certificate verification. For components that create a server, this requires that the

@@ -33,7 +33,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
-use vector_lib::configurable::configurable_component;
+use vector_lib::{configurable::configurable_component, tls::{TlsConfig, TlsSettings}};
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
@@ -345,7 +345,7 @@ where
         auth_config: Option<Auth>,
     ) -> Result<HttpClient<B>, HttpError> {
         let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
-        let auth_extension = build_auth_extension(auth_config, proxy_connector.clone(), client_builder);
+        let auth_extension = build_auth_extension(auth_config, proxy_config, client_builder);
         let client = client_builder.build(proxy_connector.clone());
 
         let app_name = crate::get_app_name();
@@ -436,7 +436,7 @@ where
 
 fn build_auth_extension<B>(
     auth: Option<Auth>,
-    proxy_connector: ProxyConnector<HttpsConnector<HttpConnector>>,
+    proxy_config: &ProxyConfig,
     client_builder: &mut client::Builder,
 ) -> Option<Arc<dyn AuthExtension<B>>>
 where
@@ -454,13 +454,21 @@ where
                 client_id,
                 client_secret,
                 grace_period,
+                tls,
             } => {
+                let tls_for_auth = tls.clone();
+                let tls_for_auth: TlsSettings = TlsSettings::from_options(&tls_for_auth).unwrap();
+
+                let auth_proxy_connector =
+                    build_proxy_connector(tls_for_auth.into(), proxy_config).unwrap();
+                let auth_client = client_builder.build(auth_proxy_connector.clone());
+
                 let oauth2_extension = OAuth2Extension::new(
                     token_endpoint,
                     client_id,
                     client_secret,
                     grace_period,
-                    client_builder.build(proxy_connector.clone()),
+                    auth_client,
                 );
                 return Some(Arc::new(oauth2_extension));
             }
@@ -650,6 +658,12 @@ pub enum Auth {
         #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::human_name = "Grace period for bearer token."))]
         grace_period: u32,
+        
+        /// The TLS settings for the http client's connection.
+        ///
+        /// Optional, constrains TLS settings for this http client.
+        #[configurable(derived)]
+        tls: Option<TlsConfig>,
     },
 }
 
@@ -932,7 +946,7 @@ mod tests {
 
     use super::*;
     use crate::test_util::next_addr;
-    use crate::tls::{TlsConfig, TlsSettings};
+    use crate::tls::TlsConfig;
 
     #[test]
     fn test_default_request_headers_defaults() {
@@ -1306,6 +1320,7 @@ mod tests {
             client_id,
             client_secret,
             grace_period,
+            tls: None
         };
 
         let client =
@@ -1432,13 +1447,6 @@ mod tests {
         let client_id: String = String::from("some_client_secret");
         let grace_period = 5;
 
-        let oauth2_strategy = Auth::OAuth2 {
-            token_endpoint,
-            client_id,
-            client_secret: None,
-            grace_period,
-        };
-
         let tls_config = TlsConfig {
             verify_hostname: Some(false),
             ca_file: Some("tests/data/ca/certs/ca.cert.pem".into()),
@@ -1448,10 +1456,17 @@ mod tests {
             ),
             ..Default::default()
         };
-        let tls_settings = TlsSettings::from_options(&Some(tls_config)).unwrap();
+    
+        let oauth2_strategy = Auth::OAuth2 {
+            token_endpoint,
+            client_id,
+            client_secret: None,
+            grace_period,
+            tls: Some(tls_config)
+        };
 
         let client =
-            HttpClient::new_with_auth_extension(tls_settings, &ProxyConfig::default(), Some(oauth2_strategy))
+            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(oauth2_strategy))
                 .unwrap();
 
         let req = Request::get(format!("http://{}/", addr))
