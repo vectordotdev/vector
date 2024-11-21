@@ -13,11 +13,10 @@ use tokio;
 use tokio::task::JoinHandle;
 use tokio_util::codec::Decoder;
 use tracing::{debug, warn};
+use vector_common::constants::{GZIP_MAGIC, ZLIB_MAGIC};
 use vector_config::configurable_component;
 
 const GELF_MAGIC: &[u8] = &[0x1e, 0x0f];
-const GZIP_MAGIC: &[u8] = &[0x1f, 0x8b];
-const ZLIB_MAGIC: &[u8] = &[0x78];
 const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
 const DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 
