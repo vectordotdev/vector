@@ -356,17 +356,32 @@ async fn do_fetch_impersonated_token(
 }
 
 async fn token_from_json(resp: Response) -> crate::Result<Token> {
-    if !resp.status().is_success() {
-        let token_err = resp.json::<TokenErr>().await?;
+    let is_success = resp.status().is_success();
+    let resp = resp.bytes().await?;
+    if !is_success {
+        error!(
+            message = "No success in response.",
+            raw_resp = String::from_utf8_lossy(&resp).into_owned(),
+        );
+        let token_err: TokenErr = serde_json::from_slice(&resp)?;
         return Err(token_err.into())
     }
+
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct TokenCamelCase {
         access_token: String,
         expire_time: String,
     }
-    let token = resp.json::<TokenCamelCase>().await?;
+    let token: TokenCamelCase = serde_json::from_slice(&resp.clone()).map_err(|e| {
+        error!(
+            message = "Failed to parse OAuth token JSON.",
+            error = %e,
+            raw_resp = String::from_utf8_lossy(&resp).into_owned(),
+        );
+        e
+    })?;
+
     let remapped = json!({
         "access_token": token.access_token,
         "token_type": "Bearer",
