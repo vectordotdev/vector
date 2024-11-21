@@ -10,7 +10,7 @@ use vector_lib::codecs::{
 
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
-    http::{Auth, AuthorizationConfig, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
@@ -91,7 +91,7 @@ pub struct HttpSinkConfig {
     pub tls: Option<TlsConfig>,
 
     #[configurable(derived)]
-    pub authorization_config: Option<AuthorizationConfig>,
+    pub authorization_config: Option<Auth>,
 
     #[configurable(derived)]
     #[serde(
