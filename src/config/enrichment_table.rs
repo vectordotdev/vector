@@ -4,6 +4,8 @@ use vector_lib::configurable::{configurable_component, NamedComponent};
 
 use crate::enrichment_tables::EnrichmentTables;
 
+use super::SinkConfig;
+
 /// Fully resolved enrichment table component.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -36,4 +38,8 @@ pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync
         &self,
         globals: &GlobalOptions,
     ) -> crate::Result<Box<dyn vector_lib::enrichment::Table + Send + Sync>>;
+
+    fn sink_config(&self) -> Option<&dyn SinkConfig> {
+        None
+    }
 }

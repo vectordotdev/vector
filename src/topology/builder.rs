@@ -15,11 +15,11 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
-use vector_lib::config::LogNamespace;
 use vector_lib::internal_event::{
     self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
 };
 use vector_lib::transform::update_runtime_schema_definition;
+use vector_lib::{buffers::BufferConfig, config::LogNamespace};
 use vector_lib::{
     buffers::{
         topology::{
@@ -41,7 +41,8 @@ use super::{
 use crate::{
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
-        ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
+        ProxyConfig, SinkContext, SinkHealthcheckOptions, SourceContext, TransformContext,
+        TransformOuter, TransformOutput,
     },
     event::{EventArray, EventContainer},
     extra_context::ExtraContext,
@@ -155,7 +156,7 @@ impl<'a> Builder<'a> {
         let mut enrichment_tables = HashMap::new();
 
         // Build enrichment tables
-        'tables: for (name, table) in self.config.enrichment_tables.iter() {
+        'tables: for (name, table_outer) in self.config.enrichment_tables.iter() {
             let table_name = name.to_string();
             if ENRICHMENT_TABLES.needs_reload(&table_name) {
                 let indexes = if !self.diff.enrichment_tables.is_added(name) {
@@ -166,7 +167,7 @@ impl<'a> Builder<'a> {
                     None
                 };
 
-                let mut table = match table.inner.build(&self.config.global).await {
+                let mut table = match table_outer.inner.build(&self.config.global).await {
                     Ok(table) => table,
                     Err(error) => {
                         self.errors
@@ -192,6 +193,111 @@ impl<'a> Builder<'a> {
                             }
                         }
                     }
+                }
+
+                if let Some(sink_config) = table_outer.inner.sink_config() {
+                    debug!(component = %name, "Building new sink.");
+                    let typetag = sink_config.get_component_name();
+                    let input_type = sink_config.input().data_type();
+
+                    let span = error_span!(
+                        "sink",
+                        component_kind = "sink",
+                        component_id = %name.id(),
+                        component_type = %sink_config.get_component_name(),
+                    );
+                    let _entered_span = span.enter();
+
+                    let (tx, rx) = if let Some(buffer) = self.buffers.remove(name) {
+                        buffer
+                    } else {
+                        let buffer_type = "memory";
+                        let buffer_span = error_span!("sink", buffer_type);
+                        let buffer = BufferConfig::default()
+                            .build(
+                                self.config.global.data_dir.clone(),
+                                name.to_string(),
+                                buffer_span,
+                            )
+                            .await;
+                        match buffer {
+                            Err(error) => {
+                                self.errors.push(format!("Sink \"{}\": {}", name, error));
+                                continue;
+                            }
+                            Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
+                        }
+                    };
+
+                    let cx = SinkContext {
+                        healthcheck: SinkHealthcheckOptions::default(),
+                        globals: self.config.global.clone(),
+                        proxy: ProxyConfig::merge_with_env(
+                            &self.config.global.proxy,
+                            &ProxyConfig::default(),
+                        ),
+                        schema: self.config.schema,
+                        app_name: crate::get_app_name().to_string(),
+                        app_name_slug: crate::get_slugified_app_name(),
+                        extra_context: self.extra_context.clone(),
+                    };
+                    let (sink, _healthcheck) = match sink_config.build(cx).await {
+                        Err(error) => {
+                            self.errors.push(format!("Sink \"{}\": {}", name, error));
+                            continue;
+                        }
+                        Ok(built) => built,
+                    };
+
+                    let (trigger, tripwire) = Tripwire::new();
+                    let sink = async move {
+                        debug!("Sink starting.");
+
+                        // Why is this Arc<Mutex<Option<_>>> needed you ask.
+                        // In case when this function build_pieces errors
+                        // this future won't be run so this rx won't be taken
+                        // which will enable us to reuse rx to rebuild
+                        // old configuration by passing this Arc<Mutex<Option<_>>>
+                        // yet again.
+                        let rx = rx
+                            .lock()
+                            .unwrap()
+                            .take()
+                            .expect("Task started but input has been taken.");
+
+                        let mut rx = wrap(rx);
+
+                        let events_received = register!(EventsReceived);
+                        sink.run(
+                            rx.by_ref()
+                                .filter(|events: &EventArray| {
+                                    ready(filter_events_type(events, input_type))
+                                })
+                                .inspect(|events| {
+                                    events_received.emit(CountByteSize(
+                                        events.len(),
+                                        events.estimated_json_encoded_size_of(),
+                                    ))
+                                })
+                                .take_until_if(tripwire),
+                        )
+                        .await
+                        .map(|_| {
+                            debug!("Sink finished normally.");
+                            TaskOutput::Sink(rx)
+                        })
+                        .map_err(|_| {
+                            debug!("Sink finished with an error.");
+                            TaskError::Opaque
+                        })
+                    };
+
+                    let task = Task::new(name.clone(), typetag, sink);
+
+                    self.inputs.insert(name.clone(), (tx, Inputs::default()));
+                    //self.healthchecks.insert(key.clone(), healthcheck_task);
+                    self.tasks.insert(name.clone(), task);
+                    self.detach_triggers.insert(name.clone(), trigger);
                 }
 
                 enrichment_tables.insert(table_name, table);

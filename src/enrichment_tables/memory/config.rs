@@ -1,12 +1,18 @@
-use crate::enrichment_tables::memory::Memory;
-use vector_lib::configurable::configurable_component;
-use vector_lib::enrichment::Table;
+use std::sync::Arc;
 
-use crate::config::EnrichmentTableConfig;
+use crate::sinks::Healthcheck;
+use crate::{config::SinkContext, enrichment_tables::memory::Memory};
+use async_trait::async_trait;
+use tokio::sync::Mutex;
+use vector_lib::config::{AcknowledgementsConfig, Input};
+use vector_lib::enrichment::Table;
+use vector_lib::{configurable::configurable_component, sink::VectorSink};
+
+use crate::config::{EnrichmentTableConfig, SinkConfig};
 
 /// Configuration for the `memory` enrichment table.
 #[configurable_component(enrichment_table("memory"))]
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct MemoryConfig {
     /// TTL (time-to-live), used to limit lifetime of data stored in cache.
     /// When TTL expires, data behind a specific key in cache is removed.
@@ -27,7 +33,19 @@ pub struct MemoryConfig {
     /// By default, all writes are made visible immediately.
     #[serde(default = "default_flush_interval")]
     pub flush_interval: u64,
+
+    #[serde(skip)]
+    memory: Arc<Mutex<Option<Box<Memory>>>>,
 }
+
+impl PartialEq for MemoryConfig {
+    fn eq(&self, other: &Self) -> bool {
+        self.ttl == other.ttl
+            && self.scan_interval == other.scan_interval
+            && self.flush_interval == other.flush_interval
+    }
+}
+impl Eq for MemoryConfig {}
 
 impl Default for MemoryConfig {
     fn default() -> Self {
@@ -35,6 +53,7 @@ impl Default for MemoryConfig {
             ttl: default_ttl(),
             scan_interval: default_scan_interval(),
             flush_interval: default_flush_interval(),
+            memory: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -51,12 +70,44 @@ const fn default_flush_interval() -> u64 {
     0
 }
 
+impl MemoryConfig {
+    async fn get_or_build_memory(&self) -> Memory {
+        let mut boxed_memory = self.memory.lock().await;
+        *boxed_memory
+            .get_or_insert_with(|| Box::new(Memory::new(self.clone())))
+            .clone()
+    }
+}
+
 impl EnrichmentTableConfig for MemoryConfig {
     async fn build(
         &self,
         _globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        Ok(Box::new(Memory::new(self.clone())))
+        Ok(Box::new(self.get_or_build_memory().await))
+    }
+
+    fn sink_config(&self) -> Option<&dyn SinkConfig> {
+        Some(self)
+    }
+}
+
+#[async_trait]
+#[typetag::serde(name = "memory_enrichment_table")]
+impl SinkConfig for MemoryConfig {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let healthcheck = Box::pin(async move { Ok(()) });
+        let sink = VectorSink::from_event_streamsink(self.get_or_build_memory().await);
+
+        Ok((sink, healthcheck))
+    }
+
+    fn input(&self) -> Input {
+        Input::log()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
     }
 }
 

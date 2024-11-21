@@ -1,4 +1,5 @@
 //! Functionality to handle enrichment tables.
+use crate::sinks::prelude::SinkConfig;
 use enum_dispatch::enum_dispatch;
 use vector_lib::configurable::{configurable_component, NamedComponent};
 pub use vector_lib::enrichment::{Condition, IndexHandle, Table};

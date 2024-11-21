@@ -65,6 +65,7 @@ pub struct Memory {
     read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
     write_handle: Arc<Mutex<evmap::WriteHandle<String, MemoryEntry>>>,
     config: MemoryConfig,
+    // TODO: ensure correct behavior when shared between multiple instances (probably Arc + Mutex)
     last_ttl_scan: Instant,
     last_flush: Instant,
 }
