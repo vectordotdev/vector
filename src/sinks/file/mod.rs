@@ -454,7 +454,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        config::{log_schema, DataType},
+        config::log_schema,
         test_util::{
             components::{assert_sink_compliance, FILE_SINK_TAGS},
             lines_from_file, lines_from_gzip_file, lines_from_zstd_file, random_events_with_stream,
@@ -768,39 +768,6 @@ mod tests {
 
             let metric_name = input.as_metric().name();
             assert!(output.contains(metric_name));
-        }
-    }
-
-    // The TestSerializer only supports Log and Metric data types. This test asserts the current state of running the vector file sink with an event stream.
-    // A file partition is created and empty lines are written in the file. Running a real vector instance would fail on the configuration because
-    // it would perform an input validation against the output type.
-    #[tokio::test]
-    async fn trace_single_partition_not_supported() {
-        let template = temp_file();
-
-        let config = FileSinkConfig {
-            path: template.clone().try_into().unwrap(),
-            idle_timeout: default_idle_timeout(),
-            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
-            compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
-            internal_metrics: FileInternalMetricsConfig {
-                include_file_tag: true,
-            },
-        };
-        assert!((config.input().data_type() & DataType::Trace).is_none());
-
-        let (input, _events) = random_lines_with_stream(100, 64, None);
-
-        run_assert_trace_sink(&config, input.clone()).await;
-
-        let output = lines_from_file(template);
-        assert_eq!(input.len(), output.len());
-
-        for (input, output) in input.into_iter().zip(output) {
-            assert_ne!(input, output);
-            assert_eq!("", output);
         }
     }
 
