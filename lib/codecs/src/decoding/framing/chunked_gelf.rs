@@ -1222,44 +1222,38 @@ mod tests {
         assert_eq!(frame, compressed_payload);
     }
 
-    #[rstest]
-    #[case::level_zero(flate2::Compression::new(0))]
-    #[case::level_one(flate2::Compression::new(1))]
-    #[case::level_two(flate2::Compression::new(2))]
-    #[case::level_three(flate2::Compression::new(3))]
-    #[case::level_four(flate2::Compression::new(4))]
-    #[case::level_five(flate2::Compression::new(5))]
-    #[case::level_six(flate2::Compression::new(6))]
-    #[case::level_seven(flate2::Compression::new(7))]
-    #[case::level_eight(flate2::Compression::new(8))]
-    #[case::level_nine(flate2::Compression::new(9))]
-    fn detect_gzip_compression(#[case] level: flate2::Compression) {
+    #[test]
+    fn detect_gzip_compression() {
         let payload = "foo";
-        let compressed_payload = Compression::Gzip.compress_with_level(&payload, level);
 
-        let detected_compression = ChunkedGelfDecompression::from_magic(&compressed_payload);
-
-        assert_eq!(detected_compression, ChunkedGelfDecompression::Gzip);
+        for level in 0..=9 {
+            let level = flate2::Compression::new(level);
+            let compressed_payload = Compression::Gzip.compress_with_level(&payload, level);
+            let actual = ChunkedGelfDecompression::from_magic(&compressed_payload);
+            assert_eq!(
+                actual,
+                ChunkedGelfDecompression::Gzip,
+                "Failed for level {}",
+                level.level()
+            );
+        }
     }
 
-    #[rstest]
-    #[case::level_zero(flate2::Compression::new(0))]
-    #[case::level_one(flate2::Compression::new(1))]
-    #[case::level_two(flate2::Compression::new(2))]
-    #[case::level_three(flate2::Compression::new(3))]
-    #[case::level_four(flate2::Compression::new(4))]
-    #[case::level_five(flate2::Compression::new(5))]
-    #[case::level_six(flate2::Compression::new(6))]
-    #[case::level_seven(flate2::Compression::new(7))]
-    #[case::level_eight(flate2::Compression::new(8))]
-    #[case::level_nine(flate2::Compression::new(9))]
-    fn detect_zlib_compression(#[case] level: flate2::Compression) {
+    #[test]
+    fn detect_zlib_compression() {
         let payload = "foo";
-        let compressed_payload = Compression::Zlib.compress_with_level(&payload, level);
 
-        let detected_compression = ChunkedGelfDecompression::from_magic(&compressed_payload);
-
-        assert_eq!(detected_compression, ChunkedGelfDecompression::Zlib);
+        for level in 0..=9 {
+            let level = flate2::Compression::new(level);
+            let compressed_payload = Compression::Zlib.compress_with_level(&payload, level);
+            let actual = ChunkedGelfDecompression::from_magic(&compressed_payload);
+            assert_eq!(
+                actual,
+                ChunkedGelfDecompression::Zlib,
+                "Failed for level {}",
+                level.level()
+            );
+        }
     }
 
     #[test]
