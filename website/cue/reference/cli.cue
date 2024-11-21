@@ -595,6 +595,22 @@ cli: {
 				"""
 			type: string: default: null
 		}
+		VECTOR_HOSTNAME: {
+			description: """
+				Overrides the hostname used in Vector's logs and metrics.
+				This is useful when running Vector in a container or on other systems where the hostname is not meaningful.
+
+				The example of how it can be used in Kubernetes pod template:
+
+				```yaml
+				env:
+				- name: VECTOR_HOSTNAME
+					valueFrom:
+						fieldRef:
+							fieldPath: spec.nodeName
+				"""
+			type: string: default: null
+		}
 		VECTOR_LOG: {
 			description: "Vector's log level. Each log level includes messages from higher priority levels."
 			type: string: {

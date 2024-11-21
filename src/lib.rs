@@ -197,8 +197,13 @@ pub mod built_info {
 }
 
 /// Returns the host name of the current system.
+/// The hostname can be overridden by setting the VECTOR_HOSTNAME environment variable.
 pub fn get_hostname() -> std::io::Result<String> {
-    Ok(hostname::get()?.to_string_lossy().into())
+    Ok(if let Ok(hostname) = std::env::var("VECTOR_HOSTNAME") {
+        hostname.to_string()
+    } else {
+        hostname::get()?.to_string_lossy().into_owned()
+    })
 }
 
 /// Spawn a task with the given name. The name is only used if
