@@ -33,11 +33,8 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
+use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
-use vector_lib::{
-    configurable::configurable_component,
-    tls::{TlsConfig, TlsSettings},
-};
 
 use crate::{
     config::ProxyConfig,
@@ -331,13 +328,13 @@ where
     pub fn new_with_auth_extension(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
-        auth_config: Option<Auth>,
+        auth: Option<Auth>,
     ) -> Result<HttpClient<B>, HttpError> {
         HttpClient::new_with_custom_client(
             tls_settings,
             proxy_config,
             &mut Client::builder(),
-            auth_config,
+            auth,
         )
     }
 
@@ -347,8 +344,8 @@ where
         client_builder: &mut client::Builder,
         auth_config: Option<Auth>,
     ) -> Result<HttpClient<B>, HttpError> {
-        let proxy_connector = build_proxy_connector(tls_settings.clone().into(), proxy_config)?;
-        let auth_extension = build_auth_extension(tls_settings, auth_config, proxy_config, client_builder);
+        let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
+        let auth_extension = build_auth_extension(auth_config, proxy_connector.clone(), client_builder);
         let client = client_builder.build(proxy_connector.clone());
 
         let app_name = crate::get_app_name();
@@ -438,9 +435,8 @@ where
 }
 
 fn build_auth_extension<B>(
-    tls_settings: impl Into<MaybeTlsSettings>,
-    authorization_config: Option<Auth>,
-    proxy_config: &ProxyConfig,
+    auth: Option<Auth>,
+    proxy_connector: ProxyConnector<HttpsConnector<HttpConnector>>,
     client_builder: &mut client::Builder,
 ) -> Option<Arc<dyn AuthExtension<B>>>
 where
@@ -448,11 +444,10 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    if let Some(auth) = authorization_config {
+    if let Some(auth) = auth {
         match auth {
             Auth::Basic { user, password } => {
-                let basic_auth_extension = BasicAuthExtension { user, password };
-                return Some(Arc::new(basic_auth_extension));
+                return Some(Arc::new(BasicAuthExtension { user, password }));
             }
             Auth::OAuth2 {
                 token_endpoint,
@@ -460,20 +455,16 @@ where
                 client_secret,
                 grace_period,
             } => {
-                let auth_proxy_connector =
-                    build_proxy_connector(tls_settings, proxy_config).unwrap();
-                let auth_client = client_builder.build(auth_proxy_connector.clone());
-
                 let oauth2_extension = OAuth2Extension::new(
                     token_endpoint,
                     client_id,
                     client_secret,
                     grace_period,
-                    auth_client,
+                    client_builder.build(proxy_connector.clone()),
                 );
                 return Some(Arc::new(oauth2_extension));
             }
-            Auth::Bearer { .. } => panic!("Bearer authentication is not supported currently."),
+            Auth::Bearer { .. } => unimplemented!("Bearer authentication is not supported currently."),
         }
     }
 
@@ -939,9 +930,9 @@ mod tests {
     use tokio_rustls::TlsAcceptor;
     use tower::ServiceBuilder;
 
-    use crate::test_util::next_addr;
-
     use super::*;
+    use crate::test_util::next_addr;
+    use crate::tls::{TlsConfig, TlsSettings};
 
     #[test]
     fn test_default_request_headers_defaults() {
@@ -1193,9 +1184,8 @@ mod tests {
     async fn test_oauth2extension_handle_errors_gently_with_hyper_server() {
         let addr: SocketAddr = next_addr();
         // Simplest possible configuration for oauth's client connector.
-        let tls: vector_lib::tls::MaybeTls<(), TlsSettings> =
-            MaybeTlsSettings::from_config(&None, false).unwrap();
-        let proxy_connector = build_proxy_connector(tls, &ProxyConfig::default()).unwrap();
+        let maybe_tls = MaybeTlsSettings::tls_client(&None).unwrap();
+        let proxy_connector = build_proxy_connector(maybe_tls, &ProxyConfig::default()).unwrap();
         let auth_client = Client::builder().build(proxy_connector);
 
         let token_endpoint = format!("http://{}", addr);
