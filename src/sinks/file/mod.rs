@@ -446,11 +446,15 @@ mod tests {
     use chrono::{SubsecRound, Utc};
     use futures::{stream, SinkExt};
     use similar_asserts::assert_eq;
-    use vector_lib::{event::LogEvent, sink::VectorSink};
+    use vector_lib::{
+        codecs::JsonSerializerConfig,
+        event::{LogEvent, TraceEvent},
+        sink::VectorSink,
+    };
 
     use super::*;
     use crate::{
-        config::log_schema,
+        config::{log_schema, DataType},
         test_util::{
             components::{assert_sink_compliance, FILE_SINK_TAGS},
             lines_from_file, lines_from_gzip_file, lines_from_zstd_file, random_events_with_stream,
@@ -482,7 +486,7 @@ mod tests {
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
-        run_assert_log_sink(config, input.clone()).await;
+        run_assert_log_sink(&config, input.clone()).await;
 
         let output = lines_from_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -508,7 +512,7 @@ mod tests {
 
         let (input, _) = random_lines_with_stream(100, 64, None);
 
-        run_assert_log_sink(config, input.clone()).await;
+        run_assert_log_sink(&config, input.clone()).await;
 
         let output = lines_from_gzip_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -534,7 +538,7 @@ mod tests {
 
         let (input, _) = random_lines_with_stream(100, 64, None);
 
-        run_assert_log_sink(config, input.clone()).await;
+        run_assert_log_sink(&config, input.clone()).await;
 
         let output = lines_from_zstd_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -581,7 +585,7 @@ mod tests {
         input[7].as_mut_log().insert("date", "2019-29-07");
         input[7].as_mut_log().insert("level", "error");
 
-        run_assert_sink(config, input.clone().into_iter()).await;
+        run_assert_sink(&config, input.clone().into_iter()).await;
 
         let output = [
             lines_from_file(directory.join("warnings-2019-26-07.log")),
@@ -703,7 +707,7 @@ mod tests {
 
         let (input, _events) = random_metrics_with_stream(100, None, None);
 
-        run_assert_sink(config, input.clone().into_iter()).await;
+        run_assert_sink(&config, input.clone().into_iter()).await;
 
         let output = lines_from_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -744,7 +748,7 @@ mod tests {
             timestamp_offset,
         );
 
-        run_assert_sink(config, input.clone().into_iter()).await;
+        run_assert_sink(&config, input.clone().into_iter()).await;
 
         let output = (0..metric_count).map(|index| {
             let expected_timestamp = timestamp + (timestamp_offset * index as u32);
@@ -767,7 +771,66 @@ mod tests {
         }
     }
 
-    async fn run_assert_log_sink(config: FileSinkConfig, events: Vec<String>) {
+    // The TestSerializer only supports Log and Metric data types. This test asserts the current state of running the vector file sink with an event stream.
+    // A file partition is created and empty lines are written in the file. Running a real vector instance would fail on the configuration because
+    // it would perform an input validation against the output type.
+    #[tokio::test]
+    async fn trace_single_partition_not_supported() {
+        let template = temp_file();
+
+        let config = FileSinkConfig {
+            path: template.clone().try_into().unwrap(),
+            idle_timeout: default_idle_timeout(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            compression: Compression::None,
+            acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
+        };
+        assert!((config.input().data_type() & DataType::Trace).is_none());
+
+        let (input, _events) = random_lines_with_stream(100, 64, None);
+
+        run_assert_trace_sink(&config, input.clone()).await;
+
+        let output = lines_from_file(template);
+        assert_eq!(input.len(), output.len());
+
+        for (input, output) in input.into_iter().zip(output) {
+            assert_ne!(input, output);
+            assert_eq!("", output);
+        }
+    }
+
+    #[tokio::test]
+    async fn trace_single_partition() {
+        let template = temp_file();
+
+        let config = FileSinkConfig {
+            path: template.clone().try_into().unwrap(),
+            idle_timeout: default_idle_timeout(),
+            encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+            compression: Compression::None,
+            acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
+        };
+
+        let (input, _events) = random_lines_with_stream(100, 64, None);
+
+        run_assert_trace_sink(&config, input.clone()).await;
+
+        let output = lines_from_file(template);
+        for (input, output) in input.iter().zip(output) {
+            assert!(output.contains(input));
+        }
+    }
+
+    async fn run_assert_log_sink(config: &FileSinkConfig, events: Vec<String>) {
         run_assert_sink(
             config,
             events.into_iter().map(LogEvent::from).map(Event::Log),
@@ -775,7 +838,19 @@ mod tests {
         .await;
     }
 
-    async fn run_assert_sink(config: FileSinkConfig, events: impl Iterator<Item = Event> + Send) {
+    async fn run_assert_trace_sink(config: &FileSinkConfig, events: Vec<String>) {
+        run_assert_sink(
+            config,
+            events
+                .into_iter()
+                .map(LogEvent::from)
+                .map(TraceEvent::from)
+                .map(Event::Trace),
+        )
+        .await;
+    }
+
+    async fn run_assert_sink(config: &FileSinkConfig, events: impl Iterator<Item = Event> + Send) {
         assert_sink_compliance(&FILE_SINK_TAGS, async move {
             let sink = FileSink::new(&config, SinkContext::default()).unwrap();
             VectorSink::from_event_streamsink(sink)
