@@ -347,8 +347,8 @@ where
         client_builder: &mut client::Builder,
         auth_config: Option<Auth>,
     ) -> Result<HttpClient<B>, HttpError> {
-        let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
-        let auth_extension = build_auth_extension(auth_config, proxy_config, client_builder);
+        let proxy_connector = build_proxy_connector(tls_settings.clone().into(), proxy_config)?;
+        let auth_extension = build_auth_extension(tls_settings, auth_config, proxy_config, client_builder);
         let client = client_builder.build(proxy_connector.clone());
 
         let app_name = crate::get_app_name();
@@ -438,6 +438,7 @@ where
 }
 
 fn build_auth_extension<B>(
+    tls_settings: impl Into<MaybeTlsSettings>,
     authorization_config: Option<Auth>,
     proxy_config: &ProxyConfig,
     client_builder: &mut client::Builder,
@@ -447,8 +448,8 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    if let Some(authorization_config) = authorization_config {
-        match authorization_config {
+    if let Some(auth) = authorization_config {
+        match auth {
             Auth::Basic { user, password } => {
                 let basic_auth_extension = BasicAuthExtension { user, password };
                 return Some(Arc::new(basic_auth_extension));
@@ -458,13 +459,9 @@ where
                 client_id,
                 client_secret,
                 grace_period,
-                tls,
             } => {
-                let tls_for_auth = tls.clone();
-                let tls_for_auth: TlsSettings = TlsSettings::from_options(&tls_for_auth).unwrap();
-
                 let auth_proxy_connector =
-                    build_proxy_connector(tls_for_auth.into(), proxy_config).unwrap();
+                    build_proxy_connector(tls_settings, proxy_config).unwrap();
                 let auth_client = client_builder.build(auth_proxy_connector.clone());
 
                 let oauth2_extension = OAuth2Extension::new(
@@ -582,7 +579,7 @@ impl<B> fmt::Debug for HttpClient<B> {
 /// HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
 /// HTTP header without any additional encryption beyond what is provided by the transport itself.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 #[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
 pub enum Auth {
@@ -662,12 +659,6 @@ pub enum Auth {
         #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::human_name = "Grace period for bearer token."))]
         grace_period: u32,
-
-        /// The TLS settings for the http client's connection.
-        ///
-        /// Optional, constrains TLS settings for this http client.
-        #[configurable(derived)]
-        tls: Option<TlsConfig>,
     },
 }
 
@@ -1320,16 +1311,15 @@ mod tests {
         let client_secret = Some(SensitiveString::from(String::from("some_secret")));
         let grace_period = 5;
 
-        let oauth2_config = Auth::OAuth2 {
+        let oauth2_strategy = Auth::OAuth2 {
             token_endpoint,
             client_id,
             client_secret,
             grace_period,
-            tls: None,
         };
 
         let client =
-            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(oauth2_config))
+            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(oauth2_strategy))
                 .unwrap();
 
         let req = Request::get(format!("http://{}/", addr))
@@ -1452,7 +1442,14 @@ mod tests {
         let client_id: String = String::from("some_client_secret");
         let grace_period = 5;
 
-        let tls_config = Some(TlsConfig {
+        let oauth2_strategy = Auth::OAuth2 {
+            token_endpoint,
+            client_id,
+            client_secret: None,
+            grace_period,
+        };
+
+        let tls_config = TlsConfig {
             verify_hostname: Some(false),
             ca_file: Some("tests/data/ca/certs/ca.cert.pem".into()),
             crt_file: Some("tests/data/ca/intermediate_client/certs/localhost.cert.pem".into()),
@@ -1460,18 +1457,11 @@ mod tests {
                 "tests/data/ca/intermediate_client/private/localhost.key.pem".into(),
             ),
             ..Default::default()
-        });
-
-        let oauth2_config = Auth::OAuth2 {
-            token_endpoint,
-            client_id,
-            client_secret: None,
-            grace_period,
-            tls: tls_config,
         };
+        let tls_settings = TlsSettings::from_options(&Some(tls_config)).unwrap();
 
         let client =
-            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(oauth2_config))
+            HttpClient::new_with_auth_extension(tls_settings, &ProxyConfig::default(), Some(oauth2_strategy))
                 .unwrap();
 
         let req = Request::get(format!("http://{}/", addr))
@@ -1510,10 +1500,10 @@ mod tests {
         let user = String::from("user");
         let password = SensitiveString::from(String::from("password"));
 
-        let basic_auth_config = Auth::Basic { user, password };
+        let basic_strategy = Auth::Basic { user, password };
 
         let client =
-            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(basic_auth_config))
+            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(basic_strategy))
                 .unwrap();
 
         let req = Request::get(format!("http://{}/", addr))

@@ -91,9 +91,6 @@ pub struct HttpSinkConfig {
     pub tls: Option<TlsConfig>,
 
     #[configurable(derived)]
-    pub authorization_config: Option<Auth>,
-
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
