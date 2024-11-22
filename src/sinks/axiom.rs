@@ -120,6 +120,7 @@ impl SinkConfig for AxiomConfig {
             method: HttpMethod::Post,
             tls: self.tls.clone(),
             request,
+            authorization_config: None,
             acknowledgements: self.acknowledgements,
             batch: self.batch,
             headers: None,

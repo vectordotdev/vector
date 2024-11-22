@@ -33,8 +33,11 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
-use vector_lib::{configurable::configurable_component, tls::{TlsConfig, TlsSettings}};
 use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
+    configurable::configurable_component,
+    tls::{TlsConfig, TlsSettings},
+};
 
 use crate::{
     config::ProxyConfig,
@@ -328,21 +331,16 @@ where
     pub fn new_with_auth_extension(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
-        auth: Option<Auth>,
+        auth: Option<AuthorizationConfig>,
     ) -> Result<HttpClient<B>, HttpError> {
-        HttpClient::new_with_custom_client(
-            tls_settings,
-            proxy_config,
-            &mut Client::builder(),
-            auth,
-        )
+        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder(), auth)
     }
 
     pub fn new_with_custom_client(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
         client_builder: &mut client::Builder,
-        auth_config: Option<Auth>,
+        auth_config: Option<AuthorizationConfig>,
     ) -> Result<HttpClient<B>, HttpError> {
         let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
         let auth_extension = build_auth_extension(auth_config, proxy_config, client_builder);
@@ -435,7 +433,7 @@ where
 }
 
 fn build_auth_extension<B>(
-    auth: Option<Auth>,
+    auth: Option<AuthorizationConfig>,
     proxy_config: &ProxyConfig,
     client_builder: &mut client::Builder,
 ) -> Option<Arc<dyn AuthExtension<B>>>
@@ -445,7 +443,7 @@ where
     B::Error: Into<crate::Error> + Send,
 {
     if let Some(auth) = auth {
-        match auth {
+        match auth.strategy {
             Auth::Basic { user, password } => {
                 return Some(Arc::new(BasicAuthExtension { user, password }));
             }
@@ -454,9 +452,8 @@ where
                 client_id,
                 client_secret,
                 grace_period,
-                tls,
             } => {
-                let tls_for_auth = tls.clone();
+                let tls_for_auth = auth.tls.clone();
                 let tls_for_auth: TlsSettings = TlsSettings::from_options(&tls_for_auth).unwrap();
 
                 let auth_proxy_connector =
@@ -472,7 +469,9 @@ where
                 );
                 return Some(Arc::new(oauth2_extension));
             }
-            Auth::Bearer { .. } => unimplemented!("Bearer authentication is not supported currently."),
+            Auth::Bearer { .. } => {
+                unimplemented!("Bearer authentication is not supported currently.")
+            }
         }
     }
 
@@ -573,6 +572,23 @@ impl<B> fmt::Debug for HttpClient<B> {
     }
 }
 
+/// Configuration for HTTP client providing an authentication mechanism.
+#[configurable_component]
+#[configurable(metadata(docs::advanced))]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct AuthorizationConfig {
+    /// Define how to authorize against an upstream.
+    #[configurable]
+    strategy: Auth,
+
+    /// The TLS settings for the http client's connection.
+    ///
+    /// Optional, constrains TLS settings for this http client.
+    #[configurable(derived)]
+    tls: Option<TlsConfig>,
+}
+
 /// Configuration of the authentication strategy for HTTP requests.
 ///
 /// HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
@@ -658,12 +674,6 @@ pub enum Auth {
         #[configurable(metadata(docs::type_unit = "seconds"))]
         #[configurable(metadata(docs::human_name = "Grace period for bearer token."))]
         grace_period: u32,
-        
-        /// The TLS settings for the http client's connection.
-        ///
-        /// Optional, constrains TLS settings for this http client.
-        #[configurable(derived)]
-        tls: Option<TlsConfig>,
     },
 }
 
@@ -1320,11 +1330,15 @@ mod tests {
             client_id,
             client_secret,
             grace_period,
-            tls: None
+        };
+
+        let auth_config = AuthorizationConfig {
+            strategy: oauth2_strategy,
+            tls: None,
         };
 
         let client =
-            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(oauth2_strategy))
+            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(auth_config))
                 .unwrap();
 
         let req = Request::get(format!("http://{}/", addr))
@@ -1451,22 +1465,24 @@ mod tests {
             verify_hostname: Some(false),
             ca_file: Some("tests/data/ca/certs/ca.cert.pem".into()),
             crt_file: Some("tests/data/ca/intermediate_client/certs/localhost.cert.pem".into()),
-            key_file: Some(
-                "tests/data/ca/intermediate_client/private/localhost.key.pem".into(),
-            ),
+            key_file: Some("tests/data/ca/intermediate_client/private/localhost.key.pem".into()),
             ..Default::default()
         };
-    
+
         let oauth2_strategy = Auth::OAuth2 {
             token_endpoint,
             client_id,
             client_secret: None,
             grace_period,
-            tls: Some(tls_config)
+        };
+
+        let auth_config = AuthorizationConfig {
+            strategy: oauth2_strategy,
+            tls: Some(tls_config),
         };
 
         let client =
-            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(oauth2_strategy))
+            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(auth_config))
                 .unwrap();
 
         let req = Request::get(format!("http://{}/", addr))
@@ -1507,8 +1523,13 @@ mod tests {
 
         let basic_strategy = Auth::Basic { user, password };
 
+        let auth_config = AuthorizationConfig {
+            strategy: basic_strategy,
+            tls: None,
+        };
+
         let client =
-            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(basic_strategy))
+            HttpClient::new_with_auth_extension(None, &ProxyConfig::default(), Some(auth_config))
                 .unwrap();
 
         let req = Request::get(format!("http://{}/", addr))
