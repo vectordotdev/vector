@@ -1,6 +1,6 @@
 features:
 - postgresql_metrics-integration-tests
-- postgres-integration-tests
+- postgres_sink-integration-tests
 
 test_filter: ::postgres
 
