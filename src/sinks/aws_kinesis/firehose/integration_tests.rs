@@ -261,6 +261,7 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
         &proxy,
         &None,
         &None,
+        false,
     )
     .await
     .unwrap()
