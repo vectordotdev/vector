@@ -753,7 +753,7 @@ mod tests {
         let output = (0..metric_count).map(|index| {
             let expected_timestamp = timestamp + (timestamp_offset * index as u32);
             let expected_filename =
-                directory.join(&format!("{}.log", expected_timestamp.format(format)));
+                directory.join(format!("{}.log", expected_timestamp.format(format)));
 
             lines_from_file(expected_filename)
         });
@@ -819,7 +819,7 @@ mod tests {
 
     async fn run_assert_sink(config: &FileSinkConfig, events: impl Iterator<Item = Event> + Send) {
         assert_sink_compliance(&FILE_SINK_TAGS, async move {
-            let sink = FileSink::new(&config, SinkContext::default()).unwrap();
+            let sink = FileSink::new(config, SinkContext::default()).unwrap();
             VectorSink::from_event_streamsink(sink)
                 .run(Box::pin(stream::iter(events.map(Into::into))))
                 .await
