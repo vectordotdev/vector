@@ -55,6 +55,7 @@ impl SqsSinkConfig {
             proxy,
             &self.base_config.tls,
             &None,
+            false,
         )
         .await
     }

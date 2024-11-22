@@ -124,6 +124,9 @@ pub trait ClientBuilder {
 
     /// Build the client using the given config settings.
     fn build(config: &SdkConfig) -> Self::Client;
+
+    /// Build the client using the given config settings and path style addressing.
+    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client;
 }
 
 fn region_provider(
@@ -168,10 +171,19 @@ pub async fn create_client<T: ClientBuilder>(
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
     timeout: &Option<AwsTimeout>,
+    force_path_style: impl Into<bool>,
 ) -> crate::Result<T::Client> {
-    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options, timeout)
-        .await
-        .map(|(client, _)| client)
+    create_client_and_region::<T>(
+        auth,
+        region,
+        endpoint,
+        proxy,
+        tls_options,
+        timeout,
+        force_path_style,
+    )
+    .await
+    .map(|(client, _)| client)
 }
 
 /// Create the SDK client and resolve the region using the provided settings.
@@ -182,6 +194,7 @@ pub async fn create_client_and_region<T: ClientBuilder>(
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
     timeout: &Option<AwsTimeout>,
+    force_path_style: impl Into<bool>,
 ) -> crate::Result<(T::Client, Region)> {
     let retry_config = RetryConfig::disabled();
 
@@ -239,7 +252,11 @@ pub async fn create_client_and_region<T: ClientBuilder>(
 
     let config = config_builder.build();
 
-    Ok((T::build(&config), region))
+    if force_path_style.into() {
+        Ok((T::build_and_force_path_style(&config), region))
+    } else {
+        Ok((T::build(&config), region))
+    }
 }
 
 #[derive(Snafu, Debug)]

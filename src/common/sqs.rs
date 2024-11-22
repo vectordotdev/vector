@@ -8,4 +8,8 @@ impl ClientBuilder for SqsClientBuilder {
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_sqs::client::Client::new(config)
     }
+
+    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
+        SqsClientBuilder::build(config)
+    }
 }

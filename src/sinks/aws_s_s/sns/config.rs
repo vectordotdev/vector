@@ -54,6 +54,7 @@ impl SnsSinkConfig {
             proxy,
             &self.base_config.tls,
             &None,
+            false,
         )
         .await
     }
@@ -110,6 +111,10 @@ impl ClientBuilder for SnsClientBuilder {
 
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_sns::client::Client::new(config)
+    }
+
+    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
+        SnsClientBuilder::build(config)
     }
 }
 

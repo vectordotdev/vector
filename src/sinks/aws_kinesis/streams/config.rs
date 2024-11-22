@@ -40,6 +40,10 @@ impl ClientBuilder for KinesisClientBuilder {
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         KinesisClient::new(config)
     }
+
+    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
+        KinesisClientBuilder::build(config)
+    }
 }
 
 pub const MAX_PAYLOAD_SIZE: usize = 5_000_000;
@@ -105,6 +109,7 @@ impl KinesisStreamsSinkConfig {
             proxy,
             &self.base.tls,
             &None,
+            false,
         )
         .await
     }
