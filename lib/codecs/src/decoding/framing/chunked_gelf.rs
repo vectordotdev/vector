@@ -530,6 +530,7 @@ mod tests {
         pub fn compress(&self, payload: &impl AsRef<[u8]>) -> Bytes {
             self.compress_with_level(payload, flate2::Compression::default())
         }
+        
         pub fn compress_with_level(
             &self,
             payload: &impl AsRef<[u8]>,
