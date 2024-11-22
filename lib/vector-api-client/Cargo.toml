@@ -13,11 +13,11 @@ serde.workspace = true
 serde_json.workspace = true
 
 # Error handling
-anyhow = { version = "1.0.86", default-features = false, features = ["std"] }
+anyhow = { version = "1.0.93", default-features = false, features = ["std"] }
 
 # Tokio / Futures
 futures.workspace = true
-tokio = { version = "1.40.0", default-features = false, features = ["macros", "rt", "sync"] }
+tokio = { version = "1.41.1", default-features = false, features = ["macros", "rt", "sync"] }
 tokio-stream = { version = "0.1.16", default-features = false, features = ["sync"] }
 
 # GraphQL
@@ -30,6 +30,6 @@ tokio-tungstenite = { version = "0.20.1", default-features = false, features = [
 # External libs
 chrono.workspace = true
 clap.workspace = true
-url = { version = "2.5.2", default-features = false }
+url = { version = "2.5.3", default-features = false }
 uuid.workspace = true
 indoc = { version = "2.0.5", default-features = false }

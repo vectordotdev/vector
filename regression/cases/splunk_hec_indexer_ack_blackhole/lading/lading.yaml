@@ -11,3 +11,7 @@ generator:
       acknowledgements:
         ack_query_interval_seconds: 10
         ack_timeout_seconds: 300
+
+target_metrics:
+  - prometheus: # internal telemetry
+      uri: "http://127.0.0.1:9090/metrics"

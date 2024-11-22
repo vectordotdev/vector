@@ -249,7 +249,7 @@ releases: "0.40.0": {
 		{
 			type: "fix"
 			description: """
-				Fixes sink retry paramater validation to prevent panic at runtime.
+				Fixes sink retry parameter validation to prevent panic at runtime.
 				"""
 			contributors: ["dhable"]
 		},

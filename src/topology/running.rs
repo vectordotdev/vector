@@ -1014,13 +1014,24 @@ impl RunningTopology {
                 warn!(
                 "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
             );
-                Some(e.as_secs_f64())
+                if e < Duration::from_secs(0) {
+                    None
+                } else {
+                    Some(e.as_secs_f64())
+                }
             }
             (Some(_), Some(_)) => {
                 error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
                 return None;
             }
-            (None, e) => e,
+            (None, Some(e)) => {
+                if e < 0f64 {
+                    None
+                } else {
+                    Some(e)
+                }
+            }
+            (None, None) => Some(300f64),
         };
 
         if let Err(error) = crate::metrics::Controller::get()

@@ -102,6 +102,15 @@ base: components: sources: opentelemetry: configuration: {
 							required: false
 							type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 						}
+						server_name: {
+							description: """
+																Server name to use when using Server Name Indication (SNI).
+
+																Only relevant for outgoing connections.
+																"""
+							required: false
+							type: string: examples: ["www.example.com"]
+						}
 						verify_certificate: {
 							description: """
 																Enables certificate verification. For components that create a server, this requires that the
@@ -143,6 +152,7 @@ base: components: sources: opentelemetry: configuration: {
 		type: object: {
 			examples: [{
 				address: "0.0.0.0:4318"
+				headers: []
 				keepalive: {
 					max_connection_age_jitter_factor: 0.1
 					max_connection_age_secs:          300
@@ -157,6 +167,22 @@ base: components: sources: opentelemetry: configuration: {
 						"""
 					required: true
 					type: string: examples: ["0.0.0.0:4318", "localhost:4318"]
+				}
+				headers: {
+					description: """
+						A list of HTTP headers to include in the log event.
+
+						Accepts the wildcard (`*`) character for headers matching a specified pattern.
+
+						Specifying "*" results in all headers included in the log event.
+
+						These headers are not included in the JSON payload if a field with a conflicting name exists.
+						"""
+					required: false
+					type: array: {
+						default: []
+						items: type: string: examples: ["User-Agent", "X-My-Custom-Header", "X-*", "*"]
+					}
 				}
 				keepalive: {
 					description: "Configuration of HTTP server keepalive parameters."
@@ -254,6 +280,15 @@ base: components: sources: opentelemetry: configuration: {
 																"""
 							required: false
 							type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+						}
+						server_name: {
+							description: """
+																Server name to use when using Server Name Indication (SNI).
+
+																Only relevant for outgoing connections.
+																"""
+							required: false
+							type: string: examples: ["www.example.com"]
 						}
 						verify_certificate: {
 							description: """

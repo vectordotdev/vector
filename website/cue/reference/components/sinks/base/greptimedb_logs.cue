@@ -170,9 +170,14 @@ base: components: sinks: greptimedb_logs: configuration: {
 		type: string: examples: ["password"]
 	}
 	pipeline_name: {
-		description: "Pipeline name to be used for the logs."
-		required:    true
+		description: """
+			Pipeline name to be used for the logs.
+
+			Default to `greptime_identity`, use the original log structure
+			"""
+		required: false
 		type: string: {
+			default: "greptime_identity"
 			examples: ["pipeline_name"]
 			syntax: "template"
 		}
@@ -431,6 +436,15 @@ base: components: sinks: greptimedb_logs: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

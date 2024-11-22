@@ -21,6 +21,14 @@ releases: "0.41.0": {
 		There are no breaking changes or deprecations with this release and so no upgrade guide.
 		"""
 
+	known_issues: [
+		"""
+			The `vector` source cannot receive events encoded by the`vector` sink
+			[#21252](https://github.com/vectordotdev/vector/issues/21252). This will be fixed in
+			v0.41.1.
+			""",
+	]
+
 	changelog: [
 		{
 			type: "feat"

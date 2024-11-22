@@ -20,7 +20,7 @@ pub mod aws_cloudwatch_metrics;
 pub mod aws_kinesis;
 #[cfg(feature = "sinks-aws_s3")]
 pub mod aws_s3;
-#[cfg(any(feature = "sinks-aws_sqs", feature = "sinks-sinks-aws_sns"))]
+#[cfg(feature = "sinks-aws_sqs")]
 pub mod aws_s_s;
 #[cfg(feature = "sinks-axiom")]
 pub mod axiom;
@@ -55,7 +55,10 @@ pub mod gcp;
 pub mod gcp_chronicle;
 #[cfg(any(feature = "sinks-gcp-chronicle", feature = "sinks-gcp"))]
 pub mod gcs_common;
-#[cfg(any(feature = "sinks-greptimedb_metrics", feature = "sink-greptimedb_logs"))]
+#[cfg(any(
+    feature = "sinks-greptimedb_metrics",
+    feature = "sinks-greptimedb_logs"
+))]
 pub mod greptimedb;
 #[cfg(feature = "sinks-honeycomb")]
 pub mod honeycomb;

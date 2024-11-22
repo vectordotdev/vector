@@ -148,6 +148,14 @@ pub struct TlsConfig {
     #[configurable(metadata(docs::examples = "PassWord1"))]
     #[configurable(metadata(docs::human_name = "Key File Password"))]
     pub key_pass: Option<String>,
+
+    /// Server name to use when using Server Name Indication (SNI).
+    ///
+    /// Only relevant for outgoing connections.
+    #[serde(alias = "server_name")]
+    #[configurable(metadata(docs::examples = "www.example.com"))]
+    #[configurable(metadata(docs::human_name = "Server Name"))]
+    pub server_name: Option<String>,
 }
 
 impl TlsConfig {
@@ -169,6 +177,7 @@ pub struct TlsSettings {
     authorities: Vec<X509>,
     pub(super) identity: Option<IdentityStore>, // openssl::pkcs12::ParsedPkcs12 doesn't impl Clone yet
     alpn_protocols: Option<Vec<u8>>,
+    server_name: Option<String>,
 }
 
 #[derive(Clone)]
@@ -203,6 +212,7 @@ impl TlsSettings {
             authorities: options.load_authorities()?,
             identity: options.load_identity()?,
             alpn_protocols: options.parse_alpn_protocols()?,
+            server_name: options.server_name.clone(),
         })
     }
 
@@ -333,8 +343,17 @@ impl TlsSettings {
         Ok(())
     }
 
-    pub fn apply_connect_configuration(&self, connection: &mut ConnectConfiguration) {
+    pub fn apply_connect_configuration(
+        &self,
+        connection: &mut ConnectConfiguration,
+    ) -> std::result::Result<(), openssl::error::ErrorStack> {
         connection.set_verify_hostname(self.verify_hostname);
+        if let Some(server_name) = &self.server_name {
+            // Prevent native TLS lib from inferring default SNI using domain name from url.
+            connection.set_use_server_name_indication(false);
+            connection.set_hostname(server_name)?;
+        }
+        Ok(())
     }
 }
 

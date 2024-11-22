@@ -5,6 +5,7 @@ import dotEnv from "dotenv-defaults";
 import fs from "fs";
 import glob from "glob-promise";
 import path from "path";
+import crypto from "crypto";
 
 dotEnv.config();
 
@@ -17,7 +18,7 @@ type Payload = {
 }[];
 
 type AlgoliaRecord = {
-  objectID: string;
+  id: string;
   pageTitle: string;
   pageUrl: string;
   itemUrl: string;
@@ -66,6 +67,11 @@ function getItemUrl(file: string, { level, domId }: Payload[0]) {
   }
 
   return level > 1 && level < 6 && domId ? `${fileUrl}#${domId}` : fileUrl;
+}
+
+// Hash the file name to create a unique ID for the record using the same hash function as the one used in the synapse stream package.
+function hashString(fileName: string) {
+  return crypto.createHash('md5').update(fileName).digest('hex')
 }
 
 async function indexHTMLFiles(
@@ -122,10 +128,11 @@ async function indexHTMLFiles(
     for (const item of payload) {
       const pageUrl = getPageUrl(file);
       const itemUrl = getItemUrl(file, item);
+      const hashedId = hashString(itemUrl);
 
       if (!activeRecord) {
         activeRecord = {
-          objectID: itemUrl,
+          id: hashedId,
           pageTitle,
           pageUrl,
           itemUrl,
@@ -143,7 +150,7 @@ async function indexHTMLFiles(
         algoliaRecords.push({ ...activeRecord });
 
         activeRecord = {
-          objectID: itemUrl,
+          id: hashedId,
           pageTitle,
           pageUrl,
           itemUrl,
@@ -163,7 +170,7 @@ async function indexHTMLFiles(
         const lastIndex = hierarchySize - levelDiff;
 
         activeRecord = {
-          objectID: itemUrl,
+          id: hashedId,
           pageTitle,
           pageUrl,
           itemUrl,
@@ -178,18 +185,18 @@ async function indexHTMLFiles(
       }
 
       if (activeRecord) {
-        algoliaRecords.push({ ...activeRecord });
+        algoliaRecords.push({ ...activeRecord })
       }
 
       for (const rec of algoliaRecords) {
-        // The objectID is the url of the section of the page that the record covers.
+        // The id is the url of the section of the page that the record covers.
         // If you have a duplicate here somehow two records point to the same thing.
-        if (DEBUG && usedIds[rec.objectID]) {
-          console.log(chalk.yellow(`Duplicate ID for ${rec.objectID}`));
+        if (DEBUG && usedIds[rec.id]) {
+          console.log(chalk.yellow(`Duplicate ID for ${rec.id}`));
           console.log(JSON.stringify(rec, null, 2));
         }
 
-        usedIds[rec.objectID] = true;
+        usedIds[rec.id] = true;
 
         // The h2 -> h5 should have a set of tags that are the "path" within the file.
         if (DEBUG && rec.level > 1 && rec.level < 6 && rec.hierarchy.length == 0) {
@@ -255,7 +262,7 @@ async function buildIndex() {
   for (const section of sections) {
     let files = await glob(section.path);
     console.log(chalk.blue(`Indexing ${section.displayPath}...`));
-    indexHTMLFiles(allRecords, section.name, files, section.ranking);
+    await indexHTMLFiles(allRecords, section.name, files, section.ranking);
   }
 
   console.log(chalk.green(`Success. ${allRecords.length} records have been successfully indexed.`));

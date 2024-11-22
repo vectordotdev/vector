@@ -28,8 +28,12 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	api_version: {
-		description: "The API version of Elasticsearch."
-		required:    false
+		description: """
+			The API version of Elasticsearch.
+
+			Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
+			"""
+		required: false
 		type: string: {
 			default: "auto"
 			enum: {
@@ -166,8 +170,12 @@ base: components: sinks: elasticsearch: configuration: {
 				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
 			strategy: {
-				description: "The authentication strategy to use."
-				required:    true
+				description: """
+					The authentication strategy to use.
+
+					Amazon OpenSearch Serverless requires this option to be set to `aws`.
+					"""
+				required: true
 				type: string: enum: {
 					aws:   "Amazon OpenSearch Service-specific authentication."
 					basic: "HTTP Basic Authentication."
@@ -550,6 +558,17 @@ base: components: sinks: elasticsearch: configuration: {
 			}
 		}
 	}
+	opensearch_service_type: {
+		description: "Amazon OpenSearch service type"
+		required:    false
+		type: string: {
+			default: "managed"
+			enum: {
+				managed:    "Elasticsearch or OpenSearch Managed domain"
+				serverless: "OpenSearch Serverless collection"
+			}
+		}
+	}
 	pipeline: {
 		description: "The name of the pipeline to apply."
 		required:    false
@@ -838,6 +857,15 @@ base: components: sinks: elasticsearch: configuration: {
 					"""
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
 			}
 			verify_certificate: {
 				description: """

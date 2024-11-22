@@ -8,8 +8,11 @@ use std::{
     time::Duration,
 };
 
+use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
 use indexmap::IndexMap;
 use serde::Serialize;
+
+use vector_config::configurable_component;
 pub use vector_lib::config::{
     AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
     SourceAcknowledgementsConfig, SourceOutput, TransformOutput,
@@ -17,15 +20,13 @@ pub use vector_lib::config::{
 pub use vector_lib::configurable::component::{
     GenerateConfig, SinkDescription, TransformDescription,
 };
-use vector_lib::configurable::configurable_component;
-
-use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
 
 pub mod api;
 mod builder;
 mod cmd;
 mod compiler;
 mod diff;
+mod dot_graph;
 mod enrichment_table;
 pub mod format;
 mod graph;
@@ -686,22 +687,27 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "sources-file_descriptor"))]
     async fn no_conflict_fd_resources() {
+        use crate::sources::file_descriptors::file_descriptor::null_fd;
+        let fd1 = null_fd().unwrap();
+        let fd2 = null_fd().unwrap();
         let result = load(
-            r#"
+            &format!(
+                r#"
             [sources.file_descriptor1]
             type = "file_descriptor"
-            fd = 10
+            fd = {fd1}
 
             [sources.file_descriptor2]
             type = "file_descriptor"
-            fd = 20
+            fd = {fd2}
 
             [sinks.out]
             type = "test_basic"
             inputs = ["file_descriptor1", "file_descriptor2"]
-            "#,
+            "#
+            ),
             Format::Toml,
         )
         .await;
