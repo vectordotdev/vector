@@ -90,7 +90,6 @@ pub enum BulkAction {
 
     /// The `update` action.
     Update,
-
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
