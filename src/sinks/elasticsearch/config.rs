@@ -282,7 +282,7 @@ impl ElasticsearchConfig {
 pub struct BulkConfig {
     /// Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
     ///
-    /// Only `index` and `create` actions are supported.
+    /// Only `index`, `create` and `update` actions are supported.
     ///
     /// [es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
     #[serde(default = "default_bulk_action")]
