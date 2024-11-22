@@ -89,7 +89,7 @@ pub enum BulkAction {
     Create,
 
     /// The `update` action.
-    Update
+    Update,
 
 }
 
