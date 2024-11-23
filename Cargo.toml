@@ -838,7 +838,7 @@ all-integration-tests = [
   "nginx-integration-tests",
   "opentelemetry-integration-tests",
   "postgresql_metrics-integration-tests",
-  "postgres-integration-tests",
+  "postgres_sink-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "redis-integration-tests",
@@ -903,7 +903,7 @@ nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 opentelemetry-integration-tests = ["sources-opentelemetry", "dep:prost"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
-postgres-integration-tests = ["sinks-postgres"]
+postgres_sink-integration-tests = ["sinks-postgres"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "sinks-influxdb"]
 pulsar-integration-tests = ["sinks-pulsar", "sources-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
