@@ -12,7 +12,7 @@ use std::time::Duration;
 use tokio;
 use tokio::task::JoinHandle;
 use tokio_util::codec::Decoder;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 use vector_common::constants::{GZIP_MAGIC, ZLIB_MAGIC};
 use vector_config::configurable_component;
 
@@ -172,7 +172,7 @@ pub enum ChunkedGelfDecompression {
 impl ChunkedGelfDecompression {
     pub fn from_magic(data: &Bytes) -> Self {
         if data.starts_with(GZIP_MAGIC) {
-            debug!("Detected Gzip compression");
+            trace!("Detected Gzip compression");
             return Self::Gzip;
         }
 
@@ -180,7 +180,7 @@ impl ChunkedGelfDecompression {
             // Based on https://datatracker.ietf.org/doc/html/rfc1950#section-2.2
             if let Some([first_byte, second_byte]) = data.get(0..2) {
                 if (*first_byte as u16 * 256 + *second_byte as u16) % 31 == 0 {
-                    debug!("Detected Zlib compression");
+                    trace!("Detected Zlib compression");
                     return Self::Zlib;
                 }
             };
@@ -191,7 +191,7 @@ impl ChunkedGelfDecompression {
             );
         };
 
-        debug!("No compression detected",);
+        trace!("No compression detected",);
         Self::None
     }
 
@@ -446,11 +446,11 @@ impl ChunkedGelfDecoder {
         mut src: Bytes,
     ) -> Result<Option<Bytes>, ChunkedGelfDecoderError> {
         let message = if src.starts_with(GELF_MAGIC) {
-            debug!("Received a chunked GELF message based on the magic bytes");
+            trace!("Received a chunked GELF message based on the magic bytes");
             src.advance(2);
             self.decode_chunk(src)?
         } else {
-            debug!(
+            trace!(
                 "Received an unchunked GELF message. First two bytes of message: {:?}",
                 &src[0..2]
             );
