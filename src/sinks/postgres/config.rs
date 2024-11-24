@@ -40,7 +40,8 @@ pub struct PostgresConfig {
     /// The table that data is inserted into.
     pub table: String,
 
-    /// The postgres connection pool size.
+    /// The postgres connection pool size. See [this](https://docs.rs/sqlx/latest/sqlx/struct.Pool.html#why-use-a-pool) for more
+    /// information about why a connection pool should be used.
     #[serde(default = "default_pool_size")]
     pub pool_size: u32,
 
@@ -106,6 +107,7 @@ impl SinkConfig for PostgresConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
+    // TODO: allow for Input::all()
     fn input(&self) -> Input {
         Input::log()
     }
