@@ -17,7 +17,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 				description: """
 					Whether or not end-to-end acknowledgements are enabled.
 
-					When enabled for a sink, any source connected to that sink, where the source supports
+					When enabled for a sink, any source connected to that sink, which also supports
 					end-to-end acknowledgements as well, waits for events to be acknowledged by **all
 					connected** sinks before acknowledging them at the source.
 
