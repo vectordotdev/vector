@@ -51,9 +51,7 @@ base: components: sinks: clickhouse: configuration: {
 			grace_period: {
 				description: """
 					The grace period configuration for a bearer token.
-					To avoid random authorization failures caused by expired token exception,
-					we will acquire new token, some time (grace period) before current token will be expired,
-					because of that, we will always execute request with fresh enough token.
+					This helps prevent random authorization failures due to expired tokens. It acquires a new token a short time before the current token expires, ensuring requests are always executed with a valid token.
 					"""
 				relevant_when: "strategy = \"o_auth2\""
 				required:      false
