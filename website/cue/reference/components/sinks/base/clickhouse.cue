@@ -86,9 +86,9 @@ base: components: sinks: clickhouse: configuration: {
 					o_auth2: """
 						Authentication based on OAuth 2.0 protocol.
 
-						This strategy allows to dynamically acquire and use token based on provided parameters.
-						Both standard client_credentials and mTLS extension is supported, for standard client_credentials just provide both
-						client_id and client_secret parameters:
+						This strategy enables dynamic acquisition and usage of tokens based on the provided parameters.
+						It supports both standard `client_credentials` and mTLS extensions. For standard `client_credentials`, provide both
+						`client_id` and `client_secret` parameters.
 
 						# Example
 
