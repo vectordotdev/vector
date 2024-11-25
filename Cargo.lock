@@ -5543,7 +5543,7 @@ dependencies = [
  "chrono",
  "prost 0.12.6",
  "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost-types 0.13.3",
  "snap",
 ]
 
@@ -7355,7 +7355,7 @@ dependencies = [
  "num_enum 0.7.3",
  "prost 0.12.6",
  "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost-types 0.13.3",
  "snafu 0.7.5",
  "vector-common",
 ]
@@ -7451,7 +7451,7 @@ checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes 1.8.0",
  "heck 0.5.0",
- "itertools 0.12.1",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -7484,7 +7484,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81bddcdb20abf9501610992b6759a4c888aef7d1a7247ef75e2404275ac24af1"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.10.5",
  "proc-macro2 1.0.92",
  "quote 1.0.37",
  "syn 2.0.89",
@@ -10917,7 +10917,7 @@ dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-reflect",
- "prost-types 0.12.6",
+ "prost-types 0.13.3",
  "pulsar",
  "quickcheck",
  "rand 0.8.5",
@@ -11185,7 +11185,7 @@ dependencies = [
  "proptest",
  "prost 0.12.6",
  "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost-types 0.13.3",
  "quanta",
  "quickcheck",
  "quickcheck_macros",
