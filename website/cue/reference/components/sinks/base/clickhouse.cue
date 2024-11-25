@@ -99,8 +99,7 @@ base: components: sinks: clickhouse: configuration: {
 						 client_secret: "secret-value"
 						 token_endpoint: "https://yourendpoint.com/oauth/token"
 						```
-						In case you want to use mTLS extension [rfc8705](https://datatracker.ietf.org/doc/html/rfc8705), provide desired key and certificate,
-						together with client_id (with no client_secret parameter).
+						To use mTLS extension [rfc8705](https://datatracker.ietf.org/doc/html/rfc8705), provide the desired key, certificate, and client_id (with no client_secret parameter).
 
 						# Example
 
