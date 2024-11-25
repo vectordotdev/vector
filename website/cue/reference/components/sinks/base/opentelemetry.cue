@@ -104,8 +104,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 						grace_period: {
 							description: """
 																				The grace period configuration for a bearer token.
-																				To avoid random authorization failures caused by expired token exception,
-																				we will acquire new token, some time (grace period) before current token will be expired,
+																				A new token is acquired shortly before the current token expires,
 																				because of that, we will always execute request with fresh enough token.
 																				"""
 							relevant_when: "strategy = \"o_auth2\""
