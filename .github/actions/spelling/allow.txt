@@ -473,3 +473,4 @@ zookeeper
 zst
 zstandard
 otel
+otelcol
