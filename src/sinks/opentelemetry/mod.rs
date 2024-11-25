@@ -8,7 +8,7 @@ use vector_lib::codecs::encoding::{FramingConfig, SerializerConfig};
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
 
-/// Configuration for the `OpenTelementry` sink.
+/// Configuration for the `OpenTelemetry` sink.
 #[configurable_component(sink("opentelemetry", "Deliver OTLP data over HTTP."))]
 #[derive(Clone, Debug, Default)]
 pub struct OpenTelemetryConfig {
@@ -18,11 +18,12 @@ pub struct OpenTelemetryConfig {
 }
 
 /// The protocol used to send data to OpenTelemetry.
-/// Currently only HTTP is supported, but we plan to support gRPC soon.
-/// The proto definitions are defined in https://github.com/vectordotdev/vector/tree/master/lib/opentelemetry-proto.
+/// Currently only HTTP is supported, but we plan to support gRPC.
+/// The proto definitions are defined [here](https://github.com/vectordotdev/vector/blob/master/lib/opentelemetry-proto/src/proto/opentelemetry-proto/opentelemetry/proto/README.md).
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case", tag = "type")]
+#[configurable(metadata(docs::enum_tag_description = "The communication protocol."))]
 pub enum Protocol {
     /// Send data over HTTP.
     Http(HttpSinkConfig),
@@ -60,7 +61,7 @@ impl GenerateConfig for OpenTelemetryConfig {
             uri = "http://localhost:5318/v1/logs"
             encoding.codec = "json"
         "#})
-            .unwrap()
+        .unwrap()
     }
 }
 
