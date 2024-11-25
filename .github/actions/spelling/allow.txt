@@ -472,3 +472,4 @@ zeek
 zookeeper
 zst
 zstandard
+otel
