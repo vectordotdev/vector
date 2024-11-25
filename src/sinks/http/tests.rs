@@ -59,7 +59,6 @@ fn default_cfg(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
         batch: Default::default(),
         request: Default::default(),
         tls: Default::default(),
-        authorization_config: None,
         acknowledgements: Default::default(),
     }
 }
