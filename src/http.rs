@@ -331,14 +331,9 @@ where
     pub fn new_with_auth_extension(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
-        auth_config: Option<AuthorizationConfig>,
+        auth: Option<AuthorizationConfig>,
     ) -> Result<HttpClient<B>, HttpError> {
-        HttpClient::new_with_custom_client(
-            tls_settings,
-            proxy_config,
-            &mut Client::builder(),
-            auth_config,
-        )
+        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder(), auth)
     }
 
     pub fn new_with_custom_client(
@@ -438,7 +433,7 @@ where
 }
 
 fn build_auth_extension<B>(
-    authorization_config: Option<AuthorizationConfig>,
+    auth: Option<AuthorizationConfig>,
     proxy_config: &ProxyConfig,
     client_builder: &mut client::Builder,
 ) -> Option<Arc<dyn AuthExtension<B>>>
@@ -447,19 +442,18 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error> + Send,
 {
-    if let Some(authorization_config) = authorization_config {
-        match authorization_config.strategy {
-            HttpClientAuthorizationStrategy::Basic { user, password } => {
-                let basic_auth_extension = BasicAuthExtension { user, password };
-                return Some(Arc::new(basic_auth_extension));
+    if let Some(auth) = auth {
+        match auth.strategy {
+            Auth::Basic { user, password } => {
+                return Some(Arc::new(BasicAuthExtension { user, password }));
             }
-            HttpClientAuthorizationStrategy::OAuth2 {
+            Auth::OAuth2 {
                 token_endpoint,
                 client_id,
                 client_secret,
                 grace_period,
             } => {
-                let tls_for_auth = authorization_config.tls.clone();
+                let tls_for_auth = auth.tls.clone();
                 let tls_for_auth: TlsSettings = TlsSettings::from_options(&tls_for_auth).unwrap();
 
                 let auth_proxy_connector =
@@ -474,6 +468,9 @@ where
                     auth_client,
                 );
                 return Some(Arc::new(oauth2_extension));
+            }
+            Auth::Bearer { .. } => {
+                unimplemented!("Bearer authentication is not supported currently.")
             }
         }
     }
@@ -583,7 +580,7 @@ impl<B> fmt::Debug for HttpClient<B> {
 pub struct AuthorizationConfig {
     /// Define how to authorize against an upstream.
     #[configurable]
-    strategy: HttpClientAuthorizationStrategy,
+    strategy: Auth,
 
     /// The TLS settings for the http client's connection.
     ///
@@ -597,10 +594,10 @@ pub struct AuthorizationConfig {
 /// HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
 /// HTTP header without any additional encryption beyond what is provided by the transport itself.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 #[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
-pub enum HttpClientAuthorizationStrategy {
+pub enum Auth {
     /// Basic authentication.
     ///
     /// The username and password are concatenated and encoded via [base64][base64].
@@ -608,12 +605,22 @@ pub enum HttpClientAuthorizationStrategy {
     /// [base64]: https://en.wikipedia.org/wiki/Base64
     Basic {
         /// The basic authentication username.
+        #[configurable(metadata(docs::examples = "${USERNAME}"))]
         #[configurable(metadata(docs::examples = "username"))]
         user: String,
 
         /// The basic authentication password.
+        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
         #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
+    },
+
+    /// Bearer authentication.
+    ///
+    /// The bearer token value (OAuth2, JWT, etc.) is passed as-is.
+    Bearer {
+        /// The bearer authentication token.
+        token: SensitiveString,
     },
 
     /// Authentication based on OAuth 2.0 protocol.
@@ -674,41 +681,6 @@ const fn default_oauth2_token_grace_period() -> u32 {
     300 // 5 minutes
 }
 
-/// Configuration of the authentication strategy for HTTP requests.
-///
-/// HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
-/// HTTP header without any additional encryption beyond what is provided by the transport itself.
-#[configurable_component]
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
-#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
-pub enum Auth {
-    /// Basic authentication.
-    ///
-    /// The username and password are concatenated and encoded via [base64][base64].
-    ///
-    /// [base64]: https://en.wikipedia.org/wiki/Base64
-    Basic {
-        /// The basic authentication username.
-        #[configurable(metadata(docs::examples = "${USERNAME}"))]
-        #[configurable(metadata(docs::examples = "username"))]
-        user: String,
-
-        /// The basic authentication password.
-        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
-        #[configurable(metadata(docs::examples = "password"))]
-        password: SensitiveString,
-    },
-
-    /// Bearer authentication.
-    ///
-    /// The bearer token value (OAuth2, JWT, etc.) is passed as-is.
-    Bearer {
-        /// The bearer authentication token.
-        token: SensitiveString,
-    },
-}
-
 pub trait MaybeAuth: Sized {
     fn choose_one(&self, other: &Self) -> crate::Result<Self>;
 }
@@ -745,6 +717,7 @@ impl Auth {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
+            Auth::OAuth2 { .. } => panic!("OAuth2 authentication is not supported currently"),
         }
     }
 }
@@ -981,9 +954,9 @@ mod tests {
     use tokio_rustls::TlsAcceptor;
     use tower::ServiceBuilder;
 
-    use crate::test_util::next_addr;
-
     use super::*;
+    use crate::test_util::next_addr;
+    use crate::tls::TlsConfig;
 
     #[test]
     fn test_default_request_headers_defaults() {
@@ -1235,9 +1208,8 @@ mod tests {
     async fn test_oauth2extension_handle_errors_gently_with_hyper_server() {
         let addr: SocketAddr = next_addr();
         // Simplest possible configuration for oauth's client connector.
-        let tls: vector_lib::tls::MaybeTls<(), TlsSettings> =
-            MaybeTlsSettings::from_config(&None, false).unwrap();
-        let proxy_connector = build_proxy_connector(tls, &ProxyConfig::default()).unwrap();
+        let maybe_tls = MaybeTlsSettings::tls_client(&None).unwrap();
+        let proxy_connector = build_proxy_connector(maybe_tls, &ProxyConfig::default()).unwrap();
         let auth_client = Client::builder().build(proxy_connector);
 
         let token_endpoint = format!("http://{}", addr);
@@ -1353,7 +1325,7 @@ mod tests {
         let client_secret = Some(SensitiveString::from(String::from("some_secret")));
         let grace_period = 5;
 
-        let oauth2_strategy = HttpClientAuthorizationStrategy::OAuth2 {
+        let oauth2_strategy = Auth::OAuth2 {
             token_endpoint,
             client_id,
             client_secret,
@@ -1489,7 +1461,15 @@ mod tests {
         let client_id: String = String::from("some_client_secret");
         let grace_period = 5;
 
-        let oauth2_strategy = HttpClientAuthorizationStrategy::OAuth2 {
+        let tls_config = TlsConfig {
+            verify_hostname: Some(false),
+            ca_file: Some("tests/data/ca/certs/ca.cert.pem".into()),
+            crt_file: Some("tests/data/ca/intermediate_client/certs/localhost.cert.pem".into()),
+            key_file: Some("tests/data/ca/intermediate_client/private/localhost.key.pem".into()),
+            ..Default::default()
+        };
+
+        let oauth2_strategy = Auth::OAuth2 {
             token_endpoint,
             client_id,
             client_secret: None,
@@ -1498,15 +1478,7 @@ mod tests {
 
         let auth_config = AuthorizationConfig {
             strategy: oauth2_strategy,
-            tls: Some(TlsConfig {
-                verify_hostname: Some(false),
-                ca_file: Some("tests/data/ca/certs/ca.cert.pem".into()),
-                crt_file: Some("tests/data/ca/intermediate_client/certs/localhost.cert.pem".into()),
-                key_file: Some(
-                    "tests/data/ca/intermediate_client/private/localhost.key.pem".into(),
-                ),
-                ..Default::default()
-            }),
+            tls: Some(tls_config),
         };
 
         let client =
@@ -1549,7 +1521,7 @@ mod tests {
         let user = String::from("user");
         let password = SensitiveString::from(String::from("password"));
 
-        let basic_strategy = HttpClientAuthorizationStrategy::Basic { user, password };
+        let basic_strategy = Auth::Basic { user, password };
 
         let auth_config = AuthorizationConfig {
             strategy: basic_strategy,

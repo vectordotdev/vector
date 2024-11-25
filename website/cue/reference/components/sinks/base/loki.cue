@@ -36,6 +36,33 @@ base: components: sinks: loki: configuration: {
 			"""
 		required: false
 		type: object: options: {
+			client_id: {
+				description:   "The client id."
+				relevant_when: "strategy = \"o_auth2\""
+				required:      true
+				type: string: examples: ["client_id"]
+			}
+			client_secret: {
+				description:   "The sensitive client secret."
+				relevant_when: "strategy = \"o_auth2\""
+				required:      false
+				type: string: examples: ["client_secret"]
+			}
+			grace_period: {
+				description: """
+					The grace period configuration for a bearer token.
+					To avoid random authorization failures caused by expired token exception,
+					we will acquire new token, some time (grace period) before current token will be expired,
+					because of that, we will always execute request with fresh enough token.
+					"""
+				relevant_when: "strategy = \"o_auth2\""
+				required:      false
+				type: uint: {
+					default: 300
+					examples: [300]
+					unit: "seconds"
+				}
+			}
 			password: {
 				description:   "The basic authentication password."
 				relevant_when: "strategy = \"basic\""
@@ -58,6 +85,37 @@ base: components: sinks: loki: configuration: {
 
 						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
 						"""
+					o_auth2: """
+						Authentication based on OAuth 2.0 protocol.
+
+						This strategy allows to dynamically acquire and use token based on provided parameters.
+						Both standard client_credentials and mTLS extension is supported, for standard client_credentials just provide both
+						client_id and client_secret parameters:
+
+						# Example
+
+						```yaml
+						strategy:
+						 strategy: "o_auth2"
+						 client_id: "client.id"
+						 client_secret: "secret-value"
+						 token_endpoint: "https://yourendpoint.com/oauth/token"
+						```
+						In case you want to use mTLS extension [rfc8705](https://datatracker.ietf.org/doc/html/rfc8705), provide desired key and certificate,
+						together with client_id (with no client_secret parameter).
+
+						# Example
+
+						```yaml
+						strategy:
+						 strategy: "o_auth2"
+						 client_id: "client.id"
+						 token_endpoint: "https://yourendpoint.com/oauth/token"
+						tls:
+						 crt_path: cert.pem
+						 key_file: key.pem
+						```
+						"""
 				}
 			}
 			token: {
@@ -65,6 +123,12 @@ base: components: sinks: loki: configuration: {
 				relevant_when: "strategy = \"bearer\""
 				required:      true
 				type: string: {}
+			}
+			token_endpoint: {
+				description:   "Token endpoint location, required for token acquisition."
+				relevant_when: "strategy = \"o_auth2\""
+				required:      true
+				type: string: examples: ["https://auth.provider/oauth/token"]
 			}
 			user: {
 				description:   "The basic authentication username."
