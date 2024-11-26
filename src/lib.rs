@@ -22,11 +22,13 @@
 //! The main library to support building Vector.
 
 #[macro_use]
-extern crate tracing;
-#[macro_use]
 extern crate derivative;
 #[macro_use]
+extern crate tracing;
+#[macro_use]
 extern crate vector_lib;
+
+pub use indoc::indoc;
 
 #[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation-tracing")))]
 #[global_allocator]

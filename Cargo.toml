@@ -690,8 +690,8 @@ sinks-logs = [
   "sinks-aws_kinesis_firehose",
   "sinks-aws_kinesis_streams",
   "sinks-aws_s3",
-  "sinks-aws_sqs",
   "sinks-aws_sns",
+  "sinks-aws_sqs",
   "sinks-axiom",
   "sinks-azure_blob",
   "sinks-azure_monitor_logs",
@@ -712,12 +712,13 @@ sinks-logs = [
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
-  "sinks-mezmo",
   "sinks-loki",
+  "sinks-mezmo",
   "sinks-mqtt",
   "sinks-nats",
-  "sinks-new_relic_logs",
   "sinks-new_relic",
+  "sinks-new_relic_logs",
+  "sinks-opentelemetry",
   "sinks-papertrail",
   "sinks-pulsar",
   "sinks-redis",
@@ -783,6 +784,7 @@ sinks-mqtt = ["dep:rumqttc"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
+sinks-opentelemetry = []
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "dep:lru"]
