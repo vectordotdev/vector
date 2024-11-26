@@ -67,6 +67,9 @@ pub struct UnixSinkConfig {
     pub path: PathBuf,
 
     /// The Unix socket mode to use.
+    ///
+    /// Unavailable on macOS, where the mode is always `Stream`.
+    #[cfg_attr(target_os = "macos", serde(skip))]
     #[serde(default = "default_unix_mode")]
     unix_mode: UnixMode,
 }
@@ -406,6 +409,7 @@ mod tests {
         assert_eq!(input_lines, receiver.await);
     }
 
+    #[cfg_attr(target_os = "macos", ignore)]
     #[tokio::test]
     async fn basic_unix_datagram_sink() {
         let num_lines = 1000;
