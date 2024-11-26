@@ -52,7 +52,7 @@ use crate::tls::{MaybeTlsSettings, TlsConfig};
 
 static RETRIABLE_CODES: OnceLock<RegexSet> = OnceLock::new();
 
-/// Checks if the request can be retried after the given error was returned.
+/// Checks if the request can be retried after the given error was returnesd.
 pub fn is_retriable_error<T>(error: &SdkError<T, HttpResponse>) -> bool {
     match error {
         SdkError::TimeoutError(_) | SdkError::DispatchFailure(_) => true,
