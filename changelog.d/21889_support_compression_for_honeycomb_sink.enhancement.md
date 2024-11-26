@@ -1,3 +1,3 @@
-Support compression for the Honeycomb sink. The `gzip` format is enabled by default.
+Support compression for the Honeycomb sink. The `zstd` format is enabled by default.
 
 authors: hgiasac

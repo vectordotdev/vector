@@ -63,7 +63,7 @@ pub struct HoneycombConfig {
 
     /// The compression algorithm to use.
     #[configurable(derived)]
-    #[serde(default = "Compression::gzip_default")]
+    #[serde(default = "Compression::zstd_default")]
     compression: Compression,
 
     #[configurable(derived)]
