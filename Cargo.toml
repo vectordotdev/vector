@@ -137,6 +137,7 @@ cfg-if = { version = "1.0.0", default-features = false }
 chrono = { version = "0.4.38", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.0", default-features = false, features = ["serde"] }
 clap = { version = "4.5.21", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.1", default-features = false }
 indexmap = { version = "2.6.0", default-features = false, features = ["serde", "std"] }
@@ -179,6 +180,7 @@ dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
+vector-common = { path = "lib/vector-common", default-features = false}
 vector-lib.workspace = true
 vector-config.workspace = true
 vector-config-common.workspace = true
@@ -306,12 +308,12 @@ dyn-clone = { version = "1.0.17", default-features = false }
 encoding_rs = { version = "0.8.35", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.13", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
+flate2.workspace = true
 futures-util = { version = "0.3.29", default-features = false }
 glob.workspace = true
 governor = { version = "0.7.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "2.0.0", default-features = false, optional = true }
-h2 = { version = "0.4.6", default-features = false, optional = true }
+h2 = { version = "0.4.7", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.9", default-features = false }
@@ -379,6 +381,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.10.1", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
+sysinfo = "0.32.0"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7.0"
@@ -419,10 +422,6 @@ vrl.workspace = true
 
 wiremock = "0.6.2"
 zstd = { version = "0.13.0", default-features = false }
-
-tokio-rustls = "0.23"
-rustls = "0.20"
-rustls-pemfile = "0.3"
 
 [patch.crates-io]
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
