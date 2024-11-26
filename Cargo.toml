@@ -720,6 +720,7 @@ sinks-logs = [
   "sinks-new_relic",
   "sinks-papertrail",
   "sinks-pulsar",
+  "sinks-openobserve",
   "sinks-redis",
   "sinks-sematext",
   "sinks-socket",
@@ -783,6 +784,7 @@ sinks-mqtt = ["dep:rumqttc"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
+sinks-openobserve = ["sinks-http"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "dep:lru"]
