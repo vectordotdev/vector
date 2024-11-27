@@ -141,7 +141,7 @@ flate2 = { version = "1.0.35", default-features = false, features = ["default"] 
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.1", default-features = false }
 indexmap = { version = "2.6.0", default-features = false, features = ["serde", "std"] }
-metrics = "0.24.0"
+metrics = "0.24.1"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 pin-project = { version = "1.1.7", default-features = false }
@@ -288,7 +288,7 @@ greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingest
 
 # External libs
 arc-swap = { version = "1.7", default-features = false, optional = true }
-async-compression = { version = "0.4.17", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.4.18", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.22.1", default-features = false, optional = true }
@@ -370,7 +370,7 @@ toml.workspace = true
 tonic = { workspace = true, optional = true }
 hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.2.18", default-features = false }
-url = { version = "2.5.3", default-features = false, features = ["serde"] }
+url = { version = "2.5.4", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }
 zstd = { version = "0.13.0", default-features = false }
 arr_macro = { version = "0.2.1" }
@@ -381,7 +381,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.10.1", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
-sysinfo = "0.32.0"
+sysinfo = "0.32.1"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7.0"

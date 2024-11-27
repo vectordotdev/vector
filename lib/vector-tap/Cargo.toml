@@ -20,7 +20,7 @@ tokio = { version = "1.41.1", default-features = false, features = ["time"] }
 tokio-stream = { version = "0.1.16", default-features = false, features = ["sync"] }
 tokio-tungstenite = { version = "0.20.1", default-features = false }
 tracing = { version = "0.1.34", default-features = false }
-url = { version = "2.5.3", default-features = false }
+url = { version = "2.5.4", default-features = false }
 uuid.workspace = true
 vector-api-client = { path = "../vector-api-client" }
 vector-common = { path = "../vector-common" }
