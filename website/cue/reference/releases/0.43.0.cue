@@ -8,7 +8,7 @@ releases: "0.43.0": {
 
 	description: """
 		The Vector team is pleased to announce version 0.43.0!
-		This release contains a number of new components such as the `OpenTelementry` sink and the `ExclusiveRoute` sink.
+		This release contains a number of new components such as the `OpenTelemetry` sink and the `ExclusiveRoute` sink.
 		It also includes numerous enhancements and fixes as listed below.
 		There are no breaking changes or deprecations with this release and so no upgrade guide.
 		"""
