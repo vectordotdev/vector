@@ -6,6 +6,13 @@ releases: "0.43.0": {
 
 	whats_next: []
 
+	description: """
+		The Vector team is pleased to announce version 0.43.0!
+		This release contains a number of new components such as the `OpenTelementry` sink and the `ExclusiveRoute` sink.
+		It also includes numerous enhancements and fixes as listed below.
+		There are no breaking changes or deprecations with this release and so no upgrade guide.
+		"""
+
 	changelog: [
 		{
 			type: "feat"
@@ -40,7 +47,7 @@ releases: "0.43.0": {
 			type: "feat"
 			description: """
 				Allows for chunked gelf decoding in message-based sources, such as UDP sockets or unix datagram sockets. Implementation is based on [Graylog's documentation](https://go2docs.graylog.org/5-0/getting_in_log_data/gelf.html#GELFviaUDP).
-				
+
 				This framing method can be configured via the `framing.method = "chunked_gelf"` option in the source configuration.
 				"""
 			contributors: ["jorgehermo9"]
@@ -63,7 +70,7 @@ releases: "0.43.0": {
 			type: "enhancement"
 			description: """
 				Expose `connection_retry_options` in the Pulsar sink configuration to allow customizing the connection retry behaviour of the pulsar client. This includes the following options:
-				
+
 				- `min_backoff_ms`: Minimum delay between connection retries.
 				- `max_backoff_secs`: Maximum delay between reconnection retries.
 				- `max_retries`: Maximum number of connection retries.
