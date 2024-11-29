@@ -3082,7 +3082,7 @@ checksum = "e5766087c2235fec47fafa4cfecc81e494ee679d0fd4a59887ea0919bfb0e4fc"
 dependencies = [
  "cfg-if",
  "libc",
- "socket2 0.5.7",
+ "socket2 0.5.8",
  "windows-sys 0.48.0",
 ]
 
@@ -4490,7 +4490,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.7",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.40",
@@ -4654,7 +4654,7 @@ dependencies = [
  "http-body 1.0.0",
  "hyper 1.4.1",
  "pin-project-lite",
- "socket2 0.5.7",
+ "socket2 0.5.8",
  "tokio",
  "tower-service",
  "tracing 0.1.40",
@@ -5016,7 +5016,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b58db92f96b720de98181bbbe63c831e87005ab460c1bf306eb2622b4707997f"
 dependencies = [
- "socket2 0.5.7",
+ "socket2 0.5.8",
  "widestring 1.0.2",
  "windows-sys 0.48.0",
  "winreg 0.50.0",
@@ -8255,9 +8255,9 @@ dependencies = [
 
 [[package]]
 name = "roaring"
-version = "0.10.6"
+version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f4b84ba6e838ceb47b41de5194a60244fac43d9fe03b71dbe8c5a201081d6d1"
+checksum = "f81dc953b2244ddd5e7860cb0bb2a790494b898ef321d4aff8e260efab60cc88"
 dependencies = [
  "bytemuck",
  "byteorder",
@@ -9211,9 +9211,9 @@ dependencies = [
 
 [[package]]
 name = "socket2"
-version = "0.5.7"
+version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce305eb0b4296696835b71df73eb912e0f1ffd2556a501fcede6e0c50349191c"
+checksum = "c970269d99b64e60ec3bd6ad27270092a5394c4e309314b18ae3fe575695fbe8"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",
@@ -9756,7 +9756,7 @@ dependencies = [
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2 0.5.7",
+ "socket2 0.5.8",
  "tokio-macros",
  "tracing 0.1.40",
  "windows-sys 0.52.0",
@@ -9835,7 +9835,7 @@ dependencies = [
  "postgres-protocol",
  "postgres-types",
  "rand 0.8.5",
- "socket2 0.5.7",
+ "socket2 0.5.8",
  "tokio",
  "tokio-util",
  "whoami",
@@ -10047,7 +10047,7 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost 0.13.3",
- "socket2 0.5.7",
+ "socket2 0.5.8",
  "tokio",
  "tokio-stream",
  "tower",
@@ -10894,7 +10894,7 @@ dependencies = [
  "smpl_jwt",
  "snafu 0.7.5",
  "snap",
- "socket2 0.5.7",
+ "socket2 0.5.8",
  "stream-cancel",
  "strip-ansi-escapes",
  "sysinfo",
@@ -11149,7 +11149,7 @@ dependencies = [
  "similar-asserts",
  "smallvec",
  "snafu 0.7.5",
- "socket2 0.5.7",
+ "socket2 0.5.8",
  "tokio",
  "tokio-openssl",
  "tokio-stream",
