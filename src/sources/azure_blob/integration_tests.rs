@@ -12,7 +12,7 @@ use crate::{
     event::Event,
     serde::default_decoding,
     test_util::components::{
-        run_and_assert_source_compliance, run_and_assert_source_error, COMPONENT_ERROR_TAGS,
+        run_and_assert_source_compliance, //run_and_assert_source_error, COMPONENT_ERROR_TAGS,
         SOURCE_TAGS,
     },
 };
@@ -102,6 +102,10 @@ impl AzureBlobConfig {
             .await
             .expect("Failed putting blob");
 
+        self.queue_notify_blob_created(&name).await;
+    }
+
+    async fn queue_notify_blob_created(&self, name: &str) {
         let queue_client = make_queue_client(self).expect("Failed to create queue client");
         let message = format!(
             r#"{{
@@ -197,4 +201,14 @@ async fn azure_blob_emit_error_on_message_read() {
 
     let events = config.run_error().await;
     assert!(events.is_empty());
+}
+
+#[tokio::test]
+async fn azure_blob_ignore_missing_blob() {
+    let config = AzureBlobConfig::new_emulator().await;
+    config.queue_notify_blob_created("non-existent").await;
+    config.upload_blob("file.txt".to_string(), "some_content".to_string()).await;
+
+    let events = run_and_assert_source_compliance(config.clone(), Duration::from_secs(1), &SOURCE_TAGS).await;
+    assert_eq!(events.len(), 1);
 }

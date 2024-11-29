@@ -176,3 +176,21 @@ impl InternalEvent for QueueMessageProcessingRejected {
         counter!("azure_queue_message_processing_rejected_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub struct BlobDoesntExist<'a> {
+    pub nonexistent_blob_name: &'a str,
+}
+
+impl<'a> InternalEvent for BlobDoesntExist<'a>  {
+    fn emit(self) {
+        warn!(
+            message = "Ignoring event because blob doesn't exist in storage",
+            blob_name = self.nonexistent_blob_name
+        );
+        counter!(
+            "azure_queue_event_ignored_total", 1,
+            "ignore_type" => "blob_doesnt_exist"
+        )
+    }
+}

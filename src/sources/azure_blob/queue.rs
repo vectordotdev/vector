@@ -25,7 +25,7 @@ use crate::{
     azure,
     internal_events::{
         QueueMessageDeleteError, QueueMessageProcessingError, QueueMessageReceiveError,
-        QueueStorageInvalidEventIgnored, QueueStorageMismatchingContainerName,
+        QueueStorageInvalidEventIgnored, QueueStorageMismatchingContainerName, BlobDoesntExist,
     },
     shutdown::ShutdownSignal,
     sources::azure_blob::{AzureBlobConfig, BlobPack, BlobPackStream},
@@ -227,6 +227,15 @@ async fn proccess_event_grid_message(
                         }
                     }
                     Err(e) => {
+                        if let Some(http_error) = e.as_http_error() {
+                            if http_error.status() == azure_core::StatusCode::NotFound {
+                                emit!(BlobDoesntExist{
+                                    nonexistent_blob_name: blob_client.blob_name(),
+                                });
+                                remove_message_from_queue(queue_client, message).await;
+                                return Ok(None);
+                            }
+                        }
                         return Err(ProcessingError::FailedToGetBlob { error: e });
                     }
                 }
@@ -254,14 +263,7 @@ async fn proccess_event_grid_message(
                 }),
                 success_handler: Box::new(|| {
                     Box::pin(async move {
-                        let res = queue_client_copy.pop_receipt_client(message).delete().await;
-
-                        match res {
-                            Ok(_) => {}
-                            Err(e) => {
-                                emit!(QueueMessageDeleteError { error: &e })
-                            }
-                        }
+                        remove_message_from_queue(&queue_client_copy, message).await;
                     })
                 }),
             }))
@@ -293,6 +295,12 @@ const fn default_poll_secs() -> u32 {
 // value allowed by the Azure API.
 const fn num_messages() -> u8 {
     32
+}
+
+async fn remove_message_from_queue(queue_client: &QueueClient, message: Message) {
+    _ = queue_client.pop_receipt_client(message).delete().await.map_err(|e| {
+        emit!(QueueMessageDeleteError { error: &e });
+    });
 }
 
 #[test]
