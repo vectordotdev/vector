@@ -1,8 +1,9 @@
 use std::sync::Arc;
-use std::{collections::HashMap, num::ParseFloatError};
+use std::{collections::HashMap, num::ParseFloatError, sync::LazyLock};
 
 use chrono::Utc;
 use indexmap::IndexMap;
+use regex::Regex;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::LogEvent;
 use vector_lib::{
@@ -110,7 +111,7 @@ pub struct MetricConfig {
 
     /// Tags to apply to the metric.
     #[configurable(metadata(docs::additional_props_description = "A metric tag."))]
-    pub tags: Option<IndexMap<String, TagConfig>>,
+    pub tags: Option<IndexMap<Template, TagConfig>>,
 
     #[configurable(derived)]
     #[serde(flatten)]
@@ -271,24 +272,47 @@ fn render_template(template: &Template, event: &Event) -> Result<String, Transfo
 }
 
 fn render_tags(
-    tags: &Option<IndexMap<String, TagConfig>>,
+    tags: &Option<IndexMap<Template, TagConfig>>,
     event: &Event,
 ) -> Result<Option<MetricTags>, TransformError> {
+    let mut static_labels: HashMap<String, String> = HashMap::new();
+    let mut dynamic_labels: HashMap<String, String> = HashMap::new();
     Ok(match tags {
         None => None,
         Some(tags) => {
             let mut result = MetricTags::default();
             for (name, config) in tags {
                 match config {
-                    TagConfig::Plain(template) => {
-                        render_tag_into(event, name, template, &mut result)?
-                    }
+                    TagConfig::Plain(template) => render_tag_into(
+                        event,
+                        name,
+                        template,
+                        &mut result,
+                        &mut static_labels,
+                        &mut dynamic_labels,
+                    )?,
                     TagConfig::Multi(vec) => {
                         for template in vec {
-                            render_tag_into(event, name, template, &mut result)?;
+                            render_tag_into(
+                                event,
+                                name,
+                                template,
+                                &mut result,
+                                &mut static_labels,
+                                &mut dynamic_labels,
+                            )?;
                         }
                     }
                 }
+            }
+            for (k, v) in static_labels {
+                if let Some(discarded_v) = dynamic_labels.insert(k.clone(), v.clone()) {
+                    warn!(
+                        "Static label overrides dynamic label. \
+                key: {}, value: {}, discarded value: {}",
+                        k, v, discarded_v
+                    );
+                };
             }
             result.as_option()
         }
@@ -297,19 +321,24 @@ fn render_tags(
 
 fn render_tag_into(
     event: &Event,
-    name: &str,
+    name: &Template,
     template: &Option<Template>,
     result: &mut MetricTags,
+    static_labels: &mut HashMap<String, String>,
+    dynamic_labels: &mut HashMap<String, String>,
 ) -> Result<(), TransformError> {
     let value = match template {
         None => TagValue::Bare,
         Some(template) => match render_template(template, event) {
-            Ok(result) => TagValue::Value(result),
+            Ok(result) => {
+                tag_expansion(event, name, template, static_labels, dynamic_labels);
+                TagValue::Value(result)
+            }
             Err(TransformError::TemplateRenderingError(error)) => {
                 emit!(crate::internal_events::TemplateRenderingError {
                     error,
                     drop_event: false,
-                    field: Some(name),
+                    field: Some(name.get_ref()),
                 });
                 return Ok(());
             }
@@ -318,6 +347,60 @@ fn render_tag_into(
     };
     result.insert(name.to_string(), value);
     Ok(())
+}
+
+static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^0-9A-Za-z_]").unwrap());
+fn slugify_text(input: String) -> String {
+    let result = RE.replace_all(&input, "_");
+    result.to_lowercase()
+}
+
+fn tag_expansion(
+    event: &Event,
+    key_template: &Template,
+    value_template: &Template,
+    static_labels: &mut HashMap<String, String>,
+    dynamic_labels: &mut HashMap<String, String>,
+) {
+    let key = key_template.render_string(event);
+    let value = value_template.render_string(event);
+
+    let key_s = key.unwrap();
+    let value_s = value.unwrap();
+
+    if let Some(opening_prefix) = key_s.strip_suffix('*') {
+        let output: Result<serde_json::map::Map<String, serde_json::Value>, serde_json::Error> =
+            serde_json::from_str(value_s.clone().as_str());
+
+        if output.is_err() {
+            warn!(
+                "Failed to expand dynamic label. value: {}, err: {}",
+                value_s,
+                output.err().unwrap()
+            );
+            return;
+        }
+
+        // key_* -> key_one, key_two, key_three
+        // * -> one, two, three
+        for (k, v) in output.unwrap() {
+            let key = slugify_text(format!("{}{}", opening_prefix, k));
+            let val = Value::from(v).to_string_lossy().into_owned();
+            if val == "<null>" {
+                warn!("Encountered \"null\" value for dynamic label. key: {}", key);
+                continue;
+            }
+            if let Some(prev) = dynamic_labels.insert(key.clone(), val.clone()) {
+                warn!(
+                    "Encountered duplicated dynamic label. \
+                                key: {}, value: {}, discarded value: {}",
+                    key, val, prev
+                );
+            };
+        }
+    } else {
+        static_labels.insert(key_s, value_s);
+    }
 }
 
 fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
