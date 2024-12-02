@@ -227,7 +227,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "chore"
 			description: """
-				The global `expire_metrics_secs` configuration option now defaults to 300s rather than being
+				The global `expire_metrics_secs` configuration option now defaults to `300s` rather than being
 				disabled. To preserve the old behavior, set to a negative value to disable expiration.
 				"""
 			contributors: ["jszwedko"]
