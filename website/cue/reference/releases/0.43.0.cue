@@ -29,7 +29,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 
 ### Enhancements
 
-- `decode_punycode` and `encode_punycode` with `validate` flag set to false should be faster now, in cases when input data needs no encoding or decoding. (https://github.com/vectordotdev/vrl/pull/1104)
+- `decode_punycode` and `encode_punycode` with the `validate` flag set to false should be faster now, in cases when input data needs no encoding or decoding. (https://github.com/vectordotdev/vrl/pull/1104)
 - `vrl::value::Value` now implements `PartialCmp` that first checks whether the enum discriminants
 	(that both are floats for example), and if they are calls `partial_cmp` on the inner values.
 	Otherwise, it will return `None`. (https://github.com/vectordotdev/vrl/pull/1117)
