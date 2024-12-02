@@ -220,7 +220,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "enhancement"
 			description: """
-				The `sample` transform now has a `sample_rate_key` configuration option, which default to `sample_rate`, that allows configuring which key is used to attach the sample rate to sampled events. If set to an empty string, the sample rate will not be attached to sampled events.
+				The `sample` transform now has a `sample_rate_key` configuration option, which default to `sample_rate`. It allows configuring which key is used to attach the sample rate to sampled events. If set to an empty string, the sample rate will not be attached to sampled events.
 				"""
 			contributors: ["dekelpilli"]
 		},
