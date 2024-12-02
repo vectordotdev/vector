@@ -8,8 +8,18 @@ releases: "0.43.0": {
 
 	description: """
 		The Vector team is pleased to announce version 0.43.0!
-		This release contains a number of new components such as the `OpenTelemetry` sink and the `ExclusiveRoute` sink.
+		
+		This release contains a few notable new features along with the numerous enhancements and fixes as listed below: 
+		- A new `opentelemetry` sink with initial support for emitting logs via OTLP over HTTP. We expect this to expand to support gRPC and emission of other data types.
+		- A new `exclusive_route` transform to route events exclusively using an ordered set of conditions
+		- A new `cef` encoder to emit events encoded as in [Common Event Format](https://www.microfocus.com/documentation/arcsight/arcsight-smartconnectors/pdfdoc/common-event-format-v25/common-event-format-v25.pdf)
+		- A new `chunked_gelf` framing decoder to receive [chunked GELF messages](https://archivedocs.graylog.org/en/latest/pages/gelf.html)
+		- Vector's configuration now allows for use of the [YAML merge operator](https://yaml.org/type/merge.html) allowing simplification of configurations with duplication
+		- Two new secrets backends for loading secrets into Vector configuration: `file`, which loads secrets from a JSON file, and `directory`, which loads secrets from a tree of files.
+		
+		
 		It also includes numerous enhancements and fixes as listed below.
+		
 		There are no breaking changes or deprecations with this release and so no upgrade guide.
 		"""
 
