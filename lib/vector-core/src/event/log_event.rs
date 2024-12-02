@@ -1,6 +1,3 @@
-use crate::event::util::log::all_fields_skip_array_elements;
-use bytes::Bytes;
-use chrono::Utc;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
@@ -8,12 +5,15 @@ use std::{
     iter::FromIterator,
     mem::size_of,
     num::NonZeroUsize,
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
+
+use crate::event::util::log::all_fields_skip_array_elements;
+use bytes::Bytes;
+use chrono::Utc;
 
 use crossbeam_utils::atomic::AtomicCell;
 use lookup::{lookup_v2::TargetPath, metadata_path, path, PathPrefix};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
     byte_size_of::ByteSizeOf,
@@ -36,7 +36,7 @@ use crate::config::{log_schema, telemetry};
 use crate::event::util::log::{all_fields, all_metadata_fields};
 use crate::event::MaybeAsLogMut;
 
-static VECTOR_SOURCE_TYPE_PATH: Lazy<Option<OwnedTargetPath>> = Lazy::new(|| {
+static VECTOR_SOURCE_TYPE_PATH: LazyLock<Option<OwnedTargetPath>> = LazyLock::new(|| {
     Some(OwnedTargetPath::metadata(owned_value_path!(
         "vector",
         "source_type"
@@ -625,7 +625,7 @@ impl EventDataEq for LogEvent {
 
 #[cfg(any(test, feature = "test"))]
 mod test_utils {
-    use super::*;
+    use super::{log_schema, Bytes, LogEvent, Utc};
 
     // these rely on the global log schema, which is no longer supported when using the
     // "LogNamespace::Vector" namespace.
@@ -761,7 +761,7 @@ struct TracingTargetPaths {
 }
 
 /// Lazily initialized singleton.
-static TRACING_TARGET_PATHS: Lazy<TracingTargetPaths> = Lazy::new(|| TracingTargetPaths {
+static TRACING_TARGET_PATHS: LazyLock<TracingTargetPaths> = LazyLock::new(|| TracingTargetPaths {
     timestamp: OwnedTargetPath::event(owned_value_path!("timestamp")),
     kind: OwnedTargetPath::event(owned_value_path!("metadata", "kind")),
     level: OwnedTargetPath::event(owned_value_path!("metadata", "level")),

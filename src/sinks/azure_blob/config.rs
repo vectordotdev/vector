@@ -42,11 +42,25 @@ impl TowerRequestConfigDefaults for AzureBlobTowerRequestConfigDefaults {
 pub struct AzureBlobSinkConfig {
     /// The Azure Blob Storage Account connection string.
     ///
-    /// Authentication with access key is the only supported authentication method.
+    /// Authentication with an access key or shared access signature (SAS)
+    /// are supported authentication methods. If using a non-account SAS,
+    /// healthchecks will fail and will need to be disabled by setting
+    /// `healthcheck.enabled` to `false` for this sink
+    ///
+    /// When generating an account SAS, the following are the minimum required option
+    /// settings for Vector to access blob storage and pass a health check.
+    /// | Option                 | Value              |
+    /// | ---------------------- | ------------------ |
+    /// | Allowed services       | Blob               |
+    /// | Allowed resource types | Container & Object |
+    /// | Allowed permissions    | Read & Create      |
     ///
     /// Either `storage_account`, or this field, must be specified.
     #[configurable(metadata(
         docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
+    ))]
+    #[configurable(metadata(
+        docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
     ))]
     pub connection_string: Option<SensitiveString>,
 
@@ -129,6 +143,12 @@ pub struct AzureBlobSinkConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
+    /// Compression configuration.
+    ///
+    /// All compression algorithms use the default compression level unless otherwise specified.
+    ///
+    /// Some cloud storage API clients and browsers handle decompression transparently, so
+    /// depending on how they are accessed, files may not always appear to be compressed.
     #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
@@ -250,6 +270,6 @@ impl AzureBlobSinkConfig {
     }
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
-        Ok(KeyPartitioner::new(self.blob_prefix.clone()))
+        Ok(KeyPartitioner::new(self.blob_prefix.clone(), None))
     }
 }

@@ -4,7 +4,8 @@
 #![allow(dead_code)]
 #![allow(unreachable_pub)]
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
+
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use vector_lib::{
@@ -94,7 +95,7 @@ fn compute_api_endpoint(endpoint: &str) -> String {
     // This mechanism is derived from the forwarder health check in the Datadog Agent:
     // https://github.com/DataDog/datadog-agent/blob/cdcf0fc809b9ac1cd6e08057b4971c7dbb8dbe30/comp/forwarder/defaultforwarder/forwarder_health.go#L45-L47
     // https://github.com/DataDog/datadog-agent/blob/cdcf0fc809b9ac1cd6e08057b4971c7dbb8dbe30/comp/forwarder/defaultforwarder/forwarder_health.go#L188-L190
-    static DOMAIN_REGEX: Lazy<Regex> = Lazy::new(|| {
+    static DOMAIN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?:[a-z]{2}\d\.)?(datadoghq\.[a-z]+|ddog-gov\.com)/*$")
             .expect("Could not build Datadog domain regex")
     });

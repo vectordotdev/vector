@@ -1,7 +1,6 @@
-use std::{collections::HashMap, num::NonZeroUsize};
+use std::{collections::HashMap, num::NonZeroUsize, sync::LazyLock};
 
 use bytes::{Bytes, BytesMut};
-use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
@@ -621,7 +620,7 @@ impl StreamSink<Event> for LokiSink {
     }
 }
 
-static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^0-9A-Za-z_]").unwrap());
+static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^0-9A-Za-z_]").unwrap());
 
 fn slugify_text(input: String) -> String {
     let result = RE.replace_all(&input, "_");

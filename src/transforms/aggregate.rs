@@ -1004,9 +1004,9 @@ mod tests {
     #[tokio::test]
     async fn transform_shutdown() {
         let agg = toml::from_str::<AggregateConfig>(
-            r#"
+            r"
 interval_ms = 999999
-"#,
+",
         )
         .unwrap()
         .build(&TransformContext::default())

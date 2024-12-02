@@ -16,7 +16,7 @@ use std::{
     task::{ready, Context, Poll},
 };
 
-use chrono::{SubsecRound, Utc};
+use chrono::{DateTime, SubsecRound, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::{stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
@@ -286,10 +286,36 @@ pub fn random_metrics_with_stream(
     batch: Option<BatchNotifier>,
     tags: Option<MetricTags>,
 ) -> (Vec<Event>, impl Stream<Item = EventArray>) {
-    let timestamp = Utc::now().trunc_subsecs(3);
+    random_metrics_with_stream_timestamp(
+        count,
+        batch,
+        tags,
+        Utc::now().trunc_subsecs(3),
+        std::time::Duration::from_secs(2),
+    )
+}
+
+/// Generates event metrics with the provided tags and timestamp.
+///
+/// # Parameters
+/// - `count`: the number of metrics to generate
+/// - `batch`: the batch notifier to use with the stream
+/// - `tags`: the tags to apply to each metric event
+/// - `timestamp`: the timestamp to use for each metric event
+/// - `timestamp_offset`: the offset from the `timestamp` to use for each additional metric
+///
+/// # Returns
+/// A tuple of the generated metric events and the stream of the generated events
+pub fn random_metrics_with_stream_timestamp(
+    count: usize,
+    batch: Option<BatchNotifier>,
+    tags: Option<MetricTags>,
+    timestamp: DateTime<Utc>,
+    timestamp_offset: std::time::Duration,
+) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events: Vec<_> = (0..count)
         .map(|index| {
-            let ts = timestamp + (std::time::Duration::from_secs(2) * index as u32);
+            let ts = timestamp + (timestamp_offset * index as u32);
             Event::Metric(
                 Metric::new(
                     format!("counter_{}", thread_rng().gen::<u32>()),

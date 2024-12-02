@@ -22,11 +22,13 @@
 //! The main library to support building Vector.
 
 #[macro_use]
-extern crate tracing;
-#[macro_use]
 extern crate derivative;
 #[macro_use]
+extern crate tracing;
+#[macro_use]
 extern crate vector_lib;
+
+pub use indoc::indoc;
 
 #[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation-tracing")))]
 #[global_allocator]
@@ -97,7 +99,6 @@ pub mod serde;
 #[cfg(windows)]
 pub mod service;
 pub mod signal;
-#[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
 pub(crate) mod sink_ext;
 #[allow(unreachable_pub)]
 pub mod sinks;
@@ -198,8 +199,13 @@ pub mod built_info {
 }
 
 /// Returns the host name of the current system.
+/// The hostname can be overridden by setting the VECTOR_HOSTNAME environment variable.
 pub fn get_hostname() -> std::io::Result<String> {
-    Ok(hostname::get()?.to_string_lossy().into())
+    Ok(if let Ok(hostname) = std::env::var("VECTOR_HOSTNAME") {
+        hostname.to_string()
+    } else {
+        hostname::get()?.to_string_lossy().into_owned()
+    })
 }
 
 /// Spawn a task with the given name. The name is only used if

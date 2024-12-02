@@ -55,7 +55,6 @@ dkr
 Dockerfiles
 DOOV
 Douban
-E2ETest
 emqx
 eventloop
 Enot
@@ -435,7 +434,7 @@ rpms
 rstest
 rsyslog
 rsyslogd
-security-tab
+scriptblock
 servlet
 Sinjo
 sublocation
@@ -457,6 +456,7 @@ timestamped
 typesense
 tzdata
 ubuntu
+unchunked
 upstreaminfo
 useragents
 usergroups
@@ -472,3 +472,5 @@ zeek
 zookeeper
 zst
 zstandard
+otel
+otelcol

@@ -48,7 +48,7 @@ jobs:
 
   integration-tests:
     name: Integration Tests
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-20.04
     needs: changes
     if: always() && (
       github.event_name == 'merge_group' || (
@@ -97,6 +97,7 @@ jobs:
 
       - run: sudo npm -g install @datadog/datadog-ci
 
+      - run: sudo -E bash scripts/ci-free-disk-space.sh
       - run: docker image prune -af ; docker container prune -f
 
       - name: Determine if secrets are defined (PR author is team member).
@@ -110,6 +111,8 @@ jobs:
             echo "PR_HAS_ACCESS_TO_SECRETS=false" >> "$GITHUB_ENV"
           fi
 
+      - run: docker image prune -af ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.amqp == 'true' }}
         name: amqp
         uses: nick-fields/retry@v3
@@ -117,6 +120,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int amqp
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.appsignal == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
@@ -127,6 +132,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  appsignal
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.aws == 'true' }}
         name: aws
         uses: nick-fields/retry@v3
@@ -134,6 +141,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  aws
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.axiom == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
@@ -144,6 +153,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  axiom
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.azure == 'true' }}
         name: azure
         uses: nick-fields/retry@v3
@@ -152,6 +163,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  azure
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.clickhouse == 'true' }}
         name: clickhouse
         uses: nick-fields/retry@v3
@@ -159,6 +172,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  clickhouse
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.databend == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
@@ -169,6 +184,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  databend
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-agent == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: datadog-agent
@@ -177,6 +194,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  datadog-agent
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-logs == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
@@ -198,6 +217,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  datadog-metrics
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: (github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.datadog-traces == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: datadog-traces
@@ -207,6 +228,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  datadog-traces
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.dnstap == 'true' }}
         name: dnstap
         uses: nick-fields/retry@v3
@@ -214,6 +237,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  dnstap
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.docker-logs == 'true' }}
         name: docker-logs
@@ -223,6 +248,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  docker-logs
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.elasticsearch == 'true' }}
         name: elasticsearch
         uses: nick-fields/retry@v3
@@ -230,6 +257,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  elasticsearch
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.eventstoredb == 'true' }}
         name: eventstoredb
@@ -239,6 +268,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  eventstoredb
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.fluent == 'true' }}
         name: fluent
         uses: nick-fields/retry@v3
@@ -247,6 +278,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  fluent
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.gcp == 'true' }}
         name: gcp
         uses: nick-fields/retry@v3
@@ -254,6 +287,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  gcp
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.greptimedb == 'true' }}
         name: greptimedb
@@ -273,6 +308,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  humio
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.http-client == 'true' }}
         name: http-client
         uses: nick-fields/retry@v3
@@ -280,6 +317,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  http-client
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.influxdb == 'true' }}
         name: influxdb
@@ -289,6 +328,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  influxdb
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.kafka == 'true' }}
         name: kafka
         uses: nick-fields/retry@v3
@@ -296,6 +337,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  kafka
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.logstash == 'true' }}
         name: logstash
@@ -305,6 +348,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  logstash
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.loki == 'true' }}
         name: loki
         uses: nick-fields/retry@v3
@@ -312,6 +357,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  loki
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.mongodb == 'true' }}
         name: mongodb
@@ -321,6 +368,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  mongodb
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.mqtt == 'true' }}
         name: mqtt
         uses: nick-fields/retry@v3
@@ -329,6 +378,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  mqtt
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.nats == 'true' }}
         name: nats
         uses: nick-fields/retry@v3
@@ -336,6 +387,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  nats
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.nginx == 'true' }}
         name: nginx
@@ -355,6 +408,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  opentelemetry
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.postgres == 'true' }}
         name: postgres
         uses: nick-fields/retry@v3
@@ -362,6 +417,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  postgres
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.prometheus == 'true' }}
         name: prometheus
@@ -371,6 +428,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  prometheus
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.pulsar == 'true' }}
         name: pulsar
         uses: nick-fields/retry@v3
@@ -378,6 +437,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  pulsar
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.redis == 'true' }}
         name: redis
@@ -387,6 +448,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  redis
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' }}
         name: shutdown
         uses: nick-fields/retry@v3
@@ -394,6 +457,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  shutdown
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.splunk == 'true' }}
         name: splunk
@@ -403,6 +468,8 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  splunk
 
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+
       - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.webhdfs == 'true' }}
         name: webhdfs
         uses: nick-fields/retry@v3
@@ -410,6 +477,8 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  webhdfs
+
+      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
   integration-test-suite:
     name: Integration Test Suite

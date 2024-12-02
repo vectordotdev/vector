@@ -16,6 +16,9 @@ on:
     # At midnight UTC Tue-Sat
     - cron: '0 0 * * 2-6'
 
+permissions:
+  statuses: write
+
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
   group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
@@ -60,7 +63,7 @@ jobs:
         )
       )
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: "recursive"
 

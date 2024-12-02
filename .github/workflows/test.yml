@@ -41,7 +41,7 @@ jobs:
     env:
       CARGO_INCREMENTAL: 0
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
@@ -74,9 +74,8 @@ jobs:
         if: needs.changes.outputs.source == 'true'
         run: make check-clippy
 
-        # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
-        # Then, modify the `cross-linux` job to run `test` instead of `build`.
       - name: Unit - x86_64-unknown-linux-gnu
+        if: needs.changes.outputs.source == 'true'
         run: make test
         env:
           CARGO_BUILD_JOBS: 5
@@ -146,4 +145,3 @@ jobs:
           else
             exit 0
           fi
-
