@@ -298,9 +298,9 @@ const fn num_messages() -> u8 {
 }
 
 async fn remove_message_from_queue(queue_client: &QueueClient, message: Message) {
-    _ = queue_client.pop_receipt_client(message).delete().await.map_err(|e| {
-        emit!(QueueMessageDeleteError { error: &e });
-    });
+    _ = queue_client.pop_receipt_client(message).delete().await.inspect_err(move |e| {
+        emit!(QueueMessageDeleteError { error: &e })
+    })
 }
 
 #[test]

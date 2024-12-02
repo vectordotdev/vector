@@ -206,14 +206,10 @@ async fn azure_blob_emit_error_on_message_read() {
 #[tokio::test]
 async fn azure_blob_ignore_missing_blob() {
     let config = AzureBlobConfig::new_emulator().await;
-    // let _ = config.run_assert().await;
 
     config.queue_notify_blob_created("non-existent").await;
     config.upload_blob("file.txt".to_string(), "some_content".to_string()).await;
 
     let events = config.run_assert().await;
-    for event in events.iter() {
-        info!("event: {event:?}");
-    }
     assert_eq!(events.len(), 1);
 }
