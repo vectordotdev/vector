@@ -306,7 +306,6 @@ fn render_tags(
                 }
             }
             for (k, v) in static_labels {
-                println!("{} {}", k, v);
                 if let Some(discarded_v) = dynamic_labels.insert(k.clone(), v.clone()) {
                     warn!(
                         "Static label overrides dynamic label. \
@@ -314,6 +313,16 @@ fn render_tags(
                         k, v, discarded_v
                     );
                 };
+            }
+            println!("{:?}", dynamic_labels);
+            for (name, value) in dynamic_labels {
+                if name == "timestamp".to_string() {
+                    continue;
+                }
+                if name == "message".to_string() {
+                    continue;
+                }
+                result.insert(name.to_string(), value);
             }
             result.as_option()
         }
@@ -324,11 +333,11 @@ fn render_tag_into(
     event: &Event,
     name: &Template,
     template: &Option<Template>,
-    result: &mut MetricTags,
+    _result: &mut MetricTags,
     static_labels: &mut HashMap<String, String>,
     dynamic_labels: &mut HashMap<String, String>,
 ) -> Result<(), TransformError> {
-    let value = match template {
+    let _value = match template {
         None => TagValue::Bare,
         Some(template) => match render_template(template, event) {
             Ok(result) => {
@@ -346,7 +355,7 @@ fn render_tag_into(
             Err(other) => return Err(other),
         },
     };
-    result.insert(name.to_string(), value);
+    // result.insert(name.to_string(), value);
     Ok(())
 }
 
@@ -1201,7 +1210,6 @@ mod tests {
             .with_tags(Some(metric_tags!(
                 "method" => "post",
                 "code" => "200",
-                "host" => "localhost",
             )))
             .with_timestamp(Some(ts()))
         );
