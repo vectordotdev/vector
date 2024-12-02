@@ -195,7 +195,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "feat"
 			description: """
-				Introducing the first version of the [OpenTelemetry](https://opentelemetry.io/docs/what-is-opentelemetry/) sink.
+				Introducing the first version of the [OpenTelemetry](https://opentelemetry.io/docs/what-is-opentelemetry/) sink. This initial implementation supports emitting logs as OTLP over HTTP. Support is expected to expand in the future.
 				"""
 			contributors: ["pront"]
 		},
