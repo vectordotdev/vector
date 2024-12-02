@@ -147,7 +147,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "feat"
 			description: """
-				Introduce a new `exclusive_route` transform, which functions as a switch statement to route events based on user-defined conditions.
+				Introduce a new `exclusive_route` transform, which functions as a switch statement to route events based on user-defined conditions. See the [release highlight](/highlights/2024-11-07-exclusive_route/) for more details on how to use this new transform.
 				"""
 			contributors: ["pront"]
 		},
