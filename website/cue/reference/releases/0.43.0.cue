@@ -185,7 +185,10 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "feat"
 			description: """
-				Add `update` support to the bulk API to Elasticsearch Sink.
+				The `elasticsearch` sink now supports publishing events as bulk "update"s by configuring `bulk.action` to `update`. This mode has a couple of constraints:
+				
+				- The message must be added in `.doc` and have `.doc_as_upsert` to true.
+                                - `id_key` must be set, and the `encoding` field should specify `doc` and `doc_as_upsert` as values
 				"""
 			contributors: ["blackrez"]
 		},
