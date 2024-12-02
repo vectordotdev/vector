@@ -8,18 +8,18 @@ releases: "0.43.0": {
 
 	description: """
 		The Vector team is pleased to announce version 0.43.0!
-		
-		This release contains a few notable new features along with the numerous enhancements and fixes as listed below: 
+
+		This release contains a few notable new features along with the numerous enhancements and fixes as listed below:
 		- A new `opentelemetry` sink with initial support for emitting logs via OTLP over HTTP. We expect this to expand to support gRPC and emission of other data types.
 		- A new `exclusive_route` transform to route events exclusively using an ordered set of conditions
 		- A new `cef` encoder to emit events encoded as in [Common Event Format](https://www.microfocus.com/documentation/arcsight/arcsight-smartconnectors/pdfdoc/common-event-format-v25/common-event-format-v25.pdf)
 		- A new `chunked_gelf` framing decoder to receive [chunked GELF messages](https://archivedocs.graylog.org/en/latest/pages/gelf.html)
 		- Vector's configuration now allows for use of the [YAML merge operator](https://yaml.org/type/merge.html) allowing simplification of configurations with duplication
 		- Two new secrets backends for loading secrets into Vector configuration: `file`, which loads secrets from a JSON file, and `directory`, which loads secrets from a tree of files.
-		
-		
+
+
 		It also includes numerous enhancements and fixes as listed below.
-		
+
 		There are no breaking changes or deprecations with this release and so no upgrade guide.
 		"""
 
@@ -27,34 +27,34 @@ releases: "0.43.0": {
 		{
 			type: "feat"
 			description: """
-VRL was updated to v0.20.0. This includes the following changes:
+				VRL was updated to v0.20.0. This includes the following changes:
 
-### Breaking Changes & Upgrade Guide
+				### Breaking Changes & Upgrade Guide
 
-- Fixes the `to_float` function to return an error instead of `f64::INFINITY` when parsing [non-normal](https://doc.rust-lang.org/std/primitive.f64.html#method.is_normal) numbers. (https://github.com/vectordotdev/vrl/pull/1107)
+				- Fixes the `to_float` function to return an error instead of `f64::INFINITY` when parsing [non-normal](https://doc.rust-lang.org/std/primitive.f64.html#method.is_normal) numbers. (https://github.com/vectordotdev/vrl/pull/1107)
 
-### New Features
+				### New Features
 
-- The `decrypt` and `encrypt` VRL functions now support aes-siv (RFC 5297) encryption and decryption. (https://github.com/vectordotdev/vrl/pull/1100)
+				- The `decrypt` and `encrypt` VRL functions now support aes-siv (RFC 5297) encryption and decryption. (https://github.com/vectordotdev/vrl/pull/1100)
 
-### Enhancements
+				### Enhancements
 
-- `decode_punycode` and `encode_punycode` with the `validate` flag set to false should be faster now, in cases when input data needs no encoding or decoding. (https://github.com/vectordotdev/vrl/pull/1104)
-	Otherwise, it will return `None`. (https://github.com/vectordotdev/vrl/pull/1117)
-- The `encode_proto` function was enhanced to automatically convert valid string fields to numeric proto
-	fields. (https://github.com/vectordotdev/vrl/pull/1114)
+				- `decode_punycode` and `encode_punycode` with the `validate` flag set to false should be faster now, in cases when input data needs no encoding or decoding. (https://github.com/vectordotdev/vrl/pull/1104)
+					Otherwise, it will return `None`. (https://github.com/vectordotdev/vrl/pull/1117)
+				- The `encode_proto` function was enhanced to automatically convert valid string fields to numeric proto
+					fields. (https://github.com/vectordotdev/vrl/pull/1114)
 
-### Fixes
+				### Fixes
 
-- The `parse_groks` VRL function and Datadog grok parsing now catch the panic coming from `rust-onig` on too many regex match retries and handle it as a custom error. (https://github.com/vectordotdev/vrl/pull/1079)
-- `encode_punycode` with the `validate` flag set to false should be more consistent with when `validate` is set to true, turning all uppercase character to lowercase as well as doing punycode encoding (https://github.com/vectordotdev/vrl/pull/1115)
-- Removed false warning when using `set_semantic_meaning`. (https://github.com/vectordotdev/vrl/pull/1148)
-"""
-	  },
+				- The `parse_groks` VRL function and Datadog grok parsing now catch the panic coming from `rust-onig` on too many regex match retries and handle it as a custom error. (https://github.com/vectordotdev/vrl/pull/1079)
+				- `encode_punycode` with the `validate` flag set to false should be more consistent with when `validate` is set to true, turning all uppercase character to lowercase as well as doing punycode encoding (https://github.com/vectordotdev/vrl/pull/1115)
+				- Removed false warning when using `set_semantic_meaning`. (https://github.com/vectordotdev/vrl/pull/1148)
+				"""
+		},
 		{
 			type: "feat"
 			description: """
-				The Elasticsearch sink can now write to Amazon OpenSearch Serverless.
+				The Elasticsearch sink can now write to Amazon OpenSearch Serverless via the `opensearch_service_type = "serverless"` option.
 				"""
 			contributors: ["handlerbot", "AvihaiSam"]
 		},
@@ -83,7 +83,9 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "feat"
 			description: """
-				Allows for chunked GELF decoding in message-based sources, such as UDP sockets or unix datagram sockets. Implementation is based on [Graylog's documentation](https://go2docs.graylog.org/5-0/getting_in_log_data/gelf.html#GELFviaUDP).
+				Allows for chunked GELF decoding in message-based sources, such as UDP sockets or unix datagram sockets.
+				Implementation is based on [Graylog's documentation](https://go2docs.graylog.org/5-0/getting_in_log_data/gelf.html#GELFviaUDP).
+				The implementation also supports payload decompression.
 
 				This framing method can be configured via the `framing.method = "chunked_gelf"` option in the source configuration.
 				"""
@@ -95,13 +97,6 @@ VRL was updated to v0.20.0. This includes the following changes:
 				The `sample` transform can now take in a `group_by` configuration option that allows logs with unique values for the patterns passed in to be sampled independently. This can reduce the complexity of the topology, since users no longer need to create separate samplers with similar configurations to handle different log streams.
 				"""
 			contributors: ["hillmandj"]
-		},
-		{
-			type: "feat"
-			description: """
-				Chunked gelf decoder now allows for payload decompression.
-				"""
-			contributors: ["jorgehermo9"]
 		},
 		{
 			type: "enhancement"
@@ -126,7 +121,8 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "feat"
 			description: """
-				Adds support for loading and concatenating multiple VRL files in the `remap` transform. This allows users to break down Vector remaps into smaller, more manageable units of configuration, improving organization, reusability, and maintainability of VRL code.
+				Adds support for loading and concatenating multiple VRL files in the `remap` transform via the `files` option.
+				This allows users to break down Vector remaps into smaller, more manageable units of configuration, improving organization, reusability, and maintainability of VRL code.
 				"""
 			contributors: ["brittonhayes"]
 		},
@@ -185,10 +181,11 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "feat"
 			description: """
-				The `elasticsearch` sink now supports publishing events as bulk "update"s by configuring `bulk.action` to `update`. This mode has a couple of constraints:
-				
-				- The message must be added in `.doc` and have `.doc_as_upsert` to true.
-                                - `id_key` must be set, and the `encoding` field should specify `doc` and `doc_as_upsert` as values
+					The `elasticsearch` sink now supports publishing events as bulk "update"s by configuring `bulk.action` to `update`.
+					While using this mode has a couple of constraints:
+
+					1. The message must be added in `.doc` and have `.doc_as_upsert` to true.
+					2. `id_key` must be set, and the `encoding` field should specify `doc` and `doc_as_upsert` as values
 				"""
 			contributors: ["blackrez"]
 		},
