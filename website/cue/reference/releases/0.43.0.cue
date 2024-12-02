@@ -61,7 +61,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "enhancement"
 			description: """
-				Add ability to encode messages to CEF format with the `cef` encoder (widely used in SIEM systems).
+				Add ability to encode messages to [Common Event Format (CEF)](https://www.microfocus.com/documentation/arcsight/arcsight-smartconnectors/pdfdoc/common-event-format-v25/common-event-format-v25.pdf) with the `cef` encoder (widely used in SIEM systems).
 				"""
 			contributors: ["nabokihms"]
 		},
