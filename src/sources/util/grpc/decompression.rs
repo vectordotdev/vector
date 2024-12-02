@@ -268,7 +268,7 @@ where
             // Drive the core decompression loop, reading chunks from the underlying body, decompressing them if needed,
             // and eventually handling trailers at the end, if they're present.
             result = &mut body_decompression, if !body_eof => match result {
-                Err(e) => break Ok(e.to_http()),
+                Err(e) => break Ok(e.into_http()),
                 Ok(bytes_received) => {
                     body_bytes_received = bytes_received;
                     body_eof = true;

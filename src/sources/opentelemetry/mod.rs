@@ -18,7 +18,7 @@ use vector_lib::opentelemetry::convert::{
     SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
 };
 
-use tonic::transport::server::RoutesBuilder;
+use tonic::service::RoutesBuilder;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_lib::opentelemetry::proto::collector::{

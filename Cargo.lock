@@ -1637,9 +1637,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.4.1"
+version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "327762f6e5a765692301e5bb513e0d9fef63be86bbc14528052b1cd3e6f03e07"
+checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 
 [[package]]
 name = "bitmask-enum"
@@ -2231,7 +2231,7 @@ dependencies = [
  "influxdb-line-protocol",
  "memchr",
  "ordered-float 4.5.0",
- "prost 0.12.6",
+ "prost 0.13.3",
  "prost-reflect",
  "rand 0.8.5",
  "regex",
@@ -2455,10 +2455,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-foundation-sys"
-version = "0.8.4"
+name = "core-foundation"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
+checksum = "b55271e5c8c478ad3f38ad24ef34923091e0548492a266d19b3c0b4d82574c63"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
+]
+
+[[package]]
+name = "core-foundation-sys"
+version = "0.8.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "core2"
@@ -2604,7 +2614,7 @@ version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "829d955a0bb380ef178a640b91779e3987da38c9aea133b20614cfed8cdea9c6"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "crossterm_winapi",
  "futures-core",
  "mio",
@@ -4174,7 +4184,7 @@ version = "0.1.0-rc.1"
 source = "git+https://github.com/vectordotdev/heim.git?branch=update-nix#4925b53083587ccd695c4149836cc42e0e5e76fb"
 dependencies = [
  "cfg-if",
- "core-foundation",
+ "core-foundation 0.9.3",
  "futures-core",
  "futures-util",
  "lazy_static",
@@ -4211,7 +4221,7 @@ source = "git+https://github.com/vectordotdev/heim.git?branch=update-nix#4925b53
 dependencies = [
  "bitflags 1.3.2",
  "cfg-if",
- "core-foundation",
+ "core-foundation 0.9.3",
  "heim-common",
  "heim-runtime",
  "libc",
@@ -5543,9 +5553,9 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.9.0",
  "chrono",
- "prost 0.12.6",
- "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost 0.13.3",
+ "prost-build 0.13.3",
+ "prost-types 0.13.3",
  "snap",
 ]
 
@@ -5986,7 +5996,7 @@ dependencies = [
  "openssl-probe",
  "openssl-sys",
  "schannel",
- "security-framework",
+ "security-framework 2.10.0",
  "security-framework-sys",
  "tempfile",
 ]
@@ -6073,7 +6083,7 @@ version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab2156c4fce2f8df6c499cc1c763e4394b7482525bf2a9701c9d79d215f519e4"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "cfg-if",
  "cfg_aliases",
  "libc",
@@ -6157,7 +6167,7 @@ version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c533b4c39709f9ba5005d8002048266593c1cfaf3c5f0739d5b8ab0c6c504009"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "filetime",
  "fsevent-sys",
  "inotify",
@@ -6563,7 +6573,7 @@ version = "0.10.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6174bc48f102d208783c2c84bf931bb75927a617866870de8a4ea85597f871f5"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "cfg-if",
  "foreign-types",
  "libc",
@@ -6619,10 +6629,10 @@ dependencies = [
  "chrono",
  "hex",
  "ordered-float 4.5.0",
- "prost 0.12.6",
- "prost-build 0.12.6",
- "tonic 0.11.0",
- "tonic-build 0.11.0",
+ "prost 0.13.3",
+ "prost-build 0.13.3",
+ "tonic 0.12.3",
+ "tonic-build 0.12.3",
  "vector-core",
  "vector-lookup",
  "vrl",
@@ -7376,9 +7386,9 @@ dependencies = [
  "indexmap 2.6.0",
  "nom",
  "num_enum 0.7.3",
- "prost 0.12.6",
- "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost 0.13.3",
+ "prost-build 0.13.3",
+ "prost-types 0.13.3",
  "snafu 0.7.5",
  "vector-common",
 ]
@@ -7391,7 +7401,7 @@ checksum = "b4c2511913b88df1637da85cc8d96ec8e43a3f8bb8ccb71ee1ac240d6f3df58d"
 dependencies = [
  "bit-set 0.5.3",
  "bit-vec 0.6.3",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "lazy_static",
  "num-traits",
  "rand 0.8.5",
@@ -7482,6 +7492,27 @@ dependencies = [
  "prettyplease 0.2.15",
  "prost 0.12.6",
  "prost-types 0.12.6",
+ "regex",
+ "syn 2.0.90",
+ "tempfile",
+]
+
+[[package]]
+name = "prost-build"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c1318b19085f08681016926435853bbf7858f9c082d0999b80550ff5d9abe15"
+dependencies = [
+ "bytes 1.9.0",
+ "heck 0.5.0",
+ "itertools 0.13.0",
+ "log",
+ "multimap",
+ "once_cell",
+ "petgraph",
+ "prettyplease 0.2.15",
+ "prost 0.13.3",
+ "prost-types 0.13.3",
  "regex",
  "syn 2.0.90",
  "tempfile",
@@ -7846,7 +7877,7 @@ version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eabd94c2f37801c20583fc49dd5cd6b0ba68c716787c2dd6ed18571e1e63117b"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "cassowary",
  "compact_str",
  "crossterm",
@@ -7867,7 +7898,7 @@ version = "11.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d86a7c4638d42c44551f4791a20e687dbb4c3de1f33c43dd71e355cd429def1"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
 ]
 
 [[package]]
@@ -8434,7 +8465,7 @@ version = "0.38.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99e4ea3e1cdc4b559b8e5650f9c8e5998e3e5c1343b4eaf034565f32318d63c0"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "errno",
  "libc",
  "linux-raw-sys 0.4.14",
@@ -8468,6 +8499,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls"
+version = "0.23.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebbbdb961df0ad3f2652da8f3fdc4b36122f568f968f45ad3316f26c025c677b"
+dependencies = [
+ "log",
+ "once_cell",
+ "ring",
+ "rustls-pki-types",
+ "rustls-webpki 0.102.2",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "rustls-native-certs"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8476,7 +8522,7 @@ dependencies = [
  "openssl-probe",
  "rustls-pemfile 1.0.3",
  "schannel",
- "security-framework",
+ "security-framework 2.10.0",
 ]
 
 [[package]]
@@ -8489,7 +8535,19 @@ dependencies = [
  "rustls-pemfile 2.1.0",
  "rustls-pki-types",
  "schannel",
- "security-framework",
+ "security-framework 2.10.0",
+]
+
+[[package]]
+name = "rustls-native-certs"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fcff2dd52b58a8d98a70243663a0d234c4e2b79235637849d15913394a247d3"
+dependencies = [
+ "openssl-probe",
+ "rustls-pki-types",
+ "schannel",
+ "security-framework 3.0.1",
 ]
 
 [[package]]
@@ -8513,9 +8571,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-pki-types"
-version = "1.3.1"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ede67b28608b4c60685c7d54122d4400d90f62b40caee7700e700380a390fa8"
+checksum = "16f1201b3c9a7ee8039bcadc17b7e605e2945b27eee7631788c1bd2b0643674b"
 
 [[package]]
 name = "rustls-webpki"
@@ -8562,7 +8620,7 @@ version = "14.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7803e8936da37efd9b6d4478277f4b2b9bb5cdb37a113e8d63222e58da647e63"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "cfg-if",
  "clipboard-win",
  "libc",
@@ -8689,7 +8747,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "770452e37cad93e0a50d5abc3990d2bc351c36d0328f86cefec2f2fb206eaef6"
 dependencies = [
  "bitflags 1.3.2",
- "core-foundation",
+ "core-foundation 0.9.3",
+ "core-foundation-sys",
+ "libc",
+ "security-framework-sys",
+]
+
+[[package]]
+name = "security-framework"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1415a607e92bec364ea2cf9264646dcce0f91e6d65281bd6f2819cca3bf39c8"
+dependencies = [
+ "bitflags 2.6.0",
+ "core-foundation 0.10.0",
  "core-foundation-sys",
  "libc",
  "security-framework-sys",
@@ -8697,9 +8768,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework-sys"
-version = "2.10.0"
+version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41f3cc463c0ef97e11c3461a9d3787412d30e8e7eb907c79180c4a57bf7c04ef"
+checksum = "fa39c7303dc58b5543c94d22c1766b0d31f2ee58306363ea622b10bbc075eaa2"
 dependencies = [
  "core-foundation-sys",
  "libc",
@@ -9526,7 +9597,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba3a3adc5c275d719af8cb4272ea1c4a6d668a777f37e115f6d11ddbc1c8e0e7"
 dependencies = [
  "bitflags 1.3.2",
- "core-foundation",
+ "core-foundation 0.9.3",
  "system-configuration-sys",
 ]
 
@@ -9895,6 +9966,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-rustls"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c7bc40d0e5a97695bb96e27995cd3a08538541b0a846f65bba7a359f36700d4"
+dependencies = [
+ "rustls 0.23.7",
+ "rustls-pki-types",
+ "tokio",
+]
+
+[[package]]
 name = "tokio-stream"
 version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10058,6 +10140,7 @@ dependencies = [
  "axum 0.7.5",
  "base64 0.22.1",
  "bytes 1.9.0",
+ "flate2",
  "h2 0.4.7",
  "http 1.1.0",
  "http-body 1.0.0",
@@ -10068,8 +10151,11 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost 0.13.3",
+ "rustls-native-certs 0.8.1",
+ "rustls-pemfile 2.1.0",
  "socket2 0.5.8",
  "tokio",
+ "tokio-rustls 0.26.0",
  "tokio-stream",
  "tower",
  "tower-layer",
@@ -10104,6 +10190,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tonic-build"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9557ce109ea773b399c9b9e5dca39294110b74f1f342cb347a80d1fce8c26a11"
+dependencies = [
+ "prettyplease 0.2.15",
+ "proc-macro2 1.0.92",
+ "prost-build 0.13.3",
+ "prost-types 0.13.3",
+ "quote 1.0.37",
+ "syn 2.0.90",
+]
+
+[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10131,7 +10231,7 @@ checksum = "61c5bb1d698276a2443e5ecfabc1008bf15a36c12e6a7176e7bf089ea9131140"
 dependencies = [
  "async-compression",
  "base64 0.21.7",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "bytes 1.9.0",
  "futures-core",
  "futures-util",
@@ -10841,7 +10941,7 @@ dependencies = [
  "hex",
  "hickory-proto",
  "hostname 0.4.0",
- "http 0.2.9",
+ "http 1.1.0",
  "http-body 0.4.5",
  "http-serde",
  "hyper 0.14.28",
@@ -10884,10 +10984,10 @@ dependencies = [
  "postgres-openssl",
  "proptest",
  "proptest-derive",
- "prost 0.12.6",
- "prost-build 0.12.6",
+ "prost 0.13.3",
+ "prost-build 0.13.3",
  "prost-reflect",
- "prost-types 0.12.6",
+ "prost-types 0.13.3",
  "pulsar",
  "quickcheck",
  "rand 0.8.5",
@@ -10931,8 +11031,8 @@ dependencies = [
  "tokio-tungstenite 0.20.1",
  "tokio-util",
  "toml",
- "tonic 0.11.0",
- "tonic-build 0.11.0",
+ "tonic 0.12.3",
+ "tonic-build 0.12.3",
  "tower",
  "tower-http",
  "tower-test",
@@ -11151,9 +11251,9 @@ dependencies = [
  "parking_lot",
  "pin-project",
  "proptest",
- "prost 0.12.6",
- "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost 0.13.3",
+ "prost-build 0.13.3",
+ "prost-types 0.13.3",
  "quanta",
  "quickcheck",
  "quickcheck_macros",
@@ -11162,7 +11262,7 @@ dependencies = [
  "regex",
  "ryu",
  "schannel",
- "security-framework",
+ "security-framework 2.10.0",
  "serde",
  "serde_json",
  "serde_with 3.11.0",
@@ -11177,7 +11277,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml",
- "tonic 0.11.0",
+ "tonic 0.12.3",
  "tracing 0.1.41",
  "tracing-core 0.1.33",
  "tracing-subscriber",
@@ -11646,7 +11746,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60b6f804e41d0852e16d2eaee61c7e4f7d3e8ffdb7b8ed85886aeb0791fe9fcd"
 dependencies = [
- "core-foundation",
+ "core-foundation 0.9.3",
  "home",
  "jni",
  "log",
@@ -11829,7 +11929,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d24d6bcc7f734a4091ecf8d7a64c5f7d7066f45585c1861eba06449909609c8a"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "widestring 1.0.2",
  "windows-sys 0.52.0",
 ]
