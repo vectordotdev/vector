@@ -306,6 +306,7 @@ fn render_tags(
                 }
             }
             for (k, v) in static_labels {
+                println!("{} {}", k, v);
                 if let Some(discarded_v) = dynamic_labels.insert(k.clone(), v.clone()) {
                     warn!(
                         "Static label overrides dynamic label. \
@@ -1116,6 +1117,56 @@ mod tests {
             name = "http_requests_total"
             namespace = "app"
             tags = {method = "{{method}}", code = "{{code}}", missing_tag = "{{unknown}}", host = "localhost"}
+            "#,
+        );
+
+        let mut event = create_event("message", "i am log");
+        event.as_mut_log().insert("method", "post");
+        event.as_mut_log().insert("code", "200");
+        let mut metadata =
+            event
+                .metadata()
+                .clone()
+                .with_origin_metadata(DatadogMetricOriginMetadata::new(
+                    None,
+                    None,
+                    Some(ORIGIN_SERVICE_VALUE),
+                ));
+        // definitions aren't valid for metrics yet, it's just set to the default (anything).
+        metadata.set_schema_definition(&Arc::new(Definition::any()));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+
+        let metric = do_transform(config, event).await.unwrap();
+
+        assert_eq!(
+            metric.into_metric(),
+            Metric::new_with_metadata(
+                "http_requests_total",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+                metadata,
+            )
+            .with_namespace(Some("app"))
+            .with_tags(Some(metric_tags!(
+                "method" => "post",
+                "code" => "200",
+                "host" => "localhost",
+            )))
+            .with_timestamp(Some(ts()))
+        );
+    }
+    
+    #[tokio::test]
+    async fn count_http_requests_with_tags_expansion() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "message"
+            name = "http_requests_total"
+            namespace = "app"
+            tags = {"*" = "{{.}}"}
             "#,
         );
 
