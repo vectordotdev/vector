@@ -39,7 +39,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 ### Fixes
 
 - The `parse_groks` VRL function and Datadog grok parsing now catch the panic coming from `rust-onig` on too many regex match retries and handle it as a custom error. (https://github.com/vectordotdev/vrl/pull/1079)
-- `encode_punycode` with `validate` flag set to false should be more consistent with `validate` set to true, turning all uppercase character to lowercase besides doing punycode encoding (https://github.com/vectordotdev/vrl/pull/1115)
+- `encode_punycode` with the `validate` flag set to false should be more consistent with when `validate` is set to true, turning all uppercase character to lowercase as well as doing punycode encoding (https://github.com/vectordotdev/vrl/pull/1115)
 - Removed false warning when using `set_semantic_meaning`. (https://github.com/vectordotdev/vrl/pull/1148)
 """
 	  },
