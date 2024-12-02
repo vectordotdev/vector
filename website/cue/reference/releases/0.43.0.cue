@@ -148,7 +148,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 			description: """
 				Vector now supports YAML merges in configuration files, a part of the YAML 1.1
 				specification. This functionality is useful for reducing the size of transform
-				configurations. See YAML documentation [here](https://yaml.org/type/merge.html).
+				configurations. See the [YAML documentation](https://yaml.org/type/merge.html).
 				"""
 			contributors: ["lattwood"]
 		},
