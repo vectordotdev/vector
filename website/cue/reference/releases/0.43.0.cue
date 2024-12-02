@@ -213,7 +213,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "enhancement"
 			description: """
-				Add Gzip compression support to the`gcp_chronicle_unstructured` sink. See official documentation [here](https://cloud.google.com/chronicle/docs/reference/ingestion-api#frequently_asked_questions).
+				Add Gzip compression support to the `gcp_chronicle_unstructured` sink. See the [documentation](https://cloud.google.com/chronicle/docs/reference/ingestion-api#frequently_asked_questions).
 				"""
 			contributors: ["chocpanda"]
 		},
