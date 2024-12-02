@@ -133,7 +133,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "fix"
 			description: """
-				Remove pubsub log only restriction. This allows using pubsub sink/source for metric and trace events.
+				The 'gcp_pubsub' sink now supports emitting metrics and traces.
 				"""
 			contributors: ["genadipost"]
 		},
