@@ -258,7 +258,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "enhancement"
 			description: """
-				Support for watching config file changes by polling at certain interval.
+				Support for watching config file changes by polling at certain interval rather than relying on notifications. This can be enabled setting `--watch-config-method` to `poll` where the interval can be configured via `--watch-config-poll-interval-seconds`.
 				"""
 			contributors: ["amribm"]
 		},
