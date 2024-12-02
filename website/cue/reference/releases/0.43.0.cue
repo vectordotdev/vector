@@ -111,7 +111,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "enhancement"
 			description: """
-				The `http sink` will now retry requests when the response is a request timeout (HTTP 408).
+				The `http sink` now retries requests when the response is a request timeout (HTTP 408).
 				"""
 			contributors: ["noble-varghese", "pront"]
 		},
