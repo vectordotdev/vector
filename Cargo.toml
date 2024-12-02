@@ -147,18 +147,18 @@ metrics-util = { version = "0.18.0", default-features = false, features = ["regi
 pin-project = { version = "1.1.7", default-features = false }
 proptest = { version = "1.5" }
 proptest-derive = { version = "0.5.0" }
-prost = { version = "0.12", default-features = false, features = ["std"] }
-prost-build = { version = "0.12", default-features = false }
+prost = { version = "0.13.3", default-features = false, features = ["std"] }
+prost-build = { version = "0.13.3", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
-prost-types = { version = "0.12", default-features = false }
+prost-types = { version = "0.13.3", default-features = false }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 serde_json = { version = "1.0.133", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.215", default-features = false, features = ["alloc", "derive", "rc"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
 tokio = { version = "1.41.1", default-features = false, features = ["full"] }
 toml = { version = "0.8.19", default-features = false, features = ["display", "parse"] }
-tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
-tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
+tonic = { version = "0.12.3", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tonic-build = { version = "0.12.3", default-features = false, features = ["transport", "prost"] }
 uuid = { version = "1.10.0", features = ["v4", "v7", "serde"] }
 vrl = { git = "https://github.com/vectordotdev/vrl", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 
@@ -176,7 +176,7 @@ dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
-vector-common = { path = "lib/vector-common", default-features = false}
+vector-common = { path = "lib/vector-common", default-features = false }
 vector-lib.workspace = true
 vector-config.workspace = true
 vector-config-common.workspace = true
