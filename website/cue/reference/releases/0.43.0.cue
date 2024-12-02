@@ -170,7 +170,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 			type: "enhancement"
 			description: """
 				Add VECTOR_HOSTNAME env variable to override the hostname used in the Vector events and internal metrics.
-				This is useful when Vector is running on a system where the hostname is not meaningful, e.g., in a container (Kubernetes).
+				This is useful when Vector is running on a system where the hostname is not meaningful, such as in a container (Kubernetes).
 				"""
 			contributors: ["nabokihms"]
 		},
