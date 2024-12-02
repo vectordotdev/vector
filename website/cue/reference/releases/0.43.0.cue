@@ -170,7 +170,7 @@ VRL was updated to v0.20.0. This includes the following changes:
 		{
 			type: "enhancement"
 			description: """
-				EDE code 30 (Invalid Query Type) (added in https://datatracker.ietf.org/doc/draft-ietf-dnsop-compact-denial-of-existence/04/) has been added to recognized EDE codes and has correct `purpose` attached to it.
+				The `dnstap` source now supports decoding of EDE code 30 (Invalid Query Type) (added in https://datatracker.ietf.org/doc/draft-ietf-dnsop-compact-denial-of-existence/04/) and has the correct `purpose` attached to it.
 				"""
 			contributors: ["esensar"]
 		},
