@@ -314,9 +314,8 @@ fn render_tags(
                     );
                 };
             }
-            println!("{:?}", dynamic_labels);
             for (name, value) in dynamic_labels {
-                result.insert(name.to_string(), value);
+                result.insert(name.to_string(), TagValue::Value(value));
             }
             result.as_option()
         }
@@ -325,31 +324,41 @@ fn render_tags(
 
 fn render_tag_into(
     event: &Event,
-    name: &Template,
-    template: &Option<Template>,
-    _result: &mut MetricTags,
+    key_template: &Template,
+    value_template: &Option<Template>,
+    result: &mut MetricTags,
     static_labels: &mut HashMap<String, String>,
     dynamic_labels: &mut HashMap<String, String>,
 ) -> Result<(), TransformError> {
-    let _value = match template {
-        None => TagValue::Bare,
-        Some(template) => match render_template(template, event) {
-            Ok(result) => {
-                tag_expansion(event, name, template, static_labels, dynamic_labels);
-                TagValue::Value(result)
+    let key = render_template(key_template, event);
+    match value_template {
+        None => {
+            result.insert(key_template.to_string(), TagValue::Bare);
+        }
+        Some(template) => match (key, render_template(template, event)) {
+            (Ok(key_s), Ok(value_s)) => {
+                tag_expansion(key_s, value_s, static_labels, dynamic_labels);
             }
-            Err(TransformError::TemplateRenderingError(error)) => {
+            (Err(TransformError::TemplateRenderingError(key_error)), _) => {
                 emit!(crate::internal_events::TemplateRenderingError {
-                    error,
+                    error: key_error,
                     drop_event: false,
-                    field: Some(name.get_ref()),
+                    field: Some(key_template.get_ref()),
                 });
                 return Ok(());
             }
-            Err(other) => return Err(other),
+            (_, Err(TransformError::TemplateRenderingError(value_error))) => {
+                emit!(crate::internal_events::TemplateRenderingError {
+                    error: value_error,
+                    drop_event: false,
+                    field: Some(template.get_ref()),
+                });
+                return Ok(());
+            }
+            (Err(key_error), _) => return Err(key_error),
+            (_, Err(value_error)) => return Err(value_error),
         },
     };
-    // result.insert(name.to_string(), value);
     Ok(())
 }
 
@@ -360,18 +369,11 @@ fn slugify_text(input: String) -> String {
 }
 
 fn tag_expansion(
-    event: &Event,
-    key_template: &Template,
-    value_template: &Template,
+    key_s: String,
+    value_s: String,
     static_labels: &mut HashMap<String, String>,
     dynamic_labels: &mut HashMap<String, String>,
 ) {
-    let key = key_template.render_string(event);
-    let value = value_template.render_string(event);
-
-    let key_s = key.unwrap();
-    let value_s = value.unwrap();
-
     if let Some(opening_prefix) = key_s.strip_suffix('*') {
         let output: Result<serde_json::map::Map<String, serde_json::Value>, serde_json::Error> =
             serde_json::from_str(value_s.clone().as_str());
