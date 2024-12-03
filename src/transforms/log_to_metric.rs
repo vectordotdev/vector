@@ -316,12 +316,6 @@ fn render_tags(
             }
             println!("{:?}", dynamic_labels);
             for (name, value) in dynamic_labels {
-                if name == "timestamp".to_string() {
-                    continue;
-                }
-                if name == "message".to_string() {
-                    continue;
-                }
                 result.insert(name.to_string(), value);
             }
             result.as_option()
@@ -1003,7 +997,7 @@ mod tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::config::ComponentKey;
-    use vector_lib::event::EventMetadata;
+    use vector_lib::event::{EventMetadata, ObjectMap};
     use vector_lib::metric_tags;
 
     #[test]
@@ -1165,7 +1159,7 @@ mod tests {
             .with_timestamp(Some(ts()))
         );
     }
-    
+
     #[tokio::test]
     async fn count_http_requests_with_tags_expansion() {
         let config = parse_config(
@@ -1175,13 +1169,18 @@ mod tests {
             field = "message"
             name = "http_requests_total"
             namespace = "app"
-            tags = {"*" = "{{.}}"}
+            tags = {"*" = "{{dict}}"}
             "#,
         );
 
         let mut event = create_event("message", "i am log");
-        event.as_mut_log().insert("method", "post");
-        event.as_mut_log().insert("code", "200");
+        let log = event.as_mut_log();
+
+        let mut test_dict = ObjectMap::default();
+        test_dict.insert("one".into(), Value::from("foo"));
+        test_dict.insert("two".into(), Value::from("baz"));
+        log.insert("dict", Value::from(test_dict));
+
         let mut metadata =
             event
                 .metadata()
@@ -1208,8 +1207,8 @@ mod tests {
             )
             .with_namespace(Some("app"))
             .with_tags(Some(metric_tags!(
-                "method" => "post",
-                "code" => "200",
+                "one" => "foo",
+                "two" => "baz",
             )))
             .with_timestamp(Some(ts()))
         );
