@@ -179,12 +179,12 @@ releases: "0.43.0": {
 		{
 			type: "feat"
 			description: """
-					The `elasticsearch` sink now supports publishing events as bulk "update"s by configuring `bulk.action` to `update`.
-					While using this mode has a couple of constraints:
+				The `elasticsearch` sink now supports publishing events as bulk "update"s by configuring `bulk.action` to `update`.
+				While using this mode has a couple of constraints:
 
-					1. The message must be added in `.doc` and have `.doc_as_upsert` to true.
-					2. `id_key` must be set, and the `encoding` field should specify `doc` and `doc_as_upsert` as values
-					"""
+				1. The message must be added in `.doc` and have `.doc_as_upsert` to true.
+				2. `id_key` must be set, and the `encoding` field should specify `doc` and `doc_as_upsert` as values
+				"""
 			contributors: ["blackrez"]
 		},
 		{
