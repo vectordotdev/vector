@@ -1244,6 +1244,40 @@ mod tests {
             assert!(value.is_none() || value == Some("one") || value == Some("two"));
         }
     }
+    #[tokio::test]
+    async fn multi_value_tags_expansion_yaml() {
+        // Have to use YAML to represent bare tags
+        let config = parse_yaml_config(
+            r#"
+            metrics:
+            - field: "message"
+              type: "counter"
+              tags:
+                "*": "{{dict}}"
+            "#,
+        );
+
+        let mut event = create_event("message", "I am log");
+        let log = event.as_mut_log();
+
+        let mut test_dict = ObjectMap::default();
+        test_dict.insert("one".into(), Value::from(vec!["foo", "baz"]));
+        log.insert("dict", Value::from(test_dict));
+
+        let metric = do_transform(config, event).await.unwrap().into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        assert_eq!(
+            tags.iter_single().collect::<Vec<_>>(),
+            vec![("one", "[\"foo\",\"baz\"]")]
+        );
+
+        assert_eq!(tags.iter_all().count(), 1);
+        for (name, value) in tags.iter_all() {
+            assert_eq!(name, "one");
+            assert_eq!(value, Some("[\"foo\",\"baz\"]"));
+        }
+    }
 
     #[tokio::test]
     async fn multi_value_tags_toml() {
