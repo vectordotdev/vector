@@ -18,8 +18,6 @@ releases: "0.43.0": {
 		- Two new secrets backends for loading secrets into Vector configuration: `file`, which loads secrets from a JSON file, and `directory`, which loads secrets from a tree of files.
 
 
-		It also includes numerous enhancements and fixes as listed below.
-
 		There are no breaking changes or deprecations with this release and so no upgrade guide.
 		"""
 
