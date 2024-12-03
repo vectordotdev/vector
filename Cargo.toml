@@ -360,7 +360,7 @@ tokio-postgres = { version = "0.7.12", default-features = false, features = ["ru
 tokio-tungstenite = { version = "0.20.1", default-features = false, features = ["connect"], optional = true }
 toml.workspace = true
 tonic = { workspace = true, optional = true }
-hickory-proto = { version = "0.25.0-alpha.3", default-features = false, features = ["dnssec-openssl"], optional = true }
+hickory-proto = { version = "0.25.0-alpha.4", default-features = false, features = ["dnssec-openssl"], optional = true }
 typetag = { version = "0.2.18", default-features = false }
 url = { version = "2.5.3", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }

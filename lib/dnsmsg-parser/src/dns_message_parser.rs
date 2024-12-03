@@ -2,13 +2,11 @@ use std::str::Utf8Error;
 use std::{fmt::Write as _, ops::Deref};
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
+use hickory_proto::dnssec::rdata::{DNSSECRData, DNSKEY, DS};
+use hickory_proto::dnssec::SupportedAlgorithms;
 use hickory_proto::{
     op::{message::Message as TrustDnsMessage, Query},
     rr::{
-        dnssec::{
-            rdata::{DNSSECRData, DNSKEY, DS},
-            SupportedAlgorithms,
-        },
         rdata::{
             caa::Value,
             opt::{EdnsCode, EdnsOption},
@@ -1271,20 +1269,8 @@ mod tests {
     };
 
     #[allow(deprecated)]
+    use hickory_proto::dnssec::rdata::key::UpdateScope;
     use hickory_proto::rr::{
-        dnssec::{
-            rdata::{
-                dnskey::DNSKEY,
-                ds::DS,
-                key::{KeyTrust, KeyUsage, Protocol, UpdateScope},
-                nsec::NSEC,
-                nsec3::NSEC3,
-                nsec3param::NSEC3PARAM,
-                sig::SIG,
-                DNSSECRData, KEY, RRSIG,
-            },
-            Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
-        },
         domain::Name,
         rdata::{
             caa::KeyValue,
@@ -1295,6 +1281,13 @@ mod tests {
         },
     };
     use hickory_proto::{
+        dnssec::{
+            rdata::{
+                key::{KeyTrust, KeyUsage, Protocol},
+                KEY, NSEC, NSEC3, NSEC3PARAM, RRSIG, SIG,
+            },
+            Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
+        },
         rr::rdata::{
             cert::{Algorithm as CertAlgorithm, CertType},
             CERT,
