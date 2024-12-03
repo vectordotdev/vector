@@ -110,6 +110,9 @@ pub struct MetricConfig {
     pub namespace: Option<Template>,
 
     /// Tags to apply to the metric.
+    ///
+    /// Both keys and values are templateable, which enables you to attach dynamic labels to events.
+    ///
     #[configurable(metadata(docs::additional_props_description = "A metric tag."))]
     pub tags: Option<IndexMap<Template, TagConfig>>,
 
