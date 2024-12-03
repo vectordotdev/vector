@@ -9661,6 +9661,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "thiserror-impl"
+version = "2.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f077553d607adc1caf65430528a576c757a71ed73944b66ebb58ef2bbd243568"
+dependencies = [
+ "proc-macro2 1.0.92",
+ "quote 1.0.37",
+ "syn 2.0.89",
+]
+
+[[package]]
 name = "thread_local"
 version = "1.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11341,8 +11352,8 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vrl"
-version = "0.20.0"
-source = "git+https://github.com/vectordotdev/vrl?branch=main#c8af70c396ccfac66835e1275f9d2619df35f13e"
+version = "0.19.0"
+source = "git+https://github.com/vectordotdev/vrl?branch=main#a958c5d299f10ffb8cc427e250ca39da58054f45"
 dependencies = [
  "aes",
  "aes-siv",
