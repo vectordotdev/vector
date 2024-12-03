@@ -184,7 +184,7 @@ releases: "0.43.0": {
 
 					1. The message must be added in `.doc` and have `.doc_as_upsert` to true.
 					2. `id_key` must be set, and the `encoding` field should specify `doc` and `doc_as_upsert` as values
-				"""
+					"""
 			contributors: ["blackrez"]
 		},
 		{
