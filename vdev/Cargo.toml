@@ -23,7 +23,7 @@ indexmap.workspace = true
 indicatif = { version = "0.17.9", features = ["improved_unicode"] }
 itertools = "0.13.0"
 log = "0.4.22"
-os_info = { version = "3.8.2", default-features = false }
+os_info = { version = "3.9.0", default-features = false }
 # watch https://github.com/epage/anstyle for official interop with Clap
 owo-colors = { version = "4.1.0", features = ["supports-colors"] }
 paste = "1.0.15"
