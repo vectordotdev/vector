@@ -27,22 +27,22 @@ releases: "0.43.0": {
 			description: """
 				VRL was updated to v0.20.0. This includes the following changes:
 
-				### Breaking Changes & Upgrade Guide
+				#### Breaking Changes & Upgrade Guide
 
 				- Fixes the `to_float` function to return an error instead of `f64::INFINITY` when parsing [non-normal](https://doc.rust-lang.org/std/primitive.f64.html#method.is_normal) numbers. (https://github.com/vectordotdev/vrl/pull/1107)
 
-				### New Features
+				#### New Features
 
 				- The `decrypt` and `encrypt` VRL functions now support aes-siv (RFC 5297) encryption and decryption. (https://github.com/vectordotdev/vrl/pull/1100)
 
-				### Enhancements
+				#### Enhancements
 
 				- `decode_punycode` and `encode_punycode` with the `validate` flag set to false should be faster now, in cases when input data needs no encoding or decoding. (https://github.com/vectordotdev/vrl/pull/1104)
 					Otherwise, it will return `None`. (https://github.com/vectordotdev/vrl/pull/1117)
 				- The `encode_proto` function was enhanced to automatically convert valid string fields to numeric proto
 					fields. (https://github.com/vectordotdev/vrl/pull/1114)
 
-				### Fixes
+				#### Fixes
 
 				- The `parse_groks` VRL function and Datadog grok parsing now catch the panic coming from `rust-onig` on too many regex match retries and handle it as a custom error. (https://github.com/vectordotdev/vrl/pull/1079)
 				- `encode_punycode` with the `validate` flag set to false should be more consistent with when `validate` is set to true, turning all uppercase character to lowercase as well as doing punycode encoding (https://github.com/vectordotdev/vrl/pull/1115)
