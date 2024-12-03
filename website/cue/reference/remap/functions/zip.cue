@@ -5,7 +5,7 @@ remap: functions: zip: {
 	description: """
 		Iterate over several arrays in parallel, producing a new array containing arrays of items from each source.
 		The resulting array will be as long as the shortest input array, with all the remaining elements dropped.
-		This function is modelled from the `zip` function [in Python](https://docs.python.org/3/library/functions.html#zip),
+		This function is modeled from the `zip` function [in Python](https://docs.python.org/3/library/functions.html#zip),
 		but similar methods can be found in [Ruby](https://docs.ruby-lang.org/en/master/Array.html#method-i-zip)
 		and [Rust](https://doc.rust-lang.org/stable/std/iter/trait.Iterator.html#method.zip).
 
