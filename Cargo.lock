@@ -814,11 +814,12 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "aws-config"
-version = "1.5.10"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b49afaa341e8dd8577e1a2200468f98956d6eda50bcf4a53246cc00174ba924"
+checksum = "80c950a809d39bc9480207cb1cfc879ace88ea7e3a4392a8e9999e45d6e5692e"
 dependencies = [
  "aws-credential-types",
+ "aws-http",
  "aws-runtime",
  "aws-sdk-sso",
  "aws-sdk-ssooidc",
@@ -834,11 +835,11 @@ dependencies = [
  "fastrand 2.3.0",
  "hex",
  "http 0.2.9",
+ "hyper 0.14.28",
  "ring",
  "time",
  "tokio",
  "tracing 0.1.41",
- "url",
  "zeroize",
 ]
 
@@ -872,40 +873,22 @@ dependencies = [
 
 [[package]]
 name = "aws-runtime"
-<<<<<<< HEAD
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce0953f7fc1c4428511345e28ea3e98c8b59c9e91eafae30bf76d71d70642693"
-=======
-version = "1.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a10d5c055aa540164d9561a0e2e74ad30f0dcf7393c3a92f6733ddf9c5762468"
->>>>>>> 0d322fb49 (Add some debug logging and try clearing region if we're manually setting endpoint url from config)
 dependencies = [
  "aws-credential-types",
+ "aws-http",
  "aws-sigv4",
  "aws-smithy-async",
  "aws-smithy-eventstream",
-<<<<<<< HEAD
  "aws-smithy-http 0.60.12",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "aws-types",
  "fastrand 2.3.0",
-=======
- "aws-smithy-http",
- "aws-smithy-runtime",
- "aws-smithy-runtime-api",
- "aws-smithy-types",
- "aws-types",
- "bytes 1.9.0",
- "fastrand 2.1.1",
->>>>>>> 0d322fb49 (Add some debug logging and try clearing region if we're manually setting endpoint url from config)
  "http 0.2.9",
- "http-body 0.4.5",
- "once_cell",
  "percent-encoding",
- "pin-project-lite",
  "tracing 0.1.41",
  "uuid",
 ]
@@ -1144,17 +1127,12 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-sso"
-<<<<<<< HEAD
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86575c7604dcdb583aba3390200e5333d8e4fe597bad54f57b190aaf4fac9771"
-=======
-version = "1.49.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09677244a9da92172c8dc60109b4a9658597d4d298b188dd0018b6a66b410ca4"
->>>>>>> 0d322fb49 (Add some debug logging and try clearing region if we're manually setting endpoint url from config)
 dependencies = [
  "aws-credential-types",
+ "aws-http",
  "aws-runtime",
  "aws-smithy-async",
  "aws-smithy-http 0.60.12",
@@ -1165,24 +1143,18 @@ dependencies = [
  "aws-types",
  "bytes 1.10.1",
  "http 0.2.9",
- "once_cell",
- "regex-lite",
+ "regex",
  "tracing 0.1.41",
 ]
 
 [[package]]
 name = "aws-sdk-ssooidc"
-<<<<<<< HEAD
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef0d7c1d0730adb5e85407174483a579e39576e0f4350ecd0fac69ec1217b1b"
-=======
-version = "1.50.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81fea2f3a8bb3bd10932ae7ad59cc59f65f270fc9183a7e91f501dc5efbef7ee"
->>>>>>> 0d322fb49 (Add some debug logging and try clearing region if we're manually setting endpoint url from config)
 dependencies = [
  "aws-credential-types",
+ "aws-http",
  "aws-runtime",
  "aws-smithy-async",
  "aws-smithy-http 0.60.12",
@@ -1193,24 +1165,18 @@ dependencies = [
  "aws-types",
  "bytes 1.10.1",
  "http 0.2.9",
- "once_cell",
- "regex-lite",
+ "regex",
  "tracing 0.1.41",
 ]
 
 [[package]]
 name = "aws-sdk-sts"
-<<<<<<< HEAD
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f45778089751d5aa8645a02dd60865fa0eea39f00be5db2c7779bc50b83db19a"
-=======
-version = "1.50.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ada54e5f26ac246dc79727def52f7f8ed38915cb47781e2a72213957dc3a7d5"
->>>>>>> 0d322fb49 (Add some debug logging and try clearing region if we're manually setting endpoint url from config)
 dependencies = [
  "aws-credential-types",
+ "aws-http",
  "aws-runtime",
  "aws-smithy-async",
  "aws-smithy-http 0.60.12",
@@ -1222,8 +1188,7 @@ dependencies = [
  "aws-smithy-xml",
  "aws-types",
  "http 0.2.9",
- "once_cell",
- "regex-lite",
+ "regex",
  "tracing 0.1.41",
 ]
 
