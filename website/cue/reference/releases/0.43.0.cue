@@ -127,7 +127,7 @@ releases: "0.43.0": {
 		{
 			type: "fix"
 			description: """
-				The 'gcp_pubsub' sink now supports emitting metrics and traces.
+				The `gcp_pubsub` sink now supports emitting metrics and traces.
 				"""
 			contributors: ["genadipost"]
 		},
