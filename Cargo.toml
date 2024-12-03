@@ -140,7 +140,7 @@ clap = { version = "4.5.21", default-features = false, features = ["derive", "er
 flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.1", default-features = false }
-indexmap = { version = "2.6.0", default-features = false, features = ["serde", "std"] }
+indexmap = { version = "2.7.0", default-features = false, features = ["serde", "std"] }
 metrics = "0.24.1"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
