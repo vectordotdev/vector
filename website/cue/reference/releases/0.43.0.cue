@@ -164,7 +164,7 @@ releases: "0.43.0": {
 		{
 			type: "enhancement"
 			description: """
-				The `dnstap` source now supports decoding of EDE code 30 (Invalid Query Type) (added in https://datatracker.ietf.org/doc/draft-ietf-dnsop-compact-denial-of-existence/04/) and has the correct `purpose` attached to it.
+				The `dnstap` source now supports decoding of EDE code 30 (Invalid Query Type) (added in [Compact Denial of Existence in DNSSEC](https://datatracker.ietf.org/doc/draft-ietf-dnsop-compact-denial-of-existence/04/)) and has the correct `purpose` attached to it.
 				"""
 			contributors: ["esensar"]
 		},
