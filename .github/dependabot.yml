@@ -11,6 +11,21 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
+    allow:
+      - dependency-name: "vrl"
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      time: "04:00" # UTC
+    labels:
+      - "domain: deps"
+      - "no-changelog"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 100
+    ignore:
+      - dependency-name: "vrl"
     groups:
       patches:
         applies-to: version-updates
