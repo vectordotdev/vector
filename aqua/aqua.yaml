@@ -3,7 +3,7 @@
 # https://aquaproj.github.io/
 registries:
   - type: standard
-    ref: v4.265.0 # renovate: depName=aquaproj/aqua-registry
+    ref: v4.268.0 # renovate: depName=aquaproj/aqua-registry
 packages:
   - name: rustwasm/wasm-pack@v0.13.1
   - name: crates.io/cargo-deb@1.41.3
