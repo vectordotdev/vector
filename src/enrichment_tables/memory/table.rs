@@ -271,6 +271,12 @@ mod tests {
         test_util::components::{run_and_assert_sink_compliance, SINK_TAGS},
     };
 
+    fn build_memory_config(modfn: impl Fn(&mut MemoryConfig)) -> MemoryConfig {
+        let mut config = MemoryConfig::default();
+        modfn(&mut config);
+        config
+    }
+
     #[test]
     fn finds_row() {
         let mut memory = Memory::new(Default::default());
@@ -295,10 +301,7 @@ mod tests {
     fn calculates_ttl() {
         let ttl = 100;
         let secs_to_subtract = 10;
-        let memory = Memory::new(MemoryConfig {
-            ttl,
-            ..Default::default()
-        });
+        let memory = Memory::new(build_memory_config(|c| c.ttl = ttl));
         {
             let mut handle = memory.write_handle.lock().unwrap();
             handle.update(
@@ -330,11 +333,10 @@ mod tests {
     #[test]
     fn removes_expired_records_on_scan_interval() {
         let ttl = 100;
-        let mut memory = Memory::new(MemoryConfig {
-            ttl,
-            scan_interval: 0,
-            ..Default::default()
-        });
+        let mut memory = Memory::new(build_memory_config(|c| {
+            c.ttl = ttl;
+            c.scan_interval = 0;
+        }));
         {
             let mut handle = memory.write_handle.lock().unwrap();
             handle.update(
@@ -376,11 +378,10 @@ mod tests {
     #[test]
     fn does_not_show_values_before_flush_interval() {
         let ttl = 100;
-        let mut memory = Memory::new(MemoryConfig {
-            ttl,
-            flush_interval: 10,
-            ..Default::default()
-        });
+        let mut memory = Memory::new(build_memory_config(|c| {
+            c.ttl = ttl;
+            c.flush_interval = 10;
+        }));
         memory.handle_value(&ObjectMap::from([("test_key".into(), Value::from(5))]));
 
         let condition = Condition::Equals {
@@ -398,10 +399,7 @@ mod tests {
     #[test]
     fn updates_ttl_on_value_replacement() {
         let ttl = 100;
-        let mut memory = Memory::new(MemoryConfig {
-            ttl,
-            ..Default::default()
-        });
+        let mut memory = Memory::new(build_memory_config(|c| c.ttl = ttl));
         {
             let mut handle = memory.write_handle.lock().unwrap();
             handle.update(
