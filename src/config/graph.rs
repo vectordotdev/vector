@@ -2,8 +2,8 @@ use indexmap::{set::IndexSet, IndexMap};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{
-    schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
-    TransformOutput,
+    schema, ComponentKey, DataType, EnrichmentTableOuter, OutputId, SinkOuter, SourceOuter,
+    SourceOutput, TransformOuter, TransformOutput,
 };
 
 #[derive(Debug, Clone)]
@@ -37,24 +37,28 @@ impl Graph {
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        enrichment_tables: &IndexMap<ComponentKey, EnrichmentTableOuter<String>>,
         schema: schema::Options,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, false, schema)
+        Self::new_inner(sources, transforms, sinks, enrichment_tables, false, schema)
     }
 
     pub fn new_unchecked(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        enrichment_tables: &IndexMap<ComponentKey, EnrichmentTableOuter<String>>,
         schema: schema::Options,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, true, schema).expect("errors ignored")
+        Self::new_inner(sources, transforms, sinks, enrichment_tables, true, schema)
+            .expect("errors ignored")
     }
 
     fn new_inner(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        enrichment_tables: &IndexMap<ComponentKey, EnrichmentTableOuter<String>>,
         ignore_errors: bool,
         schema: schema::Options,
     ) -> Result<Self, Vec<String>> {
@@ -85,7 +89,15 @@ impl Graph {
             );
         }
 
-        for (id, config) in sinks.iter() {
+        let table_sinks = enrichment_tables
+            .iter()
+            .filter_map(|(key, table)| table.as_sink().map(|s| (key, s)))
+            .collect::<Vec<_>>();
+
+        for (id, config) in sinks
+            .iter()
+            .chain(table_sinks.iter().map(|(key, sink)| (*key, sink)))
+        {
             graph.nodes.insert(
                 id.clone(),
                 Node::Sink {
@@ -106,7 +118,10 @@ impl Graph {
             }
         }
 
-        for (id, config) in sinks.iter() {
+        for (id, config) in sinks
+            .iter()
+            .chain(table_sinks.iter().map(|(key, sink)| (*key, sink)))
+        {
             for input in config.inputs.iter() {
                 if let Err(e) = graph.add_input(input, id, &available_inputs) {
                     errors.push(e);

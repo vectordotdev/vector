@@ -53,7 +53,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         allow_empty: _,
     } = builder;
 
-    let graph = match Graph::new(&sources, &transforms, &sinks, schema) {
+    let graph = match Graph::new(&sources, &transforms, &sinks, &enrichment_tables, schema) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);
@@ -83,6 +83,13 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         .map(|(key, transform)| {
             let inputs = graph.inputs_for(&key);
             (key, transform.with_inputs(inputs))
+        })
+        .collect();
+    let enrichment_tables = enrichment_tables
+        .into_iter()
+        .map(|(key, table)| {
+            let inputs = graph.inputs_for(&key);
+            (key, table.with_inputs(inputs))
         })
         .collect();
     let tests = tests

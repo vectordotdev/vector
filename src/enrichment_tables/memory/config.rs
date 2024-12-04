@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::sinks::Healthcheck;
 use crate::{config::SinkContext, enrichment_tables::memory::Memory};
 use async_trait::async_trait;
+use futures::{future, FutureExt};
 use tokio::sync::Mutex;
 use vector_lib::config::{AcknowledgementsConfig, Input};
 use vector_lib::enrichment::Table;
@@ -87,8 +88,8 @@ impl EnrichmentTableConfig for MemoryConfig {
         Ok(Box::new(self.get_or_build_memory().await))
     }
 
-    fn sink_config(&self) -> Option<&dyn SinkConfig> {
-        Some(self)
+    fn sink_config(&self) -> Option<Box<dyn SinkConfig>> {
+        Some(Box::new(self.clone()))
     }
 }
 
@@ -96,10 +97,9 @@ impl EnrichmentTableConfig for MemoryConfig {
 #[typetag::serde(name = "memory_enrichment_table")]
 impl SinkConfig for MemoryConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let healthcheck = Box::pin(async move { Ok(()) });
         let sink = VectorSink::from_event_streamsink(self.get_or_build_memory().await);
 
-        Ok((sink, healthcheck))
+        Ok((sink, future::ok(()).boxed()))
     }
 
     fn input(&self) -> Input {

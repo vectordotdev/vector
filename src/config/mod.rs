@@ -26,7 +26,7 @@ mod builder;
 mod cmd;
 mod compiler;
 mod diff;
-mod dot_graph;
+pub mod dot_graph;
 mod enrichment_table;
 pub mod format;
 mod graph;
@@ -104,7 +104,7 @@ pub struct Config {
     sources: IndexMap<ComponentKey, SourceOuter>,
     sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
     transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
-    pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
+    pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
     tests: Vec<TestDefinition>,
     secret: IndexMap<ComponentKey, SecretBackends>,
     pub graceful_shutdown_duration: Option<Duration>,

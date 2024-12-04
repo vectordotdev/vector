@@ -444,6 +444,7 @@ impl RunningTopology {
             .filter(|&(existing_sink, _)| existing_sink)
             .map(|(_, key)| key.clone());
 
+        // TODO: also remove this for enrichment tables that act as sinks
         // For any sink whose buffer configuration didn't change, we can reuse their buffer.
         let reuse_buffers = diff
             .sinks
@@ -611,6 +612,15 @@ impl RunningTopology {
         // Now that all sources and transforms are fully configured, we can wire up sinks.
         for key in diff.sinks.changed_and_added() {
             debug!(component = %key, "Connecting inputs for sink.");
+            self.setup_inputs(key, diff, new_pieces).await;
+        }
+        let added_changed_tables: Vec<&ComponentKey> = diff
+            .enrichment_tables
+            .changed_and_added()
+            .filter(|k| new_pieces.tasks.contains_key(k))
+            .collect();
+        for key in added_changed_tables {
+            debug!(component = %key, "Connecting inputs for enrichment table sink.");
             self.setup_inputs(key, diff, new_pieces).await;
         }
 
@@ -845,6 +855,30 @@ impl RunningTopology {
 
         for key in &diff.sinks.to_add {
             trace!(message = "Spawning new sink.", key = %key);
+            self.spawn_sink(key, &mut new_pieces);
+        }
+
+        let changed_tables: Vec<&ComponentKey> = diff
+            .enrichment_tables
+            .to_change
+            .iter()
+            .filter(|k| new_pieces.tasks.contains_key(k))
+            .collect();
+
+        let added_tables: Vec<&ComponentKey> = diff
+            .enrichment_tables
+            .to_add
+            .iter()
+            .filter(|k| new_pieces.tasks.contains_key(k))
+            .collect();
+
+        for key in changed_tables {
+            debug!(message = "Spawning changed enrichment table sink.", key = %key);
+            self.spawn_sink(key, &mut new_pieces);
+        }
+
+        for key in added_tables {
+            debug!(message = "Spawning enrichment table new sink.", key = %key);
             self.spawn_sink(key, &mut new_pieces);
         }
     }
