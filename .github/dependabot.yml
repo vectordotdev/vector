@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
       time: "04:00" # UTC
     labels:
       - "domain: deps"
@@ -84,7 +84,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     labels:
       - "domain: ci"
       - "no-changelog"
