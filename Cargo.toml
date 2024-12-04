@@ -136,7 +136,7 @@ members = [
 cfg-if = { version = "1.0.0", default-features = false }
 chrono = { version = "0.4.38", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.0", default-features = false, features = ["serde"] }
-clap = { version = "4.5.21", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.22", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.1", default-features = false }
@@ -230,7 +230,7 @@ aws-credential-types = { version = "1.2.1", default-features = false, features =
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream", "rt-tokio"], optional = true }
 aws-smithy-types = { version = "1.2.9", default-features = false, features = ["rt-tokio"], optional = true }
 aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional = true }
-aws-smithy-runtime = { version = "1.7.3", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
+aws-smithy-runtime = { version = "1.7.4", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
 aws-smithy-async = { version = "1.2.1", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
@@ -398,7 +398,7 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.16", default-features = false }
-aws-smithy-runtime = { version = "1.7.3", default-features = false, features = ["tls-rustls"] }
+aws-smithy-runtime = { version = "1.7.4", default-features = false, features = ["tls-rustls"] }
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
