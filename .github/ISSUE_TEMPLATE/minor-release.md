@@ -54,6 +54,7 @@ On the day of release:
     - The deployment is done by Amplify. You can see
       the [deployment logs here](https://dd-corpsite.datadoghq.com/logs?query=service%3Awebsites-vector%20branch%3Awebsite&agg_m=count&agg_m_source=base&agg_t=count&cols=host%2Cservice&fromUser=true&messageDisplay=inline&refresh_mode=sliding&storage=hot&stream_sort=time%2Casc&viz=stream).
 - [ ] Release Linux packages. See [`vector-release` usage](https://github.com/DataDog/vector-release#usage).
+  - [ ] Manually trigger the `trigger-package-release-pipeline-prod-stable` job.
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).
 - [ ] Once Helm chart is released, updated Vector manifests
     - Run `cargo vdev build manifests` and open a PR with changes
