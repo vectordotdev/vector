@@ -131,7 +131,7 @@ impl Memory {
 
         if needs_flush {
             self.last_flush = now;
-            handle.flush();
+            handle.refresh();
             if let Some(reader) = self.get_read_handle().read() {
                 let mut byte_size = 0;
                 for (k, v) in reader.iter() {
