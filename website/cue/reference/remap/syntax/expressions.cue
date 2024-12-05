@@ -8,15 +8,15 @@ remap: syntax: expressions: {
 
 	examples: [
 		"""
-		# newline delimited expressions
-		del(.user_info)
-		.timestamp = now()
-		.message = "hello world"
-		""",
+			# newline delimited expressions
+			del(.user_info)
+			.timestamp = now()
+			.message = "hello world"
+			""",
 		"""
-		# semicolon delimited expressions
-		del(.user_info); .timestamp = now()
-		.message = "hello world"
-		"""
+			# semicolon delimited expressions
+			del(.user_info); .timestamp = now()
+			.message = "hello world"
+			""",
 	]
 }
