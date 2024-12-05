@@ -310,7 +310,6 @@ fn render_tags(
                     }
                 }
             }
-            // println!("{:?}", static_tags);
             for (k, v) in static_tags {
                 if let Some(discarded_v) = dynamic_tags.insert(k.clone(), v.clone()) {
                     warn!(
@@ -320,7 +319,6 @@ fn render_tags(
                     );
                 };
             }
-            // println!("result is {:?}", result);
             result.as_option()
         }
     })
@@ -334,10 +332,6 @@ fn render_tag_into(
     static_tags: &mut HashMap<String, TagValue>,
     dynamic_tags: &mut HashMap<String, TagValue>,
 ) -> Result<(), TransformError> {
-    // println!(
-    //     "key_template: {:?}, value_template: {:?}",
-    //     key_template, value_template
-    // );
     let key_s = match render_template(key_template, event) {
         Ok(key_s) => key_s,
         Err(TransformError::TemplateRenderingError(err)) => {
@@ -385,7 +379,6 @@ fn tag_expansion(
     static_tags: &mut HashMap<String, TagValue>,
     dynamic_tags: &mut HashMap<String, TagValue>,
 ) {
-    // println!("key_s: {:?}, value_s: {:?}", key_s, value_s);
     if let Some(opening_prefix) = key_s.strip_suffix('*') {
         let output: Result<serde_json::map::Map<String, serde_json::Value>, serde_json::Error> =
             serde_json::from_str(value_s.clone().as_str());
