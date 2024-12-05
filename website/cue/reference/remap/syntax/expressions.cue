@@ -3,18 +3,20 @@ package metadata
 remap: syntax: expressions: {
 	title: "Expressions"
 	description: """
-		VRL programs are made up of literal and dynamic expressions, described more in detail below.  Expressions can be separated by newline, or by using a semicolon.
+		VRL programs are made up of literal and dynamic expressions, described more in detail below.  Expressions can be separated by newline or semicolon in any combination.
 		"""
 
 	examples: [
 		"""
-		# newline delimited expressions 
+		# newline delimited expressions
 		del(.user_info)
-		.timestamp = now()  
+		.timestamp = now()
+		.message = "hello world"
 		""",
 		"""
 		# semicolon delimited expressions
 		del(.user_info); .timestamp = now()
+		.message = "hello world"
 		"""
 	]
 }
