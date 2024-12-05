@@ -84,7 +84,7 @@ impl MqttSource {
                         Ok(MqttEvent::Incoming(
                             Incoming::PubAck(_) | Incoming::PubRec(_) | Incoming::PubComp(_),
                         )) => {
-                            // TODO Handle acknowledgement
+                            // TODO Handle acknowledgement - https://github.com/vectordotdev/vector/issues/21967
                         }
                         _ => {}
                     }
