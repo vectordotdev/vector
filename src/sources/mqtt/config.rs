@@ -28,7 +28,7 @@ pub enum ConfigurationError {
     InvalidClientId,
 
     #[snafu(display("Username and password must be either both or neither provided."))]
-    BadCredentials,
+    IncompleteCredentials,
 }
 
 /// Configuration for the `mqtt` source.
@@ -173,7 +173,7 @@ impl MqttSourceConfig {
             }
             _ => {
                 // We need either both username and password, or neither. MQTT also allows for providing only password, but rumqttc does not allow that so we cannot either.
-                return Err(ConfigurationError::BadCredentials).context(ConfigurationSnafu);
+                return Err(ConfigurationError::IncompleteCredentials).context(ConfigurationSnafu);
             }
         }
 

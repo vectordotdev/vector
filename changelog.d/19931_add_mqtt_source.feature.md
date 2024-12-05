@@ -1,3 +1,3 @@
-Vector can receive logs from a MQTT broker through the new mqtt source.
+Adds a new `mqtt` source enabling Vector to receive logs from a MQTT broker.
 
-authors: mladedav
+authors: mladedav pront
