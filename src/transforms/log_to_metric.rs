@@ -278,22 +278,24 @@ fn render_tags(
     tags: &Option<IndexMap<Template, TagConfig>>,
     event: &Event,
 ) -> Result<Option<MetricTags>, TransformError> {
-    let mut static_labels: HashMap<String, String> = HashMap::new();
-    let mut dynamic_labels: HashMap<String, String> = HashMap::new();
+    let mut static_tags: HashMap<String, TagValue> = HashMap::new();
+    let mut dynamic_tags: HashMap<String, TagValue> = HashMap::new();
     Ok(match tags {
         None => None,
         Some(tags) => {
             let mut result = MetricTags::default();
             for (name, config) in tags {
                 match config {
-                    TagConfig::Plain(template) => render_tag_into(
-                        event,
-                        name,
-                        template,
-                        &mut result,
-                        &mut static_labels,
-                        &mut dynamic_labels,
-                    )?,
+                    TagConfig::Plain(template) => {
+                        render_tag_into(
+                            event,
+                            name,
+                            template,
+                            &mut result,
+                            &mut static_tags,
+                            &mut dynamic_tags,
+                        )?;
+                    }
                     TagConfig::Multi(vec) => {
                         for template in vec {
                             render_tag_into(
@@ -301,25 +303,24 @@ fn render_tags(
                                 name,
                                 template,
                                 &mut result,
-                                &mut static_labels,
-                                &mut dynamic_labels,
+                                &mut static_tags,
+                                &mut dynamic_tags,
                             )?;
                         }
                     }
                 }
             }
-            for (k, v) in static_labels {
-                if let Some(discarded_v) = dynamic_labels.insert(k.clone(), v.clone()) {
+            // println!("{:?}", static_tags);
+            for (k, v) in static_tags {
+                if let Some(discarded_v) = dynamic_tags.insert(k.clone(), v.clone()) {
                     warn!(
-                        "Static label overrides dynamic label. \
-                key: {}, value: {}, discarded value: {}",
+                        "Static static overrides dynamic tag. \
+                key: {}, value: {:?}, discarded value: {:?}",
                         k, v, discarded_v
                     );
                 };
             }
-            for (name, value) in dynamic_labels {
-                result.insert(name.to_string(), TagValue::Value(value));
-            }
+            // println!("result is {:?}", result);
             result.as_option()
         }
     })
@@ -330,27 +331,34 @@ fn render_tag_into(
     key_template: &Template,
     value_template: &Option<Template>,
     result: &mut MetricTags,
-    static_labels: &mut HashMap<String, String>,
-    dynamic_labels: &mut HashMap<String, String>,
+    static_tags: &mut HashMap<String, TagValue>,
+    dynamic_tags: &mut HashMap<String, TagValue>,
 ) -> Result<(), TransformError> {
-    let key = render_template(key_template, event);
+    // println!(
+    //     "key_template: {:?}, value_template: {:?}",
+    //     key_template, value_template
+    // );
+    let key_s = match render_template(key_template, event) {
+        Ok(key_s) => key_s,
+        Err(TransformError::TemplateRenderingError(err)) => {
+            emit!(crate::internal_events::TemplateRenderingError {
+                error: err,
+                drop_event: false,
+                field: Some(key_template.get_ref()),
+            });
+            return Ok(());
+        }
+        Err(err) => return Err(err),
+    };
     match value_template {
         None => {
-            result.insert(key_template.to_string(), TagValue::Bare);
+            result.insert(key_s, TagValue::Bare);
         }
-        Some(template) => match (key, render_template(template, event)) {
-            (Ok(key_s), Ok(value_s)) => {
-                tag_expansion(key_s, value_s, static_labels, dynamic_labels);
+        Some(template) => match render_template(template, event) {
+            Ok(value_s) => {
+                tag_expansion(key_s.clone(), value_s, result, static_tags, dynamic_tags);
             }
-            (Err(TransformError::TemplateRenderingError(key_error)), _) => {
-                emit!(crate::internal_events::TemplateRenderingError {
-                    error: key_error,
-                    drop_event: false,
-                    field: Some(key_template.get_ref()),
-                });
-                return Ok(());
-            }
-            (_, Err(TransformError::TemplateRenderingError(value_error))) => {
+            Err(TransformError::TemplateRenderingError(value_error)) => {
                 emit!(crate::internal_events::TemplateRenderingError {
                     error: value_error,
                     drop_event: false,
@@ -358,8 +366,7 @@ fn render_tag_into(
                 });
                 return Ok(());
             }
-            (Err(key_error), _) => return Err(key_error),
-            (_, Err(value_error)) => return Err(value_error),
+            Err(err) => return Err(err),
         },
     };
     Ok(())
@@ -374,9 +381,11 @@ fn slugify_text(input: String) -> String {
 fn tag_expansion(
     key_s: String,
     value_s: String,
-    static_labels: &mut HashMap<String, String>,
-    dynamic_labels: &mut HashMap<String, String>,
+    result: &mut MetricTags,
+    static_tags: &mut HashMap<String, TagValue>,
+    dynamic_tags: &mut HashMap<String, TagValue>,
 ) {
+    // println!("key_s: {:?}, value_s: {:?}", key_s, value_s);
     if let Some(opening_prefix) = key_s.strip_suffix('*') {
         let output: Result<serde_json::map::Map<String, serde_json::Value>, serde_json::Error> =
             serde_json::from_str(value_s.clone().as_str());
@@ -399,16 +408,20 @@ fn tag_expansion(
                 warn!("Encountered \"null\" value for dynamic label. key: {}", key);
                 continue;
             }
-            if let Some(prev) = dynamic_labels.insert(key.clone(), val.clone()) {
+            let val = TagValue::Value(val);
+            if let Some(prev) = dynamic_tags.insert(key.clone(), val.clone()) {
                 warn!(
                     "Encountered duplicated dynamic label. \
-                                key: {}, value: {}, discarded value: {}",
+                                key: {}, value: {:?}, discarded value: {:?}",
                     key, val, prev
                 );
             };
+            result.insert(key, val);
         }
     } else {
-        static_labels.insert(key_s, value_s);
+        let val = TagValue::Value(value_s);
+        result.insert(key_s.clone(), val.clone());
+        static_tags.insert(key_s, val);
     }
 }
 
