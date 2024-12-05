@@ -3,7 +3,7 @@ package metadata
 remap: functions: crc32: {
 	category: "Checksum"
 	description: """
-		Calculates a CRC32 of the `value`.
+		Calculates a CRC32 of the string,`value`.
 		"""
 
 	arguments: [
