@@ -1,6 +1,6 @@
 ---
 title: MQTT
-description: Receive observability event data from an [MQTT](https://mqtt.org) broker
+description: Receive logs from an [MQTT](https://mqtt.org) broker
 kind: source
 layout: component
 tags: ["mqtt", "component", "source"]

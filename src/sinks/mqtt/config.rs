@@ -8,46 +8,26 @@ use vector_lib::codecs::JsonSerializerConfig;
 use crate::template::Template;
 use crate::{
     codecs::EncodingConfig,
+    common::mqtt::MqttCommonConfig,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     sinks::{
         mqtt::sink::{ConfigurationSnafu, MqttConnector, MqttError, MqttSink, TlsSnafu},
         prelude::*,
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::MaybeTlsSettings,
 };
 
 /// Configuration for the `mqtt` sink
 #[configurable_component(sink("mqtt"))]
 #[derive(Clone, Debug)]
 pub struct MqttSinkConfig {
-    /// MQTT server address (The broker’s domain name or IP address).
-    #[configurable(metadata(docs::examples = "mqtt.example.com", docs::examples = "127.0.0.1"))]
-    pub host: String,
-
-    /// TCP port of the MQTT server to connect to.
-    #[serde(default = "default_port")]
-    pub port: u16,
-
-    /// MQTT username.
-    pub user: Option<String>,
-
-    /// MQTT password.
-    pub password: Option<String>,
-
-    /// MQTT client ID.
-    pub client_id: Option<String>,
-
-    /// Connection keep-alive interval.
-    #[serde(default = "default_keep_alive")]
-    pub keep_alive: u16,
+    #[serde(flatten)]
+    pub common: MqttCommonConfig,
 
     /// If set to true, the MQTT session is cleaned on login.
     #[serde(default = "default_clean_session")]
     pub clean_session: bool,
-
-    #[configurable(derived)]
-    pub tls: Option<TlsEnableableConfig>,
 
     /// MQTT publish topic (templates allowed)
     pub topic: Template,
@@ -100,14 +80,6 @@ impl From<MqttQoS> for QoS {
     }
 }
 
-const fn default_port() -> u16 {
-    1883
-}
-
-const fn default_keep_alive() -> u16 {
-    60
-}
-
 const fn default_clean_session() -> bool {
     false
 }
@@ -123,14 +95,9 @@ const fn default_retain() -> bool {
 impl Default for MqttSinkConfig {
     fn default() -> Self {
         Self {
-            host: "localhost".into(),
-            port: default_port(),
-            user: None,
-            password: None,
-            client_id: None,
-            keep_alive: default_keep_alive(),
+            common: MqttCommonConfig::default(),
             clean_session: default_clean_session(),
-            tls: None,
+
             topic: Template::try_from("vector").expect("Cannot parse as a template"),
             retain: default_retain(),
             encoding: JsonSerializerConfig::default().into(),
@@ -174,7 +141,7 @@ pub enum ConfigurationError {
 
 impl MqttSinkConfig {
     fn build_connector(&self) -> Result<MqttConnector, MqttError> {
-        let client_id = self.client_id.clone().unwrap_or_else(|| {
+        let client_id = self.common.client_id.clone().unwrap_or_else(|| {
             let hash = rand::thread_rng()
                 .sample_iter(&rand_distr::Alphanumeric)
                 .take(6)
@@ -186,11 +153,11 @@ impl MqttSinkConfig {
         if client_id.is_empty() {
             return Err(ConfigurationError::EmptyClientId).context(ConfigurationSnafu);
         }
-        let tls = MaybeTlsSettings::from_config(&self.tls, false).context(TlsSnafu)?;
-        let mut options = MqttOptions::new(&client_id, &self.host, self.port);
-        options.set_keep_alive(Duration::from_secs(self.keep_alive.into()));
+        let tls = MaybeTlsSettings::from_config(&self.common.tls, false).context(TlsSnafu)?;
+        let mut options = MqttOptions::new(&client_id, &self.common.host, self.common.port);
+        options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
         options.set_clean_session(self.clean_session);
-        match (&self.user, &self.password) {
+        match (&self.common.user, &self.common.password) {
             (Some(user), Some(password)) => {
                 options.set_credentials(user, password);
             }

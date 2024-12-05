@@ -8,12 +8,13 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     lookup::owned_value_path,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::MaybeTlsSettings,
 };
 use vrl::value::Kind;
 
 use crate::{
     codecs::DecodingConfig,
+    common::mqtt::MqttCommonConfig,
     config::{SourceConfig, SourceContext, SourceOutput},
     serde::{default_decoding, default_framing_message_based},
 };
@@ -37,36 +38,8 @@ pub enum ConfigurationError {
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct MqttSourceConfig {
-    /// MQTT server address (The broker’s domain name or IP address).
-    #[configurable(metadata(docs::examples = "mqtt.example.com", docs::examples = "127.0.0.1"))]
-    pub host: String,
-
-    /// TCP port of the MQTT server to connect to.
-    #[configurable(derived)]
-    #[serde(default = "default_port")]
-    #[derivative(Default(value = "default_port()"))]
-    pub port: u16,
-
-    /// MQTT username.
-    #[configurable(derived)]
-    #[serde(default)]
-    pub user: Option<String>,
-
-    /// MQTT password.
-    #[configurable(derived)]
-    #[serde(default)]
-    pub password: Option<String>,
-
-    /// MQTT client ID. If there are multiple
-    #[configurable(derived)]
-    #[serde(default)]
-    pub client_id: Option<String>,
-
-    /// Connection keep-alive interval.
-    #[configurable(derived)]
-    #[serde(default = "default_keep_alive")]
-    #[derivative(Default(value = "default_keep_alive()"))]
-    pub keep_alive: u16,
+    #[serde(flatten)]
+    pub common: MqttCommonConfig,
 
     /// MQTT topic from which messages are to be read.
     #[configurable(derived)]
@@ -84,21 +57,10 @@ pub struct MqttSourceConfig {
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    #[configurable(derived)]
-    pub tls: Option<TlsEnableableConfig>,
-
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
-}
-
-const fn default_port() -> u16 {
-    1883
-}
-
-const fn default_keep_alive() -> u16 {
-    60
 }
 
 fn default_topic() -> String {
@@ -147,7 +109,7 @@ impl SourceConfig for MqttSourceConfig {
 
 impl MqttSourceConfig {
     fn build_connector(&self) -> Result<MqttConnector, MqttError> {
-        let client_id = self.client_id.clone().unwrap_or_else(|| {
+        let client_id = self.common.client_id.clone().unwrap_or_else(|| {
             let hash = rand::thread_rng()
                 .sample_iter(&rand_distr::Alphanumeric)
                 .take(6)
@@ -160,11 +122,11 @@ impl MqttSourceConfig {
             return Err(ConfigurationError::InvalidClientId).context(ConfigurationSnafu);
         }
 
-        let tls = MaybeTlsSettings::from_config(&self.tls, false).context(TlsSnafu)?;
-        let mut options = MqttOptions::new(client_id, &self.host, self.port);
-        options.set_keep_alive(Duration::from_secs(self.keep_alive.into()));
+        let tls = MaybeTlsSettings::from_config(&self.common.tls, false).context(TlsSnafu)?;
+        let mut options = MqttOptions::new(client_id, &self.common.host, self.common.port);
+        options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
         options.set_clean_session(false);
-        match (&self.user, &self.password) {
+        match (&self.common.user, &self.common.password) {
             (Some(user), Some(password)) => {
                 options.set_credentials(user, password);
             }
