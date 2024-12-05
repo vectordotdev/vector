@@ -1180,7 +1180,7 @@ mod tests {
             field = "message"
             name = "http_requests_total"
             namespace = "app"
-            tags = {"*" = "{{dict}}"}
+            tags = {"*" = "{{ dict }}"}
             "#,
         );
 
@@ -1224,7 +1224,58 @@ mod tests {
             .with_timestamp(Some(ts()))
         );
     }
+    #[tokio::test]
+    async fn count_http_requests_with_colliding_dynamic_tags() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "message"
+            name = "http_requests_total"
+            namespace = "app"
+            tags = {"l1_*" = "{{ map1 }}", "*" = "{{ map2 }}"}
+            "#,
+        );
 
+        let mut event = create_event("message", "i am log");
+        let log = event.as_mut_log();
+
+        let mut map1 = ObjectMap::default();
+        map1.insert("key1".into(), Value::from("val1"));
+        log.insert("map1", Value::from(map1));
+
+        let mut map2 = ObjectMap::default();
+        map2.insert("l1_key1".into(), Value::from("val2"));
+        log.insert("map2", Value::from(map2));
+
+        let mut metadata =
+            event
+                .metadata()
+                .clone()
+                .with_origin_metadata(DatadogMetricOriginMetadata::new(
+                    None,
+                    None,
+                    Some(ORIGIN_SERVICE_VALUE),
+                ));
+        // definitions aren't valid for metrics yet, it's just set to the default (anything).
+        metadata.set_schema_definition(&Arc::new(Definition::any()));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+
+        let metric = do_transform(config, event).await.unwrap().into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        assert_eq!(
+            tags.iter_single().collect::<Vec<_>>(),
+            vec![("l1_key1", "val2")]
+        );
+
+        assert_eq!(tags.iter_all().count(), 2);
+        for (name, value) in tags.iter_all() {
+            assert_eq!(name, "l1_key1");
+            assert!(value == Some("val1") || value == Some("val2"));
+        }
+    }
     #[tokio::test]
     async fn multi_value_tags_yaml() {
         // Have to use YAML to represent bare tags
