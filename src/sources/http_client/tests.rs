@@ -1,13 +1,16 @@
+use http::Uri;
 use std::collections::HashMap;
 use tokio::time::Duration;
-use vector_lib::codecs::CharacterDelimitedDecoderConfig;
+use vector_lib::config::LogNamespace;
 use warp::{http::HeaderMap, Filter};
 
+use crate::components::validation::prelude::*;
 use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
 use vector_lib::codecs::decoding::{
     CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig,
 };
+use vector_lib::codecs::CharacterDelimitedDecoderConfig;
 use vector_lib::event::Event;
 
 use super::HttpClientConfig;
@@ -36,6 +39,39 @@ fn http_client_generate_config() {
     test_generate_config::<HttpClientConfig>();
 }
 
+impl ValidatableComponent for HttpClientConfig {
+    fn validation_configuration() -> ValidationConfiguration {
+        let uri = Uri::from_static("http://127.0.0.1:9898");
+
+        let config = Self {
+            endpoint: uri.to_string(),
+            interval: Duration::from_secs(1),
+            timeout: Duration::from_secs(1),
+            decoding: DeserializerConfig::Json(Default::default()),
+            ..Default::default()
+        };
+        let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
+
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Pull,
+            HttpResourceConfig::from_parts(uri, Some(config.method.into())),
+            config.get_decoding_config(None),
+        );
+
+        ValidationConfiguration::from_source(
+            Self::NAME,
+            log_namespace,
+            vec![ComponentTestCaseConfig::from_source(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
+    }
+}
+
+register_validatable_component!(HttpClientConfig);
+
 /// Bytes should be decoded and HTTP header set to text/plain.
 #[tokio::test]
 async fn bytes_decoding() {
@@ -44,7 +80,7 @@ async fn bytes_decoding() {
     // validates the Accept header is set correctly for the Bytes codec
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::header::exact("Accept", "text/plain"))
-        .map(|| r#"A plain text event"#);
+        .map(|| r"A plain text event");
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 

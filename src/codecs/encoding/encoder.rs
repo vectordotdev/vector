@@ -23,7 +23,7 @@ where
 impl Default for Encoder<Framer> {
     fn default() -> Self {
         Self {
-            framer: NewlineDelimitedEncoder::new().into(),
+            framer: NewlineDelimitedEncoder::default().into(),
             serializer: TextSerializerConfig::default().build().into(),
         }
     }
@@ -116,6 +116,7 @@ impl Encoder<Framer> {
             (Serializer::Native(_), _) | (Serializer::Protobuf(_), _) => "application/octet-stream",
             (
                 Serializer::Avro(_)
+                | Serializer::Cef(_)
                 | Serializer::Csv(_)
                 | Serializer::Gelf(_)
                 | Serializer::Json(_)

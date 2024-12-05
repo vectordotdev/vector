@@ -71,7 +71,8 @@ pub struct HumioLogsConfig {
 
     /// Overrides the name of the log field used to retrieve the hostname to send to Humio.
     ///
-    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used if log
+    /// events are Legacy namespaced, or the semantic meaning of "host" is used, if defined.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "config_host_key_target_path")]
@@ -128,8 +129,10 @@ pub struct HumioLogsConfig {
     pub acknowledgements: AcknowledgementsConfig,
 
     /// Overrides the name of the log field used to retrieve the timestamp to send to Humio.
+    /// When set to `“”`, a timestamp is not set in the events sent to Humio.
     ///
-    /// By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
+    /// By default, either the [global `log_schema.timestamp_key` option][global_timestamp_key] is used
+    /// if log events are Legacy namespaced, or the semantic meaning of "timestamp" is used, if defined.
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[serde(default = "config_timestamp_key_target_path")]
@@ -188,7 +191,7 @@ impl HumioLogsConfig {
         HecLogsSinkConfig {
             default_token: self.token.clone(),
             endpoint: self.endpoint.clone(),
-            host_key: self.host_key.clone(),
+            host_key: Some(self.host_key.clone()),
             indexed_fields: self.indexed_fields.clone(),
             index: self.index.clone(),
             sourcetype: self.event_type.clone(),
@@ -203,7 +206,7 @@ impl HumioLogsConfig {
                 indexer_acknowledgements_enabled: false,
                 ..Default::default()
             },
-            timestamp_key: config_timestamp_key_target_path(),
+            timestamp_key: Some(config_timestamp_key_target_path()),
             endpoint_target: EndpointTarget::Event,
             auto_extract_timestamp: None,
         }

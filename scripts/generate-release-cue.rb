@@ -145,16 +145,13 @@ def generate_changelog!(new_version)
     contributors = Array.new
 
     if last.start_with?("authors: ")
-      authors_str = last[9..]
-      authors_str = authors_str.delete(" \t\r\n")
-      authors_arr = authors_str.split(",")
-      authors_arr.each { |author| contributors.push(author) }
+      contributors = last[9..].split(" ").map(&:strip)
 
       # remove that line from the description
       lines.pop()
     end
 
-    description = lines.join("")
+    description = lines.join("").strip()
 
     # get the PR number of the changelog fragment.
     # the fragment type is not used in the Vector release currently.
@@ -195,7 +192,7 @@ def generate_changelog!(new_version)
     entry = "{\n" +
       "type: #{type.to_json}\n" +
       "description: \"\"\"\n" +
-      "#{description}" +
+      "#{description}\n" +
       "\"\"\"\n"
 
     if contributors.length() > 0

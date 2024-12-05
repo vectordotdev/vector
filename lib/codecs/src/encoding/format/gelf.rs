@@ -36,8 +36,6 @@ pub enum GelfSerializerError {
         actual_type: String,
         expected_type: String,
     },
-    #[snafu(display(r#"LogEvent contains an invalid field name. field = "{}""#, field))]
-    InvalidFieldName { field: String },
 }
 
 /// Config used to build a `GelfSerializer`.

@@ -42,6 +42,7 @@ sinks:
     inputs: [ "parse_message" ]
     endpoint:        "http://localhost:8080"
     default_api_key: "DEADBEEF"
+    compression: "gzip"
     healthcheck:
       enabled: false
     buffer:

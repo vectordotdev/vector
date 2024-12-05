@@ -8,12 +8,13 @@ use std::fmt::Debug;
 
 use bytes::BytesMut;
 pub use format::{
-    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CsvSerializer,
-    CsvSerializerConfig, GelfSerializer, GelfSerializerConfig, JsonSerializer,
-    JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer,
-    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, ProtobufSerializer,
-    ProtobufSerializerConfig, ProtobufSerializerOptions, RawMessageSerializer,
-    RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
+    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
+    CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
+    JsonSerializer, JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer,
+    LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
+    NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
+    ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
+    TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -67,7 +68,7 @@ pub enum FramingConfig {
     /// Event data is prefixed with its length in bytes.
     ///
     /// The prefix is a 32-bit unsigned integer, little endian.
-    LengthDelimited,
+    LengthDelimited(LengthDelimitedEncoderConfig),
 
     /// Event data is delimited by a newline (LF) character.
     NewlineDelimited,
@@ -86,8 +87,8 @@ impl From<CharacterDelimitedEncoderConfig> for FramingConfig {
 }
 
 impl From<LengthDelimitedEncoderConfig> for FramingConfig {
-    fn from(_: LengthDelimitedEncoderConfig) -> Self {
-        Self::LengthDelimited
+    fn from(config: LengthDelimitedEncoderConfig) -> Self {
+        Self::LengthDelimited(config)
     }
 }
 
@@ -103,9 +104,7 @@ impl FramingConfig {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesEncoderConfig.build()),
             FramingConfig::CharacterDelimited(config) => Framer::CharacterDelimited(config.build()),
-            FramingConfig::LengthDelimited => {
-                Framer::LengthDelimited(LengthDelimitedEncoderConfig.build())
-            }
+            FramingConfig::LengthDelimited(config) => Framer::LengthDelimited(config.build()),
             FramingConfig::NewlineDelimited => {
                 Framer::NewlineDelimited(NewlineDelimitedEncoderConfig.build())
             }
@@ -185,6 +184,13 @@ pub enum SerializerConfig {
         /// Apache Avro-specific encoder options.
         avro: AvroSerializerOptions,
     },
+
+    /// Encodes an event as a CEF (Common Event Format) formatted message.
+    ///
+    Cef(
+        /// Options for the CEF encoder.
+        CefSerializerConfig,
+    ),
 
     /// Encodes an event as a CSV message.
     ///
@@ -267,6 +273,12 @@ impl From<AvroSerializerConfig> for SerializerConfig {
     }
 }
 
+impl From<CefSerializerConfig> for SerializerConfig {
+    fn from(config: CefSerializerConfig) -> Self {
+        Self::Cef(config)
+    }
+}
+
 impl From<CsvSerializerConfig> for SerializerConfig {
     fn from(config: CsvSerializerConfig) -> Self {
         Self::Csv(config)
@@ -328,6 +340,7 @@ impl SerializerConfig {
             SerializerConfig::Avro { avro } => Ok(Serializer::Avro(
                 AvroSerializerConfig::new(avro.schema.clone()).build()?,
             )),
+            SerializerConfig::Cef(config) => Ok(Serializer::Cef(config.build()?)),
             SerializerConfig::Csv(config) => Ok(Serializer::Csv(config.build()?)),
             SerializerConfig::Gelf => Ok(Serializer::Gelf(GelfSerializerConfig::new().build())),
             SerializerConfig::Json(config) => Ok(Serializer::Json(config.build())),
@@ -360,14 +373,19 @@ impl SerializerConfig {
             // [1]: https://avro.apache.org/docs/1.11.1/specification/_print/#message-framing
             SerializerConfig::Avro { .. }
             | SerializerConfig::Native
-            | SerializerConfig::Protobuf(_) => FramingConfig::LengthDelimited,
-            SerializerConfig::Csv(_)
-            | SerializerConfig::Gelf
+            | SerializerConfig::Protobuf(_) => {
+                FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
+            }
+            SerializerConfig::Cef(_)
+            | SerializerConfig::Csv(_)
             | SerializerConfig::Json(_)
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
             | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
+            SerializerConfig::Gelf => {
+                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
+            }
         }
     }
 
@@ -377,6 +395,7 @@ impl SerializerConfig {
             SerializerConfig::Avro { avro } => {
                 AvroSerializerConfig::new(avro.schema.clone()).input_type()
             }
+            SerializerConfig::Cef(config) => config.input_type(),
             SerializerConfig::Csv(config) => config.input_type(),
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::input_type(),
             SerializerConfig::Json(config) => config.input_type(),
@@ -395,6 +414,7 @@ impl SerializerConfig {
             SerializerConfig::Avro { avro } => {
                 AvroSerializerConfig::new(avro.schema.clone()).schema_requirement()
             }
+            SerializerConfig::Cef(config) => config.schema_requirement(),
             SerializerConfig::Csv(config) => config.schema_requirement(),
             SerializerConfig::Gelf { .. } => GelfSerializerConfig::schema_requirement(),
             SerializerConfig::Json(config) => config.schema_requirement(),
@@ -413,6 +433,8 @@ impl SerializerConfig {
 pub enum Serializer {
     /// Uses an `AvroSerializer` for serialization.
     Avro(AvroSerializer),
+    /// Uses a `CefSerializer` for serialization.
+    Cef(CefSerializer),
     /// Uses a `CsvSerializer` for serialization.
     Csv(CsvSerializer),
     /// Uses a `GelfSerializer` for serialization.
@@ -439,6 +461,7 @@ impl Serializer {
         match self {
             Serializer::Json(_) | Serializer::NativeJson(_) | Serializer::Gelf(_) => true,
             Serializer::Avro(_)
+            | Serializer::Cef(_)
             | Serializer::Csv(_)
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
@@ -460,6 +483,7 @@ impl Serializer {
             Serializer::Json(serializer) => serializer.to_json_value(event),
             Serializer::NativeJson(serializer) => serializer.to_json_value(event),
             Serializer::Avro(_)
+            | Serializer::Cef(_)
             | Serializer::Csv(_)
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
@@ -475,6 +499,12 @@ impl Serializer {
 impl From<AvroSerializer> for Serializer {
     fn from(serializer: AvroSerializer) -> Self {
         Self::Avro(serializer)
+    }
+}
+
+impl From<CefSerializer> for Serializer {
+    fn from(serializer: CefSerializer) -> Self {
+        Self::Cef(serializer)
     }
 }
 
@@ -538,6 +568,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
             Serializer::Avro(serializer) => serializer.encode(event, buffer),
+            Serializer::Cef(serializer) => serializer.encode(event, buffer),
             Serializer::Csv(serializer) => serializer.encode(event, buffer),
             Serializer::Gelf(serializer) => serializer.encode(event, buffer),
             Serializer::Json(serializer) => serializer.encode(event, buffer),

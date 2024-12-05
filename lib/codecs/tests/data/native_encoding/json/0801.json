@@ -1,1 +1,1 @@
-{"log":{"&":null,"⅜":")衢"}}
+{"metric":{"name":"z","namespace":"g","timestamp":"1969-12-31T17:16:18.000009297Z","interval_ms":3446835846,"kind":"absolute","distribution":{"samples":[{"value":45939.9215,"rate":1686728179},{"value":335040.0,"rate":478338670},{"value":-651072.0,"rate":0},{"value":127424.0,"rate":3796429400},{"value":310656.0,"rate":1420299560},{"value":404800.0,"rate":3596482203},{"value":41152.0,"rate":4141550938},{"value":3915.7366,"rate":703886153},{"value":467648.0,"rate":2059272915}],"statistic":"summary"}}}

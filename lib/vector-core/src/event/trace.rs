@@ -112,6 +112,10 @@ impl TraceEvent {
         }
         None
     }
+
+    pub fn remove<'a>(&mut self, key: impl TargetPath<'a>) -> Option<Value> {
+        self.0.remove(key)
+    }
 }
 
 impl From<LogEvent> for TraceEvent {

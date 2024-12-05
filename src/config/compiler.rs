@@ -1,9 +1,10 @@
 use super::{
-    builder::ConfigBuilder, graph::Graph, id::Inputs, transform::get_transform_output_ids,
-    validation, Config, OutputId,
+    builder::ConfigBuilder, graph::Graph, transform::get_transform_output_ids, validation, Config,
+    OutputId,
 };
 
 use indexmap::IndexSet;
+use vector_lib::id::Inputs;
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -35,19 +36,11 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(output_errors);
     }
 
-    #[cfg(feature = "enterprise")]
-    let hash = Some(builder.sha256_hash());
-
-    #[cfg(not(feature = "enterprise"))]
-    let hash = None;
-
     let ConfigBuilder {
         global,
         #[cfg(feature = "api")]
         api,
         schema,
-        #[cfg(feature = "enterprise")]
-        enterprise,
         healthchecks,
         enrichment_tables,
         sources,
@@ -103,9 +96,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             #[cfg(feature = "api")]
             api,
             schema,
-            #[cfg(feature = "enterprise")]
-            enterprise,
-            hash,
             healthchecks,
             enrichment_tables,
             sources,

@@ -3,7 +3,7 @@ package metadata
 remap: functions: decode_punycode: {
 	category:    "Codec"
 	description: """
-		Decodes a [punycode](\(urls.punycode)) encoded `value`, like an internationalized domain name ([IDN](\(urls.idn))).
+		Decodes a [punycode](\(urls.punycode)) encoded `value`, such as an internationalized domain name ([IDN](\(urls.idn))). This function assumes that the value passed is meant to be used in IDN context and that it is either a domain name or a part of it.
 		"""
 
 	arguments: [
@@ -12,6 +12,13 @@ remap: functions: decode_punycode: {
 			description: "The string to decode."
 			required:    true
 			type: ["string"]
+		},
+		{
+			name:        "validate"
+			description: "If enabled, checks if the input string is a valid domain name."
+			required:    false
+			type: ["boolean"]
+			default: true
 		},
 	]
 	internal_failure_reasons: [
@@ -33,6 +40,13 @@ remap: functions: decode_punycode: {
 				decode_punycode!("www.cafe.com")
 				"""
 			return: "www.cafe.com"
+		},
+		{
+			title: "Ignore validation"
+			source: """
+				decode_punycode!("xn--8hbb.xn--fiba.xn--8hbf.xn--eib.", validate: false)
+				"""
+			return: "١٠.٦٦.٣٠.٥."
 		},
 	]
 }

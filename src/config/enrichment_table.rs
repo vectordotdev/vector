@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use vector_lib::config::GlobalOptions;
 use vector_lib::configurable::{configurable_component, NamedComponent};
@@ -22,7 +21,6 @@ impl EnrichmentTableOuter {
 }
 
 /// Generalized interface for describing and building enrichment table components.
-#[async_trait]
 #[enum_dispatch]
 pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync {
     /// Builds the enrichment table with the given globals.

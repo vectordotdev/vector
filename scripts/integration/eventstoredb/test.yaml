@@ -4,7 +4,7 @@ features:
 test_filter: '::eventstoredb_metrics::'
 
 matrix:
-  version: [latest]
+  version: ["24.2", "24.6", "latest"]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch

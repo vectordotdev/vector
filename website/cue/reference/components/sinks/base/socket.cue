@@ -15,8 +15,8 @@ base: components: sinks: socket: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -53,6 +53,91 @@ base: components: sinks: socket: configuration: {
 					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 				}
 			}
+			cef: {
+				description:   "The CEF Serializer Options."
+				relevant_when: "codec = \"cef\""
+				required:      true
+				type: object: options: {
+					device_event_class_id: {
+						description: """
+																Unique identifier for each event type. Identifies the type of event reported.
+																The value length must be less than or equal to 1023.
+																"""
+						required: true
+						type: string: {}
+					}
+					device_product: {
+						description: """
+																Identifies the product of a vendor.
+																The part of a unique device identifier. No two products can use the same combination of device vendor and device product.
+																The value length must be less than or equal to 63.
+																"""
+						required: true
+						type: string: {}
+					}
+					device_vendor: {
+						description: """
+																Identifies the vendor of the product.
+																The part of a unique device identifier. No two products can use the same combination of device vendor and device product.
+																The value length must be less than or equal to 63.
+																"""
+						required: true
+						type: string: {}
+					}
+					device_version: {
+						description: """
+																Identifies the version of the problem. In combination with device product and vendor, it composes the unique id of the device that sends messages.
+																The value length must be less than or equal to 31.
+																"""
+						required: true
+						type: string: {}
+					}
+					extensions: {
+						description: """
+																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
+																The event can have any number of key-value pairs in any order.
+																"""
+						required: false
+						type: object: options: "*": {
+							description: "This is a path that points to the extension value of a log event."
+							required:    true
+							type: string: {}
+						}
+					}
+					name: {
+						description: """
+																This is a path that points to the human-readable description of a log event.
+																The value length must be less than or equal to 512.
+																Equals "cef.name" by default.
+																"""
+						required: true
+						type: string: {}
+					}
+					severity: {
+						description: """
+																This is a path that points to the field of a log event that reflects importance of the event.
+																Reflects importance of the event.
+
+																It must point to a number from 0 to 10.
+																0 = Lowest, 10 = Highest.
+																Equals to "cef.severity" by default.
+																"""
+						required: true
+						type: string: {}
+					}
+					version: {
+						description: """
+																CEF Version. Can be either 0 or 1.
+																Equals to "0" by default.
+																"""
+						required: true
+						type: string: enum: {
+							V0: "CEF specification version 0.1."
+							V1: "CEF specification version 1.x."
+						}
+					}
+				}
+			}
 			codec: {
 				description: "The codec to use for encoding events."
 				required:    true
@@ -62,6 +147,7 @@ base: components: sinks: socket: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					cef: "Encodes an event as a CEF (Common Event Format) formatted message."
 					csv: """
 						Encodes an event as a CSV message.
 
@@ -153,7 +239,7 @@ base: components: sinks: socket: configuration: {
 					delimiter: {
 						description: "The field delimiter to use when writing CSV."
 						required:    false
-						type: uint: default: 44
+						type: ascii_char: default: ","
 					}
 					double_quote: {
 						description: """
@@ -175,7 +261,7 @@ base: components: sinks: socket: configuration: {
 																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
 																"""
 						required: false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					fields: {
 						description: """
@@ -193,7 +279,7 @@ base: components: sinks: socket: configuration: {
 					quote: {
 						description: "The quote character to use when writing CSV."
 						required:    false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					quote_style: {
 						description: "The quoting style to use when writing CSV data."
@@ -223,6 +309,16 @@ base: components: sinks: socket: configuration: {
 				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			json: {
+				description:   "Options for the JsonSerializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: pretty: {
+					description: "Whether to use pretty JSON formatting."
+					required:    false
+					type: bool: default: false
+				}
 			}
 			metric_tag_values: {
 				description: """
@@ -297,7 +393,34 @@ base: components: sinks: socket: configuration: {
 				type: object: options: delimiter: {
 					description: "The ASCII (7-bit) character that delimits byte sequences."
 					required:    true
-					type: uint: {}
+					type: ascii_char: {}
+				}
+			}
+			length_delimited: {
+				description:   "Options for the length delimited decoder."
+				relevant_when: "method = \"length_delimited\""
+				required:      true
+				type: object: options: {
+					length_field_is_big_endian: {
+						description: "Length field byte order (little or big endian)"
+						required:    false
+						type: bool: default: true
+					}
+					length_field_length: {
+						description: "Number of bytes representing the field length"
+						required:    false
+						type: uint: default: 4
+					}
+					length_field_offset: {
+						description: "Number of bytes in the header before the length field"
+						required:    false
+						type: uint: default: 0
+					}
+					max_frame_length: {
+						description: "Maximum frame length"
+						required:    false
+						type: uint: default: 8388608
+					}
 				}
 			}
 			method: {
@@ -424,16 +547,25 @@ base: components: sinks: socket: configuration: {
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

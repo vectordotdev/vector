@@ -1,7 +1,7 @@
 ---
 title: AWS SQS
 description: Publish observability events to [Simple Queue Service](https://aws.amazon.com/sqs/) topics
-kind: sink
+component_kind: sink
 layout: component
 tags: ["aws", "sqs", "component", "sink"]
 ---

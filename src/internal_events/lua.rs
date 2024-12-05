@@ -11,7 +11,7 @@ pub struct LuaGcTriggered {
 
 impl InternalEvent for LuaGcTriggered {
     fn emit(self) {
-        gauge!("lua_memory_used_bytes", self.used_memory as f64);
+        gauge!("lua_memory_used_bytes").set(self.used_memory as f64);
     }
 }
 
@@ -31,11 +31,12 @@ impl InternalEvent for LuaScriptError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => mlua_error_code(&self.error),
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
             reason: "Error in lua script.",
@@ -60,17 +61,18 @@ impl InternalEvent for LuaBuildError {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => lua_build_error_code(&self.error),
             "error_type" => error_type::SCRIPT_FAILED,
             "stage" => error_stage:: PROCESSING,
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason })
     }
 }
 
-const fn mlua_error_code(err: &mlua::Error) -> &'static str {
+fn mlua_error_code(err: &mlua::Error) -> &'static str {
     use mlua::Error::*;
 
     match err {
@@ -78,14 +80,15 @@ const fn mlua_error_code(err: &mlua::Error) -> &'static str {
         RuntimeError(_) => "runtime_error",
         MemoryError(_) => "memory_error",
         SafetyError(_) => "memory_safety_error",
-        MemoryLimitNotAvailable => "memory_limit_not_available",
+        MemoryControlNotAvailable => "memory_control_not_available",
         RecursiveMutCallback => "mutable_callback_called_recursively",
         CallbackDestructed => "callback_destructed",
         StackError => "out_of_stack",
         BindError => "too_many_arguments_to_function_bind",
+        BadArgument { .. } => "bad_argument",
         ToLuaConversionError { .. } => "error_converting_value_to_lua",
         FromLuaConversionError { .. } => "error_converting_value_from_lua",
-        CoroutineInactive => "coroutine_inactive",
+        CoroutineUnresumable => "coroutine_unresumable",
         UserDataTypeMismatch => "userdata_type_mismatch",
         UserDataDestructed => "userdata_destructed",
         UserDataBorrowError => "userdata_borrow_error",
@@ -96,6 +99,7 @@ const fn mlua_error_code(err: &mlua::Error) -> &'static str {
         CallbackError { .. } => "callback_error",
         PreviouslyResumedPanic => "previously_resumed_panic",
         ExternalError(_) => "external_error",
+        WithContext { cause, .. } => mlua_error_code(cause),
         _ => "unknown",
     }
 }

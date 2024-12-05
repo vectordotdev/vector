@@ -10,7 +10,7 @@ aliases: [
 
 Vector implements cryptography and secure communication using the [OpenSSL][openssl] library.
 In particular, the official Vector binaries are statically linked against OpenSSL version
-{{< param openssl_version >}} and do not use any OpenSSL library installed on the running system.
+{{< openssl-version >}} and do not use any OpenSSL library installed on the running system.
 
 **Note**: OpenSSL recognizes a number of [environment variables][openssl-env] independently of Vector.
 
@@ -146,12 +146,12 @@ configuration file for it, Vector can also use them directly with the above envi
 [cli]: /docs/reference/cli
 [fips-140-2]: https://en.wikipedia.org/wiki/FIPS_140-2
 [openssl]: https://www.openssl.org/
-[openssl-config]: https://www.openssl.org/docs/man{{< param openssl_version >}}/man5/config.html
-[openssl-env]: https://www.openssl.org/docs/man{{< param openssl_version >}}/man7/openssl-env.html
+[openssl-config]: https://www.openssl.org/docs/man{{< openssl-version majMin=true >}}/man5/config.html
+[openssl-env]: https://www.openssl.org/docs/man{{< openssl-version majMin=true >}}/man7/openssl-env.html
 [openssl-fips]: https://github.com/openssl/openssl/blob/master/README-FIPS.md
-[openssl-fips-module]: https://www.openssl.org/docs/man{{< param openssl_version >}}/man7/fips_module.html
+[openssl-fips-module]: https://www.openssl.org/docs/man{{< openssl-version majMin=true >}}/man7/fips_module.html
 [openssl-probe]: https://github.com/alexcrichton/openssl-probe
-[openssl-providers]: https://www.openssl.org/docs/man{{< param openssl_version >}}/man7/provider.html
-[openssl-providers-default]: https://www.openssl.org/docs/man{{< param openssl_version >}}/man7/OSSL_PROVIDER-default.html
-[openssl-providers-fips]: https://www.openssl.org/docs/man{{< param openssl_version >}}/man7/OSSL_PROVIDER-FIPS.html
-[openssl-providers-legacy]: https://www.openssl.org/docs/man{{< param openssl_version >}}/man7/OSSL_PROVIDER-legacy.html
+[openssl-providers]: https://www.openssl.org/docs/man{{< openssl-version majMin=true >}}/man7/provider.html
+[openssl-providers-default]: https://www.openssl.org/docs/man{{< openssl-version majMin=true >}}/man7/OSSL_PROVIDER-default.html
+[openssl-providers-fips]: https://www.openssl.org/docs/man{{< openssl-version majMin=true >}}/man7/OSSL_PROVIDER-FIPS.html
+[openssl-providers-legacy]: https://www.openssl.org/docs/man{{< openssl-version majMin=true >}}/man7/OSSL_PROVIDER-legacy.html

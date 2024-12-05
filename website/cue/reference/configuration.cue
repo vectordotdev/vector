@@ -42,7 +42,8 @@ configuration: {
 			description: """
 				If set, Vector will configure the internal metrics system to automatically
 				remove all metrics that have not been updated in the given time.
-				This value must be positive.
+
+				If set to a negative value expiration is disabled.
 				"""
 			required: false
 			warnings: ["Deprecated, please use `expire_metrics_secs` instead."]
@@ -73,18 +74,18 @@ configuration: {
 		expire_metrics_secs: {
 			common: false
 			description: """
-				If set, Vector will configure the internal metrics system to automatically
-				remove all metrics that have not been updated in the given number of seconds.
-				This value must be positive.
+				Vector will expire internal metrics that haven't been emitted/updated in the
+				configured interval (default 300 seconds).
 
-				Note that internal counters that are expired but are later updated will have
-				their values reset to zero.
-				Be careful to set this value high enough to avoid
-				expiring critical but infrequently updated internal counters.
+				Note that internal counters that are expired but are later updated will have their
+				values reset to zero. Be careful to set this value high enough to avoid expiring
+				critical but infrequently updated internal counters.
+
+				If set to a negative value expiration is disabled.
 				"""
 			required: false
 			type: float: {
-				default: null
+				default: 300.0
 				examples: [60.0]
 				unit: "seconds"
 			}
@@ -116,7 +117,8 @@ configuration: {
 					type: string: {
 						enum: {
 							"file":  "Enrich data from a CSV file."
-							"geoip": "Enrich data from a [MaxMind](\(urls.maxmind)) database."
+							"geoip": "Enrich data from a [GeoIp](\(urls.maxmind_geoip2)) [MaxMind](\(urls.maxmind)) database."
+							"mmdb":  "Enrich data from any [MaxMind](\(urls.maxmind)) database."
 						}
 					}
 				}
@@ -220,6 +222,8 @@ configuration: {
 						* [GeoIP2-ISP.mmdb](\(urls.maxmind_geoip2_isp)) (paid) — Determine the Internet
 							Service Provider (ISP), organization name, and autonomous system organization
 							and number associated with an IP address.
+						* [GeoIP2-Anonymous-IP.mmdb](\(urls.maxmind_geoip2_anonymous_ip)) (paid) — Determine
+							proxy, VPN, hosting, and other anonymous IP addresses.
 
 						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
 
@@ -250,6 +254,29 @@ configuration: {
 					}
 				}
 			}
+			type: object: options: {
+				mmdb: {
+					required:    true
+					description: """
+						Configuration options for generic [MaxMind](\(urls.maxmind)) databases.
+
+						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
+
+						This enrichment table only supports lookup with IP address.
+						"""
+					type: object: options: {
+						path: {
+							description: """
+								Path to the database file.
+								"""
+							required: true
+							type: string: {
+								examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
+							}
+						}
+					}
+				}
+			}
 		}
 		schema: {
 			common: false
@@ -260,12 +287,16 @@ configuration: {
 			type: object: {
 				examples: []
 				options: {
-					log_namespacing: {
+					log_namespace: {
 						common:      false
 						description: """
 							Globally enables / disables log namespacing. See [Log Namespacing](\(urls.log_namespacing_blog))
 							for more details. If you want to enable individual sources, there is a config
 							option in the source configuration.
+
+							Known issues:
+
+							- Enabling log namespacing doesn't work when disk buffers are used (see [#18574](https://github.com/vectordotdev/vector/issues/18574))
 							"""
 						required:    false
 						warnings: []
@@ -449,12 +480,73 @@ configuration: {
 			common: false
 			description: """
 				Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
-				in Vector config. Currently, only the exec backend is supported. Multiple backends can be configured. To signify
-				Vector that it should look for a secret to retrieve use the `SECRET[<backend_name>.<secret_key>]`. This placeholder
-				will then be replaced by the secret retrieved from the relevant backend.
+				in Vector config. Multiple backends can be configured. Use `SECRET[<backend_name>.<secret_key>]` to tell Vector to retrieve the secret. This placeholder is replaced by the secret
+				retrieved from the relevant backend.
 				"""
 			required: false
 			type: object: options: {
+				file: {
+					required: true
+					description: """
+						Retrieve secrets from a file path.
+
+						The secret must be a JSON text string with key/value pairs. For example:
+						```json
+						{
+							"username": "test",
+							"password": "example-password"
+						}
+						```
+
+						If an error occurs while reading the file, Vector will log the error and exit.
+
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						path: {
+							description: "The file path to read."
+							required:    true
+							type: string: {
+								examples: ["/path/to/secret.json"]
+							}
+						}
+					}
+				}
+				directory: {
+					required: true
+					description: """
+						Retrieve secrets from file contents in a directory.
+
+						The directory must contain files with names corresponding to secret keys.
+
+						If an error occurs while reading the file, Vector will log the error and exit.
+
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						path: {
+							description: """
+								The path of the directory with secrets.
+								"""
+							required: true
+							type: string: {
+								examples: [
+									"${CREDENTIALS_DIRECTORY}", // https://systemd.io/CREDENTIALS
+									"/path/to/secrets-directory",
+								]
+							}
+						}
+						remove_trailing_whitespace: {
+							description: """
+								Remove trailing whitespace from file contents.
+								"""
+							required: false
+							type: bool: default: false
+						}
+					}
+				}
 				exec: {
 					required: true
 					description: """
@@ -479,7 +571,7 @@ configuration: {
 						If an `error` is returned for any secrets, or if the command exits with a non-zero status code,
 						Vector will log the errors and exit.
 
-						Secrets will be loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
 						configuration reload process.
 						"""
 					type: object: options: {
@@ -500,6 +592,36 @@ configuration: {
 							type: uint: {
 								default: 5
 								unit:    "seconds"
+							}
+						}
+					}
+				}
+				aws_secrets_manager: {
+					required: true
+					description: """
+						Retrieve secrets from AWS Secrets Manager.
+
+						The secret must be a JSON text string with key/value pairs. For example:
+						```json
+						{
+							"username": "test",
+							"password": "example-password"
+						}
+						```
+
+						If an error occurred retrieving the secrets, Vector logs the error and exits.
+
+						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
+					type: object: options: {
+						secret_id: {
+							description: """
+								The ID of the secret to be retrieved.
+								"""
+							required: true
+							type: string: {
+								examples: ["/secret/foo-bar"]
 							}
 						}
 					}

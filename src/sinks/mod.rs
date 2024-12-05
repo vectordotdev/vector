@@ -20,7 +20,7 @@ pub mod aws_cloudwatch_metrics;
 pub mod aws_kinesis;
 #[cfg(feature = "sinks-aws_s3")]
 pub mod aws_s3;
-#[cfg(any(feature = "sinks-aws_sqs", feature = "sinks-sinks-aws_sns"))]
+#[cfg(feature = "sinks-aws_sqs")]
 pub mod aws_s_s;
 #[cfg(feature = "sinks-axiom")]
 pub mod axiom;
@@ -51,9 +51,14 @@ pub mod elasticsearch;
 pub mod file;
 #[cfg(feature = "sinks-gcp")]
 pub mod gcp;
-#[cfg(feature = "sinks-gcp")]
+#[cfg(feature = "sinks-gcp-chronicle")]
+pub mod gcp_chronicle;
+#[cfg(any(feature = "sinks-gcp-chronicle", feature = "sinks-gcp"))]
 pub mod gcs_common;
-#[cfg(feature = "sinks-greptimedb")]
+#[cfg(any(
+    feature = "sinks-greptimedb_metrics",
+    feature = "sinks-greptimedb_logs"
+))]
 pub mod greptimedb;
 #[cfg(feature = "sinks-honeycomb")]
 pub mod honeycomb;
@@ -77,6 +82,8 @@ pub mod nats;
 pub mod new_relic;
 #[cfg(feature = "sinks-webhdfs")]
 pub mod opendal_common;
+#[cfg(feature = "sinks-opentelemetry")]
+pub mod opentelemetry;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]

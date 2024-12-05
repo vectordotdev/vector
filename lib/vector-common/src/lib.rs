@@ -22,6 +22,8 @@ pub mod json_size;
 
 pub mod config;
 
+pub mod constants;
+
 #[cfg(feature = "conversion")]
 pub use vrl::compiler::TimeZone;
 
@@ -43,6 +45,8 @@ pub mod event_test_util;
 pub mod finalization;
 pub mod finalizer;
 pub use finalizer::EmptyStream;
+
+pub mod id;
 
 pub mod internal_event;
 

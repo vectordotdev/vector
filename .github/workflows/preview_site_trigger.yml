@@ -2,13 +2,13 @@ name: Call Build Preview
 
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
 
 jobs:
   approval_check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ ! contains(github.head_ref, 'dependabot*') && ! contains(github.head_ref, 'gh-readonly-queue*') }}
+    if: ${{ contains(github.head_ref, 'website') }}
     steps:
       - name: Echo approval
         run: |
@@ -23,7 +23,7 @@ jobs:
 
       # Upload the artifact
       - name: Upload PR information artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pr
           path: pr/

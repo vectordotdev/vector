@@ -320,7 +320,6 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
     }
 }
 
-#[async_trait::async_trait]
 impl HttpSink for InfluxDbLogsSink {
     type Input = BytesMut;
     type Output = BytesMut;

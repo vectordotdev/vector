@@ -206,6 +206,11 @@ base: components: sources: aws_s3: configuration: {
 															[gelf]: https://docs.graylog.org/docs/gelf
 															[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 															"""
+						influxdb: """
+															Decodes the raw bytes as an [Influxdb Line Protocol][influxdb] message.
+
+															[influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
+															"""
 						json: """
 															Decodes the raw bytes as [JSON][json].
 
@@ -252,6 +257,22 @@ base: components: sources: aws_s3: configuration: {
 			gelf: {
 				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+						"""
+					required: false
+					type: bool: default: true
+				}
+			}
+			influxdb: {
+				description:   "Influxdb-specific decoding options."
+				relevant_when: "codec = \"influxdb\""
 				required:      false
 				type: object: options: lossy: {
 					description: """
@@ -386,7 +407,7 @@ base: components: sources: aws_s3: configuration: {
 					delimiter: {
 						description: "The character that delimits byte sequences."
 						required:    true
-						type: uint: {}
+						type: ascii_char: {}
 					}
 					max_length: {
 						description: """
@@ -407,6 +428,86 @@ base: components: sources: aws_s3: configuration: {
 					}
 				}
 			}
+			chunked_gelf: {
+				description:   "Options for the chunked GELF decoder."
+				relevant_when: "method = \"chunked_gelf\""
+				required:      false
+				type: object: options: {
+					decompression: {
+						description: "Decompression configuration for GELF messages."
+						required:    false
+						type: string: {
+							default: "Auto"
+							enum: {
+								Auto: "Automatically detect the decompression method based on the magic bytes of the message."
+								Gzip: "Use Gzip decompression."
+								None: "Do not decompress the message."
+								Zlib: "Use Zlib decompression."
+							}
+						}
+					}
+					max_length: {
+						description: """
+																The maximum length of a single GELF message, in bytes. Messages longer than this length will
+																be dropped. If this option is not set, the decoder does not limit the length of messages and
+																the per-message memory is unbounded.
+
+																Note that a message can be composed of multiple chunks and this limit is applied to the whole
+																message, not to individual chunks.
+
+																This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.
+																The message's payload is the concatenation of all the chunks' payloads.
+																"""
+						required: false
+						type: uint: {}
+					}
+					pending_messages_limit: {
+						description: """
+																The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
+																dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
+																If this option is not set, the decoder does not limit the number of pending messages and the memory usage
+																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
+																"""
+						required: false
+						type: uint: {}
+					}
+					timeout_secs: {
+						description: """
+																The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
+																decoder drops all the received chunks of the timed out message.
+																"""
+						required: false
+						type: float: default: 5.0
+					}
+				}
+			}
+			length_delimited: {
+				description:   "Options for the length delimited decoder."
+				relevant_when: "method = \"length_delimited\""
+				required:      true
+				type: object: options: {
+					length_field_is_big_endian: {
+						description: "Length field byte order (little or big endian)"
+						required:    false
+						type: bool: default: true
+					}
+					length_field_length: {
+						description: "Number of bytes representing the field length"
+						required:    false
+						type: uint: default: 4
+					}
+					length_field_offset: {
+						description: "Number of bytes in the header before the length field"
+						required:    false
+						type: uint: default: 0
+					}
+					max_frame_length: {
+						description: "Maximum frame length"
+						required:    false
+						type: uint: default: 8388608
+					}
+				}
+			}
 			method: {
 				description: "The framing method."
 				required:    false
@@ -415,8 +516,13 @@ base: components: sources: aws_s3: configuration: {
 					enum: {
 						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
 						character_delimited: "Byte frames which are delimited by a chosen character."
-						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
-						newline_delimited:   "Byte frames which are delimited by a newline character."
+						chunked_gelf: """
+															Byte frames which are chunked GELF messages.
+
+															[chunked_gelf]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html
+															"""
+						length_delimited:  "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+						newline_delimited: "Byte frames which are delimited by a newline character."
 						octet_counting: """
 															Byte frames according to the [octet counting][octet_counting] format.
 
@@ -560,6 +666,18 @@ base: components: sources: aws_s3: configuration: {
 					unit: "tasks"
 				}
 			}
+			connect_timeout_seconds: {
+				description: """
+					The connection timeout for AWS requests
+
+					Limits the amount of time allowed to initiate a socket connection.
+					"""
+				required: false
+				type: uint: {
+					examples: [20]
+					unit: "seconds"
+				}
+			}
 			delete_failed_message: {
 				description: """
 					Whether to delete non-retryable messages.
@@ -578,6 +696,36 @@ base: components: sources: aws_s3: configuration: {
 				required: false
 				type: bool: default: true
 			}
+			max_number_of_messages: {
+				description: """
+					Maximum number of messages to poll from SQS in a batch
+
+					Defaults to 10
+
+					Should be set to a smaller value when the files are large to help prevent the ingestion of
+					one file from causing the other files to exceed the visibility_timeout. Valid values are 1 - 10
+					"""
+				required: false
+				type: uint: {
+					default: 10
+					examples: [1]
+				}
+			}
+			operation_timeout_seconds: {
+				description: """
+					The operation timeout for AWS requests
+
+					Limits the amount of time allowed for an operation to be fully serviced; an
+					operation represents the full request/response lifecycle of a call to a service.
+					Take care when configuring this settings to allow enough time for the polling
+					interval configured in `poll_secs`
+					"""
+				required: false
+				type: uint: {
+					examples: [20]
+					unit: "seconds"
+				}
+			}
 			poll_secs: {
 				description: """
 					How long to wait while polling the queue for new messages, in seconds.
@@ -595,6 +743,20 @@ base: components: sources: aws_s3: configuration: {
 				description: "The URL of the SQS queue to poll for bucket notifications."
 				required:    true
 				type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
+			}
+			read_timeout_seconds: {
+				description: """
+					The read timeout for AWS requests
+
+					Limits the amount of time allowed to read the first byte of a response from the
+					time the request is initiated. Take care when configuring this settings to allow
+					enough time for the polling interval configured in `poll_secs`
+					"""
+				required: false
+				type: uint: {
+					examples: [20]
+					unit: "seconds"
+				}
 			}
 			tls_options: {
 				description: "TLS configuration."
@@ -649,16 +811,25 @@ base: components: sources: aws_s3: configuration: {
 						required: false
 						type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 					}
+					server_name: {
+						description: """
+																Server name to use when using Server Name Indication (SNI).
+
+																Only relevant for outgoing connections.
+																"""
+						required: false
+						type: string: examples: ["www.example.com"]
+					}
 					verify_certificate: {
 						description: """
-																Enables certificate verification.
+																Enables certificate verification. For components that create a server, this requires that the
+																client connections have a valid client certificate. For components that initiate requests,
+																this validates that the upstream has a valid certificate.
 
 																If enabled, certificates must not be expired and must be issued by a trusted
 																issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 																certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 																so on until the verification process reaches a root certificate.
-
-																Relevant for both incoming and outgoing connections.
 
 																Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 																"""
@@ -751,16 +922,25 @@ base: components: sources: aws_s3: configuration: {
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

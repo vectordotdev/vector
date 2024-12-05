@@ -16,6 +16,7 @@ const SKIP_FUNCTION_EXAMPLES: &[&str] = &[
     "type_def", // Not supported on VM runtime
     "random_bytes",
     "uuid_v4",
+    "uuid_v7",
     "strip_ansi_escape_codes",
     "get_hostname",
     "now",

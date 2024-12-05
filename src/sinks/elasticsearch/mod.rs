@@ -1,11 +1,11 @@
 mod common;
 mod config;
-mod encoder;
-mod health;
-mod request_builder;
-mod retry;
-mod service;
-mod sink;
+pub mod encoder;
+pub mod health;
+pub mod request_builder;
+pub mod retry;
+pub mod service;
+pub mod sink;
 
 #[cfg(test)]
 mod tests;
@@ -14,15 +14,15 @@ mod tests;
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests;
 
-use std::convert::TryFrom;
+use std::{convert::TryFrom, fmt};
 
 pub use common::*;
 pub use config::*;
 pub use encoder::ElasticsearchEncoder;
 use http::{uri::InvalidUri, Request};
 use snafu::Snafu;
-use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, internal_event};
 
 use crate::{
     event::{EventRef, LogEvent},
@@ -34,7 +34,9 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
-#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
+#[configurable(metadata(
+    docs::enum_tag_description = "The authentication strategy to use.\n\nAmazon OpenSearch Serverless requires this option to be set to `aws`."
+))]
 pub enum ElasticsearchAuthConfig {
     /// HTTP Basic Authentication.
     Basic {
@@ -85,6 +87,9 @@ pub enum BulkAction {
 
     /// The `create` action.
     Create,
+
+    /// The `update` action.
+    Update,
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -93,6 +98,7 @@ impl BulkAction {
         match self {
             BulkAction::Index => "index",
             BulkAction::Create => "create",
+            BulkAction::Update => "update",
         }
     }
 
@@ -100,6 +106,7 @@ impl BulkAction {
         match self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
+            BulkAction::Update => "/update",
         }
     }
 }
@@ -111,7 +118,47 @@ impl TryFrom<&str> for BulkAction {
         match input {
             "index" => Ok(BulkAction::Index),
             "create" => Ok(BulkAction::Create),
+            "update" => Ok(BulkAction::Update),
             _ => Err(format!("Invalid bulk action: {}", input)),
+        }
+    }
+}
+
+/// Elasticsearch version types.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum VersionType {
+    /// The `internal` type.
+    Internal,
+
+    /// The `external` or `external_gt` type.
+    External,
+
+    /// The `external_gte` type.
+    ExternalGte,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+impl VersionType {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Internal => "internal",
+            Self::External => "external",
+            Self::ExternalGte => "external_gte",
+        }
+    }
+}
+
+impl TryFrom<&str> for VersionType {
+    type Error = String;
+
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        match input {
+            "internal" => Ok(VersionType::Internal),
+            "external" | "external_gt" => Ok(VersionType::External),
+            "external_gte" => Ok(VersionType::ExternalGte),
+            _ => Err(format!("Invalid versioning mode: {}", input)),
         }
     }
 }
@@ -120,8 +167,29 @@ impl_generate_config_from_default!(ElasticsearchConfig);
 
 #[derive(Debug, Clone)]
 pub enum ElasticsearchCommonMode {
-    Bulk { index: Template, action: Template },
+    Bulk {
+        index: Template,
+        action: Template,
+        version: Option<Template>,
+        version_type: VersionType,
+    },
     DataStream(DataStreamConfig),
+}
+
+struct VersionValueParseError<'a> {
+    value: &'a str,
+}
+
+impl internal_event::InternalEvent for VersionValueParseError<'_> {
+    fn emit(self) {
+        warn!("{self}")
+    }
+}
+
+impl fmt::Display for VersionValueParseError<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Cannot parse version \"{}\" as integer", self.value)
+    }
 }
 
 impl ElasticsearchCommonMode {
@@ -162,6 +230,39 @@ impl ElasticsearchCommonMode {
         }
     }
 
+    fn version<'a>(&self, event: impl Into<EventRef<'a>>) -> Option<u64> {
+        match self {
+            ElasticsearchCommonMode::Bulk {
+                version: Some(version),
+                ..
+            } => version
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("version"),
+                        drop_event: true,
+                    });
+                })
+                .ok()
+                .as_ref()
+                .and_then(|value| {
+                    value
+                        .parse()
+                        .map_err(|_| emit!(VersionValueParseError { value }))
+                        .ok()
+                }),
+            _ => None,
+        }
+    }
+
+    const fn version_type(&self) -> Option<VersionType> {
+        match self {
+            ElasticsearchCommonMode::Bulk { version_type, .. } => Some(*version_type),
+            _ => Some(VersionType::Internal),
+        }
+    }
+
     const fn as_data_stream_config(&self) -> Option<&DataStreamConfig> {
         match self {
             Self::DataStream(value) => Some(value),
@@ -173,6 +274,7 @@ impl ElasticsearchCommonMode {
 /// Configuration for Elasticsearch API version.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticsearchApiVersion {
     /// Auto-detect the API version.
@@ -219,4 +321,14 @@ pub enum ParseError {
         "`endpoint` and `endpoints` options are mutually exclusive. Please use `endpoints` option."
     ))]
     EndpointsExclusive,
+    #[snafu(display("Tried to use external versioning without specifying the version itself"))]
+    ExternalVersioningWithoutVersion,
+    #[snafu(display("Cannot use external versioning without specifying a document ID"))]
+    ExternalVersioningWithoutDocumentID,
+    #[snafu(display("Your version field will be ignored because you use internal versioning"))]
+    ExternalVersionIgnoredWithInternalVersioning,
+    #[snafu(display("Amazon OpenSearch Serverless requires `api_version` value to be `auto`"))]
+    ServerlessElasticsearchApiVersionMustBeAuto,
+    #[snafu(display("Amazon OpenSearch Serverless requires `auth.strategy` value to be `aws`"))]
+    OpenSearchServerlessRequiresAwsAuth,
 }

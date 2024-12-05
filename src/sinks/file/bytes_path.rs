@@ -14,7 +14,7 @@ pub struct BytesPath {
 
 impl BytesPath {
     #[cfg(unix)]
-    pub fn new(path: Bytes) -> Self {
+    pub const fn new(path: Bytes) -> Self {
         Self { path }
     }
     #[cfg(windows)]

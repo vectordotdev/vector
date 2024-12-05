@@ -102,7 +102,7 @@ base: components: transforms: lua: configuration: {
 		description: """
 			The Lua program to initialize the transform with.
 
-			The program can be used to to import external dependencies, as well as define the functions
+			The program can be used to import external dependencies, as well as define the functions
 			used for the various lifecycle hooks. However, it's not strictly required, as the lifecycle
 			hooks can be configured directly with inline Lua source for each respective hook.
 			"""

@@ -1,6 +1,7 @@
 #[cfg(unix)]
 use std::path::PathBuf;
 use std::{net::SocketAddr, time::Duration};
+use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -70,6 +71,7 @@ pub struct SyslogConfig {
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
+#[allow(clippy::large_enum_variant)]
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
@@ -78,6 +80,9 @@ pub enum Mode {
 
         #[configurable(derived)]
         keepalive: Option<TcpKeepaliveConfig>,
+
+        #[configurable(derived)]
+        permit_origin: Option<IpAllowlistConfig>,
 
         #[configurable(derived)]
         tls: Option<TlsSourceConfig>,
@@ -141,6 +146,7 @@ impl Default for SyslogConfig {
             mode: Mode::Tcp {
                 address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
                 keepalive: None,
+                permit_origin: None,
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
@@ -173,6 +179,7 @@ impl SourceConfig for SyslogConfig {
             Mode::Tcp {
                 address,
                 keepalive,
+                permit_origin,
                 tls,
                 receive_buffer_bytes,
                 connection_limit,
@@ -200,6 +207,7 @@ impl SourceConfig for SyslogConfig {
                     cx,
                     false.into(),
                     connection_limit,
+                    permit_origin.map(Into::into),
                     SyslogConfig::NAME,
                     log_namespace,
                 )
@@ -248,7 +256,10 @@ impl SourceConfig for SyslogConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -842,7 +853,7 @@ mod test {
         let msg = "qwerty";
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r#"[incorrect x]"#, msg
+            r"[incorrect x]", msg
         );
 
         let mut expected = Event::Log(LogEvent::from(msg));
@@ -882,7 +893,7 @@ mod test {
 
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r#"[incorrect x=]"#, msg
+            r"[incorrect x=]", msg
         );
 
         let event = event_from_bytes(
@@ -907,7 +918,7 @@ mod test {
 
         let msg = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
-            r#"[empty]"#
+            r"[empty]"
         );
 
         let event = event_from_bytes("host", None, msg.into(), LogNamespace::Legacy).unwrap();
@@ -1114,6 +1125,7 @@ mod test {
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Tcp {
                 address: in_addr.into(),
+                permit_origin: None,
                 keepalive: None,
                 tls: None,
                 receive_buffer_bytes: None,
@@ -1257,6 +1269,7 @@ mod test {
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Tcp {
                 address: in_addr.into(),
+                permit_origin: None,
                 keepalive: None,
                 tls: None,
                 receive_buffer_bytes: None,

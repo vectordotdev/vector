@@ -121,10 +121,6 @@ cli: {
 			description: env_vars.VECTOR_ALLOW_EMPTY_CONFIG.description
 			env_var:     "VECTOR_ALLOW_EMPTY_CONFIG"
 		}
-		"strict-env-vars": {
-			description: env_vars.VECTOR_STRICT_ENV_VARS.description
-			env_var:     "VECTOR_STRICT_ENV_VARS"
-		}
 	}
 
 	_core_config_options: {
@@ -160,6 +156,18 @@ cli: {
 			default:     env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.type.uint.default
 			env_var:     "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS"
 			type:        "integer"
+		}
+		"watch-config-poll-interval-seconds": {
+			description: env_vars.VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS.description
+			env_var:     "VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS"
+			default:     env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.type.uint.default
+			type:        "integer"
+		}
+		"watch-config-method": {
+			description: env_vars.VECTOR_WATCH_CONFIG_METHOD.description
+			env_var:     "VECTOR_WATCH_CONFIG_METHOD"
+			default:     env_vars.VECTOR_WATCH_CONFIG_METHOD.type.string.default
+			type:        "string"
 		}
 	}
 
@@ -310,6 +318,10 @@ cli: {
 				"no-reconnect": {
 					_short:      "n"
 					description: "Whether to reconnect if the underlying Vector API connection drops. By default, tap will attempt to reconnect if the connection drops."
+				}
+				"duration_ms": {
+					_short:      "d"
+					description: "Specifies a duration (in milliseconds) to sample logs (e.g. passing in 10000 will sample logs for 10 seconds then exit)."
 				}
 			}
 
@@ -583,6 +595,22 @@ cli: {
 				"""
 			type: string: default: null
 		}
+		VECTOR_HOSTNAME: {
+			description: """
+				Overrides the hostname used in Vector's logs and metrics.
+				This is useful when running Vector in a container or on other systems where the hostname is not meaningful.
+
+				The example of how it can be used in Kubernetes pod template:
+
+				```yaml
+				env:
+				- name: VECTOR_HOSTNAME
+					valueFrom:
+						fieldRef:
+							fieldPath: spec.nodeName
+				"""
+			type: string: default: null
+		}
 		VECTOR_LOG: {
 			description: "Vector's log level. Each log level includes messages from higher priority levels."
 			type: string: {
@@ -624,6 +652,25 @@ cli: {
 			description: "Watch for changes in the configuration file and reload accordingly"
 			type: bool: default: false
 		}
+		VECTOR_WATCH_CONFIG_METHOD: {
+			description: """
+				Method for watching config files.
+
+				`recommend` - recommended event based watcher for host OS
+				`poll` - `poll` watcher can be used in cases where event based watcher doesn't work, e.g., when attaching the configuration via NFS.
+				"""
+			type: string: default: "recommended"
+		}
+		VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS: {
+			description: """
+				Poll for config changes at given interval
+				only applicable if `poll` is set in `--watch-config-method`
+				"""
+			type: uint: {
+				default: 30
+				unit:    "seconds"
+			}
+		}
 		VECTOR_INTERNAL_LOG_RATE_LIMIT: {
 			description: "Set the internal log rate limit. This limits Vector from emitting identical logs more than once over the given number of seconds."
 			type: uint: {
@@ -658,9 +705,13 @@ cli: {
 		}
 		VECTOR_STRICT_ENV_VARS: {
 			description: """
-				Turn on strict mode for environment variable interpolation. When set, interpolation of a missing environment variable in configuration files will cause an error instead of a warning, which will result in a failure to load any such configuration file. This defaults to false, but that default is deprecated and will be changed to strict in future versions.
+				Turn on strict mode for environment variable interpolation. When set, interpolation of a missing
+				environment variable in configuration files will cause an error instead of a warning, which will
+				result in a failure to load any such configuration file. This option is deprecated and will be
+				removed in a future version to remove the ability to downgrade missing environment variables to
+				warnings.
 				"""
-			type: bool: default: false
+			type: bool: default: true
 		}
 	}
 

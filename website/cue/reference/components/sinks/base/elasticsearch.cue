@@ -15,8 +15,8 @@ base: components: sinks: elasticsearch: configuration: {
 				Whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
+				connected** sinks before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -28,8 +28,12 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	api_version: {
-		description: "The API version of Elasticsearch."
-		required:    false
+		description: """
+			The API version of Elasticsearch.
+
+			Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
+			"""
+		required: false
 		type: string: {
 			default: "auto"
 			enum: {
@@ -166,8 +170,12 @@ base: components: sinks: elasticsearch: configuration: {
 				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
 			strategy: {
-				description: "The authentication strategy to use."
-				required:    true
+				description: """
+					The authentication strategy to use.
+
+					Amazon OpenSearch Serverless requires this option to be set to `aws`.
+					"""
+				required: true
 				type: string: enum: {
 					aws:   "Amazon OpenSearch Service-specific authentication."
 					basic: "HTTP Basic Authentication."
@@ -241,7 +249,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
 
-					Only `index` and `create` actions are supported.
+					Only `index`, `create` and `update` actions are supported.
 
 					[es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 					"""
@@ -259,6 +267,33 @@ base: components: sinks: elasticsearch: configuration: {
 					default: "vector-%Y.%m.%d"
 					examples: ["application-{{ application_id }}-%Y-%m-%d", "{{ index }}"]
 					syntax: "template"
+				}
+			}
+			version: {
+				description: "Version field value."
+				required:    false
+				type: string: {
+					examples: ["{{ obj_version }}-%Y-%m-%d", "123"]
+					syntax: "template"
+				}
+			}
+			version_type: {
+				description: """
+					Version type.
+
+					Possible values are `internal`, `external` or `external_gt` and `external_gte`.
+
+					[es_index_versioning]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html#index-versioning
+					"""
+				required: false
+				type: string: {
+					default: "internal"
+					enum: {
+						external:     "The `external` or `external_gt` type."
+						external_gte: "The `external_gte` type."
+						internal:     "The `internal` type."
+					}
+					examples: ["internal", "external"]
 				}
 			}
 		}
@@ -520,6 +555,17 @@ base: components: sinks: elasticsearch: configuration: {
 
 					Elasticsearch Data Streams only support the `create` action.
 					"""
+			}
+		}
+	}
+	opensearch_service_type: {
+		description: "Amazon OpenSearch service type"
+		required:    false
+		type: string: {
+			default: "managed"
+			enum: {
+				managed:    "Elasticsearch or OpenSearch Managed domain"
+				serverless: "OpenSearch Serverless collection"
 			}
 		}
 	}
@@ -812,16 +858,25 @@ base: components: sinks: elasticsearch: configuration: {
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
 					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

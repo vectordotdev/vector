@@ -16,7 +16,7 @@ pub struct ConnectionOpen {
 
 impl InternalEvent for ConnectionOpen {
     fn emit(self) {
-        gauge!("open_connections", self.count as f64);
+        gauge!("open_connections").set(self.count as f64);
     }
 }
 
@@ -27,7 +27,7 @@ pub struct EndpointsActive {
 
 impl InternalEvent for EndpointsActive {
     fn emit(self) {
-        gauge!("active_endpoints", self.count as f64);
+        gauge!("active_endpoints").set(self.count as f64);
     }
 }
 

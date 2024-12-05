@@ -4,6 +4,7 @@ use chrono::SecondsFormat;
 use csv_core::{WriteResult, Writer, WriterBuilder};
 use lookup::lookup_v2::ConfigTargetPath;
 use tokio_util::codec::Encoder;
+use vector_config_macros::configurable_component;
 use vector_core::{
     config::DataType,
     event::{Event, Value},
@@ -11,7 +12,7 @@ use vector_core::{
 };
 
 /// The user configuration to choose the metric tag strategy.
-#[crate::configurable_component]
+#[configurable_component]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum QuoteStyle {
@@ -35,7 +36,7 @@ pub enum QuoteStyle {
 }
 
 /// Config used to build a `CsvSerializer`.
-#[crate::configurable_component]
+#[configurable_component]
 #[derive(Debug, Clone)]
 pub struct CsvSerializerConfig {
     /// The CSV Serializer Options.
@@ -71,10 +72,11 @@ impl CsvSerializerConfig {
 }
 
 /// Config used to build a `CsvSerializer`.
-#[crate::configurable_component]
+#[configurable_component]
 #[derive(Debug, Clone)]
 pub struct CsvSerializerOptions {
     /// The field delimiter to use when writing CSV.
+    #[configurable(metadata(docs::type_override = "ascii_char"))]
     #[serde(
         default = "default_delimiter",
         with = "vector_core::serde::ascii_char",
@@ -98,6 +100,7 @@ pub struct CsvSerializerOptions {
     /// like \ (instead of escaping quotes by doubling them).
     ///
     /// To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+    #[configurable(metadata(docs::type_override = "ascii_char"))]
     #[serde(
         default = "default_escape",
         with = "vector_core::serde::ascii_char",
@@ -106,6 +109,7 @@ pub struct CsvSerializerOptions {
     pub escape: u8,
 
     /// The quote character to use when writing CSV.
+    #[configurable(metadata(docs::type_override = "ascii_char"))]
     #[serde(
         default = "default_escape",
         with = "vector_core::serde::ascii_char",

@@ -23,13 +23,15 @@ impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
             endpoint = self.endpoint,
         );
         counter!(
-            "component_received_events_total", self.count as u64,
+            "component_received_events_total",
             "endpoint" => self.endpoint.to_owned(),
-        );
+        )
+        .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total", self.byte_size.get() as u64,
+            "component_received_event_bytes_total",
             "endpoint" => self.endpoint.to_owned(),
-        );
+        )
+        .increment(self.byte_size.get() as u64);
     }
 }
 
@@ -49,10 +51,11 @@ impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -72,10 +75,11 @@ impl<'a> InternalEvent for MongoDbMetricsBsonParseError<'a> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
             "endpoint" => self.endpoint.to_owned(),
-        );
+        )
+        .increment(1);
     }
 }

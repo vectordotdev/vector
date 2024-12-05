@@ -6,22 +6,13 @@ use std::{
     },
 };
 
-use futures::{future, Future, FutureExt};
-use tokio::{
-    sync::{mpsc, watch},
-    time::{interval, sleep_until, Duration, Instant},
-};
-use tracing::Instrument;
-use vector_lib::buffers::topology::channel::BufferSender;
-use vector_lib::trigger::DisabledTrigger;
-
 use super::{
     builder,
     builder::TopologyPieces,
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
     task::TaskOutput,
-    BuiltBuffer, TapOutput, TapResource, TaskHandle, WatchRx, WatchTx,
+    BuiltBuffer, TaskHandle,
 };
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
@@ -31,6 +22,15 @@ use crate::{
     signal::ShutdownError,
     spawn_named,
 };
+use futures::{future, Future, FutureExt};
+use tokio::{
+    sync::{mpsc, watch},
+    time::{interval, sleep_until, Duration, Instant},
+};
+use tracing::Instrument;
+use vector_lib::buffers::topology::channel::BufferSender;
+use vector_lib::tap::topology::{TapOutput, TapResource, WatchRx, WatchTx};
+use vector_lib::trigger::DisabledTrigger;
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
 
@@ -1014,13 +1014,24 @@ impl RunningTopology {
                 warn!(
                 "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
             );
-                Some(e.as_secs_f64())
+                if e < Duration::from_secs(0) {
+                    None
+                } else {
+                    Some(e.as_secs_f64())
+                }
             }
             (Some(_), Some(_)) => {
                 error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
                 return None;
             }
-            (None, e) => e,
+            (None, Some(e)) => {
+                if e < 0f64 {
+                    None
+                } else {
+                    Some(e)
+                }
+            }
+            (None, None) => Some(300f64),
         };
 
         if let Err(error) = crate::metrics::Controller::get()

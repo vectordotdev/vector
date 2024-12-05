@@ -2,13 +2,12 @@ use std::{
     collections::HashMap,
     future::ready,
     num::NonZeroUsize,
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
     time::Instant,
 };
 
 use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryStreamExt};
 use futures_util::stream::FuturesUnordered;
-use once_cell::sync::Lazy;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
@@ -56,18 +55,17 @@ use crate::{
     SourceSender,
 };
 
-static ENRICHMENT_TABLES: Lazy<vector_lib::enrichment::TableRegistry> =
-    Lazy::new(vector_lib::enrichment::TableRegistry::default);
+static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
+    LazyLock::new(vector_lib::enrichment::TableRegistry::default);
 
-pub(crate) static SOURCE_SENDER_BUFFER_SIZE: Lazy<usize> =
-    Lazy::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
+pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
+    LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
 
 const READY_ARRAY_CAPACITY: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(CHUNK_SIZE * 4) };
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
 
-static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
-    crate::app::WORKER_THREADS
-        .get()
+static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
+    crate::app::worker_threads()
         .map(std::num::NonZeroUsize::get)
         .unwrap_or_else(crate::num_threads)
 });
@@ -345,7 +343,7 @@ impl<'a> Builder<'a> {
             // been signalled to forcefully shutdown, or if the source pump encounters an error.
             //
             // The forceful shutdown will only resolve if the source itself doesn't shutdown gracefully
-            // within the alloted time window. This can occur normally for certain sources, like stdin,
+            // within the allotted time window. This can occur normally for certain sources, like stdin,
             // where the I/O is blocking (in a separate thread) and won't wake up to check if it's time
             // to shutdown unless some input is given.
             let server = async move {

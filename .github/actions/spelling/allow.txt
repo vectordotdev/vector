@@ -35,6 +35,7 @@ Benss
 Blaupunkt
 Blusens
 Casio
+Cantarell
 Celkon
 Ceph
 Chromecast
@@ -54,7 +55,6 @@ dkr
 Dockerfiles
 DOOV
 Douban
-E2ETest
 emqx
 eventloop
 Enot
@@ -131,6 +131,7 @@ Moto
 Mpman
 Multilaser
 Mumbai
+musleabi
 Mytab
 NLB
 Nabi
@@ -164,6 +165,7 @@ pront
 Proscan
 Qmobilevn
 RPZ
+RRSIGs
 Rackspace
 Rathi
 Regza
@@ -253,6 +255,7 @@ buildname
 buildroot
 bytestream
 callsites
+cdnskey
 cncf
 codepath
 codepaths
@@ -261,6 +264,7 @@ compiletime
 coredns
 corejs
 coreutils
+csync
 curta
 daemonset
 dalek
@@ -269,6 +273,7 @@ datacenter
 datadog
 datadoghq
 datanode
+ddog
 debian
 demuxing
 dfs
@@ -282,6 +287,7 @@ dnsutils
 dockercmd
 downsides
 downwardapi
+ede
 emoji
 esbuild
 etld
@@ -303,6 +309,7 @@ gcr
 gcs
 gdpr
 github
+gnueabi
 gnueabihf
 gnupg
 gnuplot
@@ -342,6 +349,7 @@ ifneq
 imobile
 influxd
 ionik
+ipallowlist
 ipod
 ircd
 jemalloc
@@ -412,6 +420,7 @@ podman
 postgresql
 proxyuser
 pseudocode
+psl
 pushgateway
 qwerty
 rabbitmq
@@ -425,7 +434,7 @@ rpms
 rstest
 rsyslog
 rsyslogd
-security-tab
+scriptblock
 servlet
 Sinjo
 sublocation
@@ -437,18 +446,22 @@ solarwinds
 splunk
 ssh
 staticuser
+statsd
 symbian
 tanushri
 timeframe
 timeseries
 timespan
 timestamped
+typesense
 tzdata
 ubuntu
+unchunked
 upstreaminfo
 useragents
 usergroups
 userguide
+urlencoding
 webhdfs
 winapi
 workarounds
@@ -459,3 +472,7 @@ zeek
 zookeeper
 zst
 zstandard
+otel
+otelcol
+siv
+onig

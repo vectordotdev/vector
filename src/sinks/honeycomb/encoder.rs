@@ -1,6 +1,6 @@
 //! Encoding for the `honeycomb` sink.
 
-use bytes::BytesMut;
+use bytes::Bytes;
 use chrono::{SecondsFormat, Utc};
 use serde_json::{json, to_vec};
 use std::io;
@@ -21,8 +21,8 @@ impl SinkEncoder<Vec<Event>> for HoneycombEncoder {
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
         let mut byte_size = telemetry().create_request_count_byte_size();
-        let mut body = BytesMut::new();
         let n_events = events.len();
+        let mut json_events: Vec<serde_json::Value> = Vec::with_capacity(n_events);
 
         for mut event in events {
             self.transformer.transform(&mut event);
@@ -37,15 +37,15 @@ impl SinkEncoder<Vec<Event>> for HoneycombEncoder {
                 Utc::now()
             };
 
-            let data = to_vec(&json!({
+            let data = json!({
                 "time": timestamp.to_rfc3339_opts(SecondsFormat::Nanos, true),
                 "data": log.convert_to_fields(),
-            }))?;
+            });
 
-            body.extend(&data);
+            json_events.push(data);
         }
 
-        let body = body.freeze();
+        let body = Bytes::from(to_vec(&serde_json::Value::Array(json_events))?);
 
         write_all(writer, n_events, body.as_ref()).map(|()| (body.len(), byte_size))
     }
