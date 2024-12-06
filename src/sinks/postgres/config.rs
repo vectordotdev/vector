@@ -29,7 +29,7 @@ const fn default_pool_size() -> u32 {
 
 /// Configuration for the `postgres` sink.
 #[configurable_component(sink("postgres", "Deliver log data to a PostgreSQL database."))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Default, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PostgresConfig {
     // TODO: if I used UriSerde instead of String, I couldn't get a url string to use
