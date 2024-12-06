@@ -372,6 +372,7 @@ fn slugify_text(input: String) -> String {
     result.to_lowercase()
 }
 
+// borrow from src/sinks/loki/sink.rs
 fn tag_expansion(
     key_s: String,
     value_s: String,
