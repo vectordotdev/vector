@@ -5,7 +5,7 @@ remap: functions: to_float: {
 	description: """
 		Coerces the `value` into a float.
 		"""
-
+	notices: ["Since [VRL v0.20.0](\(urls.vrl_changelog)#0200-2024-11-27) which is used since Vector v0.43.0, this function behaves differently than [parse_float](\(urls.vrl_functions)#parse_float). Notably, `to_float` will return an error for [non-normal](\(urls.is_normal)) floats whereas [parse_float](\(urls.vrl_functions)#parse_float) can return `inf` which might result in unsafe arithemtic operations that panic.  This will be addressed in the future."]
 	arguments: [
 		{
 			name: "value"
