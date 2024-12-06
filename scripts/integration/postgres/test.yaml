@@ -5,8 +5,8 @@ features:
 test_filter: ::postgres
 
 env:
-  PG_HOST: postgres
-  PG_SOCKET: /pg_socket
+  PG_URL: postgresql://vector:vector@postgres/postgres
+  PG_SOCKET_URL: postgresql:///postgres?host=/pg_socket&user=vector&password=vector
 
 runner:
   volumes:

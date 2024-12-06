@@ -231,6 +231,10 @@ pub fn temp_dir() -> PathBuf {
     path.join(dir_name)
 }
 
+pub fn temp_table() -> String {
+    format!("test_{}", random_string(10).to_lowercase())
+}
+
 pub fn map_event_batch_stream(
     stream: impl Stream<Item = Event>,
     batch: Option<BatchNotifier>,

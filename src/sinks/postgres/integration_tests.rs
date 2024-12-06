@@ -4,7 +4,7 @@ use crate::{
         postgres::PostgresConfig,
         util::{test::load_sink, UriSerde},
     },
-    test_util::{components::run_and_assert_sink_compliance, random_string, trace_init},
+    test_util::{components::run_and_assert_sink_compliance, temp_table, trace_init},
 };
 use futures::stream;
 use serde::{Deserialize, Serialize};
@@ -12,17 +12,8 @@ use sqlx::{Connection, FromRow, PgConnection};
 use std::future::ready;
 use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 
-fn pg_host() -> String {
-    std::env::var("PG_HOST").unwrap_or_else(|_| "localhost".into())
-}
-
 fn pg_url() -> String {
-    std::env::var("PG_URL")
-        .unwrap_or_else(|_| format!("postgres://vector:vector@{}/postgres", pg_host()))
-}
-
-fn gen_table() -> String {
-    format!("test_{}", random_string(10).to_lowercase())
+    std::env::var("PG_URL").expect("PG_URL must be set")
 }
 
 fn make_event() -> (Event, BatchStatusReceiver) {
@@ -45,9 +36,8 @@ struct TestEvent {
 async fn prepare_config() -> (String, String, PgConnection) {
     trace_init();
 
-    let table = gen_table();
-    let endpoint = pg_url();
-    let _endpoint: UriSerde = endpoint.parse().unwrap();
+    let table = temp_table();
+    let endpoint: UriSerde = pg_url().parse().unwrap();
 
     let cfg = format!(
         r#"
@@ -57,12 +47,14 @@ async fn prepare_config() -> (String, String, PgConnection) {
         "#,
     );
 
-    let connection = PgConnection::connect(&endpoint)
+    let connection = PgConnection::connect(endpoint.to_string().as_str())
         .await
         .expect("Failed to connect to Postgres");
 
     (cfg, table, connection)
 }
+// TODO: create table that has an `insertion_date` that defaults to NOW in postgres, so we can order
+// by it and get the event insertion order to check with the expected order.
 
 async fn insert_event_with_cfg(cfg: String, table: String, mut connection: PgConnection) {
     // We store the timestamp as text and not as `timestamp with timezone` postgres type due to
@@ -90,7 +82,6 @@ async fn insert_event_with_cfg(cfg: String, table: String, mut connection: PgCon
         .fetch_all(&mut connection)
         .await
         .unwrap();
-    dbg!(&events);
     assert_eq!(1, events.len());
 
     // drop input_event after comparing with response
