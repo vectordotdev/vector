@@ -32,7 +32,7 @@ on:
         description: "The SHA to use for comparison (optional). If not provided, it defaults to the current HEAD of the origin/master branch."
         required: false
   schedule:
-    - cron: '0 6 * * 1-5' # Runs at 6 AM UTC on weekdays (Monday to Friday)
+    - cron: '0 7 * * 1' # Runs at 7 AM UTC on Mondays
 
 env:
   SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
