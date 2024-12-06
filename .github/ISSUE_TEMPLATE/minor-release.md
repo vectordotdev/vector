@@ -48,13 +48,17 @@ On the day of release:
   - [ ] `git push origin v0.<minor>.0`
 - [ ] Wait for release workflow to complete
   - Discoverable via [https://github.com/timberio/vector/actions/workflows/release.yml](https://github.com/timberio/vector/actions/workflows/release.yml)
+- [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
+  - [ ] `git checkout website && git reset --hard origin/v0.<new version number> && git push`
+  - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
+    - The deployment is done by Amplify. You can see
+      the [deployment logs here](https://dd-corpsite.datadoghq.com/logs?query=service%3Awebsites-vector%20branch%3Awebsite&agg_m=count&agg_m_source=base&agg_t=count&cols=host%2Cservice&fromUser=true&messageDisplay=inline&refresh_mode=sliding&storage=hot&stream_sort=time%2Casc&viz=stream).
 - [ ] Release Linux packages. See [`vector-release` usage](https://github.com/DataDog/vector-release#usage).
+  - [ ] Manually trigger the `trigger-package-release-pipeline-prod-stable` job.
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).
 - [ ] Once Helm chart is released, updated Vector manifests
     - Run `cargo vdev build manifests` and open a PR with changes
 - [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Bump the release number in the `Cargo.toml` on master to the next major release
-- [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
-  - [ ] `git checkout website && git reset --hard origin/v0.<new version number> && git push`
 - [ ] Kick-off post-mortems for any regressions resolved by the release
