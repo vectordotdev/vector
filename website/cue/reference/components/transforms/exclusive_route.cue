@@ -6,7 +6,7 @@ components: transforms: exclusive_route: {
 	description: """
 		Routes events from one or more streams to unique sub-streams based on a set of user-defined conditions.
 
-		Also, see the [Route](\(urls.vector_route_transform) transform for routing an event to multiple streams.
+		Also, see the [Route](\(urls.vector_route_transform)) transform for routing an event to multiple streams.
 		"""
 
 	classes: {
