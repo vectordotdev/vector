@@ -108,6 +108,11 @@ components: sources: host_metrics: {
 			type:        "gauge"
 		}
 
+		// Host process
+		process_runtime: _host & _process_counter & {description: "The process uptime."}
+		process_cpu_usage: _host & _process_gauge & {description: "The process CPU usage."}
+		process_memory_usage: _host & _process_gauge & {description: "The process memory usage."}
+
 		// Host cgroups
 		cgroup_cpu_usage_seconds_total: _host & _cgroup_cpu & {description: "The total amount CPU time used by this cgroup and its descendants, in seconds."}
 		cgroup_cpu_user_seconds_total: _host & _cgroup_cpu & {description: "The total amount of CPU time spent by this cgroup in user space, in seconds."}
@@ -256,5 +261,17 @@ components: sources: host_metrics: {
 			}
 		}
 		_network_nomac: _network_gauge & {relevant_when: "OS is not macOS"}
+		_process_counter: {
+			type: "counter"
+			tags: _host_metrics_tags & {
+				collector: examples: ["process"]
+			}
+		}
+		_process_gauge: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["process"]
+			}
+		}
 	}
 }

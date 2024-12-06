@@ -4,6 +4,9 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions:
+  statuses: write
+
 jobs:
   test-install:
     runs-on: ubuntu-20.04

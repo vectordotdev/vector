@@ -16,6 +16,9 @@ on:
     # At midnight UTC
     - cron: '0 0 * * *'
 
+permissions:
+  statuses: write
+
 jobs:
   test-deny:
     runs-on: ubuntu-latest

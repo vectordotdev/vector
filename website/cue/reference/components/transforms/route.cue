@@ -6,6 +6,9 @@ components: transforms: route: {
 	description: """
 		Splits a stream of events into multiple sub-streams based on a set of
 		conditions.
+
+		Also, see the [Exclusive Route](\(urls.vector_exclusive_route_transform) transform for routing an event to
+		a single stream.
 		"""
 
 	classes: {
@@ -100,7 +103,7 @@ components: transforms: route: {
 		routing_to_multiple_components: {
 			title: "Routing to multiple components"
 			body: """
-				The following is an example of how you can creates two routes that feed three downstream components.
+				The following is an example of how you can create two routes that feed three downstream components.
 
 				It is worth noting that a single route can feed multiple downstream components.
 
@@ -110,7 +113,7 @@ components: transforms: route: {
 						inputs: [ some_source ]
 						type: route
 						route:
-							foo-exists: exists(.foo)
+							foo-exists: 'exists(.foo)'
 							foo-doesnt-exist: '!exists(.foo)'
 					remap-route-1:
 						type: remap
@@ -140,13 +143,13 @@ components: transforms: route: {
 									foo: X
 						outputs:
 							- extract_from: remap-route-1
-								my-routes:
+								conditions:
 									- type: vrl
 										source: |
 											assert!(exists(.foo))
 											assert_eq!(.route, "route 1")
 							- extract_from: remap-route-3
-								my-routes:
+								conditions:
 									- type: vrl
 										source: |
 											assert!(exists(.foo))
@@ -159,12 +162,11 @@ components: transforms: route: {
 									bar: X
 						outputs:
 							- extract_from: remap-route-2
-								my-routes:
+								conditions:
 									- type: vrl
 										source: |
 											assert!(!exists(.foo))
 											assert_eq!(.route, "route 2")
-
 				```
 				"""
 		}

@@ -191,17 +191,18 @@ components: {
 		}
 
 		if Args.kind == "transform" {
-			aggregate?: #FeaturesAggregate
-			convert?:   #FeaturesConvert
-			enrich?:    #FeaturesEnrich
-			filter?:    #FeaturesFilter
-			parse?:     #FeaturesParse
-			program?:   #FeaturesProgram
-			proxy?:     #FeaturesProxy
-			reduce?:    #FeaturesReduce
-			route?:     #FeaturesRoute
-			sanitize?:  #FeaturesSanitize
-			shape?:     #FeaturesShape
+			aggregate?:       #FeaturesAggregate
+			convert?:         #FeaturesConvert
+			enrich?:          #FeaturesEnrich
+			filter?:          #FeaturesFilter
+			parse?:           #FeaturesParse
+			program?:         #FeaturesProgram
+			proxy?:           #FeaturesProxy
+			reduce?:          #FeaturesReduce
+			route?:           #FeaturesRoute
+			exclusive_route?: #FeaturesExclusiveRoute
+			sanitize?:        #FeaturesSanitize
+			shape?:           #FeaturesShape
 		}
 
 		if Args.kind == "sink" {
@@ -326,6 +327,8 @@ components: {
 	#FeaturesReduce: {}
 
 	#FeaturesRoute: {}
+
+	#FeaturesExclusiveRoute: {}
 
 	#FeaturesSanitize: {}
 

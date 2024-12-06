@@ -14,6 +14,9 @@
 
 name: K8S E2E Suite
 
+permissions:
+  statuses: write
+
 on:
   workflow_dispatch:
   workflow_call:
@@ -95,6 +98,7 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      - run: sudo -E bash scripts/ci-free-disk-space.sh
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
