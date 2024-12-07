@@ -6,7 +6,7 @@
 #
 # The workflow accepts two optional inputs:
 #   - The baseline SHA:
-#     - If not specified, the SHA from 24 hours ago on origin/master is used.
+#     - If not specified, the SHA from 7 days ago on origin/master is used.
 #   - The comparison SHA:
 #     - If not specified, the current HEAD of origin/master is used.
 #
@@ -26,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       baseline-sha:
-        description: "The SHA to use as the baseline (optional). If not provided, it defaults to the SHA from 24 hours ago."
+        description: "The SHA to use as the baseline (optional). If not provided, it defaults to the SHA from 7 days ago."
         required: false
       comparison-sha:
         description: "The SHA to use for comparison (optional). If not provided, it defaults to the current HEAD of the origin/master branch."
@@ -59,8 +59,8 @@ jobs:
         run: |
           # Set baseline SHA
           if [ -z "${{ github.event.inputs.baseline-sha }}" ]; then
-            BASELINE_SHA=$(git rev-list -n 1 --before="24 hours ago" origin/master)
-            echo "Using baseline SHA from 24 hours ago: ${BASELINE_SHA}"
+            BASELINE_SHA=$(git rev-list -n 1 --before="7 days ago" origin/master)
+            echo "Using baseline SHA from 7 days ago: ${BASELINE_SHA}"
           else
             BASELINE_SHA="${{ github.event.inputs.baseline-sha }}"
             echo "Using provided baseline SHA: ${BASELINE_SHA}"
