@@ -90,7 +90,7 @@ impl TransformConfig for SampleConfig {
                 .as_ref()
                 .map(|condition| condition.build(&context.enrichment_tables))
                 .transpose()?,
-            default_sample_rate_key(),
+            self.sample_rate_key.clone(),
         )))
     }
 
