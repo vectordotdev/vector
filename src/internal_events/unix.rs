@@ -65,14 +65,12 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
     }
 }
 
-#[cfg(all(unix, any(feature = "sinks-socket", feature = "sinks-statsd")))]
 #[derive(Debug)]
 pub struct UnixSocketSendError<'a, E> {
     pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
 }
 
-#[cfg(all(unix, any(feature = "sinks-socket", feature = "sinks-statsd")))]
 impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
     fn emit(self) {
         let reason = "Unix socket send error.";
