@@ -265,7 +265,7 @@ impl SinkConfig for KafkaSinkConfig {
     fn input(&self) -> Input {
         let requirements = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
 
-        Input::new(self.encoding.config().input_type() & (DataType::Log | DataType::Metric))
+        Input::new(self.encoding.config().input_type())
             .with_schema_requirement(requirements)
     }
 
