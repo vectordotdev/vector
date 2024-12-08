@@ -385,6 +385,7 @@ async fn build_unit_test(
         &transform_only_config.sources,
         &transform_only_config.transforms,
         &transform_only_config.sinks,
+        &transform_only_config.enrichment_tables,
         transform_only_config.schema,
     );
     let test = test.resolve_outputs(&transform_only_graph)?;
@@ -401,6 +402,7 @@ async fn build_unit_test(
         &config_builder.sources,
         &config_builder.transforms,
         &config_builder.sinks,
+        &config_builder.enrichment_tables,
         config_builder.schema,
     );
 
@@ -432,6 +434,7 @@ async fn build_unit_test(
         &config_builder.sources,
         &config_builder.transforms,
         &config_builder.sinks,
+        &config_builder.enrichment_tables,
         config_builder.schema,
     );
     let valid_inputs = graph.input_map()?;
