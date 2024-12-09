@@ -97,6 +97,8 @@
       {{ end }}
 
       {{ if gt (len $release.changelog) 0 }}
+      {{/* for the new changelog format, render chores too since they are explicitly added */}}
+      {{ $groups := $groups | merge (dict "chore" "chore")}}
       <div class="mt-8">
         <div class="prose dark:prose-dark max-w-none">
           {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
