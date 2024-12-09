@@ -10746,6 +10746,7 @@ dependencies = [
 name = "vector"
 version = "0.43.0"
 dependencies = [
+ "anyhow",
  "apache-avro",
  "approx",
  "arc-swap",

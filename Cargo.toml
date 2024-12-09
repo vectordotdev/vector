@@ -396,6 +396,7 @@ tonic-build = { workspace = true, optional = true }
 openssl-src = { version = "300", default-features = false, features = ["force-engine", "legacy"] }
 
 [dev-dependencies]
+anyhow = "1"
 approx = "0.5.1"
 assert_cmd = { version = "2.0.16", default-features = false }
 aws-smithy-runtime = { version = "1.7.3", default-features = false, features = ["tls-rustls"] }

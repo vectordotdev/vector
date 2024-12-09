@@ -26,6 +26,7 @@ use vrl::path::ValuePath;
 use vrl::value::{Kind, Value};
 
 use crate::config::OutputId;
+use crate::sources::dnstap;
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, Input, TransformConfig, TransformContext,
@@ -207,6 +208,7 @@ impl RemapConfig {
 
         let mut functions = vrl::stdlib::all();
         functions.append(&mut vector_lib::enrichment::vrl_functions());
+        functions.append(&mut dnstap::vrl_functions());
         functions.append(&mut vector_vrl_functions::all());
 
         let state = TypeState {
