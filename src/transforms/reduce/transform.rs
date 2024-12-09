@@ -1005,21 +1005,17 @@ merge_strategies.bar = "concat"
               source = "exists(.test_end)"
             "#,
         ))
-            .unwrap();
+        .unwrap();
 
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
 
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
 
-            let e_1 = LogEvent::from(Value::from(
-                btreemap! {"a b" => 1}
-            ));
+            let e_1 = LogEvent::from(Value::from(btreemap! {"a b" => 1}));
             tx.send(e_1.into()).await.unwrap();
 
-            let e_2 = LogEvent::from(Value::from(
-                btreemap! {"a b" => 2, "test_end" => "done"}
-            ));
+            let e_2 = LogEvent::from(Value::from(btreemap! {"a b" => 2, "test_end" => "done"}));
             tx.send(e_2.into()).await.unwrap();
 
             let output = out.recv().await.unwrap().into_log();
@@ -1033,6 +1029,6 @@ merge_strategies.bar = "concat"
             topology.stop().await;
             assert_eq!(out.recv().await, None);
         })
-            .await
+        .await
     }
 }
