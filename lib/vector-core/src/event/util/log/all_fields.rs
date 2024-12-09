@@ -64,7 +64,7 @@ pub struct FieldsIter<'a> {
     path: Vec<PathComponent<'a>>,
     /// Treat array as a single value and don't traverse each element.
     skip_array_elements: bool,
-    /// Surround invalid field with quotes to make them parsable.
+    /// Surround invalid fields with quotes to make them parsable.
     quote_invalid_fields: bool,
 }
 
