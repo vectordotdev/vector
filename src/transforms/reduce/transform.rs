@@ -1018,7 +1018,7 @@ merge_strategies.bar = "concat"
             tx.send(e_1.into()).await.unwrap();
 
             let e_2 = LogEvent::from(Value::from(
-                btreemap! {"a b" => 2}
+                btreemap! {"a b" => 2, "test_end" => "done"}
             ));
             tx.send(e_2.into()).await.unwrap();
 
