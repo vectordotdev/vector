@@ -6,6 +6,10 @@ releases: "0.43.1": {
 
 	whats_next: []
 
+	description: """
+		This patch release contains fixes for regressions in 0.43.0.
+		"""
+
 	changelog: [
 		{
 			type: "fix"
