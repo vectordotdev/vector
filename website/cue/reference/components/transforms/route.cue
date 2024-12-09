@@ -7,7 +7,7 @@ components: transforms: route: {
 		Splits a stream of events into multiple sub-streams based on a set of
 		conditions.
 
-		Also, see the [Exclusive Route](\(urls.vector_exclusive_route_transform) transform for routing an event to
+		Also, see the [Exclusive Route](\(urls.vector_exclusive_route_transform)) transform for routing an event to
 		a single stream.
 		"""
 

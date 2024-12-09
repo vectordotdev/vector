@@ -18,7 +18,7 @@ routed to a single stream. This transforms complements the existing [Route trans
 
 A visual representation:
 
-<img src="../../../static/img/exclusive_route.svg" alt="Vector">
+<img src="/img/exclusive_route.svg" alt="Vector">
 
 ### Config Example
 

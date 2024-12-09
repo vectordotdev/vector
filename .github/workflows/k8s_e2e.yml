@@ -193,7 +193,7 @@ jobs:
     steps:
       - name: (PR review) Get PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
       - name: (PR review) Checkout PR branch
@@ -247,7 +247,7 @@ jobs:
     steps:
       - name: (PR review) Get PR branch
         if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
       - name: (PR review) Submit PR result as success
