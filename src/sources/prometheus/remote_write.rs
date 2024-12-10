@@ -4,6 +4,7 @@ use bytes::Bytes;
 use prost::Message;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 use vector_lib::prometheus::parser::proto;
 use warp::http::{HeaderMap, StatusCode};
 
@@ -88,6 +89,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             "",
             HttpMethod::Post,
             StatusCode::OK,
+            OptionalTargetPath::none(),
             true,
             &self.tls,
             &self.auth,
