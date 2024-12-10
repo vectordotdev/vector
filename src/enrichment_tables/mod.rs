@@ -5,6 +5,8 @@ pub use vector_lib::enrichment::{Condition, IndexHandle, Table};
 
 use crate::config::{EnrichmentTableConfig, GlobalOptions};
 
+pub mod pgtable;
+
 pub mod file;
 
 #[cfg(feature = "enrichment-tables-geoip")]
@@ -12,6 +14,9 @@ pub mod geoip;
 
 #[cfg(feature = "enrichment-tables-mmdb")]
 pub mod mmdb;
+
+#[cfg(feature = "enrichment-tables-pgtable")]
+pub mod pgtable;
 
 /// Configurable enrichment tables.
 #[configurable_component]
@@ -34,6 +39,10 @@ pub enum EnrichmentTables {
     /// [maxmind]: https://www.maxmind.com/
     #[cfg(feature = "enrichment-tables-mmdb")]
     Mmdb(mmdb::MmdbConfig),
+
+    /// Exposes data from a postgres table.
+    #[cfg(feature = "enrichment-tables-postgres")]
+    Pgtable(pgtable::PgtableConfig),
 }
 
 // TODO: Use `enum_dispatch` here.
@@ -45,6 +54,8 @@ impl NamedComponent for EnrichmentTables {
             Self::Geoip(config) => config.get_component_name(),
             #[cfg(feature = "enrichment-tables-mmdb")]
             Self::Mmdb(config) => config.get_component_name(),
+            #[cfg(feature = "enrichment-tables-postgres")]
+            Self::Pgtable(config) => config.get_component_name(),
             #[allow(unreachable_patterns)]
             _ => unimplemented!(),
         }
