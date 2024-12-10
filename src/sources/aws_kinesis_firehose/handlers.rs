@@ -7,6 +7,7 @@ use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_common::constants::GZIP_MAGIC;
 use vector_lib::codecs::StreamDecodingError;
 use vector_lib::lookup::{metadata_path, path, PathPrefix};
 use vector_lib::{
@@ -242,7 +243,7 @@ fn is_gzip(data: &[u8]) -> bool {
     // deflate algorithm.
     //
     // Reference: https://datatracker.ietf.org/doc/html/rfc1952 Section 2.3
-    data.len() >= 10 && &data[..3] == b"\x1f\x8b\x08"
+    data.starts_with(GZIP_MAGIC)
 }
 
 fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {

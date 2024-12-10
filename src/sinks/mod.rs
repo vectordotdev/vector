@@ -82,6 +82,8 @@ pub mod nats;
 pub mod new_relic;
 #[cfg(feature = "sinks-webhdfs")]
 pub mod opendal_common;
+#[cfg(feature = "sinks-opentelemetry")]
+pub mod opentelemetry;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]

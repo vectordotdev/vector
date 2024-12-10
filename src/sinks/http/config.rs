@@ -10,7 +10,7 @@ use vector_lib::codecs::{
 
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
-    http::{Auth, AuthorizationConfig, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
@@ -91,9 +91,6 @@ pub struct HttpSinkConfig {
     pub tls: Option<TlsConfig>,
 
     #[configurable(derived)]
-    pub authorization_config: Option<AuthorizationConfig>,
-
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -156,12 +153,7 @@ impl From<HttpMethod> for Method {
 impl HttpSinkConfig {
     fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(&self.tls)?;
-        let auth_strategy = self.authorization_config.clone();
-        Ok(HttpClient::new_with_auth_extension(
-            tls,
-            cx.proxy(),
-            auth_strategy,
-        )?)
+        Ok(HttpClient::new(tls, cx.proxy())?)
     }
 
     pub(super) fn build_encoder(&self) -> crate::Result<Encoder<Framer>> {
@@ -346,7 +338,6 @@ mod tests {
                 batch: BatchConfig::default(),
                 request: RequestConfig::default(),
                 tls: None,
-                authorization_config: None,
                 acknowledgements: AcknowledgementsConfig::default(),
                 payload_prefix: String::new(),
                 payload_suffix: String::new(),

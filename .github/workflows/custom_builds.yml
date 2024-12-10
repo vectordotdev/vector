@@ -1,7 +1,7 @@
 name: Custom Builds
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 on:
