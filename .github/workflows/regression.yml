@@ -407,7 +407,7 @@ jobs:
             --target-config-dir ${{ github.workspace }}/regression/ \
             --warmup-seconds ${{ env.SMP_WARMUP_SECONDS }} \
             --submission-metadata ${{ runner.temp }}/submission-metadata \
-            --replicas {{ env.SMP_REPLICAS }}
+            --replicas ${{ env.SMP_REPLICAS }}
 
       - uses: actions/upload-artifact@v4
         with:
