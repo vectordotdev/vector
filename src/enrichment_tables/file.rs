@@ -4,7 +4,7 @@ use std::{collections::HashMap, fs, hash::Hasher, path::PathBuf, time::SystemTim
 use bytes::Bytes;
 use tracing::trace;
 use vector_lib::configurable::configurable_component;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use vector_lib::enrichment::{Case, Condition, Conditions, IndexHandle, Table};
 use vector_lib::{conversion::Conversion, TimeZone};
 use vrl::value::{ObjectMap, Value};
 
@@ -400,19 +400,49 @@ impl File {
         &'a self,
         data: I,
         case: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&'a [String]>,
     ) -> impl Iterator<Item = ObjectMap> + 'a
     where
         I: Iterator<Item = &'a Vec<Value>> + 'a,
     {
         data.filter_map(move |row| {
-            if self.row_equals(case, condition, row) {
+            if condition
+                .iter()
+                .any(|condition| self.row_equals(case, condition, row))
+            {
                 Some(self.add_columns(select, row))
             } else {
                 None
             }
         })
+    }
+
+    /// Returns the union of the results of each condition.
+    /// Assumes that the conditions are ordered in the same order as the indexes.
+    fn union<'a>(
+        &'a self,
+        case: Case,
+        condition: &'a Conditions<'a>,
+        handle: &[IndexHandle],
+    ) -> Result<Option<Vec<usize>>, String> {
+        let mut accum = None;
+
+        for (condition, handle) in condition.iter().zip(handle) {
+            match accum {
+                None => {
+                    accum = self.indexed(case, condition, *handle)?.cloned();
+                }
+                Some(ref accuminner) => match self.indexed(case, condition, *handle)? {
+                    None => {}
+                    Some(indexed) => {
+                        accum = Some(merge_sorted(accuminner, indexed));
+                    }
+                },
+            }
+        }
+
+        Ok(accum)
     }
 
     fn indexed<'a>(
@@ -484,55 +514,70 @@ impl Table for File {
     fn find_table_row<'a>(
         &self,
         case: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&'a [String]>,
-        index: Option<IndexHandle>,
+        index: &[IndexHandle],
     ) -> Result<ObjectMap, String> {
-        match index {
-            None => {
-                // No index has been passed so we need to do a Sequential Scan.
-                single_or_err(self.sequential(self.data.iter(), case, condition, select))
-            }
-            Some(handle) => {
-                let result = self
-                    .indexed(case, condition, handle)?
-                    .ok_or_else(|| "no rows found in index".to_string())?
-                    .iter()
-                    .map(|idx| &self.data[*idx]);
+        if index.is_empty() {
+            // No index has been passed so we need to do a Sequential Scan.
+            single_or_err(self.sequential(self.data.iter(), case, condition, select))
+        } else if index.len() == 1 {
+            // When we only have one index, we can use it directly, which saves an extra clone.
+            let result = self
+                .indexed(case, &condition[0], index[0])?
+                .ok_or_else(|| "no rows found in index".to_string())?
+                .iter()
+                .map(|idx| &self.data[*idx]);
 
-                // Perform a sequential scan over the indexed result.
-                single_or_err(self.sequential(result, case, condition, select))
-            }
+            // Perform a sequential scan over the indexed result.
+            single_or_err(self.sequential(result, case, condition, select))
+        } else {
+            let result = self
+                .union(case, condition, index)?
+                .ok_or_else(|| "no rows found in index".to_string())?;
+            let result = result.iter().map(|idx| &self.data[*idx]);
+
+            // Perform a sequential scan over the indexed result.
+            single_or_err(self.sequential(result, case, condition, select))
         }
     }
 
     fn find_table_rows<'a>(
         &self,
         case: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&'a [String]>,
-        index: Option<IndexHandle>,
+        index: &[IndexHandle],
     ) -> Result<Vec<ObjectMap>, String> {
-        match index {
-            None => {
-                // No index has been passed so we need to do a Sequential Scan.
-                Ok(self
-                    .sequential(self.data.iter(), case, condition, select)
-                    .collect())
-            }
-            Some(handle) => {
-                // Perform a sequential scan over the indexed result.
-                Ok(self
-                    .sequential(
-                        self.indexed(case, condition, handle)?
-                            .iter()
-                            .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
-                        case,
-                        condition,
-                        select,
-                    )
-                    .collect())
-            }
+        if index.is_empty() {
+            // No index has been passed so we need to do a Sequential Scan.
+            Ok(self
+                .sequential(self.data.iter(), case, condition, select)
+                .collect())
+        } else if index.len() == 1 {
+            // When we only have one index, we can use it directly, which saves an extra clone.
+            Ok(self
+                .sequential(
+                    self.indexed(case, &condition[0], index[0])?
+                        .iter()
+                        .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
+                    case,
+                    condition,
+                    select,
+                )
+                .collect())
+        } else {
+            // Perform a sequential scan over the indexed result.
+            Ok(self
+                .sequential(
+                    self.union(case, condition, index)?
+                        .iter()
+                        .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
+                    case,
+                    condition,
+                    select,
+                )
+                .collect())
         }
     }
 
@@ -589,6 +634,46 @@ impl std::fmt::Debug for File {
             self.data.len(),
             self.indexes.len()
         )
+    }
+}
+
+/// Merges two slices into a single sorted vector.
+/// The slices must be sorted.
+fn merge_sorted<T>(left: &[T], right: &[T]) -> Vec<T>
+where
+    T: PartialOrd + Copy + core::fmt::Debug,
+{
+    let mut result = Vec::new();
+    let mut leftidx = 0;
+    let mut rightidx = 0;
+
+    loop {
+        match (left.get(leftidx), right.get(rightidx)) {
+            (Some(leftval), Some(rightval)) => {
+                if leftval == rightval {
+                    result.push(*leftval);
+                    leftidx += 1;
+                    rightidx += 1;
+                } else if leftval < rightval {
+                    result.push(*leftval);
+                    leftidx += 1;
+                } else {
+                    result.push(*rightval);
+                    rightidx += 1;
+                }
+            }
+            (Some(leftval), None) => {
+                result.push(*leftval);
+                leftidx += 1;
+            }
+            (None, Some(rightval)) => {
+                result.push(*rightval);
+                rightidx += 1;
+            }
+            (None, None) => {
+                return result;
+            }
+        }
     }
 }
 
@@ -726,7 +811,7 @@ mod tests {
                 ("field1".into(), Value::from("zirp")),
                 ("field2".into(), Value::from("zurp")),
             ])),
-            file.find_table_row(Case::Sensitive, &[condition], None, None)
+            file.find_table_row(Case::Sensitive, &[vec![condition]], None, &[])
         );
     }
 
@@ -800,7 +885,7 @@ mod tests {
                 ("field1".into(), Value::from("zirp")),
                 ("field2".into(), Value::from("zurp")),
             ])),
-            file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
+            file.find_table_row(Case::Sensitive, &[vec![condition]], None, &[handle])
         );
     }
 
@@ -834,12 +919,12 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Sensitive,
-                &[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "field1",
                     value: Value::from("zip"),
-                }],
+                }]],
                 None,
-                Some(handle)
+                &[handle]
             )
         );
 
@@ -847,12 +932,12 @@ mod tests {
             Ok(vec![]),
             file.find_table_rows(
                 Case::Sensitive,
-                &[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "field1",
                     value: Value::from("ZiP"),
-                }],
+                }]],
                 None,
-                Some(handle)
+                &[handle]
             )
         );
     }
@@ -896,9 +981,9 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Sensitive,
-                &[condition],
+                &[vec![condition]],
                 Some(&["field1".to_string(), "field3".to_string()]),
-                Some(handle)
+                &[handle]
             )
         );
     }
@@ -933,12 +1018,12 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Insensitive,
-                &[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "field1",
                     value: Value::from("zip"),
-                }],
+                }]],
                 None,
-                Some(handle)
+                &[handle]
             )
         );
 
@@ -955,12 +1040,12 @@ mod tests {
             ]),
             file.find_table_rows(
                 Case::Insensitive,
-                &[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "field1",
                     value: Value::from("ZiP"),
-                }],
+                }]],
                 None,
-                Some(handle)
+                &[handle]
             )
         );
     }
@@ -997,7 +1082,7 @@ mod tests {
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
 
-        let conditions = [
+        let conditions = vec![
             Condition::Equals {
                 field: "field1",
                 value: "zip".into(),
@@ -1028,7 +1113,7 @@ mod tests {
                     )
                 )
             ])),
-            file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
+            file.find_table_row(Case::Sensitive, &[conditions], None, &[handle])
         );
     }
 
@@ -1053,7 +1138,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found".to_string()),
-            file.find_table_row(Case::Sensitive, &[condition], None, None)
+            file.find_table_row(Case::Sensitive, &[vec![condition]], None, &[])
         );
     }
 
@@ -1080,7 +1165,240 @@ mod tests {
 
         assert_eq!(
             Err("no rows found in index".to_string()),
-            file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
+            file.find_table_row(Case::Sensitive, &[vec![condition]], None, &[handle])
+        );
+    }
+
+    #[test]
+    fn finds_union_with_single_index() {
+        let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
+            vec![
+                vec!["zip".into(), "zup".into()],
+                vec!["zirp".into(), "zurp".into()],
+                vec!["zip".into(), "zoop".into()],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field2"]).unwrap();
+
+        let condition1 = vec![Condition::Equals {
+            field: "field2",
+            value: Value::from("zup"),
+        }];
+
+        let condition2 = vec![Condition::Equals {
+            field: "field2",
+            value: Value::from("zoop"),
+        }];
+
+        assert_eq!(
+            Ok(vec![
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
+                ]),
+            ]),
+            file.find_table_rows(
+                Case::Sensitive,
+                &[condition1, condition2],
+                None,
+                &[handle, handle]
+            )
+        );
+    }
+
+    #[test]
+    fn finds_union_with_multiple_indexes() {
+        let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
+            vec![
+                vec!["zip".into(), "zup".into()],
+                vec!["zirp".into(), "zurp".into()],
+                vec!["zirp".into(), "zoop".into()],
+                vec!["zip".into(), "zoop".into()],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let handle1 = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+        let handle2 = file.add_index(Case::Sensitive, &["field2"]).unwrap();
+
+        let condition1 = vec![Condition::Equals {
+            field: "field1",
+            value: Value::from("zip"),
+        }];
+
+        let condition2 = vec![Condition::Equals {
+            field: "field2",
+            value: Value::from("zurp"),
+        }];
+
+        assert_eq!(
+            Ok(vec![
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zirp")),
+                    ("field2".into(), Value::from("zurp")),
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
+                ]),
+            ]),
+            file.find_table_rows(
+                Case::Sensitive,
+                &[condition1, condition2],
+                None,
+                &[handle1, handle2]
+            )
+        );
+    }
+
+    #[test]
+    fn finds_union_with_dates() {
+        let mut file = File::new(
+            Default::default(),
+            SystemTime::now(),
+            vec![
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
+                ],
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
+                ],
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2017, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
+                ],
+                vec![
+                    "zip".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2018, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp"),
+                    ),
+                ],
+            ],
+            vec!["field1".to_string(), "field2".to_string()],
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+
+        let conditions = vec![
+            vec![
+                Condition::Equals {
+                    field: "field1",
+                    value: "zip".into(),
+                },
+                Condition::BetweenDates {
+                    field: "field2",
+                    from: chrono::Utc
+                        .with_ymd_and_hms(2016, 1, 1, 0, 0, 0)
+                        .single()
+                        .expect("invalid timestamp"),
+                    to: chrono::Utc
+                        .with_ymd_and_hms(2017, 1, 1, 0, 0, 0)
+                        .single()
+                        .expect("invalid timestamp"),
+                },
+            ],
+            vec![
+                Condition::Equals {
+                    field: "field1",
+                    value: "zip".into(),
+                },
+                Condition::BetweenDates {
+                    field: "field2",
+                    from: chrono::Utc
+                        .with_ymd_and_hms(2018, 1, 1, 0, 0, 0)
+                        .single()
+                        .expect("invalid timestamp"),
+                    to: chrono::Utc
+                        .with_ymd_and_hms(2019, 1, 1, 0, 0, 0)
+                        .single()
+                        .expect("invalid timestamp"),
+                },
+            ],
+        ];
+
+        assert_eq!(
+            Ok(vec![
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    (
+                        "field2".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp")
+                        )
+                    )
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    (
+                        "field2".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2018, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp")
+                        )
+                    )
+                ]),
+            ]),
+            file.find_table_rows(Case::Sensitive, &conditions, None, &[handle])
+        );
+    }
+
+    #[test]
+    fn merge_sorted_merges() {
+        assert_eq!(
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+            merge_sorted(&[1, 3, 5, 7, 9], &[2, 4, 6, 8])
+        );
+    }
+
+    #[test]
+    fn merge_sorted_removes_dedupes() {
+        assert_eq!(
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+            merge_sorted(&[1, 2, 3, 4, 5, 6, 7, 8, 9], &[2, 4, 6, 8])
+        );
+
+        assert_eq!(
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+            merge_sorted(&[2, 4, 6, 8], &[1, 2, 3, 4, 5, 6, 7, 8, 9])
         );
     }
 }

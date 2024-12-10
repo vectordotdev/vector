@@ -16,6 +16,8 @@ use vrl::value::{ObjectMap, Value};
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
 
+pub type Conditions<'a> = [Vec<Condition<'a>>];
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Condition<'a> {
     /// Condition exactly matches the field value.
@@ -45,9 +47,9 @@ pub trait Table: DynClone {
     fn find_table_row<'a>(
         &self,
         case: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&[String]>,
-        index: Option<IndexHandle>,
+        index: &[IndexHandle],
     ) -> Result<ObjectMap, String>;
 
     /// Search the enrichment table data with the given condition.
@@ -56,9 +58,9 @@ pub trait Table: DynClone {
     fn find_table_rows<'a>(
         &self,
         case: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&[String]>,
-        index: Option<IndexHandle>,
+        index: &[IndexHandle],
     ) -> Result<Vec<ObjectMap>, String>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
