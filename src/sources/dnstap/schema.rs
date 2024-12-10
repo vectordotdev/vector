@@ -12,7 +12,7 @@ pub struct DnstapEventSchema;
 
 impl DnstapEventSchema {
     /// The message schema for the request and response message fields
-    fn request_message_schema_definition(&self) -> Collection<Field> {
+    pub(crate) fn request_message_schema_definition(&self) -> Collection<Field> {
         let mut result: BTreeMap<Field, Kind> = BTreeMap::new();
         result.insert(
             DNSTAP_VALUE_PATHS.time.to_string().into(),

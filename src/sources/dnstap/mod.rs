@@ -8,6 +8,7 @@ use vector_lib::internal_event::{
 };
 use vector_lib::lookup::{owned_value_path, path};
 use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
+use vrl::compiler::Function;
 use vrl::path::{OwnedValuePath, PathPrefix};
 use vrl::value::{kind::Collection, Kind};
 
@@ -32,6 +33,7 @@ use dnsmsg_parser::{dns_message, dns_message_parser};
 pub use schema::DnstapEventSchema;
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
+mod vrl_functions;
 
 /// Configuration for the `dnstap` source.
 #[configurable_component(source("dnstap", "Collect DNS logs from a dnstap-compatible server."))]
@@ -346,6 +348,10 @@ impl FrameHandler for CommonFrameHandler {
     fn source_type_key(&self) -> Option<&vrl::path::OwnedValuePath> {
         self.source_type_key.as_ref()
     }
+}
+
+pub fn vrl_functions() -> Vec<Box<dyn Function>> {
+    vrl_functions::all()
 }
 
 #[cfg(test)]
