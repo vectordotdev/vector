@@ -14,7 +14,7 @@ releases: "0.43.1": {
 		{
 			type: "fix"
 			description: """
-				Update to VRL v0.20.1 which a reverts to previous `to_float` behavior for non-normal floats.
+				Update to VRL v0.20.1 which reverts to previous `to_float` behavior for non-normal floats.
 				"""
 			contributors: ["pront"]
 		},
