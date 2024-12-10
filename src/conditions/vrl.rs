@@ -7,7 +7,6 @@ use vrl::value::Value;
 
 use crate::config::LogNamespace;
 use crate::event::TargetEvents;
-use crate::sources::dnstap;
 use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
     event::{Event, VrlTarget},
@@ -46,7 +45,7 @@ impl ConditionalConfig for VrlConfig {
         let functions = vrl::stdlib::all()
             .into_iter()
             .chain(vector_lib::enrichment::vrl_functions())
-            .chain(dnstap::vrl_functions())
+            .chain(dnstap_parser::vrl_functions())
             .chain(vector_vrl_functions::all())
             .collect::<Vec<_>>();
 

@@ -80,6 +80,7 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
     let mut functions = vrl::stdlib::all();
     functions.extend(vector_vrl_functions::all());
     functions.extend(enrichment::vrl_functions());
+    functions.extend(dnstap_parser::vrl_functions());
 
     let event = &mut input.event;
     let state = TypeState::default();

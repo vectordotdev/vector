@@ -288,7 +288,7 @@ pub struct DnstapPaths {
 }
 
 /// Lazily initialized singleton.
-pub(crate) static DNSTAP_VALUE_PATHS: LazyLock<DnstapPaths> = LazyLock::new(|| DnstapPaths {
+pub static DNSTAP_VALUE_PATHS: LazyLock<DnstapPaths> = LazyLock::new(|| DnstapPaths {
     server_identity: owned_value_path!("serverId"),
     server_version: owned_value_path!("serverVersion"),
     extra: owned_value_path!("extraInfo"),

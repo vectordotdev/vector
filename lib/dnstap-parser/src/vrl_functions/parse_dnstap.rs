@@ -1,4 +1,5 @@
-use crate::sources::dnstap::{DnstapEventSchema, DnstapParser};
+use crate::parser::DnstapParser;
+use crate::schema::DnstapEventSchema;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
 use vector_lib::event::LogEvent;
@@ -148,8 +149,6 @@ impl FunctionExpression for ParseDnstapFn {
 
 #[cfg(test)]
 mod tests {
-    use crate::sources::dnstap::DnstapEventSchema;
-
     use super::*;
     use chrono::{DateTime, TimeZone, Utc};
     use vrl::value;
