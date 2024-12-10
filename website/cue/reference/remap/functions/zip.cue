@@ -32,7 +32,7 @@ remap: functions: zip: {
 	return: {
 		types: ["array"]
 		rules: [
-			"`zip` is considered fallible if any of the parameters is not an array, or if only the first parameter is present and it is not an array of arrays.",
+			"`zip` is considered fallible if either of the parameters is not an array, or if only the first parameter is present and it is not an array of arrays.",
 		]
 	}
 
