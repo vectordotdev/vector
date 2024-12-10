@@ -1,6 +1,6 @@
 use std::task::{Context, Poll};
 
-use futures::{future::BoxFuture, TryFutureExt};
+use futures::future::BoxFuture;
 use http::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
