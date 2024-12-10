@@ -90,7 +90,7 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
             _ => {}
         }
 
-        let body = body.freeze();
+        let body = body.clone().freeze();
 
         write_all(writer, n_events, body.as_ref()).map(|()| (body.len(), byte_size))
     }
