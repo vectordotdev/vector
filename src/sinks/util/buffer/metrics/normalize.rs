@@ -197,8 +197,8 @@ impl MetricSet {
             }
             None => {
                 // No reference so store this and emit nothing
-                self.insert(metric);
-                None
+                self.insert(metric.clone());
+                Some(metric.into_incremental())
             }
         }
     }
