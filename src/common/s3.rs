@@ -8,6 +8,11 @@ impl ClientBuilder for S3ClientBuilder {
     type Client = aws_sdk_s3::client::Client;
 
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
+        let config = config::Builder::from(config).build();
+        aws_sdk_s3::client::Client::from_conf(config)
+    }
+
+    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
         let config = config::Builder::from(config).force_path_style(true).build();
         aws_sdk_s3::client::Client::from_conf(config)
     }

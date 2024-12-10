@@ -41,6 +41,10 @@ impl ClientBuilder for KinesisFirehoseClientBuilder {
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         Self::Client::new(config)
     }
+
+    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
+        KinesisFirehoseClientBuilder::build(config)
+    }
 }
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
@@ -108,6 +112,7 @@ impl KinesisFirehoseSinkConfig {
             proxy,
             &self.base.tls,
             &None,
+            false,
         )
         .await
     }
