@@ -124,7 +124,7 @@ pub struct GreptimeDBMetricsConfig {
     /// this option to avoid the conflict.
     ///
     /// Default to `false` for compatibility.
-    #[configurable(metadata(docs::examples = true))]
+    #[configurable]
     pub new_naming: Option<bool>,
 }
 
