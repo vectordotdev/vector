@@ -63,7 +63,7 @@ impl RetryLogic for ClickhouseRetryLogic {
 pub(super) struct ClickhouseServiceRequestBuilder {
     pub(super) auth: Option<Auth>,
     pub(super) endpoint: Uri,
-    pub(super) skip_unknown_fields: bool,
+    pub(super) skip_unknown_fields: Option<bool>,
     pub(super) date_time_best_effort: bool,
     pub(super) insert_random_shard: bool,
     pub(super) compression: Compression,
@@ -112,7 +112,7 @@ fn set_uri_query(
     database: &str,
     table: &str,
     format: Format,
-    skip_unknown: bool,
+    skip_unknown: Option<bool>,
     date_time_best_effort: bool,
     insert_random_shard: bool,
 ) -> crate::Result<Uri> {
@@ -135,8 +135,12 @@ fn set_uri_query(
     }
 
     uri.push_str("?input_format_import_nested_json=1&");
-    if skip_unknown {
-        uri.push_str("input_format_skip_unknown_fields=1&");
+    if let Some(skip_unknown) = skip_unknown {
+        if skip_unknown {
+            uri.push_str("input_format_skip_unknown_fields=1&");
+        } else {
+            uri.push_str("input_format_skip_unknown_fields=0&")
+        }
     }
     if date_time_best_effort {
         uri.push_str("date_time_input_format=best_effort&")
@@ -162,13 +166,14 @@ mod tests {
             "my_database",
             "my_table",
             Format::JsonEachRow,
-            false,
+            Some(false),
             true,
             false,
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
+                                     input_format_skip_unknown_fields=0&\
                                      date_time_input_format=best_effort&\
                                      query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
 
@@ -177,13 +182,14 @@ mod tests {
             "my_database",
             "my_\"table\"",
             Format::JsonEachRow,
-            false,
+            Some(false),
             false,
             false,
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
+                                     input_format_skip_unknown_fields=0&\
                                      query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
 
         let uri = set_uri_query(
@@ -191,7 +197,7 @@ mod tests {
             "my_database",
             "my_\"table\"",
             Format::JsonAsObject,
-            true,
+            Some(true),
             true,
             false,
         )
@@ -199,6 +205,21 @@ mod tests {
         assert_eq!(uri.to_string(), "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=1&\
+                                     date_time_input_format=best_effort&\
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject");
+
+        let uri = set_uri_query(
+            &"http://localhost:80".parse().unwrap(),
+            "my_database",
+            "my_\"table\"",
+            Format::JsonAsObject,
+            None,
+            true,
+            false,
+        )
+        .unwrap();
+        assert_eq!(uri.to_string(), "http://localhost:80/?\
+                                     input_format_import_nested_json=1&\
                                      date_time_input_format=best_effort&\
                                      query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject");
     }
@@ -210,7 +231,7 @@ mod tests {
             "my_database",
             "my_table",
             Format::JsonEachRow,
-            false,
+            Some(false),
             false,
             false,
         )
