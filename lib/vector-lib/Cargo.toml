@@ -22,7 +22,7 @@ vector-tap = { path = "../vector-tap" }
 vrl = { workspace = true, optional = true }
 
 [features]
-api = ["vector-core/api", "vector-tap/api"]
+api = ["vector-tap/api"]
 api-client = ["dep:vector-api-client"]
 lua = ["vector-core/lua"]
 file-source = ["dep:file-source"]

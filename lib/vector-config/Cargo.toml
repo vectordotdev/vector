@@ -33,4 +33,3 @@ vector-config-macros = { path = "../vector-config-macros" }
 [dev-dependencies]
 assert-json-diff = { version = "2", default-features = false }
 serde_with = { version = "3.11.0", default-features = false, features = ["std", "macros"] }
-vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
