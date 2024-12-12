@@ -2,6 +2,7 @@ use crate::sources::exec::*;
 use crate::{event::LogEvent, test_util::trace_init};
 use bytes::Bytes;
 use std::ffi::OsStr;
+use std::thread;
 use std::io::Cursor;
 use vector_lib::event::EventMetadata;
 use vrl::value;
@@ -44,6 +45,82 @@ fn test_scheduled_handle_event() {
 #[test]
 fn test_scheduled_handle_event_vector_namespace() {
     let config = standard_scheduled_test_config();
+    let hostname = Some("Some.Machine".to_string());
+    let data_stream = Some(STDOUT.to_string());
+    let pid = Some(8888_u32);
+
+    let mut event: Event =
+        LogEvent::from_parts(value!("hello world"), EventMetadata::default()).into();
+
+    handle_event(
+        &config,
+        &hostname,
+        &data_stream,
+        pid,
+        &mut event,
+        LogNamespace::Vector,
+    );
+
+    let log = event.as_log();
+    let meta = log.metadata().value();
+
+    assert_eq!(
+        meta.get(path!(ExecConfig::NAME, "host")).unwrap(),
+        &value!("Some.Machine")
+    );
+    assert_eq!(
+        meta.get(path!(ExecConfig::NAME, STREAM_KEY)).unwrap(),
+        &value!(STDOUT)
+    );
+    assert_eq!(
+        meta.get(path!(ExecConfig::NAME, PID_KEY)).unwrap(),
+        &value!(8888_i64)
+    );
+    assert_eq!(
+        meta.get(path!(ExecConfig::NAME, COMMAND_KEY)).unwrap(),
+        &value!(config.command)
+    );
+    assert_eq!(log.value(), &value!("hello world"));
+    assert_eq!(
+        meta.get(path!("vector", "source_type")).unwrap(),
+        &value!("exec")
+    );
+    assert!(meta
+        .get(path!("vector", "ingest_timestamp"))
+        .unwrap()
+        .is_timestamp());
+}
+
+#[test]
+fn test_cronjob_handle_event() {
+    let config = standard_cronjob_test_config();
+    let hostname = Some("Some.Machine".to_string());
+    let data_stream = Some(STDOUT.to_string());
+    let pid = Some(8888_u32);
+
+    let mut event = LogEvent::from("hello world").into();
+    handle_event(
+        &config,
+        &hostname,
+        &data_stream,
+        pid,
+        &mut event,
+        LogNamespace::Legacy,
+    );
+    let log = event.as_log();
+
+    assert_eq!(*log.get_host().unwrap(), "Some.Machine".into());
+    assert_eq!(log[STREAM_KEY], STDOUT.into());
+    assert_eq!(log[PID_KEY], (8888_i64).into());
+    assert_eq!(log[COMMAND_KEY], config.command.into());
+    assert_eq!(*log.get_message().unwrap(), "hello world".into());
+    assert_eq!(*log.get_source_type().unwrap(), "exec".into());
+    assert!(log.get_timestamp().is_some());
+}
+
+#[test]
+fn test_cronjob_handle_event_vector_namespace() {
+    let config = standard_cronjob_test_config();
     let hostname = Some("Some.Machine".to_string());
     let data_stream = Some(STDOUT.to_string());
     let pid = Some(8888_u32);
@@ -175,6 +252,7 @@ fn test_build_command() {
             respawn_on_exit: default_respawn_on_exit(),
             respawn_interval_secs: default_respawn_interval_secs(),
         }),
+        cron_job: None,
         command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
         environment: None,
         clear_environment: default_clear_environment(),
@@ -209,6 +287,7 @@ fn test_build_command_custom_environment() {
             respawn_on_exit: default_respawn_on_exit(),
             respawn_interval_secs: default_respawn_interval_secs(),
         }),
+        cron_job: None,
         command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
         environment: Some(HashMap::from([("FOO".to_owned(), "foo".to_owned())])),
         clear_environment: default_clear_environment(),
@@ -239,6 +318,7 @@ fn test_build_command_clear_environment() {
             respawn_on_exit: default_respawn_on_exit(),
             respawn_interval_secs: default_respawn_interval_secs(),
         }),
+        cron_job: None,
         command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
         environment: Some(HashMap::from([("FOO".to_owned(), "foo".to_owned())])),
         clear_environment: true,
@@ -435,6 +515,60 @@ async fn test_graceful_shutdown() {
     }
 }
 
+#[tokio::test]
+#[cfg(unix)]
+async fn test_graceful_shutdown_cronjob() {
+    trace_init();
+    let mut config = standard_cronjob_test_config();
+    config.command = vec![
+        String::from("bash"),
+        String::from("-c"),
+        String::from(
+            r#"trap 'echo signal received ; sleep 1; echo slept ; exit' SIGTERM; while true ; do sleep 10 ; done"#,
+        ),
+    ];
+    let hostname = Some("Some.Machine".to_string());
+    let decoder = Default::default();
+    let (trigger, shutdown, _) = ShutdownSignal::new_wired();
+    let (tx, mut rx) = SourceSender::new_test();
+
+    // create a thread to shutdown cronjob
+    let handle = thread::spawn(|| {
+        thread::sleep(Duration::from_secs(10)); // let the source start the command
+        drop(trigger); // start shutdown
+    });
+
+    // start cronjob and await
+    let cron_job_clone = config.cron_job.clone().unwrap();
+    let _ = run_cronjob(
+        config.clone(),
+        hostname,
+        cron_job_clone.schedule,
+        config.str_to_fixed_offset_or_default(cron_job_clone.timezone.as_str()),
+        decoder,
+        shutdown,
+        tx,
+        LogNamespace::Legacy,
+    ).await;
+
+    handle.join().unwrap();
+
+    // check is job shutdown gracefully
+    if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
+        let log = event.as_log();
+        assert_eq!(*log.get_message().unwrap(), "signal received".into());
+    } else {
+        panic!("Expected to receive event");
+    }
+
+    if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
+        let log = event.as_log();
+        assert_eq!(*log.get_message().unwrap(), "slept".into());
+    } else {
+        panic!("Expected to receive event");
+    }
+}
+
 fn standard_scheduled_test_config() -> ExecConfig {
     Default::default()
 }
@@ -446,6 +580,35 @@ fn standard_streaming_test_config() -> ExecConfig {
         streaming: Some(StreamingConfig {
             respawn_on_exit: default_respawn_on_exit(),
             respawn_interval_secs: default_respawn_interval_secs(),
+        }),
+        cron_job: None,
+        command: vec!["yes".to_owned()],
+        environment: None,
+        clear_environment: default_clear_environment(),
+        working_directory: None,
+        include_stderr: default_include_stderr(),
+        maximum_buffer_size_bytes: default_maximum_buffer_size(),
+        framing: None,
+        decoding: default_decoding(),
+        log_namespace: None,
+    }
+}
+
+#[test]
+fn test_cronjob_default_timezone() {
+    let config = standard_cronjob_test_config().cron_job;
+    let timezone = config.unwrap().timezone;
+    assert_eq!("+08:00", timezone.as_str())
+}
+
+fn standard_cronjob_test_config() -> ExecConfig {
+    ExecConfig {
+        mode: Mode::CronJob,
+        scheduled: None,
+        streaming: None,
+        cron_job: Some(CronJobConfig{
+            timezone: default_timezone(),
+            schedule: "*/2 * * * * * ".to_string()
         }),
         command: vec!["yes".to_owned()],
         environment: None,

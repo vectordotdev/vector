@@ -7,7 +7,7 @@ use std::{
 
 use std::str::FromStr;
 use cron::Schedule;
-use chrono::{FixedOffset, Utc};
+use chrono::{FixedOffset, Utc, Local};
 use futures::StreamExt;
 use smallvec::SmallVec;
 use snafu::Snafu;
@@ -208,8 +208,10 @@ const fn default_respawn_on_exit() -> bool {
 }
 
 fn default_timezone() -> String {
+    // get default second offset to utc locally
+    let local_offset_seconds = Local::now().offset().local_minus_utc();
     // default timezone use east +8 hours
-    FixedOffset::east_opt(8 * 3600).unwrap().to_string()
+    FixedOffset::east_opt(local_offset_seconds).unwrap().to_string()
 }
 
 const fn default_clear_environment() -> bool {
@@ -287,8 +289,10 @@ impl ExecConfig {
         }
     }
     fn str_to_fixed_offset_or_default(&self, str: &str) -> FixedOffset {
+        // get default second offset to utc locally
+        let local_offset_seconds = Local::now().offset().local_minus_utc();
         // parse str to fixedOffset(timezone) or use default
-        str.parse::<FixedOffset>().unwrap_or_else(|_| FixedOffset::east_opt(8 * 3600).unwrap())
+        str.parse::<FixedOffset>().unwrap_or_else(|_| FixedOffset::east_opt(local_offset_seconds).unwrap())
     }
 
 }
