@@ -5,14 +5,12 @@ use aws_config::{
     default_provider::credentials::DefaultCredentialsChain,
     identity::IdentityCache,
     imds,
-    profile::{
-        profile_file::{ProfileFileKind, ProfileFiles},
-        ProfileFileCredentialsProvider,
-    },
+    profile::ProfileFileCredentialsProvider,
     provider_config::ProviderConfig,
     sts::AssumeRoleProviderBuilder,
 };
 use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
+use aws_runtime::env_config::file::{EnvConfigFileKind, EnvConfigFiles};
 use aws_smithy_async::time::SystemTimeSource;
 use aws_smithy_runtime_api::client::identity::SharedIdentityCache;
 use aws_types::{region::Region, SdkConfig};
@@ -277,8 +275,8 @@ impl AwsAuthentication {
 
                 // The SDK uses the default profile out of the box, but doesn't provide an optional
                 // type in the builder. We can just hardcode it so that everything works.
-                let profile_files = ProfileFiles::builder()
-                    .with_file(ProfileFileKind::Credentials, credentials_file)
+                let profile_files = EnvConfigFiles::builder()
+                    .with_file(EnvConfigFileKind::Credentials, credentials_file)
                     .build();
 
                 let provider_config = ProviderConfig::empty().with_http_client(connector);
