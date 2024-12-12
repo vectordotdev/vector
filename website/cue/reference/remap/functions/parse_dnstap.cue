@@ -34,11 +34,12 @@ remap: functions: parse_dnstap: {
 		{
 			title: "Parse dnstap query message"
 			source: #"""
-				parse_dnstap!("ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcnoIAxACGAEiEAAAAAAAAAAAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAHgB")
+				parse_dnstap!("ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zGgBy5wEIAxACGAEiEAAAAAAAAAAAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAGAAbQAAAAByZLM4AAAAAQAAAAAAAQJoNQdleGFtcGxlA2NvbQAABgABAAApBNABAUAAADkADwA1AAlubyBTRVAgbWF0Y2hpbmcgdGhlIERTIGZvdW5kIGZvciBkbnNzZWMtZmFpbGVkLm9yZy54AQ==")
 				"""#
 			return: {
 				"dataType": "Message",
 				"dataTypeId": 1,
+				"extraInfo": "",
 				"messageType": "ResolverQuery",
 				"messageTypeId": 3,
 				"queryZone": "com.",
@@ -72,6 +73,47 @@ remap: functions: parse_dnstap: {
 						}
 						],
 						"udpPayloadSize": 512,
+					},
+					"question": [
+					{
+						"class": "IN",
+						"domainName": "facebook1.com.",
+						"questionType": "A",
+						"questionTypeId": 1,
+					}
+					],
+					"rcodeName": "NoError",
+				},
+				"responseData": {
+					"fullRcode": 16,
+					"header": {
+						"aa": false,
+						"ad": false,
+						"anCount": 0,
+						"arCount": 1,
+						"cd": false,
+						"id": 45880,
+						"nsCount": 0,
+						"opcode": 0,
+						"qdCount": 1,
+						"qr": 0,
+						"ra": false,
+						"rcode": 16,
+						"rd": false,
+						"tc": false,
+					},
+					"opt": {
+						"do": false,
+						"ednsVersion": 1,
+						"extendedRcode": 1,
+						"ede": [
+						{
+							"extraText": "no SEP matching the DS found for dnssec-failed.org.",
+							"infoCode": 9,
+							"purpose": "DNSKEY Missing",
+						}
+						],
+						"udpPayloadSize": 1232,
 					},
 					"question": [
 					{

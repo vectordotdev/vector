@@ -31,11 +31,12 @@ impl Function for ParseDnstap {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "Parse dnstap query message",
-            source: r#"parse_dnstap("ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcnoIAxACGAEiEAAAAAAAAAAAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAHgB")"#,
+            source: r#"parse_dnstap("ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zGgBy5wEIAxACGAEiEAAAAAAAAAAAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAGAAbQAAAAByZLM4AAAAAQAAAAAAAQJoNQdleGFtcGxlA2NvbQAABgABAAApBNABAUAAADkADwA1AAlubyBTRVAgbWF0Y2hpbmcgdGhlIERTIGZvdW5kIGZvciBkbnNzZWMtZmFpbGVkLm9yZy54AQ==")"#,
             result: Ok(indoc!(
                 r#"{
                     "dataType": "Message",
                     "dataTypeId": 1,
+                    "extraInfo": "",
                     "messageType": "ResolverQuery",
                     "messageTypeId": 3,
                     "queryZone": "com.",
@@ -69,6 +70,47 @@ impl Function for ParseDnstap {
                             }
                             ],
                             "udpPayloadSize": 512,
+                        },
+                        "question": [
+                        {
+                            "class": "IN",
+                            "domainName": "facebook1.com.",
+                            "questionType": "A",
+                            "questionTypeId": 1,
+                        }
+                        ],
+                        "rcodeName": "NoError",
+                    },
+                    "responseData": {
+                        "fullRcode": 16,
+                        "header": {
+                            "aa": false,
+                            "ad": false,
+                            "anCount": 0,
+                            "arCount": 1,
+                            "cd": false,
+                            "id": 45880,
+                            "nsCount": 0,
+                            "opcode": 0,
+                            "qdCount": 1,
+                            "qr": 0,
+                            "ra": false,
+                            "rcode": 16,
+                            "rd": false,
+                            "tc": false,
+                        },
+                        "opt": {
+                            "do": false,
+                            "ednsVersion": 1,
+                            "extendedRcode": 1,
+                            "ede": [
+                            {
+                                "extraText": "no SEP matching the DS found for dnssec-failed.org.",
+                                "infoCode": 9,
+                                "purpose": "DNSKEY Missing",
+                            }
+                            ],
+                            "udpPayloadSize": 1232,
                         },
                         "question": [
                         {
@@ -157,7 +199,7 @@ mod tests {
         parse_dnstap => ParseDnstap;
 
         query {
-            args: func_args![value: value!("ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcnoIAxACGAEiEAAAAAAAAAAAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAHgB")],
+            args: func_args![value: value!("ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zGgBy5wEIAxACGAEiEAAAAAAAAAAAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAGAAbQAAAAByZLM4AAAAAQAAAAAAAQJoNQdleGFtcGxlA2NvbQAABgABAAApBNABAUAAADkADwA1AAlubyBTRVAgbWF0Y2hpbmcgdGhlIERTIGZvdW5kIGZvciBkbnNzZWMtZmFpbGVkLm9yZy54AQ==")],
             want: Ok({
                 let timestamp = Value::Timestamp(
                     Utc.from_utc_datetime(
@@ -169,6 +211,7 @@ mod tests {
                 value!({
                     dataType: "Message",
                     dataTypeId: 1,
+                    extraInfo: "",
                     messageType: "ResolverQuery",
                     messageTypeId: 3,
                     queryZone: "com.",
@@ -212,6 +255,47 @@ mod tests {
                         }
                         ],
                         rcodeName: "NoError",
+                    },
+                    responseData: {
+                        fullRcode: 16,
+                        header: {
+                            aa: false,
+                            ad: false,
+                            anCount: 0,
+                            arCount: 1,
+                            cd: false,
+                            id: 45880,
+                            nsCount: 0,
+                            opcode: 0,
+                            qdCount: 1,
+                            qr: 0,
+                            ra: false,
+                            rcode: 16,
+                            rd: false,
+                            tc: false,
+                        },
+                        opt: {
+                            do: false,
+                            ede: [
+                            {
+                                extraText: "no SEP matching the DS found for dnssec-failed.org.",
+                                infoCode: 9,
+                                purpose: "DNSKEY Missing",
+                            }
+                            ],
+                            ednsVersion: 1,
+                            extendedRcode: 1,
+                            udpPayloadSize: 1232,
+                        },
+                        question: [
+                        {
+                            class: "IN",
+                            domainName: "h5.example.com.",
+                            questionType: "SOA",
+                            questionTypeId: 6,
+                        }
+                        ],
+                        rcodeName: "BADSIG",
                     },
                     responseAddress: "2001:502:7094::30",
                     responsePort: 53,
