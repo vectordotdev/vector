@@ -3,6 +3,6 @@ fn main() {
     let mut prost_build = prost_build::Config::new();
     prost_build.btree_map(["."]);
     prost_build
-        .compile_protos(&["proto/dnstap.proto"], &[] as &[&str])
+        .compile_protos(&["proto/dnstap.proto"], &["proto"])
         .expect("Failed to compile proto files");
 }
