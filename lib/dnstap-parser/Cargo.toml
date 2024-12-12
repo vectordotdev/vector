@@ -22,5 +22,5 @@ vrl.workspace = true
 prost-build.workspace = true
 
 [dev-dependencies]
-anyhow = "1"
+anyhow.workspace = true
 chrono-tz.workspace = true
