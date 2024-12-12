@@ -12,7 +12,7 @@ pub struct DnstapEventSchema;
 
 impl DnstapEventSchema {
     /// The message schema for the request and response message fields
-    fn request_message_schema_definition(&self) -> Collection<Field> {
+    pub(crate) fn request_message_schema_definition(&self) -> Collection<Field> {
         let mut result: BTreeMap<Field, Kind> = BTreeMap::new();
         result.insert(
             DNSTAP_VALUE_PATHS.time.to_string().into(),
@@ -288,7 +288,7 @@ pub struct DnstapPaths {
 }
 
 /// Lazily initialized singleton.
-pub(crate) static DNSTAP_VALUE_PATHS: LazyLock<DnstapPaths> = LazyLock::new(|| DnstapPaths {
+pub static DNSTAP_VALUE_PATHS: LazyLock<DnstapPaths> = LazyLock::new(|| DnstapPaths {
     server_identity: owned_value_path!("serverId"),
     server_version: owned_value_path!("serverVersion"),
     extra: owned_value_path!("extraInfo"),
