@@ -89,7 +89,7 @@ base: components: sinks: greptimedb_metrics: configuration: {
 			The address _must_ include a port.
 			"""
 		required: true
-		type: string: examples: ["example.com:4001", "1nge17d2r3ns.ap-southeast-1.aws.greptime.cloud:4001"]
+		type: string: examples: ["example.com:4001"]
 	}
 	grpc_compression: {
 		description: """
@@ -97,7 +97,9 @@ base: components: sinks: greptimedb_metrics: configuration: {
 			Default to none, `gzip` or `zstd` is supported.
 			"""
 		required: false
-		type: string: examples: ["grpc_compression"]
+		type: string: examples: [
+			"gzip",
+		]
 	}
 	new_naming: {
 		description: """
