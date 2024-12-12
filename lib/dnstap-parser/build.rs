@@ -4,5 +4,5 @@ fn main() {
     prost_build.btree_map(["."]);
     prost_build
         .compile_protos(&["proto/dnstap.proto"], &[] as &[&str])
-        .unwrap();
+        .expect("Failed to compile proto files");
 }
