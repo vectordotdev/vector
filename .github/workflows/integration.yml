@@ -71,7 +71,6 @@ jobs:
             || needs.changes.outputs.fluent == 'true'
             || needs.changes.outputs.gcp == 'true'
             || needs.changes.outputs.greptimedb == 'true'
-            #|| needs.changes.outputs.humio == 'true'
             || needs.changes.outputs.http-client == 'true'
             || needs.changes.outputs.influxdb == 'true'
             || needs.changes.outputs.kafka == 'true'
