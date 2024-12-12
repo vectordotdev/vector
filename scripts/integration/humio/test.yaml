@@ -8,7 +8,7 @@ runner:
     HUMIO_ADDRESS: http://humio:8080
 
 matrix:
-  version: [1.13.1]
+  version: [1.167.0]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
