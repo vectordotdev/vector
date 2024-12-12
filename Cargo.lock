@@ -2250,7 +2250,6 @@ dependencies = [
  "uuid",
  "vector-common",
  "vector-config",
- "vector-config-common",
  "vector-config-macros",
  "vector-core",
  "vector-lookup",
@@ -2878,12 +2877,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "db-key"
-version = "0.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b72465f46d518f6015d9cf07f7f3013a95dd6b9c2747c3d65ae0cce43929d14f"
-
-[[package]]
 name = "dbl"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3111,7 +3104,6 @@ dependencies = [
  "serde_json",
  "snafu 0.7.5",
  "tracing 0.1.41",
- "tracing-subscriber",
  "vector-config",
  "vector-config-common",
 ]
@@ -3552,8 +3544,6 @@ dependencies = [
  "tracing 0.1.41",
  "vector-common",
  "vector-config",
- "vector-config-common",
- "vector-config-macros",
  "winapi",
 ]
 
@@ -5522,21 +5512,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 
 [[package]]
-name = "logfmt"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "879777f0cc6f3646a044de60e4ab98c75617e3f9580f7a2032e6ad7ea0cd3054"
-
-[[package]]
 name = "loki-logproto"
 version = "0.1.0"
 dependencies = [
- "bytes 1.9.0",
  "chrono",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-types 0.12.6",
- "snap",
 ]
 
 [[package]]
@@ -6321,33 +6303,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "num_enum"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e613fc340b2220f734a8595782c551f1250e969d87d3be1ae0579e8d4065179"
-dependencies = [
- "num_enum_derive 0.7.3",
-]
-
-[[package]]
 name = "num_enum_derive"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96667db765a921f7b295ffee8b60472b686a51d4f21c2ee4ffdb94c7013b65a6"
 dependencies = [
  "proc-macro-crate 1.3.1",
- "proc-macro2 1.0.92",
- "quote 1.0.37",
- "syn 2.0.90",
-]
-
-[[package]]
-name = "num_enum_derive"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
-dependencies = [
- "proc-macro-crate 3.2.0",
  "proc-macro2 1.0.92",
  "quote 1.0.37",
  "syn 2.0.90",
@@ -6619,16 +6580,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c65ee1f9701bf938026630b455d5315f490640234259037edb259798b3bcf85e"
 dependencies = [
  "num-traits",
-]
-
-[[package]]
-name = "os_info"
-version = "3.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5ca711d8b83edbb00b44d504503cd247c9c0bd8b0fa2694f2a1a3d8165379ce"
-dependencies = [
- "log",
- "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7173,7 +7124,6 @@ checksum = "bf0668e945d7caa9b3e3a4cb360d7dd1f2613d62233f8846dbfb7ea3c3df0910"
 dependencies = [
  "owo-colors",
  "pad",
- "prettytable-rs",
 ]
 
 [[package]]
@@ -7202,7 +7152,6 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eea25e07510aa6ab6547308ebe3c036016d162b8da920dbb079e3ba8acf3d95a"
 dependencies = [
- "csv",
  "encode_unicode 1.0.0",
  "is-terminal",
  "lazy_static",
@@ -7328,7 +7277,6 @@ version = "0.1.0"
 dependencies = [
  "indexmap 2.7.0",
  "nom",
- "num_enum 0.7.3",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-types 0.12.6",
@@ -10723,7 +10671,6 @@ dependencies = [
  "indicatif",
  "itertools 0.13.0",
  "log",
- "os_info",
  "owo-colors",
  "paste",
  "regex",
@@ -10782,7 +10729,6 @@ dependencies = [
  "bytesize",
  "chrono",
  "chrono-tz",
- "cidr-utils",
  "clap",
  "colored",
  "console-subscriber",
@@ -10805,7 +10751,6 @@ dependencies = [
  "goauth",
  "governor",
  "greptimedb-ingester",
- "grok",
  "h2 0.4.7",
  "hash_hasher",
  "hashbrown 0.14.5",
@@ -10830,7 +10775,6 @@ dependencies = [
  "lapin",
  "libc",
  "listenfd",
- "logfmt",
  "loki-logproto",
  "lru",
  "maxminddb",
@@ -10940,7 +10884,6 @@ dependencies = [
  "clap",
  "futures 0.3.31",
  "graphql_client",
- "indoc",
  "reqwest 0.11.26",
  "serde",
  "serde_json",
@@ -10975,7 +10918,6 @@ dependencies = [
  "metrics-util",
  "num-traits",
  "paste",
- "pin-project",
  "proptest",
  "quickcheck",
  "rand 0.8.5",
@@ -10992,8 +10934,6 @@ dependencies = [
  "tracing-subscriber",
  "vector-common",
  "vector-config",
- "vector-config-common",
- "vector-config-macros",
 ]
 
 [[package]]
@@ -11003,29 +10943,20 @@ dependencies = [
  "async-stream",
  "bytes 1.9.0",
  "chrono",
- "chrono-tz",
  "crossbeam-utils",
  "derivative",
  "futures 0.3.31",
  "indexmap 2.7.0",
  "metrics",
- "nom",
- "ordered-float 4.5.0",
  "paste",
  "pin-project",
- "quickcheck",
- "quickcheck_macros",
- "ryu",
  "serde",
  "serde_json",
  "smallvec",
- "snafu 0.7.5",
  "stream-cancel",
  "tokio",
  "tracing 0.1.41",
  "vector-config",
- "vector-config-common",
- "vector-config-macros",
  "vrl",
 ]
 
@@ -11051,7 +10982,6 @@ dependencies = [
  "url",
  "vector-config-common",
  "vector-config-macros",
- "vector-core",
  "vrl",
 ]
 
@@ -11087,7 +11017,6 @@ dependencies = [
 name = "vector-core"
 version = "0.1.0"
 dependencies = [
- "async-graphql",
  "async-trait",
  "base64 0.22.1",
  "bitmask-enum",
@@ -11097,10 +11026,8 @@ dependencies = [
  "chrono-tz",
  "criterion",
  "crossbeam-utils",
- "db-key",
  "derivative",
  "dyn-clone",
- "enrichment",
  "enumflags2",
  "env-test-util",
  "float_eq",
@@ -11152,9 +11079,7 @@ dependencies = [
  "toml",
  "tonic 0.11.0",
  "tracing 0.1.41",
- "tracing-core 0.1.33",
  "tracing-subscriber",
- "typetag",
  "url",
  "urlencoding",
  "uuid",
@@ -11162,7 +11087,6 @@ dependencies = [
  "vector-common",
  "vector-config",
  "vector-config-common",
- "vector-config-macros",
  "vector-lookup",
  "vrl",
 ]
@@ -11232,7 +11156,6 @@ dependencies = [
  "portpicker",
  "serde_json",
  "serde_yaml 0.9.34+deprecated",
- "snafu 0.7.5",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.20.1",
@@ -11265,14 +11188,10 @@ dependencies = [
 name = "vector-vrl-tests"
 version = "0.1.0"
 dependencies = [
- "ansi_term",
- "chrono",
  "chrono-tz",
  "clap",
  "enrichment",
  "glob",
- "prettydiff",
- "regex",
  "serde",
  "serde_json",
  "tikv-jemallocator",
@@ -11287,7 +11206,6 @@ version = "0.1.0"
 dependencies = [
  "cargo-lock",
  "enrichment",
- "getrandom 0.2.15",
  "gloo-utils",
  "serde",
  "serde-wasm-bindgen",
