@@ -36,6 +36,10 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_cloudwatchlogs::client::Client::new(config)
     }
+
+    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
+        CloudwatchLogsClientBuilder::build(config)
+    }
 }
 
 #[configurable_component]
@@ -175,6 +179,7 @@ impl CloudwatchLogsSinkConfig {
             proxy,
             &self.tls,
             &None,
+            false,
         )
         .await
     }

@@ -167,6 +167,7 @@ impl AwsSqsConfig {
             &cx.proxy,
             &self.tls,
             &None,
+            false,
         )
         .await
     }

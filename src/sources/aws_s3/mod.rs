@@ -238,6 +238,7 @@ impl AwsS3Config {
             proxy,
             &self.tls_options,
             &None,
+            true,
         )
         .await?;
 
@@ -254,6 +255,7 @@ impl AwsS3Config {
                     proxy,
                     &sqs.tls_options,
                     &sqs.timeout,
+                    false,
                 )
                 .await?;
 
@@ -1023,6 +1025,7 @@ mod integration_tests {
             &proxy_config,
             &None,
             &None,
+            true,
         )
         .await
         .unwrap()
@@ -1042,6 +1045,7 @@ mod integration_tests {
             &proxy_config,
             &None,
             &None,
+            false,
         )
         .await
         .unwrap()

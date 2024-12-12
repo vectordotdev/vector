@@ -122,6 +122,10 @@ impl ClientBuilder for CloudwatchMetricsClientBuilder {
     fn build(config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_cloudwatch::client::Client::new(config)
     }
+
+    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
+        CloudwatchMetricsClientBuilder::build(config)
+    }
 }
 
 #[async_trait::async_trait]
@@ -178,6 +182,7 @@ impl CloudWatchMetricsSinkConfig {
             proxy,
             &self.tls,
             &None,
+            false,
         )
         .await
     }

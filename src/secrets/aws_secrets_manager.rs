@@ -17,6 +17,10 @@ impl ClientBuilder for SecretsManagerClientBuilder {
         let config = config::Builder::from(config).build();
         Client::from_conf(config)
     }
+
+    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
+        SecretsManagerClientBuilder::build(config)
+    }
 }
 
 /// Configuration for the `aws_secrets_manager` secrets backend.
@@ -63,6 +67,7 @@ impl SecretBackend for AwsSecretsManagerBackend {
             &ProxyConfig::default(),
             &self.tls,
             &None,
+            false,
         )
         .await?;
 
