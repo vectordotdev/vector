@@ -367,7 +367,7 @@ jobs:
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
-    timeout-minutes: 70
+    timeout-minutes: 120
     needs:
       - should-run-gate
       - resolve-inputs
