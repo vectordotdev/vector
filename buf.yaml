@@ -1,7 +1,6 @@
 version: v2
 modules:
   - path: lib/vector-core/proto
-  - path: lib/dnstap-parser/proto
   - path: proto/third-party
   - path: proto/vector
 lint:
