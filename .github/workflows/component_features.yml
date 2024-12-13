@@ -16,6 +16,9 @@ on:
     # At midnight UTC Tue-Sat
     - cron: '0 0 * * 2-6'
 
+permissions:
+  statuses: write
+
 jobs:
   check-component-features:
     # use free tier on schedule and 8 core to expedite results on demand invocation

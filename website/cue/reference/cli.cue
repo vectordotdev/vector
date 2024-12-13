@@ -157,6 +157,18 @@ cli: {
 			env_var:     "VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS"
 			type:        "integer"
 		}
+		"watch-config-poll-interval-seconds": {
+			description: env_vars.VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS.description
+			env_var:     "VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS"
+			default:     env_vars.VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS.type.uint.default
+			type:        "integer"
+		}
+		"watch-config-method": {
+			description: env_vars.VECTOR_WATCH_CONFIG_METHOD.description
+			env_var:     "VECTOR_WATCH_CONFIG_METHOD"
+			default:     env_vars.VECTOR_WATCH_CONFIG_METHOD.type.string.default
+			type:        "string"
+		}
 	}
 
 	// Reusable options
@@ -583,6 +595,22 @@ cli: {
 				"""
 			type: string: default: null
 		}
+		VECTOR_HOSTNAME: {
+			description: """
+				Overrides the hostname used in Vector's logs and metrics.
+				This is useful when running Vector in a container or on other systems where the hostname is not meaningful.
+
+				The example of how it can be used in Kubernetes pod template:
+
+				```yaml
+				env:
+				- name: VECTOR_HOSTNAME
+					valueFrom:
+						fieldRef:
+							fieldPath: spec.nodeName
+				"""
+			type: string: default: null
+		}
 		VECTOR_LOG: {
 			description: "Vector's log level. Each log level includes messages from higher priority levels."
 			type: string: {
@@ -623,6 +651,25 @@ cli: {
 		VECTOR_WATCH_CONFIG: {
 			description: "Watch for changes in the configuration file and reload accordingly"
 			type: bool: default: false
+		}
+		VECTOR_WATCH_CONFIG_METHOD: {
+			description: """
+				Method for watching config files.
+
+				`recommend` - recommended event based watcher for host OS
+				`poll` - `poll` watcher can be used in cases where event based watcher doesn't work, e.g., when attaching the configuration via NFS.
+				"""
+			type: string: default: "recommended"
+		}
+		VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS: {
+			description: """
+				Poll for config changes at given interval
+				only applicable if `poll` is set in `--watch-config-method`
+				"""
+			type: uint: {
+				default: 30
+				unit:    "seconds"
+			}
 		}
 		VECTOR_INTERNAL_LOG_RATE_LIMIT: {
 			description: "Set the internal log rate limit. This limits Vector from emitting identical logs more than once over the given number of seconds."

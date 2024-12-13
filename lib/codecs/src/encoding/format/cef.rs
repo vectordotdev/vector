@@ -6,6 +6,7 @@ use snafu::Snafu;
 use std::num::ParseIntError;
 use std::{collections::HashMap, fmt::Write};
 use tokio_util::codec::Encoder;
+use vector_config_macros::configurable_component;
 use vector_core::{
     config::DataType,
     event::{Event, LogEvent, Value},
@@ -82,7 +83,7 @@ pub enum CefSerializerError {
 }
 
 /// Config used to build a `CefSerializer`.
-#[crate::configurable_component]
+#[configurable_component]
 #[derive(Debug, Clone)]
 pub struct CefSerializerConfig {
     /// The CEF Serializer Options.
@@ -164,7 +165,7 @@ impl CefSerializerConfig {
 }
 
 /// CEF version.
-#[crate::configurable_component]
+#[configurable_component]
 #[derive(Debug, Default, Clone)]
 pub enum Version {
     #[default]
@@ -190,7 +191,7 @@ impl std::fmt::Display for Version {
 }
 
 /// Config used to build a `CefSerializer`.
-#[crate::configurable_component]
+#[configurable_component]
 #[derive(Debug, Clone)]
 pub struct CefSerializerOptions {
     /// CEF Version. Can be either 0 or 1.
