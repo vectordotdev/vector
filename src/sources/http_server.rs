@@ -378,18 +378,24 @@ impl SourceConfig for SimpleHttpConfig {
             .build()?
             .with_log_namespace(log_namespace);
 
-        let custom_response_headers =
-            self.custom_response_headers.clone().into_iter()
-                .map(|(k, v)| {
-                    let parsed_key =
-                        k.parse::<HeaderName>().map_err(|e| format!("Failed to parse header key {}: {}", k, e))?;
-                    let parsed_values =
-                        v.into_iter()
-                            .map(|v| v.parse::<HeaderValue>().map_err(|e| format!("Failed to parse header value {}: {}", v, e)))
-                            .collect::<Result<_,_>>()?;
-                    Ok::<(HeaderName, Vec<HeaderValue>), String>((parsed_key, parsed_values))
-                })
-                .collect::<Result<_, _>>()?;
+        let custom_response_headers = self
+            .custom_response_headers
+            .clone()
+            .into_iter()
+            .map(|(k, v)| {
+                let parsed_key = k
+                    .parse::<HeaderName>()
+                    .map_err(|e| format!("Failed to parse header key {}: {}", k, e))?;
+                let parsed_values = v
+                    .into_iter()
+                    .map(|v| {
+                        v.parse::<HeaderValue>()
+                            .map_err(|e| format!("Failed to parse header value {}: {}", v, e))
+                    })
+                    .collect::<Result<_, _>>()?;
+                Ok::<(HeaderName, Vec<HeaderValue>), String>((parsed_key, parsed_values))
+            })
+            .collect::<Result<_, _>>()?;
 
         let source = SimpleHttpSource {
             headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"))?,
