@@ -240,7 +240,7 @@ impl<'a> Field<'a> {
     }
 }
 
-impl<'a> ToTokens for Field<'a> {
+impl ToTokens for Field<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.original.to_tokens(tokens)
     }

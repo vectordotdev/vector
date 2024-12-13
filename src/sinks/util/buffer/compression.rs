@@ -426,7 +426,7 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
     {
         struct NumberOrString;
 
-        impl<'de> de::Visitor<'de> for NumberOrString {
+        impl de::Visitor<'_> for NumberOrString {
             type Value = CompressionLevel;
 
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -443,7 +443,7 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
                     "default" => Ok(CompressionLevel::Default),
                     "best" => Ok(CompressionLevel::Best),
                     level => {
-                        return Err(de::Error::invalid_value(
+                        Err(de::Error::invalid_value(
                             de::Unexpected::Str(level),
                             &r#""none", "fast", "best" or "default""#,
                         ))

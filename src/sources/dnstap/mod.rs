@@ -625,7 +625,7 @@ mod integration_tests {
         }
     }
 
-    fn get_bind_ports(raw_data: bool, query_type: &'static str) -> (&str, &str) {
+    fn get_bind_ports(raw_data: bool, query_type: &'static str) -> (&'static str, &'static str) {
         // Returns the query port and control port, respectively, for the given BIND instance.
         match query_type {
             "query" if raw_data => ("8001", "9001"),

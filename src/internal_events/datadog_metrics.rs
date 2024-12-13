@@ -9,7 +9,7 @@ pub struct DatadogMetricsEncodingError<'a> {
     pub dropped_events: usize,
 }
 
-impl<'a> InternalEvent for DatadogMetricsEncodingError<'a> {
+impl InternalEvent for DatadogMetricsEncodingError<'_> {
     fn emit(self) {
         error!(
             message = self.reason,
