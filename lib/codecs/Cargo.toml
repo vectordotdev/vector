@@ -16,6 +16,7 @@ chrono.workspace = true
 csv-core = { version = "0.1.10", default-features = false }
 derivative = { version = "2", default-features = false }
 dyn-clone = { version = "1", default-features = false }
+flate2.workspace = true
 influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
@@ -28,7 +29,7 @@ serde.workspace = true
 serde_with = { version = "3.11.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_json.workspace = true
 smallvec = { version = "1", default-features = false, features = ["union"] }
-snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
+snafu.workspace = true
 syslog_loose = { version = "0.21", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tokio.workspace = true
@@ -36,7 +37,6 @@ tracing = { version = "0.1", default-features = false }
 vrl.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
-vector-config-common = { path = "../vector-config-common", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 

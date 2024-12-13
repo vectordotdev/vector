@@ -14,7 +14,6 @@ vrl.workspace = true
 serde.workspace = true
 serde-wasm-bindgen = "0.6"
 gloo-utils = { version = "0.2", features = ["serde"] }
-getrandom = { version = "0.2", features = ["js"] }
 vector-vrl-functions = { path = "../functions" }
 enrichment = { path = "../../enrichment" }
 

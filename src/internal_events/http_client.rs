@@ -95,29 +95,6 @@ impl<'a> InternalEvent for GotHttpWarning<'a> {
     }
 }
 
-#[derive(Debug)]
-pub struct AuthExtensionError<'a> {
-    pub error: &'a vector_lib::Error,
-}
-
-impl<'a> InternalEvent for AuthExtensionError<'a> {
-    fn emit(self) {
-        error!(
-            message = "HTTP Auth extension error.",
-            error = %self.error,
-            error_type = error_type::REQUEST_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total",
-            "error_type" => error_type::CONFIGURATION_FAILED,
-            "stage" => error_stage::SENDING,
-        )
-        .increment(1);
-    }
-}
-
 /// Newtype placeholder to provide a formatter for the request and response body.
 struct FormatBody<'a, B>(&'a B);
 

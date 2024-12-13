@@ -180,6 +180,7 @@ jobs:
             reduce transform
             remap transform
             route transform
+            exclusive_route transform
             sample transform
             tag_cardinality_limit transform
             throttle transform
@@ -206,6 +207,8 @@ jobs:
             gcp_pubsub sink
             gcp_stackdriver_logs sink
             gcp_stackdriver_metrics sink
+            greptimedb_metrics sink
+            greptimedb_logs sink
             honeycomb sink
             http sink
             humio_logs sink
