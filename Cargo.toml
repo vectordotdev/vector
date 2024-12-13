@@ -140,6 +140,7 @@ clap = { version = "4.5.22", default-features = false, features = ["derive", "er
 flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.1", default-features = false }
+hickory-proto = { version = "0.25.0-alpha.4", default-features = false, features = ["dnssec-openssl"] }
 indexmap = { version = "2.7.0", default-features = false, features = ["serde", "std"] }
 metrics = "0.24.1"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
@@ -364,8 +365,8 @@ tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["
 tokio-postgres = { version = "0.7.12", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = { version = "0.20.1", default-features = false, features = ["connect"], optional = true }
 toml.workspace = true
+hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
-hickory-proto = { version = "0.25.0-alpha.4", default-features = false, features = ["dnssec-openssl"], optional = true }
 typetag = { version = "0.2.18", default-features = false }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }
