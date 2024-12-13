@@ -1,12 +1,14 @@
 //! Authentication settings for AWS components.
 use std::time::Duration;
 
-use aws_config::profile::profile_file::{ProfileFileKind, ProfileFiles};
 use aws_config::{
     default_provider::credentials::DefaultCredentialsChain,
     identity::IdentityCache,
     imds,
-    profile::ProfileFileCredentialsProvider,
+    profile::{
+        profile_file::{ProfileFileKind, ProfileFiles},
+        ProfileFileCredentialsProvider,
+    },
     provider_config::ProviderConfig,
     sts::AssumeRoleProviderBuilder,
 };
