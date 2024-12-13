@@ -1,6 +1,7 @@
 version: v2
 modules:
   - path: lib/vector-core/proto
+  - path: lib/dnstap-parser/proto
   - path: proto/third-party
   - path: proto/vector
 lint:
@@ -13,8 +14,6 @@ lint:
 breaking:
   use:
     - FILE
-  ignore:
-    - proto/third-party/dnstap.proto
   except:
     - EXTENSION_NO_DELETE
     - FIELD_SAME_DEFAULT
