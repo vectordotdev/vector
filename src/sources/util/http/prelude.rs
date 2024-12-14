@@ -70,6 +70,11 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         decode(encoding_header, body)
     }
 
+    // This function can be defined to enrich `warp::Reply`s.
+    fn enrich_reply<T: warp::Reply + 'static>(&self, reply: T) -> Box<dyn warp::Reply> {
+        Box::new(reply)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn run(
         self,
@@ -90,6 +95,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let path = path.to_owned();
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
         let enable_source_ip = self.enable_source_ip();
+        let self_clone = self.clone();
 
         Ok(Box::pin(async move {
             let mut filter: BoxedFilter<()> = match method {
@@ -171,21 +177,32 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, acknowledgements, response_code, cx.out.clone())
+                        handle_request(events, acknowledgements, response_code, cx.out.clone()).map(
+                            {
+                                let self_clone = self.clone();
+                                move |result| {
+                                    result.map(move |reply| self_clone.enrich_reply(reply))
+                                }
+                            },
+                        )
                     },
                 );
 
             let ping = warp::get().and(warp::path("ping")).map(|| "pong");
-            let routes = svc.or(ping).recover(|r: Rejection| async move {
-                if let Some(e_msg) = r.find::<ErrorMessage>() {
-                    let json = warp::reply::json(e_msg);
-                    Ok(warp::reply::with_status(json, e_msg.status_code()))
-                } else {
-                    //other internal error - will return 500 internal server error
-                    emit!(HttpInternalError {
-                        message: &format!("Internal error: {:?}", r)
-                    });
-                    Err(r)
+            let routes = svc.or(ping).recover(move |r: Rejection| {
+                let self_clone = self_clone.clone();
+                async move {
+                    if let Some(e_msg) = r.find::<ErrorMessage>() {
+                        let json = warp::reply::json(e_msg);
+                        Ok(self_clone
+                            .enrich_reply(warp::reply::with_status(json, e_msg.status_code())))
+                    } else {
+                        //other internal error - will return 500 internal server error
+                        emit!(HttpInternalError {
+                            message: &format!("Internal error: {:?}", r)
+                        });
+                        Err(r)
+                    }
                 }
             });
 

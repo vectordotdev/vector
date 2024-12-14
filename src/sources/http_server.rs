@@ -6,7 +6,7 @@ use http::StatusCode;
 use http_serde;
 use tokio_util::codec::Decoder as _;
 use vrl::value::{kind::Collection, Kind};
-use warp::http::HeaderMap;
+use warp::http::{HeaderMap, HeaderName, HeaderValue};
 
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
@@ -99,6 +99,14 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::examples = "*"))]
     headers: Vec<String>,
 
+    /// Custom response headers to be added to the HTTP response
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "example_custom_response_headers()"))]
+    #[configurable(metadata(
+        docs::additional_props_description = "A custom response header key-values pair"
+    ))]
+    custom_response_headers: HashMap<String, Vec<String>>,
+
     /// A list of URL query parameters to include in the log event.
     ///
     /// Accepts the wildcard (`*`) character for query parameters matching a specified pattern.
@@ -174,6 +182,13 @@ pub struct SimpleHttpConfig {
     #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
+}
+
+fn example_custom_response_headers() -> HashMap<String, Vec<String>> {
+    HashMap::<String, Vec<String>>::from_iter([(
+        "Access-Control-Allow-Origin".to_string(),
+        vec!["my-cool-server".to_string(), "my-other-server".to_string()],
+    )])
 }
 
 impl SimpleHttpConfig {
@@ -271,6 +286,7 @@ impl Default for SimpleHttpConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             encoding: None,
             headers: Vec::new(),
+            custom_response_headers: HashMap::new(),
             query_parameters: Vec::new(),
             tls: None,
             auth: None,
@@ -362,8 +378,28 @@ impl SourceConfig for SimpleHttpConfig {
             .build()?
             .with_log_namespace(log_namespace);
 
+        let custom_response_headers = self
+            .custom_response_headers
+            .clone()
+            .into_iter()
+            .map(|(k, v)| {
+                let parsed_key = k
+                    .parse::<HeaderName>()
+                    .map_err(|e| format!("Failed to parse header key {}: {}", k, e))?;
+                let parsed_values = v
+                    .into_iter()
+                    .map(|v| {
+                        v.parse::<HeaderValue>()
+                            .map_err(|e| format!("Failed to parse header value {}: {}", v, e))
+                    })
+                    .collect::<Result<_, _>>()?;
+                Ok::<(HeaderName, Vec<HeaderValue>), String>((parsed_key, parsed_values))
+            })
+            .collect::<Result<_, _>>()?;
+
         let source = SimpleHttpSource {
             headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"))?,
+            custom_response_headers,
             query_parameters: build_param_matcher(&remove_duplicates(
                 self.query_parameters.clone(),
                 "query_parameters",
@@ -415,6 +451,7 @@ impl SourceConfig for SimpleHttpConfig {
 #[derive(Clone)]
 struct SimpleHttpSource {
     headers: Vec<HttpConfigParamKind>,
+    custom_response_headers: HashMap<HeaderName, Vec<HeaderValue>>,
     query_parameters: Vec<HttpConfigParamKind>,
     path_key: OptionalValuePath,
     host_key: OptionalValuePath,
@@ -520,10 +557,29 @@ impl HttpSource for SimpleHttpSource {
     fn enable_source_ip(&self) -> bool {
         self.host_key.path.is_some()
     }
+
+    /// Enriches the warp::reply::Reply with custom headers
+    ///
+    /// This method adds the custom headers specified in the configuration
+    /// to the HTTP response.
+    fn enrich_reply<T: warp::Reply + 'static>(&self, reply: T) -> Box<dyn warp::Reply> {
+        let mut response = reply.into_response();
+        let header_map = response.headers_mut();
+
+        for (key, values) in &self.custom_response_headers {
+            for value in values {
+                header_map
+                    .try_append(key.clone(), value.clone())
+                    .expect("Failed to append header. Too many custom http headers specified in custom_response_headers config.");
+            }
+        }
+        Box::new(response)
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::str::FromStr;
     use std::{io::Write, net::SocketAddr};
 
@@ -567,6 +623,7 @@ mod tests {
     #[allow(clippy::too_many_arguments)]
     async fn source<'a>(
         headers: Vec<String>,
+        custom_response_headers: HashMap<String, Vec<String>>,
         query_parameters: Vec<String>,
         path_key: &'a str,
         host_key: &'a str,
@@ -595,6 +652,7 @@ mod tests {
             SimpleHttpConfig {
                 address,
                 headers,
+                custom_response_headers,
                 encoding: None,
                 query_parameters,
                 response_code,
@@ -705,6 +763,7 @@ mod tests {
 
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -751,6 +810,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -790,6 +850,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -823,6 +884,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -861,6 +923,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -906,6 +969,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -957,6 +1021,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1043,6 +1108,7 @@ mod tests {
                     "X-*".to_string(),
                     "AbsentHeader".to_string(),
                 ],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1089,6 +1155,7 @@ mod tests {
 
             let (rx, addr) = source(
                 vec!["*".to_string()],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1123,10 +1190,64 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_custom_response_headers() {
+        async fn send(address: SocketAddr, body: &str) -> reqwest::Response {
+            reqwest::Client::new()
+                .post(&format!("http://{}/", address))
+                .body(body.to_owned())
+                .send()
+                .await
+                .unwrap()
+        }
+
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let mut custom_headers: HashMap<String, Vec<String>> = HashMap::new();
+            custom_headers.insert(
+                "Access-Control-Allow-Origin".to_string(),
+                vec!["example.com".to_string(), "example2.com".to_string()],
+            );
+
+            let (rx, addr) = source(
+                vec!["*".to_string()],
+                custom_headers,
+                vec![],
+                "http_path",
+                "remote_ip",
+                "/",
+                "POST",
+                StatusCode::OK,
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::default().into()),
+            )
+            .await;
+
+            spawn_collect_n(
+                async move {
+                    let response = send(addr, "{\"key1\":\"value1\"}").await;
+                    let response_headers = response.headers();
+                    let view = response_headers.get_all("Access-Control-Allow-Origin");
+                    let mut iter = view.iter();
+                    assert_eq!(&"example.com", iter.next().unwrap());
+                    assert_eq!(&"example2.com", iter.next().unwrap());
+                    assert!(iter.next().is_none());
+                },
+                rx,
+                1,
+            )
+            .await
+        })
+        .await;
+    }
+
+    #[tokio::test]
     async fn http_query() {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![
                     "source".to_string(),
                     "region".to_string(),
@@ -1226,6 +1347,7 @@ mod tests {
 
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1257,6 +1379,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "vector_http_path",
                 "vector_remote_ip",
@@ -1298,6 +1421,7 @@ mod tests {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "vector_http_path",
                 "vector_remote_ip",
@@ -1359,6 +1483,7 @@ mod tests {
         components::init_test();
         let (_rx, addr) = source(
             vec![],
+            HashMap::new(),
             vec![],
             "vector_http_path",
             "vector_remote_ip",
@@ -1384,6 +1509,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async move {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1418,6 +1544,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1449,6 +1576,7 @@ mod tests {
         let events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
                 vec![],
+                HashMap::new(),
                 vec![],
                 "http_path",
                 "remote_ip",
@@ -1482,6 +1610,7 @@ mod tests {
         components::init_test();
         let (_rx, addr) = source(
             vec![],
+            HashMap::new(),
             vec![],
             "http_path",
             "remote_ip",
