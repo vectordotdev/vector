@@ -150,8 +150,6 @@ async fn insert_multiple_events() {
 async fn default_columns_are_not_populated() {
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
-    // We store the timestamp as text and not as `timestamp with timezone` postgres type due to
-    // postgres not supporting nanosecond-resolution (it does support microsecond-resolution).
     let create_table_sql =
         format!("CREATE TABLE IF NOT EXISTS {table} (id BIGINT, not_existing_column TEXT DEFAULT 'default_value')");
     sqlx::query(&create_table_sql)
