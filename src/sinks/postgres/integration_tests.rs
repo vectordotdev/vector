@@ -24,6 +24,7 @@ fn create_event(id: i64) -> Event {
     event.insert("payload", event_payload);
     let timestamp = Utc::now();
     // Postgres does not support nanosecond-resolution, so we truncate the timestamp to microsecond-resolution.
+    // https://www.postgresql.org/docs/current/datatype-datetime.html
     let timestamp_microsecond_resolution =
         DateTime::from_timestamp_micros(timestamp.timestamp_micros());
     event.insert("timestamp", timestamp_microsecond_resolution);
@@ -39,7 +40,7 @@ fn create_event_with_notifier(id: i64) -> (Event, BatchStatusReceiver) {
 fn create_events(count: usize) -> (Vec<Event>, BatchStatusReceiver) {
     let mut events = (0..count as i64).map(create_event).collect::<Vec<_>>();
     let receiver = BatchNotifier::apply_to(&mut events);
-    return (events, receiver);
+    (events, receiver)
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -143,7 +144,6 @@ async fn insert_multiple_events() {
 
 // Using null::{table} with jsonb_populate_recordset does not work with default values.
 // it is like inserting null values explicitly, it does not use table's default values.
-//
 // https://dba.stackexchange.com/questions/308114/use-default-value-instead-of-inserted-null
 // https://stackoverflow.com/questions/49992531/postgresql-insert-a-null-convert-to-default
 // TODO: this cannot be fixed without a workaround involving a trigger creation, which is beyond
