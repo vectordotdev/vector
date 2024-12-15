@@ -77,7 +77,7 @@ async fn insert_single_event() {
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
     let create_table_sql =
-        format!("CREATE TABLE IF NOT EXISTS {table} (id BIGINT, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)");
+        format!("CREATE TABLE {table} (id BIGINT, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)");
     sqlx::query(&create_table_sql)
         .execute(&mut connection)
         .await
@@ -107,7 +107,7 @@ async fn insert_multiple_events() {
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
     let create_table_sql = format!(
-        "CREATE TABLE IF NOT EXISTS {table} (id BIGINT, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
+        "CREATE TABLE {table} (id BIGINT, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
     );
     sqlx::query(&create_table_sql)
         .execute(&mut connection)
@@ -141,7 +141,9 @@ async fn insert_multiple_events() {
     assert_eq!(expected_values, actual_values);
 }
 
-// Using null::{table} with jsonb_populate_recordset does not work with default values
+// Using null::{table} with jsonb_populate_recordset does not work with default values.
+// it is like inserting null values explicitly, it does not use table's default values.
+//
 // https://dba.stackexchange.com/questions/308114/use-default-value-instead-of-inserted-null
 // https://stackoverflow.com/questions/49992531/postgresql-insert-a-null-convert-to-default
 // TODO: this cannot be fixed without a workaround involving a trigger creation, which is beyond
@@ -150,8 +152,9 @@ async fn insert_multiple_events() {
 async fn default_columns_are_not_populated() {
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
-    let create_table_sql =
-        format!("CREATE TABLE IF NOT EXISTS {table} (id BIGINT, not_existing_column TEXT DEFAULT 'default_value')");
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id BIGINT, not_existing_column TEXT DEFAULT 'default_value')"
+    );
     sqlx::query(&create_table_sql)
         .execute(&mut connection)
         .await
