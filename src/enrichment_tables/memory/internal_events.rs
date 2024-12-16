@@ -94,3 +94,22 @@ impl InternalEvent for MemoryEnrichmentTableReadFailed {
         Some("MemoryEnrichmentTableReadFailed")
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct MemoryEnrichmentTableInsertFailed {
+    pub key: String,
+}
+
+impl InternalEvent for MemoryEnrichmentTableInsertFailed {
+    fn emit(self) {
+        counter!(
+            "memory_enrichment_table_failed_insertions",
+            "key" => self.key
+        )
+        .increment(1);
+    }
+
+    fn name(&self) -> Option<&'static str> {
+        Some("MemoryEnrichmentTableInsertFailed")
+    }
+}

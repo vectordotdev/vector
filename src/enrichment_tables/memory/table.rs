@@ -1,6 +1,6 @@
 use crate::enrichment_tables::memory::internal_events::{
-    MemoryEnrichmentTableFlushed, MemoryEnrichmentTableInserted, MemoryEnrichmentTableRead,
-    MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
+    MemoryEnrichmentTableFlushed, MemoryEnrichmentTableInsertFailed, MemoryEnrichmentTableInserted,
+    MemoryEnrichmentTableRead, MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
 };
 use crate::enrichment_tables::memory::MemoryConfig;
 use std::sync::{Arc, Mutex};
@@ -62,6 +62,7 @@ impl MemoryEntry {
 struct MemoryMetadata {
     last_ttl_scan: Instant,
     last_flush: Instant,
+    byte_size: u64,
 }
 
 impl Default for MemoryMetadata {
@@ -70,6 +71,7 @@ impl Default for MemoryMetadata {
         Self {
             last_ttl_scan: now,
             last_flush: now,
+            byte_size: 0,
         }
     }
 }
@@ -104,24 +106,36 @@ impl Memory {
     fn handle_value(&mut self, value: &ObjectMap) {
         // Panic: If the Mutex is poisoned
         let mut handle = self.write_handle.lock().unwrap();
+        let mut metadata = self.metadata.lock().unwrap();
         let now = Instant::now();
 
         for (k, v) in value.iter() {
-            handle.update(
-                k.as_str().to_string(),
-                MemoryEntry {
-                    key: k.as_str().to_string(),
-                    value: Box::new(v.clone()),
-                    update_time: now.into(),
-                },
-            );
+            let new_entry = MemoryEntry {
+                key: k.as_str().to_string(),
+                value: Box::new(v.clone()),
+                update_time: now.into(),
+            };
+            let new_entry_key = k.as_str().to_string();
+            let new_entry_size = new_entry_key.size_of() + new_entry.size_of();
+            info!("New entry size: {}", new_entry_size);
+            if self.config.max_byte_size > 0
+                && metadata.byte_size.saturating_add(new_entry_size as u64)
+                    > self.config.max_byte_size
+            {
+                // Reject new entries
+                emit!(MemoryEnrichmentTableInsertFailed {
+                    key: k.as_str().to_string()
+                });
+                return;
+            }
+            metadata.byte_size = metadata.byte_size.saturating_add(new_entry_size as u64);
+            handle.update(k.as_str().to_string(), new_entry);
             emit!(MemoryEnrichmentTableInserted {
                 key: k.as_str().to_string()
             });
         }
 
         let mut needs_flush = false;
-        let mut metadata = self.metadata.lock().unwrap();
         if now.duration_since(metadata.last_ttl_scan).as_secs() >= self.config.scan_interval {
             metadata.last_ttl_scan = now;
             // Since evmap holds 2 separate maps for the data, we are free to directly remove
@@ -131,6 +145,8 @@ impl Memory {
                 for (k, v) in reader.iter() {
                     if let Some(entry) = v.get_one() {
                         if entry.expired(now, self.config.ttl) {
+                            // Byte size is not reduced at this point, because the actual deletion
+                            // will only happen at refresh time
                             handle.empty(k.clone());
                             emit!(MemoryEnrichmentTableTtlExpired { key: k.to_string() });
                             needs_flush = true;
@@ -150,6 +166,7 @@ impl Memory {
                 for (k, v) in reader.iter() {
                     byte_size += k.size_of() + v.get_one().size_of();
                 }
+                metadata.byte_size = byte_size as u64;
                 emit!(MemoryEnrichmentTableFlushed {
                     new_objects_count: reader.len(),
                     new_byte_size: byte_size
@@ -448,6 +465,67 @@ mod tests {
             ])),
             memory.find_table_row(Case::Sensitive, &[condition], None, None)
         );
+    }
+
+    #[test]
+    fn ignores_all_values_over_byte_size_limit() {
+        let mut memory = Memory::new(build_memory_config(|c| {
+            c.max_byte_size = 1;
+        }));
+        memory.handle_value(&ObjectMap::from([("test_key".into(), Value::from(5))]));
+
+        let condition = Condition::Equals {
+            field: "key",
+            value: Value::from("test_key"),
+        };
+
+        assert!(memory
+            .find_table_rows(Case::Sensitive, &[condition], None, None)
+            .unwrap()
+            .pop()
+            .is_none());
+    }
+
+    #[test]
+    fn ignores_values_when_byte_size_limit_is_reached() {
+        let ttl = 100;
+        let mut memory = Memory::new(build_memory_config(|c| {
+            c.ttl = ttl;
+            c.max_byte_size = 150;
+        }));
+        memory.handle_value(&ObjectMap::from([("test_key".into(), Value::from(5))]));
+        memory.handle_value(&ObjectMap::from([("rejected_key".into(), Value::from(5))]));
+
+        assert_eq!(
+            Ok(ObjectMap::from([
+                ("key".into(), Value::from("test_key")),
+                ("ttl".into(), Value::from(ttl)),
+                ("value".into(), Value::from(5)),
+            ])),
+            memory.find_table_row(
+                Case::Sensitive,
+                &[Condition::Equals {
+                    field: "key",
+                    value: Value::from("test_key")
+                }],
+                None,
+                None
+            )
+        );
+
+        assert!(memory
+            .find_table_rows(
+                Case::Sensitive,
+                &[Condition::Equals {
+                    field: "key",
+                    value: Value::from("rejected_key")
+                }],
+                None,
+                None
+            )
+            .unwrap()
+            .pop()
+            .is_none());
     }
 
     #[test]

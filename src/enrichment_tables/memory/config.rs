@@ -34,6 +34,12 @@ pub struct MemoryConfig {
     /// By default, all writes are made visible immediately.
     #[serde(default = "default_flush_interval")]
     pub flush_interval: u64,
+    /// Maximum size of the table in bytes. All insertions that would
+    /// cause this table to grow over this size are rejected.
+    ///
+    /// By default, there is no size limit.
+    #[serde(default = "default_max_byte_size")]
+    pub max_byte_size: u64,
 
     #[serde(skip)]
     memory: Arc<Mutex<Option<Box<Memory>>>>,
@@ -55,6 +61,7 @@ impl Default for MemoryConfig {
             scan_interval: default_scan_interval(),
             flush_interval: default_flush_interval(),
             memory: Arc::new(Mutex::new(None)),
+            max_byte_size: default_max_byte_size(),
         }
     }
 }
@@ -68,6 +75,10 @@ const fn default_scan_interval() -> u64 {
 }
 
 const fn default_flush_interval() -> u64 {
+    0
+}
+
+const fn default_max_byte_size() -> u64 {
     0
 }
 
@@ -117,6 +128,7 @@ impl std::fmt::Debug for MemoryConfig {
             .field("ttl", &self.ttl)
             .field("scan_interval", &self.scan_interval)
             .field("flush_interval", &self.flush_interval)
+            .field("max_byte_size", &self.max_byte_size)
             .finish()
     }
 }
