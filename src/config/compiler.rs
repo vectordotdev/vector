@@ -3,7 +3,7 @@ use super::{
     OutputId,
 };
 
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use vector_lib::id::Inputs;
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
@@ -52,8 +52,17 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         graceful_shutdown_duration,
         allow_empty: _,
     } = builder;
+    let sinks_and_table_sinks = sinks
+        .clone()
+        .into_iter()
+        .chain(
+            enrichment_tables
+                .iter()
+                .filter_map(|(key, table)| table.as_sink().map(|s| (key.clone(), s))),
+        )
+        .collect::<IndexMap<_, _>>();
 
-    let graph = match Graph::new(&sources, &transforms, &sinks, &enrichment_tables, schema) {
+    let graph = match Graph::new(&sources, &transforms, &sinks_and_table_sinks, schema) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);
