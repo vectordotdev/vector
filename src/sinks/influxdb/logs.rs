@@ -5,13 +5,12 @@ use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
 use vrl::event_path;
-use vrl::path::OwnedValuePath;
+use vrl::path::OwnedTargetPath;
 use vrl::value::Kind;
 
 use vector_lib::config::log_schema;
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::lookup::PathPrefix;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 use vector_lib::schema;
 
 use super::{
@@ -114,19 +113,19 @@ pub struct InfluxDbLogsConfig {
     ///
     /// The setting of `log_schema.host_key`, usually `host`, is used here by default.
     #[configurable(metadata(docs::examples = "hostname"))]
-    pub host_key: Option<OptionalValuePath>,
+    pub host_key: Option<OptionalTargetPath>,
 
     /// Use this option to customize the key containing the message.
     ///
     /// The setting of `log_schema.message_key`, usually `message`, is used here by default.
     #[configurable(metadata(docs::examples = "text"))]
-    pub message_key: Option<OptionalValuePath>,
+    pub message_key: Option<OptionalTargetPath>,
 
     /// Use this option to customize the key containing the source_type.
     ///
     /// The setting of `log_schema.source_type_key`, usually `source_type`, is used here by default.
     #[configurable(metadata(docs::examples = "source"))]
-    pub source_type_key: Option<OptionalValuePath>,
+    pub source_type_key: Option<OptionalTargetPath>,
 }
 
 #[derive(Debug)]
@@ -137,9 +136,9 @@ struct InfluxDbLogsSink {
     measurement: String,
     tags: HashSet<KeyString>,
     transformer: Transformer,
-    host_key: OwnedValuePath,
-    message_key: OwnedValuePath,
-    source_type_key: OwnedValuePath,
+    host_key: OwnedTargetPath,
+    message_key: OwnedTargetPath,
+    source_type_key: OwnedTargetPath,
 }
 
 impl GenerateConfig for InfluxDbLogsConfig {
@@ -186,21 +185,21 @@ impl SinkConfig for InfluxDbLogsConfig {
             .host_key
             .as_ref()
             .and_then(|k| k.path.clone())
-            .or_else(|| log_schema().host_key().cloned())
+            .or_else(|| log_schema().host_key_target_path().cloned())
             .expect("global log_schema.host_key to be valid path");
 
         let message_key = self
             .message_key
             .as_ref()
             .and_then(|k| k.path.clone())
-            .or_else(|| log_schema().message_key().cloned())
+            .or_else(|| log_schema().message_key_target_path().cloned())
             .expect("global log_schema.message_key to be valid path");
 
         let source_type_key = self
             .source_type_key
             .as_ref()
             .and_then(|k| k.path.clone())
-            .or_else(|| log_schema().source_type_key().cloned())
+            .or_else(|| log_schema().source_type_key_target_path().cloned())
             .expect("global log_schema.source_type_key to be valid path");
 
         let sink = InfluxDbLogsSink {
@@ -247,9 +246,9 @@ struct InfluxDbLogsEncoder {
     measurement: String,
     tags: HashSet<KeyString>,
     transformer: Transformer,
-    host_key: OwnedValuePath,
-    message_key: OwnedValuePath,
-    source_type_key: OwnedValuePath,
+    host_key: OwnedTargetPath,
+    message_key: OwnedTargetPath,
+    source_type_key: OwnedTargetPath,
 }
 
 impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
@@ -260,18 +259,18 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         // the path that points to "message" such that it has a dedicated key.
         // TODO: add a `TargetPath::is_event_root()` to conditionally rename?
         if let Some(message_path) = log.message_path().cloned().as_ref() {
-            log.rename_key(message_path, (PathPrefix::Event, &self.message_key));
+            log.rename_key(message_path, &self.message_key);
         }
         // Add the `host` and `source_type` to the HashSet of tags to include
         // Ensure those paths are on the event to be encoded, rather than metadata
         if let Some(host_path) = log.host_path().cloned().as_ref() {
             self.tags.replace(host_path.path.to_string().into());
-            log.rename_key(host_path, (PathPrefix::Event, &self.host_key));
+            log.rename_key(host_path, &self.host_key);
         }
 
         if let Some(source_type_path) = log.source_type_path().cloned().as_ref() {
             self.tags.replace(source_type_path.path.to_string().into());
-            log.rename_key(source_type_path, (PathPrefix::Event, &self.source_type_key));
+            log.rename_key(source_type_path, &self.source_type_key);
         }
 
         self.tags.replace("metric_type".into());
@@ -858,9 +857,9 @@ mod tests {
             measurement,
             tags,
             transformer: Default::default(),
-            host_key: owned_value_path!("host"),
-            message_key: owned_value_path!("message"),
-            source_type_key: owned_value_path!("source_type"),
+            host_key: OwnedTargetPath::event(owned_value_path!("host")),
+            message_key: OwnedTargetPath::event(owned_value_path!("message")),
+            source_type_key: OwnedTargetPath::event(owned_value_path!("source_type")),
         }
     }
 }
