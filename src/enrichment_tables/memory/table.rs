@@ -27,7 +27,6 @@ use vrl::value::{KeyString, ObjectMap, Value};
 /// Single memory entry containing the value and TTL
 #[derive(Clone, Eq, PartialEq, Hash, ShallowCopy)]
 pub struct MemoryEntry {
-    key: String,
     value: Box<Value>,
     update_time: CopyValue<Instant>,
 }
@@ -39,12 +38,12 @@ impl ByteSizeOf for MemoryEntry {
 }
 
 impl MemoryEntry {
-    fn as_object_map(&self, now: Instant, total_ttl: u64) -> ObjectMap {
+    fn as_object_map(&self, now: Instant, total_ttl: u64, key: &str) -> ObjectMap {
         let ttl = total_ttl.saturating_sub(now.duration_since(*self.update_time).as_secs());
         ObjectMap::from([
             (
                 KeyString::from("key"),
-                Value::Bytes(Bytes::copy_from_slice(self.key.as_bytes())),
+                Value::Bytes(Bytes::copy_from_slice(key.as_bytes())),
             ),
             (KeyString::from("value"), (*self.value).clone()),
             (
@@ -111,7 +110,6 @@ impl Memory {
 
         for (k, v) in value.iter() {
             let new_entry = MemoryEntry {
-                key: k.as_str().to_string(),
                 value: Box::new(v.clone()),
                 update_time: now.into(),
             };
@@ -221,7 +219,11 @@ impl Table for Memory {
                         emit!(MemoryEnrichmentTableRead {
                             key: key.to_string()
                         });
-                        Ok(vec![row.as_object_map(Instant::now(), self.config.ttl)])
+                        Ok(vec![row.as_object_map(
+                            Instant::now(),
+                            self.config.ttl,
+                            &key,
+                        )])
                     }
                     None => {
                         emit!(MemoryEnrichmentTableReadFailed {
@@ -336,7 +338,6 @@ mod tests {
             handle.update(
                 "test_key".to_string(),
                 MemoryEntry {
-                    key: "test_key".to_string(),
                     value: Box::new(Value::from(5)),
                     update_time: (Instant::now() - Duration::from_secs(secs_to_subtract)).into(),
                 },
@@ -371,7 +372,6 @@ mod tests {
             handle.update(
                 "test_key".to_string(),
                 MemoryEntry {
-                    key: "test_key".to_string(),
                     value: Box::new(Value::from(5)),
                     update_time: (Instant::now() - Duration::from_secs(ttl + 10)).into(),
                 },
@@ -434,7 +434,6 @@ mod tests {
             handle.update(
                 "test_key".to_string(),
                 MemoryEntry {
-                    key: "test_key".to_string(),
                     value: Box::new(Value::from(5)),
                     update_time: (Instant::now() - Duration::from_secs(ttl / 2)).into(),
                 },
