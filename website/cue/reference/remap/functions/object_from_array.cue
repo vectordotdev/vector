@@ -3,8 +3,8 @@ package metadata
 remap: functions: object_from_array: {
 	category: "Object"
 	description: """
-		Iterate over either one or a pair of arrays and create an object out of all the key-value pairs contained in them.
-		Any entries that are missing the value use `null` instead.
+		Iterate over either one array of arrays or a pair of arrays and create an object out of all the key-value pairs contained in them.
+		With one array of arrays, any entries with no value use `null` instead.
 		Any keys that are `null` skip the  corresponding value.
 
 		If a single parameter is given, it must contain an array of all the input arrays.
@@ -31,7 +31,7 @@ remap: functions: object_from_array: {
 	return: {
 		types: ["object"]
 		rules: [
-			"`object_from_array` is considered fallible in the following cases: if either of the parameters is not an array; if only the `value` parameter is present and it is not an array of arrays; or if any of the keys are not either a string or `null`.",
+			"`object_from_array` is considered fallible in the following cases: if any of the parameters is not an array; if only the `value` parameter is present and it is not an array of arrays; or if any of the keys are not either a string or `null`.",
 		]
 	}
 
