@@ -1,3 +1,7 @@
+use bytes::Bytes;
+use futures::{FutureExt, TryFutureExt};
+use hyper::{service::make_service_fn, Server};
+use serde_json::json;
 use std::{
     collections::HashMap,
     convert::{Infallible, TryFrom},
@@ -5,16 +9,13 @@ use std::{
     net::SocketAddr,
     time::Duration,
 };
-
-use bytes::Bytes;
-use futures::{FutureExt, TryFutureExt};
-use hyper::{service::make_service_fn, Server};
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    lookup::lookup_v2::OptionalTargetPath,
     EstimatedJsonEncodedSizeOf,
 };
 use warp::{
@@ -24,6 +25,7 @@ use warp::{
     },
     http::{HeaderMap, StatusCode},
     reject::Rejection,
+    reply::Reply,
     Filter,
 };
 
@@ -77,6 +79,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         path: &str,
         method: HttpMethod,
         response_code: StatusCode,
+        response_body_key: OptionalTargetPath,
         strict_path: bool,
         tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
@@ -171,7 +174,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, acknowledgements, response_code, cx.out.clone())
+                        handle_request(
+                            events,
+                            acknowledgements,
+                            response_code,
+                            response_body_key.clone(),
+                            cx.out.clone(),
+                        )
                     },
                 );
 
@@ -262,13 +271,32 @@ async fn handle_request(
     events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,
     response_code: StatusCode,
+    response_body_key: OptionalTargetPath,
     mut out: SourceSender,
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
         Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
+            let mut response = response_code.into_response();
+
+            if let Some(path) = &response_body_key.path {
+                if let Some(first_event) = events.first() {
+                    if let Some(body) = first_event.as_log().get(path.to_string().as_str()) {
+                        response = warp::reply::with_status(
+                            warp::reply::json(&json!(body)),
+                            response_code,
+                        )
+                        .into_response();
+                    } else {
+                        return Err(warp::reject::custom(ErrorMessage::new(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Error generating response body".into(),
+                        )));
+                    }
+                }
+            }
 
             let count = events.len();
+            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
             out.send_batch(events)
                 .map_err(|_| {
                     // can only fail if receiving end disconnected, so we are shutting down,
@@ -276,7 +304,7 @@ async fn handle_request(
                     emit!(StreamClosedError { count });
                     warp::reject::custom(RejectShuttingDown)
                 })
-                .and_then(|_| handle_batch_status(response_code, receiver))
+                .and_then(|_| handle_batch_status(response, receiver))
                 .await
         }
         Err(error) => {
@@ -287,13 +315,13 @@ async fn handle_request(
 }
 
 async fn handle_batch_status(
-    success_response_code: StatusCode,
+    success_response: impl warp::Reply,
     receiver: Option<BatchStatusReceiver>,
 ) -> Result<impl warp::Reply, Rejection> {
     match receiver {
-        None => Ok(success_response_code),
+        None => Ok(success_response),
         Some(receiver) => match receiver.await {
-            BatchStatus::Delivered => Ok(success_response_code),
+            BatchStatus::Delivered => Ok(success_response),
             BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error delivering contents to sink".into(),
