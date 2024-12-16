@@ -37,6 +37,7 @@ on:
 env:
   SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
   SMP_WARMUP_SECONDS: 70 # default is 45 seconds
+  SMP_TIMEOUT_MINUTES: 120
   SMP_REPLICAS: 100 # default is 10
 
 jobs:
@@ -415,7 +416,7 @@ jobs:
           path: ${{ runner.temp }}/submission-metadata
 
       - name: Await job
-        timeout-minutes: 70
+        timeout-minutes: ${{ env.SMP_TIMEOUT_MINUTES }}
         env:
           RUST_LOG: info
         run: |
@@ -424,7 +425,7 @@ jobs:
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job status \
             --wait \
             --wait-delay-seconds 60 \
-            --wait-timeout-minutes 70 \
+            --wait-timeout-minutes ${{ env.SMP_TIMEOUT_MINUTES }} \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Handle cancellation if necessary
