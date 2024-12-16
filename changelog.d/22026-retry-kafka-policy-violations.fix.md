@@ -1,3 +1,3 @@
-Retry Kafka messages that error with `RDKafkaErrorCode::PolicyViolation` so messages are not lost.
+Retry Kafka messages that error with a policy violation so messages are not lost.
 
 authors: PriceHiller
