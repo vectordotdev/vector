@@ -1,11 +1,12 @@
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
+use vector_config_macros::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
 use crate::MetricTagValues;
 
 /// Config used to build a `JsonSerializer`.
-#[crate::configurable_component]
+#[configurable_component]
 #[derive(Debug, Clone, Default)]
 pub struct JsonSerializerConfig {
     /// Controls how metric tag values are encoded.
@@ -21,7 +22,7 @@ pub struct JsonSerializerConfig {
 }
 
 /// Options for the JsonSerializer.
-#[crate::configurable_component]
+#[configurable_component]
 #[derive(Debug, Clone, Default)]
 pub struct JsonSerializerOptions {
     /// Whether to use pretty JSON formatting.
@@ -273,7 +274,6 @@ mod tests {
     }
 
     mod pretty_json {
-
         use super::*;
         use bytes::{Bytes, BytesMut};
         use chrono::{TimeZone, Timelike, Utc};

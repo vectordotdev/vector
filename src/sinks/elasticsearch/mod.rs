@@ -34,7 +34,9 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
-#[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
+#[configurable(metadata(
+    docs::enum_tag_description = "The authentication strategy to use.\n\nAmazon OpenSearch Serverless requires this option to be set to `aws`."
+))]
 pub enum ElasticsearchAuthConfig {
     /// HTTP Basic Authentication.
     Basic {
@@ -85,6 +87,9 @@ pub enum BulkAction {
 
     /// The `create` action.
     Create,
+
+    /// The `update` action.
+    Update,
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -93,6 +98,7 @@ impl BulkAction {
         match self {
             BulkAction::Index => "index",
             BulkAction::Create => "create",
+            BulkAction::Update => "update",
         }
     }
 
@@ -100,6 +106,7 @@ impl BulkAction {
         match self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
+            BulkAction::Update => "/update",
         }
     }
 }
@@ -111,6 +118,7 @@ impl TryFrom<&str> for BulkAction {
         match input {
             "index" => Ok(BulkAction::Index),
             "create" => Ok(BulkAction::Create),
+            "update" => Ok(BulkAction::Update),
             _ => Err(format!("Invalid bulk action: {}", input)),
         }
     }
@@ -319,4 +327,8 @@ pub enum ParseError {
     ExternalVersioningWithoutDocumentID,
     #[snafu(display("Your version field will be ignored because you use internal versioning"))]
     ExternalVersionIgnoredWithInternalVersioning,
+    #[snafu(display("Amazon OpenSearch Serverless requires `api_version` value to be `auto`"))]
+    ServerlessElasticsearchApiVersionMustBeAuto,
+    #[snafu(display("Amazon OpenSearch Serverless requires `auth.strategy` value to be `aws`"))]
+    OpenSearchServerlessRequiresAwsAuth,
 }

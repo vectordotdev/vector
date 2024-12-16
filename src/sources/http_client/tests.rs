@@ -80,7 +80,7 @@ async fn bytes_decoding() {
     // validates the Accept header is set correctly for the Bytes codec
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::header::exact("Accept", "text/plain"))
-        .map(|| r#"A plain text event"#);
+        .map(|| r"A plain text event");
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 

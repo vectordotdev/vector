@@ -30,13 +30,13 @@ env:
 
 jobs:
   test-integration:
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-20.04
     timeout-minutes: 40
     if: inputs.if || github.event_name == 'workflow_dispatch'
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
       - name: (PR comment) Checkout PR branch

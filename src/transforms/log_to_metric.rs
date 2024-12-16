@@ -1635,10 +1635,10 @@ mod tests {
     #[tokio::test]
     async fn transform_gauge() {
         let config = parse_yaml_config(
-            r#"
+            r"
             metrics: []
             all_metrics: true
-            "#,
+            ",
         );
 
         let json_str = r#"{
@@ -1674,10 +1674,10 @@ mod tests {
     #[tokio::test]
     async fn transform_histogram() {
         let config = parse_yaml_config(
-            r#"
+            r"
             metrics: []
             all_metrics: true
-            "#,
+            ",
         );
 
         let json_str = r#"{
@@ -1753,10 +1753,10 @@ mod tests {
     #[tokio::test]
     async fn transform_distribution_histogram() {
         let config = parse_yaml_config(
-            r#"
+            r"
             metrics: []
             all_metrics: true
-            "#,
+            ",
         );
 
         let json_str = r#"{
@@ -1814,10 +1814,10 @@ mod tests {
     #[tokio::test]
     async fn transform_distribution_summary() {
         let config = parse_yaml_config(
-            r#"
+            r"
             metrics: []
             all_metrics: true
-            "#,
+            ",
         );
 
         let json_str = r#"{
@@ -1875,10 +1875,10 @@ mod tests {
     #[tokio::test]
     async fn transform_summary() {
         let config = parse_yaml_config(
-            r#"
+            r"
             metrics: []
             all_metrics: true
-            "#,
+            ",
         );
 
         let json_str = r#"{
@@ -1938,10 +1938,10 @@ mod tests {
     #[tokio::test]
     async fn transform_counter() {
         let config = parse_yaml_config(
-            r#"
+            r"
             metrics: []
             all_metrics: true
-            "#,
+            ",
         );
 
         let json_str = r#"{
@@ -1977,10 +1977,10 @@ mod tests {
     #[tokio::test]
     async fn transform_set() {
         let config = parse_yaml_config(
-            r#"
+            r"
             metrics: []
             all_metrics: true
-            "#,
+            ",
         );
 
         let json_str = r#"{
@@ -2018,10 +2018,10 @@ mod tests {
     #[tokio::test]
     async fn transform_all_metrics_optional_namespace() {
         let config = parse_yaml_config(
-            r#"
+            r"
             metrics: []
             all_metrics: true
-            "#,
+            ",
         );
 
         let json_str = r#"{

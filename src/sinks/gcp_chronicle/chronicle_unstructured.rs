@@ -2,6 +2,7 @@
 //! See <https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries>
 //! for more information.
 use bytes::{Bytes, BytesMut};
+
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
 use http::{header::HeaderValue, Request, StatusCode, Uri};
@@ -33,6 +34,7 @@ use crate::{
     schema,
     sinks::{
         gcp_chronicle::{
+            compression::ChronicleCompression,
             partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
             sink::ChronicleSink,
         },
@@ -108,6 +110,7 @@ pub struct ChronicleUnstructuredTowerRequestConfigDefaults;
 impl TowerRequestConfigDefaults for ChronicleUnstructuredTowerRequestConfigDefaults {
     const RATE_LIMIT_NUM: u64 = 1_000;
 }
+
 /// Configuration for the `gcp_chronicle_unstructured` sink.
 #[configurable_component(sink(
     "gcp_chronicle_unstructured",
@@ -155,6 +158,10 @@ pub struct ChronicleUnstructuredConfig {
     #[configurable(derived)]
     pub encoding: EncodingConfig,
 
+    #[serde(default)]
+    #[configurable(derived)]
+    pub compression: ChronicleCompression,
+
     #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig<ChronicleUnstructuredTowerRequestConfigDefaults>,
@@ -193,6 +200,7 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
             credentials_path = "/path/to/credentials.json"
             customer_id = "customer_id"
             namespace = "namespace"
+            compression = "gzip"
             log_type = "log_type"
             encoding.codec = "text"
         "#})
@@ -411,6 +419,7 @@ impl Encoder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleEncoder {
 #[derive(Clone, Debug)]
 struct ChronicleRequestBuilder {
     encoder: ChronicleEncoder,
+    compression: Compression,
 }
 
 struct ChronicleRequestPayload {
@@ -438,7 +447,7 @@ impl RequestBuilder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleRequestBui
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
-        Compression::None
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -480,6 +489,7 @@ impl ChronicleRequestBuilder {
     fn new(config: &ChronicleUnstructuredConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.config().build()?;
+        let compression = Compression::from(config.compression);
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
         let encoder = ChronicleEncoder {
             customer_id: config.customer_id.clone(),
@@ -494,7 +504,10 @@ impl ChronicleRequestBuilder {
             encoder,
             transformer,
         };
-        Ok(Self { encoder })
+        Ok(Self {
+            encoder,
+            compression,
+        })
     }
 }
 

@@ -42,7 +42,8 @@ configuration: {
 			description: """
 				If set, Vector will configure the internal metrics system to automatically
 				remove all metrics that have not been updated in the given time.
-				This value must be positive.
+
+				If set to a negative value expiration is disabled.
 				"""
 			required: false
 			warnings: ["Deprecated, please use `expire_metrics_secs` instead."]
@@ -73,18 +74,18 @@ configuration: {
 		expire_metrics_secs: {
 			common: false
 			description: """
-				If set, Vector will configure the internal metrics system to automatically
-				remove all metrics that have not been updated in the given number of seconds.
-				This value must be positive.
+				Vector will expire internal metrics that haven't been emitted/updated in the
+				configured interval (default 300 seconds).
 
-				Note that internal counters that are expired but are later updated will have
-				their values reset to zero.
-				Be careful to set this value high enough to avoid
-				expiring critical but infrequently updated internal counters.
+				Note that internal counters that are expired but are later updated will have their
+				values reset to zero. Be careful to set this value high enough to avoid expiring
+				critical but infrequently updated internal counters.
+
+				If set to a negative value expiration is disabled.
 				"""
 			required: false
 			type: float: {
-				default: null
+				default: 300.0
 				examples: [60.0]
 				unit: "seconds"
 			}
@@ -222,7 +223,7 @@ configuration: {
 							Service Provider (ISP), organization name, and autonomous system organization
 							and number associated with an IP address.
 						* [GeoIP2-Anonymous-IP.mmdb](\(urls.maxmind_geoip2_anonymous_ip)) (paid) — Determine
-							proxy, VPN, hosting, and other anonymous IP addresses.	
+							proxy, VPN, hosting, and other anonymous IP addresses.
 
 						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
 
@@ -292,6 +293,10 @@ configuration: {
 							Globally enables / disables log namespacing. See [Log Namespacing](\(urls.log_namespacing_blog))
 							for more details. If you want to enable individual sources, there is a config
 							option in the source configuration.
+
+							Known issues:
+
+							- Enabling log namespacing doesn't work when disk buffers are used (see [#18574](https://github.com/vectordotdev/vector/issues/18574))
 							"""
 						required:    false
 						warnings: []

@@ -61,9 +61,9 @@ remap: expressions: path: {
 							"""
 					}
 					nonexistent: {
-						title: "Non-existent paths"
+						title: "Nonexistent paths"
 						description: """
-							Non-existent paths resolve to `null`.
+							Nonexistent paths resolve to `null`.
 							"""
 					}
 					quoting: {

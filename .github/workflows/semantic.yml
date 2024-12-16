@@ -53,9 +53,11 @@ jobs:
             enriching
             enterprise
             exceptions
+            external
             external docs
             filtering
             healthchecks
+            internal
             internal docs
             logs
             metrics
@@ -161,6 +163,7 @@ jobs:
             redis source
             socket source
             splunk_hec source
+            static_metrics source
             statsd source
             stdin source
             syslog source
@@ -177,6 +180,7 @@ jobs:
             reduce transform
             remap transform
             route transform
+            exclusive_route transform
             sample transform
             tag_cardinality_limit transform
             throttle transform
@@ -203,6 +207,8 @@ jobs:
             gcp_pubsub sink
             gcp_stackdriver_logs sink
             gcp_stackdriver_metrics sink
+            greptimedb_metrics sink
+            greptimedb_logs sink
             honeycomb sink
             http sink
             humio_logs sink
@@ -236,3 +242,4 @@ jobs:
             javascript website
             search website
             template website
+            website

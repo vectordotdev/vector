@@ -32,6 +32,9 @@ on:
   pull_request_review:
     types: [submitted]
 
+permissions:
+  statuses: write
+
 env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
@@ -81,7 +84,7 @@ jobs:
 
   integration-tests:
     needs: prep-pr
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-20.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4

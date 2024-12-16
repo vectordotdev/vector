@@ -372,7 +372,7 @@ mod tests {
         let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
         assert_eq!(written, 5);
 
-        assert_eq!(String::from_utf8(writer).unwrap(), r#"value"#);
+        assert_eq!(String::from_utf8(writer).unwrap(), r"value");
         assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
     }
 }

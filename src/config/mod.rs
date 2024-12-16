@@ -8,8 +8,11 @@ use std::{
     time::Duration,
 };
 
+use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
 use indexmap::IndexMap;
 use serde::Serialize;
+
+use vector_config::configurable_component;
 pub use vector_lib::config::{
     AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
     SourceAcknowledgementsConfig, SourceOutput, TransformOutput,
@@ -17,9 +20,6 @@ pub use vector_lib::config::{
 pub use vector_lib::configurable::component::{
     GenerateConfig, SinkDescription, TransformDescription,
 };
-use vector_lib::configurable::configurable_component;
-
-use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
 
 pub mod api;
 mod builder;
