@@ -103,7 +103,7 @@ jobs:
 
   e2e-test-suite:
     name: E2E Test Suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: always()
     needs: e2e-tests

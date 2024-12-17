@@ -42,7 +42,7 @@ env:
 jobs:
 
   resolve-inputs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       baseline-sha: ${{ steps.set_and_validate_shas.outputs.BASELINE_SHA }}
       comparison-sha: ${{ steps.set_and_validate_shas.outputs.COMPARISON_SHA }}
@@ -111,7 +111,7 @@ jobs:
 
   # Only run this workflow if files changed in areas that could possibly introduce a regression.
   check-source-changed:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs: resolve-inputs
     outputs:
@@ -172,7 +172,7 @@ jobs:
           echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
 
   should-run-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: check-source-changed
     if: ${{ needs.check-source-changed.outputs.source_changed }}
     steps:
