@@ -64,10 +64,18 @@ impl GelfDeserializerConfig {
             [log_namespace],
         )
         .with_event_field(&owned_value_path!(VERSION), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!(HOST), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!(SHORT_MESSAGE), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(HOST), Kind::bytes(), Some("host"))
+        .with_event_field(
+            &owned_value_path!(SHORT_MESSAGE),
+            Kind::bytes(),
+            Some("message"),
+        )
         .optional_field(&owned_value_path!(FULL_MESSAGE), Kind::bytes(), None)
-        .optional_field(&owned_value_path!(TIMESTAMP), Kind::timestamp(), None)
+        .optional_field(
+            &owned_value_path!(TIMESTAMP),
+            Kind::timestamp(),
+            Some("timestamp"),
+        )
         .optional_field(&owned_value_path!(LEVEL), Kind::integer(), None)
         .optional_field(&owned_value_path!(FACILITY), Kind::bytes(), None)
         .optional_field(&owned_value_path!(LINE), Kind::integer(), None)
@@ -288,7 +296,17 @@ mod tests {
             Some(&Value::Bytes(Bytes::from_static(b"example.org")))
         );
         assert_eq!(
+            log.get_by_meaning("host"),
+            Some(&Value::Bytes(Bytes::from_static(b"example.org")))
+        );
+        assert_eq!(
             log.get(log_schema().message_key_target_path().unwrap()),
+            Some(&Value::Bytes(Bytes::from_static(
+                b"A short message that helps you identify what is going on"
+            )))
+        );
+        assert_eq!(
+            log.get_by_meaning("message"),
             Some(&Value::Bytes(Bytes::from_static(
                 b"A short message that helps you identify what is going on"
             )))
@@ -301,6 +319,7 @@ mod tests {
         );
         let dt = DateTime::from_timestamp(1385053862, 307_200_000).expect("invalid timestamp");
         assert_eq!(log.get(TIMESTAMP), Some(&Value::Timestamp(dt)));
+        assert_eq!(log.get_by_meaning("timestamp"), Some(&Value::Timestamp(dt)));
         assert_eq!(log.get(LEVEL), Some(&Value::Integer(1)));
         assert_eq!(
             log.get(FACILITY),
