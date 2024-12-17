@@ -543,6 +543,7 @@ spencergilbert
 spinlock
 SPOF
 spog
+sqlx
 srcaddr
 srcport
 SREs
