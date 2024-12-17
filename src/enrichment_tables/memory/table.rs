@@ -115,7 +115,6 @@ impl Memory {
             };
             let new_entry_key = k.as_str().to_string();
             let new_entry_size = new_entry_key.size_of() + new_entry.size_of();
-            info!("New entry size: {}", new_entry_size);
             if self.config.max_byte_size > 0
                 && metadata.byte_size.saturating_add(new_entry_size as u64)
                     > self.config.max_byte_size
