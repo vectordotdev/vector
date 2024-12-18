@@ -242,6 +242,10 @@ pub struct FileConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
     pub rotate_wait: Duration,
+
+    /// Read wait sec when read file triggered caused by file change
+    #[serde(default)]
+    pub trigger_wait_sec: Option<u64>,
 }
 
 fn default_max_line_bytes() -> usize {
@@ -319,6 +323,15 @@ pub enum FingerprintConfig {
     /// [inode]: https://en.wikipedia.org/wiki/Inode
     #[serde(rename = "device_and_inode")]
     DevInode,
+
+    /// Use full content as the identifier.
+    /// If file content changed, the checksum is changed too,
+    /// then read the new full content again.
+    FullContentChecksum,
+
+    /// Use the file modifiaction time as the identifier.
+    /// if file is modificate, then trigger reread.
+    ModificationTime,
 }
 
 impl Default for FingerprintConfig {
@@ -361,6 +374,8 @@ impl From<FingerprintConfig> for FingerprintStrategy {
                 }
             }
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
+            FingerprintConfig::FullContentChecksum => FingerprintStrategy::FullContentChecksum,
+            FingerprintConfig::ModificationTime => FingerprintStrategy::ModificationTime,
         }
     }
 }
@@ -400,6 +415,7 @@ impl Default for FileConfig {
             log_namespace: None,
             internal_metrics: Default::default(),
             rotate_wait: default_rotate_wait(),
+            trigger_wait_sec: None,
         }
     }
 }
@@ -566,6 +582,7 @@ pub fn file_source(
         emitter,
         handle: tokio::runtime::Handle::current(),
         rotate_wait: config.rotate_wait,
+        trigger_wait_sec: config.trigger_wait_sec.map(Duration::from_secs),
     };
 
     let event_metadata = EventMetadata {
