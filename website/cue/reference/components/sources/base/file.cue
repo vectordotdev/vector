@@ -98,6 +98,7 @@ base: components: sources: file: configuration: {
 			ignored_header_bytes: {
 				description: """
 					The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
+					If the file is compressed, the number of bytes refer to the header in the uncompressed content.
 
 					This can be helpful if all files share a common header that should be skipped.
 					"""
@@ -112,7 +113,7 @@ base: components: sources: file: configuration: {
 				description: """
 					The number of lines to read for generating the checksum.
 
-					If your files share a common header that is not always a fixed size,
+					The number of lines are determined from the uncompressed content if the file is compressed.
 
 					If the file has less than this amount of lines, it won’t be read at all.
 					"""
