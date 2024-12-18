@@ -174,7 +174,7 @@ where
                                 request_id,
                                 finalizers,
                                 event_count,
-                                &bytes_sent,
+                                bytes_sent.as_ref(),
                                 &events_sent,
                             ))
                             .instrument(info_span!("request", request_id).or_current());
