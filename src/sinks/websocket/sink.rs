@@ -586,6 +586,7 @@ mod tests {
                                                 user: _user,
                                                 password: _password,
                                             } => { /* Not needed for tests at the moment */ }
+                                            Auth::Digest { .. } => { /* Not needed for tests at the moment */ }
                                         }
                                     }
                                     Ok(res)

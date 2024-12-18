@@ -56,12 +56,14 @@ pub enum HttpError {
     CallRequest { source: hyper::Error },
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
+    #[snafu(display("Expected 401 with Digest Auth"))]
+    DigestAuthExpectation
 }
 
 impl HttpError {
     pub const fn is_retriable(&self) -> bool {
         match self {
-            HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
+            HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } | HttpError::DigestAuthExpectation => false,
             HttpError::CallRequest { .. }
             | HttpError::BuildTlsConnector { .. }
             | HttpError::MakeHttpsConnector { .. } => true,
@@ -295,6 +297,20 @@ pub enum Auth {
         /// The bearer authentication token.
         token: SensitiveString,
     },
+    /// Digest authentication.
+    /// 
+    /// requires a round trip to the server to get the challenge and then send the response
+    Digest {
+        /// The digest authentication username.
+        #[configurable(metadata(docs::examples = "${USERNAME}"))]
+        #[configurable(metadata(docs::examples = "username"))]
+        user: String,
+
+        /// The digest authentication password.
+        #[configurable(metadata(docs::examples = "${PASSWORD}"))]
+        #[configurable(metadata(docs::examples = "password"))]
+        password: SensitiveString,
+    },
 }
 
 pub trait MaybeAuth: Sized {
@@ -332,6 +348,10 @@ impl Auth {
             Auth::Bearer { token } => match Authorization::bearer(token.inner()) {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
+            },
+            Auth::Digest { user, password } => {
+                let auth = Authorization::basic(user.as_str(), password.inner());
+                map.typed_insert(auth);
             },
         }
     }
