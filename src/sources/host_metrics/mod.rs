@@ -35,6 +35,8 @@ mod filesystem;
 mod memory;
 mod network;
 mod process;
+#[cfg(target_os = "linux")]
+mod tcp;
 
 /// Collector types.
 #[serde_as]
@@ -70,6 +72,9 @@ pub enum Collector {
 
     /// Metrics related to network utilization.
     Network,
+
+    /// Metrics related to TCP connections.
+    TCP,
 }
 
 /// Filtering configuration.
@@ -201,6 +206,7 @@ fn default_collectors() -> Option<Vec<Collector>> {
         Collector::Memory,
         Collector::Network,
         Collector::Process,
+        Collector::TCP,
     ];
 
     #[cfg(target_os = "linux")]
@@ -398,6 +404,10 @@ impl HostMetrics {
         }
         if self.config.has_collector(Collector::Network) {
             self.network_metrics(&mut buffer).await;
+        }
+        #[cfg(target_os = "linux")]
+        if self.config.has_collector(Collector::TCP) {
+            self.tcp_metrics(&mut buffer).await;
         }
 
         let metrics = buffer.metrics;
