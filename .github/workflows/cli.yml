@@ -9,7 +9,7 @@ permissions:
 jobs:
   test-cli:
     runs-on: ubuntu-20.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       CARGO_INCREMENTAL: 0
     steps:
