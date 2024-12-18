@@ -232,6 +232,8 @@ impl Checkpointer {
             BytesChecksum(c) => format!("g{:x}.{}", c, pos),
             FirstLinesChecksum(c) => format!("h{:x}.{}", c, pos),
             DevInode(dev, ino) => format!("i{:x}.{:x}.{}", dev, ino, pos),
+            FullContentChecksum(c) => format!("f{:x}.{}", c, pos),
+            ModificationTime(path, timestamp) => format!("m{:x}.{}.{}", path, timestamp, pos),
             Unknown(x) => format!("{:x}.{}", x, pos),
         };
         self.directory.join(path)
@@ -262,6 +264,18 @@ impl Checkpointer {
                     scan_fmt!(file_name, "i{x}.{x}.{}", [hex u64], [hex u64], FilePosition)
                         .unwrap();
                 (DevInode(dev, ino), pos)
+            }
+            'f' => {
+                let (c, pos) =
+                    scan_fmt!(file_name, "f{x}.{}", [hex u64], FilePosition)
+                        .unwrap();
+                (FullContentChecksum(c), pos)
+            }
+            'm' => {
+                let (path, timestamp, pos) =
+                    scan_fmt!(file_name, "m{x}.{}.{}", [hex u64], u64, FilePosition)
+                        .unwrap();
+                (ModificationTime(path, timestamp), pos)
             }
             _ => {
                 let (c, pos) = scan_fmt!(file_name, "{x}.{}", [hex u64], FilePosition).unwrap();

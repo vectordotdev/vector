@@ -17,6 +17,7 @@ scan_fmt = "0.2.6"
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-common = { path = "../vector-config-common", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
+sha2="0.10.8"
 
 [dependencies.bstr]
 version = "1.10"

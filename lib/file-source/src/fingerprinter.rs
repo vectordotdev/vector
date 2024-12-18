@@ -4,6 +4,9 @@ use std::{
     io::{self, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use sha2::{Sha256, Digest};
 
 use crc::Crc;
 use serde::{Deserialize, Serialize};
@@ -32,6 +35,8 @@ pub enum FingerprintStrategy {
         lines: usize,
     },
     DevInode,
+    FullContentChecksum,
+    ModificationTime,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize, Ord, PartialOrd)]
@@ -42,6 +47,8 @@ pub enum FileFingerprint {
     #[serde(alias = "first_line_checksum")]
     FirstLinesChecksum(u64),
     DevInode(u64, u64),
+    FullContentChecksum(u64),
+    ModificationTime(u64, u64),
     Unknown(u64),
 }
 
@@ -57,8 +64,28 @@ impl FileFingerprint {
                 buf.write_all(&dev.to_be_bytes()).expect("writing to array");
                 buf.write_all(&ino.to_be_bytes()).expect("writing to array");
                 FINGERPRINT_CRC.checksum(&buf[..])
-            }
+            },
+            FullContentChecksum(c) => *c,
+            ModificationTime(path, update_timestamp) => {
+                let mut buf = Vec::with_capacity(std::mem::size_of_val(update_timestamp) + std::mem::size_of_val(path));
+                buf.write_all(&path.to_be_bytes()).expect("writing to array");
+                buf.write_all(&update_timestamp.to_be_bytes()).expect("writing to array");
+                FINGERPRINT_CRC.checksum(&buf[..])
+            },
             Unknown(c) => *c,
+        }
+    }
+    pub fn read_from_beginning(&self) -> bool {
+        use FileFingerprint::*;
+        match self {
+            BytesChecksum(_) => false,
+            FirstLinesChecksum(_) => false,
+            DevInode(_, _) => false,
+            // full_content_checksum and modification_time type fingerprints
+            // are read from the beginning when update detected
+            FullContentChecksum(_) => true,
+            ModificationTime(_, _) => true,
+            Unknown(_) => false,
         }
     }
 }
@@ -83,6 +110,22 @@ impl Fingerprinter {
                 let dev = file_handle.portable_dev()?;
                 let ino = file_handle.portable_ino()?;
                 Ok(DevInode(dev, ino))
+            }
+            FingerprintStrategy::FullContentChecksum => {
+                let mut file = fs::File::open(&path)?;
+                let mut hasher = Sha256::new();
+                let _ = io::copy(&mut file, &mut hasher)?;
+                let hash:[u8; 32] = hasher.finalize().try_into().unwrap();
+                let fingerprint = FINGERPRINT_CRC.checksum(&hash);
+                Ok(FullContentChecksum(fingerprint))
+            }
+            FingerprintStrategy::ModificationTime => {
+                let metadata = fs::metadata(path)?;
+                let update_timestamp = metadata.modified()?.duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs();
+                let path_str = path.to_str().unwrap();
+                let mut hasher = DefaultHasher::new();
+                path_str.hash(&mut hasher);
+                Ok(ModificationTime(hasher.finish(), update_timestamp))
             }
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,

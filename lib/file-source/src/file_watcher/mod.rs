@@ -45,10 +45,12 @@ pub struct FileWatcher {
     reached_eof: bool,
     last_read_attempt: Instant,
     last_read_success: Instant,
+    data_ready_time: Instant,
     last_seen: Instant,
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
+    trigger_wait_sec: Option<Duration>,
 }
 
 impl FileWatcher {
@@ -63,6 +65,7 @@ impl FileWatcher {
         ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
         line_delimiter: Bytes,
+        trigger_wait_sec: Option<Duration>,
     ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path)?;
         let (devno, ino) = (f.portable_dev()?, f.portable_ino()?);
@@ -148,10 +151,12 @@ impl FileWatcher {
             reached_eof: false,
             last_read_attempt: ts,
             last_read_success: ts,
+            data_ready_time: Instant::now(),
             last_seen: ts,
             max_line_bytes,
             line_delimiter,
             buf: BytesMut::new(),
+            trigger_wait_sec,
         })
     }
 
@@ -276,6 +281,15 @@ impl FileWatcher {
     pub fn should_read(&self) -> bool {
         self.last_read_success.elapsed() < Duration::from_secs(10)
             || self.last_read_attempt.elapsed() > Duration::from_secs(10)
+    }
+
+    #[inline]
+    pub fn should_wait(&self) -> bool {
+        if let Some(wait_sec) = self.trigger_wait_sec {
+            self.data_ready_time.elapsed() < wait_sec
+        } else {
+            false
+        }
     }
 
     #[inline]

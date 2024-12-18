@@ -53,6 +53,7 @@ where
     pub emitter: E,
     pub handle: tokio::runtime::Handle,
     pub rotate_wait: Duration,
+    pub trigger_wait_sec: Option<Duration>,
 }
 
 /// `FileServer` as Source
@@ -102,7 +103,7 @@ where
 
         let mut known_small_files = HashSet::new();
 
-        let mut existing_files = Vec::new();
+        let mut existing_files: Vec<(PathBuf, FileFingerprint)> = Vec::new();
         for path in self.paths_provider.paths().into_iter() {
             if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
                 &path,
@@ -235,6 +236,11 @@ where
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
                 if !watcher.should_read() {
+                    continue;
+                }
+                // if data ready time to current is less than trigger wait sec,
+                // then skip current watcher.
+                if watcher.should_wait() {
                     continue;
                 }
 
@@ -393,7 +399,9 @@ where
         // `kubernetes_logs` source returns the files well after start-up, once it has populated
         // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
         // https://github.com/vectordotdev/vector/issues/7139
-        let read_from = if !self.ignore_checkpoints {
+        let read_from = if file_id.read_from_beginning() {
+            ReadFrom::Beginning
+        } else if !self.ignore_checkpoints {
             checkpoints
                 .get(file_id)
                 .map(ReadFrom::Checkpoint)
@@ -408,6 +416,7 @@ where
             self.ignore_before,
             self.max_line_bytes,
             self.line_delimiter.clone(),
+            self.trigger_wait_sec,
         ) {
             Ok(mut watcher) => {
                 if let ReadFrom::Checkpoint(file_position) = read_from {
