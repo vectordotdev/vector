@@ -125,6 +125,19 @@ impl UncompressedReader for UncompressedReaderImpl {
     }
 }
 
+fn skip_first_n_bytes<R: BufRead>(reader: &mut R, n: usize) -> io::Result<()> {
+    // We cannot simply seek the file by n because the file may be compressed;
+    // to skip the first n decompressed bytes, we decompress up to n and discard the output.
+    let mut skipped_bytes = 0;
+    while skipped_bytes < n {
+        let chunk = reader.fill_buf()?;
+        let bytes_to_skip = std::cmp::min(chunk.len(), (n - skipped_bytes) as usize);
+        reader.consume(bytes_to_skip);
+        skipped_bytes += bytes_to_skip;
+    }
+    Ok(())
+}
+
 impl Fingerprinter {
     pub fn get_fingerprint_of_file(
         &self,
@@ -141,18 +154,19 @@ impl Fingerprinter {
                 Ok(DevInode(dev, ino))
             }
             FingerprintStrategy::Checksum {
-                ignored_header_bytes: _,
+                ignored_header_bytes,
                 bytes: _,
                 lines,
             }
             | FingerprintStrategy::FirstLinesChecksum {
-                ignored_header_bytes: _,
+                ignored_header_bytes,
                 lines,
             } => {
                 buffer.resize(self.max_line_length, 0u8);
                 let mut fp = fs::File::open(path)?;
-                let reader = UncompressedReaderImpl::reader(&mut fp);
+                let mut reader = UncompressedReaderImpl::reader(&mut fp);
 
+                skip_first_n_bytes(&mut reader, ignored_header_bytes)?;
                 let bytes_read = fingerprinter_read_until(reader, b'\n', lines, buffer)?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
                 Ok(FirstLinesChecksum(fingerprint))
@@ -600,6 +614,60 @@ mod test {
         assert_ne!(
             read_byte_content(&target_dir, "two_lines_continued.log"),
             read_byte_content(&target_dir, "two_lines_continued_compressed.log")
+        );
+    }
+
+    #[test]
+    fn test_first_two_lines_checksum_fingerprint_with_headers() {
+        let max_line_length = 64;
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 14,
+                lines: 2,
+            },
+            max_line_length,
+            ignore_not_found: false,
+        };
+
+        let target_dir = tempdir().unwrap();
+        let prepare_test = |file: &str, contents: &[u8]| {
+            let path = target_dir.path().join(file);
+            fs::write(&path, contents).unwrap();
+            path
+        };
+
+        let two_lines = prepare_test(
+            "two_lines.log",
+            b"some-header-1\nhello world\nfrom vector\n",
+        );
+        let two_lines_compressed_same_header = prepare_test(
+            "two_lines_compressed_same_header.log",
+            &gzip(&mut b"some-header-1\nhello world\nfrom vector\n".to_vec()),
+        );
+        let two_lines_compressed_same_header_size = prepare_test(
+            "two_lines_compressed_same_header_size.log",
+            &gzip(&mut b"some-header-2\nhello world\nfrom vector\n".to_vec()),
+        );
+        let two_lines_compressed_different_header_size = prepare_test(
+            "two_lines_compressed_different_header_size.log",
+            &gzip(&mut b"some-header-22\nhellow world\nfrom vector\n".to_vec()),
+        );
+
+        let mut buf = Vec::new();
+        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
+
+        assert!(run(&two_lines).is_ok());
+        assert_eq!(
+            run(&two_lines).unwrap(),
+            run(&two_lines_compressed_same_header).unwrap()
+        );
+        assert_eq!(
+            run(&two_lines).unwrap(),
+            run(&two_lines_compressed_same_header_size).unwrap()
+        );
+        assert_ne!(
+            run(&two_lines).unwrap(),
+            run(&two_lines_compressed_different_header_size).unwrap()
         );
     }
 
