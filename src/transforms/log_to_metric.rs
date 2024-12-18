@@ -1,8 +1,9 @@
 use std::sync::Arc;
-use std::{collections::HashMap, num::ParseFloatError};
+use std::{collections::HashMap, num::ParseFloatError, sync::LazyLock};
 
 use chrono::Utc;
 use indexmap::IndexMap;
+use regex::Regex;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::LogEvent;
 use vector_lib::{
@@ -109,8 +110,11 @@ pub struct MetricConfig {
     pub namespace: Option<Template>,
 
     /// Tags to apply to the metric.
+    ///
+    /// Both keys and values are templateable, which enables you to attach dynamic labels to events.
+    ///
     #[configurable(metadata(docs::additional_props_description = "A metric tag."))]
-    pub tags: Option<IndexMap<String, TagConfig>>,
+    pub tags: Option<IndexMap<Template, TagConfig>>,
 
     #[configurable(derived)]
     #[serde(flatten)]
@@ -271,9 +275,11 @@ fn render_template(template: &Template, event: &Event) -> Result<String, Transfo
 }
 
 fn render_tags(
-    tags: &Option<IndexMap<String, TagConfig>>,
+    tags: &Option<IndexMap<Template, TagConfig>>,
     event: &Event,
 ) -> Result<Option<MetricTags>, TransformError> {
+    let mut static_tags: HashMap<String, TagValue> = HashMap::new();
+    let mut dynamic_tags: HashMap<String, TagValue> = HashMap::new();
     Ok(match tags {
         None => None,
         Some(tags) => {
@@ -281,14 +287,37 @@ fn render_tags(
             for (name, config) in tags {
                 match config {
                     TagConfig::Plain(template) => {
-                        render_tag_into(event, name, template, &mut result)?
+                        render_tag_into(
+                            event,
+                            name,
+                            template,
+                            &mut result,
+                            &mut static_tags,
+                            &mut dynamic_tags,
+                        )?;
                     }
                     TagConfig::Multi(vec) => {
                         for template in vec {
-                            render_tag_into(event, name, template, &mut result)?;
+                            render_tag_into(
+                                event,
+                                name,
+                                template,
+                                &mut result,
+                                &mut static_tags,
+                                &mut dynamic_tags,
+                            )?;
                         }
                     }
                 }
+            }
+            for (k, v) in static_tags {
+                if let Some(discarded_v) = dynamic_tags.insert(k.clone(), v.clone()) {
+                    warn!(
+                        "Static static overrides dynamic tag. \
+                key: {}, value: {:?}, discarded value: {:?}",
+                        k, v, discarded_v
+                    );
+                };
             }
             result.as_option()
         }
@@ -297,27 +326,97 @@ fn render_tags(
 
 fn render_tag_into(
     event: &Event,
-    name: &str,
-    template: &Option<Template>,
+    key_template: &Template,
+    value_template: &Option<Template>,
     result: &mut MetricTags,
+    static_tags: &mut HashMap<String, TagValue>,
+    dynamic_tags: &mut HashMap<String, TagValue>,
 ) -> Result<(), TransformError> {
-    let value = match template {
-        None => TagValue::Bare,
+    let key_s = match render_template(key_template, event) {
+        Ok(key_s) => key_s,
+        Err(TransformError::TemplateRenderingError(err)) => {
+            emit!(crate::internal_events::TemplateRenderingError {
+                error: err,
+                drop_event: false,
+                field: Some(key_template.get_ref()),
+            });
+            return Ok(());
+        }
+        Err(err) => return Err(err),
+    };
+    match value_template {
+        None => {
+            result.insert(key_s, TagValue::Bare);
+        }
         Some(template) => match render_template(template, event) {
-            Ok(result) => TagValue::Value(result),
-            Err(TransformError::TemplateRenderingError(error)) => {
+            Ok(value_s) => {
+                tag_expansion(key_s.clone(), value_s, result, static_tags, dynamic_tags);
+            }
+            Err(TransformError::TemplateRenderingError(value_error)) => {
                 emit!(crate::internal_events::TemplateRenderingError {
-                    error,
+                    error: value_error,
                     drop_event: false,
-                    field: Some(name),
+                    field: Some(template.get_ref()),
                 });
                 return Ok(());
             }
-            Err(other) => return Err(other),
+            Err(err) => return Err(err),
         },
     };
-    result.insert(name.to_string(), value);
     Ok(())
+}
+
+static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^0-9A-Za-z_]").unwrap());
+fn slugify_text(input: String) -> String {
+    let result = RE.replace_all(&input, "_");
+    result.to_lowercase()
+}
+
+// borrow from src/sinks/loki/sink.rs
+fn tag_expansion(
+    key_s: String,
+    value_s: String,
+    result: &mut MetricTags,
+    static_tags: &mut HashMap<String, TagValue>,
+    dynamic_tags: &mut HashMap<String, TagValue>,
+) {
+    if let Some(opening_prefix) = key_s.strip_suffix('*') {
+        let output: Result<serde_json::map::Map<String, serde_json::Value>, serde_json::Error> =
+            serde_json::from_str(value_s.clone().as_str());
+
+        if output.is_err() {
+            warn!(
+                "Failed to expand dynamic label. value: {}, err: {}",
+                value_s,
+                output.err().unwrap()
+            );
+            return;
+        }
+
+        // key_* -> key_one, key_two, key_three
+        // * -> one, two, three
+        for (k, v) in output.unwrap() {
+            let key = slugify_text(format!("{}{}", opening_prefix, k));
+            let val = Value::from(v).to_string_lossy().into_owned();
+            if val == "<null>" {
+                warn!("Encountered \"null\" value for dynamic label. key: {}", key);
+                continue;
+            }
+            let val = TagValue::Value(val);
+            if let Some(prev) = dynamic_tags.insert(key.clone(), val.clone()) {
+                warn!(
+                    "Encountered duplicated dynamic label. \
+                                key: {}, value: {:?}, discarded value: {:?}",
+                    key, val, prev
+                );
+            };
+            result.insert(key, val);
+        }
+    } else {
+        let val = TagValue::Value(value_s);
+        result.insert(key_s.clone(), val.clone());
+        static_tags.insert(key_s, val);
+    }
 }
 
 fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
@@ -910,7 +1009,7 @@ mod tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::config::ComponentKey;
-    use vector_lib::event::EventMetadata;
+    use vector_lib::event::{EventMetadata, ObjectMap};
     use vector_lib::metric_tags;
 
     #[test]
@@ -1074,6 +1173,111 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn count_http_requests_with_tags_expansion() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "message"
+            name = "http_requests_total"
+            namespace = "app"
+            tags = {"*" = "{{ dict }}"}
+            "#,
+        );
+
+        let mut event = create_event("message", "i am log");
+        let log = event.as_mut_log();
+
+        let mut test_dict = ObjectMap::default();
+        test_dict.insert("one".into(), Value::from("foo"));
+        test_dict.insert("two".into(), Value::from("baz"));
+        log.insert("dict", Value::from(test_dict));
+
+        let mut metadata =
+            event
+                .metadata()
+                .clone()
+                .with_origin_metadata(DatadogMetricOriginMetadata::new(
+                    None,
+                    None,
+                    Some(ORIGIN_SERVICE_VALUE),
+                ));
+        // definitions aren't valid for metrics yet, it's just set to the default (anything).
+        metadata.set_schema_definition(&Arc::new(Definition::any()));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+
+        let metric = do_transform(config, event).await.unwrap();
+
+        assert_eq!(
+            metric.into_metric(),
+            Metric::new_with_metadata(
+                "http_requests_total",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+                metadata,
+            )
+            .with_namespace(Some("app"))
+            .with_tags(Some(metric_tags!(
+                "one" => "foo",
+                "two" => "baz",
+            )))
+            .with_timestamp(Some(ts()))
+        );
+    }
+    #[tokio::test]
+    async fn count_http_requests_with_colliding_dynamic_tags() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "message"
+            name = "http_requests_total"
+            namespace = "app"
+            tags = {"l1_*" = "{{ map1 }}", "*" = "{{ map2 }}"}
+            "#,
+        );
+
+        let mut event = create_event("message", "i am log");
+        let log = event.as_mut_log();
+
+        let mut map1 = ObjectMap::default();
+        map1.insert("key1".into(), Value::from("val1"));
+        log.insert("map1", Value::from(map1));
+
+        let mut map2 = ObjectMap::default();
+        map2.insert("l1_key1".into(), Value::from("val2"));
+        log.insert("map2", Value::from(map2));
+
+        let mut metadata =
+            event
+                .metadata()
+                .clone()
+                .with_origin_metadata(DatadogMetricOriginMetadata::new(
+                    None,
+                    None,
+                    Some(ORIGIN_SERVICE_VALUE),
+                ));
+        // definitions aren't valid for metrics yet, it's just set to the default (anything).
+        metadata.set_schema_definition(&Arc::new(Definition::any()));
+        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+
+        let metric = do_transform(config, event).await.unwrap().into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        assert_eq!(
+            tags.iter_single().collect::<Vec<_>>(),
+            vec![("l1_key1", "val2")]
+        );
+
+        assert_eq!(tags.iter_all().count(), 2);
+        for (name, value) in tags.iter_all() {
+            assert_eq!(name, "l1_key1");
+            assert!(value == Some("val1") || value == Some("val2"));
+        }
+    }
+    #[tokio::test]
     async fn multi_value_tags_yaml() {
         // Have to use YAML to represent bare tags
         let config = parse_yaml_config(
@@ -1099,6 +1303,40 @@ mod tests {
         for (name, value) in tags.iter_all() {
             assert_eq!(name, "tag");
             assert!(value.is_none() || value == Some("one") || value == Some("two"));
+        }
+    }
+    #[tokio::test]
+    async fn multi_value_tags_expansion_yaml() {
+        // Have to use YAML to represent bare tags
+        let config = parse_yaml_config(
+            r#"
+            metrics:
+            - field: "message"
+              type: "counter"
+              tags:
+                "*": "{{dict}}"
+            "#,
+        );
+
+        let mut event = create_event("message", "I am log");
+        let log = event.as_mut_log();
+
+        let mut test_dict = ObjectMap::default();
+        test_dict.insert("one".into(), Value::from(vec!["foo", "baz"]));
+        log.insert("dict", Value::from(test_dict));
+
+        let metric = do_transform(config, event).await.unwrap().into_metric();
+        let tags = metric.tags().expect("Metric should have tags");
+
+        assert_eq!(
+            tags.iter_single().collect::<Vec<_>>(),
+            vec![("one", "[\"foo\",\"baz\"]")]
+        );
+
+        assert_eq!(tags.iter_all().count(), 1);
+        for (name, value) in tags.iter_all() {
+            assert_eq!(name, "one");
+            assert_eq!(value, Some("[\"foo\",\"baz\"]"));
         }
     }
 
