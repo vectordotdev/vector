@@ -200,7 +200,7 @@ where
         request_id: usize,
         finalizers: EventFinalizers,
         event_count: usize,
-        bytes_sent: &Option<Registered<BytesSent>>,
+        bytes_sent: Option<&Registered<BytesSent>>,
         events_sent: &RegisteredEventCache<(), TaggedEventsSent>,
     ) {
         match result {
