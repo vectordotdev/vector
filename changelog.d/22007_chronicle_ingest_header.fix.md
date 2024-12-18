@@ -1,3 +1,3 @@
-Set Content Encoding headers when configuring compression for the Chronicle unstructured log sink
+The `chronicle_unstructured` sink now sets the `content-encoding` header when compression is enabled.
 
 authors: chocpanda
