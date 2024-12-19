@@ -1,11 +1,12 @@
 use std::{
     collections::HashSet,
     fs::{self, metadata, File},
-    io::{self, Read, Seek, SeekFrom, Write},
+    io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
 
 use crc::Crc;
+use flate2::bufread::GzDecoder;
 use serde::{Deserialize, Serialize};
 
 use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
@@ -69,6 +70,74 @@ impl From<u64> for FileFingerprint {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+enum SupportedCompressionAlgorithms {
+    GZIP,
+}
+
+impl SupportedCompressionAlgorithms {
+    fn values() -> Vec<SupportedCompressionAlgorithms> {
+        vec![SupportedCompressionAlgorithms::GZIP]
+    }
+
+    fn magic_header_bytes(&self) -> &'static [u8] {
+        match self {
+            SupportedCompressionAlgorithms::GZIP => &[0x1f, 0x8b],
+        }
+    }
+}
+
+trait UncompressedReader {
+    fn check(fp: &mut File) -> Option<SupportedCompressionAlgorithms>;
+    fn reader<'a>(fp: &'a mut File) -> Box<dyn BufRead + 'a>;
+}
+
+struct UncompressedReaderImpl;
+impl UncompressedReader for UncompressedReaderImpl {
+    fn check(fp: &mut File) -> Option<SupportedCompressionAlgorithms> {
+        SupportedCompressionAlgorithms::values()
+            .iter()
+            .find_map(|compression_algorithm| {
+                // magic headers for algorithms can be of different lengths, and using a buffer too long could exceed the length of the file
+                // so instantiate and check the various sizes independently
+                let magic_header_bytes = compression_algorithm.magic_header_bytes();
+                let mut magic = vec![0u8; magic_header_bytes.len()];
+
+                if fp.read_exact(&mut magic).is_ok()
+                    && fp.seek(SeekFrom::Start(0)).is_ok()
+                    && magic == magic_header_bytes
+                {
+                    Some(*compression_algorithm)
+                } else {
+                    None
+                }
+            })
+    }
+    fn reader<'a>(fp: &'a mut File) -> Box<dyn BufRead + 'a> {
+        // To support new compression algorithms, add them below
+        match Self::check(fp) {
+            Some(SupportedCompressionAlgorithms::GZIP) => {
+                Box::new(BufReader::new(GzDecoder::new(BufReader::new(fp))))
+            }
+            // No compression, or read the raw bytes
+            None => Box::new(BufReader::new(fp)),
+        }
+    }
+}
+
+fn skip_first_n_bytes<R: BufRead>(reader: &mut R, n: usize) -> io::Result<()> {
+    // We cannot simply seek the file by n because the file may be compressed;
+    // to skip the first n decompressed bytes, we decompress up to n and discard the output.
+    let mut skipped_bytes = 0;
+    while skipped_bytes < n {
+        let chunk = reader.fill_buf()?;
+        let bytes_to_skip = std::cmp::min(chunk.len(), (n - skipped_bytes) as usize);
+        reader.consume(bytes_to_skip);
+        skipped_bytes += bytes_to_skip;
+    }
+    Ok(())
+}
+
 impl Fingerprinter {
     pub fn get_fingerprint_of_file(
         &self,
@@ -95,8 +164,10 @@ impl Fingerprinter {
             } => {
                 buffer.resize(self.max_line_length, 0u8);
                 let mut fp = fs::File::open(path)?;
-                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
-                let bytes_read = fingerprinter_read_until(fp, b'\n', lines, buffer)?;
+                let mut reader = UncompressedReaderImpl::reader(&mut fp);
+
+                skip_first_n_bytes(&mut reader, ignored_header_bytes)?;
+                let bytes_read = fingerprinter_read_until(reader, b'\n', lines, buffer)?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
                 Ok(FirstLinesChecksum(fingerprint))
             }
@@ -281,11 +352,36 @@ fn fingerprinter_read_until(
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashSet, fs, io::Error, path::Path, time::Duration};
+    use std::{
+        collections::HashSet,
+        fs,
+        io::{Error, Read, Write},
+        path::Path,
+        time::Duration,
+    };
 
-    use tempfile::tempdir;
+    use flate2::write::GzEncoder;
+    use tempfile::{tempdir, TempDir};
 
     use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
+
+    fn gzip(data: &mut [u8]) -> Vec<u8> {
+        let mut buffer = vec![];
+        let mut encoder = GzEncoder::new(&mut buffer, flate2::Compression::default());
+        encoder.write_all(data).expect("Failed to write data");
+        encoder
+            .finish()
+            .expect("Failed to finish encoding with gzip footer");
+        buffer
+    }
+
+    fn read_byte_content(target_dir: &TempDir, file: &str) -> Vec<u8> {
+        let path = target_dir.path().join(file);
+        let mut file = fs::File::open(path).unwrap();
+        let mut content = Vec::new();
+        file.read_to_end(&mut content).unwrap();
+        content
+    }
 
     #[test]
     fn test_checksum_fingerprint() {
@@ -366,10 +462,21 @@ mod test {
 
         let empty = prepare_test("empty.log", b"");
         let incomplete_line = prepare_test("incomplete_line.log", b"missing newline char");
-        let one_line = prepare_test("one_line.log", b"hello world\n");
+        let one_line = prepare_test(
+            "one_line_duplicate_compressed.log",
+            &gzip(&mut b"hello world\n".to_vec()),
+        );
         let one_line_duplicate = prepare_test("one_line_duplicate.log", b"hello world\n");
+        let one_line_duplicate_compressed = prepare_test(
+            "one_line_duplicate_compressed.log",
+            &gzip(&mut b"hello world\n".to_vec()),
+        );
         let one_line_continued =
             prepare_test("one_line_continued.log", b"hello world\nthe next line\n");
+        let one_line_continued_compressed = prepare_test(
+            "one_line_continued_compressed.log",
+            &gzip(&mut b"hello world\nthe next line\n".to_vec()),
+        );
         let different_two_lines = prepare_test("different_two_lines.log", b"line one\nline two\n");
 
         let exactly_max_line_length =
@@ -395,14 +502,38 @@ mod test {
         assert!(run(&exactly_max_line_length).is_ok());
         assert!(run(&exceeding_max_line_length).is_ok());
 
-        assert_eq!(run(&one_line).unwrap(), run(&one_line_duplicate).unwrap());
-        assert_eq!(run(&one_line).unwrap(), run(&one_line_continued).unwrap());
+        assert_eq!(
+            run(&one_line).unwrap(),
+            run(&one_line_duplicate_compressed).unwrap()
+        );
+        assert_eq!(
+            run(&one_line).unwrap(),
+            run(&one_line_continued_compressed).unwrap()
+        );
+        assert_eq!(
+            run(&one_line).unwrap(),
+            run(&one_line_duplicate_compressed).unwrap()
+        );
+        assert_eq!(
+            run(&one_line).unwrap(),
+            run(&one_line_continued_compressed).unwrap()
+        );
 
         assert_ne!(run(&one_line).unwrap(), run(&different_two_lines).unwrap());
 
         assert_eq!(
             run(&exactly_max_line_length).unwrap(),
             run(&exceeding_max_line_length).unwrap()
+        );
+
+        assert_ne!(
+            read_byte_content(&target_dir, "one_line_duplicate.log"),
+            read_byte_content(&target_dir, "one_line_duplicate_compressed.log")
+        );
+
+        assert_ne!(
+            read_byte_content(&target_dir, "one_line_continued.log"),
+            read_byte_content(&target_dir, "one_line_continued_compressed.log")
         );
     }
 
@@ -436,6 +567,15 @@ mod test {
             "two_lines_continued.log",
             b"hello world\nfrom vector\nthe next line\n",
         );
+        let two_lines_duplicate_compressed = prepare_test(
+            "two_lines_duplicate_compressed.log",
+            &gzip(&mut b"hello world\nfrom vector\n".to_vec()),
+        );
+        let two_lines_continued_compressed = prepare_test(
+            "two_lines_continued_compressed.log",
+            &gzip(&mut b"hello world\nfrom vector\nthe next line\n".to_vec()),
+        );
+
         let different_three_lines = prepare_test(
             "different_three_lines.log",
             b"line one\nline two\nine three\n",
@@ -453,10 +593,81 @@ mod test {
 
         assert_eq!(run(&two_lines).unwrap(), run(&two_lines_duplicate).unwrap());
         assert_eq!(run(&two_lines).unwrap(), run(&two_lines_continued).unwrap());
+        assert_eq!(
+            run(&two_lines).unwrap(),
+            run(&two_lines_duplicate_compressed).unwrap()
+        );
+        assert_eq!(
+            run(&two_lines).unwrap(),
+            run(&two_lines_continued_compressed).unwrap()
+        );
 
         assert_ne!(
             run(&two_lines).unwrap(),
             run(&different_three_lines).unwrap()
+        );
+
+        assert_ne!(
+            read_byte_content(&target_dir, "two_lines_duplicate.log"),
+            read_byte_content(&target_dir, "two_lines_duplicate_compressed.log")
+        );
+        assert_ne!(
+            read_byte_content(&target_dir, "two_lines_continued.log"),
+            read_byte_content(&target_dir, "two_lines_continued_compressed.log")
+        );
+    }
+
+    #[test]
+    fn test_first_two_lines_checksum_fingerprint_with_headers() {
+        let max_line_length = 64;
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 14,
+                lines: 2,
+            },
+            max_line_length,
+            ignore_not_found: false,
+        };
+
+        let target_dir = tempdir().unwrap();
+        let prepare_test = |file: &str, contents: &[u8]| {
+            let path = target_dir.path().join(file);
+            fs::write(&path, contents).unwrap();
+            path
+        };
+
+        let two_lines = prepare_test(
+            "two_lines.log",
+            b"some-header-1\nhello world\nfrom vector\n",
+        );
+        let two_lines_compressed_same_header = prepare_test(
+            "two_lines_compressed_same_header.log",
+            &gzip(&mut b"some-header-1\nhello world\nfrom vector\n".to_vec()),
+        );
+        let two_lines_compressed_same_header_size = prepare_test(
+            "two_lines_compressed_same_header_size.log",
+            &gzip(&mut b"some-header-2\nhello world\nfrom vector\n".to_vec()),
+        );
+        let two_lines_compressed_different_header_size = prepare_test(
+            "two_lines_compressed_different_header_size.log",
+            &gzip(&mut b"some-header-22\nhellow world\nfrom vector\n".to_vec()),
+        );
+
+        let mut buf = Vec::new();
+        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
+
+        assert!(run(&two_lines).is_ok());
+        assert_eq!(
+            run(&two_lines).unwrap(),
+            run(&two_lines_compressed_same_header).unwrap()
+        );
+        assert_eq!(
+            run(&two_lines).unwrap(),
+            run(&two_lines_compressed_same_header_size).unwrap()
+        );
+        assert_ne!(
+            run(&two_lines).unwrap(),
+            run(&two_lines_compressed_different_header_size).unwrap()
         );
     }
 
