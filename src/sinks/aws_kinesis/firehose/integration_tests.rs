@@ -255,13 +255,13 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
     let proxy = ProxyConfig::default();
 
     create_client::<KinesisFirehoseClientBuilder>(
+        &KinesisFirehoseClientBuilder {},
         &auth,
         region_endpoint.region(),
         region_endpoint.endpoint(),
         &proxy,
         &None,
         &None,
-        false,
     )
     .await
     .unwrap()

@@ -38,12 +38,8 @@ pub struct KinesisFirehoseClientBuilder;
 impl ClientBuilder for KinesisFirehoseClientBuilder {
     type Client = KinesisClient;
 
-    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+    fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
         Self::Client::new(config)
-    }
-
-    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
-        KinesisFirehoseClientBuilder::build(config)
     }
 }
 
@@ -106,13 +102,13 @@ impl KinesisFirehoseSinkConfig {
 
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         create_client::<KinesisFirehoseClientBuilder>(
+            &KinesisFirehoseClientBuilder {},
             &self.base.auth,
             self.base.region.region(),
             self.base.region.endpoint(),
             proxy,
             &self.base.tls,
             &None,
-            false,
         )
         .await
     }

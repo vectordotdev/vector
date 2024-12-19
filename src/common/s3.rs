@@ -2,18 +2,20 @@ use aws_sdk_s3::config;
 
 use crate::aws::ClientBuilder;
 
-pub(crate) struct S3ClientBuilder;
+pub(crate) struct S3ClientBuilder {
+    pub force_path_style: Option<bool>,
+}
 
 impl ClientBuilder for S3ClientBuilder {
     type Client = aws_sdk_s3::client::Client;
 
-    fn build(config: &aws_types::SdkConfig) -> Self::Client {
-        let config = config::Builder::from(config).build();
-        aws_sdk_s3::client::Client::from_conf(config)
-    }
+    fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
+        let mut builder = config::Builder::from(config);
 
-    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
-        let config = config::Builder::from(config).force_path_style(true).build();
-        aws_sdk_s3::client::Client::from_conf(config)
+        if let Some(true) = self.force_path_style {
+            builder = builder.force_path_style(true);
+        }
+
+        aws_sdk_s3::client::Client::from_conf(builder.build())
     }
 }

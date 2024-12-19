@@ -13,13 +13,9 @@ pub(crate) struct SecretsManagerClientBuilder;
 impl ClientBuilder for SecretsManagerClientBuilder {
     type Client = Client;
 
-    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+    fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
         let config = config::Builder::from(config).build();
         Client::from_conf(config)
-    }
-
-    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
-        SecretsManagerClientBuilder::build(config)
     }
 }
 
@@ -61,13 +57,13 @@ impl SecretBackend for AwsSecretsManagerBackend {
         _: &mut signal::SignalRx,
     ) -> crate::Result<HashMap<String, String>> {
         let client = create_client::<SecretsManagerClientBuilder>(
+            &SecretsManagerClientBuilder {},
             &self.auth,
             self.region.region(),
             self.region.endpoint(),
             &ProxyConfig::default(),
             &self.tls,
             &None,
-            false,
         )
         .await?;
 

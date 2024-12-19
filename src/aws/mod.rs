@@ -123,10 +123,7 @@ pub trait ClientBuilder {
     type Client;
 
     /// Build the client using the given config settings.
-    fn build(config: &SdkConfig) -> Self::Client;
-
-    /// Build the client using the given config settings and path style addressing.
-    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client;
+    fn build(&self, config: &SdkConfig) -> Self::Client;
 }
 
 fn region_provider(
@@ -164,38 +161,36 @@ async fn resolve_region(
 }
 
 /// Create the SDK client using the provided settings.
-pub async fn create_client<T: ClientBuilder>(
+pub async fn create_client<T>(
+    builder: &T,
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
     timeout: &Option<AwsTimeout>,
-    force_path_style: impl Into<bool>,
-) -> crate::Result<T::Client> {
-    create_client_and_region::<T>(
-        auth,
-        region,
-        endpoint,
-        proxy,
-        tls_options,
-        timeout,
-        force_path_style,
-    )
-    .await
-    .map(|(client, _)| client)
+) -> crate::Result<T::Client>
+where
+    T: ClientBuilder,
+{
+    create_client_and_region::<T>(builder, auth, region, endpoint, proxy, tls_options, timeout)
+        .await
+        .map(|(client, _)| client)
 }
 
 /// Create the SDK client and resolve the region using the provided settings.
-pub async fn create_client_and_region<T: ClientBuilder>(
+pub async fn create_client_and_region<T>(
+    builder: &T,
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
     timeout: &Option<AwsTimeout>,
-    force_path_style: impl Into<bool>,
-) -> crate::Result<(T::Client, Region)> {
+) -> crate::Result<(T::Client, Region)>
+where
+    T: ClientBuilder,
+{
     let retry_config = RetryConfig::disabled();
 
     // The default credentials chains will look for a region if not given but we'd like to
@@ -252,11 +247,7 @@ pub async fn create_client_and_region<T: ClientBuilder>(
 
     let config = config_builder.build();
 
-    if force_path_style.into() {
-        Ok((T::build_and_force_path_style(&config), region))
-    } else {
-        Ok((T::build(&config), region))
-    }
+    Ok((T::build(builder, &config), region))
 }
 
 #[derive(Snafu, Debug)]

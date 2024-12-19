@@ -37,12 +37,8 @@ pub struct KinesisClientBuilder;
 impl ClientBuilder for KinesisClientBuilder {
     type Client = KinesisClient;
 
-    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+    fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
         KinesisClient::new(config)
-    }
-
-    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
-        KinesisClientBuilder::build(config)
     }
 }
 
@@ -103,13 +99,13 @@ impl KinesisStreamsSinkConfig {
 
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         create_client::<KinesisClientBuilder>(
+            &KinesisClientBuilder {},
             &self.base.auth,
             self.base.region.region(),
             self.base.region.endpoint(),
             proxy,
             &self.base.tls,
             &None,
-            false,
         )
         .await
     }

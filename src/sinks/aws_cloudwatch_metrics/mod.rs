@@ -119,12 +119,8 @@ struct CloudwatchMetricsClientBuilder;
 impl ClientBuilder for CloudwatchMetricsClientBuilder {
     type Client = aws_sdk_cloudwatch::client::Client;
 
-    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+    fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_cloudwatch::client::Client::new(config)
-    }
-
-    fn build_and_force_path_style(config: &aws_types::SdkConfig) -> Self::Client {
-        CloudwatchMetricsClientBuilder::build(config)
     }
 }
 
@@ -176,13 +172,13 @@ impl CloudWatchMetricsSinkConfig {
         };
 
         create_client::<CloudwatchMetricsClientBuilder>(
+            &CloudwatchMetricsClientBuilder {},
             &self.auth,
             region,
             self.region.endpoint(),
             proxy,
             &self.tls,
             &None,
-            false,
         )
         .await
     }

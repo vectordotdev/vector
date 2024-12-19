@@ -230,15 +230,18 @@ impl AwsS3Config {
     ) -> crate::Result<sqs::Ingestor> {
         let region = self.region.region();
         let endpoint = self.region.endpoint();
+        let force_path_style_value: bool = true;
 
         let s3_client = create_client::<S3ClientBuilder>(
+            &S3ClientBuilder {
+                force_path_style: Some(force_path_style_value),
+            },
             &self.auth,
             region.clone(),
             endpoint.clone(),
             proxy,
             &self.tls_options,
             &None,
-            true,
         )
         .await?;
 
@@ -249,13 +252,13 @@ impl AwsS3Config {
         match self.sqs {
             Some(ref sqs) => {
                 let (sqs_client, region) = create_client_and_region::<SqsClientBuilder>(
+                    &SqsClientBuilder {},
                     &self.auth,
                     region.clone(),
                     endpoint,
                     proxy,
                     &sqs.tls_options,
                     &sqs.timeout,
-                    false,
                 )
                 .await?;
 
@@ -1018,14 +1021,17 @@ mod integration_tests {
             endpoint: Some(s3_address()),
         };
         let proxy_config = ProxyConfig::default();
+        let force_path_style_value: bool = true;
         create_client::<S3ClientBuilder>(
+            &S3ClientBuilder {
+                force_path_style: Some(force_path_style_value),
+            },
             &auth,
             region_endpoint.region(),
             region_endpoint.endpoint(),
             &proxy_config,
             &None,
             &None,
-            true,
         )
         .await
         .unwrap()
@@ -1039,13 +1045,13 @@ mod integration_tests {
         };
         let proxy_config = ProxyConfig::default();
         create_client::<SqsClientBuilder>(
+            &SqsClientBuilder {},
             &auth,
             region_endpoint.region(),
             region_endpoint.endpoint(),
             &proxy_config,
             &None,
             &None,
-            false,
         )
         .await
         .unwrap()
