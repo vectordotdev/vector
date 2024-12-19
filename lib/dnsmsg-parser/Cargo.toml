@@ -8,7 +8,7 @@ license = "MIT"
 
 [dependencies]
 data-encoding = "2.6"
-hickory-proto = { version = "0.24", features = ["dnssec"] }
+hickory-proto.workspace = true
 snafu.workspace = true
 
 [dev-dependencies]

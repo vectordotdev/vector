@@ -103,6 +103,7 @@ members = [
   ".",
   "lib/codecs",
   "lib/dnsmsg-parser",
+  "lib/dnstap-parser",
   "lib/docs-renderer",
   "lib/enrichment",
   "lib/fakedata",
@@ -133,6 +134,7 @@ members = [
 ]
 
 [workspace.dependencies]
+anyhow = "1.0.94"
 cfg-if = { version = "1.0.0", default-features = false }
 chrono = { version = "0.4.38", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.0", default-features = false, features = ["serde"] }
@@ -140,6 +142,7 @@ clap = { version = "4.5.22", default-features = false, features = ["derive", "er
 flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.1", default-features = false }
+hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"] }
 indexmap = { version = "2.7.0", default-features = false, features = ["serde", "std"] }
 metrics = "0.24.1"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
@@ -177,6 +180,7 @@ snafu.workspace = true
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
+dnstap-parser = { path = "lib/dnstap-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
@@ -366,7 +370,7 @@ tokio-postgres = { version = "0.7.12", default-features = false, features = ["ru
 tokio-tungstenite = { version = "0.20.1", default-features = false, features = ["connect"], optional = true }
 toml.workspace = true
 tonic = { workspace = true, optional = true }
-hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"], optional = true }
+hickory-proto = { workspace = true, optional = true }
 typetag = { version = "0.2.18", default-features = false }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }
@@ -582,7 +586,7 @@ sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver",
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-http-error", "protobuf-build", "dep:prost"]
 sources-demo_logs = ["dep:fakedata"]
-sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "protobuf-build", "dep:prost"]
+sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "dep:dnstap-parser", "protobuf-build", "dep:prost"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []

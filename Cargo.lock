@@ -3096,6 +3096,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "dnstap-parser"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "bytes 1.9.0",
+ "chrono",
+ "chrono-tz",
+ "dnsmsg-parser",
+ "hickory-proto",
+ "prost 0.12.6",
+ "prost-build 0.12.6",
+ "snafu 0.7.5",
+ "tracing 0.1.41",
+ "vector-lib",
+ "vrl",
+]
+
+[[package]]
 name = "doc-comment"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4315,7 +4334,6 @@ dependencies = [
  "rand 0.8.5",
  "thiserror 1.0.68",
  "tinyvec",
- "tokio",
  "tracing 0.1.41",
  "url",
 ]
@@ -10808,6 +10826,7 @@ dependencies = [
  "derivative",
  "dirs-next",
  "dnsmsg-parser",
+ "dnstap-parser",
  "dyn-clone",
  "encoding_rs",
  "enum_dispatch",
@@ -11260,6 +11279,7 @@ version = "0.1.0"
 dependencies = [
  "chrono-tz",
  "clap",
+ "dnstap-parser",
  "enrichment",
  "glob",
  "serde",
@@ -11275,6 +11295,7 @@ name = "vector-vrl-web-playground"
 version = "0.1.0"
 dependencies = [
  "cargo-lock",
+ "dnstap-parser",
  "enrichment",
  "gloo-utils",
  "serde",
