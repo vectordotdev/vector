@@ -123,7 +123,7 @@ pub trait ClientBuilder {
     type Client;
 
     /// Build the client using the given config settings.
-    fn build(config: &SdkConfig) -> Self::Client;
+    fn build(&self, config: &SdkConfig) -> Self::Client;
 }
 
 fn region_provider(
@@ -161,28 +161,36 @@ async fn resolve_region(
 }
 
 /// Create the SDK client using the provided settings.
-pub async fn create_client<T: ClientBuilder>(
+pub async fn create_client<T>(
+    builder: &T,
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
     timeout: &Option<AwsTimeout>,
-) -> crate::Result<T::Client> {
-    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options, timeout)
+) -> crate::Result<T::Client>
+where
+    T: ClientBuilder,
+{
+    create_client_and_region::<T>(builder, auth, region, endpoint, proxy, tls_options, timeout)
         .await
         .map(|(client, _)| client)
 }
 
 /// Create the SDK client and resolve the region using the provided settings.
-pub async fn create_client_and_region<T: ClientBuilder>(
+pub async fn create_client_and_region<T>(
+    builder: &T,
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
     timeout: &Option<AwsTimeout>,
-) -> crate::Result<(T::Client, Region)> {
+) -> crate::Result<(T::Client, Region)>
+where
+    T: ClientBuilder,
+{
     let retry_config = RetryConfig::disabled();
 
     // The default credentials chains will look for a region if not given but we'd like to
@@ -239,7 +247,7 @@ pub async fn create_client_and_region<T: ClientBuilder>(
 
     let config = config_builder.build();
 
-    Ok((T::build(&config), region))
+    Ok((T::build(builder, &config), region))
 }
 
 #[derive(Snafu, Debug)]

@@ -701,6 +701,15 @@ base: components: sinks: aws_s3: configuration: {
 		required: false
 		type: string: default: "%s"
 	}
+	force_path_style: {
+		description: """
+			Specifies which addressing style to use.
+
+			This controls if the bucket name is in the hostname or part of the URL.
+			"""
+		required: false
+		type: bool: default: true
+	}
 	framing: {
 		description: "Framing configuration."
 		required:    false

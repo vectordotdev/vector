@@ -161,6 +161,7 @@ impl SourceConfig for AwsSqsConfig {
 impl AwsSqsConfig {
     async fn build_client(&self, cx: &SourceContext) -> crate::Result<aws_sdk_sqs::Client> {
         create_client::<SqsClientBuilder>(
+            &SqsClientBuilder {},
             &self.auth,
             self.region.region(),
             self.region.endpoint(),
