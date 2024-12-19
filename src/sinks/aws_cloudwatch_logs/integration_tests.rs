@@ -467,9 +467,17 @@ async fn create_client_test() -> CloudwatchLogsClient {
     let endpoint = Some(cloudwatch_address());
     let proxy = ProxyConfig::default();
 
-    create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None, &None)
-        .await
-        .unwrap()
+    create_client::<CloudwatchLogsClientBuilder>(
+        &CloudwatchLogsClientBuilder {},
+        &auth,
+        region,
+        endpoint,
+        &proxy,
+        &None,
+        &None,
+    )
+    .await
+    .unwrap()
 }
 
 async fn ensure_group() {

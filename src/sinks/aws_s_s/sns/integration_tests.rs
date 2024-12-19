@@ -32,6 +32,7 @@ async fn create_sns_test_client() -> SnsClient {
     let endpoint = sns_address();
     let proxy = ProxyConfig::default();
     create_client::<SnsClientBuilder>(
+        &SnsClientBuilder {},
         &auth,
         Some(Region::new("us-east-1")),
         Some(endpoint),
@@ -53,6 +54,7 @@ async fn create_sqs_test_client() -> SqsClient {
     let endpoint = sqs_address();
     let proxy = ProxyConfig::default();
     create_client::<SqsClientBuilder>(
+        &SqsClientBuilder {},
         &auth,
         Some(Region::new("us-east-1")),
         Some(endpoint),
