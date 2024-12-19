@@ -185,7 +185,7 @@ impl SourceConfig for DnstapConfig {
             Mode::Tcp(config) => {
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
 
-                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
+                let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true)?;
                 let frame_handler = tcp::DnstapFrameHandler::new(
                     config.clone(),
                     tls,

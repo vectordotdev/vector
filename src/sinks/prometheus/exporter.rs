@@ -460,7 +460,7 @@ impl PrometheusExporter {
         let tls = self.config.tls.clone();
         let address = self.config.address;
 
-        let tls = MaybeTlsSettings::from_config(&tls, true)?;
+        let tls = MaybeTlsSettings::from_config(tls.as_ref(), true)?;
         let listener = tls.bind(&address).await?;
 
         tokio::spawn(async move {

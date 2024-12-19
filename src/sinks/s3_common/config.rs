@@ -362,12 +362,12 @@ pub async fn create_service(
     region: &RegionOrEndpoint,
     auth: &AwsAuthentication,
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
+    tls_options: Option<&TlsConfig>,
 ) -> crate::Result<S3Service> {
     let endpoint = region.endpoint();
     let region = region.region();
     let client =
-        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options, &None)
+        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options, None)
             .await?;
     Ok(S3Service::new(client))
 }

@@ -236,8 +236,8 @@ impl AwsS3Config {
             region.clone(),
             endpoint.clone(),
             proxy,
-            &self.tls_options,
-            &None,
+            self.tls_options.as_ref(),
+            None,
         )
         .await?;
 
@@ -252,8 +252,8 @@ impl AwsS3Config {
                     region.clone(),
                     endpoint,
                     proxy,
-                    &sqs.tls_options,
-                    &sqs.timeout,
+                    sqs.tls_options.as_ref(),
+                    sqs.timeout.as_ref(),
                 )
                 .await?;
 
