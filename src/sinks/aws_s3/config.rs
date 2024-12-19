@@ -139,6 +139,12 @@ pub struct S3SinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
+
+    /// Specifies which addressing style to use.
+    ///
+    /// This controls if the bucket name is in the hostname or part of the URL.
+    #[serde(default = "crate::serde::default_true")]
+    pub force_path_style: bool,
 }
 
 pub(super) fn default_key_prefix() -> String {
@@ -167,6 +173,7 @@ impl GenerateConfig for S3SinkConfig {
             auth: AwsAuthentication::default(),
             acknowledgements: Default::default(),
             timezone: Default::default(),
+            force_path_style: Default::default(),
         })
         .unwrap()
     }
@@ -251,7 +258,14 @@ impl S3SinkConfig {
     }
 
     pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
-        s3_common::config::create_service(&self.region, &self.auth, proxy, &self.tls).await
+        s3_common::config::create_service(
+            &self.region,
+            &self.auth,
+            proxy,
+            &self.tls,
+            self.force_path_style,
+        )
+        .await
     }
 }
 

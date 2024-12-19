@@ -177,6 +177,7 @@ async fn client() -> aws_sdk_kinesis::Client {
     let proxy = ProxyConfig::default();
     let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address());
     create_client::<KinesisClientBuilder>(
+        &KinesisClientBuilder {},
         &auth,
         region.region(),
         region.endpoint(),
