@@ -393,6 +393,11 @@ impl IngestorProcess {
                         message_id: &message_id
                     });
                     if self.state.delete_message {
+                        trace!(
+                            message = "Queued SQS message for deletion",
+                            id = message_id,
+                            receipt_handle = receipt_handle,
+                        );
                         delete_entries.push(
                             DeleteMessageBatchRequestEntry::builder()
                                 .id(message_id)
@@ -516,6 +521,12 @@ impl IngestorProcess {
             });
 
         let object = object_result?;
+
+        info!(
+            message = "Got S3 object from SQS notification.",
+            bucket = s3_event.s3.bucket.name,
+            key = s3_event.s3.object.key
+        );
 
         let metadata = object.metadata;
 
@@ -641,12 +652,36 @@ impl IngestorProcess {
                 Some(receiver) => {
                     let result = receiver.await;
                     match result {
-                        BatchStatus::Delivered => Ok(()),
-                        BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
+                        BatchStatus::Delivered => {
+                            info!(
+                                message = "S3 object from SQS notification delivered.",
+                                bucket = s3_event.s3.bucket.name,
+                                key = s3_event.s3.object.key,
+                            );
+                            Ok(())
+                        }
+                        BatchStatus::Errored => {
+                            warn!(
+                                message = "S3 object from SQS notification had an error.",
+                                bucket = s3_event.s3.bucket.name,
+                                key = s3_event.s3.object.key,
+                            ); 
+                            Err(ProcessingError::ErrorAcknowledgement)
+                        },
                         BatchStatus::Rejected => {
                             if self.state.delete_failed_message {
+                                warn!(
+                                    message = "S3 object from SQS notification was rejected. Deleting failed message.",
+                                    bucket = s3_event.s3.bucket.name,
+                                    key = s3_event.s3.object.key,
+                                ); 
                                 Ok(())
                             } else {
+                                error!(
+                                    message = "S3 object from SQS notification was rejected.",
+                                    bucket = s3_event.s3.bucket.name,
+                                    key = s3_event.s3.object.key,
+                                ); 
                                 Err(ProcessingError::ErrorAcknowledgement)
                             }
                         }
