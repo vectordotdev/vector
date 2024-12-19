@@ -76,6 +76,30 @@ where
     }
 }
 
+/// Defines the log class to create if missing
+///
+/// See https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch_Logs_Log_Classes.html
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub enum LogGroupClassDef {
+    /// Logs that require real-time monitoring or frequently accessed logs
+    #[default]
+    Standard,
+    /// Log class that can be used to cost-effectively consolidate logs
+    InfrequentAccess,
+}
+
+impl From<LogGroupClassDef> for aws_sdk_cloudwatchlogs::types::LogGroupClass {
+    fn from(value: LogGroupClassDef) -> Self {
+        match value {
+            LogGroupClassDef::Standard => aws_sdk_cloudwatchlogs::types::LogGroupClass::Standard,
+            LogGroupClassDef::InfrequentAccess => {
+                aws_sdk_cloudwatchlogs::types::LogGroupClass::InfrequentAccess
+            }
+        }
+    }
+}
+
 /// Configuration for the `aws_cloudwatch_logs` sink.
 #[configurable_component(sink(
     "aws_cloudwatch_logs",
@@ -115,8 +139,21 @@ pub struct CloudwatchLogsSinkConfig {
     /// the first stream.
     ///
     /// [log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    #[configurable(deprecated, metadata(docs::hidden))]
     #[serde(default = "crate::serde::default_true")]
     pub create_missing_group: bool,
+
+    /// Dynamically create a [log group][log_group] if it does not already exist with the specified
+    /// [group class][group_class].
+    ///
+    /// This ignores `create_missing_stream` directly after creating the group and creates
+    /// the first stream.
+    ///
+    /// [log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+    /// [group_class]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch_Logs_Log_Classes.html
+    #[configurable(derived)]
+    #[serde(default)]
+    pub group_class: Option<LogGroupClassDef>,
 
     /// Dynamically create a [log stream][log_stream] if it does not already exist.
     ///
@@ -232,12 +269,14 @@ impl GenerateConfig for CloudwatchLogsSinkConfig {
 }
 
 fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
+    #[allow(deprecated)]
     CloudwatchLogsSinkConfig {
         encoding,
         group_name: Default::default(),
         stream_name: Default::default(),
         region: Default::default(),
         create_missing_group: true,
+        group_class: Default::default(),
         create_missing_stream: true,
         retention: Default::default(),
         compression: Default::default(),

@@ -10,7 +10,7 @@ use aws_sdk_cloudwatchlogs::{
         describe_log_streams::DescribeLogStreamsError, put_log_events::PutLogEventsError,
         put_retention_policy::PutRetentionPolicyError,
     },
-    types::InputLogEvent,
+    types::{InputLogEvent, LogGroupClass},
     Client as CloudwatchLogsClient,
 };
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
@@ -235,7 +235,17 @@ impl CloudwatchLogsSvc {
         let group_name = key.group.clone();
         let stream_name = key.stream.clone();
 
-        let create_missing_group = config.create_missing_group;
+        let group_class = match config.group_class {
+            Some(class) => Some(LogGroupClass::from(class)),
+            None => {
+                // Backwards compat for `create_missing_group` field
+                if config.create_missing_group {
+                    Some(LogGroupClass::Standard)
+                } else {
+                    None
+                }
+            }
+        };
         let create_missing_stream = config.create_missing_stream;
 
         let retention = config.retention.clone();
@@ -245,7 +255,7 @@ impl CloudwatchLogsSvc {
             client,
             stream_name,
             group_name,
-            create_missing_group,
+            group_class,
             create_missing_stream,
             retention,
             token: None,
@@ -319,7 +329,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 self.headers.clone(),
                 self.stream_name.clone(),
                 self.group_name.clone(),
-                self.create_missing_group,
+                self.group_class.clone(),
                 self.create_missing_stream,
                 self.retention.clone(),
                 event_batches,
@@ -337,7 +347,7 @@ pub struct CloudwatchLogsSvc {
     headers: IndexMap<HeaderName, HeaderValue>,
     stream_name: String,
     group_name: String,
-    create_missing_group: bool,
+    group_class: Option<LogGroupClass>,
     create_missing_stream: bool,
     retention: Retention,
     token: Option<String>,
