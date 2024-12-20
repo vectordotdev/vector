@@ -893,7 +893,7 @@ mod tests {
     ) -> hyper::body::Bytes {
         trace_init();
 
-        let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
+        let client_settings = MaybeTlsSettings::from_config(tls_config.as_ref(), false).unwrap();
         let proto = client_settings.http_protocol_name();
 
         let address = next_addr();
@@ -978,7 +978,7 @@ mod tests {
     ) -> Result<String, http::status::StatusCode> {
         trace_init();
 
-        let client_settings = MaybeTlsSettings::from_config(&None, false).unwrap();
+        let client_settings = MaybeTlsSettings::from_config(None, false).unwrap();
         let proto = client_settings.http_protocol_name();
 
         let address = next_addr();

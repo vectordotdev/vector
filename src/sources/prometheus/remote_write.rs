@@ -183,7 +183,7 @@ mod test {
         let address = test_util::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
-        let proto = MaybeTlsSettings::from_config(&tls, true)
+        let proto = MaybeTlsSettings::from_config(tls.as_ref(), true)
             .unwrap()
             .http_protocol_name();
         let source = PrometheusRemoteWriteConfig {

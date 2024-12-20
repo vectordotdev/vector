@@ -494,8 +494,8 @@ async fn client() -> S3Client {
         region.region(),
         region.endpoint(),
         &proxy,
-        &tls_options,
-        &None,
+        tls_options.as_ref(),
+        None,
     )
     .await
     .unwrap()

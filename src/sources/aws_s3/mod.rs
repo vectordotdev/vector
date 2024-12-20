@@ -1021,8 +1021,8 @@ mod integration_tests {
             region_endpoint.region(),
             region_endpoint.endpoint(),
             &proxy_config,
-            &None,
-            &None,
+            None,
+            None,
         )
         .await
         .unwrap()
@@ -1040,8 +1040,8 @@ mod integration_tests {
             region_endpoint.region(),
             region_endpoint.endpoint(),
             &proxy_config,
-            &None,
-            &None,
+            None,
+            None,
         )
         .await
         .unwrap()

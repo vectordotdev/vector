@@ -192,7 +192,7 @@ impl DatadogTracesConfig {
 
         let tls_settings = MaybeTlsSettings::from_config(
             Some(match self.local_dd_common.tls.as_ref() {
-                Some(config) => &config,
+                Some(config) => config,
                 None => {
                     default_tls_config = TlsEnableableConfig::enabled();
                     &default_tls_config

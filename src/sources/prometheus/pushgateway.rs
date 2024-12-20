@@ -382,7 +382,7 @@ mod test {
             tokio::spawn(source);
             wait_for_tcp(address).await;
 
-            let proto = MaybeTlsSettings::from_config(&tls, true)
+            let proto = MaybeTlsSettings::from_config(tls.as_ref(), true)
                 .unwrap()
                 .http_protocol_name();
             let push_path = "metrics/job/async_worker";

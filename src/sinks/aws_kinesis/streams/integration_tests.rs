@@ -181,8 +181,8 @@ async fn client() -> aws_sdk_kinesis::Client {
         region.region(),
         region.endpoint(),
         &proxy,
-        &None,
-        &None,
+        None,
+        None,
     )
     .await
     .unwrap()

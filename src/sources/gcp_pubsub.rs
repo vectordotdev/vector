@@ -980,7 +980,7 @@ mod integration_tests {
     ) {
         components::init_test();
 
-        let tls_settings = TlsSettings::from_options(&None).unwrap();
+        let tls_settings = TlsSettings::from_options(None).unwrap();
         let client = HttpClient::new(tls_settings, &ProxyConfig::default()).unwrap();
         let tester = Tester::new(client).await;
 
