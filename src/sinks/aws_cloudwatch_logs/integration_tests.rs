@@ -39,6 +39,7 @@ async fn cloudwatch_insert_log_event() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
+        group_class: Default::default(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
@@ -90,6 +91,7 @@ async fn cloudwatch_insert_log_events_sorted() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
+        group_class: Default::default(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
@@ -166,6 +168,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
+        group_class: Default::default(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
@@ -243,6 +246,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
+        group_class: Default::default(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
@@ -299,6 +303,7 @@ async fn cloudwatch_insert_log_event_batched() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
+        group_class: Default::default(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
@@ -350,6 +355,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
     let config = CloudwatchLogsSinkConfig {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
+        group_class: Default::default(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
@@ -443,6 +449,7 @@ async fn cloudwatch_healthcheck() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from("test-stream").unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
+        group_class: Default::default(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,

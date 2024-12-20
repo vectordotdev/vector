@@ -10,7 +10,7 @@ use aws_sdk_cloudwatchlogs::{
         describe_log_streams::DescribeLogStreamsError, put_log_events::PutLogEventsError,
         put_retention_policy::PutRetentionPolicyError,
     },
-    types::InputLogEvent,
+    types::{InputLogEvent, LogGroupClass},
     Client as CloudwatchLogsClient,
 };
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
@@ -240,11 +240,14 @@ impl CloudwatchLogsSvc {
 
         let retention = config.retention.clone();
 
+        let group_class = config.group_class.into();
+
         CloudwatchLogsSvc {
             headers,
             client,
             stream_name,
             group_name,
+            group_class,
             create_missing_group,
             create_missing_stream,
             retention,
@@ -319,6 +322,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 self.headers.clone(),
                 self.stream_name.clone(),
                 self.group_name.clone(),
+                self.group_class.clone(),
                 self.create_missing_group,
                 self.create_missing_stream,
                 self.retention.clone(),
@@ -337,6 +341,7 @@ pub struct CloudwatchLogsSvc {
     headers: IndexMap<HeaderName, HeaderValue>,
     stream_name: String,
     group_name: String,
+    group_class: LogGroupClass,
     create_missing_group: bool,
     create_missing_stream: bool,
     retention: Retention,
