@@ -96,6 +96,7 @@ trait UncompressedReader {
 struct UncompressedReaderImpl;
 impl UncompressedReader for UncompressedReaderImpl {
     fn check(fp: &mut File) -> Result<Option<SupportedCompressionAlgorithms>, std::io::Error> {
+        let mut algorithm: Option<SupportedCompressionAlgorithms> = None;
         for compression_algorithm in SupportedCompressionAlgorithms::values() {
             // magic headers for algorithms can be of different lengths, and using a buffer too long could exceed the length of the file
             // so instantiate and check the various sizes in monotonically increasing order
@@ -106,12 +107,12 @@ impl UncompressedReader for UncompressedReaderImpl {
             fp.read_exact(&mut magic)?;
 
             if magic == magic_header_bytes {
-                return Ok(Some(compression_algorithm));
-            } else {
-                continue;
+                algorithm = Some(compression_algorithm);
+                break;
             }
         }
-        return Ok(None);
+        fp.seek(SeekFrom::Start(0))?;
+        return Ok(algorithm);
     }
     fn reader<'a>(fp: &'a mut File) -> Result<Box<dyn BufRead + 'a>, std::io::Error> {
         // To support new compression algorithms, add them below
