@@ -249,6 +249,7 @@ mod tests {
     use serde_json::json;
     use similar_asserts::assert_eq;
     use smallvec::SmallVec;
+    use std::sync::Arc;
     use vector_core::{config::log_schema, event::Event};
     use vrl::value::Value;
 
@@ -258,7 +259,16 @@ mod tests {
         let config = GelfDeserializerConfig::default();
         let deserializer = config.build();
         let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());
-        deserializer.parse(buffer, LogNamespace::Legacy)
+        Ok(deserializer
+            .parse(buffer, LogNamespace::Legacy)?
+            .into_iter()
+            .map(|mut event| {
+                event.metadata_mut().set_schema_definition(&Arc::new(
+                    config.schema_definition(LogNamespace::Legacy),
+                ));
+                event
+            })
+            .collect())
     }
 
     /// Validates all the spec'd fields of GELF are deserialized correctly.
@@ -295,6 +305,7 @@ mod tests {
             log.get(HOST),
             Some(&Value::Bytes(Bytes::from_static(b"example.org")))
         );
+        dbg!(&log);
         assert_eq!(
             log.get_by_meaning("host"),
             Some(&Value::Bytes(Bytes::from_static(b"example.org")))
