@@ -100,15 +100,12 @@ impl UncompressedReader for UncompressedReaderImpl {
             // magic headers for algorithms can be of different lengths, and using a buffer too long could exceed the length of the file
             // so instantiate and check the various sizes in monotonically increasing order
             let magic_header_bytes = compression_algorithm.magic_header_bytes();
-            let mut magic = vec![0u8; magic_header_bytes.len()];
 
-            let result = fp.read_exact(&mut magic);
-            let reset = fp.seek(SeekFrom::Start(0));
-            if reset.is_err() {
-                return Err(reset.unwrap_err());
-            } else if result.is_err() {
-                return Err(result.unwrap_err());
-            } else if magic == magic_header_bytes {
+            let mut magic = vec![0u8; magic_header_bytes.len()];
+            fp.seek(SeekFrom::Start(0))?;
+            fp.read_exact(&mut magic)?;
+
+            if magic == magic_header_bytes {
                 return Ok(Some(compression_algorithm));
             } else {
                 continue;
