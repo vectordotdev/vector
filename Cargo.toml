@@ -714,6 +714,7 @@ sinks-logs = [
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
+  "sinks-keep",
   "sinks-loki",
   "sinks-mezmo",
   "sinks-mqtt",
@@ -780,6 +781,7 @@ sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
 sinks-kafka = ["dep:rdkafka"]
+sinks-keep = []
 sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
 sinks-mqtt = ["dep:rumqttc"]
