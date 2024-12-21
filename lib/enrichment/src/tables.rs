@@ -264,21 +264,24 @@ fn fmt_enrichment_table(
     name: &'static str,
     tables: &Arc<ArcSwap<Option<TableMap>>>,
 ) -> std::fmt::Result {
+    // Load the current state of the tables (this is a lock-free operation).
     let tables = tables.load();
-    match **tables {
+
+    // Check if the tables are loaded or still in the loading state.
+    match &**tables {
         Some(ref tables) => {
-            let mut tables = tables.iter().fold(String::from("("), |mut s, (key, _)| {
-                s.push_str(key);
-                s.push_str(", ");
-                s
-            });
-
-            tables.truncate(std::cmp::max(tables.len(), 0));
-            tables.push(')');
-
-            write!(f, "{} {}", name, tables)
+            // Map the keys to &str and join them with a comma.
+            let table_names = tables
+                .keys()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            write!(f, "{} ({})", name, table_names)
         }
-        None => write!(f, "{} loading", name),
+        None => {
+            // If the tables are still loading, indicate the loading state.
+            write!(f, "{} loading", name)
+        }
     }
 }
 
