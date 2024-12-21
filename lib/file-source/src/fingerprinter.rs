@@ -72,18 +72,18 @@ impl From<u64> for FileFingerprint {
 
 #[derive(Debug, Copy, Clone)]
 enum SupportedCompressionAlgorithms {
-    GZIP,
+    Gzip,
 }
 
 impl SupportedCompressionAlgorithms {
     fn values() -> Vec<SupportedCompressionAlgorithms> {
         // Enumerate these from smallest magic_header_bytes to largest
-        vec![SupportedCompressionAlgorithms::GZIP]
+        vec![SupportedCompressionAlgorithms::Gzip]
     }
 
     fn magic_header_bytes(&self) -> &'static [u8] {
         match self {
-            SupportedCompressionAlgorithms::GZIP => &[0x1f, 0x8b],
+            SupportedCompressionAlgorithms::Gzip => &[0x1f, 0x8b],
         }
     }
 }
@@ -112,12 +112,12 @@ impl UncompressedReader for UncompressedReaderImpl {
             }
         }
         fp.seek(SeekFrom::Start(0))?;
-        return Ok(algorithm);
+        Ok(algorithm)
     }
     fn reader<'a>(fp: &'a mut File) -> Result<Box<dyn BufRead + 'a>, std::io::Error> {
         // To support new compression algorithms, add them below
         match Self::check(fp)? {
-            Some(SupportedCompressionAlgorithms::GZIP) => {
+            Some(SupportedCompressionAlgorithms::Gzip) => {
                 Ok(Box::new(BufReader::new(GzDecoder::new(BufReader::new(fp)))))
             }
             // No compression, or read the raw bytes
@@ -132,7 +132,7 @@ fn skip_first_n_bytes<R: BufRead>(reader: &mut R, n: usize) -> io::Result<()> {
     let mut skipped_bytes = 0;
     while skipped_bytes < n {
         let chunk = reader.fill_buf()?;
-        let bytes_to_skip = std::cmp::min(chunk.len(), (n - skipped_bytes) as usize);
+        let bytes_to_skip = std::cmp::min(chunk.len(), n - skipped_bytes);
         reader.consume(bytes_to_skip);
         skipped_bytes += bytes_to_skip;
     }
