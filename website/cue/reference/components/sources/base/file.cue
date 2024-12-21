@@ -115,7 +115,7 @@ base: components: sources: file: configuration: {
 					The number of lines to read for generating the checksum.
 
 					The number of lines are determined from the uncompressed content if the file is compressed. Only
-					gzip is supported at this time
+					gzip is supported at this time.
 
 					If the file has less than this amount of lines, it won’t be read at all.
 					"""
