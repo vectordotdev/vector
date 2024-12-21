@@ -292,9 +292,12 @@ impl FileWatcher {
 
 fn is_gzipped(r: &mut io::BufReader<fs::File>) -> io::Result<bool> {
     let header_bytes = r.fill_buf()?;
-    // WARN: The paired `BufReader::consume` is not called intentionally. If we
-    // do we'll chop a decent part of the potential gzip stream off.
-    Ok(header_bytes.starts_with(GZIP_MAGIC))
+    if header_bytes.starts_with(GZIP_MAGIC) {
+        r.consume(GZIP_MAGIC.len()); // To avoid interfering with the next read
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 fn null_reader() -> impl BufRead {
