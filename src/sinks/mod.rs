@@ -70,6 +70,8 @@ pub mod humio;
 pub mod influxdb;
 #[cfg(feature = "sinks-kafka")]
 pub mod kafka;
+#[cfg(feature = "sinks-keep")]
+pub mod keep;
 #[cfg(feature = "sinks-loki")]
 pub mod loki;
 #[cfg(feature = "sinks-mezmo")]
