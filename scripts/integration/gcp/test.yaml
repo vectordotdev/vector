@@ -1,6 +1,7 @@
 features:
 - gcp-integration-tests
-- chronicle-integration-tests
+- chronicle-unstructured-integration-tests
+- chronicle-udm-events-integration-tests
 
 test_filter: '::gcp::'
 

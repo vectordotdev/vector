@@ -51,9 +51,9 @@ pub mod elasticsearch;
 pub mod file;
 #[cfg(feature = "sinks-gcp")]
 pub mod gcp;
-#[cfg(feature = "sinks-gcp-chronicle")]
+#[cfg(any(feature = "sinks-gcp-chronicle-unstructured", feature = "sinks-gcp-chronicle-udm-events"))]
 pub mod gcp_chronicle;
-#[cfg(any(feature = "sinks-gcp-chronicle", feature = "sinks-gcp"))]
+#[cfg(any(feature = "sinks-gcp-chronicle-unstructured", feature = "sinks-gcp", feature = "sinks-gcp-chronicle-udm-events"))]
 pub mod gcs_common;
 #[cfg(any(
     feature = "sinks-greptimedb_metrics",
