@@ -1,7 +1,12 @@
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{postgres::PostgresConfig, util::test::load_sink},
-    test_util::{components::run_and_assert_sink_compliance, temp_table, trace_init},
+    test_util::{
+        components::{
+            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+        },
+        temp_table, trace_init,
+    },
 };
 use chrono::{DateTime, Utc};
 use futures::stream;
@@ -53,15 +58,13 @@ struct TestEvent {
 }
 
 async fn prepare_config() -> (PostgresConfig, String, PgConnection) {
-    trace_init();
-
     let table = temp_table();
     let endpoint = pg_url();
-
     let config_str = format!(
         r#"
             endpoint = "{endpoint}"
             table = "{table}"
+            batch.max_events = 1
         "#,
     );
     let (config, _) = load_sink::<PostgresConfig>(&config_str).unwrap();
@@ -74,7 +77,36 @@ async fn prepare_config() -> (PostgresConfig, String, PgConnection) {
 }
 
 #[tokio::test]
+async fn healthcheck_passes() {
+    trace_init();
+    let (config, _table, _connection) = prepare_config().await;
+    let (_sink, healthcheck) = config.build(SinkContext::default()).await.unwrap();
+    healthcheck.await.unwrap();
+}
+
+// This test does not actually fail in the healthcheck query, but in the connection pool creation at
+// `PostgresConfig::build`
+#[tokio::test]
+async fn healthcheck_fails() {
+    trace_init();
+
+    let table = temp_table();
+    let endpoint = "postgres://user:pass?host=/unknown_socket_path".to_string();
+    let config_str = format!(
+        r#"
+            endpoint = "{endpoint}"
+            table = "{table}"
+        "#,
+    );
+    let (config, _) = load_sink::<PostgresConfig>(&config_str).unwrap();
+
+    assert!(config.build(SinkContext::default()).await.is_err());
+}
+
+#[tokio::test]
 async fn insert_single_event() {
+    trace_init();
+
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
     let create_table_sql =
@@ -105,6 +137,8 @@ async fn insert_single_event() {
 
 #[tokio::test]
 async fn insert_multiple_events() {
+    trace_init();
+
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
     let create_table_sql = format!(
@@ -150,10 +184,12 @@ async fn insert_multiple_events() {
 // Vector's job in the DB. We should document this limitation alongside with this test.
 #[tokio::test]
 async fn default_columns_are_not_populated() {
+    trace_init();
+
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
     let create_table_sql = format!(
-        "CREATE TABLE {table} (id BIGINT, not_existing_column TEXT DEFAULT 'default_value')"
+        "CREATE TABLE {table} (id BIGINT, not_existing_field TEXT DEFAULT 'default_value')"
     );
     sqlx::query(&create_table_sql)
         .execute(&mut connection)
@@ -171,10 +207,99 @@ async fn default_columns_are_not_populated() {
     std::mem::drop(input_event);
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-    let select_all_sql = format!("SELECT not_existing_column FROM {table}");
-    let inserted_not_existing_column: (Option<String>,) = sqlx::query_as(&select_all_sql)
+    let select_all_sql = format!("SELECT not_existing_field FROM {table}");
+    let inserted_not_existing_field: (Option<String>,) = sqlx::query_as(&select_all_sql)
         .fetch_one(&mut connection)
         .await
         .unwrap();
-    assert_eq!(inserted_not_existing_column.0, None);
+    assert_eq!(inserted_not_existing_field.0, None);
+}
+
+#[tokio::test]
+async fn extra_fields_are_ignored() {
+    trace_init();
+
+    let (config, table, mut connection) = prepare_config().await;
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!("CREATE TABLE {table} (message TEXT)");
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let (input_event, mut receiver) = create_event_with_notifier(0);
+    let input_log_event = input_event.clone().into_log();
+    let expected_value = input_log_event
+        .get_message()
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .into_owned();
+
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event)), &POSTGRES_SINK_TAGS)
+        .await;
+    // We drop the event to notify the receiver that the batch was delivered.
+    std::mem::drop(input_log_event);
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let select_all_sql = format!("SELECT * FROM {table}");
+    let actual_value: (String,) = sqlx::query_as(&select_all_sql)
+        .fetch_one(&mut connection)
+        .await
+        .unwrap();
+    assert_eq!(expected_value, actual_value.0);
+}
+
+#[tokio::test]
+async fn insertion_fails_required_field_is_not_present() {
+    trace_init();
+
+    let (config, table, mut connection) = prepare_config().await;
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql =
+        format!("CREATE TABLE {table} (message TEXT, not_existing_field TEXT NOT NULL)");
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let (input_event, mut receiver) = create_event_with_notifier(0);
+
+    run_and_assert_sink_error(
+        sink,
+        stream::once(ready(input_event.clone())),
+        &COMPONENT_ERROR_TAGS,
+    )
+    .await;
+    // We drop the event to notify the receiver that the batch was delivered.
+    std::mem::drop(input_event);
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+
+    // We ensure that the event was not inserted.
+    let select_all_sql = format!("SELECT * FROM {table}");
+    let first_row: Option<(String, String)> = sqlx::query_as(&select_all_sql)
+        .fetch_optional(&mut connection)
+        .await
+        .unwrap();
+    assert_eq!(first_row, None);
+}
+
+#[tokio::test]
+async fn insertion_fails_missing_table() {
+    trace_init();
+
+    let table = "missing_table".to_string();
+    let (mut config, _, _) = prepare_config().await;
+    config.table = table.clone();
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let (input_event, mut receiver) = create_event_with_notifier(0);
+
+    run_and_assert_sink_error(
+        sink,
+        stream::once(ready(input_event)),
+        &COMPONENT_ERROR_TAGS,
+    )
+    .await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 }
