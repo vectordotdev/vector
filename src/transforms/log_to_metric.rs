@@ -1,9 +1,8 @@
 use std::sync::Arc;
-use std::{collections::HashMap, num::ParseFloatError, sync::LazyLock};
+use std::{collections::HashMap, num::ParseFloatError};
 
 use chrono::Utc;
 use indexmap::IndexMap;
-use regex::Regex;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::LogEvent;
 use vector_lib::{
@@ -20,6 +19,7 @@ use vrl::{event_path, path};
 use crate::config::schema::Definition;
 use crate::transforms::log_to_metric::TransformError::PathNotFound;
 use crate::{
+    common::expansion::pair_expansion,
     config::{
         DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
         TransformOutput,
@@ -111,7 +111,7 @@ pub struct MetricConfig {
 
     /// Tags to apply to the metric.
     ///
-    /// Both keys and values are templateable, which enables you to attach dynamic labels to events.
+    /// Both keys and values are templateable, which enables you to attach dynamic tags to events.
     ///
     #[configurable(metadata(docs::additional_props_description = "A metric tag."))]
     pub tags: Option<IndexMap<Template, TagConfig>>,
@@ -278,8 +278,8 @@ fn render_tags(
     tags: &Option<IndexMap<Template, TagConfig>>,
     event: &Event,
 ) -> Result<Option<MetricTags>, TransformError> {
-    let mut static_tags: HashMap<String, TagValue> = HashMap::new();
-    let mut dynamic_tags: HashMap<String, TagValue> = HashMap::new();
+    let mut static_tags: HashMap<String, String> = HashMap::new();
+    let mut dynamic_tags: HashMap<String, String> = HashMap::new();
     Ok(match tags {
         None => None,
         Some(tags) => {
@@ -329,8 +329,8 @@ fn render_tag_into(
     key_template: &Template,
     value_template: &Option<Template>,
     result: &mut MetricTags,
-    static_tags: &mut HashMap<String, TagValue>,
-    dynamic_tags: &mut HashMap<String, TagValue>,
+    static_tags: &mut HashMap<String, String>,
+    dynamic_tags: &mut HashMap<String, String>,
 ) -> Result<(), TransformError> {
     let key_s = match render_template(key_template, event) {
         Ok(key_s) => key_s,
@@ -350,7 +350,18 @@ fn render_tag_into(
         }
         Some(template) => match render_template(template, event) {
             Ok(value_s) => {
-                tag_expansion(key_s.clone(), value_s, result, static_tags, dynamic_tags);
+                let expanded_pairs = pair_expansion(key_s, value_s, static_tags, dynamic_tags)
+                    .map_err(|_| {
+                        TransformError::TemplateRenderingError(
+                            TemplateRenderingError::MissingKeys {
+                                missing_keys: vec![],
+                            },
+                        )
+                    })?;
+
+                for (key, value) in expanded_pairs {
+                    result.insert(key, TagValue::Value(value));
+                }
             }
             Err(TransformError::TemplateRenderingError(value_error)) => {
                 emit!(crate::internal_events::TemplateRenderingError {
@@ -364,59 +375,6 @@ fn render_tag_into(
         },
     };
     Ok(())
-}
-
-static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^0-9A-Za-z_]").unwrap());
-fn slugify_text(input: String) -> String {
-    let result = RE.replace_all(&input, "_");
-    result.to_lowercase()
-}
-
-// borrow from src/sinks/loki/sink.rs
-fn tag_expansion(
-    key_s: String,
-    value_s: String,
-    result: &mut MetricTags,
-    static_tags: &mut HashMap<String, TagValue>,
-    dynamic_tags: &mut HashMap<String, TagValue>,
-) {
-    if let Some(opening_prefix) = key_s.strip_suffix('*') {
-        let output: Result<serde_json::map::Map<String, serde_json::Value>, serde_json::Error> =
-            serde_json::from_str(value_s.clone().as_str());
-
-        if output.is_err() {
-            warn!(
-                "Failed to expand dynamic label. value: {}, err: {}",
-                value_s,
-                output.err().unwrap()
-            );
-            return;
-        }
-
-        // key_* -> key_one, key_two, key_three
-        // * -> one, two, three
-        for (k, v) in output.unwrap() {
-            let key = slugify_text(format!("{}{}", opening_prefix, k));
-            let val = Value::from(v).to_string_lossy().into_owned();
-            if val == "<null>" {
-                warn!("Encountered \"null\" value for dynamic label. key: {}", key);
-                continue;
-            }
-            let val = TagValue::Value(val);
-            if let Some(prev) = dynamic_tags.insert(key.clone(), val.clone()) {
-                warn!(
-                    "Encountered duplicated dynamic label. \
-                                key: {}, value: {:?}, discarded value: {:?}",
-                    key, val, prev
-                );
-            };
-            result.insert(key, val);
-        }
-    } else {
-        let val = TagValue::Value(value_s);
-        result.insert(key_s.clone(), val.clone());
-        static_tags.insert(key_s, val);
-    }
 }
 
 fn to_metric_with_config(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
