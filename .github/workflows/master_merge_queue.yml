@@ -80,7 +80,7 @@ jobs:
   cross-linux:
     # We run cross checks when dependencies change to ensure they still build.
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    if: needs.changes.outputs.dependencies == 'true'
+#    if: needs.changes.outputs.dependencies == 'true'
     uses: ./.github/workflows/cross.yml
     needs: changes
     secrets: inherit
