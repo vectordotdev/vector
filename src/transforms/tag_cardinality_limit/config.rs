@@ -16,6 +16,19 @@ use vector_lib::configurable::configurable_component;
 ))]
 #[derive(Clone, Debug)]
 pub struct TagCardinalityLimitConfig {
+    #[serde(flatten)]
+    pub global: TagCardinalityLimitInnerConfig,
+
+    /// Tag cardinality limits configuration per metric name.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub per_metric_limits: Vec<PerMetricConfig>,
+}
+
+/// Configuration for the `tag_cardinality_limit` transform for a specific group of metrics.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct TagCardinalityLimitInnerConfig {
     /// How many distinct values to accept for any given key.
     #[serde(default = "default_value_limit")]
     pub value_limit: usize,
@@ -77,6 +90,21 @@ pub enum LimitExceededAction {
     DropEvent,
 }
 
+/// Tag cardinality limit configuration per metric name.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct PerMetricConfig {
+    /// Name of the metric this configuration refers to.
+    pub name: String,
+
+    /// Namespace of the metric this configuration refers to.
+    #[serde(default)]
+    pub namespace: Option<String>,
+
+    #[serde(flatten)]
+    pub config: TagCardinalityLimitInnerConfig,
+}
+
 const fn default_limit_exceeded_action() -> LimitExceededAction {
     LimitExceededAction::DropTag
 }
@@ -92,9 +120,12 @@ pub(crate) const fn default_cache_size() -> usize {
 impl GenerateConfig for TagCardinalityLimitConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            mode: Mode::Exact,
-            value_limit: default_value_limit(),
-            limit_exceeded_action: default_limit_exceeded_action(),
+            global: TagCardinalityLimitInnerConfig {
+                mode: Mode::Exact,
+                value_limit: default_value_limit(),
+                limit_exceeded_action: default_limit_exceeded_action(),
+            },
+            per_metric_limits: Vec::default(),
         })
         .unwrap()
     }
