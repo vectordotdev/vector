@@ -266,6 +266,7 @@ enum TransformError {
         error: ParseFloatError,
     },
     TemplateRenderingError(TemplateRenderingError),
+    PairExpansionError,
 }
 
 fn render_template(template: &Template, event: &Event) -> Result<String, TransformError> {
@@ -351,13 +352,7 @@ fn render_tag_into(
         Some(template) => match render_template(template, event) {
             Ok(value_s) => {
                 let expanded_pairs = pair_expansion(key_s, value_s, static_tags, dynamic_tags)
-                    .map_err(|_| {
-                        TransformError::TemplateRenderingError(
-                            TemplateRenderingError::MissingKeys {
-                                missing_keys: vec![],
-                            },
-                        )
-                    })?;
+                    .map_err(|_| TransformError::PairExpansionError)?;
 
                 for (key, value) in expanded_pairs {
                     result.insert(key, TagValue::Value(value));
