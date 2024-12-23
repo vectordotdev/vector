@@ -353,10 +353,7 @@ fn render_tag_into(
             Ok(value_s) => {
                 let expanded_pairs = pair_expansion(key_s, value_s, static_tags, dynamic_tags)
                     .map_err(|_| TransformError::PairExpansionError)?;
-
-                for (key, value) in expanded_pairs {
-                    result.insert(key, TagValue::Value(value));
-                }
+                result.extend(expanded_pairs);
             }
             Err(TransformError::TemplateRenderingError(value_error)) => {
                 emit!(crate::internal_events::TemplateRenderingError {
