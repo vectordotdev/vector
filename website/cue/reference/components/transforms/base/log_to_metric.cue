@@ -88,7 +88,7 @@ base: components: transforms: log_to_metric: configuration: {
 				description: """
 					Tags to apply to the metric.
 
-					Both keys and values are templateable, which enables you to attach dynamic tags to events.
+					Both keys and values can be templated, allowing you to attach dynamic tags to events.
 					"""
 				required: false
 				type: object: options: "*": {
