@@ -47,7 +47,7 @@ jobs:
   # If we don't run this job (such as in a pull request), then by consequence all downstream
   # test jobs are not run. This allows us to not have to check for merge group in each job.
   changes:
-    if: ${{ github.event_name == 'merge_group' }}
+#    if: ${{ github.event_name == 'merge_group' }}
     uses: ./.github/workflows/changes.yml
     with:
       base_ref: ${{ github.event.merge_group.base_ref }}
