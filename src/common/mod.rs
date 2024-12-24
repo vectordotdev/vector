@@ -20,3 +20,6 @@ pub(crate) mod s3;
 
 #[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
 pub(crate) mod expansion;
+
+#[cfg(feature = "sinks-websocket-listener")]
+pub(crate) mod server_auth;

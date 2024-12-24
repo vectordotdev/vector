@@ -108,6 +108,8 @@ pub mod vector;
 pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
+#[cfg(feature = "sinks-websocket-listener")]
+pub mod websocket_listener;
 
 pub use vector_lib::{config::Input, sink::VectorSink};
 

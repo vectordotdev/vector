@@ -241,6 +241,7 @@ dyn_clone::clone_trait_object!(SinkConfig);
 pub struct SinkContext {
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
+    pub enrichment_tables: vector_lib::enrichment::TableRegistry,
     pub proxy: ProxyConfig,
     pub schema: schema::Options,
     pub app_name: String,
@@ -256,6 +257,7 @@ impl Default for SinkContext {
         Self {
             healthcheck: Default::default(),
             globals: Default::default(),
+            enrichment_tables: Default::default(),
             proxy: Default::default(),
             schema: Default::default(),
             app_name: crate::get_app_name().to_string(),
