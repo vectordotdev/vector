@@ -134,11 +134,16 @@ impl GenerateConfig for PrometheusScrapeConfig {
 #[typetag::serde(name = "prometheus_scrape")]
 impl SourceConfig for PrometheusScrapeConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
+        // replace the key match with match[], if present
+        let mut query: HashMap<String, Vec<String>> = self.query.clone();
+        if let Some(values) = query.remove("match") {
+            query.insert("match[]".to_string(), values);
+        }
         let urls = self
             .endpoints
             .iter()
             .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
-            .map(|r| r.map(|uri| build_url(&uri, &self.query)))
+            .map(|r| r.map(|uri| build_url(&uri, &query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(&self.tls)?;
 
