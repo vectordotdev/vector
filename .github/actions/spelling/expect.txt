@@ -191,6 +191,7 @@ eventstreamsink
 evictingpages
 evmap
 ewma
+exabyte
 examplegroup
 exitcodes
 extendedstatus
