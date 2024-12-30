@@ -82,7 +82,7 @@ The basis of Mapping between the Internal Trace format and the Datadog format ca
 
 ##### Span Mapping
 
-Vector fields shown using VRL.
+Vector fields are shown using VRL path notation.
 
 | Datadog Field | Vector Field | Comments |
 |---------------|--------------|----------|
@@ -126,7 +126,6 @@ Name.
 | Client | "http" | If the above conditions are not true. |
 | * | "custom" |  |
 
-#####
 
 ##### From Vector -> Datadog
 
