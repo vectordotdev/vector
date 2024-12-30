@@ -118,12 +118,12 @@ remap: functions: parse_dnstap: {
 					"question": [
 						{
 							"class":          "IN"
-							"domainName":     "facebook1.com."
-							"questionType":   "A"
-							"questionTypeId": 1
+							"domainName":     "h5.example.com."
+							"questionType":   "SOA"
+							"questionTypeId": 6
 						},
 					]
-					"rcodeName": "NoError"
+					"rcodeName": "BADSIG"
 				}
 				"responseAddress": "2001:502:7094::30"
 				"responsePort":    53
