@@ -57,13 +57,15 @@ pub enum HttpError {
     #[snafu(display("Failed to build HTTP request: {}", source))]
     BuildRequest { source: http::Error },
     #[snafu(display("Expected 401 with Digest Auth"))]
-    DigestAuthExpectation
+    DigestAuthExpectation,
 }
 
 impl HttpError {
     pub const fn is_retriable(&self) -> bool {
         match self {
-            HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } | HttpError::DigestAuthExpectation => false,
+            HttpError::BuildRequest { .. }
+            | HttpError::MakeProxyConnector { .. }
+            | HttpError::DigestAuthExpectation => false,
             HttpError::CallRequest { .. }
             | HttpError::BuildTlsConnector { .. }
             | HttpError::MakeHttpsConnector { .. } => true,
@@ -298,7 +300,7 @@ pub enum Auth {
         token: SensitiveString,
     },
     /// Digest authentication.
-    /// 
+    ///
     /// requires a round trip to the server to get the challenge and then send the response
     Digest {
         /// The digest authentication username.
@@ -352,7 +354,7 @@ impl Auth {
             Auth::Digest { user, password } => {
                 let auth = Authorization::basic(user.as_str(), password.inner());
                 map.typed_insert(auth);
-            },
+            }
         }
     }
 }

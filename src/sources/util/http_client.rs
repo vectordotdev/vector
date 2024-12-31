@@ -13,11 +13,11 @@ use futures_util::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::{response::Parts, Uri};
 use hyper::{Body, Request};
 use md5::Digest;
-use vector_lib::sensitive_string::SensitiveString;
 use std::time::Duration;
 use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::json_size::JsonSize;
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::{
     http::{Auth, HttpClient},
@@ -178,7 +178,6 @@ pub(crate) async fn call<
 
             // building an empty request should be infallible
             let mut request = builder.body(Body::empty()).expect("error creating request");
-            
             let mut is_digest = false;
             let mut username = "".to_string();
             let mut user_password = SensitiveString::default();
@@ -193,7 +192,7 @@ pub(crate) async fn call<
                     _ => false
                 };
             }
-            
+
             tokio::time::timeout(inputs.timeout, client.send(request))
             .then({
                 let headers_value = headers.clone();

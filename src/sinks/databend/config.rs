@@ -132,7 +132,7 @@ impl SinkConfig for DatabendConfig {
             }
             Some(Auth::Digest { .. }) => {
                 return Err("Digest authentication is not supported currently".into());
-            },
+            }
             None => {}
         }
         if let Some(database) = &self.database {
