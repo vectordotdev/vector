@@ -1,3 +1,5 @@
+use std::net::{Ipv4Addr, SocketAddr};
+
 use super::default_host_key;
 use bytes::BytesMut;
 use chrono::Utc;
@@ -40,6 +42,17 @@ use crate::{
 pub struct UdpConfig {
     #[configurable(derived)]
     address: SocketListenAddr,
+
+    /// TODO: document this.
+    /// TODO: The join multicast method should fail if the address is not SocketListenAddr::SocketAddr.
+    /// multicast wont work with systemd{N} fd sockets.
+    /// Also, if the address is IPv4, the multicast address should be IPv4 too.
+    /// TODO: should we support a list of groups or a single group? The `join_multicast` method supports
+    /// just one group per call.
+    /// TODO: document that we use `IPv4Addr` and not `SocketAddr` for the multicast groups because
+    /// the `join_multicast_v6` is not supported due to the need of using an interface index.s
+    #[serde(default)]
+    multicast_groups: Vec<Ipv4Addr>,
 
     /// The maximum buffer size of incoming messages.
     ///
@@ -118,6 +131,7 @@ impl UdpConfig {
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
+            multicast_groups: Vec::new(),
             max_length: default_max_length(),
             host_key: None,
             port_key: default_port_key(),
@@ -151,6 +165,35 @@ pub(super) fn udp(
                     error,
                 })
             })?;
+
+        if !config.multicast_groups.is_empty() {
+            let listen_addr = match config.address() {
+                SocketListenAddr::SocketAddr(SocketAddr::V4(addr)) => addr,
+                SocketListenAddr::SocketAddr(SocketAddr::V6(_)) => {
+                    todo!("handle this error, IPv6 multicast is not supported")
+                }
+                // TODO: if we need to support systemd{N} fd sockets, we should use the
+                // `UdpSocket::local_addr` method to get the address of the socket.
+                // that method can fail and I wonder if the user sets `IP_ADDR_ANY` (`0.0.0.0`) in the config,
+                // the `UdpSocket::local_addr` would return the real interface address that the
+                // socket is bound to, and not `IP_ADDR_ANY`. We need to use the same address
+                // for the multicast group join that the user has set in the config.
+                // if systemd{N} fd sockets are required to work too, we should investigate on this.
+                SocketListenAddr::SystemdFd(_) => todo!("handle this error"),
+            };
+            for group_addr in config.multicast_groups {
+                socket
+                    .join_multicast_v4(group_addr, *listen_addr.ip())
+                    .map_err(|error| {
+                        // TODO: is this considered a `SocketBindError`? or should we create a new error for this case?
+                        emit!(SocketBindError {
+                            mode: SocketMode::Udp,
+                            error,
+                        })
+                    })?;
+                // TODO: add debug (or info) logs here to inform the user that the socket has joined the multicast group.
+            }
+        }
 
         if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
             if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
