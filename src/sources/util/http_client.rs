@@ -236,7 +236,6 @@ pub(crate) async fn call<
                             if part.contains("nonce") {
                                 nonce = part.split("=").collect::<Vec<&str>>()[1].trim_matches('"');
                             }
-                            println!("{}", part);
                         }
                         let ha1 = format!("{:x}", md5::Md5::digest(format!("{}:{}:{}", username_inner, realm, user_password_inner.inner())));
                         let ha2 = format!("{:x}", md5::Md5::digest(format!("GET:{}", uri.path())));
