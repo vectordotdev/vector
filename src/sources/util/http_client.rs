@@ -219,11 +219,13 @@ pub(crate) async fn call<
                         if status != 401 {
                             return Ok(Err(crate::http::HttpError::DigestAuthExpectation))
                         }
-                        let parts = response_headers
-                            .get("www-authenticate")
-                            .unwrap()
-                            .to_str()
-                            .unwrap();
+                        let parts = match response_headers.get("www-authenticate") {
+                            Some(header_value) => match header_value.to_str() {
+                                Ok(value) => value,
+                                Err(_) => return Ok(Err(crate::http::HttpError::DigestAuthExpectation)),
+                            },
+                            None => return Ok(Err(crate::http::HttpError::DigestAuthExpectation)),
+                        };
                         let parts: Vec<&str> = parts.split(",").collect();
                         let mut realm = "";
                         let mut nonce = "";
