@@ -1,4 +1,3 @@
-What: Fixed a typo in the condition of the filter component created via `vector generate`.
-How: Replaced the assignment (`=`) with the equality (`==`) operator.
+The `filter` transform now generates a more accurate config when generated via `vector generate` by using a comparison rather than an assignment.
 
 authors: abcdam
