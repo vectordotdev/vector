@@ -1,1 +1,3 @@
-Remove default 4MB message size limit in gcp_pubsub source imposed by Tonic 0.9
+The `gcp_pubsub` source no longer has a 4MB message size limit.
+
+authors: sbalmos
