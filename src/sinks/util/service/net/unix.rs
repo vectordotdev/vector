@@ -1,11 +1,18 @@
-use std::path::{Path, PathBuf};
+use std::{
+    io,
+    os::fd::{AsFd, BorrowedFd},
+    path::{Path, PathBuf},
+};
 
 use snafu::ResultExt;
-use tokio::net::{UnixDatagram, UnixStream};
+use tokio::{
+    io::AsyncWriteExt,
+    net::{UnixDatagram, UnixStream},
+};
 
 use vector_lib::configurable::configurable_component;
 
-use crate::{net, sinks::util::unix::UnixEither};
+use crate::net;
 
 use super::{net_error::*, ConnectorType, NetError, NetworkConnector};
 
@@ -63,6 +70,29 @@ impl UnixConnectorConfig {
                 mode: self.unix_mode,
                 send_buffer_size: self.send_buffer_size,
             }),
+        }
+    }
+}
+
+pub(super) enum UnixEither {
+    Datagram(UnixDatagram),
+    Stream(UnixStream),
+}
+
+impl UnixEither {
+    pub(super) async fn send(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::Datagram(datagram) => datagram.send(buf).await,
+            Self::Stream(stream) => stream.write_all(buf).await.map(|_| buf.len()),
+        }
+    }
+}
+
+impl AsFd for UnixEither {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        match self {
+            Self::Datagram(datagram) => datagram.as_fd(),
+            Self::Stream(stream) => stream.as_fd(),
         }
     }
 }
