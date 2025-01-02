@@ -17,7 +17,7 @@ remap: functions: parse_klog: {
 		"`value` does not match the `klog` format.",
 	]
 	return: types: ["object"]
-  notices: [
+	notices: [
 		"""
 			This function resolves the year for messages. If the current month is January and the provided month is December, it sets the year to the previous year. Otherwise, it sets the year to the current year.
 			""",
