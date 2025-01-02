@@ -13,7 +13,6 @@ wasm-bindgen = "0.2"
 vrl.workspace = true
 serde.workspace = true
 serde-wasm-bindgen = "0.6"
-dnstap-parser = { path = "../../dnstap-parser" }
 gloo-utils = { version = "0.2", features = ["serde"] }
 vector-vrl-functions = { path = "../functions" }
 enrichment = { path = "../../enrichment" }

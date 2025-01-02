@@ -8,7 +8,7 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-anyhow.workspace = true
+anyhow = "1.0.94"
 chrono.workspace = true
 clap.workspace = true
 clap-verbosity-flag = "3.0.1"
