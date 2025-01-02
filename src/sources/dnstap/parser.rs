@@ -5,7 +5,6 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     sync::LazyLock,
 };
-use vector_lib::emit;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::Bytes;
@@ -19,8 +18,9 @@ use prost::Message;
 use snafu::Snafu;
 use vrl::{owned_value_path, path};
 
-use vector_lib::{
+use crate::{
     event::{LogEvent, Value},
+    internal_events::DnstapParseWarning,
     Error, Result,
 };
 
@@ -29,7 +29,7 @@ mod dnstap_proto {
     include!(concat!(env!("OUT_DIR"), "/dnstap.rs"));
 }
 
-use crate::{internal_events::DnstapParseWarning, schema::DNSTAP_VALUE_PATHS};
+use crate::sources::dnstap::schema::DNSTAP_VALUE_PATHS;
 use dnstap_proto::{
     message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
     SocketProtocol,
@@ -38,7 +38,7 @@ use vector_lib::config::log_schema;
 use vector_lib::lookup::lookup_v2::ValuePath;
 use vector_lib::lookup::PathPrefix;
 
-use dnsmsg_parser::{
+use super::{
     dns_message::{
         DnsRecord, EdnsOptionEntry, OptPseudoSection, QueryHeader, QueryQuestion, UpdateHeader,
         ZoneInfo,
@@ -459,15 +459,14 @@ impl DnstapParser {
             );
         }
 
-        if let Some(response_port) = dnstap_message.response_port {
+        Ok(if let Some(response_port) = dnstap_message.response_port {
             DnstapParser::insert(
                 event,
                 prefix.clone(),
                 &DNSTAP_VALUE_PATHS.response_port,
                 response_port,
             );
-        };
-        Ok(())
+        })
     }
 
     fn log_time<'a>(
@@ -1016,6 +1015,7 @@ fn to_dnstap_message_type(type_id: i32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::Value;
     use chrono::DateTime;
     use dnsmsg_parser::dns_message_parser::DnsParserOptions;
     use std::collections::BTreeMap;
