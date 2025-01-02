@@ -442,12 +442,10 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
                     "fast" => Ok(CompressionLevel::Fast),
                     "default" => Ok(CompressionLevel::Default),
                     "best" => Ok(CompressionLevel::Best),
-                    level => {
-                        Err(de::Error::invalid_value(
-                            de::Unexpected::Str(level),
-                            &r#""none", "fast", "best" or "default""#,
-                        ))
-                    }
+                    level => Err(de::Error::invalid_value(
+                        de::Unexpected::Str(level),
+                        &r#""none", "fast", "best" or "default""#,
+                    )),
                 }
             }
 
