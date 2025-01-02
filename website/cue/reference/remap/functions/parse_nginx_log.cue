@@ -4,7 +4,8 @@ remap: functions: parse_nginx_log: {
 	category:    "Parse"
 	description: """
       Parses Nginx access and error log lines. Lines can be in [`combined`](\(urls.nginx_combined)),
-      [`ingress_upstreaminfo`](\(urls.nginx_ingress_upstreaminfo)), or [`error`](\(urls.nginx_error)) format.
+      [`ingress_upstreaminfo`](\(urls.nginx_ingress_upstreaminfo)), [`main`](\(urls.nginx_main))
+	  or [`error`](\(urls.nginx_error)) format.
       """
 	notices: [
 		"""
@@ -42,6 +43,7 @@ remap: functions: parse_nginx_log: {
 				"combined":             "Nginx combined format"
 				"error":                "Default Nginx error format"
 				"ingress_upstreaminfo": "Provides detailed upstream information (Nginx Ingress Controller)"
+				"main":                 "Nginx main format used by Docker images"
 			}
 			type: ["string"]
 		},
@@ -122,6 +124,26 @@ remap: functions: parse_nginx_log: {
 				upstream_response_length:        19437
 				upstream_response_time:          0.049
 				upstream_status:                 200
+			}
+		},
+		{
+			title: "Parse via Nginx log format (main)"
+			source: #"""
+				parse_nginx_log!(
+				    s'172.24.0.3 - alice [31/Dec/2024:17:32:06 +0000] "GET / HTTP/1.1" 200 615 "https://domain.tld/path" "curl/8.11.1" "1.2.3.4, 10.10.1.1"',
+				    "main"
+				)
+				"""#
+			return: {
+				body_bytes_size       615
+				http_referer          "https://domain.tld/path"
+				http_user_agent       "curl/8.11.1"
+				http_x_forwarded_for  "1.2.3.4, 10.10.1.1"
+				remote_addr           "172.24.0.3"
+				remote_user           "alice"
+				request               "GET / HTTP/1.1"
+				status                200
+				timestamp             "2024-12-31T17:32:06Z"
 			}
 		},
 	]
