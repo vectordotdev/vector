@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
-use prost_reflect::{DynamicMessage, MessageDescriptor};
+use prost_reflect::{DynamicMessage, MessageDescriptor, DescriptorPool};
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
 use vector_core::event::LogEvent;
@@ -77,12 +77,13 @@ pub struct ProtobufDeserializerOptions {
 #[derive(Debug, Clone)]
 pub struct ProtobufDeserializer {
     message_descriptor: MessageDescriptor,
+    descriptor_pool: DescriptorPool,
 }
 
 impl ProtobufDeserializer {
     /// Creates a new `ProtobufDeserializer`.
-    pub fn new(message_descriptor: MessageDescriptor) -> Self {
-        Self { message_descriptor }
+    pub fn new(message_descriptor: MessageDescriptor, descriptor_pool: DescriptorPool) -> Self {
+        Self { message_descriptor, descriptor_pool }
     }
 }
 
@@ -96,7 +97,7 @@ impl Deserializer for ProtobufDeserializer {
             .map_err(|error| format!("Error parsing protobuf: {:?}", error))?;
 
         let proto_vrl =
-            vrl::protobuf::proto_to_value(&prost_reflect::Value::Message(dynamic_message), None)?;
+            vrl::protobuf::proto_to_value(Some(&self.descriptor_pool), &prost_reflect::Value::Message(dynamic_message), None)?;
         let mut event = Event::Log(LogEvent::from(proto_vrl));
         let event = match log_namespace {
             LogNamespace::Vector => event,
@@ -119,11 +120,12 @@ impl Deserializer for ProtobufDeserializer {
 impl TryFrom<&ProtobufDeserializerConfig> for ProtobufDeserializer {
     type Error = vector_common::Error;
     fn try_from(config: &ProtobufDeserializerConfig) -> vector_common::Result<Self> {
-        let message_descriptor = vrl::protobuf::get_message_descriptor(
-            &config.protobuf.desc_file,
+        let pool = vrl::protobuf::get_message_pool_descriptor(&config.protobuf.desc_file)?;
+        let message_descriptor = vrl::protobuf::get_message_descriptor_from_pool(
+            &pool,
             &config.protobuf.message_type,
         )?;
-        Ok(Self::new(message_descriptor))
+        Ok(Self::new(message_descriptor, pool))
     }
 }
 
