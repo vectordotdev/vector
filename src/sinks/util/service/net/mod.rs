@@ -12,7 +12,7 @@ use std::{
 };
 
 #[cfg(unix)]
-use {crate::sinks::util::unix::UnixEither, std::path::PathBuf};
+use std::path::PathBuf;
 
 use crate::{
     internal_events::{
@@ -33,7 +33,7 @@ pub use self::unix::{UnixConnectorConfig, UnixMode};
 use self::tcp::TcpConnector;
 use self::udp::UdpConnector;
 #[cfg(unix)]
-use self::unix::UnixConnector;
+use self::unix::{UnixConnector, UnixEither};
 
 use futures_util::{future::BoxFuture, FutureExt};
 use snafu::{ResultExt, Snafu};
