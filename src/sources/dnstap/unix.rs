@@ -11,6 +11,7 @@ use crate::{
     sources::util::framestream::UnixFrameHandler,
 };
 
+pub use super::schema::DnstapEventSchema;
 use vector_lib::EstimatedJsonEncodedSizeOf;
 
 /// Unix domain socket configuration for the `dnstap` source.

@@ -2,8 +2,6 @@ use std::path::PathBuf;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
-use dnstap_parser::parser::DnstapParser;
-use dnstap_parser::schema::DnstapEventSchema;
 use vector_lib::event::{Event, LogEvent};
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered,
@@ -13,19 +11,25 @@ use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
 use vrl::path::{OwnedValuePath, PathPrefix};
 use vrl::value::{kind::Collection, Kind};
 
+use self::parser::DnstapParser;
+
 use super::util::framestream::{
     build_framestream_tcp_source, build_framestream_unix_source, FrameHandler,
 };
 use crate::internal_events::DnstapParseError;
+use crate::sources::dnstap::schema::DNSTAP_VALUE_PATHS;
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
     Result,
 };
-use dnstap_parser::schema::DNSTAP_VALUE_PATHS;
 
+pub mod parser;
+pub mod schema;
 pub mod tcp;
 #[cfg(unix)]
 pub mod unix;
+use dnsmsg_parser::{dns_message, dns_message_parser};
+pub use schema::DnstapEventSchema;
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
 

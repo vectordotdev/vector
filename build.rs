@@ -116,6 +116,7 @@ fn main() {
 
     #[cfg(feature = "protobuf-build")]
     {
+        println!("cargo:rerun-if-changed=proto/third-party/dnstap.proto");
         println!("cargo:rerun-if-changed=proto/third-party/google/pubsub/v1/pubsub.proto");
         println!("cargo:rerun-if-changed=proto/third-party/google/rpc/status.proto");
         println!("cargo:rerun-if-changed=proto/vector/dd_metric.proto");
@@ -143,6 +144,7 @@ fn main() {
                 prost_build,
                 &[
                     "lib/vector-core/proto/event.proto",
+                    "proto/third-party/dnstap.proto",
                     "proto/vector/ddsketch_full.proto",
                     "proto/vector/dd_metric.proto",
                     "proto/vector/dd_trace.proto",
