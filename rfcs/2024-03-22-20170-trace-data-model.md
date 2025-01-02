@@ -298,7 +298,7 @@ required.
 
 ### Using OpenTelemetry-inspired model on the existing log model
 
-A logical model built on top of the existing log model would allow for a quick implemention, but
+A logical model built on top of the existing log model would allow for a quick implementation, but
 lacks some of the benefits of having a more regular typing. It still has advantage of rather than
 needing to respecify the definitions and re-create work done by the wider OpenTelemetry
 community we can re-use the language and guidelines used in the OpenTelemetry product. However, it

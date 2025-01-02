@@ -454,6 +454,7 @@ timeframe
 timeseries
 timespan
 timestamped
+tracestate
 typesense
 tzdata
 ubuntu
