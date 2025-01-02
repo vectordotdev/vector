@@ -106,6 +106,7 @@ urls: {
 	b_tree_map:                                 "https://doc.rust-lang.org/std/collections/struct.BTreeMap.html"
 	cargo_audit:                                "\(github)/RustSec/cargo-audit"
 	centos:                                     "https://www.centos.org/"
+	charset_standard:                           "\(encoding_standard)#names-and-labels"
 	chrono_time_formats:                        "https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers"
 	cgroups_limit_resources:                    "https://the.binbashtheory.com/control-resources-cgroups/"
 	clickhouse:                                 "https://clickhouse.com/"
