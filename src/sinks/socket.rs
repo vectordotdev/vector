@@ -448,7 +448,7 @@ mod test {
 
         // Only accept two connections.
         let jh2 = tokio::spawn(async move {
-            let tls = MaybeTlsSettings::from_config(&config, true).unwrap();
+            let tls = MaybeTlsSettings::from_config(config.as_ref(), true).unwrap();
             let listener = tls.bind(&addr).await.unwrap();
             listener
                 .accept_stream()

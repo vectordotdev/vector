@@ -221,7 +221,7 @@ impl SinkConfig for StackdriverConfig {
 
         let request_limits = self.request.into_settings();
 
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let uri: Uri = self.endpoint.parse()?;

@@ -128,7 +128,7 @@ pub struct UnixSocketFileDeleteError<'a> {
     pub error: Error,
 }
 
-impl<'a> InternalEvent for UnixSocketFileDeleteError<'a> {
+impl InternalEvent for UnixSocketFileDeleteError<'_> {
     fn emit(self) {
         error!(
             message = "Failed in deleting unix socket file.",

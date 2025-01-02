@@ -174,7 +174,7 @@ where
                                 request_id,
                                 finalizers,
                                 event_count,
-                                &bytes_sent,
+                                bytes_sent.as_ref(),
                                 &events_sent,
                             ))
                             .instrument(info_span!("request", request_id).or_current());
@@ -200,7 +200,7 @@ where
         request_id: usize,
         finalizers: EventFinalizers,
         event_count: usize,
-        bytes_sent: &Option<Registered<BytesSent>>,
+        bytes_sent: Option<&Registered<BytesSent>>,
         events_sent: &RegisteredEventCache<(), TaggedEventsSent>,
     ) {
         match result {
