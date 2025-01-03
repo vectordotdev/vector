@@ -114,7 +114,7 @@ impl TcpSinkConfig {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
-        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let connector = TcpConnector::new(host, port, self.keepalive, tls, self.send_buffer_bytes);
         let sink = TcpSink::new(connector.clone(), transformer, encoder);
 

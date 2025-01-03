@@ -13,7 +13,7 @@ serde.workspace = true
 serde_json.workspace = true
 
 # Error handling
-anyhow = { version = "1.0.93", default-features = false, features = ["std"] }
+anyhow = { version = "1.0.94", default-features = false, features = ["std"] }
 
 # Tokio / Futures
 futures.workspace = true
@@ -30,6 +30,5 @@ tokio-tungstenite = { version = "0.20.1", default-features = false, features = [
 # External libs
 chrono.workspace = true
 clap.workspace = true
-url = { version = "2.5.3", default-features = false }
+url = { version = "2.5.4", default-features = false }
 uuid.workspace = true
-indoc = { version = "2.0.5", default-features = false }

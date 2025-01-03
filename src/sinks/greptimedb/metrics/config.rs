@@ -70,9 +70,6 @@ pub struct GreptimeDBMetricsConfig {
     ///
     /// The address _must_ include a port.
     #[configurable(metadata(docs::examples = "example.com:4001"))]
-    #[configurable(metadata(
-        docs::examples = "1nge17d2r3ns.ap-southeast-1.aws.greptime.cloud:4001"
-    ))]
     pub endpoint: String,
     /// The username for your GreptimeDB instance.
     ///
@@ -88,7 +85,7 @@ pub struct GreptimeDBMetricsConfig {
     pub password: Option<SensitiveString>,
     /// Set gRPC compression encoding for the request
     /// Default to none, `gzip` or `zstd` is supported.
-    #[configurable(metadata(docs::examples = "grpc_compression"))]
+    #[configurable(metadata(docs::examples = "gzip"))]
     #[serde(default)]
     pub grpc_compression: Option<String>,
 

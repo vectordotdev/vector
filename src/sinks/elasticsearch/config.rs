@@ -264,6 +264,7 @@ impl ElasticsearchConfig {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
                 index: self.bulk.index.clone(),
+                template_fallback_index: self.bulk.template_fallback_index.clone(),
                 action: self.bulk.action.clone(),
                 version: self.bulk.version.clone(),
                 version_type: self.bulk.version_type,
@@ -282,7 +283,7 @@ impl ElasticsearchConfig {
 pub struct BulkConfig {
     /// Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
     ///
-    /// Only `index` and `create` actions are supported.
+    /// Only `index`, `create` and `update` actions are supported.
     ///
     /// [es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
     #[serde(default = "default_bulk_action")]
@@ -295,6 +296,10 @@ pub struct BulkConfig {
     #[configurable(metadata(docs::examples = "application-{{ application_id }}-%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "{{ index }}"))]
     pub index: Template,
+
+    /// The default index to write events to if the template in `bulk.index` cannot be resolved
+    #[configurable(metadata(docs::examples = "test-index"))]
+    pub template_fallback_index: Option<String>,
 
     /// Version field value.
     #[configurable(metadata(docs::examples = "{{ obj_version }}-%Y-%m-%d"))]
@@ -329,6 +334,7 @@ impl Default for BulkConfig {
         Self {
             action: default_bulk_action(),
             index: default_index(),
+            template_fallback_index: Default::default(),
             version: Default::default(),
             version_type: default_version_type(),
         }

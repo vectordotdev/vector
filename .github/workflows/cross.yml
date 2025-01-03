@@ -3,10 +3,13 @@ name: Cross
 on:
   workflow_call:
 
+permissions:
+  statuses: write
+
 jobs:
   cross-linux:
     name: Cross - ${{ matrix.target }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 45
     env:
       CARGO_INCREMENTAL: 0

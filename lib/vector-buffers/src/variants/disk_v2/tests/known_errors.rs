@@ -23,6 +23,20 @@ use crate::{
     EventCount,
 };
 
+impl AsMetadata for u32 {
+    fn into_u32(self) -> u32 {
+        self
+    }
+
+    fn from_u32(value: u32) -> Option<Self> {
+        if value < 32 {
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
 #[tokio::test]
 async fn reader_throws_error_when_record_length_delimiter_is_zero() {
     with_temp_dir(|dir| {
@@ -685,20 +699,6 @@ async fn writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented() 
 async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
     static GET_METADATA_VALUE: AtomicU32 = AtomicU32::new(0);
     static CAN_DECODE_VALUE: AtomicU32 = AtomicU32::new(0);
-
-    impl AsMetadata for u32 {
-        fn into_u32(self) -> u32 {
-            self
-        }
-
-        fn from_u32(value: u32) -> Option<Self> {
-            if value < 32 {
-                Some(value)
-            } else {
-                None
-            }
-        }
-    }
 
     #[derive(Debug)]
     struct ControllableRecord(u8);

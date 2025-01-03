@@ -32,6 +32,9 @@ on:
   pull_request_review:
     types: [submitted]
 
+permissions:
+  statuses: write
+
 env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
@@ -50,7 +53,7 @@ env:
 jobs:
   prep-pr:
     name: (PR review) Signal pending to PR
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all')
     steps:
@@ -493,7 +496,7 @@ jobs:
 
   update-pr-status:
     name: Signal result to PR
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
       - integration-tests

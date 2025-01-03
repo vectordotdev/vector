@@ -7,7 +7,7 @@ pub struct VrlConditionExecutionError<'a> {
     pub error: &'a str,
 }
 
-impl<'a> InternalEvent for VrlConditionExecutionError<'a> {
+impl InternalEvent for VrlConditionExecutionError<'_> {
     fn emit(self) {
         error!(
             message = "VRL condition execution failed.",

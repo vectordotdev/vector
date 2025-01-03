@@ -65,6 +65,8 @@ pub struct GlobalOptions {
     /// The time zone name may be any name in the [TZ database][tzdb] or `local` to indicate system
     /// local time.
     ///
+    /// Note that in Vector/VRL all timestamps are represented in UTC.
+    ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub timezone: Option<TimeZone>,
@@ -163,11 +165,11 @@ impl GlobalOptions {
     pub fn merge(&self, with: Self) -> Result<Self, Vec<String>> {
         let mut errors = Vec::new();
 
-        if conflicts(&self.proxy.http, &with.proxy.http) {
+        if conflicts(self.proxy.http.as_ref(), with.proxy.http.as_ref()) {
             errors.push("conflicting values for 'proxy.http' found".to_owned());
         }
 
-        if conflicts(&self.proxy.https, &with.proxy.https) {
+        if conflicts(self.proxy.https.as_ref(), with.proxy.https.as_ref()) {
             errors.push("conflicting values for 'proxy.https' found".to_owned());
         }
 
@@ -175,22 +177,25 @@ impl GlobalOptions {
             errors.push("conflicting values for 'proxy.no_proxy' found".to_owned());
         }
 
-        if conflicts(&self.timezone, &with.timezone) {
+        if conflicts(self.timezone.as_ref(), with.timezone.as_ref()) {
             errors.push("conflicting values for 'timezone' found".to_owned());
         }
 
         if conflicts(
-            &self.acknowledgements.enabled,
-            &with.acknowledgements.enabled,
+            self.acknowledgements.enabled.as_ref(),
+            with.acknowledgements.enabled.as_ref(),
         ) {
             errors.push("conflicting values for 'acknowledgements' found".to_owned());
         }
 
-        if conflicts(&self.expire_metrics, &with.expire_metrics) {
+        if conflicts(self.expire_metrics.as_ref(), with.expire_metrics.as_ref()) {
             errors.push("conflicting values for 'expire_metrics' found".to_owned());
         }
 
-        if conflicts(&self.expire_metrics_secs, &with.expire_metrics_secs) {
+        if conflicts(
+            self.expire_metrics_secs.as_ref(),
+            with.expire_metrics_secs.as_ref(),
+        ) {
             errors.push("conflicting values for 'expire_metrics_secs' found".to_owned());
         }
 
@@ -237,7 +242,7 @@ impl GlobalOptions {
     }
 }
 
-fn conflicts<T: PartialEq>(this: &Option<T>, that: &Option<T>) -> bool {
+fn conflicts<T: PartialEq>(this: Option<&T>, that: Option<&T>) -> bool {
     matches!((this, that), (Some(this), Some(that)) if this != that)
 }
 

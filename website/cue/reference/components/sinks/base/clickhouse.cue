@@ -394,9 +394,13 @@ base: components: sinks: clickhouse: configuration: {
 		}
 	}
 	skip_unknown_fields: {
-		description: "Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema."
-		required:    false
-		type: bool: default: false
+		description: """
+			Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema.
+
+			If left unspecified, use the default provided by the `ClickHouse` server.
+			"""
+		required: false
+		type: bool: {}
 	}
 	table: {
 		description: "The table that data is inserted into."

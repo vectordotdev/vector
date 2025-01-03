@@ -87,6 +87,9 @@ pub enum BulkAction {
 
     /// The `create` action.
     Create,
+
+    /// The `update` action.
+    Update,
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -95,6 +98,7 @@ impl BulkAction {
         match self {
             BulkAction::Index => "index",
             BulkAction::Create => "create",
+            BulkAction::Update => "update",
         }
     }
 
@@ -102,6 +106,7 @@ impl BulkAction {
         match self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
+            BulkAction::Update => "/update",
         }
     }
 }
@@ -113,6 +118,7 @@ impl TryFrom<&str> for BulkAction {
         match input {
             "index" => Ok(BulkAction::Index),
             "create" => Ok(BulkAction::Create),
+            "update" => Ok(BulkAction::Update),
             _ => Err(format!("Invalid bulk action: {}", input)),
         }
     }
@@ -163,6 +169,7 @@ impl_generate_config_from_default!(ElasticsearchConfig);
 pub enum ElasticsearchCommonMode {
     Bulk {
         index: Template,
+        template_fallback_index: Option<String>,
         action: Template,
         version: Option<Template>,
         version_type: VersionType,
@@ -189,14 +196,28 @@ impl fmt::Display for VersionValueParseError<'_> {
 impl ElasticsearchCommonMode {
     fn index(&self, log: &LogEvent) -> Option<String> {
         match self {
-            Self::Bulk { index, .. } => index
+            Self::Bulk {
+                index,
+                template_fallback_index,
+                ..
+            } => index
                 .render_string(log)
-                .map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("index"),
-                        drop_event: true,
-                    });
+                .or_else(|error| {
+                    if let Some(fallback) = template_fallback_index {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("index"),
+                            drop_event: false,
+                        });
+                        Ok(fallback.clone())
+                    } else {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("index"),
+                            drop_event: true,
+                        });
+                        Err(())
+                    }
                 })
                 .ok(),
             Self::DataStream(ds) => ds.index(log),

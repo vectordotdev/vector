@@ -292,6 +292,19 @@ base: components: sources: file_descriptor: configuration: {
 				relevant_when: "method = \"chunked_gelf\""
 				required:      false
 				type: object: options: {
+					decompression: {
+						description: "Decompression configuration for GELF messages."
+						required:    false
+						type: string: {
+							default: "Auto"
+							enum: {
+								Auto: "Automatically detect the decompression method based on the magic bytes of the message."
+								Gzip: "Use Gzip decompression."
+								None: "Do not decompress the message."
+								Zlib: "Use Zlib decompression."
+							}
+						}
+					}
 					max_length: {
 						description: """
 																The maximum length of a single GELF message, in bytes. Messages longer than this length will

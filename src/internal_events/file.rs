@@ -74,7 +74,7 @@ pub struct FileIoError<'a, P> {
     pub dropped_events: usize,
 }
 
-impl<'a, P: std::fmt::Debug> InternalEvent for FileIoError<'a, P> {
+impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
     fn emit(self) {
         error!(
             message = %self.message,
@@ -123,7 +123,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
-    impl<'a> InternalEvent for FileBytesReceived<'a> {
+    impl InternalEvent for FileBytesReceived<'_> {
         fn emit(self) {
             trace!(
                 message = "Bytes received.",
@@ -188,7 +188,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
-    impl<'a> InternalEvent for FileChecksumFailed<'a> {
+    impl InternalEvent for FileChecksumFailed<'_> {
         fn emit(self) {
             warn!(
                 message = "Currently ignoring file too small to fingerprint.",
@@ -213,7 +213,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
-    impl<'a> InternalEvent for FileFingerprintReadError<'a> {
+    impl InternalEvent for FileFingerprintReadError<'_> {
         fn emit(self) {
             error!(
                 message = "Failed reading file for fingerprinting.",
@@ -253,7 +253,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
-    impl<'a> InternalEvent for FileDeleteError<'a> {
+    impl InternalEvent for FileDeleteError<'_> {
         fn emit(self) {
             error!(
                 message = "Failed in deleting file.",
@@ -290,7 +290,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
-    impl<'a> InternalEvent for FileDeleted<'a> {
+    impl InternalEvent for FileDeleted<'_> {
         fn emit(self) {
             info!(
                 message = "File deleted.",
@@ -315,7 +315,7 @@ mod source {
         pub reached_eof: bool,
     }
 
-    impl<'a> InternalEvent for FileUnwatched<'a> {
+    impl InternalEvent for FileUnwatched<'_> {
         fn emit(self) {
             let reached_eof = if self.reached_eof { "true" } else { "false" };
             info!(
@@ -346,7 +346,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
-    impl<'a> InternalEvent for FileWatchError<'a> {
+    impl InternalEvent for FileWatchError<'_> {
         fn emit(self) {
             error!(
                 message = "Failed to watch file.",
@@ -384,7 +384,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
-    impl<'a> InternalEvent for FileResumed<'a> {
+    impl InternalEvent for FileResumed<'_> {
         fn emit(self) {
             info!(
                 message = "Resuming to watch file.",
@@ -409,7 +409,7 @@ mod source {
         pub include_file_metric_tag: bool,
     }
 
-    impl<'a> InternalEvent for FileAdded<'a> {
+    impl InternalEvent for FileAdded<'_> {
         fn emit(self) {
             info!(
                 message = "Found new file to watch.",
@@ -475,7 +475,7 @@ mod source {
         pub error: &'a Error,
     }
 
-    impl<'a> InternalEvent for PathGlobbingError<'a> {
+    impl InternalEvent for PathGlobbingError<'_> {
         fn emit(self) {
             error!(
                 message = "Failed to glob path.",
