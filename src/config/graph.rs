@@ -112,7 +112,7 @@ impl Graph {
             );
         }
 
-        for (id, config) in sinks.iter() {
+        for (id, config) in sinks {
             graph.nodes.insert(
                 id.clone(),
                 Node::Sink {
@@ -133,7 +133,7 @@ impl Graph {
             }
         }
 
-        for (id, config) in sinks.iter() {
+        for (id, config) in sinks {
             for input in config.inputs.iter() {
                 if let Err(e) = graph.add_input(input, id, &available_inputs) {
                     errors.push(e);

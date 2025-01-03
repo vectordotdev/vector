@@ -31,12 +31,16 @@ impl ConfigDiff {
         self.sources.flip();
         self.transforms.flip();
         self.sinks.flip();
+        self.enrichment_tables.flip();
         self
     }
 
     /// Checks whether or not the given component is present at all.
     pub fn contains(&self, key: &ComponentKey) -> bool {
-        self.sources.contains(key) || self.transforms.contains(key) || self.sinks.contains(key)
+        self.sources.contains(key)
+            || self.transforms.contains(key)
+            || self.sinks.contains(key)
+            || self.enrichment_tables.contains(key)
     }
 
     /// Checks whether or not the given component is changed.
@@ -44,6 +48,7 @@ impl ConfigDiff {
         self.sources.is_changed(key)
             || self.transforms.is_changed(key)
             || self.sinks.is_changed(key)
+            || self.enrichment_tables.contains(key)
     }
 
     /// Checks whether or not the given component is removed.
@@ -51,6 +56,7 @@ impl ConfigDiff {
         self.sources.is_removed(key)
             || self.transforms.is_removed(key)
             || self.sinks.is_removed(key)
+            || self.enrichment_tables.contains(key)
     }
 }
 

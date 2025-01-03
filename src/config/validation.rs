@@ -349,6 +349,11 @@ pub fn warnings(config: &Config) -> Vec<String> {
         .collect::<Vec<_>>()
     });
 
+    let table_sinks = config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_sink().map(|s| (key, s)))
+        .collect::<Vec<_>>();
     for (input_type, id) in transform_ids.chain(source_ids) {
         if !config
             .transforms
@@ -356,6 +361,9 @@ pub fn warnings(config: &Config) -> Vec<String> {
             .any(|(_, transform)| transform.inputs.contains(&id))
             && !config
                 .sinks
+                .iter()
+                .any(|(_, sink)| sink.inputs.contains(&id))
+            && !table_sinks
                 .iter()
                 .any(|(_, sink)| sink.inputs.contains(&id))
         {
