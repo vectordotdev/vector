@@ -212,6 +212,21 @@ impl NetworkMetrics {
             None
         }
     }
+
+    /// Total TCP connections
+    async fn tcp_conns_total(&self) -> f64 {
+        filter_host_metric(&self.0, "tcp_connections_total")
+    }
+
+    /// Total bytes in the send queue across all connections.
+    async fn tcp_tx_queued_bytes_total(&self) -> f64 {
+        filter_host_metric(&self.0, "tcp_tx_queued_bytes_total")
+    }
+
+    /// Total bytes in the receive queue across all connections.
+    async fn tcp_rx_queued_bytes_total(&self) -> f64 {
+        filter_host_metric(&self.0, "tcp_rx_queued_bytes_total")
+    }
 }
 
 pub struct FileSystemMetrics(Vec<Metric>);

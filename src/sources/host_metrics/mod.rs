@@ -33,6 +33,8 @@ mod cpu;
 mod disk;
 mod filesystem;
 mod memory;
+#[cfg(target_os = "linux")]
+mod netlink_tcp;
 mod network;
 mod process;
 
