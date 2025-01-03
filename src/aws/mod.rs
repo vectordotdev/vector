@@ -9,7 +9,7 @@ use aws_config::{
 };
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::{
-    http_request::{SignableBody, SignableRequest, SigningSettings},
+    http_request::{PayloadChecksumKind, SignableBody, SignableRequest, SigningSettings},
     sign::v4,
 };
 use aws_smithy_async::rt::sleep::TokioSleep;
@@ -104,7 +104,7 @@ fn check_response(res: &HttpResponse) -> bool {
 /// have turned off as we want to consistently use openssl.
 fn connector(
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
+    tls_options: Option<&TlsConfig>,
 ) -> crate::Result<SharedHttpClient> {
     let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
 
@@ -123,12 +123,12 @@ pub trait ClientBuilder {
     type Client;
 
     /// Build the client using the given config settings.
-    fn build(config: &SdkConfig) -> Self::Client;
+    fn build(&self, config: &SdkConfig) -> Self::Client;
 }
 
 fn region_provider(
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
+    tls_options: Option<&TlsConfig>,
 ) -> crate::Result<impl ProvideRegion> {
     let config = aws_config::provider_config::ProviderConfig::default()
         .with_http_client(connector(proxy, tls_options)?);
@@ -146,7 +146,7 @@ fn region_provider(
 
 async fn resolve_region(
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
+    tls_options: Option<&TlsConfig>,
     region: Option<Region>,
 ) -> crate::Result<Region> {
     match region {
@@ -161,28 +161,36 @@ async fn resolve_region(
 }
 
 /// Create the SDK client using the provided settings.
-pub async fn create_client<T: ClientBuilder>(
+pub async fn create_client<T>(
+    builder: &T,
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
-    timeout: &Option<AwsTimeout>,
-) -> crate::Result<T::Client> {
-    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options, timeout)
+    tls_options: Option<&TlsConfig>,
+    timeout: Option<&AwsTimeout>,
+) -> crate::Result<T::Client>
+where
+    T: ClientBuilder,
+{
+    create_client_and_region::<T>(builder, auth, region, endpoint, proxy, tls_options, timeout)
         .await
         .map(|(client, _)| client)
 }
 
 /// Create the SDK client and resolve the region using the provided settings.
-pub async fn create_client_and_region<T: ClientBuilder>(
+pub async fn create_client_and_region<T>(
+    builder: &T,
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
-    timeout: &Option<AwsTimeout>,
-) -> crate::Result<(T::Client, Region)> {
+    tls_options: Option<&TlsConfig>,
+    timeout: Option<&AwsTimeout>,
+) -> crate::Result<(T::Client, Region)>
+where
+    T: ClientBuilder,
+{
     let retry_config = RetryConfig::disabled();
 
     // The default credentials chains will look for a region if not given but we'd like to
@@ -239,7 +247,7 @@ pub async fn create_client_and_region<T: ClientBuilder>(
 
     let config = config_builder.build();
 
-    Ok((T::build(&config), region))
+    Ok((T::build(builder, &config), region))
 }
 
 #[derive(Snafu, Debug)]
@@ -254,7 +262,8 @@ pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
-    region: &Option<Region>,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
 ) -> crate::Result<()> {
     let headers = request
         .headers()
@@ -276,12 +285,21 @@ pub async fn sign_request(
 
     let credentials = credentials_provider.provide_credentials().await?;
     let identity = Identity::new(credentials, None);
+
+    let mut signing_settings = SigningSettings::default();
+
+    // Include the x-amz-content-sha256 header when calculating the AWS v4 signature;
+    // this is required by some AWS services, e.g. S3 and OpenSearch Serverless
+    if payload_checksum_sha256 {
+        signing_settings.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+    }
+
     let signing_params_builder = v4::SigningParams::builder()
         .identity(&identity)
         .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
         .name(service_name)
         .time(SystemTime::now())
-        .settings(SigningSettings::default());
+        .settings(signing_settings);
 
     let signing_params = signing_params_builder
         .build()

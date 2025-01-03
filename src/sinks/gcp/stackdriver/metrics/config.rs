@@ -98,7 +98,7 @@ impl SinkConfig for StackdriverConfig {
 
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;

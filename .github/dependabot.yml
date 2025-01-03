@@ -3,8 +3,10 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
       time: "04:00" # UTC
+    allow:
+      - dependency-type: "all"
     labels:
       - "domain: deps"
       - "no-changelog"
@@ -12,6 +14,13 @@ updates:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
     groups:
+      patches:
+        applies-to: version-updates
+        patterns:
+        - "*"
+        update-types:
+        - "patch"
+
       amq:
         patterns:
         - "amq-*"
@@ -77,7 +86,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     labels:
       - "domain: ci"
       - "no-changelog"

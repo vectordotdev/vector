@@ -8,9 +8,9 @@ pub struct LuaEvent {
     pub metric_multi_value_tags: bool,
 }
 
-impl<'a> IntoLua<'a> for LuaEvent {
+impl IntoLua for LuaEvent {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
-    fn into_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
         match self.event {
             Event::Log(log) => table.raw_set("log", log.into_lua(lua)?)?,
@@ -24,7 +24,7 @@ impl<'a> IntoLua<'a> for LuaEvent {
             )?,
             Event::Trace(_) => {
                 return Err(LuaError::ToLuaConversionError {
-                    from: "Event",
+                    from: String::from("Event"),
                     to: "table",
                     message: Some("Trace are not supported".to_string()),
                 })
@@ -34,12 +34,12 @@ impl<'a> IntoLua<'a> for LuaEvent {
     }
 }
 
-impl<'a> FromLua<'a> for Event {
-    fn from_lua(value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
+impl FromLua for Event {
+    fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
         let LuaValue::Table(table) = &value else {
             return Err(LuaError::FromLuaConversionError {
                 from: value.type_name(),
-                to: "Event",
+                to: String::from("Event"),
                 message: Some("Event should be a Lua table".to_string()),
             });
         };
@@ -53,7 +53,7 @@ impl<'a> FromLua<'a> for Event {
             )?)),
             _ => Err(LuaError::FromLuaConversionError {
                 from: value.type_name(),
-                to: "Event",
+                to: String::from("Event"),
                 message: Some(
                     "Event should contain either \"log\" or \"metric\" key at the top level"
                         .to_string(),

@@ -18,7 +18,6 @@
 # /ci-run-unit-mac            : runs Unit - Mac
 # /ci-run-unit-windows        : runs Unit - Windows
 # /ci-run-environment         : runs Environment Suite
-# /ci-run-regression          : runs Regression Detection Suite
 # /ci-run-k8s                 : runs K8s E2E Suite
 
 name: CI Review Trigger
@@ -26,6 +25,9 @@ name: CI Review Trigger
 on:
   pull_request_review:
     types: [submitted]
+
+permissions:
+  statuses: write
 
 env:
   DD_ENV: "ci"
@@ -49,7 +51,7 @@ env:
 jobs:
   validate:
     name: Validate review
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: |
         startsWith(github.event.review.body, '/ci-run-all')
@@ -61,7 +63,6 @@ jobs:
         || startsWith(github.event.review.body, '/ci-run-unit-mac')
         || startsWith(github.event.review.body, '/ci-run-unit-windows')
         || startsWith(github.event.review.body, '/ci-run-environment')
-        || startsWith(github.event.review.body, '/ci-run-regression')
         || startsWith(github.event.review.body, '/ci-run-k8s')
     steps:
       - name: Generate authentication token
@@ -128,12 +129,6 @@ jobs:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-environment')
     uses: ./.github/workflows/environment.yml
-    secrets: inherit
-
-  regression:
-    needs: validate
-    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-regression')
-    uses: ./.github/workflows/regression.yml
     secrets: inherit
 
   k8s:

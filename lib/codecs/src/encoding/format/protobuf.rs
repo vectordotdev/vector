@@ -3,6 +3,7 @@ use bytes::BytesMut;
 use prost_reflect::{prost::Message as _, MessageDescriptor};
 use std::path::PathBuf;
 use tokio_util::codec::Encoder;
+use vector_config_macros::configurable_component;
 use vector_core::{
     config::DataType,
     event::{Event, Value},
@@ -10,7 +11,7 @@ use vector_core::{
 };
 
 /// Config used to build a `ProtobufSerializer`.
-#[crate::configurable_component]
+#[configurable_component]
 #[derive(Debug, Clone)]
 pub struct ProtobufSerializerConfig {
     /// Options for the Protobuf serializer.
@@ -41,7 +42,7 @@ impl ProtobufSerializerConfig {
 }
 
 /// Protobuf serializer options.
-#[crate::configurable_component]
+#[configurable_component]
 #[derive(Debug, Clone)]
 pub struct ProtobufSerializerOptions {
     /// The path to the protobuf descriptor set file.

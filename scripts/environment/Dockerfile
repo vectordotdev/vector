@@ -1,4 +1,4 @@
-FROM docker.io/ubuntu:20.04 AS ENVIRONMENT
+FROM docker.io/ubuntu:20.04
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ='America/New York' \
     PATH=/root/.cargo/bin:/root/.local/bin/:$PATH \

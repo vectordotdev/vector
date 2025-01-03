@@ -28,8 +28,12 @@ base: components: sinks: elasticsearch: configuration: {
 		}
 	}
 	api_version: {
-		description: "The API version of Elasticsearch."
-		required:    false
+		description: """
+			The API version of Elasticsearch.
+
+			Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
+			"""
+		required: false
 		type: string: {
 			default: "auto"
 			enum: {
@@ -166,8 +170,12 @@ base: components: sinks: elasticsearch: configuration: {
 				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
 			strategy: {
-				description: "The authentication strategy to use."
-				required:    true
+				description: """
+					The authentication strategy to use.
+
+					Amazon OpenSearch Serverless requires this option to be set to `aws`.
+					"""
+				required: true
 				type: string: enum: {
 					aws:   "Amazon OpenSearch Service-specific authentication."
 					basic: "HTTP Basic Authentication."
@@ -241,7 +249,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
 
-					Only `index` and `create` actions are supported.
+					Only `index`, `create` and `update` actions are supported.
 
 					[es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 					"""
@@ -260,6 +268,11 @@ base: components: sinks: elasticsearch: configuration: {
 					examples: ["application-{{ application_id }}-%Y-%m-%d", "{{ index }}"]
 					syntax: "template"
 				}
+			}
+			template_fallback_index: {
+				description: "The default index to write events to if the template in `bulk.index` cannot be resolved"
+				required:    false
+				type: string: examples: ["test-index"]
 			}
 			version: {
 				description: "Version field value."
@@ -547,6 +560,17 @@ base: components: sinks: elasticsearch: configuration: {
 
 					Elasticsearch Data Streams only support the `create` action.
 					"""
+			}
+		}
+	}
+	opensearch_service_type: {
+		description: "Amazon OpenSearch service type"
+		required:    false
+		type: string: {
+			default: "managed"
+			enum: {
+				managed:    "Elasticsearch or OpenSearch Managed domain"
+				serverless: "OpenSearch Serverless collection"
 			}
 		}
 	}

@@ -34,6 +34,7 @@ mod disk;
 mod filesystem;
 mod memory;
 mod network;
+mod process;
 
 /// Collector types.
 #[serde_as]
@@ -48,6 +49,9 @@ pub enum Collector {
 
     /// Metrics related to CPU utilization.
     Cpu,
+
+    /// Metrics related to Process utilization.
+    Process,
 
     /// Metrics related to disk I/O utilization.
     Disk,
@@ -125,6 +129,10 @@ pub struct HostMetricsConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub network: network::NetworkConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub process: process::ProcessConfig,
 }
 
 /// Options for the cgroups (controller groups) metrics collector.
@@ -192,6 +200,7 @@ fn default_collectors() -> Option<Vec<Collector>> {
         Collector::Host,
         Collector::Memory,
         Collector::Network,
+        Collector::Process,
     ];
 
     #[cfg(target_os = "linux")]
@@ -214,6 +223,20 @@ fn example_devices() -> FilterList {
 }
 
 fn default_all_devices() -> FilterList {
+    FilterList {
+        includes: Some(vec!["*".try_into().unwrap()]),
+        excludes: None,
+    }
+}
+
+fn example_processes() -> FilterList {
+    FilterList {
+        includes: Some(vec!["docker".try_into().unwrap()]),
+        excludes: None,
+    }
+}
+
+fn default_all_processes() -> FilterList {
     FilterList {
         includes: Some(vec!["*".try_into().unwrap()]),
         excludes: None,
@@ -353,6 +376,9 @@ impl HostMetrics {
         }
         if self.config.has_collector(Collector::Cpu) {
             self.cpu_metrics(&mut buffer).await;
+        }
+        if self.config.has_collector(Collector::Process) {
+            self.process_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Disk) {
             self.disk_metrics(&mut buffer).await;
@@ -708,6 +734,7 @@ mod tests {
             #[cfg(target_os = "linux")]
             Collector::CGroups,
             Collector::Cpu,
+            Collector::Process,
             Collector::Disk,
             Collector::Filesystem,
             Collector::Load,

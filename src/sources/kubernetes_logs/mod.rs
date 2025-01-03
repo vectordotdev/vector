@@ -10,6 +10,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::FutureExt, stream::StreamExt};
 use futures_util::Stream;
+use http_1::{HeaderName, HeaderValue};
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use k8s_paths_provider::K8sPathsProvider;
 use kube::{
@@ -34,7 +35,10 @@ use vector_lib::{
 };
 use vrl::value::{kind::Collection, Kind};
 
-use crate::sources::kubernetes_logs::partial_events_merger::merge_partial_events;
+use crate::{
+    built_info::{PKG_NAME, PKG_VERSION},
+    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
+};
 use crate::{
     config::{
         log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig,
@@ -586,7 +590,7 @@ impl Source {
         // If the user passed a custom Kubeconfig use it, otherwise
         // we attempt to load the local kubeconfig, followed by the
         // in-cluster environment variables
-        let client_config = match &config.kube_config_file {
+        let mut client_config = match &config.kube_config_file {
             Some(kc) => {
                 ClientConfig::from_custom_kubeconfig(
                     config::Kubeconfig::read_from(kc)?,
@@ -596,6 +600,11 @@ impl Source {
             }
             None => ClientConfig::infer().await?,
         };
+        if let Ok(user_agent) = HeaderValue::from_str(&format!("{}/{}", PKG_NAME, PKG_VERSION)) {
+            client_config
+                .headers
+                .push((HeaderName::from_static("user-agent"), user_agent));
+        }
         let client = Client::try_from(client_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
@@ -695,7 +704,7 @@ impl Source {
                 ..Default::default()
             },
         )
-        .backoff(watcher::default_backoff());
+        .backoff(watcher::DefaultBackoff::default());
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
@@ -718,7 +727,7 @@ impl Source {
                 ..Default::default()
             },
         )
-        .backoff(watcher::default_backoff());
+        .backoff(watcher::DefaultBackoff::default());
         let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
         let ns_cacher = MetaCache::new();
@@ -741,7 +750,7 @@ impl Source {
                 ..Default::default()
             },
         )
-        .backoff(watcher::default_backoff());
+        .backoff(watcher::DefaultBackoff::default());
         let node_store_w = reflector::store::Writer::default();
         let node_state = node_store_w.as_reader();
         let node_cacher = MetaCache::new();

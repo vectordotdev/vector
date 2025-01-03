@@ -210,7 +210,7 @@ impl AwsAuthentication {
     /// the correct proxy and TLS options.
     fn assume_role_provider_builder(
         proxy: &ProxyConfig,
-        tls_options: &Option<TlsConfig>,
+        tls_options: Option<&TlsConfig>,
         region: &Region,
         assume_role: &str,
         external_id: Option<&str>,
@@ -238,7 +238,7 @@ impl AwsAuthentication {
         &self,
         service_region: Region,
         proxy: &ProxyConfig,
-        tls_options: &Option<TlsConfig>,
+        tls_options: Option<&TlsConfig>,
     ) -> crate::Result<SharedCredentialsProvider> {
         match self {
             Self::AccessKey {
@@ -343,7 +343,7 @@ impl AwsAuthentication {
 async fn default_credentials_provider(
     region: Region,
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
+    tls_options: Option<&TlsConfig>,
     imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
     let connector = super::connector(proxy, tls_options)?;
@@ -387,11 +387,7 @@ mod tests {
 
     #[test]
     fn parsing_default() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-        "#,
-        )
-        .unwrap();
+        let config = toml::from_str::<ComponentConfig>("").unwrap();
 
         assert!(matches!(config.auth, AwsAuthentication::Default { .. }));
     }
@@ -399,9 +395,9 @@ mod tests {
     #[test]
     fn parsing_default_with_load_timeout() {
         let config = toml::from_str::<ComponentConfig>(
-            r#"
+            "
             auth.load_timeout_secs = 10
-        "#,
+        ",
         )
         .unwrap();
 
@@ -435,11 +431,11 @@ mod tests {
     #[test]
     fn parsing_default_with_imds_client() {
         let config = toml::from_str::<ComponentConfig>(
-            r#"
+            "
             auth.imds.max_attempts = 5
             auth.imds.connect_timeout_seconds = 30
             auth.imds.read_timeout_seconds = 10
-        "#,
+        ",
         )
         .unwrap();
 
