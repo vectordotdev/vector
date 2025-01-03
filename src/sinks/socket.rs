@@ -40,9 +40,14 @@ pub enum Mode {
     /// Send over UDP.
     Udp(UdpMode),
 
-    /// Send over a Unix domain socket (UDS).
+    /// Send over a Unix domain socket (UDS), in stream mode.
     #[cfg(unix)]
     Unix(UnixMode),
+
+    /// Send over a Unix domain socket (UDS), in datagram mode. Unavailable on macOS.
+    #[cfg(unix)]
+    #[cfg_attr(target_os = "macos", serde(skip))]
+    UnixDatagram(UnixMode),
 }
 
 /// TCP configuration.
@@ -137,7 +142,22 @@ impl SinkConfig for SocketSinkConfig {
                 let transformer = encoding.transformer();
                 let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
                 let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(transformer, encoder)
+                config.build(
+                    transformer,
+                    encoder,
+                    super::util::service::net::UnixMode::Stream,
+                )
+            }
+            #[cfg(unix)]
+            Mode::UnixDatagram(UnixMode { config, encoding }) => {
+                let transformer = encoding.transformer();
+                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                let encoder = Encoder::<Framer>::new(framer, serializer);
+                config.build(
+                    transformer,
+                    encoder,
+                    super::util::service::net::UnixMode::Datagram,
+                )
             }
         }
     }
@@ -148,6 +168,8 @@ impl SinkConfig for SocketSinkConfig {
             Mode::Udp(UdpMode { encoding, .. }) => encoding.config().input_type(),
             #[cfg(unix)]
             Mode::Unix(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
+            #[cfg(unix)]
+            Mode::UnixDatagram(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
         };
         Input::new(encoder_input_type)
     }
@@ -224,11 +246,8 @@ mod test {
                     encoding: JsonSerializerConfig::default().into(),
                 }),
                 #[cfg(unix)]
-                DatagramSocketAddr::Unix(path) => Mode::Unix(UnixMode {
-                    config: UnixSinkConfig::new(
-                        path.to_path_buf(),
-                        crate::sinks::util::service::net::UnixMode::Datagram,
-                    ),
+                DatagramSocketAddr::Unix(path) => Mode::UnixDatagram(UnixMode {
+                    config: UnixSinkConfig::new(path.to_path_buf()),
                     encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
                 }),
             },
@@ -335,10 +354,7 @@ mod test {
 
         let config = SocketSinkConfig {
             mode: Mode::Unix(UnixMode {
-                config: UnixSinkConfig::new(
-                    out_path,
-                    crate::sinks::util::service::net::UnixMode::Stream,
-                ),
+                config: UnixSinkConfig::new(out_path),
                 encoding: (None::<FramingConfig>, NativeJsonSerializerConfig).into(),
             }),
             acknowledgements: Default::default(),
