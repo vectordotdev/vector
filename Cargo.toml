@@ -243,8 +243,8 @@ azure_storage_blobs = { version = "0.17", default-features = false, optional = t
 opendal = { version = "0.45", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true }
 
 # Tower
-tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
-tower-http = { version = "0.4.4", default-features = false, features = ["compression-full", "decompression-gzip", "trace"] }
+tower = { version = "0.5.0", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
+tower-http = { version = "0.5.2", default-features = false, features = ["compression-full", "decompression-gzip", "trace"] }
 # Serde
 serde.workspace = true
 serde-toml-merge = { version = "0.3.8", default-features = false }
