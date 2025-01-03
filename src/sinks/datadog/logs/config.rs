@@ -45,14 +45,16 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 
 /// Configuration for the `datadog_logs` sink.
 #[configurable_component(sink("datadog_logs", "Publish log events to Datadog."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
     #[serde(flatten)]
     pub local_dd_common: LocalDatadogCommonConfig,
 
     #[configurable(derived)]
-    #[serde(default)]
+    #[derivative(Default(value = "default_compression()"))]
+    #[serde(default = "default_compression")]
     pub compression: Option<Compression>,
 
     #[configurable(derived)]
@@ -66,6 +68,10 @@ pub struct DatadogLogsConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
+}
+
+const fn default_compression() -> Option<Compression> {
+    Some(Compression::zstd_default())
 }
 
 impl GenerateConfig for DatadogLogsConfig {
