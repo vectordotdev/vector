@@ -7,11 +7,10 @@ use std::{
 };
 
 use super::{
-    builder,
-    builder::TopologyPieces,
+    builder::{self, TopologyPieces},
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
-    task::TaskOutput,
+    task::{Task, TaskOutput},
     BuiltBuffer, TaskHandle,
 };
 use crate::{
@@ -28,9 +27,9 @@ use tokio::{
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
-use vector_lib::buffers::topology::channel::BufferSender;
 use vector_lib::tap::topology::{TapOutput, TapResource, WatchRx, WatchTx};
 use vector_lib::trigger::DisabledTrigger;
+use vector_lib::{buffers::topology::channel::BufferSender, shutdown::ShutdownSignal};
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
 
@@ -49,6 +48,7 @@ pub struct RunningTopology {
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
+    utilization_task: Option<TaskHandle>,
 }
 
 impl RunningTopology {
@@ -67,6 +67,7 @@ impl RunningTopology {
             running: Arc::new(AtomicBool::new(true)),
             graceful_shutdown_duration: config.graceful_shutdown_duration,
             config,
+            utilization_task: None,
         }
     }
 
@@ -1042,6 +1043,7 @@ impl RunningTopology {
             return None;
         }
 
+        let mut utilization_emitter = pieces.utilization_emitter.take().unwrap();
         let mut running_topology = Self::new(config, abort_tx);
 
         if !running_topology
@@ -1052,6 +1054,17 @@ impl RunningTopology {
         }
         running_topology.connect_diff(&diff, &mut pieces).await;
         running_topology.spawn_diff(&diff, pieces);
+
+        running_topology.utilization_task =
+            // TODO: how to name this custom task?
+            Some(tokio::spawn(Task::new("".into(), "", async move {
+                utilization_emitter
+                    .run_utilization(ShutdownSignal::noop())
+                    .await;
+                // TODO: new task output type for this? Or handle this task in a completely
+                // different way
+                Ok(TaskOutput::Healthcheck)
+            })));
 
         Some((running_topology, abort_rx))
     }
