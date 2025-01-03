@@ -12,7 +12,7 @@ use aws_sdk_cloudwatchlogs::{
         put_log_events::{PutLogEventsError, PutLogEventsOutput},
         put_retention_policy::PutRetentionPolicyError,
     },
-    types::InputLogEvent,
+    types::{InputLogEvent, LogGroupClass},
     Client as CloudwatchLogsClient,
 };
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
@@ -38,6 +38,7 @@ struct Client {
     client: CloudwatchLogsClient,
     stream_name: String,
     group_name: String,
+    group_class: LogGroupClass,
     headers: IndexMap<HeaderName, HeaderValue>,
     retention_days: u32,
 }
@@ -60,6 +61,7 @@ impl CloudwatchFuture {
         headers: IndexMap<HeaderName, HeaderValue>,
         stream_name: String,
         group_name: String,
+        group_class: LogGroupClass,
         create_missing_group: bool,
         create_missing_stream: bool,
         retention: Retention,
@@ -72,6 +74,7 @@ impl CloudwatchFuture {
             client,
             stream_name,
             group_name,
+            group_class,
             headers,
             retention_days,
         };
@@ -288,10 +291,12 @@ impl Client {
     pub fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
+        let group_class = self.group_class.clone();
         Box::pin(async move {
             client
                 .create_log_group()
                 .log_group_name(group_name)
+                .log_group_class(group_class)
                 .send()
                 .await?;
             Ok(())
