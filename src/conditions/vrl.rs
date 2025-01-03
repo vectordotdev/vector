@@ -89,6 +89,27 @@ pub struct Vrl {
 }
 
 impl Vrl {
+    fn format_vrl_error(&self, err: Terminate) -> String {
+        let formatted_err = match err {
+            Terminate::Abort(ref err) | Terminate::Error(ref err) => Formatter::new(
+                &self.source,
+                vrl::diagnostic::Diagnostic::from(
+                    Box::new((*err).clone()) as Box<dyn vrl::diagnostic::DiagnosticMessage>
+                ),
+            )
+            .colored()
+            .to_string(),
+        };
+        format!(
+            "source execution {}: {}",
+            if matches!(err, Terminate::Abort(_)) {
+                "aborted"
+            } else {
+                "failed"
+            },
+            formatted_err
+        )
+    }
     fn run(&self, event: Event) -> (Event, RuntimeResult) {
         let log_namespace = event
             .maybe_as_log()
@@ -128,30 +149,7 @@ impl Conditional for Vrl {
     fn check_with_context(&self, event: Event) -> (Result<(), String>, Event) {
         let (event, result) = self.run(event);
 
-        let value_result = result.map_err(|err| match err {
-            Terminate::Abort(err) => {
-                let err = Formatter::new(
-                    &self.source,
-                    vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
-                    ),
-                )
-                .colored()
-                .to_string();
-                format!("source execution aborted: {}", err)
-            }
-            Terminate::Error(err) => {
-                let err = Formatter::new(
-                    &self.source,
-                    vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
-                    ),
-                )
-                .colored()
-                .to_string();
-                format!("source execution failed: {}", err)
-            }
-        });
+        let value_result = result.map_err(|err| self.format_vrl_error(err));
 
         let value = match value_result {
             Ok(value) => value,
