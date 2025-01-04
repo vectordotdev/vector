@@ -179,7 +179,7 @@ impl EventEncoder {
 
             let key_s = key.unwrap();
             let value_s = value.unwrap();
-            let _ = pair_expansion(key_s, value_s, &mut static_labels, &mut dynamic_labels);
+            let _ = pair_expansion(&key_s, &value_s, &mut static_labels, &mut dynamic_labels);
         }
 
         for (k, v) in static_labels {
@@ -250,8 +250,8 @@ impl EventEncoder {
             let key_s = key.unwrap();
             let value_s = value.unwrap();
             let _ = pair_expansion(
-                key_s,
-                value_s,
+                &key_s,
+                &value_s,
                 &mut static_structured_metadata,
                 &mut dynamic_structured_metadata,
             );

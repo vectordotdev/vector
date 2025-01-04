@@ -351,7 +351,7 @@ fn render_tag_into(
         }
         Some(template) => match render_template(template, event) {
             Ok(value_s) => {
-                let expanded_pairs = pair_expansion(key_s, value_s, static_tags, dynamic_tags)
+                let expanded_pairs = pair_expansion(&key_s, &value_s, static_tags, dynamic_tags)
                     .map_err(|_| TransformError::PairExpansionError)?;
                 result.extend(expanded_pairs);
             }
