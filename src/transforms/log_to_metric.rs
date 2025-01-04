@@ -291,7 +291,7 @@ fn render_tags(
                         render_tag_into(
                             event,
                             name,
-                            template,
+                            template.as_ref(),
                             &mut result,
                             &mut static_tags,
                             &mut dynamic_tags,
@@ -302,7 +302,7 @@ fn render_tags(
                             render_tag_into(
                                 event,
                                 name,
-                                template,
+                                template.as_ref(),
                                 &mut result,
                                 &mut static_tags,
                                 &mut dynamic_tags,
@@ -328,7 +328,7 @@ fn render_tags(
 fn render_tag_into(
     event: &Event,
     key_template: &Template,
-    value_template: &Option<Template>,
+    value_template: Option<&Template>,
     result: &mut MetricTags,
     static_tags: &mut HashMap<String, String>,
     dynamic_tags: &mut HashMap<String, String>,
@@ -363,7 +363,7 @@ fn render_tag_into(
                 });
                 return Ok(());
             }
-            Err(err) => return Err(err),
+            Err(other) => return Err(other),
         },
     };
     Ok(())
