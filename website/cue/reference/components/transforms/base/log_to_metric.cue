@@ -85,8 +85,12 @@ base: components: transforms: log_to_metric: configuration: {
 				type: string: syntax: "template"
 			}
 			tags: {
-				description: "Tags to apply to the metric."
-				required:    false
+				description: """
+					Tags to apply to the metric.
+
+					Both keys and values can be templated, allowing you to attach dynamic tags to events.
+					"""
+				required: false
 				type: object: options: "*": {
 					description: "A metric tag."
 					required:    true
