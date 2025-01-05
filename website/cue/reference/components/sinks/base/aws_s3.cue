@@ -1074,6 +1074,7 @@ base: components: sinks: aws_s3: configuration: {
 				DEEP_ARCHIVE:        "Glacier Deep Archive."
 				EXPRESS_ONEZONE:     "High Performance (single Availability zone)."
 				GLACIER:             "Glacier Flexible Retrieval."
+				GLACIER_IR:          "Glacier Instant Retrieval."
 				INTELLIGENT_TIERING: "Intelligent Tiering."
 				ONEZONE_IA:          "Infrequently Accessed (single Availability zone)."
 				REDUCED_REDUNDANCY:  "Reduced Redundancy."
