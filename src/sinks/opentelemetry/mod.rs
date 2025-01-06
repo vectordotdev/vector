@@ -75,7 +75,7 @@ impl SinkConfig for OpenTelemetryConfig {
 
     fn input(&self) -> Input {
         match &self.protocol {
-            Protocol::Http(config) => config.input()
+            Protocol::Http(config) => config.input(),
         }
     }
 
