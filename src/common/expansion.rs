@@ -19,16 +19,12 @@ pub(crate) fn pair_expansion(
 ) -> Result<HashMap<String, String>, serde_json::Error> {
     let mut expanded_pairs = HashMap::new();
     if let Some(opening_prefix) = key_s.strip_suffix('*') {
-        let output: Result<serde_json::map::Map<String, serde_json::Value>, serde_json::Error> =
-            serde_json::from_str(value_s);
-
-        if let Err(err) = output {
-            return Err(err);
-        }
+        let output: serde_json::map::Map<String, serde_json::Value> =
+            serde_json::from_str(value_s)?;
 
         // key_* -> key_one, key_two, key_three
         // * -> one, two, three
-        for (k, v) in output.unwrap() {
+        for (k, v) in output {
             let key = slugify_text(&format!("{}{}", opening_prefix, k));
             let val = Value::from(v).to_string_lossy().into_owned();
             if val == "<null>" {
