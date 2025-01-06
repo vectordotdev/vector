@@ -20,9 +20,12 @@ pub struct TagCardinalityLimitConfig {
     pub global: TagCardinalityLimitInnerConfig,
 
     /// Tag cardinality limits configuration per metric name.
-    #[configurable(derived)]
+    #[configurable(
+        derived,
+        metadata(docs::additional_props_description = "An individual metric configuration.")
+    )]
     #[serde(default)]
-    pub per_metric_limits: Vec<PerMetricConfig>,
+    pub per_metric_limits: HashMap<String, PerMetricConfig>,
 }
 
 /// Configuration for the `tag_cardinality_limit` transform for a specific group of metrics.
@@ -94,9 +97,6 @@ pub enum LimitExceededAction {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct PerMetricConfig {
-    /// Name of the metric this configuration refers to.
-    pub name: String,
-
     /// Namespace of the metric this configuration refers to.
     #[serde(default)]
     pub namespace: Option<String>,
@@ -125,7 +125,7 @@ impl GenerateConfig for TagCardinalityLimitConfig {
                 value_limit: default_value_limit(),
                 limit_exceeded_action: default_limit_exceeded_action(),
             },
-            per_metric_limits: Vec::default(),
+            per_metric_limits: HashMap::default(),
         })
         .unwrap()
     }

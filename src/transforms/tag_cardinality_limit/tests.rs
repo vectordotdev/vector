@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use config::PerMetricConfig;
@@ -43,7 +44,7 @@ fn make_metric(tags: MetricTags) -> Event {
     make_metric_with_name(tags, "event")
 }
 
-const fn make_transform_hashset(
+fn make_transform_hashset(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
 ) -> TagCardinalityLimitConfig {
@@ -53,11 +54,11 @@ const fn make_transform_hashset(
             limit_exceeded_action,
             mode: Mode::Exact,
         },
-        per_metric_limits: Vec::new(),
+        per_metric_limits: HashMap::new(),
     }
 }
 
-const fn make_transform_bloom(
+fn make_transform_bloom(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
 ) -> TagCardinalityLimitConfig {
@@ -69,14 +70,14 @@ const fn make_transform_bloom(
                 cache_size_per_key: default_cache_size(),
             }),
         },
-        per_metric_limits: Vec::new(),
+        per_metric_limits: HashMap::new(),
     }
 }
 
 const fn make_transform_hashset_with_per_metric_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
-    per_metric_limits: Vec<PerMetricConfig>,
+    per_metric_limits: HashMap<String, PerMetricConfig>,
 ) -> TagCardinalityLimitConfig {
     TagCardinalityLimitConfig {
         global: TagCardinalityLimitInnerConfig {
@@ -91,7 +92,7 @@ const fn make_transform_hashset_with_per_metric_limits(
 const fn make_transform_bloom_with_per_metric_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
-    per_metric_limits: Vec<PerMetricConfig>,
+    per_metric_limits: HashMap<String, PerMetricConfig>,
 ) -> TagCardinalityLimitConfig {
     TagCardinalityLimitConfig {
         global: TagCardinalityLimitInnerConfig {
@@ -408,18 +409,22 @@ async fn tag_cardinality_limit_separate_value_limit_per_metric_name_hashset() {
     separate_value_limit_per_metric_name(make_transform_hashset_with_per_metric_limits(
         2,
         LimitExceededAction::DropTag,
-        vec![
-            PerMetricConfig {
-                name: "metricA".to_string(),
-                namespace: None,
-                config: make_transform_hashset(1, LimitExceededAction::DropTag).global,
-            },
-            PerMetricConfig {
-                name: "metricB".to_string(),
-                namespace: None,
-                config: make_transform_hashset(5, LimitExceededAction::DropTag).global,
-            },
-        ],
+        HashMap::from([
+            (
+                "metricA".to_string(),
+                PerMetricConfig {
+                    namespace: None,
+                    config: make_transform_hashset(1, LimitExceededAction::DropTag).global,
+                },
+            ),
+            (
+                "metricB".to_string(),
+                PerMetricConfig {
+                    namespace: None,
+                    config: make_transform_hashset(5, LimitExceededAction::DropTag).global,
+                },
+            ),
+        ]),
     ))
     .await;
 }
@@ -429,18 +434,22 @@ async fn tag_cardinality_limit_separate_value_limit_per_metric_name_bloom() {
     separate_value_limit_per_metric_name(make_transform_bloom_with_per_metric_limits(
         2,
         LimitExceededAction::DropTag,
-        vec![
-            PerMetricConfig {
-                name: "metricA".to_string(),
-                namespace: None,
-                config: make_transform_bloom(1, LimitExceededAction::DropTag).global,
-            },
-            PerMetricConfig {
-                name: "metricB".to_string(),
-                namespace: None,
-                config: make_transform_bloom(5, LimitExceededAction::DropTag).global,
-            },
-        ],
+        HashMap::from([
+            (
+                "metricA".to_string(),
+                PerMetricConfig {
+                    namespace: None,
+                    config: make_transform_bloom(1, LimitExceededAction::DropTag).global,
+                },
+            ),
+            (
+                "metricB".to_string(),
+                PerMetricConfig {
+                    namespace: None,
+                    config: make_transform_bloom(5, LimitExceededAction::DropTag).global,
+                },
+            ),
+        ]),
     ))
     .await;
 }

@@ -49,9 +49,10 @@ base: components: transforms: tag_cardinality_limit: configuration: {
 	per_metric_limits: {
 		description: "Tag cardinality limits configuration per metric name."
 		required:    false
-		type: array: {
-			default: []
-			items: type: object: options: {
+		type: object: options: "*": {
+			description: "An individual metric configuration."
+			required:    true
+			type: object: options: {
 				cache_size_per_key: {
 					description: """
 						The size of the cache for detecting duplicate tags, in bytes.
@@ -82,25 +83,20 @@ base: components: transforms: tag_cardinality_limit: configuration: {
 					required:    true
 					type: string: enum: {
 						exact: """
-																		Tracks cardinality exactly.
+																			Tracks cardinality exactly.
 
-																		This mode has higher memory requirements than `probabilistic`, but never falsely outputs
-																		metrics with new tags after the limit has been hit.
-																		"""
+																			This mode has higher memory requirements than `probabilistic`, but never falsely outputs
+																			metrics with new tags after the limit has been hit.
+																			"""
 						probabilistic: """
-																		Tracks cardinality probabilistically.
+																			Tracks cardinality probabilistically.
 
-																		This mode has lower memory requirements than `exact`, but may occasionally allow metric
-																		events to pass through the transform even when they contain new tags that exceed the
-																		configured limit. The rate at which this happens can be controlled by changing the value of
-																		`cache_size_per_key`.
-																		"""
+																			This mode has lower memory requirements than `exact`, but may occasionally allow metric
+																			events to pass through the transform even when they contain new tags that exceed the
+																			configured limit. The rate at which this happens can be controlled by changing the value of
+																			`cache_size_per_key`.
+																			"""
 					}
-				}
-				name: {
-					description: "Name of the metric this configuration refers to."
-					required:    true
-					type: string: {}
 				}
 				namespace: {
 					description: "Namespace of the metric this configuration refers to."

@@ -47,8 +47,10 @@ impl TagCardinalityLimit {
                 .config
                 .per_metric_limits
                 .iter()
-                .find(|c| c.name == id.1 && (c.namespace.is_none() || c.namespace == id.0))
-                .map(|c| &c.config)
+                .find(|(name, config)| {
+                    **name == id.1 && (config.namespace.is_none() || config.namespace == id.0)
+                })
+                .map(|(_, c)| &c.config)
                 .unwrap_or(&self.config.global),
             None => &self.config.global,
         }
@@ -130,8 +132,9 @@ impl TagCardinalityLimit {
         let metric_name = metric.name().to_string();
         let metric_namespace = metric.namespace().map(|n| n.to_string());
         info!("The config: {:?}", self.config);
-        let has_per_metric_config = self.config.per_metric_limits.iter().any(|c| {
-            c.name == metric_name && (c.namespace.is_none() || c.namespace == metric_namespace)
+        let has_per_metric_config = self.config.per_metric_limits.iter().any(|(name, config)| {
+            *name == metric_name
+                && (config.namespace.is_none() || config.namespace == metric_namespace)
         });
         let metric_key = if has_per_metric_config {
             info!("Metric specific config has been found!");
