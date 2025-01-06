@@ -71,7 +71,6 @@ impl TagCardinalityLimit {
         value: &TagValueSet,
     ) -> bool {
         let config = self.get_config_for_metric(metric_key).clone();
-        info!("try_accept_tag using config: {:?}", config);
         let metric_accepted_tags = self.accepted_tags.entry(metric_key.clone()).or_default();
         let tag_value_set = metric_accepted_tags
             .entry_ref(key)
@@ -131,13 +130,11 @@ impl TagCardinalityLimit {
         let metric = event.as_mut_metric();
         let metric_name = metric.name().to_string();
         let metric_namespace = metric.namespace().map(|n| n.to_string());
-        info!("The config: {:?}", self.config);
         let has_per_metric_config = self.config.per_metric_limits.iter().any(|(name, config)| {
             *name == metric_name
                 && (config.namespace.is_none() || config.namespace == metric_namespace)
         });
         let metric_key = if has_per_metric_config {
-            info!("Metric specific config has been found!");
             Some((metric_namespace, metric_name.clone()))
         } else {
             None
