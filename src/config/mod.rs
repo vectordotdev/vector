@@ -143,11 +143,22 @@ impl Config {
         self.sinks.get(id)
     }
 
+    pub fn enrichment_tables(
+        &self,
+    ) -> impl Iterator<Item = (&ComponentKey, &EnrichmentTableOuter<OutputId>)> {
+        self.enrichment_tables.iter()
+    }
+
+    pub fn enrichment_table(&self, id: &ComponentKey) -> Option<&EnrichmentTableOuter<OutputId>> {
+        self.enrichment_tables.get(id)
+    }
+
     pub fn inputs_for_node(&self, id: &ComponentKey) -> Option<&[OutputId]> {
         self.transforms
             .get(id)
             .map(|t| &t.inputs[..])
             .or_else(|| self.sinks.get(id).map(|s| &s.inputs[..]))
+            .or_else(|| self.enrichment_tables.get(id).map(|s| &s.inputs[..]))
     }
 
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
