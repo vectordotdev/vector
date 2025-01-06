@@ -5,13 +5,12 @@ use crate::event::Value;
 
 static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^0-9A-Za-z_]").unwrap());
 fn slugify_text(input: &str) -> String {
-    let result = RE.replace_all(&input, "_");
+    let result = RE.replace_all(input, "_");
     result.to_lowercase()
 }
 
 /// Expands the given possibly template-able `key_s` and `value_s`, and return the expanded owned pairs
 /// it would also insert the pairs into either `static_pairs` or `dynamic_pairs` depending on the template-ability of `key_s`.
-/// Refer to loki sink and log_to_metric transform for further information.
 pub(crate) fn pair_expansion(
     key_s: &str,
     value_s: &str,
@@ -24,10 +23,6 @@ pub(crate) fn pair_expansion(
             serde_json::from_str(value_s);
 
         if let Err(err) = output {
-            warn!(
-                "Failed to expand dynamic pair. value: {}, err: {}",
-                value_s, err
-            );
             return Err(err);
         }
 

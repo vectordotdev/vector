@@ -179,7 +179,14 @@ impl EventEncoder {
 
             let key_s = key.unwrap();
             let value_s = value.unwrap();
-            let _ = pair_expansion(&key_s, &value_s, &mut static_labels, &mut dynamic_labels);
+            let result = pair_expansion(&key_s, &value_s, &mut static_labels, &mut dynamic_labels);
+            // we just need to check the error since the result have been inserted in the static_pairs or dynamic_pairs
+            if let Err(err) = result {
+                warn!(
+                    "Failed to expand dynamic label. value: {}, err: {}",
+                    value_s, err
+                );
+            }
         }
 
         for (k, v) in static_labels {
@@ -249,18 +256,25 @@ impl EventEncoder {
 
             let key_s = key.unwrap();
             let value_s = value.unwrap();
-            let _ = pair_expansion(
+            let result = pair_expansion(
                 &key_s,
                 &value_s,
                 &mut static_structured_metadata,
                 &mut dynamic_structured_metadata,
             );
+            // we just need to check the error since the result have been inserted in the static_pairs or dynamic_pairs
+            if let Err(err) = result {
+                warn!(
+                    "Failed to expand dynamic structured metadata. value: {}, err: {}",
+                    value_s, err
+                );
+            }
         }
 
         for (k, v) in static_structured_metadata {
             if let Some(discarded_v) = dynamic_structured_metadata.insert(k.clone(), v.clone()) {
                 warn!(
-                    "Static label overrides dynamic label. \
+                    "Static structured_metadata overrides dynamic structured_metadata. \
         key: {}, value: {}, discarded value: {}",
                     k, v, discarded_v
                 );
