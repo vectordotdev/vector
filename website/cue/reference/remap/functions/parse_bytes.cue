@@ -19,19 +19,19 @@ remap: functions: parse_bytes: {
 			required:    true
 			type: ["string"]
 			enum: {
-				B: "Bytes"
+				B:   "Bytes"
 				kiB: "Kilobytes (1024 bytes)"
 				MiB: "Megabytes (1024 ** 2 bytes)"
 				GiB: "Gigabytes (1024 ** 3 bytes)"
 				TiB: "Terabytes (1024 gigabytes)"
 				PiB: "Petabytes (1024 ** 2 gigabytes)"
 				EiB: "Exabytes (1024 ** 3 gigabytes)"
-				kB: "Kilobytes (1 thousand bytes in SI)"
-				MB: "Megabytes (1 million bytes in SI)"
-				GB: "Gigabytes (1 billion bytes in SI)"
-				TB: "Terabytes (1 thousand gigabytes in SI)"
-				PB: "Petabytes (1 million gigabytes in SI)"
-				EB: "Exabytes (1 billion gigabytes in SI)"
+				kB:  "Kilobytes (1 thousand bytes in SI)"
+				MB:  "Megabytes (1 million bytes in SI)"
+				GB:  "Gigabytes (1 billion bytes in SI)"
+				TB:  "Terabytes (1 thousand gigabytes in SI)"
+				PB:  "Petabytes (1 million gigabytes in SI)"
+				EB:  "Exabytes (1 billion gigabytes in SI)"
 			}
 		},
 		{
