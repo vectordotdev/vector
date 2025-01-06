@@ -21,7 +21,10 @@ remap: functions: parse_timestamp: {
 		},
 		{
 			name:        "timezone"
-			description: "The [TZ database](\(urls.tz_time_zones)) format."
+			description: """
+				The [TZ database](\(urls.tz_time_zones)) format. By default, this function parses the timestamp by global [`timezone` option](\(urls.vector_configuration)/global-options#timezone).
+				This argument overwrites the setting and it's useful for parsing those timestamp without timezone specified such as `16/10/2019 12:00:00`.
+				"""
 			required:    false
 			type: ["string"]
 		},
