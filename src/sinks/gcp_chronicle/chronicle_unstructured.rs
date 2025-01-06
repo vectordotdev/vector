@@ -129,7 +129,9 @@ impl Region {
             Region::Us => "https://malachiteingestion-pa.googleapis.com",
             Region::Asia => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
             Region::SãoPaulo => "https://southamerica-east1-malachiteingestion-pa.googleapis.com",
-            Region::Canada => "https://northamerica-northeast2-malachiteingestion-pa.googleapis.com",
+            Region::Canada => {
+                "https://northamerica-northeast2-malachiteingestion-pa.googleapis.com"
+            }
             Region::Dammam => "https://me-central2-malachiteingestion-pa.googleapis.com",
             Region::Doha => "https://me-central1-malachiteingestion-pa.googleapis.com",
             Region::Frankfurt => "https://europe-west3-malachiteingestion-pa.googleapis.com",
