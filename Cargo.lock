@@ -11295,7 +11295,6 @@ name = "vector-vrl-web-playground"
 version = "0.1.0"
 dependencies = [
  "cargo-lock",
- "dnstap-parser",
  "enrichment",
  "gloo-utils",
  "serde",
