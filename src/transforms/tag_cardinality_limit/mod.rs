@@ -40,7 +40,7 @@ impl TagCardinalityLimit {
 
     fn get_config_for_metric(
         &self,
-        metric_key: &Option<MetricId>,
+        metric_key: Option<&MetricId>,
     ) -> &TagCardinalityLimitInnerConfig {
         match metric_key {
             Some(id) => self
@@ -66,12 +66,12 @@ impl TagCardinalityLimit {
     /// key, and the configured limit_exceeded_action should be taken.
     fn try_accept_tag(
         &mut self,
-        metric_key: &Option<MetricId>,
+        metric_key: Option<&MetricId>,
         key: &str,
         value: &TagValueSet,
     ) -> bool {
         let config = self.get_config_for_metric(metric_key).clone();
-        let metric_accepted_tags = self.accepted_tags.entry(metric_key.clone()).or_default();
+        let metric_accepted_tags = self.accepted_tags.entry(metric_key.cloned()).or_default();
         let tag_value_set = metric_accepted_tags
             .entry_ref(key)
             .or_insert_with(|| AcceptedTagValueSet::new(config.value_limit, &config.mode));
@@ -101,12 +101,12 @@ impl TagCardinalityLimit {
     /// exceed the cardinality limit.
     fn tag_limit_exceeded(
         &self,
-        metric_key: &Option<MetricId>,
+        metric_key: Option<&MetricId>,
         key: &str,
         value: &TagValueSet,
     ) -> bool {
         self.accepted_tags
-            .get(metric_key)
+            .get(&metric_key.cloned())
             .and_then(|metric_accepted_tags| {
                 metric_accepted_tags.get(key).map(|value_set| {
                     !value_set.contains(value)
@@ -117,9 +117,9 @@ impl TagCardinalityLimit {
     }
 
     /// Record a key and value corresponding to a tag on an incoming Metric.
-    fn record_tag_value(&mut self, metric_key: &Option<MetricId>, key: &str, value: &TagValueSet) {
+    fn record_tag_value(&mut self, metric_key: Option<&MetricId>, key: &str, value: &TagValueSet) {
         let config = self.get_config_for_metric(metric_key).clone();
-        let metric_accepted_tags = self.accepted_tags.entry(metric_key.clone()).or_default();
+        let metric_accepted_tags = self.accepted_tags.entry(metric_key.cloned()).or_default();
         metric_accepted_tags
             .entry_ref(key)
             .or_insert_with(|| AcceptedTagValueSet::new(config.value_limit, &config.mode))
@@ -141,7 +141,7 @@ impl TagCardinalityLimit {
         };
         if let Some(tags_map) = metric.tags_mut() {
             match self
-                .get_config_for_metric(&metric_key)
+                .get_config_for_metric(metric_key.as_ref())
                 .limit_exceeded_action
             {
                 LimitExceededAction::DropEvent => {
@@ -149,7 +149,7 @@ impl TagCardinalityLimit {
                     // doesn't change the behavior of the check.
 
                     for (key, value) in tags_map.iter_sets() {
-                        if self.tag_limit_exceeded(&metric_key, key, value) {
+                        if self.tag_limit_exceeded(metric_key.as_ref(), key, value) {
                             emit!(TagCardinalityLimitRejectingEvent {
                                 metric_name: &metric_name,
                                 tag_key: key,
@@ -159,12 +159,12 @@ impl TagCardinalityLimit {
                         }
                     }
                     for (key, value) in tags_map.iter_sets() {
-                        self.record_tag_value(&metric_key, key, value);
+                        self.record_tag_value(metric_key.as_ref(), key, value);
                     }
                 }
                 LimitExceededAction::DropTag => {
                     tags_map.retain(|key, value| {
-                        if self.try_accept_tag(&metric_key, key, value) {
+                        if self.try_accept_tag(metric_key.as_ref(), key, value) {
                             true
                         } else {
                             emit!(TagCardinalityLimitRejectingTag {
