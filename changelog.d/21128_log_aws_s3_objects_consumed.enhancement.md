@@ -1,3 +1,3 @@
-`aws_s3` source now logs s3 objects fetched (and completed if acks are enabled on the sink)
+`aws_s3` source now logs when S3 objects fetched. If ACKs are enabled, it also logs on delivery.
 
 authors: fdamstra
