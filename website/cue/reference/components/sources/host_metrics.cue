@@ -164,11 +164,11 @@ components: sources: host_metrics: {
 		memory_wired_bytes: _host & _memory_macos & {description: "The number of wired bytes of main memory."}
 
 		// Host network
-		network_receive_bytes_total: _host & _network_gauge & {description: "The number of bytes received on this interface."}
-		network_receive_errs_total: _host & _network_gauge & {description: "The number of errors encountered during receives on this interface."}
-		network_receive_packets_total: _host & _network_gauge & {description: "The number of packets received on this interface."}
-		network_transmit_bytes_total: _host & _network_gauge & {description: "The number of bytes transmitted on this interface."}
-		network_transmit_errs_total: _host & _network_gauge & {description: "The number of errors encountered during transmits on this interface."}
+		network_receive_bytes_total: _host & _network_counter & {description: "The number of bytes received on this interface."}
+		network_receive_errs_total: _host & _network_counter & {description: "The number of errors encountered during receives on this interface."}
+		network_receive_packets_total: _host & _network_counter & {description: "The number of packets received on this interface."}
+		network_transmit_bytes_total: _host & _network_counter & {description: "The number of bytes transmitted on this interface."}
+		network_transmit_errs_total: _host & _network_counter & {description: "The number of errors encountered during transmits on this interface."}
 		network_transmit_packets_drop_total: _host & _network_nomac & {description: "The number of packets dropped during transmits on this interface."}
 		network_transmit_packets_total: _host & _network_nomac & {description: "The number of packets transmitted on this interface."}
 
@@ -249,8 +249,8 @@ components: sources: host_metrics: {
 		_memory_linux: _memory_gauge & {relevant_when: "OS is Linux"}
 		_memory_macos: _memory_gauge & {relevant_when: "OS is macOS X"}
 		_memory_nowin: {relevant_when: "OS is not Windows"}
-		_network_gauge: {
-			type: "gauge"
+		_network_counter: {
+			type: "counter"
 			tags: _host_metrics_tags & {
 				collector: examples: ["network"]
 				device: {
@@ -260,7 +260,7 @@ components: sources: host_metrics: {
 				}
 			}
 		}
-		_network_nomac: _network_gauge & {relevant_when: "OS is not macOS"}
+		_network_nomac: _network_counter & {relevant_when: "OS is not macOS"}
 		_process_counter: {
 			type: "counter"
 			tags: _host_metrics_tags & {

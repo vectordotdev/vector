@@ -36,7 +36,7 @@ pub struct EndpointBytesSent<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for EndpointBytesSent<'a> {
+impl InternalEvent for EndpointBytesSent<'_> {
     fn emit(self) {
         trace!(
             message = "Bytes sent.",

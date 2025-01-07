@@ -22,7 +22,7 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         crate::commands::compose_tests::start::exec::<E2ETest>(
             &self.test,
-            &self.environment,
+            self.environment.as_ref(),
             self.build_all,
         )
     }

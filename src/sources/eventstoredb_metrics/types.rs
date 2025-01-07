@@ -247,7 +247,7 @@ where
     struct PercentOrInteger;
     static PERCENT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\d+)%").unwrap());
 
-    impl<'de> Visitor<'de> for PercentOrInteger {
+    impl Visitor<'_> for PercentOrInteger {
         type Value = usize;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

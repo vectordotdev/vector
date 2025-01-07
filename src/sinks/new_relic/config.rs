@@ -139,7 +139,7 @@ impl SinkConfig for NewRelicConfig {
             .into_batcher_settings()?;
 
         let request_limits = self.request.into_settings();
-        let tls_settings = TlsSettings::from_options(&None)?;
+        let tls_settings = TlsSettings::from_options(None)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
         let credentials = Arc::from(NewRelicCredentials::from(self));
 

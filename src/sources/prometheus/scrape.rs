@@ -140,7 +140,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
             .map(|r| r.map(|uri| build_url(&uri, &self.query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
 
         let builder = PrometheusScrapeBuilder {
             honor_labels: self.honor_labels,
