@@ -136,7 +136,9 @@
         </span>
 
         {{ if eq $k "object" }}
+        <div class="py-2">
             {{ template "config-object" (dict "name" $name "config" $v "level" 4) }}
+        </div>
         {{ end }}
         
         {{ with $v.examples }}
