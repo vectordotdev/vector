@@ -266,7 +266,7 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts/vector*
 
-  build-x86_64-apple-darwin-packages:
+  build-apple-darwin-packages:
     name: Build Vector for x86_64-apple-darwin (.tar.gz)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
@@ -451,7 +451,7 @@ jobs:
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     strategy:
@@ -575,7 +575,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - build-armv7-unknown-linux-gnueabihf-packages
@@ -660,7 +660,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-armv7-unknown-linux-musleabihf-packages
@@ -768,7 +768,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-armv7-unknown-linux-musleabihf-packages
