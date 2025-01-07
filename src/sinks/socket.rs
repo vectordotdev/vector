@@ -42,9 +42,12 @@ pub enum Mode {
 
     /// Send over a Unix domain socket (UDS), in stream mode.
     #[cfg(unix)]
-    Unix(UnixMode),
+    #[serde(alias = "unix")]
+    UnixStream(UnixMode),
 
-    /// Send over a Unix domain socket (UDS), in datagram mode. Unavailable on macOS.
+    /// Send over a Unix domain socket (UDS), in datagram mode.
+    /// Unavailable on macOS, due to send(2)'s apparent non-blocking behavior,
+    /// resulting in ENOBUFS errors which we currently don't handle.
     #[cfg(unix)]
     #[cfg_attr(target_os = "macos", serde(skip))]
     UnixDatagram(UnixMode),
@@ -138,7 +141,7 @@ impl SinkConfig for SocketSinkConfig {
                 config.build(transformer, encoder)
             }
             #[cfg(unix)]
-            Mode::Unix(UnixMode { config, encoding }) => {
+            Mode::UnixStream(UnixMode { config, encoding }) => {
                 let transformer = encoding.transformer();
                 let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
                 let encoder = Encoder::<Framer>::new(framer, serializer);
@@ -167,7 +170,7 @@ impl SinkConfig for SocketSinkConfig {
             Mode::Tcp(TcpMode { encoding, .. }) => encoding.config().1.input_type(),
             Mode::Udp(UdpMode { encoding, .. }) => encoding.config().input_type(),
             #[cfg(unix)]
-            Mode::Unix(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
+            Mode::UnixStream(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
             #[cfg(unix)]
             Mode::UnixDatagram(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
         };
@@ -353,7 +356,7 @@ mod test {
         let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
 
         let config = SocketSinkConfig {
-            mode: Mode::Unix(UnixMode {
+            mode: Mode::UnixStream(UnixMode {
                 config: UnixSinkConfig::new(out_path),
                 encoding: (None::<FramingConfig>, NativeJsonSerializerConfig).into(),
             }),
