@@ -46,9 +46,9 @@ remap: functions: parse_timestamp: {
 		{
 			title: "Parse timestamp with timezone"
 			source: #"""
-				parse_timestamp!("16/10/2019 12:00:00", format: "%d/%m/%Y %H:%M:%S", timezone: "Europe/Paris")
+				parse_timestamp!("16/10/2019 12:00:00", format: "%d/%m/%Y %H:%M:%S", timezone: "Asia/Taipei")
 				"""#
-			return: "2019-10-16T11:00:00Z"
+			return: "2019-10-16T04:00:00Z"
 		},
 	]
 }
