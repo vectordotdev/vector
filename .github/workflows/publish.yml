@@ -277,6 +277,8 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     strategy:
       matrix:
+        # Large is for Intel architecture and XLarge for arm64 (M1) architecture.
+        # Refer to https://docs.github.com/en/actions/using-github-hosted-runners/using-larger-runners/about-larger-runners#about-macos-larger-runners.
         os: [ macos-latest-xlarge, macos-latest-large ]
     steps:
       - name: Checkout Vector
