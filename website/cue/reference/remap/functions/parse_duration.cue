@@ -48,9 +48,9 @@ remap: functions: parse_duration: {
 		{
 			title: "Parse multiple durations (seconds & milliseconds)"
 			source: #"""
-				parse_duration!("1s ms", unit: "ms")
+				parse_duration!("1s 1ms", unit: "ms")
 				"""#
-			return: 1005.0
+			return: 1001.0
 		},
 	]
 }
