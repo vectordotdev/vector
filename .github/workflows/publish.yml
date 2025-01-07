@@ -268,7 +268,7 @@ jobs:
 
   build-x86_64-apple-darwin-packages:
     name: Build Vector for x86_64-apple-darwin (.tar.gz)
-    runs-on: macos-latest-xlarge
+    runs-on: macos-latest-large
     timeout-minutes: 90
     needs: generate-publish-metadata
     env:
