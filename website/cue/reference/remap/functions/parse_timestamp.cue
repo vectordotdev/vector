@@ -31,6 +31,7 @@ remap: functions: parse_timestamp: {
 	]
 	internal_failure_reasons: [
 		"`value` fails to parse using the provided `format`.",
+		"`value` fails to parse using the provided `timezone`.",
 	]
 	return: types: ["timestamp"]
 
