@@ -281,6 +281,27 @@ jobs:
         # Refer to https://docs.github.com/en/actions/using-github-hosted-runners/using-larger-runners/about-larger-runners#about-macos-larger-runners.
         os: [ macos-latest-xlarge, macos-latest-large ]
     steps:
+      - name: Verify Runner Architecture
+        run: |
+          ARCH=$(uname -m)
+          echo "Detected architecture: $ARCH"
+
+          if [ "${{ matrix.runner }}" == "macos-latest-xlarge" ]; then
+            if [ "$ARCH" != "arm64" ]; then
+              echo "Error: Expected ARM architecture (arm64) for macos-latest-xlarge, but got $ARCH."
+              exit 1
+            fi
+          elif [ "${{ matrix.runner }}" == "macos-latest-large" ]; then
+            if [ "$ARCH" != "x86_64" ]; then
+              echo "Error: Expected Intel architecture (x86_64) for macos-latest-large, but got $ARCH."
+              exit 1
+            fi
+          else
+            echo "Error: Unexpected runner type ${{ matrix.runner }}!"
+            exit 1
+          fi
+
+          echo "Runner architecture verified successfully."
       - name: Checkout Vector
         uses: actions/checkout@v4
         with:
