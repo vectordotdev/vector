@@ -51,21 +51,21 @@ remap: functions: parse_bytes: {
 		{
 			title: "Parse bytes (kilobytes)"
 			source: #"""
-				parse_duration!("1024KiB", unit: "MiB")
+				parse_bytes!("1024KiB", unit: "MiB")
 				"""#
 			return: 1.0
 		},
 		{
 			title: "Parse bytes in SI unit (terabytes)"
 			source: #"""
-				parse_duration!("4TiB", unit: "MiB", base: "10")
+				parse_bytes!("4TiB", unit: "MiB", base: "10")
 				"""#
 			return: 4000000.0
 		},
 		{
 			title: "Parse bytes in ambiguous unit (gigabytes)"
 			source: #"""
-				parse_duration!("1GB", unit: "B", base: "2")
+				parse_bytes!("1GB", unit: "B", base: "2")
 				"""#
 			return: 1073741824.0
 		},
