@@ -58,7 +58,7 @@ remap: functions: parse_bytes: {
 		{
 			title: "Parse bytes in SI unit (terabytes)"
 			source: #"""
-				parse_bytes!("4TiB", unit: "MiB", base: "10")
+				parse_bytes!("4TB", unit: "MB", base: "10")
 				"""#
 			return: 4000000.0
 		},
