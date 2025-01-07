@@ -268,13 +268,16 @@ jobs:
 
   build-x86_64-apple-darwin-packages:
     name: Build Vector for x86_64-apple-darwin (.tar.gz)
-    runs-on: macos-latest-large
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+    strategy:
+      matrix:
+        os: [ macos-latest-xlarge, macos-latest-large ]
     steps:
       - name: Checkout Vector
         uses: actions/checkout@v4
@@ -294,6 +297,7 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
           path: target/artifacts/vector*
+
 
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
@@ -443,26 +447,34 @@ jobs:
 
   macos-verify:
     name: Verify macOS Package
-    runs-on: macos-latest-large
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
       - build-x86_64-apple-darwin-packages
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+    strategy:
+      matrix:
+        include:
+          - architecture: x86_64-apple-darwin
+            runner: macos-latest-large
+          - architecture: arm-apple-darwin
+            runner: macos-latest-xlarge
     steps:
       - name: Checkout Vector
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (x86_64-apple-darwin)
+      - name: Download staged package artifacts (for ${{ matrix.architecture }})
         uses: actions/download-artifact@v4
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.architecture }}
           path: target/artifacts
       - name: Verify macOS package
         run: |
-          tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz && vector-x86_64-apple-darwin/bin/vector --version
+          tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-${{ matrix.architecture }}.tar.gz \
+            && vector-${{ matrix.architecture }}/bin/vector --version
 
   publish-docker:
     name: Publish to Docker
