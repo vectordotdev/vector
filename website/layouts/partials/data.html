@@ -135,6 +135,10 @@
           </span>
         </span>
 
+        {{ if eq $k "object" }}
+            {{ template "config-object" (dict "name" $name "config" $v "level" 4) }}
+        {{ end }}
+        
         {{ with $v.examples }}
         {{ template "config-array-examples" (dict "examples" .) }}
         {{ end }}
