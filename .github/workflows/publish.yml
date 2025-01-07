@@ -443,16 +443,13 @@ jobs:
 
   macos-verify:
     name: Verify macOS Package
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-latest-large
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
       - build-x86_64-apple-darwin-packages
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-    strategy:
-      matrix:
-        runner: [macos-14, macos-15]
     steps:
       - name: Checkout Vector
         uses: actions/checkout@v4
