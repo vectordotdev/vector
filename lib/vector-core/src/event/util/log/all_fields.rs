@@ -196,7 +196,7 @@ impl<'a> Iterator for FieldsIter<'a> {
     }
 }
 
-impl<'a> Serialize for FieldsIter<'a> {
+impl Serialize for FieldsIter<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

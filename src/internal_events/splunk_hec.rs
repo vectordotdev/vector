@@ -53,7 +53,7 @@ mod sink {
         pub error: crate::Error,
     }
 
-    impl<'a> InternalEvent for SplunkInvalidMetricReceivedError<'a> {
+    impl InternalEvent for SplunkInvalidMetricReceivedError<'_> {
         fn emit(self) {
             error!(
                 message = "Invalid metric received.",
@@ -177,7 +177,7 @@ mod sink {
         pub r#type: &'a str,
     }
 
-    impl<'a> InternalEvent for SplunkEventTimestampInvalidType<'a> {
+    impl InternalEvent for SplunkEventTimestampInvalidType<'_> {
         fn emit(self) {
             warn!(
                 message =

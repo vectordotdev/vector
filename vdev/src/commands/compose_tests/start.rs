@@ -4,7 +4,7 @@ use crate::testing::{config::ComposeTestConfig, integration::ComposeTestT};
 
 pub(crate) fn exec<T: ComposeTestT>(
     integration: &str,
-    environment: &Option<String>,
+    environment: Option<&String>,
     build_all: bool,
 ) -> Result<()> {
     let environment = if let Some(environment) = environment {

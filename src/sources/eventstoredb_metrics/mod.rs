@@ -89,7 +89,7 @@ fn eventstoredb(
     mut cx: SourceContext,
 ) -> crate::Result<super::Source> {
     let mut ticks = IntervalStream::new(tokio::time::interval(interval)).take_until(cx.shutdown);
-    let tls_settings = TlsSettings::from_options(&None)?;
+    let tls_settings = TlsSettings::from_options(None)?;
     let client = HttpClient::new(tls_settings, &cx.proxy)?;
     let url: Uri = endpoint.as_str().parse()?;
 
