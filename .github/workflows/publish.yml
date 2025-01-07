@@ -466,7 +466,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (for ${{ matrix.architecture }})
+      - name: Download staged package artifacts (${{ matrix.architecture }})
         uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.architecture }}
