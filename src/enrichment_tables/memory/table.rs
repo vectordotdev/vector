@@ -102,15 +102,15 @@ impl Memory {
             .get_or(|| self.read_handle_factory.handle())
     }
 
-    fn handle_value(&mut self, value: &ObjectMap) {
+    fn handle_value(&mut self, value: ObjectMap) {
         // Panic: If the Mutex is poisoned
         let mut handle = self.write_handle.lock().unwrap();
         let mut metadata = self.metadata.lock().unwrap();
         let now = Instant::now();
 
-        for (k, v) in value.iter() {
+        for (k, v) in value.into_iter() {
             let new_entry = MemoryEntry {
-                value: Box::new(v.clone()),
+                value: Box::new(v),
                 update_time: now.into(),
             };
             let new_entry_key = k.as_str().to_string();
@@ -275,7 +275,7 @@ impl StreamSink<Event> for Memory {
             // Panic: This sink only accepts Logs, so this should never panic
             let log = event.into_log();
 
-            if let Value::Object(map) = log.value() {
+            if let (Value::Object(map), _) = log.into_parts() {
                 self.handle_value(map)
             };
 
