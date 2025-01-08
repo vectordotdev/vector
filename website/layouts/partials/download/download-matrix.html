@@ -25,10 +25,9 @@
       {{/* Targets (ARM, x86_64, etc.) */}}
       <div class="flex space-x-1">
         {{ range .options }}
-        {{/* Check version constraints */}}
+        {{/* Only render if no version is specified or current version >= minVersion */}}
         {{ $minVersion := .version }}
         {{ if or (not $minVersion) (ge $version $minVersion) }}
-        {{/* Only render if no version is specified or current version >= minVersion */}}
         {{ $vector := cond (eq $version "nightly") "vector/nightly" "vector" }}
         {{ $url := .download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
 
