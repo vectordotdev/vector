@@ -95,6 +95,19 @@ trait UncompressedReader {
 
 struct UncompressedReaderImpl;
 impl UncompressedReader for UncompressedReaderImpl {
+    /// Checks a file for supported compression algorithms by searching for
+    /// supported magic header bytes.
+    ///
+    /// If an error occurs during reading, the file handler may become unusable,
+    /// as the cursor position of the file may not be reset.
+    ///
+    /// # Arguments
+    /// - `fp`: A mutable reference to the file to check.
+    ///
+    /// # Returns
+    /// - `Ok(Some(algorithm))` if a supported compression algorithm is detected.
+    /// - `Ok(None)` if no supported compression algorithm is detected.
+    /// - `Err(std::io::Error)` if an I/O error occurs.
     fn check(fp: &mut File) -> Result<Option<SupportedCompressionAlgorithms>, std::io::Error> {
         let mut algorithm: Option<SupportedCompressionAlgorithms> = None;
         for compression_algorithm in SupportedCompressionAlgorithms::values() {
@@ -103,8 +116,14 @@ impl UncompressedReader for UncompressedReaderImpl {
             let magic_header_bytes = compression_algorithm.magic_header_bytes();
 
             let mut magic = vec![0u8; magic_header_bytes.len()];
+
             fp.seek(SeekFrom::Start(0))?;
-            fp.read_exact(&mut magic)?;
+            let result = fp.read_exact(&mut magic);
+
+            if result.is_err() {
+                fp.seek(SeekFrom::Start(0))?;
+                return Err(result.unwrap_err());
+            }
 
             if magic == magic_header_bytes {
                 algorithm = Some(compression_algorithm);
