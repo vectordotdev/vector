@@ -113,7 +113,7 @@ impl Memory {
                 value: Box::new(v),
                 update_time: now.into(),
             };
-            let new_entry_key = k.as_str().to_string();
+            let new_entry_key = String::from(k);
             let new_entry_size = new_entry_key.size_of() + new_entry.size_of();
             if self.config.max_byte_size > 0
                 && metadata.byte_size.saturating_add(new_entry_size as u64)
@@ -121,15 +121,15 @@ impl Memory {
             {
                 // Reject new entries
                 emit!(MemoryEnrichmentTableInsertFailed {
-                    key: k.as_str().to_string()
+                    key: new_entry_key.clone()
                 });
                 return;
             }
             metadata.byte_size = metadata.byte_size.saturating_add(new_entry_size as u64);
-            handle.update(k.as_str().to_string(), new_entry);
             emit!(MemoryEnrichmentTableInserted {
-                key: k.as_str().to_string()
+                key: new_entry_key.clone()
             });
+            handle.update(new_entry_key, new_entry);
         }
 
         let mut needs_flush = false;
