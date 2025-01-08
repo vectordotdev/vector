@@ -267,7 +267,7 @@ jobs:
           path: target/artifacts/vector*
 
   build-apple-darwin-packages:
-    name: Build Vector for Apple Darwin ${{ matrix.architecture }} (.tar.gz)
+    name: Build Vector for ${{ matrix.architecture }}-apple-darwin (.tar.gz)
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     needs: generate-publish-metadata
