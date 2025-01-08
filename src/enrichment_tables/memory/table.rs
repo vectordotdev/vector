@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn finds_row() {
         let mut memory = Memory::new(Default::default());
-        memory.handle_value(&ObjectMap::from([("test_key".into(), Value::from(5))]));
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
         let condition = Condition::Equals {
             field: "key",
@@ -393,7 +393,7 @@ mod tests {
         );
 
         // Force scan
-        memory.handle_value(&ObjectMap::default());
+        memory.handle_value(ObjectMap::default());
 
         // The value is not present anymore
         assert!(memory
@@ -410,7 +410,7 @@ mod tests {
             c.ttl = ttl;
             c.flush_interval = 10;
         }));
-        memory.handle_value(&ObjectMap::from([("test_key".into(), Value::from(5))]));
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
         let condition = Condition::Equals {
             field: "key",
@@ -453,7 +453,7 @@ mod tests {
             memory.find_table_row(Case::Sensitive, &[condition.clone()], None, None)
         );
 
-        memory.handle_value(&ObjectMap::from([("test_key".into(), Value::from(5))]));
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
         assert_eq!(
             Ok(ObjectMap::from([
@@ -470,7 +470,7 @@ mod tests {
         let mut memory = Memory::new(build_memory_config(|c| {
             c.max_byte_size = 1;
         }));
-        memory.handle_value(&ObjectMap::from([("test_key".into(), Value::from(5))]));
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
         let condition = Condition::Equals {
             field: "key",
@@ -491,8 +491,8 @@ mod tests {
             c.ttl = ttl;
             c.max_byte_size = 150;
         }));
-        memory.handle_value(&ObjectMap::from([("test_key".into(), Value::from(5))]));
-        memory.handle_value(&ObjectMap::from([("rejected_key".into(), Value::from(5))]));
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
+        memory.handle_value(ObjectMap::from([("rejected_key".into(), Value::from(5))]));
 
         assert_eq!(
             Ok(ObjectMap::from([
