@@ -215,7 +215,11 @@ pub enum ProcessingError {
     #[snafu(display("Unsupported S3 event version: {}.", version,))]
     UnsupportedS3EventVersion { version: semver::Version },
     #[snafu(display("Sink reported an error sending events"))]
-    ErrorAcknowledgement,
+    ErrorAcknowledgement {
+        region: String,
+        bucket: String,
+        key: String,
+    },
 }
 
 pub struct State {
@@ -661,12 +665,11 @@ impl IngestorProcess {
                             Ok(())
                         }
                         BatchStatus::Errored => {
-                            warn!(
-                                message = "S3 object from SQS notification had an error.",
-                                bucket = s3_event.s3.bucket.name,
-                                key = s3_event.s3.object.key,
-                            ); 
-                            Err(ProcessingError::ErrorAcknowledgement)
+                            Err(ProcessingError::ErrorAcknowledgement {
+                                bucket: s3_event.s3.bucket.name,
+                                key: s3_event.s3.object.key,
+                                region: s3_event.aws_region,
+                            })
                         },
                         BatchStatus::Rejected => {
                             if self.state.delete_failed_message {
@@ -677,12 +680,11 @@ impl IngestorProcess {
                                 ); 
                                 Ok(())
                             } else {
-                                error!(
-                                    message = "S3 object from SQS notification was rejected.",
-                                    bucket = s3_event.s3.bucket.name,
-                                    key = s3_event.s3.object.key,
-                                ); 
-                                Err(ProcessingError::ErrorAcknowledgement)
+                                Err(ProcessingError::ErrorAcknowledgement {
+                                    bucket: s3_event.s3.bucket.name,
+                                    key: s3_event.s3.object.key,
+                                    region: s3_event.aws_region,
+                                })
                             }
                         }
                     }
