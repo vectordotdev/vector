@@ -541,6 +541,35 @@ base: components: sources: pulsar: configuration: {
 		required:    false
 		type: string: examples: ["subscription_name"]
 	}
+	tls_options: {
+		description: "TLS options configuration for the Pulsar client."
+		required:    false
+		type: object: options: {
+			allow_insecure_connection: {
+				description: """
+					Allow insecure TLS connection if set to true
+
+					Set to false if not specified.
+					"""
+				required: false
+				type: bool: {}
+			}
+			certificate_chain_file: {
+				description: "File path containing a list of PEM encoded certificates"
+				required:    true
+				type: string: examples: ["/etc/certs/chain.pem"]
+			}
+			tls_hostname_verification_enabled: {
+				description: """
+					Whether hostname verification is enabled when insecure TLS connection is allowed
+
+					Set to true if not specified.
+					"""
+				required: false
+				type: bool: {}
+			}
+		}
+	}
 	topics: {
 		description: "The Pulsar topic names to read events from."
 		required:    true
