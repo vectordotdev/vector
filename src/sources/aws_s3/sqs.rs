@@ -214,7 +214,12 @@ pub enum ProcessingError {
     },
     #[snafu(display("Unsupported S3 event version: {}.", version,))]
     UnsupportedS3EventVersion { version: semver::Version },
-    #[snafu(display("Sink reported an error sending events"))]
+    #[snafu(display(
+        "Sink reported an error sending events for an s3 object in region {}: s3://{}/{}",
+        region,
+        bucket,
+        key
+    ))]
     ErrorAcknowledgement {
         region: String,
         bucket: String,
@@ -664,20 +669,19 @@ impl IngestorProcess {
                             );
                             Ok(())
                         }
-                        BatchStatus::Errored => {
-                            Err(ProcessingError::ErrorAcknowledgement {
-                                bucket: s3_event.s3.bucket.name,
-                                key: s3_event.s3.object.key,
-                                region: s3_event.aws_region,
-                            })
-                        },
+                        BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement {
+                            bucket: s3_event.s3.bucket.name,
+                            key: s3_event.s3.object.key,
+                            region: s3_event.aws_region,
+                        }),
                         BatchStatus::Rejected => {
                             if self.state.delete_failed_message {
                                 warn!(
-                                    message = "S3 object from SQS was rejected. Deleting failed message.",
+                                    message =
+                                        "S3 object from SQS was rejected. Deleting failed message.",
                                     bucket = s3_event.s3.bucket.name,
                                     key = s3_event.s3.object.key,
-                                ); 
+                                );
                                 Ok(())
                             } else {
                                 Err(ProcessingError::ErrorAcknowledgement {
