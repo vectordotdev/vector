@@ -131,6 +131,9 @@
 
           <span class="flex items-center space-x-1">
             {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+            {{ if $v.syntax }} 
+            {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
+            {{ end }}
           </span>
         </span>
 
