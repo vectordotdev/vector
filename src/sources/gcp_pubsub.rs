@@ -269,7 +269,7 @@ impl SourceConfig for PubsubConfig {
         let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
         auth.apply_uri(&mut uri);
 
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let host = uri.host().unwrap_or("pubsub.googleapis.com");
         let mut tls_config = ClientTlsConfig::new().domain_name(host);
         if let Some((cert, key)) = tls.identity_pem() {
@@ -479,7 +479,9 @@ impl PubsubSource {
                 }
                 Ok(req)
             },
-        );
+        )
+        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
+        .max_decoding_message_size(usize::MAX);
 
         let (ack_ids_sender, ack_ids_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
 
@@ -980,7 +982,7 @@ mod integration_tests {
     ) {
         components::init_test();
 
-        let tls_settings = TlsSettings::from_options(&None).unwrap();
+        let tls_settings = TlsSettings::from_options(None).unwrap();
         let client = HttpClient::new(tls_settings, &ProxyConfig::default()).unwrap();
         let tester = Tester::new(client).await;
 

@@ -236,7 +236,7 @@ pub trait QueryableSchema {
     fn has_flag_attribute(&self, key: &str) -> Result<bool, QueryError>;
 }
 
-impl<'a, T> QueryableSchema for &'a T
+impl<T> QueryableSchema for &T
 where
     T: QueryableSchema,
 {
@@ -265,7 +265,7 @@ where
     }
 }
 
-impl<'a> QueryableSchema for &'a SchemaObject {
+impl QueryableSchema for &SchemaObject {
     fn schema_type(&self) -> SchemaType {
         // TODO: Technically speaking, it is allowed to use the "X of" schema types in conjunction
         // with other schema types i.e. `allOf` in conjunction with specifying a `type`.
@@ -387,7 +387,7 @@ impl<'a> From<&'a SchemaObject> for SimpleSchema<'a> {
     }
 }
 
-impl<'a> QueryableSchema for SimpleSchema<'a> {
+impl QueryableSchema for SimpleSchema<'_> {
     fn schema_type(&self) -> SchemaType {
         self.schema.schema_type()
     }

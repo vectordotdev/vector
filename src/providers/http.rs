@@ -70,7 +70,7 @@ impl Default for HttpConfig {
 /// Makes an HTTP request to the provided endpoint, returning the String body.
 async fn http_request(
     url: &Url,
-    tls_options: &Option<TlsConfig>,
+    tls_options: Option<&TlsConfig>,
     headers: &IndexMap<String, String>,
     proxy: &ProxyConfig,
 ) -> Result<bytes::Bytes, &'static str> {
@@ -123,7 +123,7 @@ async fn http_request(
 /// Calls `http_request`, serializing the result to a `ConfigBuilder`.
 async fn http_request_to_config_builder(
     url: &Url,
-    tls_options: &Option<TlsConfig>,
+    tls_options: Option<&TlsConfig>,
     headers: &IndexMap<String, String>,
     proxy: &ProxyConfig,
 ) -> BuildResult {
@@ -149,7 +149,7 @@ fn poll_http(
         loop {
             interval.tick().await;
 
-            match http_request_to_config_builder(&url, &tls_options, &headers, &proxy).await {
+            match http_request_to_config_builder(&url, tls_options.as_ref(), &headers, &proxy).await {
                 Ok(config_builder) => yield signal::SignalTo::ReloadFromConfigBuilder(config_builder),
                 Err(_) => {},
             };
@@ -175,7 +175,8 @@ impl ProviderConfig for HttpConfig {
 
         let proxy = ProxyConfig::from_env().merge(&self.proxy);
         let config_builder =
-            http_request_to_config_builder(&url, &tls_options, &request.headers, &proxy).await?;
+            http_request_to_config_builder(&url, tls_options.as_ref(), &request.headers, &proxy)
+                .await?;
 
         // Poll for changes to remote configuration.
         signal_handler.add(poll_http(

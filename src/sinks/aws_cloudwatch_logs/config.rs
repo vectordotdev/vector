@@ -33,7 +33,7 @@ pub struct CloudwatchLogsClientBuilder;
 impl ClientBuilder for CloudwatchLogsClientBuilder {
     type Client = aws_sdk_cloudwatchlogs::client::Client;
 
-    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+    fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_cloudwatchlogs::client::Client::new(config)
     }
 }
@@ -169,12 +169,13 @@ pub struct CloudwatchLogsSinkConfig {
 impl CloudwatchLogsSinkConfig {
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudwatchLogsClient> {
         create_client::<CloudwatchLogsClientBuilder>(
+            &CloudwatchLogsClientBuilder {},
             &self.auth,
             self.region.region(),
             self.region.endpoint(),
             proxy,
-            &self.tls,
-            &None,
+            self.tls.as_ref(),
+            None,
         )
         .await
     }

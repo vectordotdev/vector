@@ -134,7 +134,7 @@ impl SinkConfig for RemoteWriteConfig {
 
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let request_settings = self.request.into_settings();
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
@@ -164,7 +164,7 @@ impl SinkConfig for RemoteWriteConfig {
                     .ok_or(Errors::AwsRegionRequired)?;
                 Some(Auth::Aws {
                     credentials_provider: aws_auth
-                        .credentials_provider(region.clone(), cx.proxy(), &self.tls)
+                        .credentials_provider(region.clone(), cx.proxy(), self.tls.as_ref())
                         .await?,
                     region,
                 })
