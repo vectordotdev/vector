@@ -1,18 +1,37 @@
 use metrics::{counter, gauge};
+use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::InternalEvent;
 
-#[derive(Debug)]
-pub(crate) struct MemoryEnrichmentTableRead {
-    pub key: String,
+/// Configuration of internal metrics for enrichment memory table
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct MemoryTableInternalMetricsConfig {
+    /// Whether or not to include the "key" tag on internal metrics.
+    ///
+    /// This is useful for distinguishing between different keys while monitoring. However, the tag's
+    /// cardinality is unbounded.
+    #[serde(default = "crate::serde::default_false")]
+    pub include_key_tag: bool,
 }
 
-impl InternalEvent for MemoryEnrichmentTableRead {
+#[derive(Debug)]
+pub(crate) struct MemoryEnrichmentTableRead<'a> {
+    pub key: &'a str,
+    pub include_key_metric_tag: bool,
+}
+
+impl InternalEvent for MemoryEnrichmentTableRead<'_> {
     fn emit(self) {
-        counter!(
-            "memory_enrichment_table_reads_total",
-            "key" => self.key
-        )
-        .increment(1);
+        if self.include_key_metric_tag {
+            counter!(
+                "memory_enrichment_table_reads_total",
+                "key" => self.key.to_owned()
+            )
+            .increment(1);
+        } else {
+            counter!("memory_enrichment_table_reads_total",).increment(1);
+        }
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -21,17 +40,22 @@ impl InternalEvent for MemoryEnrichmentTableRead {
 }
 
 #[derive(Debug)]
-pub(crate) struct MemoryEnrichmentTableInserted {
-    pub key: String,
+pub(crate) struct MemoryEnrichmentTableInserted<'a> {
+    pub key: &'a str,
+    pub include_key_metric_tag: bool,
 }
 
-impl InternalEvent for MemoryEnrichmentTableInserted {
+impl InternalEvent for MemoryEnrichmentTableInserted<'_> {
     fn emit(self) {
-        counter!(
-            "memory_enrichment_table_insertions_total",
-            "key" => self.key
-        )
-        .increment(1);
+        if self.include_key_metric_tag {
+            counter!(
+                "memory_enrichment_table_insertions_total",
+                "key" => self.key.to_owned()
+            )
+            .increment(1);
+        } else {
+            counter!("memory_enrichment_table_insertions_total",).increment(1);
+        }
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -58,17 +82,22 @@ impl InternalEvent for MemoryEnrichmentTableFlushed {
 }
 
 #[derive(Debug)]
-pub(crate) struct MemoryEnrichmentTableTtlExpired {
-    pub key: String,
+pub(crate) struct MemoryEnrichmentTableTtlExpired<'a> {
+    pub key: &'a str,
+    pub include_key_metric_tag: bool,
 }
 
-impl InternalEvent for MemoryEnrichmentTableTtlExpired {
+impl InternalEvent for MemoryEnrichmentTableTtlExpired<'_> {
     fn emit(self) {
-        counter!(
-            "memory_enrichment_table_ttl_expirations",
-            "key" => self.key
-        )
-        .increment(1);
+        if self.include_key_metric_tag {
+            counter!(
+                "memory_enrichment_table_ttl_expirations",
+                "key" => self.key.to_owned()
+            )
+            .increment(1);
+        } else {
+            counter!("memory_enrichment_table_ttl_expirations",).increment(1);
+        }
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -77,17 +106,22 @@ impl InternalEvent for MemoryEnrichmentTableTtlExpired {
 }
 
 #[derive(Debug)]
-pub(crate) struct MemoryEnrichmentTableReadFailed {
-    pub key: String,
+pub(crate) struct MemoryEnrichmentTableReadFailed<'a> {
+    pub key: &'a str,
+    pub include_key_metric_tag: bool,
 }
 
-impl InternalEvent for MemoryEnrichmentTableReadFailed {
+impl InternalEvent for MemoryEnrichmentTableReadFailed<'_> {
     fn emit(self) {
-        counter!(
-            "memory_enrichment_table_failed_reads",
-            "key" => self.key
-        )
-        .increment(1);
+        if self.include_key_metric_tag {
+            counter!(
+                "memory_enrichment_table_failed_reads",
+                "key" => self.key.to_owned()
+            )
+            .increment(1);
+        } else {
+            counter!("memory_enrichment_table_failed_reads",).increment(1);
+        }
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -96,17 +130,22 @@ impl InternalEvent for MemoryEnrichmentTableReadFailed {
 }
 
 #[derive(Debug)]
-pub(crate) struct MemoryEnrichmentTableInsertFailed {
-    pub key: String,
+pub(crate) struct MemoryEnrichmentTableInsertFailed<'a> {
+    pub key: &'a str,
+    pub include_key_metric_tag: bool,
 }
 
-impl InternalEvent for MemoryEnrichmentTableInsertFailed {
+impl InternalEvent for MemoryEnrichmentTableInsertFailed<'_> {
     fn emit(self) {
-        counter!(
-            "memory_enrichment_table_failed_insertions",
-            "key" => self.key
-        )
-        .increment(1);
+        if self.include_key_metric_tag {
+            counter!(
+                "memory_enrichment_table_failed_insertions",
+                "key" => self.key.to_owned()
+            )
+            .increment(1);
+        } else {
+            counter!("memory_enrichment_table_failed_insertions",).increment(1);
+        }
     }
 
     fn name(&self) -> Option<&'static str> {

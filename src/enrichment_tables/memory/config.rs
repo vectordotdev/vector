@@ -11,6 +11,8 @@ use vector_lib::{configurable::configurable_component, sink::VectorSink};
 
 use crate::config::{EnrichmentTableConfig, SinkConfig};
 
+use super::internal_events::MemoryTableInternalMetricsConfig;
+
 /// Configuration for the `memory` enrichment table.
 #[configurable_component(enrichment_table("memory"))]
 #[derive(Clone)]
@@ -41,6 +43,11 @@ pub struct MemoryConfig {
     #[serde(default = "default_max_byte_size")]
     pub max_byte_size: u64,
 
+    /// Configuration of internal metrics
+    #[configurable(derived)]
+    #[serde(default)]
+    pub internal_metrics: MemoryTableInternalMetricsConfig,
+
     #[serde(skip)]
     memory: Arc<Mutex<Option<Box<Memory>>>>,
 }
@@ -62,6 +69,7 @@ impl Default for MemoryConfig {
             flush_interval: default_flush_interval(),
             memory: Arc::new(Mutex::new(None)),
             max_byte_size: default_max_byte_size(),
+            internal_metrics: MemoryTableInternalMetricsConfig::default(),
         }
     }
 }

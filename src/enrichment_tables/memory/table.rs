@@ -116,7 +116,8 @@ impl Memory {
             let new_entry_key = String::from(k);
             let Ok(v) = serde_json::to_string(&v) else {
                 emit!(MemoryEnrichmentTableInsertFailed {
-                    key: new_entry_key.clone()
+                    key: &new_entry_key,
+                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
                 });
                 continue;
             };
@@ -131,13 +132,15 @@ impl Memory {
             {
                 // Reject new entries
                 emit!(MemoryEnrichmentTableInsertFailed {
-                    key: new_entry_key.clone()
+                    key: &new_entry_key,
+                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
                 });
                 continue;
             }
             metadata.byte_size = metadata.byte_size.saturating_add(new_entry_size as u64);
             emit!(MemoryEnrichmentTableInserted {
-                key: new_entry_key.clone()
+                key: &new_entry_key,
+                include_key_metric_tag: self.config.internal_metrics.include_key_tag
             });
             handle.update(new_entry_key, new_entry);
         }
@@ -155,7 +158,13 @@ impl Memory {
                             // Byte size is not reduced at this point, because the actual deletion
                             // will only happen at refresh time
                             handle.empty(k.clone());
-                            emit!(MemoryEnrichmentTableTtlExpired { key: k.to_string() });
+                            emit!(MemoryEnrichmentTableTtlExpired {
+                                key: k,
+                                include_key_metric_tag: self
+                                    .config
+                                    .internal_metrics
+                                    .include_key_tag
+                            });
                             needs_flush = true;
                         }
                     }
@@ -226,14 +235,16 @@ impl Table for Memory {
                 match self.get_read_handle().get_one(key.as_ref()) {
                     Some(row) => {
                         emit!(MemoryEnrichmentTableRead {
-                            key: key.to_string()
+                            key: &key,
+                            include_key_metric_tag: self.config.internal_metrics.include_key_tag
                         });
                         row.as_object_map(Instant::now(), self.config.ttl, &key)
                             .map(|r| vec![r])
                     }
                     None => {
                         emit!(MemoryEnrichmentTableReadFailed {
-                            key: key.to_string()
+                            key: &key,
+                            include_key_metric_tag: self.config.internal_metrics.include_key_tag
                         });
                         Ok(Default::default())
                     }
