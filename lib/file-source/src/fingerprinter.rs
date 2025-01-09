@@ -8,6 +8,7 @@ use std::{
 use crc::Crc;
 use flate2::bufread::GzDecoder;
 use serde::{Deserialize, Serialize};
+use vector_common::constants::GZIP_MAGIC;
 
 use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
 
@@ -83,7 +84,7 @@ impl SupportedCompressionAlgorithms {
 
     fn magic_header_bytes(&self) -> &'static [u8] {
         match self {
-            SupportedCompressionAlgorithms::Gzip => &[0x1f, 0x8b],
+            SupportedCompressionAlgorithms::Gzip => GZIP_MAGIC,
         }
     }
 }
