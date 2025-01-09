@@ -27,7 +27,7 @@ use vrl::value::{KeyString, ObjectMap, Value};
 /// Single memory entry containing the value and TTL
 #[derive(Clone, Eq, PartialEq, Hash, ShallowCopy)]
 pub struct MemoryEntry {
-    value: Box<Value>,
+    value: String,
     update_time: CopyValue<Instant>,
 }
 
@@ -38,19 +38,23 @@ impl ByteSizeOf for MemoryEntry {
 }
 
 impl MemoryEntry {
-    fn as_object_map(&self, now: Instant, total_ttl: u64, key: &str) -> ObjectMap {
+    fn as_object_map(&self, now: Instant, total_ttl: u64, key: &str) -> Result<ObjectMap, String> {
         let ttl = total_ttl.saturating_sub(now.duration_since(*self.update_time).as_secs());
-        ObjectMap::from([
+        Ok(ObjectMap::from([
             (
                 KeyString::from("key"),
                 Value::Bytes(Bytes::copy_from_slice(key.as_bytes())),
             ),
-            (KeyString::from("value"), (*self.value).clone()),
+            (
+                KeyString::from("value"),
+                serde_json::from_str::<Value>(&self.value)
+                    .map_err(|_| "Failed to read value from memory!")?,
+            ),
             (
                 KeyString::from("ttl"),
                 Value::Integer(ttl.try_into().unwrap_or(i64::MAX)),
             ),
-        ])
+        ]))
     }
 
     fn expired(&self, now: Instant, ttl: u64) -> bool {
@@ -109,11 +113,17 @@ impl Memory {
         let now = Instant::now();
 
         for (k, v) in value.into_iter() {
+            let new_entry_key = String::from(k);
+            let Ok(v) = serde_json::to_string(&v) else {
+                emit!(MemoryEnrichmentTableInsertFailed {
+                    key: new_entry_key.clone()
+                });
+                continue;
+            };
             let new_entry = MemoryEntry {
-                value: Box::new(v),
+                value: v,
                 update_time: now.into(),
             };
-            let new_entry_key = String::from(k);
             let new_entry_size = new_entry_key.size_of() + new_entry.size_of();
             if self.config.max_byte_size > 0
                 && metadata.byte_size.saturating_add(new_entry_size as u64)
@@ -123,7 +133,7 @@ impl Memory {
                 emit!(MemoryEnrichmentTableInsertFailed {
                     key: new_entry_key.clone()
                 });
-                return;
+                continue;
             }
             metadata.byte_size = metadata.byte_size.saturating_add(new_entry_size as u64);
             emit!(MemoryEnrichmentTableInserted {
@@ -218,11 +228,8 @@ impl Table for Memory {
                         emit!(MemoryEnrichmentTableRead {
                             key: key.to_string()
                         });
-                        Ok(vec![row.as_object_map(
-                            Instant::now(),
-                            self.config.ttl,
-                            &key,
-                        )])
+                        row.as_object_map(Instant::now(), self.config.ttl, &key)
+                            .map(|r| vec![r])
                     }
                     None => {
                         emit!(MemoryEnrichmentTableReadFailed {
@@ -337,7 +344,7 @@ mod tests {
             handle.update(
                 "test_key".to_string(),
                 MemoryEntry {
-                    value: Box::new(Value::from(5)),
+                    value: "5".to_string(),
                     update_time: (Instant::now() - Duration::from_secs(secs_to_subtract)).into(),
                 },
             );
@@ -371,7 +378,7 @@ mod tests {
             handle.update(
                 "test_key".to_string(),
                 MemoryEntry {
-                    value: Box::new(Value::from(5)),
+                    value: "5".to_string(),
                     update_time: (Instant::now() - Duration::from_secs(ttl + 10)).into(),
                 },
             );
@@ -433,7 +440,7 @@ mod tests {
             handle.update(
                 "test_key".to_string(),
                 MemoryEntry {
-                    value: Box::new(Value::from(5)),
+                    value: "5".to_string(),
                     update_time: (Instant::now() - Duration::from_secs(ttl / 2)).into(),
                 },
             );
