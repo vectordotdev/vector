@@ -658,7 +658,7 @@ impl IngestorProcess {
                     match result {
                         BatchStatus::Delivered => {
                             info!(
-                                message = "S3 object from SQS notification delivered.",
+                                message = "S3 object from SQS delivered.",
                                 bucket = s3_event.s3.bucket.name,
                                 key = s3_event.s3.object.key,
                             );
@@ -674,7 +674,7 @@ impl IngestorProcess {
                         BatchStatus::Rejected => {
                             if self.state.delete_failed_message {
                                 warn!(
-                                    message = "S3 object from SQS notification was rejected. Deleting failed message.",
+                                    message = "S3 object from SQS was rejected. Deleting failed message.",
                                     bucket = s3_event.s3.bucket.name,
                                     key = s3_event.s3.object.key,
                                 ); 
