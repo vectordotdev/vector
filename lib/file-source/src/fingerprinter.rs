@@ -134,6 +134,7 @@ impl UncompressedReader for UncompressedReaderImpl {
         fp.seek(SeekFrom::Start(0))?;
         Ok(algorithm)
     }
+
     fn reader<'a>(fp: &'a mut File) -> Result<Box<dyn BufRead + 'a>, std::io::Error> {
         // To support new compression algorithms, add them below
         match Self::check(fp)? {
