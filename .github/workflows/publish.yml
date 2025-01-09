@@ -364,6 +364,7 @@ jobs:
     name: Download Artifacts
     runs-on: ubuntu-20.04
     needs:
+      - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
@@ -374,6 +375,8 @@ jobs:
       - build-arm-unknown-linux-musleabi-packages
       - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     strategy:
       matrix:
         architecture:
@@ -393,11 +396,10 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
       - name: Download staged package artifacts (for ${{ matrix.architecture }})
         uses: actions/download-artifact@v4
         with:
-          name: vector-${{ needs.generate-publish-metadata.outputs.vector_version }}-${{ matrix.architecture }}
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.architecture }}
           path: target/artifacts
 
       - name: Set output path for artifacts
@@ -506,7 +508,7 @@ jobs:
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
-      - build-apple-darwin-packages
+      - download-artifacts
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     strategy:
