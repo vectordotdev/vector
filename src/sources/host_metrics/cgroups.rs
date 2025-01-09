@@ -177,6 +177,26 @@ impl<'a> CGroupRecurser<'a> {
                 .gauge("cgroup_memory_anon_bytes", stat.anon as f64, tags.clone());
             self.output
                 .gauge("cgroup_memory_file_bytes", stat.file as f64, tags.clone());
+            self.output.gauge(
+                "cgroup_memory_anon_active_bytes",
+                stat.active_anon as f64,
+                tags.clone(),
+            );
+            self.output.gauge(
+                "cgroup_memory_anon_inactive_bytes",
+                stat.inactive_anon as f64,
+                tags.clone(),
+            );
+            self.output.gauge(
+                "cgroup_memory_file_active_bytes",
+                stat.active_file as f64,
+                tags.clone(),
+            );
+            self.output.gauge(
+                "cgroup_memory_file_inactive_bytes",
+                stat.inactive_file as f64,
+                tags.clone(),
+            );
         }
     }
 }
@@ -389,6 +409,10 @@ define_stat_struct! { MemoryStat(
     // for more details.
     anon,
     file,
+    active_anon,
+    inactive_anon,
+    active_file,
+    inactive_file,
 )}
 
 fn is_dir(path: impl AsRef<Path>) -> bool {
@@ -469,6 +493,10 @@ mod tests {
         assert_ne!(count_name(&metrics, "cgroup_cpu_system_seconds_total"), 0);
         assert_ne!(count_name(&metrics, "cgroup_memory_anon_bytes"), 0);
         assert_ne!(count_name(&metrics, "cgroup_memory_file_bytes"), 0);
+        assert_ne!(count_name(&metrics, "cgroup_memory_anon_active_bytes"), 0);
+        assert_ne!(count_name(&metrics, "cgroup_memory_anon_inactive_bytes"), 0);
+        assert_ne!(count_name(&metrics, "cgroup_memory_file_active_bytes"), 0);
+        assert_ne!(count_name(&metrics, "cgroup_memory_file_inactive_bytes"), 0);
     }
 
     #[tokio::test]
@@ -599,6 +627,22 @@ mod tests {
             );
             assert_eq!(
                 count_name(&metrics, "cgroup_memory_file_bytes"),
+                SUBDIRS.len()
+            );
+            assert_eq!(
+                count_name(&metrics, "cgroup_memory_anon_active_bytes"),
+                SUBDIRS.len()
+            );
+            assert_eq!(
+                count_name(&metrics, "cgroup_memory_anon_inactive_bytes"),
+                SUBDIRS.len()
+            );
+            assert_eq!(
+                count_name(&metrics, "cgroup_memory_file_active_bytes"),
+                SUBDIRS.len()
+            );
+            assert_eq!(
+                count_name(&metrics, "cgroup_memory_file_inactive_bytes"),
                 SUBDIRS.len()
             );
         }
