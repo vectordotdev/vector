@@ -526,8 +526,7 @@ jobs:
           MACOS_PACKAGE_PATH="${{ needs.download-artifacts.outputs.artifacts-path }}/vector-${VECTOR_VERSION}-${{ matrix.target }}.tar.gz"
           echo "Verifying macOS package at: $MACOS_PACKAGE_PATH"
           tar -xvf "$MACOS_PACKAGE_PATH" && vector-${{ matrix.target }}/bin/vector --version
-  
-  
+
 
   publish-docker:
     name: Publish to Docker
