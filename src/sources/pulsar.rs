@@ -10,6 +10,7 @@ use pulsar::{
     message::proto::MessageIdData,
     Authentication, Consumer, Pulsar, SubType, TokioExecutor,
 };
+use std::path::Path;
 use tokio_util::codec::FramedRead;
 
 use vector_lib::{
@@ -32,6 +33,7 @@ use vector_lib::{
 };
 use vrl::{owned_value_path, path, value::Kind};
 
+use crate::tls::TEST_PEM_INTERMEDIATE_CA_PATH;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
@@ -100,6 +102,10 @@ pub struct PulsarSourceConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    tls_options: Option<TlsOptions>,
 }
 
 /// Authentication configuration.
@@ -170,6 +176,25 @@ struct DeadLetterQueuePolicy {
 
     /// Name of the dead letter topic where the failing messages will be sent.
     pub dead_letter_topic: String,
+}
+
+#[configurable_component]
+#[configurable(description = "TLS options configuration for the Pulsar client.")]
+#[derive(Clone, Debug)]
+pub struct TlsOptions {
+    /// File path containing a list of PEM encoded certificates
+    #[configurable(metadata(docs::examples = "/etc/certs/chain.pem"))]
+    pub certificate_chain_file: String,
+
+    /// Allow insecure TLS connection if set to true
+    ///
+    /// Set to false if not specified.
+    pub allow_insecure_connection: Option<bool>,
+
+    /// Whether hostname verification is enabled when insecure TLS connection is allowed
+    ///
+    /// Set to true if not specified.
+    pub tls_hostname_verification_enabled: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -263,10 +288,19 @@ impl PulsarSourceConfig {
                 ),
             };
         }
+        if let Some(options) = &self.tls_options {
+            builder =
+                builder.with_certificate_chain_file(Path::new(&options.certificate_chain_file))?;
+            builder = builder
+                .with_allow_insecure_connection(options.allow_insecure_connection.unwrap_or(false));
+            builder = builder.with_tls_hostname_verification_enabled(
+                options.tls_hostname_verification_enabled.unwrap_or(true),
+            );
+        }
 
         let pulsar = builder.build().await?;
 
-        let mut consumer_builder = pulsar
+        let mut consumer_builder: pulsar::ConsumerBuilder<TokioExecutor> = pulsar
             .consumer()
             .with_topics(&self.topics)
             .with_subscription_type(SubType::Shared)
@@ -524,36 +558,83 @@ mod integration_tests {
     use crate::test_util::components::{assert_source_compliance, SOURCE_TAGS};
     use crate::test_util::{collect_n, random_string, trace_init};
 
-    fn pulsar_address() -> String {
-        std::env::var("PULSAR_ADDRESS").unwrap_or_else(|_| "pulsar://127.0.0.1:6650".into())
+    fn pulsar_host() -> String {
+        std::env::var("PULSAR_HOST").unwrap_or_else(|_| "127.0.0.1".into())
     }
 
+    fn pulsar_address(scheme: &str, port: u16) -> String {
+        format!("{}://{}:{}", scheme, pulsar_host(), port)
+    }
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {
-        pulsar_send_receive(true, LogNamespace::Legacy).await;
+        pulsar_send_receive(
+            &pulsar_address("pulsar", 6650),
+            true,
+            LogNamespace::Legacy,
+            None,
+        )
+        .await;
     }
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements_vector_namespace() {
-        pulsar_send_receive(true, LogNamespace::Vector).await;
+        pulsar_send_receive(
+            &pulsar_address("pulsar", 6650),
+            true,
+            LogNamespace::Vector,
+            None,
+        )
+        .await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements() {
-        pulsar_send_receive(false, LogNamespace::Legacy).await;
+        pulsar_send_receive(
+            &pulsar_address("pulsar", 6650),
+            false,
+            LogNamespace::Legacy,
+            None,
+        )
+        .await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements_vector_namespace() {
-        pulsar_send_receive(false, LogNamespace::Vector).await;
+        pulsar_send_receive(
+            &pulsar_address("pulsar", 6650),
+            false,
+            LogNamespace::Vector,
+            None,
+        )
+        .await;
     }
 
-    async fn pulsar_send_receive(acknowledgements: bool, log_namespace: LogNamespace) {
+    #[tokio::test]
+    async fn consumes_event_with_tls() {
+        pulsar_send_receive(
+            &pulsar_address("pulsar+ssl", 6651),
+            false,
+            LogNamespace::Vector,
+            Some(TlsOptions {
+                certificate_chain_file: TEST_PEM_INTERMEDIATE_CA_PATH.into(),
+                allow_insecure_connection: None,
+                tls_hostname_verification_enabled: None,
+            }),
+        )
+        .await;
+    }
+
+    async fn pulsar_send_receive(
+        endpoint: &str,
+        acknowledgements: bool,
+        log_namespace: LogNamespace,
+        tls_options: Option<TlsOptions>,
+    ) {
         trace_init();
 
         let topic = format!("test-{}", random_string(10));
         let cnf = PulsarSourceConfig {
-            endpoint: pulsar_address(),
+            endpoint: endpoint.into(),
             topics: vec![topic.clone()],
             consumer_name: None,
             subscription_name: None,
@@ -565,12 +646,21 @@ mod integration_tests {
             decoding: DeserializerConfig::Bytes,
             acknowledgements: acknowledgements.into(),
             log_namespace: None,
+            tls_options: tls_options.clone(),
         };
+        let mut builder = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor);
+        if let Some(options) = &tls_options {
+            builder = builder
+                .with_certificate_chain_file(Path::new(&options.certificate_chain_file))
+                .unwrap();
+            builder = builder
+                .with_allow_insecure_connection(options.allow_insecure_connection.unwrap_or(false));
+            builder = builder.with_tls_hostname_verification_enabled(
+                options.tls_hostname_verification_enabled.unwrap_or(true),
+            );
+        }
 
-        let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)
-            .build()
-            .await
-            .unwrap();
+        let pulsar = builder.build().await.unwrap();
 
         let consumer = cnf.create_consumer().await.unwrap();
         let decoder = DecodingConfig::new(
