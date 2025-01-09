@@ -496,7 +496,6 @@ jobs:
       - build-apple-darwin-packages
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      ARTIFACTS_PATH: ${{ needs.download-artifacts.outputs.artifacts-path }}
     strategy:
       matrix:
         include:
@@ -511,7 +510,7 @@ jobs:
           ref: ${{ inputs.git_ref }}
       - name: Verify macOS package
         run: |
-          MACOS_PACKAGE_PATH="${ARTIFACTS_PATH}/vector-${VECTOR_VERSION}-${{ matrix.target }}.tar.gz"
+          MACOS_PACKAGE_PATH="${{ needs.download-artifacts.outputs.artifacts-path }}/vector-${VECTOR_VERSION}-${{ matrix.target }}.tar.gz"
           echo "Verifying macOS package at: $MACOS_PACKAGE_PATH"
           tar -xvf "$MACOS_PACKAGE_PATH" && vector-${{ matrix.target }}/bin/vector --version
   
@@ -553,7 +552,6 @@ jobs:
       - name: Build and publish Docker images
         env:
           PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
-          ARTIFACTS_PATH: ${{ env.ARTIFACTS_PATH }}
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 15
@@ -586,7 +584,6 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
         run: make release-s3
 
-
   publish-github:
     name: Publish to GitHub
     # We only publish to GitHub for versioned releases, not nightlies.
@@ -614,7 +611,6 @@ jobs:
       - name: Publish release to GitHub
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ARTIFACTS_PATH: ${{ env.ARTIFACTS_PATH }}
         run: make release-github
 
 
