@@ -359,9 +359,21 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts/vector*
 
+
   download-artifacts:
     name: Download Artifacts
     runs-on: ubuntu-20.04
+    needs:
+      - build-x86_64-unknown-linux-gnu-packages
+      - build-x86_64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-gnu-packages
+      - build-aarch64-unknown-linux-musl-packages
+      - build-armv7-unknown-linux-gnueabihf-packages
+      - build-armv7-unknown-linux-musleabihf-packages
+      - build-arm-unknown-linux-gnueabi-packages
+      - build-arm-unknown-linux-musleabi-packages
+      - build-apple-darwin-packages
+      - build-x86_64-pc-windows-msvc-packages
     strategy:
       matrix:
         architecture:
@@ -385,12 +397,13 @@ jobs:
       - name: Download staged package artifacts (for ${{ matrix.architecture }})
         uses: actions/download-artifact@v4
         with:
-          name: vector-${{ github.ref_name }}-${{ matrix.architecture }}
+          name: vector-${{ needs.generate-publish-metadata.outputs.vector_version }}-${{ matrix.architecture }}
           path: target/artifacts
 
       - name: Set output path for artifacts
         id: output-path
         run: echo "artifacts-path=target/artifacts" >> $GITHUB_OUTPUT
+
 
 
   deb-verify:
