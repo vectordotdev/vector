@@ -33,7 +33,6 @@ use vector_lib::{
 };
 use vrl::{owned_value_path, path, value::Kind};
 
-use crate::tls::TEST_PEM_INTERMEDIATE_CA_PATH;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
@@ -557,6 +556,7 @@ mod integration_tests {
     use crate::config::log_schema;
     use crate::test_util::components::{assert_source_compliance, SOURCE_TAGS};
     use crate::test_util::{collect_n, random_string, trace_init};
+    use crate::tls::TEST_PEM_INTERMEDIATE_CA_PATH;
 
     fn pulsar_host() -> String {
         std::env::var("PULSAR_HOST").unwrap_or_else(|_| "127.0.0.1".into())
