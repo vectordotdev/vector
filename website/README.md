@@ -6,7 +6,7 @@ This directory houses all the assets used to build Vector's website and document
 
 In order to run the site [locally](#run-the-site-locally), you need to have these installed:
 
-* The [Hugo] static site generator. You can install with `brew install hugo`.
+* The [Hugo] static site generator. Refer to https://gohugo.io/installation/ for instructions.
 * The CLI tool for the [CUE] configuration and validation language.
 * [Node.js] and the [Yarn] package manager (for static assets and some scripting).
 * [htmltest] for link checking.
