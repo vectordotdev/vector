@@ -3,7 +3,7 @@ features:
 - chronicle-unstructured-integration-tests
 - chronicle-udm-events-integration-tests
 
-test_filter: '::gcp::'
+test_filter: '::gcp_chronicle::'
 
 env:
   EMULATOR_ADDRESS: http://gcloud-pubsub:8681

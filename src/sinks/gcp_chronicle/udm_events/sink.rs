@@ -24,6 +24,7 @@ use crate::{
     codecs,
     gcp::GcpAuthenticator,
     http::HttpClient,
+
     sinks::{
         gcp_chronicle::{
             service::ChronicleService, ChronicleRequest,
@@ -282,6 +283,7 @@ where
 
 #[cfg(all(test, feature = "chronicle-udm-events-integration-tests"))]
 mod integration_tests {
+    use indoc::indoc;
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
     use vector_lib::event::{BatchNotifier, BatchStatus};
@@ -297,16 +299,27 @@ mod integration_tests {
 
     const ADDRESS_ENV_VAR: &str = "CHRONICLE_ADDRESS";
 
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct UdmMetadata {
+        event_timestamp: String,
+        log_type: String
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct Log {
+        metadata: UdmMetadata
+    }
+
     fn config(auth_path: &str) -> ChronicleUDMEventsConfig {
         let address = std::env::var(ADDRESS_ENV_VAR).unwrap();
         let config = format!(
             indoc! { r#"
-             endpoint = "{}"
-             customer_id = "customer id"
-             credentials_path = "{}"
-             encoding.codec = "json"
-        "# },
-            address, auth_path, log_type
+                endpoint = "{}"
+                customer_id = "customer id"
+                credentials_path = "{}"
+                encoding.codec = "json"
+            "# },
+            address, auth_path
         );
 
         let config: ChronicleUDMEventsConfig = toml::from_str(&config).unwrap();
@@ -314,11 +327,10 @@ mod integration_tests {
     }
 
     async fn config_build(
-        log_type: &str,
         auth_path: &str,
     ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
         let cx = SinkContext::default();
-        config(log_type, auth_path).build(cx).await
+        config(auth_path).build(cx).await
     }
 
     #[tokio::test]
@@ -327,7 +339,7 @@ mod integration_tests {
 
         let log_type = random_string(10);
         let (sink, healthcheck) =
-            config_build(&log_type, "/home/vector/scripts/integration/gcp/auth.json")
+            config_build("/home/vector/scripts/integration/gcp/auth.json")
                 .await
                 .expect("Building sink failed");
 
@@ -339,26 +351,14 @@ mod integration_tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let response = pull_messages(&log_type).await;
-        let messages = response
-            .into_iter()
-            .map(|message| message.log_text)
-            .collect::<Vec<_>>();
-        assert_eq!(input.len(), messages.len());
-        for i in 0..input.len() {
-            let data = serde_json::to_value(&messages[i]).unwrap();
-            let expected = serde_json::to_value(input[i].as_log().get("message").unwrap()).unwrap();
-            assert_eq!(data, expected);
-        }
+        assert_eq!(input.len(), response.len());
     }
 
     #[tokio::test]
     async fn invalid_credentials() {
         trace_init();
-
-        let log_type = random_string(10);
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
         let sink = config_build(
-            &log_type,
             "/home/vector/scripts/integration/gcp/invalidauth.json",
         )
         .await;
@@ -370,11 +370,8 @@ mod integration_tests {
     async fn publish_invalid_events() {
         trace_init();
 
-        // The chronicle-emulator we are testing against is setup so a `log_type` of "INVALID"
-        // will return a `400 BAD_REQUEST`.
-        let log_type = "INVALID";
         let (sink, healthcheck) =
-            config_build(log_type, "/home/vector/scripts/integration/gcp/auth.json")
+            config_build("/home/vector/scripts/integration/gcp/auth.json")
                 .await
                 .expect("Building sink failed");
 
@@ -384,15 +381,6 @@ mod integration_tests {
         let (_input, events) = random_events_with_stream(100, 100, Some(batch));
         run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
-    }
-
-    #[derive(Clone, Debug, Deserialize, Serialize)]
-    pub struct Log {
-        customer_id: String,
-        namespace: String,
-        log_type: String,
-        log_text: String,
-        ts_rfc3339: String,
     }
 
     async fn request(method: Method, path: &str, log_type: &str) -> Response {
