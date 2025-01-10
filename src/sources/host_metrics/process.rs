@@ -18,6 +18,7 @@ pub struct ProcessConfig {
 const RUNTIME: &str = "process_runtime";
 const CPU_USAGE: &str = "process_cpu_usage";
 const MEMORY_USAGE: &str = "process_memory_usage";
+const MEMORY_VIRTUAL_USAGE: &str = "process_memory_virtual_usage";
 
 impl HostMetrics {
     pub async fn process_metrics(&self, output: &mut super::MetricsBuffer) {
@@ -46,6 +47,11 @@ impl HostMetrics {
             };
             output.gauge(CPU_USAGE, process.cpu_usage().into(), tags());
             output.gauge(MEMORY_USAGE, process.memory() as f64, tags());
+            output.gauge(
+                MEMORY_VIRTUAL_USAGE,
+                process.virtual_memory() as f64,
+                tags(),
+            );
             output.counter(RUNTIME, process.run_time() as f64, tags());
         }
     }
