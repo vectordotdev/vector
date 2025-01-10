@@ -260,8 +260,8 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
         region_endpoint.region(),
         region_endpoint.endpoint(),
         &proxy,
-        &None,
-        &None,
+        None,
+        None,
     )
     .await
     .unwrap()
@@ -276,7 +276,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                     .credentials_provider(
                         test_region_endpoint().region().unwrap(),
                         &Default::default(),
-                        &None,
+                        None,
                     )
                     .await
                     .unwrap(),

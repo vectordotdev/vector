@@ -442,7 +442,6 @@ impl Default for KeepaliveConfig {
 ///   the connection after a response with a `Connection: close` header is sent.
 /// - This layer assumes that it is instantiated once per connection, which is true within the
 ///   Hyper framework.
-
 pub struct MaxConnectionAgeLayer {
     start_reference: Instant,
     max_connection_age: Duration,

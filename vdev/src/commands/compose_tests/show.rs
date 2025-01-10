@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::testing::{config::ComposeTestConfig, config::Environment, state};
 
-pub fn exec(integration: &Option<String>, path: &str) -> Result<()> {
+pub fn exec(integration: Option<&String>, path: &str) -> Result<()> {
     match integration {
         None => {
             let entries = ComposeTestConfig::collect_all(path)?;
@@ -17,7 +17,7 @@ pub fn exec(integration: &Option<String>, path: &str) -> Result<()> {
                 let environments = config
                     .environments()
                     .keys()
-                    .map(|environment| format(&active_env, environment))
+                    .map(|environment| format(active_env.as_ref(), environment))
                     .collect::<Vec<_>>()
                     .join("  ");
                 println!("{integration:width$}  {environments}");
@@ -65,14 +65,14 @@ pub fn exec(integration: &Option<String>, path: &str) -> Result<()> {
 
             println!("Environments:");
             for environment in config.environments().keys() {
-                println!("  {}", format(&active_env, environment));
+                println!("  {}", format(active_env.as_ref(), environment));
             }
         }
     }
     Ok(())
 }
 
-fn format(active_env: &Option<String>, environment: &str) -> String {
+fn format(active_env: Option<&String>, environment: &str) -> String {
     match active_env {
         Some(active) if active == environment => format!("{environment} (active)"),
         _ => environment.into(),

@@ -37,8 +37,8 @@ async fn create_sns_test_client() -> SnsClient {
         Some(Region::new("us-east-1")),
         Some(endpoint),
         &proxy,
-        &None,
-        &None,
+        None,
+        None,
     )
     .await
     .unwrap()
@@ -59,8 +59,8 @@ async fn create_sqs_test_client() -> SqsClient {
         Some(Region::new("us-east-1")),
         Some(endpoint),
         &proxy,
-        &None,
-        &None,
+        None,
+        None,
     )
     .await
     .unwrap()

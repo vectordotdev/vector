@@ -40,9 +40,17 @@ pub enum Mode {
     /// Send over UDP.
     Udp(UdpMode),
 
-    /// Send over a Unix domain socket (UDS).
+    /// Send over a Unix domain socket (UDS), in stream mode.
     #[cfg(unix)]
-    Unix(UnixMode),
+    #[serde(alias = "unix")]
+    UnixStream(UnixMode),
+
+    /// Send over a Unix domain socket (UDS), in datagram mode.
+    /// Unavailable on macOS, due to send(2)'s apparent non-blocking behavior,
+    /// resulting in ENOBUFS errors which we currently don't handle.
+    #[cfg(unix)]
+    #[cfg_attr(target_os = "macos", serde(skip))]
+    UnixDatagram(UnixMode),
 }
 
 /// TCP configuration.
@@ -133,11 +141,26 @@ impl SinkConfig for SocketSinkConfig {
                 config.build(transformer, encoder)
             }
             #[cfg(unix)]
-            Mode::Unix(UnixMode { config, encoding }) => {
+            Mode::UnixStream(UnixMode { config, encoding }) => {
                 let transformer = encoding.transformer();
                 let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
                 let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(transformer, encoder)
+                config.build(
+                    transformer,
+                    encoder,
+                    super::util::service::net::UnixMode::Stream,
+                )
+            }
+            #[cfg(unix)]
+            Mode::UnixDatagram(UnixMode { config, encoding }) => {
+                let transformer = encoding.transformer();
+                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                let encoder = Encoder::<Framer>::new(framer, serializer);
+                config.build(
+                    transformer,
+                    encoder,
+                    super::util::service::net::UnixMode::Datagram,
+                )
             }
         }
     }
@@ -147,7 +170,9 @@ impl SinkConfig for SocketSinkConfig {
             Mode::Tcp(TcpMode { encoding, .. }) => encoding.config().1.input_type(),
             Mode::Udp(UdpMode { encoding, .. }) => encoding.config().input_type(),
             #[cfg(unix)]
-            Mode::Unix(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
+            Mode::UnixStream(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
+            #[cfg(unix)]
+            Mode::UnixDatagram(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
         };
         Input::new(encoder_input_type)
     }
@@ -224,11 +249,8 @@ mod test {
                     encoding: JsonSerializerConfig::default().into(),
                 }),
                 #[cfg(unix)]
-                DatagramSocketAddr::Unix(path) => Mode::Unix(UnixMode {
-                    config: UnixSinkConfig::new(
-                        path.to_path_buf(),
-                        crate::sinks::util::service::net::UnixMode::Datagram,
-                    ),
+                DatagramSocketAddr::Unix(path) => Mode::UnixDatagram(UnixMode {
+                    config: UnixSinkConfig::new(path.to_path_buf()),
                     encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
                 }),
             },
@@ -334,11 +356,8 @@ mod test {
         let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
 
         let config = SocketSinkConfig {
-            mode: Mode::Unix(UnixMode {
-                config: UnixSinkConfig::new(
-                    out_path,
-                    crate::sinks::util::service::net::UnixMode::Stream,
-                ),
+            mode: Mode::UnixStream(UnixMode {
+                config: UnixSinkConfig::new(out_path),
                 encoding: (None::<FramingConfig>, NativeJsonSerializerConfig).into(),
             }),
             acknowledgements: Default::default(),
@@ -448,7 +467,7 @@ mod test {
 
         // Only accept two connections.
         let jh2 = tokio::spawn(async move {
-            let tls = MaybeTlsSettings::from_config(&config, true).unwrap();
+            let tls = MaybeTlsSettings::from_config(config.as_ref(), true).unwrap();
             let listener = tls.bind(&addr).await.unwrap();
             listener
                 .accept_stream()

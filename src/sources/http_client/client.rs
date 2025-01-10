@@ -182,7 +182,7 @@ impl SourceConfig for HttpClientConfig {
             .map(|r| r.map(|uri| build_url(&uri, &self.query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
 
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
 
         let log_namespace = cx.log_namespace(self.log_namespace);
 
