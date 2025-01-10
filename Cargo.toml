@@ -158,7 +158,7 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 serde_json = { version = "1.0.133", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.215", default-features = false, features = ["alloc", "derive", "rc"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
-tokio = { version = "1.41.1", default-features = false, features = ["full"] }
+tokio = { version = "1.43.0", default-features = false, features = ["full"] }
 toml = { version = "0.8.19", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
@@ -196,7 +196,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.83", default-features = false }
 futures.workspace = true
-tokio = { version = "1.41.1", default-features = false, features = ["full"] }
+tokio = { version = "1.43.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { version = "0.1.16", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -416,7 +416,7 @@ reqwest = { version = "0.11", features = ["json"] }
 rstest = { version = "0.23.0" }
 tempfile = "3.14.0"
 test-generator = "0.3.1"
-tokio = { version = "1.41.1", features = ["test-util"] }
+tokio = { version = "1.43.0", features = ["test-util"] }
 tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { workspace = true, features = ["test"] }
