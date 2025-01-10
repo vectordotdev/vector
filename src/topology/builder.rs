@@ -510,7 +510,6 @@ impl<'a> Builder<'a> {
     }
 
     async fn build_sinks(&mut self, enrichment_tables: &vector_lib::enrichment::TableRegistry) {
-        let utilization_sender = self.utilization_emitter.get_sender();
         for (key, sink) in self
             .config
             .sinks()
@@ -592,7 +591,7 @@ impl<'a> Builder<'a> {
 
             self.utilization_emitter
                 .add_component(key.clone(), gauge!("utilization"));
-            let utilization_sender = utilization_sender.clone();
+            let utilization_sender = self.utilization_emitter.get_sender();
             let component_key = key.clone();
             let sink = async move {
                 debug!("Sink starting.");
