@@ -135,15 +135,15 @@ remap: functions: parse_nginx_log: {
 				)
 				"""#
 			return: {
-				body_bytes_size       615
-				http_referer          "https://domain.tld/path"
-				http_user_agent       "curl/8.11.1"
-				http_x_forwarded_for  "1.2.3.4, 10.10.1.1"
-				remote_addr           "172.24.0.3"
-				remote_user           "alice"
-				request               "GET / HTTP/1.1"
-				status                200
-				timestamp             "2024-12-31T17:32:06Z"
+				body_bytes_size:       615
+				http_referer:          "https://domain.tld/path"
+				http_user_agent:       "curl/8.11.1"
+				http_x_forwarded_for:  "1.2.3.4, 10.10.1.1"
+				remote_addr:           "172.24.0.3"
+				remote_user:           "alice"
+				request:               "GET / HTTP/1.1"
+				status:                200
+				timestamp:             "2024-12-31T17:32:06Z"
 			}
 		},
 	]
