@@ -34,7 +34,8 @@ checks, capturing diagnostic information, and sharing crash reports.
 ## Vector Website & Docs
 
 The Vector website does collect various analytics. Aggregated analytics data is
-derived from backend server logs which are anonymized.
+derived from backend server logs which are anonymized. Vector uses
+[Netlify analytics][netlify_analytics] for this.
 
 ## Vector Community
 
@@ -53,4 +54,5 @@ privacy policy [here][discord_pp].
 
 [github_pp]: https://help.github.com/en/github/site-policy/github-privacy-statement
 [discord_pp]: https://discord.com/privacy/
+[netlify_analytics]: https://www.netlify.com/products/analytics/
 [vero_pp]: https://www.getvero.com/privacy/
