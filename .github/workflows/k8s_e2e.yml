@@ -125,7 +125,7 @@ jobs:
   # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
   compute-k8s-test-plan:
     name: Compute K8s test plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs: changes
     # Run this job even if `changes` job is skipped
@@ -193,7 +193,7 @@ jobs:
     steps:
       - name: (PR review) Get PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
       - name: (PR review) Checkout PR branch
@@ -234,7 +234,7 @@ jobs:
 
   final-result:
     name: K8s E2E Suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
       - changes
@@ -247,7 +247,7 @@ jobs:
     steps:
       - name: (PR review) Get PR branch
         if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
       - name: (PR review) Submit PR result as success

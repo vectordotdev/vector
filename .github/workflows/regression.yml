@@ -6,7 +6,7 @@
 #
 # The workflow accepts two optional inputs:
 #   - The baseline SHA:
-#     - If not specified, the SHA from 24 hours ago on origin/master is used.
+#     - If not specified, the SHA from 7 days ago on origin/master is used.
 #   - The comparison SHA:
 #     - If not specified, the current HEAD of origin/master is used.
 #
@@ -26,22 +26,23 @@ on:
   workflow_dispatch:
     inputs:
       baseline-sha:
-        description: "The SHA to use as the baseline (optional). If not provided, it defaults to the SHA from 24 hours ago."
+        description: "The SHA to use as the baseline (optional). If not provided, it defaults to the SHA from 7 days ago."
         required: false
       comparison-sha:
         description: "The SHA to use for comparison (optional). If not provided, it defaults to the current HEAD of the origin/master branch."
         required: false
   schedule:
-    - cron: '0 6 * * 1-5' # Runs at 6 AM UTC on weekdays (Monday to Friday)
+    - cron: '0 7 * * 1' # Runs at 7 AM UTC on Mondays
 
 env:
   SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
   SMP_WARMUP_SECONDS: 70 # default is 45 seconds
+  SMP_REPLICAS: 100 # default is 10
 
 jobs:
 
   resolve-inputs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       baseline-sha: ${{ steps.set_and_validate_shas.outputs.BASELINE_SHA }}
       comparison-sha: ${{ steps.set_and_validate_shas.outputs.COMPARISON_SHA }}
@@ -59,8 +60,8 @@ jobs:
         run: |
           # Set baseline SHA
           if [ -z "${{ github.event.inputs.baseline-sha }}" ]; then
-            BASELINE_SHA=$(git rev-list -n 1 --before="24 hours ago" origin/master)
-            echo "Using baseline SHA from 24 hours ago: ${BASELINE_SHA}"
+            BASELINE_SHA=$(git rev-list -n 1 --before="7 days ago" origin/master)
+            echo "Using baseline SHA from 7 days ago: ${BASELINE_SHA}"
           else
             BASELINE_SHA="${{ github.event.inputs.baseline-sha }}"
             echo "Using provided baseline SHA: ${BASELINE_SHA}"
@@ -104,13 +105,13 @@ jobs:
       - name: Set SMP version
         id: experimental-meta
         run: |
-          export SMP_CRATE_VERSION="0.16.1"
+          export SMP_CRATE_VERSION="0.19.3"
           echo "smp crate version: ${SMP_CRATE_VERSION}"
           echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
 
   # Only run this workflow if files changed in areas that could possibly introduce a regression.
   check-source-changed:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs: resolve-inputs
     outputs:
@@ -171,7 +172,7 @@ jobs:
           echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
 
   should-run-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: check-source-changed
     if: ${{ needs.check-source-changed.outputs.source_changed }}
     steps:
@@ -201,10 +202,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.7.1
+        uses: docker/setup-buildx-action@v3.8.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.9.0
+        uses: docker/build-push-action@v6.10.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -240,10 +241,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.7.1
+        uses: docker/setup-buildx-action@v3.8.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.9.0
+        uses: docker/build-push-action@v6.10.0
         with:
           context: comparison-vector/
           cache-from: type=gha
@@ -366,7 +367,7 @@ jobs:
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
-    timeout-minutes: 70
+    timeout-minutes: 120
     needs:
       - should-run-gate
       - resolve-inputs
@@ -405,7 +406,8 @@ jobs:
             --comparison-sha ${{ needs.resolve-inputs.outputs.comparison-sha }} \
             --target-config-dir ${{ github.workspace }}/regression/ \
             --warmup-seconds ${{ env.SMP_WARMUP_SECONDS }} \
-            --submission-metadata ${{ runner.temp }}/submission-metadata
+            --submission-metadata ${{ runner.temp }}/submission-metadata \
+            --replicas ${{ env.SMP_REPLICAS }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -413,7 +415,7 @@ jobs:
           path: ${{ runner.temp }}/submission-metadata
 
       - name: Await job
-        timeout-minutes: 70
+        timeout-minutes: 120
         env:
           RUST_LOG: info
         run: |
@@ -422,7 +424,7 @@ jobs:
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job status \
             --wait \
             --wait-delay-seconds 60 \
-            --wait-timeout-minutes 70 \
+            --wait-timeout-minutes 120 \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Handle cancellation if necessary

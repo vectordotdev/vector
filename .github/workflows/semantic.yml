@@ -13,7 +13,7 @@ on:
 jobs:
   main:
     name: Check Semantic PR
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: amannn/action-semantic-pull-request@v5
         env:
@@ -207,6 +207,8 @@ jobs:
             gcp_pubsub sink
             gcp_stackdriver_logs sink
             gcp_stackdriver_metrics sink
+            greptimedb_metrics sink
+            greptimedb_logs sink
             honeycomb sink
             http sink
             humio_logs sink

@@ -18,7 +18,7 @@ on:
 
 jobs:
   validate-changelog:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.event_name == 'pull_request'
     env:
       PR_HAS_LABEL: ${{ contains( github.event.pull_request.labels.*.name, 'no-changelog') }}
@@ -52,7 +52,7 @@ jobs:
 
   check-changelog:
     name: Changelog
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: validate-changelog
     if: always()
     env:

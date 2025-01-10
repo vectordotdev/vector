@@ -51,6 +51,10 @@ ignore = [
     # Vulnerable version only used in dev-dependencies
     "RUSTSEC-2024-0336",
 
+    # idna accepts Punycode labels that do not produce any non-ASCII when decoded
+    # Need to update some direct dependencies before we can upgrade idna to fix
+    "RUSTSEC-2024-0421",
+
     # unmaintained dependencies
     "RUSTSEC-2021-0139", # ansi_term
     "RUSTSEC-2024-0388", # derivative

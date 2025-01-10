@@ -249,7 +249,7 @@ base: components: sinks: elasticsearch: configuration: {
 				description: """
 					Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
 
-					Only `index` and `create` actions are supported.
+					Only `index`, `create` and `update` actions are supported.
 
 					[es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 					"""
@@ -268,6 +268,11 @@ base: components: sinks: elasticsearch: configuration: {
 					examples: ["application-{{ application_id }}-%Y-%m-%d", "{{ index }}"]
 					syntax: "template"
 				}
+			}
+			template_fallback_index: {
+				description: "The default index to write events to if the template in `bulk.index` cannot be resolved"
+				required:    false
+				type: string: examples: ["test-index"]
 			}
 			version: {
 				description: "Version field value."

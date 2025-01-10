@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.43.0"
+version = "0.44.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -103,6 +103,7 @@ members = [
   ".",
   "lib/codecs",
   "lib/dnsmsg-parser",
+  "lib/dnstap-parser",
   "lib/docs-renderer",
   "lib/enrichment",
   "lib/fakedata",
@@ -133,14 +134,17 @@ members = [
 ]
 
 [workspace.dependencies]
+anyhow = "1.0.94"
 cfg-if = { version = "1.0.0", default-features = false }
 chrono = { version = "0.4.38", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.0", default-features = false, features = ["serde"] }
-clap = { version = "4.5.21", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.22", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.1", default-features = false }
-indexmap = { version = "2.6.0", default-features = false, features = ["serde", "std"] }
-metrics = "0.24.0"
+hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"] }
+indexmap = { version = "2.7.0", default-features = false, features = ["serde", "std"] }
+metrics = "0.24.1"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 pin-project = { version = "1.1.7", default-features = false }
@@ -176,9 +180,11 @@ snafu.workspace = true
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
+dnstap-parser = { path = "lib/dnstap-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
+vector-common = { path = "lib/vector-common", default-features = false}
 vector-lib.workspace = true
 vector-config.workspace = true
 vector-config-common.workspace = true
@@ -200,7 +206,7 @@ console-subscriber = { version = "0.4.1", default-features = false, optional = t
 tracing = { version = "0.1.34", default-features = false }
 tracing-core = { version = "0.1.26", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
-tracing-subscriber = { version = "0.3.18", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry", "tracing-log"] }
+tracing-subscriber = { version = "0.3.19", default-features = false, features = ["ansi", "env-filter", "fmt", "json", "registry", "tracing-log"] }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "e0642d949891546a3bb7e47080365ee7274f05cd" }
 
 # Metrics
@@ -223,12 +229,12 @@ aws-sdk-secretsmanager = { version = "1.3.0", default-features = false, features
 aws-sdk-sts = { version = "1.3.1", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-types = { version = "1.3.3", default-features = false, optional = true }
 aws-sigv4 = { version = "1.2.5", default-features = false, features = ["sign-http"], optional = true }
-aws-config = { version = "1.0.1", default-features = false, features = ["behavior-version-latest", "credentials-process", "sso", "rt-tokio"], optional = true }
+aws-config = { version = "~1.0.1", default-features = false, features = ["behavior-version-latest", "credentials-process", "sso", "rt-tokio"], optional = true }
 aws-credential-types = { version = "1.2.1", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream", "rt-tokio"], optional = true }
 aws-smithy-types = { version = "1.2.9", default-features = false, features = ["rt-tokio"], optional = true }
 aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional = true }
-aws-smithy-runtime = { version = "1.7.3", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
+aws-smithy-runtime = { version = "1.7.4", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
 aws-smithy-async = { version = "1.2.1", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
@@ -286,17 +292,16 @@ greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingest
 
 # External libs
 arc-swap = { version = "1.7", default-features = false, optional = true }
-async-compression = { version = "0.4.17", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.4.18", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.22.1", default-features = false, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
 bollard = { version = "0.16.1", default-features = false, features = ["ssl", "chrono"], optional = true }
-bytes = { version = "1.8.0", default-features = false, features = ["serde"] }
+bytes = { version = "1.9.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.3.0", default-features = false }
 chrono.workspace = true
 chrono-tz.workspace = true
-cidr-utils = { version = "0.6.1", default-features = false }
 colored = { version = "2.1.0", default-features = false }
 csv = { version = "1.3", default-features = false }
 databend-client = { version = "0.22.2", default-features = false, features = ["rustls"], optional = true }
@@ -306,17 +311,17 @@ dyn-clone = { version = "1.0.17", default-features = false }
 encoding_rs = { version = "0.8.35", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.13", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
+flate2.workspace = true
 futures-util = { version = "0.3.29", default-features = false }
 glob.workspace = true
 governor = { version = "0.7.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
-grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.4.7", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.9", default-features = false }
 hostname = { version = "0.4.0", default-features = false }
 http = { version = "0.2.9", default-features = false }
+http-1 = { package = "http", version = "1.0", default-features = false, features = ["std"] }
 http-serde = "1.1.3"
 http-body = { version = "0.4.5", default-features = false }
 hyper = { version = "0.14.28", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
@@ -327,10 +332,9 @@ indoc = { version = "2.0.5", default-features = false }
 inventory = { version = "0.3.15", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
 itertools = { version = "0.13.0", default-features = false, optional = false, features = ["use_alloc"] }
-k8s-openapi = { version = "0.18.0", default-features = false, features = ["api", "v1_26"], optional = true }
-kube = { version = "0.82.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
+k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26"], optional = true }
+kube = { version = "0.93.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.1", default-features = false, optional = true }
-logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.12.5", default-features = false, optional = true }
 maxminddb = { version = "0.24.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
@@ -348,16 +352,16 @@ postgres-openssl = { version = "0.5.0", default-features = false, features = ["r
 pulsar = { version = "6.3.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 rand.workspace = true
 rand_distr = { version = "0.4.3", default-features = false }
-rdkafka = { version = "0.35.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
+rdkafka = { version = "0.37.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.24.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
-roaring = { version = "0.10.6", default-features = false, features = ["std"], optional = true }
+roaring = { version = "0.10.7", default-features = false, features = ["std"], optional = true }
 rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.23", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
-socket2 = { version = "0.5.7", default-features = false }
+socket2 = { version = "0.5.8", default-features = false }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.0", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
@@ -366,9 +370,9 @@ tokio-postgres = { version = "0.7.12", default-features = false, features = ["ru
 tokio-tungstenite = { version = "0.20.1", default-features = false, features = ["connect"], optional = true }
 toml.workspace = true
 tonic = { workspace = true, optional = true }
-hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"], optional = true }
+hickory-proto = { workspace = true, optional = true }
 typetag = { version = "0.2.18", default-features = false }
-url = { version = "2.5.3", default-features = false, features = ["serde"] }
+url = { version = "2.5.4", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }
 zstd = { version = "0.13.0", default-features = false }
 arr_macro = { version = "0.2.1" }
@@ -378,8 +382,8 @@ arr_macro = { version = "0.2.1" }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.10.1", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
-sysinfo = "0.32.0"
+mlua = { version = "0.10.2", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
+sysinfo = "0.32.1"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7.0"
@@ -396,7 +400,7 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.16", default-features = false }
-aws-smithy-runtime = { version = "1.7.3", default-features = false, features = ["tls-rustls"] }
+aws-smithy-runtime = { version = "1.7.4", default-features = false, features = ["tls-rustls"] }
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
@@ -404,7 +408,7 @@ azure_storage = { version = "0.17", default-features = false }
 base64 = "0.22.1"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
-libc = "0.2.164"
+libc = "0.2.167"
 similar-asserts = "1.6.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
@@ -421,13 +425,9 @@ vrl.workspace = true
 wiremock = "0.6.2"
 zstd = { version = "0.13.0", default-features = false }
 
-tokio-rustls = "0.23"
-rustls = "0.20"
-rustls-pemfile = "0.3"
-
 [patch.crates-io]
 # The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
-tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.11-framed-read-continue-on-error" }
+tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.13-framed-read-continue-on-error" }
 nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
@@ -586,7 +586,7 @@ sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver",
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-http-error", "protobuf-build", "dep:prost"]
 sources-demo_logs = ["dep:fakedata"]
-sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "protobuf-build", "dep:prost"]
+sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "dep:dnstap-parser", "protobuf-build", "dep:prost"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
@@ -692,8 +692,8 @@ sinks-logs = [
   "sinks-aws_kinesis_firehose",
   "sinks-aws_kinesis_streams",
   "sinks-aws_s3",
-  "sinks-aws_sqs",
   "sinks-aws_sns",
+  "sinks-aws_sqs",
   "sinks-axiom",
   "sinks-azure_blob",
   "sinks-azure_monitor_logs",
@@ -714,12 +714,13 @@ sinks-logs = [
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
-  "sinks-mezmo",
   "sinks-loki",
+  "sinks-mezmo",
   "sinks-mqtt",
   "sinks-nats",
-  "sinks-new_relic_logs",
   "sinks-new_relic",
+  "sinks-new_relic_logs",
+  "sinks-opentelemetry",
   "sinks-papertrail",
   "sinks-pulsar",
   "sinks-redis",
@@ -785,6 +786,7 @@ sinks-mqtt = ["dep:rumqttc"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
+sinks-opentelemetry = ["sinks-http"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "dep:lru"]

@@ -49,12 +49,13 @@ impl GenerateConfig for SqsSinkConfig {
 impl SqsSinkConfig {
     pub(super) async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
         create_client::<SqsClientBuilder>(
+            &SqsClientBuilder {},
             &self.base_config.auth,
             self.region.region(),
             self.region.endpoint(),
             proxy,
-            &self.base_config.tls,
-            &None,
+            self.base_config.tls.as_ref(),
+            None,
         )
         .await
     }

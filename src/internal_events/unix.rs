@@ -65,14 +65,12 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
     }
 }
 
-#[cfg(all(unix, any(feature = "sinks-socket", feature = "sinks-statsd")))]
 #[derive(Debug)]
 pub struct UnixSocketSendError<'a, E> {
     pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
 }
 
-#[cfg(all(unix, any(feature = "sinks-socket", feature = "sinks-statsd")))]
 impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
     fn emit(self) {
         let reason = "Unix socket send error.";
@@ -130,7 +128,7 @@ pub struct UnixSocketFileDeleteError<'a> {
     pub error: Error,
 }
 
-impl<'a> InternalEvent for UnixSocketFileDeleteError<'a> {
+impl InternalEvent for UnixSocketFileDeleteError<'_> {
     fn emit(self) {
         error!(
             message = "Failed in deleting unix socket file.",

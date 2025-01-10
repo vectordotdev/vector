@@ -472,3 +472,7 @@ zeek
 zookeeper
 zst
 zstandard
+otel
+otelcol
+siv
+onig
