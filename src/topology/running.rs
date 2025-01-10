@@ -117,13 +117,19 @@ impl RunningTopology {
         // pump in self.tasks, and the other for source in self.source_tasks.
         let mut check_handles = HashMap::<ComponentKey, Vec<_>>::new();
 
+        let map_closure = |_result| ();
+
         // We need to give some time to the sources to gracefully shutdown, so
         // we will merge them with other tasks.
         for (key, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
-            let task = task.map(|_result| ()).shared();
+            let task = task.map(map_closure).shared();
 
             wait_handles.push(task.clone());
             check_handles.entry(key).or_default().push(task);
+        }
+
+        if let Some(utilization_task) = self.utilization_task {
+            wait_handles.push(utilization_task.map(map_closure).shared());
         }
 
         // If we reach this, we will forcefully shutdown the sources. If None, we will never force shutdown.
