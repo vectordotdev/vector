@@ -1055,16 +1055,18 @@ impl RunningTopology {
         running_topology.connect_diff(&diff, &mut pieces).await;
         running_topology.spawn_diff(&diff, pieces);
 
-        running_topology.utilization_task =
-            // TODO: how to name this custom task?
-            Some(tokio::spawn(Task::new("".into(), "", async move {
+        running_topology.utilization_task = Some(tokio::spawn(Task::new(
+            "utilization_heartbeat".into(),
+            "",
+            async move {
                 utilization_emitter
                     .run_utilization(ShutdownSignal::noop())
                     .await;
                 // TODO: new task output type for this? Or handle this task in a completely
                 // different way
                 Ok(TaskOutput::Healthcheck)
-            })));
+            },
+        )));
 
         Some((running_topology, abort_rx))
     }
