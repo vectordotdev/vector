@@ -18,11 +18,10 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        // Create a temporary directory
+        // Create temporary directory for cloning the homebrew-brew repository
         let td = TempDir::new()?;
         env::set_current_dir(td.path())?;
 
-        // Clone the repository and set up Git
         debug!("Cloning the homebrew repository for username: {}", self.username);
         clone_and_setup_git(&self.username)?;
 
@@ -30,7 +29,6 @@ impl Cli {
         debug!("Updating the vector.rb formula for VECTOR_VERSION={vector_version}.");
         update_formula("Formula/vector.rb", &vector_version)?;
 
-        // Commit and push changes
         debug!("Committing and pushing changes (if any).");
         commit_and_push_changes(&vector_version)?;
 
