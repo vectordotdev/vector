@@ -503,7 +503,7 @@ impl RequestBuilder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleRequestBui
             body: payload.into_payload().bytes,
             finalizers,
             metadata,
-        }
+        };
     }
 }
 
