@@ -78,7 +78,8 @@ impl TcpConnector {
 
         let addr = SocketAddr::new(ip, self.address.port);
 
-        let tls = MaybeTlsSettings::from_config(&self.tls, false).context(FailedToConfigureTLS)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)
+            .context(FailedToConfigureTLS)?;
         let mut stream = tls
             .connect(self.address.host.as_str(), &addr)
             .await

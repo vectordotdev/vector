@@ -264,7 +264,6 @@ pub enum DeserializerConfig {
     ///
     /// Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
     /// the codec may continue to relax the enforcement of specification.
-
     ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
     /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go

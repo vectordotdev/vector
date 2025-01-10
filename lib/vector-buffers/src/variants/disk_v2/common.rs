@@ -64,7 +64,7 @@ pub(crate) const fn align16(amount: usize) -> usize {
         "`amount` must be less than `MAX_ALIGNABLE_AMOUNT`"
     );
 
-    ((amount + SERIALIZER_ALIGNMENT - 1) / SERIALIZER_ALIGNMENT) * SERIALIZER_ALIGNMENT
+    amount.div_ceil(SERIALIZER_ALIGNMENT) * SERIALIZER_ALIGNMENT
 }
 
 /// Gets the maximum possible data file size given the type-level numerical limits and buffer invariants.

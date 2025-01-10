@@ -40,9 +40,17 @@ pub enum Mode {
     /// Send over UDP.
     Udp(UdpMode),
 
-    /// Send over a Unix domain socket (UDS).
+    /// Send over a Unix domain socket (UDS), in stream mode.
     #[cfg(unix)]
-    Unix(UnixMode),
+    #[serde(alias = "unix")]
+    UnixStream(UnixMode),
+
+    /// Send over a Unix domain socket (UDS), in datagram mode.
+    /// Unavailable on macOS, due to send(2)'s apparent non-blocking behavior,
+    /// resulting in ENOBUFS errors which we currently don't handle.
+    #[cfg(unix)]
+    #[cfg_attr(target_os = "macos", serde(skip))]
+    UnixDatagram(UnixMode),
 }
 
 /// TCP configuration.
@@ -133,11 +141,26 @@ impl SinkConfig for SocketSinkConfig {
                 config.build(transformer, encoder)
             }
             #[cfg(unix)]
-            Mode::Unix(UnixMode { config, encoding }) => {
+            Mode::UnixStream(UnixMode { config, encoding }) => {
                 let transformer = encoding.transformer();
                 let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
                 let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(transformer, encoder)
+                config.build(
+                    transformer,
+                    encoder,
+                    super::util::service::net::UnixMode::Stream,
+                )
+            }
+            #[cfg(unix)]
+            Mode::UnixDatagram(UnixMode { config, encoding }) => {
+                let transformer = encoding.transformer();
+                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                let encoder = Encoder::<Framer>::new(framer, serializer);
+                config.build(
+                    transformer,
+                    encoder,
+                    super::util::service::net::UnixMode::Datagram,
+                )
             }
         }
     }
@@ -147,7 +170,9 @@ impl SinkConfig for SocketSinkConfig {
             Mode::Tcp(TcpMode { encoding, .. }) => encoding.config().1.input_type(),
             Mode::Udp(UdpMode { encoding, .. }) => encoding.config().input_type(),
             #[cfg(unix)]
-            Mode::Unix(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
+            Mode::UnixStream(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
+            #[cfg(unix)]
+            Mode::UnixDatagram(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
         };
         Input::new(encoder_input_type)
     }
@@ -159,12 +184,12 @@ impl SinkConfig for SocketSinkConfig {
 
 #[cfg(test)]
 mod test {
-    #[cfg(unix)]
-    use std::path::PathBuf;
     use std::{
         future::ready,
         net::{SocketAddr, UdpSocket},
     };
+    #[cfg(unix)]
+    use std::{os::unix::net::UnixDatagram, path::PathBuf};
 
     use futures::stream::StreamExt;
     use futures_util::stream;
@@ -196,14 +221,39 @@ mod test {
         crate::test_util::test_generate_config::<SocketSinkConfig>();
     }
 
-    async fn test_udp(addr: SocketAddr) {
-        let receiver = UdpSocket::bind(addr).unwrap();
+    enum DatagramSocket {
+        Udp(UdpSocket),
+        #[cfg(unix)]
+        Unix(UnixDatagram),
+    }
+
+    enum DatagramSocketAddr {
+        Udp(SocketAddr),
+        #[cfg(unix)]
+        Unix(PathBuf),
+    }
+
+    async fn test_datagram(datagram_addr: DatagramSocketAddr) {
+        let receiver = match &datagram_addr {
+            DatagramSocketAddr::Udp(addr) => DatagramSocket::Udp(UdpSocket::bind(addr).unwrap()),
+            #[cfg(unix)]
+            DatagramSocketAddr::Unix(path) => {
+                DatagramSocket::Unix(UnixDatagram::bind(path).unwrap())
+            }
+        };
 
         let config = SocketSinkConfig {
-            mode: Mode::Udp(UdpMode {
-                config: UdpSinkConfig::from_address(addr.to_string()),
-                encoding: JsonSerializerConfig::default().into(),
-            }),
+            mode: match &datagram_addr {
+                DatagramSocketAddr::Udp(addr) => Mode::Udp(UdpMode {
+                    config: UdpSinkConfig::from_address(addr.to_string()),
+                    encoding: JsonSerializerConfig::default().into(),
+                }),
+                #[cfg(unix)]
+                DatagramSocketAddr::Unix(path) => Mode::UnixDatagram(UnixMode {
+                    config: UnixSinkConfig::new(path.to_path_buf()),
+                    encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+                }),
+            },
             acknowledgements: Default::default(),
         };
 
@@ -218,9 +268,13 @@ mod test {
         .expect("Running sink failed");
 
         let mut buf = [0; 256];
-        let (size, _src_addr) = receiver
-            .recv_from(&mut buf)
-            .expect("Did not receive message");
+        let size = match &receiver {
+            DatagramSocket::Udp(sock) => {
+                sock.recv_from(&mut buf).expect("Did not receive message").0
+            }
+            #[cfg(unix)]
+            DatagramSocket::Unix(sock) => sock.recv(&mut buf).expect("Did not receive message"),
+        };
 
         let packet = String::from_utf8(buf[..size].to_vec()).expect("Invalid data received");
         let data = serde_json::from_str::<Value>(&packet).expect("Invalid JSON received");
@@ -234,14 +288,25 @@ mod test {
     async fn udp_ipv4() {
         trace_init();
 
-        test_udp(next_addr()).await;
+        test_datagram(DatagramSocketAddr::Udp(next_addr())).await;
     }
 
     #[tokio::test]
     async fn udp_ipv6() {
         trace_init();
 
-        test_udp(next_addr_v6()).await;
+        test_datagram(DatagramSocketAddr::Udp(next_addr_v6())).await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram() {
+        trace_init();
+
+        test_datagram(DatagramSocketAddr::Unix(temp_uds_path(
+            "unix_datagram_socket_test",
+        )))
+        .await;
     }
 
     #[tokio::test]
@@ -291,7 +356,7 @@ mod test {
         let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
 
         let config = SocketSinkConfig {
-            mode: Mode::Unix(UnixMode {
+            mode: Mode::UnixStream(UnixMode {
                 config: UnixSinkConfig::new(out_path),
                 encoding: (None::<FramingConfig>, NativeJsonSerializerConfig).into(),
             }),
@@ -402,7 +467,7 @@ mod test {
 
         // Only accept two connections.
         let jh2 = tokio::spawn(async move {
-            let tls = MaybeTlsSettings::from_config(&config, true).unwrap();
+            let tls = MaybeTlsSettings::from_config(config.as_ref(), true).unwrap();
             let listener = tls.bind(&addr).await.unwrap();
             listener
                 .accept_stream()

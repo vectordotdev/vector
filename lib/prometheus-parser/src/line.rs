@@ -62,7 +62,7 @@ impl From<nom::Err<ErrorKind>> for ErrorKind {
     }
 }
 
-impl<'a> nom::error::ParseError<&'a str> for ErrorKind {
+impl nom::error::ParseError<&str> for ErrorKind {
     fn from_error_kind(input: &str, kind: nom::error::ErrorKind) -> Self {
         ErrorKind::Nom {
             input: input.to_owned(),
