@@ -479,7 +479,9 @@ impl PubsubSource {
                 }
                 Ok(req)
             },
-        );
+        )
+        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
+        .max_decoding_message_size(usize::MAX);
 
         let (ack_ids_sender, ack_ids_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
 
