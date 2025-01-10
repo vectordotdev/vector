@@ -413,7 +413,7 @@ similar-asserts = "1.6.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
-rstest = { version = "0.23.0" }
+rstest = { version = "0.24.0" }
 tempfile = "3.14.0"
 test-generator = "0.3.1"
 tokio = { version = "1.43.0", features = ["test-util"] }
