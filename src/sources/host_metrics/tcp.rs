@@ -59,11 +59,11 @@ impl HostMetrics {
 
 #[derive(Debug, Snafu)]
 enum TcpError {
-    #[snafu(display("Could not open new netlink socket"))]
+    #[snafu(display("Could not open new netlink socket: {}", source))]
     NetlinkSocket { source: io::Error },
-    #[snafu(display("Could not send netlink message"))]
+    #[snafu(display("Could not send netlink message: {}", source))]
     NetlinkSend { source: io::Error },
-    #[snafu(display("Could not parse netlink response"))]
+    #[snafu(display("Could not parse netlink response: {}", source))]
     NetlinkParse {
         source: netlink_packet_utils::DecodeError,
     },
