@@ -67,6 +67,11 @@ on:
     - 'reopened'
     - 'synchronize'
 
+permissions:
+  pull-requests: write
+  security-events: write
+
+
 jobs:
   spelling:
     name: Check Spelling
@@ -75,8 +80,6 @@ jobs:
       pull-requests: read
       actions: read
       security-events: write
-    outputs:
-      followup: ${{ steps.spelling.outputs.followup }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: "contains(github.event_name, 'pull_request') || github.event_name == 'push'"
