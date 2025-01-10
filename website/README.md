@@ -15,7 +15,7 @@ In order to run the site [locally](#run-the-site-locally), you need to have thes
 
 vector.dev is a complex site with a lot of moving parts. This section breaks the site down into some key components.
 
-#### Branches
+### Branches
 
 The current Vector release branch (`vX.X`, for example `v0.15`) branch is used to build the "production" site at https://vector.dev. All changes should be targeted to `master`. If you want to release a website change outside of the normal release cadence, you can cherry-pick the commit to the release branch.
 
