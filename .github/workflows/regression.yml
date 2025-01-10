@@ -141,7 +141,6 @@ jobs:
               - "website/**"
               - "*.md"
               - "Tiltfile"
-              - "netlify.toml"
               - "NOTICE"
               - "LICENSE-3rdparty.csv"
               - "LICENSE"
