@@ -214,8 +214,17 @@ pub enum ProcessingError {
     },
     #[snafu(display("Unsupported S3 event version: {}.", version,))]
     UnsupportedS3EventVersion { version: semver::Version },
-    #[snafu(display("Sink reported an error sending events"))]
-    ErrorAcknowledgement,
+    #[snafu(display(
+        "Sink reported an error sending events for an s3 object in region {}: s3://{}/{}",
+        region,
+        bucket,
+        key
+    ))]
+    ErrorAcknowledgement {
+        region: String,
+        bucket: String,
+        key: String,
+    },
 }
 
 pub struct State {
@@ -393,6 +402,11 @@ impl IngestorProcess {
                         message_id: &message_id
                     });
                     if self.state.delete_message {
+                        trace!(
+                            message = "Queued SQS message for deletion.",
+                            id = message_id,
+                            receipt_handle = receipt_handle,
+                        );
                         delete_entries.push(
                             DeleteMessageBatchRequestEntry::builder()
                                 .id(message_id)
@@ -516,6 +530,12 @@ impl IngestorProcess {
             });
 
         let object = object_result?;
+
+        info!(
+            message = "Got S3 object from SQS notification.",
+            bucket = s3_event.s3.bucket.name,
+            key = s3_event.s3.object.key
+        );
 
         let metadata = object.metadata;
 
@@ -641,13 +661,34 @@ impl IngestorProcess {
                 Some(receiver) => {
                     let result = receiver.await;
                     match result {
-                        BatchStatus::Delivered => Ok(()),
-                        BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
+                        BatchStatus::Delivered => {
+                            info!(
+                                message = "S3 object from SQS delivered.",
+                                bucket = s3_event.s3.bucket.name,
+                                key = s3_event.s3.object.key,
+                            );
+                            Ok(())
+                        }
+                        BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement {
+                            bucket: s3_event.s3.bucket.name,
+                            key: s3_event.s3.object.key,
+                            region: s3_event.aws_region,
+                        }),
                         BatchStatus::Rejected => {
                             if self.state.delete_failed_message {
+                                warn!(
+                                    message =
+                                        "S3 object from SQS was rejected. Deleting failed message.",
+                                    bucket = s3_event.s3.bucket.name,
+                                    key = s3_event.s3.object.key,
+                                );
                                 Ok(())
                             } else {
-                                Err(ProcessingError::ErrorAcknowledgement)
+                                Err(ProcessingError::ErrorAcknowledgement {
+                                    bucket: s3_event.s3.bucket.name,
+                                    key: s3_event.s3.object.key,
+                                    region: s3_event.aws_region,
+                                })
                             }
                         }
                     }
