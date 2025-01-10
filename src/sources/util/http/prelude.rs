@@ -78,15 +78,15 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         method: HttpMethod,
         response_code: StatusCode,
         strict_path: bool,
-        tls: &Option<TlsEnableableConfig>,
-        auth: &Option<HttpSourceAuthConfig>,
+        tls: Option<&TlsEnableableConfig>,
+        auth: Option<&HttpSourceAuthConfig>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         keepalive_settings: KeepaliveConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
-        let auth = HttpSourceAuth::try_from(auth.as_ref())?;
+        let auth = HttpSourceAuth::try_from(auth)?;
         let path = path.to_owned();
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
         let enable_source_ip = self.enable_source_ip();

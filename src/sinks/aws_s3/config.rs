@@ -262,7 +262,7 @@ impl S3SinkConfig {
             &self.region,
             &self.auth,
             proxy,
-            &self.tls,
+            self.tls.as_ref(),
             self.force_path_style,
         )
         .await

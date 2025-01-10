@@ -154,7 +154,7 @@ impl ProxyConfig {
     fn build_proxy(
         &self,
         proxy_scheme: &'static str,
-        proxy_url: &Option<String>,
+        proxy_url: Option<&String>,
     ) -> Result<Option<Proxy>, InvalidUri> {
         proxy_url
             .as_ref()
@@ -180,11 +180,11 @@ impl ProxyConfig {
     }
 
     fn http_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
-        self.build_proxy("http", &self.http)
+        self.build_proxy("http", self.http.as_ref())
     }
 
     fn https_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
-        self.build_proxy("https", &self.https)
+        self.build_proxy("https", self.https.as_ref())
     }
 
     /// Install the [`ProxyConnector<C>`] for this `ProxyConfig`

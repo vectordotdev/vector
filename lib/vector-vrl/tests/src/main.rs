@@ -97,6 +97,7 @@ fn main() {
 
     let mut functions = vrl::stdlib::all();
     functions.extend(vector_vrl_functions::all());
+    functions.extend(dnstap_parser::vrl_functions());
     functions.extend(enrichment::vrl_functions());
 
     run_tests(
@@ -132,6 +133,7 @@ fn get_tests(cmd: &Cmd) -> Vec<Test> {
             vector_vrl_functions::all()
                 .into_iter()
                 .chain(enrichment::vrl_functions())
+                .chain(dnstap_parser::vrl_functions())
                 .collect(),
         ))
         .filter(|test| {
