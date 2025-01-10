@@ -401,7 +401,8 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.architecture }}
           path: target/artifacts
-
+      - name: List downloaded artifacts
+        run: ls -R target/artifacts
       - name: Set output path for artifacts
         id: output-path
         run: echo "artifacts-path=target/artifacts" >> $GITHUB_OUTPUT
@@ -449,6 +450,8 @@ jobs:
           ref: ${{ inputs.git_ref }}
       - name: Verify install of DEB package.
         run: |
+          pwd
+          ls -R target/
           DEB_PACKAGE_PATH="${{ needs.download-artifacts.outputs.artifacts-path }}/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb"
           echo "Verifying DEB package at: $DEB_PACKAGE_PATH"
           ./scripts/verify-install.sh "$DEB_PACKAGE_PATH"
