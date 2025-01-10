@@ -139,7 +139,10 @@ remap: functions: crc: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reasons: []
+	internal_failure_reasons: [
+	  "`value` is not a string.",
+	  "`algorithm` is not a supported algorithm.",
+	]
 	return: types: ["string"]
 
 	examples: [
