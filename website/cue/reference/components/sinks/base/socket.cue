@@ -383,7 +383,7 @@ base: components: sinks: socket: configuration: {
 	}
 	framing: {
 		description:   "Framing configuration."
-		relevant_when: "mode = \"tcp\" or mode = \"unix\""
+		relevant_when: "mode = \"tcp\" or mode = \"unix_stream\" or mode = \"unix_datagram\""
 		required:      false
 		type: object: options: {
 			character_delimited: {
@@ -453,9 +453,14 @@ base: components: sinks: socket: configuration: {
 		description: "The type of socket to use."
 		required:    true
 		type: string: enum: {
-			tcp:  "Send over TCP."
-			udp:  "Send over UDP."
-			unix: "Send over a Unix domain socket (UDS)."
+			tcp: "Send over TCP."
+			udp: "Send over UDP."
+			unix_datagram: """
+				Send over a Unix domain socket (UDS), in datagram mode.
+				Unavailable on macOS, due to send(2)'s apparent non-blocking behavior,
+				resulting in ENOBUFS errors which we currently don't handle.
+				"""
+			unix_stream: "Send over a Unix domain socket (UDS), in stream mode."
 		}
 	}
 	path: {
@@ -464,7 +469,7 @@ base: components: sinks: socket: configuration: {
 
 			This should be an absolute path.
 			"""
-		relevant_when: "mode = \"unix\""
+		relevant_when: "mode = \"unix_stream\" or mode = \"unix_datagram\""
 		required:      true
 		type: string: examples: ["/path/to/socket"]
 	}

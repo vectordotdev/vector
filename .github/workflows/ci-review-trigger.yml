@@ -51,7 +51,7 @@ env:
 jobs:
   validate:
     name: Validate review
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: |
         startsWith(github.event.review.body, '/ci-run-all')

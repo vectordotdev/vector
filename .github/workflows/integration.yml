@@ -71,7 +71,6 @@ jobs:
             || needs.changes.outputs.fluent == 'true'
             || needs.changes.outputs.gcp == 'true'
             || needs.changes.outputs.greptimedb == 'true'
-            || needs.changes.outputs.humio == 'true'
             || needs.changes.outputs.http-client == 'true'
             || needs.changes.outputs.influxdb == 'true'
             || needs.changes.outputs.kafka == 'true'
@@ -298,15 +297,17 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh int  greptimedb
 
-      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
-
-      - if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.humio == 'true' }}
-        name: humio
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int  humio
+      # temporarily disabled because the image was archived and the new image
+      # (humio/humio-single-node-demo) wants a license key
+      #- run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
+      #
+      #- if: ${{ github.event_name == 'merge_group' || needs.changes.outputs.all-int == 'true' || needs.changes.outputs.humio == 'true' }}
+        #name: humio
+        #uses: nick-fields/retry@v3
+        #with:
+          #timeout_minutes: 30
+          #max_attempts: 3
+          #command: bash scripts/ci-int-e2e-test.sh int  humio
 
       - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
 
@@ -482,7 +483,7 @@ jobs:
 
   integration-test-suite:
     name: Integration Test Suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: always()
     needs:

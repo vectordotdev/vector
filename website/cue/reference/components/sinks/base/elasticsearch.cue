@@ -269,6 +269,11 @@ base: components: sinks: elasticsearch: configuration: {
 					syntax: "template"
 				}
 			}
+			template_fallback_index: {
+				description: "The default index to write events to if the template in `bulk.index` cannot be resolved"
+				required:    false
+				type: string: examples: ["test-index"]
+			}
 			version: {
 				description: "Version field value."
 				required:    false
