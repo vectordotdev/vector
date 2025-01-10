@@ -403,7 +403,7 @@ impl IngestorProcess {
                     });
                     if self.state.delete_message {
                         trace!(
-                            message = "Queued SQS message for deletion",
+                            message = "Queued SQS message for deletion.",
                             id = message_id,
                             receipt_handle = receipt_handle,
                         );
