@@ -43,6 +43,7 @@ Providing this information upfront will facilitate a smoother review process. --
 
 ## Checklist
 - [ ] Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
+  - Ensure the following commands are passing locally: `cargo fmt`, `cargo clippy --all` and `cargo test --all`.
 - [ ] If this PR introduces changes Vector dependencies (modifies `Cargo.lock`), please
   run `dd-rust-license-tool write` to regenerate the [license inventory](https://github.com/vectordotdev/vrl/blob/main/LICENSE-3rdparty.csv) and commit the changes (if any). More details [here](https://crates.io/crates/dd-rust-license-tool).
 
