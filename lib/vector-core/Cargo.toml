@@ -14,7 +14,7 @@ bitmask-enum = { version = "2.2.5", default-features = false }
 bytes = { version = "1.9.0", default-features = false, features = ["serde"] }
 chrono.workspace = true
 chrono-tz.workspace = true
-crossbeam-utils = { version = "0.8.20", default-features = false }
+crossbeam-utils = { version = "0.8.21", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.17", default-features = false }
 enumflags2 = { version = "0.7.10", default-features = false }
@@ -39,7 +39,7 @@ pin-project.workspace = true
 proptest = { version = "1.5", optional = true }
 prost-types.workspace = true
 prost .workspace = true
-quanta = { version = "0.12.3", default-features = false }
+quanta = { version = "0.12.5", default-features = false }
 regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
 serde.workspace = true
