@@ -382,7 +382,7 @@ urls: {
 	nginx:                                      "https://www.nginx.com/"
 	nginx_combined:                             "https://nginx.org/en/docs/http/ngx_http_log_module.html"
 	nginx_ingress_upstreaminfo:                 "https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/log-format/"
-	nginx_main									"https://hg.nginx.org/pkg-oss/file/tip/debian/debian/nginx.conf"
+	nginx_main:                                 "https://hg.nginx.org/pkg-oss/file/tip/debian/debian/nginx.conf"
 	nginx_error:                                "https://github.com/nginx/nginx/blob/branches/stable-1.18/src/core/ngx_log.c#L102"
 	nginx_stub_status_module:                   "http://nginx.org/en/docs/http/ngx_http_stub_status_module.html"
 	nix:                                        "https://nixos.org/nix/"
