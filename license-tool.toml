@@ -1,6 +1,7 @@
 [overrides]
 "backon" = { origin = "https://github.com/Xuanwo/backon" }
 "bollard-stubs" = { origin = "https://github.com/fussybeaver/bollard" }
+"crunchy" = { origin = "https://github.com/eira-fransham/crunchy" }
 "openssl-macros" = { origin = "https://github.com/sfackler/rust-openssl" }
 "serde_nanos" = { origin = "https://github.com/caspervonb/serde_nanos" }
 

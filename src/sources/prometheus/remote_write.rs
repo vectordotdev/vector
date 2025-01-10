@@ -89,8 +89,8 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             HttpMethod::Post,
             StatusCode::OK,
             true,
-            &self.tls,
-            &self.auth,
+            self.tls.as_ref(),
+            self.auth.as_ref(),
             cx,
             self.acknowledgements,
             self.keepalive.clone(),
@@ -183,7 +183,7 @@ mod test {
         let address = test_util::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
-        let proto = MaybeTlsSettings::from_config(&tls, true)
+        let proto = MaybeTlsSettings::from_config(tls.as_ref(), true)
             .unwrap()
             .http_protocol_name();
         let source = PrometheusRemoteWriteConfig {

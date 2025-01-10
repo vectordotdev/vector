@@ -107,8 +107,8 @@ impl KinesisFirehoseSinkConfig {
             self.base.region.region(),
             self.base.region.endpoint(),
             proxy,
-            &self.base.tls,
-            &None,
+            self.base.tls.as_ref(),
+            None,
         )
         .await
     }

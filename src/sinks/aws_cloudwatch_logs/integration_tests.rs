@@ -473,8 +473,8 @@ async fn create_client_test() -> CloudwatchLogsClient {
         region,
         endpoint,
         &proxy,
-        &None,
-        &None,
+        None,
+        None,
     )
     .await
     .unwrap()

@@ -186,7 +186,7 @@ impl MqttSinkConfig {
         if client_id.is_empty() {
             return Err(ConfigurationError::EmptyClientId).context(ConfigurationSnafu);
         }
-        let tls = MaybeTlsSettings::from_config(&self.tls, false).context(TlsSnafu)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false).context(TlsSnafu)?;
         let mut options = MqttOptions::new(&client_id, &self.host, self.port);
         options.set_keep_alive(Duration::from_secs(self.keep_alive.into()));
         options.set_clean_session(self.clean_session);

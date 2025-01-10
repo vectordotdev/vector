@@ -7,7 +7,7 @@ pub struct TagCardinalityLimitRejectingEvent<'a> {
     pub tag_value: &'a str,
 }
 
-impl<'a> InternalEvent for TagCardinalityLimitRejectingEvent<'a> {
+impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
     fn emit(self) {
         debug!(
             message = "Event containing tag with new value after hitting configured 'value_limit'; discarding event.",
@@ -31,7 +31,7 @@ pub struct TagCardinalityLimitRejectingTag<'a> {
     pub tag_value: &'a str,
 }
 
-impl<'a> InternalEvent for TagCardinalityLimitRejectingTag<'a> {
+impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
     fn emit(self) {
         debug!(
             message = "Rejecting tag after hitting configured 'value_limit'.",
@@ -48,7 +48,7 @@ pub struct TagCardinalityValueLimitReached<'a> {
     pub key: &'a str,
 }
 
-impl<'a> InternalEvent for TagCardinalityValueLimitReached<'a> {
+impl InternalEvent for TagCardinalityValueLimitReached<'_> {
     fn emit(self) {
         debug!(
             message = "Value_limit reached for key. New values for this key will be rejected.",
