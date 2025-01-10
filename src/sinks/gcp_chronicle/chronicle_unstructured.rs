@@ -487,7 +487,7 @@ impl RequestBuilder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleRequestBui
                 );
                 headers.insert(
                     header::CONTENT_ENCODING,
-                    HeaderValue::from_str(&self.compression.content_encoding().unwrap()).unwrap(),
+                    HeaderValue::from_str(self.compression.content_encoding().unwrap()).unwrap(),
                 );
             }
             None => {
