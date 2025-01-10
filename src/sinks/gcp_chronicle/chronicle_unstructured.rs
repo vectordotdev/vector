@@ -498,12 +498,12 @@ impl RequestBuilder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleRequestBui
             }
         }
 
-        return ChronicleRequest {
-            headers: headers,
+        ChronicleRequest {
+            headers,
             body: payload.into_payload().bytes,
             finalizers,
             metadata,
-        };
+        }
     }
 }
 
