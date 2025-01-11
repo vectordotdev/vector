@@ -134,35 +134,35 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = "1.0.94"
+anyhow = "1.0.95"
 cfg-if = { version = "1.0.0", default-features = false }
-chrono = { version = "0.4.38", default-features = false, features = ["clock", "serde"] }
+chrono = { version = "0.4.39", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.0", default-features = false, features = ["serde"] }
-clap = { version = "4.5.22", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.26", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
-glob = { version = "0.3.1", default-features = false }
-hickory-proto = { version = "0.24.1", default-features = false, features = ["dnssec"] }
+glob = { version = "0.3.2", default-features = false }
+hickory-proto = { version = "0.24.2", default-features = false, features = ["dnssec"] }
 indexmap = { version = "2.7.0", default-features = false, features = ["serde", "std"] }
 metrics = "0.24.1"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
-pin-project = { version = "1.1.7", default-features = false }
+pin-project = { version = "1.1.8", default-features = false }
 proptest = { version = "1.5" }
-proptest-derive = { version = "0.5.0" }
+proptest-derive = { version = "0.5.1" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
 prost-types = { version = "0.12", default-features = false }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
-serde_json = { version = "1.0.133", default-features = false, features = ["raw_value", "std"] }
-serde = { version = "1.0.215", default-features = false, features = ["alloc", "derive", "rc"] }
+serde_json = { version = "1.0.135", default-features = false, features = ["raw_value", "std"] }
+serde = { version = "1.0.217", default-features = false, features = ["alloc", "derive", "rc"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
 tokio = { version = "1.43.0", default-features = false, features = ["full"] }
 toml = { version = "0.8.19", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
-uuid = { version = "1.11.0", features = ["v4", "v7", "serde"] }
+uuid = { version = "1.11.1", features = ["v4", "v7", "serde"] }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
@@ -194,11 +194,11 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.6", default-features = false }
-async-trait = { version = "0.1.83", default-features = false }
+async-trait = { version = "0.1.85", default-features = false }
 futures.workspace = true
 tokio = { version = "1.43.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
-tokio-stream = { version = "0.1.16", default-features = false, features = ["net", "sync", "time"] }
+tokio-stream = { version = "0.1.17", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
 console-subscriber = { version = "0.4.1", default-features = false, optional = true }
 
@@ -329,7 +329,7 @@ hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap.workspace = true
 indoc = { version = "2.0.5", default-features = false }
-inventory = { version = "0.3.15", default-features = false }
+inventory = { version = "0.3.17", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
 itertools = { version = "0.14.0", default-features = false, optional = false, features = ["use_alloc"] }
 k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26"], optional = true }
@@ -355,10 +355,10 @@ rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.37.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.24.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
-roaring = { version = "0.10.7", default-features = false, features = ["std"], optional = true }
+roaring = { version = "0.10.10", default-features = false, features = ["std"], optional = true }
 rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
-semver = { version = "1.0.23", default-features = false, features = ["serde", "std"], optional = true }
+semver = { version = "1.0.24", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
 socket2 = { version = "0.5.8", default-features = false }
@@ -371,7 +371,7 @@ tokio-tungstenite = { version = "0.20.1", default-features = false, features = [
 toml.workspace = true
 tonic = { workspace = true, optional = true }
 hickory-proto = { workspace = true, optional = true }
-typetag = { version = "0.2.18", default-features = false }
+typetag = { version = "0.2.19", default-features = false }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }
 zstd = { version = "0.13.0", default-features = false }
