@@ -73,5 +73,21 @@ remap: functions: parse_groks: {
 				message:   "Hello world"
 			}
 		},
+		{
+			title: "Parse using aliases from file"
+			source: #"""
+				parse_groks!(
+				  "username=foo",
+				  patterns: [ "%{PATTERN_A}" ],
+				  alias_sources: [ "path/to/aliases.json" ]
+				)
+				# aliases.json contents:
+				# {
+				#   "PATTERN_A": "%{PATTERN_B}",
+				#   "PATTERN_B": "username=%{USERNAME:username}"
+				# }
+				"""#
+				skip_test: true
+		}
 	]
 }
