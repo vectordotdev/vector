@@ -480,6 +480,7 @@ fn annotate_from_container(
 mod tests {
     use k8s_openapi::api::core::v1::PodIP;
     use similar_asserts::assert_eq;
+    use std::path::PathBuf;
     use vector_lib::lookup::{event_path, metadata_path};
 
     use super::*;
@@ -752,28 +753,53 @@ mod tests {
 
     #[test]
     fn test_annotate_from_file_info() {
-        let cases = vec![(
-            FieldsSpec::default(),
-            "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
-            {
-                let mut log = LogEvent::default();
-                log.insert(event_path!("kubernetes", "container_name"), "sandbox0-container0-name");
-                log
-            },
-            LogNamespace::Legacy,
-        ),(
-            FieldsSpec{
-                container_name: OwnedTargetPath::event(owned_value_path!("container_name")).into(),
-                ..Default::default()
-            },
-            "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
-            {
-                let mut log = LogEvent::default();
-                log.insert(event_path!("container_name"), "sandbox0-container0-name");
-                log
-            },
-            LogNamespace::Legacy,
-        )];
+        let path = &format!(
+            "{}{}",
+            std::path::MAIN_SEPARATOR,
+            [
+                "var",
+                "log",
+                "pods",
+                "sandbox0-ns_sandbox0-name_sandbox0-uid",
+                "sandbox0-container0-name",
+                "1.log",
+            ]
+            .iter()
+            .collect::<PathBuf>()
+            .into_os_string()
+            .into_string()
+            .unwrap()
+        );
+        let s_path = path.as_str();
+        let cases = vec![
+            (
+                FieldsSpec::default(),
+                s_path,
+                {
+                    let mut log = LogEvent::default();
+                    log.insert(
+                        event_path!("kubernetes", "container_name"),
+                        "sandbox0-container0-name",
+                    );
+                    log
+                },
+                LogNamespace::Legacy,
+            ),
+            (
+                FieldsSpec {
+                    container_name: OwnedTargetPath::event(owned_value_path!("container_name"))
+                        .into(),
+                    ..Default::default()
+                },
+                s_path,
+                {
+                    let mut log = LogEvent::default();
+                    log.insert(event_path!("container_name"), "sandbox0-container0-name");
+                    log
+                },
+                LogNamespace::Legacy,
+            ),
+        ];
 
         for (fields_spec, file, expected, log_namespace) in cases.into_iter() {
             let mut log = LogEvent::default();

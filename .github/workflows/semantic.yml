@@ -1,0 +1,245 @@
+# This is a GitHub Action that ensures that the PR titles match the Conventional Commits spec.
+# See: https://www.conventionalcommits.org/en/v1.0.0/
+
+name: "PR Title Semantic Check"
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+
+jobs:
+  main:
+    name: Check Semantic PR
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          requireScope: true
+          types: |
+            chore
+            enhancement
+            feat
+            fix
+            docs
+            revert
+
+          scopes: |
+            new source
+            new transform
+            new sink
+            ARC
+            administration
+            api
+            architecture
+            auth
+            buffers
+            ci
+            cli
+            codecs
+            compression
+            config
+            core
+            data model
+            delivery
+            deployment
+            deps
+            dev
+            durability
+            enriching
+            enterprise
+            exceptions
+            external
+            external docs
+            filtering
+            healthchecks
+            internal
+            internal docs
+            logs
+            metrics
+            networking
+            observability
+            parsing
+            performance
+            platforms
+            privacy
+            processing
+            releasing
+            reliability
+            reload
+            replay
+            schemas
+            security
+            setup
+            shutdown
+            sinks
+            soak tests
+            sources
+            startup
+            templating
+            tests
+            topology
+            traces
+            transforms
+            unit tests
+            vrl
+            amazon-linux platform
+            apt platform
+            arm platform
+            arm64 platform
+            centos platform
+            debian platform
+            docker platform
+            dpkg platform
+            helm platform
+            heroku platform
+            homebrew platform
+            kubernetes platform
+            macos platform
+            msi platform
+            nix platform
+            nixos platform
+            raspbian platform
+            rhel platform
+            rpm platform
+            ubuntu platform
+            windows platform
+            x86_64 platform
+            yum platform
+
+            service providers
+            aws service
+            azure service
+            confluent service
+            datadog service
+            elastic service
+            gcp service
+            grafana service
+            heroku service
+            honeycomb service
+            humio service
+            influxdata service
+            logdna service
+            new relic service
+            papertrail service
+            sematext service
+            splunk service
+            yandex service
+            apache_metrics source
+            aws_ecs_metrics source
+            aws_kinesis_firehose source
+            aws_s3 source
+            aws_sqs source
+            datadog_agent source
+            demo_logs source
+            dnstap source
+            docker_logs source
+            exec source
+            file source
+            file_descriptor source
+            fluent source
+            gcp_pubsub source
+            heroku_logs source
+            host_metrics source
+            http source
+            http_scrape source
+            internal_logs source
+            internal_metrics source
+            journald source
+            kafka source
+            kubernetes_logs source
+            logstash source
+            mongodb_metrics source
+            new source
+            nginx_metrics source
+            opentelemetry source
+            postgresql_metrics source
+            prometheus_remote_write source
+            prometheus_scrape source
+            redis source
+            socket source
+            splunk_hec source
+            static_metrics source
+            statsd source
+            stdin source
+            syslog source
+            vector source
+            aws_ec2_metadata transform
+            dedupe transform
+            filter transform
+            geoip transform
+            log_to_metric transform
+            lua transform
+            metric_to_log transform
+            new transform
+            pipelines transform
+            reduce transform
+            remap transform
+            route transform
+            exclusive_route transform
+            sample transform
+            tag_cardinality_limit transform
+            throttle transform
+            apex sink
+            aws_cloudwatch_logs sink
+            aws_cloudwatch_metrics sink
+            aws_kinesis_firehose sink
+            aws_kinesis_streams sink
+            aws_s3 sink
+            aws_sqs sink
+            azure_blob sink
+            azure_monitor_logs sink
+            blackhole sink
+            clickhouse sink
+            console sink
+            datadog_archives sink
+            datadog_events sink
+            datadog_logs sink
+            datadog_metrics sink
+            elasticsearch sink
+            file sink
+            gcp_chronicle sink
+            gcp_cloud_storage sink
+            gcp_pubsub sink
+            gcp_stackdriver_logs sink
+            gcp_stackdriver_metrics sink
+            greptimedb_metrics sink
+            greptimedb_logs sink
+            honeycomb sink
+            http sink
+            humio_logs sink
+            humio_metrics sink
+            influxdb_logs sink
+            influxdb_metrics sink
+            kafka sink
+            logdna sink
+            loki sink
+            nats sink
+            new sink
+            new_relic sink
+            new_relic_logs sink
+            opentelemetry sink
+            papertrail sink
+            prometheus_exporter sink
+            prometheus_remote_write sink
+            pulsar sink
+            redis sink
+            sematext_logs sink
+            sematext_metrics sink
+            socket sink
+            splunk_hec sink
+            statsd sink
+            vector sink
+            websocket sink
+            blog website
+            css website
+            guides website
+            highlights website
+            javascript website
+            search website
+            template website
+            website

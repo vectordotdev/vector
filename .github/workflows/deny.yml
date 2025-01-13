@@ -16,10 +16,13 @@ on:
     # At midnight UTC
     - cron: '0 0 * * *'
 
+permissions:
+  statuses: write
+
 jobs:
   test-deny:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
     env:
       CARGO_INCREMENTAL: 0
     steps:
@@ -34,13 +37,13 @@ jobs:
 
       - name: (PR review) Checkout PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - uses: actions/cache@v4
         name: Cache Cargo registry + index

@@ -13,7 +13,7 @@ set -u
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
 # If VECTOR_VERSION is unset or empty, default it.
-VECTOR_VERSION="${VECTOR_VERSION:-"0.41.1"}"
+VECTOR_VERSION="${VECTOR_VERSION:-"0.43.1"}"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -147,21 +147,14 @@ install_from_archive() {
         x86_64-apple-darwin)
             _archive_arch=$_arch
             ;;
+        aarch64-apple-darwin)
+            _archive_arch="arm64-apple-darwin"
+            ;;
         x86_64-*linux*-gnu)
             _archive_arch="x86_64-unknown-linux-gnu"
             ;;
         x86_64-*linux*-musl)
             _archive_arch="x86_64-unknown-linux-musl"
-            ;;
-        aarch64-apple-darwin)
-            # This if statement can be removed when Vector publishes aarch64-apple-darwin builds
-            if /usr/bin/pgrep oahd >/dev/null 2>&1; then
-                echo "Rosetta is installed, installing x86_64-apple-darwin archive"
-                _archive_arch="x86_64-apple-darwin"
-            else
-                echo "Builds for Apple Silicon are not published today, please install Rosetta"
-                err "unsupported arch: $_arch"
-            fi
             ;;
         aarch64-*linux*)
             _archive_arch="aarch64-unknown-linux-musl"

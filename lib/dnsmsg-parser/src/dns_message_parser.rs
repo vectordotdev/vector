@@ -21,7 +21,7 @@ use hickory_proto::{
     },
     serialize::binary::{BinDecodable, BinDecoder},
 };
-use thiserror::Error;
+use snafu::Snafu;
 
 use crate::ede::{EDE, EDE_OPTION_CODE};
 
@@ -31,13 +31,15 @@ use super::dns_message::{
 };
 
 /// Error type for DNS message parsing
-#[derive(Error, Debug)]
+#[derive(Debug, Snafu)]
 pub enum DnsMessageParserError {
-    #[error("Encountered error : {}", cause)]
+    #[snafu(display("Encountered error: {}", cause))]
     SimpleError { cause: String },
-    #[error("Encountered error from TrustDns: {}", source.to_string())]
+
+    #[snafu(display("Encountered error from TrustDns: {}", source))]
     TrustDnsError { source: ProtoError },
-    #[error("UTF8Error: {}", source)]
+
+    #[snafu(display("UTF8Error: {}", source))]
     Utf8ParsingError { source: Utf8Error },
 }
 

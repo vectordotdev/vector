@@ -39,6 +39,7 @@ On the day of release:
 - [ ] Wait for release workflow to complete
   - Discoverable via [https://github.com/timberio/vector/actions/workflows/release.yml](https://github.com/timberio/vector/actions/workflows/release.yml)
 - [ ] Release Linux packages. See [`vector-release` usage](https://github.com/DataDog/vector-release#usage).
+  - [ ] Manually trigger the `trigger-package-release-pipeline-prod-stable` job.
 - [ ] Push the release branch to update the remote (This should close the preparation branch PR).
   - `git checkout v0.<current minor version> && git push`
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).

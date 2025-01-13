@@ -23,9 +23,13 @@ use vector_lib::{
     event::{BatchNotifier, BatchStatus},
     EstimatedJsonEncodedSizeOf,
 };
-use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
+use warp::{
+    filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response, Filter, Reply,
+};
 
 use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
+use crate::sources::http_server::HttpConfigParamKind;
+use crate::sources::util::add_headers;
 use crate::{
     event::Event,
     http::build_http_trace_layer,
@@ -36,6 +40,7 @@ use crate::{
     SourceSender,
 };
 
+use super::OpentelemetryConfig;
 use super::{reply::protobuf, status::Status};
 
 #[derive(Clone, Copy, Debug, Snafu)]
@@ -86,6 +91,7 @@ pub(crate) fn build_warp_filter(
     out: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    headers: Vec<HttpConfigParamKind>,
 ) -> BoxedFilter<(Response,)> {
     let log_filters = build_warp_log_filter(
         acknowledgements,
@@ -93,6 +99,7 @@ pub(crate) fn build_warp_filter(
         out.clone(),
         bytes_received.clone(),
         events_received.clone(),
+        headers,
     );
     let trace_filters = build_warp_trace_filter(
         acknowledgements,
@@ -103,12 +110,28 @@ pub(crate) fn build_warp_filter(
     log_filters.or(trace_filters).unify().boxed()
 }
 
+fn enrich_events(
+    events: &mut [Event],
+    headers_config: &[HttpConfigParamKind],
+    headers: &HeaderMap,
+    log_namespace: LogNamespace,
+) {
+    add_headers(
+        events,
+        headers_config,
+        headers,
+        log_namespace,
+        OpentelemetryConfig::NAME,
+    );
+}
+
 fn build_warp_log_filter(
     acknowledgements: bool,
     log_namespace: LogNamespace,
     out: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    headers: Vec<HttpConfigParamKind>,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "logs"))
@@ -117,21 +140,29 @@ fn build_warp_log_filter(
             "application/x-protobuf",
         ))
         .and(warp::header::optional::<String>("content-encoding"))
+        .and(warp::header::headers_cloned())
         .and(warp::body::bytes())
-        .and_then(move |encoding_header: Option<String>, body: Bytes| {
-            let events = decode(encoding_header.as_deref(), body).and_then(|body| {
-                bytes_received.emit(ByteSize(body.len()));
-                decode_log_body(body, log_namespace, &events_received)
-            });
+        .and_then(
+            move |encoding_header: Option<String>, headers_config: HeaderMap, body: Bytes| {
+                let events = decode(encoding_header.as_deref(), body)
+                    .and_then(|body| {
+                        bytes_received.emit(ByteSize(body.len()));
+                        decode_log_body(body, log_namespace, &events_received)
+                    })
+                    .map(|mut events| {
+                        enrich_events(&mut events, &headers, &headers_config, log_namespace);
+                        events
+                    });
 
-            handle_request(
-                events,
-                acknowledgements,
-                out.clone(),
-                super::LOGS,
-                ExportLogsServiceResponse::default(),
-            )
-        })
+                handle_request(
+                    events,
+                    acknowledgements,
+                    out.clone(),
+                    super::LOGS,
+                    ExportLogsServiceResponse::default(),
+                )
+            },
+        )
         .boxed()
 }
 

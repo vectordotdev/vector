@@ -14,17 +14,16 @@ winapi = { version = "0.3", features = ["winioctl"] }
 crc = "3.2.1"
 glob.workspace = true
 scan_fmt = "0.2.6"
+vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
-vector-config-common = { path = "../vector-config-common", default-features = false }
-vector-config-macros = { path = "../vector-config-macros", default-features = false }
 
 [dependencies.bstr]
-version = "1.10"
+version = "1.11"
 default-features = false
 features = []
 
 [dependencies.bytes]
-version = "1.7.2"
+version = "1.9.0"
 default-features = false
 features = []
 
@@ -39,7 +38,7 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "2.5.0"
+version = "2.7.0"
 default-features = false
 features = ["serde"]
 
@@ -69,14 +68,14 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.40.0"
+version = "1.43.0"
 default-features = false
 features = ["full"]
 
 [dev-dependencies]
 criterion = "0.5"
 quickcheck = "1"
-tempfile = "3.13.0"
+tempfile = "3.14.0"
 similar-asserts = "1.6.0"
 
 [[bench]]

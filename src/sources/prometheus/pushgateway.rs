@@ -99,8 +99,8 @@ impl SourceConfig for PrometheusPushgatewayConfig {
             HttpMethod::Post,
             http::StatusCode::OK,
             false,
-            &self.tls,
-            &self.auth,
+            self.tls.as_ref(),
+            self.auth.as_ref(),
             cx,
             self.acknowledgements,
             self.keepalive.clone(),
@@ -382,7 +382,7 @@ mod test {
             tokio::spawn(source);
             wait_for_tcp(address).await;
 
-            let proto = MaybeTlsSettings::from_config(&tls, true)
+            let proto = MaybeTlsSettings::from_config(tls.as_ref(), true)
                 .unwrap()
                 .http_protocol_name();
             let push_path = "metrics/job/async_worker";

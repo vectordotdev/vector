@@ -65,6 +65,8 @@ pub struct GlobalOptions {
     /// The time zone name may be any name in the [TZ database][tzdb] or `local` to indicate system
     /// local time.
     ///
+    /// Note that in Vector/VRL all timestamps are represented in UTC.
+    ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub timezone: Option<TimeZone>,
@@ -89,11 +91,7 @@ pub struct GlobalOptions {
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
     ///
-    /// Not set by default, which allows all internal metrics to grow unbounded over time. If you
-    /// have a configuration that emits many high-cardinality metrics, you may want to consider
-    /// setting this to a value that ensures that metrics live long enough to be emitted and
-    /// captured, but not so long that they continue to build up indefinitely, as this will consume
-    /// a small amount of memory for each metric.
+    /// Deprecated: use expire_metrics_secs instead
     #[configurable(deprecated)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub expire_metrics: Option<Duration>,
@@ -101,12 +99,9 @@ pub struct GlobalOptions {
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
     ///
-    /// Not set by default, which allows all internal metrics to grow unbounded over time. If you
-    /// have a configuration that emits many high-cardinality metrics, you may want to consider
-    /// setting this to a value that ensures that metrics live long enough to be emitted and
-    /// captured, but not so long that they continue to build up indefinitely, as this will consume
-    /// a small amount of memory for each metric.
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    /// Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
+    /// that metrics live long enough to be emitted and captured,
+    #[serde(skip_serializing_if = "crate::serde::is_default")]
     pub expire_metrics_secs: Option<f64>,
 }
 
@@ -170,11 +165,11 @@ impl GlobalOptions {
     pub fn merge(&self, with: Self) -> Result<Self, Vec<String>> {
         let mut errors = Vec::new();
 
-        if conflicts(&self.proxy.http, &with.proxy.http) {
+        if conflicts(self.proxy.http.as_ref(), with.proxy.http.as_ref()) {
             errors.push("conflicting values for 'proxy.http' found".to_owned());
         }
 
-        if conflicts(&self.proxy.https, &with.proxy.https) {
+        if conflicts(self.proxy.https.as_ref(), with.proxy.https.as_ref()) {
             errors.push("conflicting values for 'proxy.https' found".to_owned());
         }
 
@@ -182,15 +177,26 @@ impl GlobalOptions {
             errors.push("conflicting values for 'proxy.no_proxy' found".to_owned());
         }
 
-        if conflicts(&self.timezone, &with.timezone) {
+        if conflicts(self.timezone.as_ref(), with.timezone.as_ref()) {
             errors.push("conflicting values for 'timezone' found".to_owned());
         }
 
         if conflicts(
-            &self.acknowledgements.enabled,
-            &with.acknowledgements.enabled,
+            self.acknowledgements.enabled.as_ref(),
+            with.acknowledgements.enabled.as_ref(),
         ) {
             errors.push("conflicting values for 'acknowledgements' found".to_owned());
+        }
+
+        if conflicts(self.expire_metrics.as_ref(), with.expire_metrics.as_ref()) {
+            errors.push("conflicting values for 'expire_metrics' found".to_owned());
+        }
+
+        if conflicts(
+            self.expire_metrics_secs.as_ref(),
+            with.expire_metrics_secs.as_ref(),
+        ) {
+            errors.push("conflicting values for 'expire_metrics_secs' found".to_owned());
         }
 
         let data_dir = if self.data_dir.is_none() || self.data_dir == default_data_dir() {
@@ -236,7 +242,7 @@ impl GlobalOptions {
     }
 }
 
-fn conflicts<T: PartialEq>(this: &Option<T>, that: &Option<T>) -> bool {
+fn conflicts<T: PartialEq>(this: Option<&T>, that: Option<&T>) -> bool {
     matches!((this, that), (Some(this), Some(that)) if this != that)
 }
 
@@ -344,7 +350,12 @@ mod tests {
         assert_eq!(merge(Some(1.0), None), Ok(Some(1.0)));
         assert_eq!(merge(None, Some(2.0)), Ok(Some(2.0)));
         assert_eq!(merge(Some(3.0), Some(3.0)), Ok(Some(3.0)));
-        assert_eq!(merge(Some(4.0), Some(5.0)), Ok(Some(4.0))); // Uses minimum
+        assert_eq!(
+            merge(Some(4.0), Some(5.0)),
+            Err(vec![
+                "conflicting values for 'expire_metrics_secs' found".into()
+            ])
+        );
     }
 
     fn merge<P: Debug, T>(

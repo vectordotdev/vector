@@ -123,7 +123,7 @@ pub struct TcpConfig {
     ///	Whether or not to sanitize incoming statsd key names. When "true", keys are sanitized by:
     /// - "/" is replaced with "-"
     /// - All whitespace is replaced with "_"
-    /// - All non alphanumeric characters [^a-zA-Z_\-0-9\.] are removed.
+    /// - All non alphanumeric characters (A-Z, a-z, 0-9, _, or -) are removed.
     #[serde(default = "default_sanitize")]
     #[configurable(derived)]
     sanitize: bool,
@@ -180,7 +180,7 @@ impl SourceConfig for StatsdConfig {
                     .as_ref()
                     .and_then(|tls| tls.client_metadata_key.clone())
                     .and_then(|k| k.path);
-                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
+                let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true)?;
                 let statsd_tcp_source = StatsdTcpSource {
                     sanitize: config.sanitize,
                 };

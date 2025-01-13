@@ -9,6 +9,7 @@ use super::encoder::HoneycombEncoder;
 
 pub(super) struct HoneycombRequestBuilder {
     pub(super) encoder: HoneycombEncoder,
+    pub(super) compression: Compression,
 }
 
 impl RequestBuilder<Vec<Event>> for HoneycombRequestBuilder {
@@ -20,7 +21,7 @@ impl RequestBuilder<Vec<Event>> for HoneycombRequestBuilder {
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
-        Compression::None
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {

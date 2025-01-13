@@ -103,7 +103,7 @@ impl SourceConfig for FluentConfig {
             .as_ref()
             .and_then(|tls| tls.client_metadata_key.clone())
             .and_then(|k| k.path);
-        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
+        let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true)?;
         source.run(
             self.address,
             self.keepalive,
@@ -473,13 +473,12 @@ impl Decoder for FluentDecoder {
 
             src.advance(byte_size);
 
-            let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
-                let base64_encoded_message = BASE64_STANDARD.encode(&src);
+            let maybe_item = self.handle_message(res, byte_size).inspect_err(|error| {
+                let base64_encoded_message = BASE64_STANDARD.encode(&src[..]);
                 emit!(FluentMessageDecodeError {
-                    error: &error,
+                    error,
                     base64_encoded_message
                 });
-                error
             })?;
             if let Some(item) = maybe_item {
                 return Ok(Some(item));
@@ -1137,7 +1136,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(format!("http://{}/", test_address))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()
@@ -1218,7 +1217,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(format!("http://{}/", test_address))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()

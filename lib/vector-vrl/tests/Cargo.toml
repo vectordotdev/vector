@@ -7,19 +7,16 @@ publish = false
 
 [dependencies]
 chrono-tz.workspace = true
+dnstap-parser = { path = "../../dnstap-parser" }
 enrichment = { path = "../../enrichment" }
 vrl.workspace = true
 vector-vrl-functions = { path = "../../vector-vrl/functions" }
 
-ansi_term = "0.12"
-chrono.workspace = true
 clap.workspace = true
 glob.workspace = true
-prettydiff = "0.7"
-regex = "1"
 serde.workspace = true
 serde_json.workspace = true
-tracing-subscriber = { version = "0.3.18", default-features = false, features = ["fmt"] }
+tracing-subscriber = { version = "0.3.19", default-features = false, features = ["fmt"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6.0" }

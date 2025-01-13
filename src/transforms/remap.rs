@@ -72,6 +72,16 @@ pub struct RemapConfig {
     #[configurable(metadata(docs::examples = "./my/program.vrl"))]
     pub file: Option<PathBuf>,
 
+    /// File paths to the [Vector Remap Language][vrl] (VRL) programs to execute for each event.
+    ///
+    /// If a relative path is provided, its root is the current working directory.
+    ///
+    /// Required if `source` or `file` are missing.
+    ///
+    /// [vrl]: https://vector.dev/docs/reference/vrl
+    #[configurable(metadata(docs::examples = "['./my/program.vrl', './my/program2.vrl']"))]
+    pub files: Option<Vec<PathBuf>>,
+
     /// When set to `single`, metric tag values are exposed as single strings, the
     /// same as they were before this config option. Tags with multiple values show the last assigned value, and null values
     /// are ignored.
@@ -152,6 +162,7 @@ impl Clone for RemapConfig {
         Self {
             source: self.source.clone(),
             file: self.file.clone(),
+            files: self.files.clone(),
             metric_tag_values: self.metric_tag_values,
             timezone: self.timezone,
             drop_on_error: self.drop_on_error,
@@ -179,23 +190,25 @@ impl RemapConfig {
             return res.clone().map_err(Into::into);
         }
 
-        let source = match (&self.source, &self.file) {
-            (Some(source), None) => source.to_owned(),
-            (None, Some(path)) => {
-                let mut buffer = String::new();
-
-                File::open(path)
-                    .with_context(|_| FileOpenFailedSnafu { path })?
-                    .read_to_string(&mut buffer)
-                    .with_context(|_| FileReadFailedSnafu { path })?;
-
-                buffer
+        let source = match (&self.source, &self.file, &self.files) {
+            (Some(source), None, None) => source.to_owned(),
+            (None, Some(path), None) => Self::read_file(path)?,
+            (None, None, Some(paths)) => {
+                let mut combined_source = String::new();
+                for path in paths {
+                    let content = Self::read_file(path)?;
+                    combined_source.push_str(&content);
+                    combined_source.push('\n');
+                }
+                combined_source
             }
-            _ => return Err(Box::new(BuildError::SourceAndOrFile)),
+            _ => return Err(Box::new(BuildError::SourceAndOrFileOrFiles)),
         };
 
         let mut functions = vrl::stdlib::all();
         functions.append(&mut vector_lib::enrichment::vrl_functions());
+        #[cfg(feature = "sources-dnstap")]
+        functions.append(&mut dnstap_parser::vrl_functions());
         functions.append(&mut vector_vrl_functions::all());
 
         let state = TypeState {
@@ -226,6 +239,15 @@ impl RemapConfig {
             .push(((enrichment_tables, merged_schema_definition), res.clone()));
 
         res.map_err(Into::into)
+    }
+
+    fn read_file(path: &PathBuf) -> Result<String> {
+        let mut buffer = String::new();
+        File::open(path)
+            .with_context(|_| FileOpenFailedSnafu { path })?
+            .read_to_string(&mut buffer)
+            .with_context(|_| FileReadFailedSnafu { path })?;
+        Ok(buffer)
     }
 }
 
@@ -623,8 +645,8 @@ fn push_dropped(event: Event, output: &mut TransformOutputsBuf) {
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
-    #[snafu(display("must provide exactly one of `source` or `file` configuration"))]
-    SourceAndOrFile,
+    #[snafu(display("must provide exactly one of `source` or `file` or `files` configuration"))]
+    SourceAndOrFileOrFiles,
 
     #[snafu(display("Could not open vrl program {:?}: {}", path, source))]
     FileOpenFailed { path: PathBuf, source: io::Error },
@@ -710,7 +732,7 @@ mod tests {
         let err = remap(config).unwrap_err().to_string();
         assert_eq!(
             &err,
-            "must provide exactly one of `source` or `file` configuration"
+            "must provide exactly one of `source` or `file` or `files` configuration"
         )
     }
 
@@ -725,7 +747,7 @@ mod tests {
         let err = remap(config).unwrap_err().to_string();
         assert_eq!(
             &err,
-            "must provide exactly one of `source` or `file` configuration"
+            "must provide exactly one of `source` or `file` or `files` configuration"
         )
     }
 
@@ -856,9 +878,9 @@ mod tests {
 
         let conf = RemapConfig {
             source: Some(
-                indoc! {r#"
+                indoc! {r"
                 . = .events
-            "#}
+            "}
                 .to_owned(),
             ),
             file: None,
@@ -1784,7 +1806,7 @@ mod tests {
         // An abort should not change the typedef.
 
         let transform1 = RemapConfig {
-            source: Some(r#"abort"#.to_string()),
+            source: Some(r"abort".to_string()),
             ..Default::default()
         };
 
@@ -1954,8 +1976,8 @@ mod tests {
 
         let conf = RemapConfig {
             source: Some(
-                r#". = [null]
-"#
+                r". = [null]
+"
                 .to_string(),
             ),
             file: None,

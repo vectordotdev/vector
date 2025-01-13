@@ -166,7 +166,7 @@ impl AzureMonitorLogsConfig {
         let shared_key = self.build_shared_key()?;
         let time_generated_key = self.get_time_generated_key();
 
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
 
         let service = AzureMonitorLogsService::new(

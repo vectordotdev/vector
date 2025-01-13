@@ -62,7 +62,7 @@ impl From<nom::Err<ErrorKind>> for ErrorKind {
     }
 }
 
-impl<'a> nom::error::ParseError<&'a str> for ErrorKind {
+impl nom::error::ParseError<&str> for ErrorKind {
     fn from_error_kind(input: &str, kind: nom::error::ErrorKind) -> Self {
         ErrorKind::Nom {
             input: input.to_owned(),
@@ -373,7 +373,7 @@ fn parse_name(input: &str) -> IResult<String> {
 }
 
 fn trim_space(input: &str) -> &str {
-    input.trim_start_matches(|c| c == ' ' || c == '\t')
+    input.trim_start_matches([' ', '\t'])
 }
 
 fn sp<'a, E: ParseError<&'a str>>(i: &'a str) -> nom::IResult<&'a str, &'a str, E> {

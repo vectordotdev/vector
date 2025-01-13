@@ -22,9 +22,14 @@ on:
         description: "Request endpoint"
         required: true
 
+permissions:
+  issues: write
+  pull-requests: write
+  statuses: write
+
 jobs:
   create_preview_site:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
 
@@ -102,5 +107,3 @@ jobs:
             issue_number: issueNumber,
             body: `Your preview site for the **${APP_NAME}** will be ready in a few minutes, please allow time for it to build. \n \n Heres your preview link: \n [${APP_NAME} preview](https://${SANITIZED_BRANCH_NAME}.${APP_ID}.amplifyapp.com)`
           });
-
-

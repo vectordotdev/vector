@@ -114,7 +114,7 @@ dyn_clone::clone_trait_object!(FunctionTransform);
 /// # Invariants
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a
-/// `TaskTransform` or vice versa.
+///   `TaskTransform` or vice versa.
 pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
     fn transform(
         self: Box<Self>,
@@ -522,7 +522,7 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
     fn event_data_eq(&self, other: &Vec<Event>) -> bool {
         struct Comparator<'a>(EventRef<'a>);
 
-        impl<'a> PartialEq<&Event> for Comparator<'a> {
+        impl PartialEq<&Event> for Comparator<'_> {
             fn eq(&self, that: &&Event) -> bool {
                 self.0.event_data_eq(that)
             }

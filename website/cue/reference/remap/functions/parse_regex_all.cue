@@ -34,7 +34,8 @@ remap: functions: parse_regex_all: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` fails to parse using the provided `pattern`.",
+		"`value` is not a string.",
+		"`pattern` is not a regex.",
 	]
 	return: {
 		types: ["array"]
