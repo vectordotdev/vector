@@ -160,7 +160,7 @@ impl SourceConfig for OpentelemetryConfig {
         let events_received = register!(EventsReceived);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        let grpc_tls_settings = MaybeTlsSettings::from_config(&self.grpc.tls, true)?;
+        let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
 
         let log_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
@@ -192,7 +192,7 @@ impl SourceConfig for OpentelemetryConfig {
             error!(message = "Source future failed.", %error);
         });
 
-        let http_tls_settings = MaybeTlsSettings::from_config(&self.http.tls, true)?;
+        let http_tls_settings = MaybeTlsSettings::from_config(self.http.tls.as_ref(), true)?;
         let protocol = http_tls_settings.http_protocol_name();
         let bytes_received = register!(BytesReceived::from(Protocol::from(protocol)));
         let headers =

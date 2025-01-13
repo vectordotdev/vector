@@ -22,7 +22,7 @@ pub struct FluentMessageDecodeError<'a> {
     pub base64_encoded_message: String,
 }
 
-impl<'a> InternalEvent for FluentMessageDecodeError<'a> {
+impl InternalEvent for FluentMessageDecodeError<'_> {
     fn emit(self) {
         error!(
             message = "Error decoding fluent message.",

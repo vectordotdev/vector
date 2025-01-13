@@ -701,6 +701,15 @@ base: components: sinks: aws_s3: configuration: {
 		required: false
 		type: string: default: "%s"
 	}
+	force_path_style: {
+		description: """
+			Specifies which addressing style to use.
+
+			This controls if the bucket name is in the hostname or part of the URL.
+			"""
+		required: false
+		type: bool: default: true
+	}
 	framing: {
 		description: "Framing configuration."
 		required:    false
@@ -1065,6 +1074,7 @@ base: components: sinks: aws_s3: configuration: {
 				DEEP_ARCHIVE:        "Glacier Deep Archive."
 				EXPRESS_ONEZONE:     "High Performance (single Availability zone)."
 				GLACIER:             "Glacier Flexible Retrieval."
+				GLACIER_IR:          "Glacier Instant Retrieval."
 				INTELLIGENT_TIERING: "Intelligent Tiering."
 				ONEZONE_IA:          "Infrequently Accessed (single Availability zone)."
 				REDUCED_REDUNDANCY:  "Reduced Redundancy."
