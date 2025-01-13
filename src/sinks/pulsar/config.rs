@@ -216,7 +216,7 @@ pub struct CustomConnectionRetryOptions {
 pub struct PulsarTlsOptions {
     /// File path containing a list of PEM encoded certificates
     #[configurable(metadata(docs::examples = "/etc/certs/chain.pem"))]
-    pub certificate_chain_file: String,
+    pub ca_file: String,
 
     /// Allow insecure TLS connection if set to true
     ///
@@ -226,7 +226,7 @@ pub struct PulsarTlsOptions {
     /// Whether hostname verification is enabled when insecure TLS connection is allowed
     ///
     /// Set to true if not specified.
-    pub tls_hostname_verification_enabled: Option<bool>,
+    pub verify_hostname: Option<bool>,
 }
 
 impl Default for PulsarSinkConfig {
@@ -317,13 +317,11 @@ impl PulsarSinkConfig {
         builder = builder.with_operation_retry_options(operation_retry_opts);
 
         if let Some(options) = &self.tls_options {
-            builder =
-                builder.with_certificate_chain_file(Path::new(&options.certificate_chain_file))?;
+            builder = builder.with_certificate_chain_file(Path::new(&options.ca_file))?;
             builder = builder
                 .with_allow_insecure_connection(options.allow_insecure_connection.unwrap_or(false));
-            builder = builder.with_tls_hostname_verification_enabled(
-                options.tls_hostname_verification_enabled.unwrap_or(true),
-            );
+            builder = builder
+                .with_tls_hostname_verification_enabled(options.verify_hostname.unwrap_or(true));
         }
         builder.build().map_err(|e| e.into()).await
     }

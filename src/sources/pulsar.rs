@@ -183,7 +183,7 @@ struct DeadLetterQueuePolicy {
 pub struct TlsOptions {
     /// File path containing a list of PEM encoded certificates
     #[configurable(metadata(docs::examples = "/etc/certs/chain.pem"))]
-    pub certificate_chain_file: String,
+    pub ca_file: String,
 
     /// Allow insecure TLS connection if set to true
     ///
@@ -193,7 +193,7 @@ pub struct TlsOptions {
     /// Whether hostname verification is enabled when insecure TLS connection is allowed
     ///
     /// Set to true if not specified.
-    pub tls_hostname_verification_enabled: Option<bool>,
+    pub verify_hostname: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -288,13 +288,11 @@ impl PulsarSourceConfig {
             };
         }
         if let Some(options) = &self.tls_options {
-            builder =
-                builder.with_certificate_chain_file(Path::new(&options.certificate_chain_file))?;
+            builder = builder.with_certificate_chain_file(Path::new(&options.ca_file))?;
             builder = builder
                 .with_allow_insecure_connection(options.allow_insecure_connection.unwrap_or(false));
-            builder = builder.with_tls_hostname_verification_enabled(
-                options.tls_hostname_verification_enabled.unwrap_or(true),
-            );
+            builder = builder
+                .with_tls_hostname_verification_enabled(options.verify_hostname.unwrap_or(true));
         }
 
         let pulsar = builder.build().await?;
@@ -616,9 +614,9 @@ mod integration_tests {
             false,
             LogNamespace::Vector,
             Some(TlsOptions {
-                certificate_chain_file: TEST_PEM_INTERMEDIATE_CA_PATH.into(),
+                ca_file: TEST_PEM_INTERMEDIATE_CA_PATH.into(),
                 allow_insecure_connection: None,
-                tls_hostname_verification_enabled: None,
+                verify_hostname: None,
             }),
         )
         .await;
@@ -651,13 +649,12 @@ mod integration_tests {
         let mut builder = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor);
         if let Some(options) = &tls_options {
             builder = builder
-                .with_certificate_chain_file(Path::new(&options.certificate_chain_file))
+                .with_certificate_chain_file(Path::new(&options.ca_file))
                 .unwrap();
             builder = builder
                 .with_allow_insecure_connection(options.allow_insecure_connection.unwrap_or(false));
-            builder = builder.with_tls_hostname_verification_enabled(
-                options.tls_hostname_verification_enabled.unwrap_or(true),
-            );
+            builder = builder
+                .with_tls_hostname_verification_enabled(options.verify_hostname.unwrap_or(true));
         }
 
         let pulsar = builder.build().await.unwrap();
