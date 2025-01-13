@@ -112,6 +112,7 @@ components: sources: host_metrics: {
 		process_runtime: _host & _process_counter & {description: "The process uptime."}
 		process_cpu_usage: _host & _process_gauge & {description: "The process CPU usage."}
 		process_memory_usage: _host & _process_gauge & {description: "The process memory usage."}
+		process_memory_virtual_usage: _host & _process_gauge & {description: "The process virtual memory usage."}
 
 		// Host cgroups
 		cgroup_cpu_usage_seconds_total: _host & _cgroup_cpu & {description: "The total amount CPU time used by this cgroup and its descendants, in seconds."}
