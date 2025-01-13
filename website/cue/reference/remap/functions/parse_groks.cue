@@ -33,9 +33,18 @@ remap: functions: parse_groks: {
 			default:     true
 			type: ["object"]
 		},
+		{
+			name:        "alias_sources"
+			description: "Path to file containing aliases in a JSON format."
+			required:    false
+			type: ["string"]
+		},
 	]
 	internal_failure_reasons: [
 		"`value` fails to parse using the provided `pattern`.",
+		"`patterns` is not an array.",
+		"`aliases` is not an object.",
+		"`alias_sources` is not a string or it doesn't point to a valid file.",
 	]
 	return: types: ["object"]
 
