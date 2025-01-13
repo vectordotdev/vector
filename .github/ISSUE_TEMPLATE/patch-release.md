@@ -8,7 +8,7 @@ labels: "domain: releasing"
 Before the release:
 
 - [ ] Create a new release preparation branch from the current release branch
-  - `git fetch && git checkout v0.<current minor version> && git checkout -b prepare-v0.<new version number>`
+  - `git fetch && git checkout v0.<current minor version> && git checkout -b website-prepare-v0.<new version number>`
 - [ ] Cherry-pick in all commits to be released from the associated release milestone
   - If any merge conflicts occur, attempt to solve them and if needed enlist the aid of those familiar with the conflicting commits.
 - [ ] Bump the release number in the `Cargo.toml` to the current version number
