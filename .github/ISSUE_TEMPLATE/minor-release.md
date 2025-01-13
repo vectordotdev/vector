@@ -13,7 +13,7 @@ The week before the release:
 - [ ] Create a new release branch from master to freeze commits
   - `git fetch && git checkout origin/master && git checkout -b v0.<new version number> && git push -u`
 - [ ] Create a new release preparation branch from `master`
-  - `git checkout -b prepare-v0.<new version number> && git push -u`
+  - `git checkout -b website-prepare-v0.<new version number> && git push -u`
 - [ ] Pin VRL to latest released version rather than `main`
 - [ ] Check if there is a newer version of [Alpine](https://alpinelinux.org/releases/) or
       [Debian](https://www.debian.org/releases/) available to update the release images in
