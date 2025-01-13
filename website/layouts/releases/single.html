@@ -117,7 +117,7 @@
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
 
-            <ul class="prose dark:prose-dark list-disc">
+            <ul class="prose dark:prose-dark list-disc ml-6">
               {{ range $changes }}
               <li>
                   <span class="prose dark:prose-dark">
@@ -155,7 +155,7 @@
           {{ if $commits }}
           {{ $numCommits := len $commits }}
           {{ $heading := printf "%d %s" $numCommits $value }}
-          <div>
+          <div class="ml-6">
             <div class="prose dark:prose-dark max-w-none">
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
