@@ -6,6 +6,14 @@ releases: "0.43.0": {
 
 	whats_next: []
 
+	known_issues: [
+		"""
+			The `vector-0.43.0-x86_64-apple-darwin.tar.gz` executable has the wrong architecture, see
+			[#22129](https://github.com/vectordotdev/vector/issues/22129). This will be fixed in
+			`v0.44`.
+			""",
+	]
+
 	description: """
 		The Vector team is pleased to announce version 0.43.0!
 
