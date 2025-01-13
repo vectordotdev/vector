@@ -87,7 +87,7 @@ remap: functions: parse_groks: {
 				#   "PATTERN_B": "username=%{USERNAME:username}"
 				# }
 				"""#
-				skip_test: true
-		}
+			skip_test: true
+		},
 	]
 }
