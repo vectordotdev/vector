@@ -32,7 +32,7 @@ impl TowerRequestConfigDefaults for ChronicleTowerRequestConfigDefaults {
 pub struct ChronicleDefaultBatchSettings;
 impl SinkBatchSettings for ChronicleDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
-    const MAX_BYTES: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(1_000_000);
     const TIMEOUT_SECS: f64 = 15.0;
 }
 
