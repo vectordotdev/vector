@@ -183,7 +183,7 @@ pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
-const fn example_collectors() -> [&'static str; 8] {
+const fn example_collectors() -> [&'static str; 9] {
     [
         "cgroups",
         "cpu",
@@ -193,6 +193,7 @@ const fn example_collectors() -> [&'static str; 8] {
         "host",
         "memory",
         "network",
+        "tcp",
     ]
 }
 
@@ -206,16 +207,17 @@ fn default_collectors() -> Option<Vec<Collector>> {
         Collector::Memory,
         Collector::Network,
         Collector::Process,
-        Collector::TCP,
     ];
 
     #[cfg(target_os = "linux")]
     {
         collectors.push(Collector::CGroups);
+        collectors.push(Collector::TCP);
     }
     #[cfg(not(target_os = "linux"))]
     if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
         collectors.push(Collector::CGroups);
+        collectors.push(Collector::TCP);
     }
 
     Some(collectors)
@@ -289,6 +291,9 @@ impl SourceConfig for HostMetricsConfig {
         {
             if self.cgroups.is_some() || self.has_collector(Collector::CGroups) {
                 return Err("CGroups collector is only available on Linux systems".into());
+            }
+            if self.has_collector(Collector::TCP) {
+                return Err("TCP collector is only available on Linux systems".into());
             }
         }
 

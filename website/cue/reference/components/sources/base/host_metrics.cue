@@ -72,8 +72,7 @@ base: components: sources: host_metrics: configuration: {
 			"""
 		required: false
 		type: array: {
-			default: ["cpu", "disk", "filesystem", "load", "host", "memory", "network", "process",
-				"cgroups", "tcp"]
+			default: ["cpu", "disk", "filesystem", "load", "host", "memory", "network", "process", "cgroups", "tcp"]
 			items: type: string: {
 				enum: {
 					cgroups: """
@@ -89,14 +88,9 @@ base: components: sources: host_metrics: configuration: {
 					memory:     "Metrics related to memory utilization."
 					network:    "Metrics related to network utilization."
 					process:    "Metrics related to Process utilization."
-					tcp: """
-						Metrics related to TCP connections.
-
-						Only available on Linux.
-						"""
+					tcp:        "Metrics related to TCP connections."
 				}
-				examples: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory",
-					"network", "tcp"]
+				examples: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network", "tcp"]
 			}
 		}
 	}
