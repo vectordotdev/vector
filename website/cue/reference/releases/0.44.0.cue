@@ -52,7 +52,7 @@ releases: "0.44.0": {
 			contributors: ["fdamstra"]
 		},
 		{
-			type: "feat"
+			type: "enhancement"
 			description: """
 				The file sink now supports any input event type that the configured encoding supports. It previously only supported log events.
 				"""
@@ -80,28 +80,28 @@ releases: "0.44.0": {
 			contributors: ["PriceHiller"]
 		},
 		{
-			type: "feat"
+			type: "enhancement"
 			description: """
 				The `log_to_metric` transformer tag key are now template-able which enables tags expansion.
 				"""
 			contributors: ["titaneric"]
 		},
 		{
-			type: "feat"
+			type: "enhancement"
 			description: """
 				Add VRL function `parse_dnstap` that can parse dnstap data and produce output in the same format as `dnstap` source.
 				"""
 			contributors: ["esensar"]
 		},
 		{
-			type: "feat"
+			type: "enhancement"
 			description: """
 				Adds a `force_path_style` option to the `aws_s3` sink that allows users to configure virtual host style addressing. The value defaults to `true` to maintain existing behavior.
 				"""
 			contributors: ["sam6258"]
 		},
 		{
-			type: "chore"
+			type: "fix"
 			description: """
 				Allow the `skip_unknown_fields` setting to be optional, thereby allowing use of the defaults provided by the ClickHouse server. Setting it to `true` will permit skipping unknown fields and `false` will make ClickHouse strict on what fields it accepts.
 				"""
@@ -152,7 +152,7 @@ releases: "0.44.0": {
 			contributors: ["jpovixwm"]
 		},
 		{
-			type: "feat"
+			type: "enhancement"
 			description: """
 				Add active and inactive metrics for anon and file memory to the cgroup collector. These additional metrics allow you to better understand the existing cgroup memory metrics.
 				"""
