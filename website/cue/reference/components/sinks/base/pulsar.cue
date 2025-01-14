@@ -552,12 +552,12 @@ base: components: sinks: pulsar: configuration: {
 				required: false
 				type: bool: {}
 			}
-			certificate_chain_file: {
+			ca_file: {
 				description: "File path containing a list of PEM encoded certificates"
 				required:    true
 				type: string: examples: ["/etc/certs/chain.pem"]
 			}
-			tls_hostname_verification_enabled: {
+			verify_hostname: {
 				description: """
 					Whether hostname verification is enabled when insecure TLS connection is allowed
 
