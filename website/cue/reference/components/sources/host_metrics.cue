@@ -112,6 +112,7 @@ components: sources: host_metrics: {
 		process_runtime: _host & _process_counter & {description: "The process uptime."}
 		process_cpu_usage: _host & _process_gauge & {description: "The process CPU usage."}
 		process_memory_usage: _host & _process_gauge & {description: "The process memory usage."}
+		process_memory_virtual_usage: _host & _process_gauge & {description: "The process virtual memory usage."}
 
 		// Host cgroups
 		cgroup_cpu_usage_seconds_total: _host & _cgroup_cpu & {description: "The total amount CPU time used by this cgroup and its descendants, in seconds."}
@@ -120,6 +121,10 @@ components: sources: host_metrics: {
 		cgroup_memory_current_bytes: _host & _cgroup_memory & {description: "The total amount of memory currently being used by this cgroup and its descendants, in bytes."}
 		cgroup_memory_anon_bytes: _host & _cgroup_memory & {description: "The total amount of memory used by this cgroup in anonymous mappings (normal program allocation), in bytes."}
 		cgroup_memory_file_bytes: _host & _cgroup_memory & {description: "The total amount of memory used by this cgroup to cache filesystem data, including tmpfs and shared memory, in bytes."}
+		cgroup_memory_anon_active_bytes: _host & _cgroup_memory & {description: "Amount of memory, swap-backed, on the internal memory management active lists used by the page reclaim algorithm, in bytes."}
+		cgroup_memory_anon_inactive_bytes: _host & _cgroup_memory & {description: "Amount of memory, swap-backed, on the internal memory management inactive lists used by the page reclaim algorithm, in bytes."}
+		cgroup_memory_file_active_bytes: _host & _cgroup_memory & {description: "Amount of memory, filesystem-backed, on the internal memory management active lists used by the page reclaim algorithm, in bytes."}
+		cgroup_memory_file_inactive_bytes: _host & _cgroup_memory & {description: "Amount of memory, filesystem-backed, on the internal memory management inactive lists used by the page reclaim algorithm, in bytes."}
 
 		// Host disk
 		disk_read_bytes_total: _host & _disk_counter & {description: "The accumulated number of bytes read in."}
