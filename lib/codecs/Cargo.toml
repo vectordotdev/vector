@@ -20,13 +20,13 @@ flate2.workspace = true
 influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
-ordered-float = { version = "4.5.0", default-features = false }
+ordered-float = { version = "4.6.0", default-features = false }
 prost.workspace = true
 prost-reflect.workspace = true
 rand.workspace = true
 regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
 serde.workspace = true
-serde_with = { version = "3.11.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
+serde_with = { version = "3.12.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_json.workspace = true
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu.workspace = true
@@ -46,7 +46,7 @@ indoc = { version = "2", default-features = false }
 tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.6.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
-rstest = "0.23.0"
+rstest = "0.24.0"
 tracing-test = "0.2.5"
 uuid.workspace = true
 vrl.workspace = true

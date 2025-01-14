@@ -191,6 +191,7 @@ eventstreamsink
 evictingpages
 evmap
 ewma
+Exabytes
 examplegroup
 exitcodes
 extendedstatus
@@ -423,7 +424,6 @@ oplog
 optimisation
 optimizable
 OSSL
-OTel
 otherhost
 otlm
 otlp
@@ -527,7 +527,6 @@ SIEM
 SIGHUPs
 sinkbuilder
 sinknetworkbytessent
-SIV
 slideover
 smartphone
 Smol
@@ -674,6 +673,7 @@ wtimeout
 WTS
 xact
 xlarge
+XMODEM
 xxs
 YAMLs
 YBv
