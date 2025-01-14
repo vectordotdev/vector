@@ -44,7 +44,7 @@ remap: functions: parse_groks: {
 		"`value` fails to parse using the provided `pattern`.",
 		"`patterns` is not an array.",
 		"`aliases` is not an object.",
-		"`alias_sources` is not a string or it doesn't point to a valid file.",
+		"`alias_sources` is not a string or doesn't point to a valid file.",
 	]
 	return: types: ["object"]
 
