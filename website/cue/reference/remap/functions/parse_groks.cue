@@ -35,7 +35,7 @@ remap: functions: parse_groks: {
 		},
 		{
 			name:        "alias_sources"
-			description: "Path to file containing aliases in a JSON format."
+			description: "Path to the file containing aliases in a JSON format."
 			required:    false
 			type: ["string"]
 		},
