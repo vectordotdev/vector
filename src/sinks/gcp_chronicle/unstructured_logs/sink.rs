@@ -7,26 +7,25 @@ use std::fmt;
 use http::header::{self, HeaderValue};
 use serde::Serialize;
 use serde_json::json;
-use tower::ServiceBuilder;
 use std::collections::HashMap;
 use std::io;
 use tokio_util::codec::Encoder as _;
+use tower::ServiceBuilder;
 use vector_lib::{
-    request_metadata::{GroupedCountByteSize, RequestMetadata},
-    sink::VectorSink,
     config::telemetry,
     event::{Event, EventFinalizers, Finalizable},
+    request_metadata::{GroupedCountByteSize, RequestMetadata},
+    sink::VectorSink,
     EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
     codecs,
     gcp::GcpAuthenticator,
+    http::HttpClient,
     sinks::prelude::*,
-    http::HttpClient, sinks::{
-        gcp_chronicle::{
-            service::ChronicleService, ChronicleRequest, ChronicleRequestPayload
-        },
+    sinks::{
+        gcp_chronicle::{service::ChronicleService, ChronicleRequest, ChronicleRequestPayload},
         gcs_common::config::GcsRetryLogic,
         util::{
             encoding::{as_tracked_write, Encoder},
@@ -34,12 +33,12 @@ use crate::{
             request_builder::EncodeResult,
             Compression, RequestBuilder,
         },
-    }
+    },
 };
 
 use super::{
+    config::ChronicleUnstructuredConfig,
     partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
-    config::ChronicleUnstructuredConfig
 };
 
 #[derive(Clone, Debug, Serialize)]
@@ -189,8 +188,8 @@ impl RequestBuilder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleUnstructur
             headers,
             body: payload.into_payload().bytes,
             finalizers,
-            metadata
-        }
+            metadata,
+        };
     }
 }
 
@@ -245,7 +244,13 @@ impl ChronicleUnstructuredConfig {
 
         let request_settings = ChronicleUnstructuredRequestBuilder::new(self)?;
 
-        let sink = ChronicleUnstructuredSink::new(svc, request_settings, partitioner, batch_settings, "http");
+        let sink = ChronicleUnstructuredSink::new(
+            svc,
+            request_settings,
+            partitioner,
+            batch_settings,
+            "http",
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -256,7 +261,6 @@ impl ChronicleUnstructuredConfig {
             self.namespace.clone(),
         ))
     }
-
 }
 
 pub struct ChronicleUnstructuredSink<Svc, RB> {

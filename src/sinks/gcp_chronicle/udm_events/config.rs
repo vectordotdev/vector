@@ -1,6 +1,9 @@
 use vector_config::component::GenerateConfig;
 use vector_lib::{
-    config::{AcknowledgementsConfig, Input}, schema, sink::VectorSink, tls::TlsSettings
+    config::{AcknowledgementsConfig, Input},
+    schema,
+    sink::VectorSink,
+    tls::TlsSettings,
 };
 
 use indoc::indoc;
@@ -10,9 +13,7 @@ use crate::{
     config::{SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        gcp_chronicle::{
-            config::ChronicleCommonConfig, service::build_healthcheck
-        },
+        gcp_chronicle::{config::ChronicleCommonConfig, service::build_healthcheck},
         Healthcheck,
     },
 };
@@ -46,12 +47,18 @@ impl GenerateConfig for ChronicleUDMEventsConfig {
 #[typetag::serde(name = "gcp_chronicle_udm_events")]
 impl SinkConfig for ChronicleUDMEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.chronicle_common.auth.build(Scope::MalachiteIngestion).await?;
+        let creds = self
+            .chronicle_common
+            .auth
+            .build(Scope::MalachiteIngestion)
+            .await?;
 
         let tls = TlsSettings::from_options(&self.chronicle_common.tls)?;
         let client = HttpClient::new(tls, cx.proxy())?;
 
-        let endpoint = self.chronicle_common.create_endpoint("v2/udmevents:batchCreate")?;
+        let endpoint = self
+            .chronicle_common
+            .create_endpoint("v2/udmevents:batchCreate")?;
 
         // For the healthcheck we see if we can fetch the list of available log types.
         let healthcheck_endpoint = self.chronicle_common.create_endpoint("v2/logtypes")?;

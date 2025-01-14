@@ -7,8 +7,7 @@ use crate::{
     gcp::GcpAuthConfig,
     sinks::{
         gcp_chronicle::{
-            compression::ChronicleCompression,
-            ChronicleConfigError, ChronicleDefaultBatchSettings,
+            compression::ChronicleCompression, ChronicleConfigError, ChronicleDefaultBatchSettings,
             ChronicleTowerRequestConfigDefaults,
         },
         util::{BatchConfig, TowerRequestConfig},
@@ -99,7 +98,6 @@ impl Region {
         }
     }
 }
-
 
 /// Shared configuration for all GCP Chronicle sinks
 /// Contains the maximum set of common settings that applies to all GCP Chronicle sink components.

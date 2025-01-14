@@ -8,13 +8,8 @@ use crate::{
     gcp::GcpAuthenticator,
     http::HttpClient,
     sinks::{
-        gcp_chronicle::{
-            GcsHealthcheckError, ChronicleRequest, ChronicleResponseError
-        },
-        gcs_common::{
-            config::healthcheck_response,
-            service::GcsResponse,
-        },
+        gcp_chronicle::{ChronicleRequest, ChronicleResponseError, GcsHealthcheckError},
+        gcs_common::{config::healthcheck_response, service::GcsResponse},
         Healthcheck,
     },
 };
@@ -71,7 +66,7 @@ impl Service<ChronicleRequest> for ChronicleService {
                         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
                         Err(ChronicleResponseError::ServerError {
                             code: status,
-                            message: String::from_utf8(body.to_vec()).unwrap()
+                            message: String::from_utf8(body.to_vec()).unwrap(),
                         })
                     }
                 }

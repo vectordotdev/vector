@@ -11,13 +11,10 @@ use vector_lib::configurable::configurable_component;
 
 use crate::{
     config::{SinkConfig, SinkContext},
-    schema,
     http::HttpClient,
+    schema,
     sinks::{
-        gcp_chronicle::{
-            config::ChronicleCommonConfig,
-            service::build_healthcheck
-        },
+        gcp_chronicle::{config::ChronicleCommonConfig, service::build_healthcheck},
         Healthcheck,
     },
     template::Template,
@@ -32,7 +29,6 @@ use vrl::value::Kind;
 ))]
 #[derive(Clone, Debug)]
 pub struct ChronicleUnstructuredConfig {
-
     #[serde(flatten)]
     pub chronicle_common: ChronicleCommonConfig,
 
@@ -85,12 +81,18 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
 #[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.chronicle_common.auth.build(Scope::MalachiteIngestion).await?;
+        let creds = self
+            .chronicle_common
+            .auth
+            .build(Scope::MalachiteIngestion)
+            .await?;
 
         let tls = TlsSettings::from_options(&self.chronicle_common.tls)?;
         let client = HttpClient::new(tls, cx.proxy())?;
 
-        let endpoint = self.chronicle_common.create_endpoint("v2/unstructuredlogentries:batchCreate")?;
+        let endpoint = self
+            .chronicle_common
+            .create_endpoint("v2/unstructuredlogentries:batchCreate")?;
 
         // For the healthcheck we see if we can fetch the list of available log types.
         let healthcheck_endpoint = self.chronicle_common.create_endpoint("v2/logtypes")?;
@@ -113,4 +115,3 @@ impl SinkConfig for ChronicleUnstructuredConfig {
         &self.chronicle_common.acknowledgements
     }
 }
-

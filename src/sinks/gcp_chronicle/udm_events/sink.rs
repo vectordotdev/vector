@@ -1,22 +1,19 @@
 //! This sink sends data to Google Chronicles UDM Events log entries endpoint.
 //! See <https://cloud.google.com/chronicle/docs/reference/ingestion-api#udmevents>
 //! for more information.
-use bytes::BytesMut;
 use http::header::{self, HeaderValue};
 use serde::Serialize;
 use serde_json::json;
 use std::collections::HashMap;
-use std::io;
 use std::fmt;
-use tokio_util::codec::Encoder as _;
+use std::io;
 use tower::ServiceBuilder;
 use vector_lib::{
     config::telemetry,
+    event::Event::Log,
     event::{Event, EventFinalizers, Finalizable},
-    sink::VectorSink,
-};
-use vector_lib::{
     request_metadata::{GroupedCountByteSize, RequestMetadata},
+    sink::VectorSink,
     EstimatedJsonEncodedSizeOf,
 };
 
@@ -24,12 +21,8 @@ use crate::{
     codecs,
     gcp::GcpAuthenticator,
     http::HttpClient,
-
     sinks::{
-        gcp_chronicle::{
-            service::ChronicleService, ChronicleRequest,
-            ChronicleRequestPayload
-        },
+        gcp_chronicle::{service::ChronicleService, ChronicleRequest, ChronicleRequestPayload},
         gcs_common::config::GcsRetryLogic,
         prelude::*,
         util::{
@@ -46,13 +39,12 @@ use super::config::ChronicleUDMEventsConfig;
 #[derive(Clone, Debug, Serialize)]
 struct ChronicleUDMEventsRequestBody {
     customer_id: String,
-    events: Vec<serde_json::Value>,
+    events: Vec<LogEvent>,
 }
 
 #[derive(Clone, Debug)]
 struct ChronicleUDMEventsEncoder {
     customer_id: String,
-    encoder: codecs::Encoder<()>,
     transformer: codecs::Transformer,
 }
 
@@ -62,21 +54,17 @@ impl Encoder<Vec<Event>> for ChronicleUDMEventsEncoder {
         input: Vec<Event>,
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
-        let mut encoder = self.encoder.clone();
         let mut byte_size = telemetry().create_request_count_byte_size();
         let events = input
             .into_iter()
             .filter_map(|mut event| {
-                let mut bytes = BytesMut::new();
                 self.transformer.transform(&mut event);
-
-                byte_size.add_event(&event, event.estimated_json_encoded_size_of());
-
-                encoder.encode(event, &mut bytes).ok()?;
-
-                let value = json!(String::from_utf8_lossy(&bytes));
-
-                Some(value)
+                if let Log(ref mut log_event) = event {
+                    byte_size.add_event(log_event, log_event.estimated_json_encoded_size_of());
+                    Some(log_event.clone())
+                } else {
+                    None
+                }
             })
             .collect::<Vec<_>>();
 
@@ -103,12 +91,9 @@ struct ChronicleUDMEventsRequestBuilder {
 impl ChronicleUDMEventsRequestBuilder {
     fn new(config: &ChronicleUDMEventsConfig) -> crate::Result<Self> {
         let transformer = config.chronicle_common.encoding.transformer();
-        let serializer = config.chronicle_common.encoding.config().build()?;
         let compression = Compression::from(config.chronicle_common.compression);
-        let encoder = crate::codecs::Encoder::<()>::new(serializer);
         let encoder = ChronicleUDMEventsEncoder {
             customer_id: config.chronicle_common.customer_id.clone(),
-            encoder,
             transformer,
         };
         Ok(Self {
@@ -302,12 +287,12 @@ mod integration_tests {
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct UdmMetadata {
         event_timestamp: String,
-        log_type: String
+        log_type: String,
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct Log {
-        metadata: UdmMetadata
+        metadata: UdmMetadata,
     }
 
     fn config(auth_path: &str) -> ChronicleUDMEventsConfig {
@@ -338,10 +323,9 @@ mod integration_tests {
         trace_init();
 
         let log_type = random_string(10);
-        let (sink, healthcheck) =
-            config_build("/home/vector/scripts/integration/gcp/auth.json")
-                .await
-                .expect("Building sink failed");
+        let (sink, healthcheck) = config_build("/home/vector/scripts/integration/gcp/auth.json")
+            .await
+            .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
@@ -358,10 +342,7 @@ mod integration_tests {
     async fn invalid_credentials() {
         trace_init();
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
-        let sink = config_build(
-            "/home/vector/scripts/integration/gcp/invalidauth.json",
-        )
-        .await;
+        let sink = config_build("/home/vector/scripts/integration/gcp/invalidauth.json").await;
 
         assert!(sink.is_err())
     }
@@ -370,10 +351,9 @@ mod integration_tests {
     async fn publish_invalid_events() {
         trace_init();
 
-        let (sink, healthcheck) =
-            config_build("/home/vector/scripts/integration/gcp/auth.json")
-                .await
-                .expect("Building sink failed");
+        let (sink, healthcheck) = config_build("/home/vector/scripts/integration/gcp/auth.json")
+            .await
+            .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 

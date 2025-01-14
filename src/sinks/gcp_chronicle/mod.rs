@@ -2,18 +2,21 @@ use bytes::Bytes;
 use vector_lib::event::{EventFinalizers, Finalizable};
 use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
 
-use std::collections::HashMap;
-use http::{header::{HeaderValue, HeaderName}, StatusCode};
+use http::{
+    header::{HeaderName, HeaderValue},
+    StatusCode,
+};
 use snafu::Snafu;
+use std::collections::HashMap;
 
 use crate::{
+    sinks::util::{service::TowerRequestConfigDefaults, SinkBatchSettings},
     template::TemplateParseError,
-    sinks::util::{service::TowerRequestConfigDefaults, SinkBatchSettings}
 };
 
 pub mod compression;
-pub mod service;
 pub mod config;
+pub mod service;
 
 #[cfg(feature = "sinks-gcp-chronicle-udm-events")]
 pub mod udm_events;
