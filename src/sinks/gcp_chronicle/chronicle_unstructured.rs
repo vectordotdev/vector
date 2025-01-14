@@ -69,55 +69,55 @@ pub enum GcsHealthcheckError {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {
-    /// European Multi region - "https://europe-malachiteingestion-pa.googleapis.com".
+    /// European Multi region
     Eu,
 
-    /// US Multi region - "https://malachiteingestion-pa.googleapis.com".
+    /// US Multi region
     Us,
 
-    /// APAC region (this is the same as the Singapore region endpoint retained for backwards compatibility) - "https://asia-southeast1-malachiteingestion-pa.googleapis.com".
+    /// APAC region (this is the same as the Singapore region endpoint retained for backwards compatibility)
     Asia,
 
-    /// SãoPaulo Region - "https://southamerica-east1-malachiteingestion-pa.googleapis.com"
+    /// SãoPaulo Region
     SãoPaulo,
 
-    /// Canada Region - "https://northamerica-northeast2-malachiteingestion-pa.googleapis.com"
+    /// Canada Region
     Canada,
 
-    /// Dammam Region - "https://me-central2-malachiteingestion-pa.googleapis.com"
+    /// Dammam Region
     Dammam,
 
-    /// Doha Region - "https://me-central1-malachiteingestion-pa.googleapis.com"
+    /// Doha Region
     Doha,
 
-    /// Frankfurt Region - "https://europe-west3-malachiteingestion-pa.googleapis.com"
+    /// Frankfurt Region
     Frankfurt,
 
-    /// London Region - "https://europe-west2-malachiteingestion-pa.googleapis.com"
+    /// London Region
     London,
 
-    /// Mumbai Region - "https://asia-south1-malachiteingestion-pa.googleapis.com"
+    /// Mumbai Region
     Mumbai,
 
-    /// Paris Region - "https://europe-west9-malachiteingestion-pa.googleapis.com"
+    /// Paris Region
     Paris,
 
-    /// Singapore Region - "https://asia-southeast1-malachiteingestion-pa.googleapis.com"
+    /// Singapore Region
     Singapore,
 
-    /// Sydney Region - "https://australia-southeast1-malachiteingestion-pa.googleapis.com"
+    /// Sydney Region
     Sydney,
 
-    /// TelAviv Region - "https://me-west1-malachiteingestion-pa.googleapis.com"
+    /// TelAviv Region
     TelAviv,
 
-    /// Tokyo Region - "https://asia-northeast1-malachiteingestion-pa.googleapis.com"
+    /// Tokyo Region
     Tokyo,
 
-    /// Turin Region - "https://europe-west12-malachiteingestion-pa.googleapis.com"
+    /// Turin Region
     Turin,
 
-    /// Zurich Region - "https://europe-west6-malachiteingestion-pa.googleapis.com"
+    /// Zurich Region
     Zurich,
 }
 
