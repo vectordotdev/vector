@@ -17,12 +17,12 @@ use super::internal_events::MemoryTableInternalMetricsConfig;
 #[configurable_component(enrichment_table("memory"))]
 #[derive(Clone)]
 pub struct MemoryConfig {
-    /// TTL (time-to-live), used to limit lifetime of data stored in cache.
+    /// TTL (time-to-live in seconds), used to limit lifetime of data stored in cache.
     /// When TTL expires, data behind a specific key in cache is removed.
     /// TTL is reset when replacing the key.
     #[serde(default = "default_ttl")]
     pub ttl: u64,
-    /// Scan interval for updating TTL of keys in seconds. This is provided
+    /// Scan interval for looking for expired records. This is provided
     /// as an optimization, to ensure that TTL is updated, but without doing
     /// too many cache scans.
     #[serde(default = "default_scan_interval")]
