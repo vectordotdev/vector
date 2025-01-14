@@ -258,6 +258,13 @@ pub struct Config {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
     rotate_wait: Duration,
+
+    /// Enables adding the file offset to each event and sets the name of the log field used.
+    ///
+    /// The value is the byte offset of the start of the line within the file.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "offset"))]
+    pub offset_key: Option<OptionalTargetPath>,
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -304,6 +311,7 @@ impl Default for Config {
             log_namespace: None,
             internal_metrics: Default::default(),
             rotate_wait: default_rotate_wait(),
+            offset_key: None,
         }
     }
 }
@@ -328,8 +336,21 @@ impl SourceConfig for Config {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
+
+        let offset_key = self
+            .offset_key
+            .as_ref()
+            .map(|_| LegacyKey::Overwrite(owned_value_path!("offset")));
+
         let schema_definition = BytesDeserializerConfig
             .schema_definition(log_namespace)
+            .with_source_metadata(
+                Self::NAME,
+                offset_key,
+                &owned_value_path!("offset"),
+                Kind::integer(),
+                None,
+            )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::Overwrite(owned_value_path!("file"))),
@@ -560,6 +581,7 @@ struct Source {
     delay_deletion: Duration,
     include_file_metric_tag: bool,
     rotate_wait: Duration,
+    offset_key: Option<OwnedTargetPath>,
 }
 
 impl Source {
@@ -622,6 +644,8 @@ impl Source {
             .clone()
             .and_then(|k| k.path);
 
+        let offset_key = config.offset_key.as_ref().and_then(|k| k.path.clone());
+
         Ok(Self {
             client,
             data_dir,
@@ -648,6 +672,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
+            offset_key,
         })
     }
 
@@ -683,6 +708,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag,
             rotate_wait,
+            offset_key,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -843,8 +869,10 @@ impl Source {
 
             let mut event = create_event(
                 line.text,
+                line.start_offset,
                 &line.filename,
                 ingestion_timestamp_field.as_ref(),
+                offset_key.as_ref(),
                 log_namespace,
             );
 
@@ -949,8 +977,10 @@ impl Source {
 
 fn create_event(
     line: Bytes,
+    offset: u64,
     file: &str,
     ingestion_timestamp_field: Option<&OwnedTargetPath>,
+    offset_key: Option<&OwnedTargetPath>,
     log_namespace: LogNamespace,
 ) -> Event {
     let deserializer = BytesDeserializer;
@@ -963,6 +993,10 @@ fn create_event(
         path!("file"),
         file,
     );
+
+    if let Some(offset_key) = offset_key {
+        log.try_insert(offset_key, offset);
+    }
 
     log_namespace.insert_vector_metadata(
         &mut log,
@@ -1272,6 +1306,11 @@ mod tests {
             Some(
                 Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
                     .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "offset"),
+                        Kind::integer(),
+                        None
+                    )
+                    .with_metadata_field(
                         &owned_value_path!("kubernetes_logs", "file"),
                         Kind::bytes(),
                         None
@@ -1390,6 +1429,7 @@ mod tests {
                     Kind::object(Collection::empty()),
                     [LogNamespace::Legacy]
                 )
+                .with_event_field(&owned_value_path!("offset"), Kind::integer(), None)
                 .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
                 .with_event_field(
                     &owned_value_path!("message"),
