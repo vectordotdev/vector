@@ -296,7 +296,7 @@ configuration: {
 						ttl: {
 							description: """
 								TTL (time-to-live in seconds), used to limit lifetime of data stored in cache.
-								When TTL expires, data behind a specific key in cache is removd.
+								When TTL expires, data behind a specific key in cache is removed.
 								TTL is reset when replacing the key.
 								"""
 							required: false
