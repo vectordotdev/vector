@@ -95,19 +95,23 @@ jobs:
           name: int_tests_changes
 
       - name: Run Integration Tests for ${{ matrix.service }}
-        run: |
-          # Parse the JSON and check if the specific IT value is 'true'
-          should_run=$(jq '."${{ matrix.service }}"' int_tests_changes.json)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: >-
+            # Parse the JSON and check if the specific IT value is 'true'
+            should_run=$(jq '."${{ matrix.service }}"' int_tests_changes.json)
 
-          # Check if any of the three conditions is true
-          if [[ "${{ github.event_name }}" == "merge_group" || \
-                "${{ needs.changes.outputs.all-int }}" == "true" || \
-                "$should_run" == "true" ]]; then
-            echo "Running test for ${{ matrix.service }}"
-            bash scripts/ci-int-e2e-test.sh int ${{ matrix.service }}
-          else
-            echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
-          fi
+            # Check if any of the three conditions is true
+            if [[ "${{ github.event_name }}" == "merge_group" || \
+                  "${{ needs.changes.outputs.all-int }}" == "true" || \
+                  "$should_run" == "true" ]]; then
+              echo "Running test for ${{ matrix.service }}"
+              bash scripts/ci-int-e2e-test.sh int ${{ matrix.service }}
+            else
+              echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
+            fi
 
 
   integration-test-suite:
