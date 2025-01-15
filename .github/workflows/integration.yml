@@ -81,6 +81,7 @@ jobs:
           "loki", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
           "redis", "splunk", "webhdfs"
         ]
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
