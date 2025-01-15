@@ -100,7 +100,7 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: |
-            # Parse the JSON and check if the specific IT value is 'true'
+            # Parse the JSON and check if the specific integration test should run.
             should_run=$(jq '."${{ matrix.service }}"' int_tests_changes.json)
 
             # Check if any of the three conditions is true
