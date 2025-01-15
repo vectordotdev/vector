@@ -10,17 +10,17 @@ use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
     pin_mut,
     stream::BoxStream,
-    FutureExt, StreamExt, TryStreamExt,
+    StreamExt, TryStreamExt,
 };
 use futures_util::future;
 use http::StatusCode;
-use stream_cancel::Tripwire;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
     handshake::server::{ErrorResponse, Request, Response},
     Message,
 };
 use tokio_util::codec::Encoder as _;
+use tracing::Instrument;
 use vector_lib::{
     event::{Event, EventStatus},
     finalization::Finalizable,
@@ -36,6 +36,10 @@ use crate::{
     codecs::{Encoder, Transformer},
     common::server_auth::AuthMatcher,
     config::SinkContext,
+    internal_events::{
+        WsListenerConnectionEstablished, WsListenerConnectionFailedError,
+        WsListenerConnectionShutdown, WsListenerSendError,
+    },
 };
 
 use super::WebSocketListenerSinkConfig;
@@ -83,15 +87,11 @@ impl WebSocketListenerSink {
         auth: Option<AuthMatcher>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         mut listener: MaybeTlsListener,
-        tripwire: Tripwire,
     ) {
         while let Ok(stream) = listener.accept().await {
-            tokio::spawn(Self::handle_connection(
-                auth.clone(),
-                Arc::clone(&peers),
-                stream,
-                tripwire.clone(),
-            ));
+            tokio::spawn(
+                Self::handle_connection(auth.clone(), Arc::clone(&peers), stream).in_current_span(),
+            );
         }
     }
 
@@ -99,7 +99,6 @@ impl WebSocketListenerSink {
         auth: Option<AuthMatcher>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         stream: MaybeTlsIncomingStream<TcpStream>,
-        tripwire: Tripwire,
     ) -> Result<(), ()> {
         let addr = stream.peer_addr();
         debug!("Incoming TCP connection from: {}", addr);
@@ -122,12 +121,23 @@ impl WebSocketListenerSink {
             .await
             .map_err(|err| {
                 debug!("Error during websocket handshake: {}", err);
+                emit!(WsListenerConnectionFailedError {
+                    error: Box::new(err)
+                })
             })?;
-        debug!("WebSocket connection established: {}", addr);
 
         // Insert the write part of this peer to the peer map.
         let (tx, rx) = unbounded();
-        peers.lock().unwrap().insert(addr, tx);
+
+        {
+            let mut peers = peers.lock().unwrap();
+            debug!("WebSocket connection established: {}", addr);
+
+            peers.insert(addr, tx);
+            emit!(WsListenerConnectionEstablished {
+                client_count: peers.len()
+            });
+        }
 
         let (outgoing, incoming) = ws_stream.split();
 
@@ -145,10 +155,16 @@ impl WebSocketListenerSink {
 
         pin_mut!(broadcast_incoming, receive_from_others);
         future::select(broadcast_incoming, receive_from_others).await;
-        tripwire.then(crate::shutdown::tripwire_handler).await;
 
-        debug!("{} disconnected", &addr);
-        peers.lock().unwrap().remove(&addr);
+        {
+            let mut peers = peers.lock().unwrap();
+            debug!("{} disconnected", &addr);
+            peers.remove(&addr);
+            emit!(WsListenerConnectionShutdown {
+                client_count: peers.len()
+            });
+        }
+
         Ok(())
     }
 }
@@ -164,14 +180,11 @@ impl StreamSink<Event> for WebSocketListenerSink {
         let encode_as_binary = self.should_encode_as_binary();
 
         let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
-        let (_trigger, tripwire) = Tripwire::new();
 
-        tokio::spawn(Self::handle_connections(
-            self.auth,
-            Arc::clone(&self.peers),
-            listener,
-            tripwire,
-        ));
+        tokio::spawn(
+            Self::handle_connections(self.auth, Arc::clone(&self.peers), listener)
+                .in_current_span(),
+        );
 
         while input.as_mut().peek().await.is_some() {
             let mut event = input.next().await.unwrap();
@@ -196,9 +209,12 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     let peers = self.peers.lock().unwrap();
                     let broadcast_recipients = peers.iter().map(|(_, ws_sink)| ws_sink);
                     for recp in broadcast_recipients {
-                        recp.unbounded_send(message.clone()).unwrap();
-                        events_sent.emit(CountByteSize(1, event_byte_size));
-                        bytes_sent.emit(ByteSize(message_len));
+                        if let Err(error) = recp.unbounded_send(message.clone()) {
+                            emit!(WsListenerSendError { error });
+                        } else {
+                            events_sent.emit(CountByteSize(1, event_byte_size));
+                            bytes_sent.emit(ByteSize(message_len));
+                        }
                     }
                 }
                 Err(_) => {

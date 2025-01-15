@@ -127,6 +127,8 @@ mod udp;
 mod unix;
 #[cfg(feature = "sinks-websocket")]
 mod websocket;
+#[cfg(feature = "sinks-websocket-listener")]
+mod websocket_listener;
 
 #[cfg(any(
     feature = "sources-file",
@@ -261,6 +263,8 @@ pub(crate) use self::throttle::*;
 pub(crate) use self::unix::*;
 #[cfg(feature = "sinks-websocket")]
 pub(crate) use self::websocket::*;
+#[cfg(feature = "sinks-websocket-listener")]
+pub(crate) use self::websocket_listener::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
 pub use self::{
