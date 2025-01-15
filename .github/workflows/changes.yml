@@ -262,48 +262,52 @@ jobs:
         run: |
           json=$(cat <<EOF
           {
-          "amqp": ${{ steps.filter.outputs.amqp }},
-          "appsignal": ${{ steps.filter.outputs.appsignal }},
-          "aws": ${{ steps.filter.outputs.aws }},
-          "axiom": ${{ steps.filter.outputs.axiom }},
-          "azure": ${{ steps.filter.outputs.azure }},
-          "clickhouse": ${{ steps.filter.outputs.clickhouse }},
-          "databend": ${{ steps.filter.outputs.databend }},
-          "datadog-agent": ${{ steps.filter.outputs.datadog-agent }},
-          "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
-          "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
-          "datadog-traces": ${{ steps.filter.outputs.datadog-traces }},
-          "dnstap": ${{ steps.filter.outputs.dnstap }},
-          "docker-logs": ${{ steps.filter.outputs.docker-logs }},
-          "elasticsearch": ${{ steps.filter.outputs.elasticsearch }},
-          "eventstoredb": ${{ steps.filter.outputs.eventstoredb }},
-          "fluent": ${{ steps.filter.outputs.fluent }},
-          "gcp": ${{ steps.filter.outputs.gcp }},
-          "greptimedb": ${{ steps.filter.outputs.greptimedb }},
-          "humio": ${{ steps.filter.outputs.humio }},
-          "http-client": ${{ steps.filter.outputs.http-client }},
-          "influxdb": ${{ steps.filter.outputs.influxdb }},
-          "kafka": ${{ steps.filter.outputs.kafka }},
-          "logstash": ${{ steps.filter.outputs.logstash }},
-          "loki": ${{ steps.filter.outputs.loki }},
-          "mongodb": ${{ steps.filter.outputs.mongodb }},
-          "mqtt": ${{ steps.filter.outputs.mqtt }},
-          "nats": ${{ steps.filter.outputs.nats }},
-          "nginx": ${{ steps.filter.outputs.nginx }},
-          "opentelemetry": ${{ steps.filter.outputs.opentelemetry }},
-          "postgres": ${{ steps.filter.outputs.postgres }},
-          "prometheus": ${{ steps.filter.outputs.prometheus }},
-          "pulsar": ${{ steps.filter.outputs.pulsar }},
-          "redis": ${{ steps.filter.outputs.redis }},
-          "splunk": ${{ steps.filter.outputs.splunk }},
-          "webhdfs": ${{ steps.filter.outputs.webhdfs }}
+            "amqp": ${{ steps.filter.outputs.amqp }},
+            "appsignal": ${{ steps.filter.outputs.appsignal }},
+            "aws": ${{ steps.filter.outputs.aws }},
+            "axiom": ${{ steps.filter.outputs.axiom }},
+            "azure": ${{ steps.filter.outputs.azure }},
+            "clickhouse": ${{ steps.filter.outputs.clickhouse }},
+            "databend": ${{ steps.filter.outputs.databend }},
+            "datadog-agent": ${{ steps.filter.outputs.datadog-agent }},
+            "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
+            "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
+            "datadog-traces": ${{ steps.filter.outputs.datadog-traces }},
+            "dnstap": ${{ steps.filter.outputs.dnstap }},
+            "docker-logs": ${{ steps.filter.outputs.docker-logs }},
+            "elasticsearch": ${{ steps.filter.outputs.elasticsearch }},
+            "eventstoredb": ${{ steps.filter.outputs.eventstoredb }},
+            "fluent": ${{ steps.filter.outputs.fluent }},
+            "gcp": ${{ steps.filter.outputs.gcp }},
+            "greptimedb": ${{ steps.filter.outputs.greptimedb }},
+            "humio": ${{ steps.filter.outputs.humio }},
+            "http-client": ${{ steps.filter.outputs.http-client }},
+            "influxdb": ${{ steps.filter.outputs.influxdb }},
+            "kafka": ${{ steps.filter.outputs.kafka }},
+            "logstash": ${{ steps.filter.outputs.logstash }},
+            "loki": ${{ steps.filter.outputs.loki }},
+            "mongodb": ${{ steps.filter.outputs.mongodb }},
+            "mqtt": ${{ steps.filter.outputs.mqtt }},
+            "nats": ${{ steps.filter.outputs.nats }},
+            "nginx": ${{ steps.filter.outputs.nginx }},
+            "opentelemetry": ${{ steps.filter.outputs.opentelemetry }},
+            "postgres": ${{ steps.filter.outputs.postgres }},
+            "prometheus": ${{ steps.filter.outputs.prometheus }},
+            "pulsar": ${{ steps.filter.outputs.pulsar }},
+            "redis": ${{ steps.filter.outputs.redis }},
+            "splunk": ${{ steps.filter.outputs.splunk }},
+            "webhdfs": ${{ steps.filter.outputs.webhdfs }}
           }
           EOF
           )
           
-          # Output the JSON to GitHub Actions output
-          echo "all-changes-json=$json" >> $GITHUB_OUTPUT
-  
+          echo "$json" > int_tests_changes.json
+
+      - name: Upload JSON artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: int_tests_changes
+          path: int_tests_changes.json
 
   # Detects changes that are specific to e2e tests
   e2e_tests:

@@ -89,10 +89,15 @@ jobs:
 
       - run: docker image prune -af ; docker container prune -f
 
+      - name: Download JSON artifact from changes.yml
+        uses: actions/download-artifact@v4
+        with:
+          name: int_tests_changes
+
       - name: Run Integration Tests for ${{ matrix.service }}
         run: |
-          # Parse the JSON and check if the specific service value is 'true'
-          should_run=$(echo "${{ needs.changes.outputs.all-changes-json }}" | jq -r ".${{ matrix.service }}")
+          # Parse the JSON and check if the specific IT value is 'true'
+          should_run=$(jq ".${{ matrix.service }} int_tests_changes.json")
 
           # Check if any of the three conditions is true
           if [[ "${{ github.event_name }}" == "merge_group" || \
