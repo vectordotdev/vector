@@ -29,7 +29,7 @@ pub(super) const HTTP_HEADER_KEEP_API_KEY: &str = "x-api-key";
 #[configurable_component(sink("keep", "Deliver log events to Keep."))]
 #[derive(Clone, Debug)]
 pub struct KeepConfig {
-    /// Keep's endpoint to send logs to
+    /// Keeps endpoint to send logs to
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(
         docs::examples = "https://backend.keep.com:8081/alerts/event/vectordev?provider_id=test",
