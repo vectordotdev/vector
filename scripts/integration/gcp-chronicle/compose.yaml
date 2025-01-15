@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  chronicle-emulator:
+    image: chronicle-emulator:snapshot
+    ports:
+    - 3000:3000
+    volumes:
+    - ./public.pem:/public.pem:ro
+    command:
+    - -p
+    - /public.pem

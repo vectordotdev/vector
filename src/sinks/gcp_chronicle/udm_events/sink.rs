@@ -317,7 +317,7 @@ mod integration_tests {
         trace_init();
 
         let log_type = random_string(10);
-        let (sink, healthcheck) = config_build("/home/vector/scripts/integration/gcp/auth.json")
+        let (sink, healthcheck) = config_build("/home/vector/scripts/integration/gcp-chronicle/auth.json")
             .await
             .expect("Building sink failed");
 
@@ -336,7 +336,7 @@ mod integration_tests {
     async fn invalid_credentials() {
         trace_init();
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
-        let sink = config_build("/home/vector/scripts/integration/gcp/invalidauth.json").await;
+        let sink = config_build("/home/vector/scripts/integration/gcp-chronicle/invalidauth.json").await;
 
         assert!(sink.is_err())
     }
@@ -345,7 +345,7 @@ mod integration_tests {
     async fn publish_invalid_events() {
         trace_init();
 
-        let (sink, healthcheck) = config_build("/home/vector/scripts/integration/gcp/auth.json")
+        let (sink, healthcheck) = config_build("/home/vector/scripts/integration/gcp-chronicle/auth.json")
             .await
             .expect("Building sink failed");
 

@@ -350,6 +350,7 @@ mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
     use vector_lib::event::{BatchNotifier, BatchStatus};
+    use indoc::indoc;
 
     use super::*;
     use crate::test_util::{
@@ -394,7 +395,7 @@ mod integration_tests {
 
         let log_type = random_string(10);
         let (sink, healthcheck) =
-            config_build(&log_type, "/home/vector/scripts/integration/gcp/auth.json")
+            config_build(&log_type, "/home/vector/scripts/integration/gcp-chronicle/auth.json")
                 .await
                 .expect("Building sink failed");
 
@@ -426,7 +427,7 @@ mod integration_tests {
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
         let sink = config_build(
             &log_type,
-            "/home/vector/scripts/integration/gcp/invalidauth.json",
+            "/home/vector/scripts/integration/gcp-chronicle/invalidauth.json",
         )
         .await;
 
@@ -441,7 +442,7 @@ mod integration_tests {
         // will return a `400 BAD_REQUEST`.
         let log_type = "INVALID";
         let (sink, healthcheck) =
-            config_build(log_type, "/home/vector/scripts/integration/gcp/auth.json")
+            config_build(log_type, "/home/vector/scripts/integration/gcp-chronicle/auth.json")
                 .await
                 .expect("Building sink failed");
 
