@@ -287,17 +287,16 @@ configuration: {
 
 						This enrichment table only supports lookup with key field.
 
-						To write data into this table, it has to be used as a sink, by defining
-						inputs. They are expected to produce objects, where each key and value pair
-						will be stored as a separate record in the table.
+						To write data into this table, you have to define inputs to use this the table as a sink. They are expected to produce objects, where each key-value pair
+						is stored as a separate record in the table.
 						"""
 					type: object: options: {
 						inputs: base.components.sinks.configuration.inputs
 						ttl: {
 							description: """
-								TTL (time-to-live in seconds), used to limit lifetime of data stored in cache.
-								When TTL expires, data behind a specific key in cache is removed.
-								TTL is reset when replacing the key.
+								TTL (time-to-live in seconds) is used to limit the lifetime of data stored in the cache.
+								When TTL expires, data behind a specific key in the cache is removed.
+								TTL is reset when the key is replaced.
 								"""
 							required: false
 							type: uint: {
@@ -307,8 +306,8 @@ configuration: {
 						}
 						scan_interval: {
 							description: """
-								Scan interval for looking for expired records. This is provided
-								as an optimization, to ensure that TTL is updated, but without doing
+								The scan interval used to look for expired records. This is provided
+								as an optimization to ensure that TTL is updated, but without doing
 								too many cache scans.
 								"""
 							required: false
@@ -319,11 +318,11 @@ configuration: {
 						}
 						flush_interval: {
 							description: """
-								Interval for making writes visible in the table.
-								Longer interval might get better performance,
-								but data would be visible in the table after a longer delay.
-								Since every TTL scan makes its changes visible, this value
-								only makes sense if it is shorter than scan_interval
+								The interval used for making writes visible in the table.
+								Longer intervals might get better performance,
+								but there is a longer delay before the data is visible in the table.
+								Since every TTL scan makes its changes visible, only use this value
+								if it is shorter than the `scan_interval`.
 
 								By default, all writes are made visible immediately.
 								"""
@@ -335,8 +334,7 @@ configuration: {
 						}
 						max_byte_size: {
 							description: """
-								Maximum size of the table in bytes. All insertions that would
-								cause this table to grow over this size are rejected.
+								Maximum size of the table in bytes. All insertions that make this table bigger than the maximum size are rejected.
 
 								By default, there is no size limit.
 								"""
@@ -348,13 +346,13 @@ configuration: {
 						}
 						internal_metrics: {
 							description: """
-								Configuration of internal metrics for enrichment memory table
+								Configuration of internal metrics for enrichment memory table.
 								"""
 							required: false
 							type: object: options: {
 								include_key_tag: {
 									description: """
-										Whether or not to include the "key" tag on internal metrics.
+										Determines whether to include the key tag on internal metrics.
 
 										This is useful for distinguishing between different keys while monitoring. However, the tag's
 										cardinality is unbounded.
