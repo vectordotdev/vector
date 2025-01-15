@@ -460,7 +460,7 @@ We can now run our new sink.
 Let's run a test HTTP server to accept the responses our sink sends:
 
 ```sh
-docker run -p 3000:3000 plork/httpdump
+python3 -m http.server 3000
 ```
 
 Our sink has a new configuration field for the endpoint. Update it to look like:
