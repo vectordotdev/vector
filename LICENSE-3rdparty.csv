@@ -385,6 +385,10 @@ mongodb,https://github.com/mongodb/mongo-rust-driver,Apache-2.0,"Saghm Rossi <sa
 multer,https://github.com/rousan/multer-rs,MIT,Rousan Ali <hello@rousan.io>
 native-tls,https://github.com/sfackler/rust-native-tls,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
 ndk-context,https://github.com/rust-windowing/android-ndk-rs,MIT OR Apache-2.0,The Rust Windowing contributors
+netlink-packet-core,https://github.com/rust-netlink/netlink-packet-core,MIT,Corentin Henry <corentinhenry@gmail.com>
+netlink-packet-sock-diag,https://github.com/rust-netlink/netlink-packet-sock-diag,MIT,"Flier Lu <flier.lu@gmail.com>, Corentin Henry <corentinhenry@gmail.com>"
+netlink-packet-utils,https://github.com/rust-netlink/netlink-packet-utils,MIT,Corentin Henry <corentinhenry@gmail.com>
+netlink-sys,https://github.com/rust-netlink/netlink-sys,MIT,Corentin Henry <corentinhenry@gmail.com>
 nibble_vec,https://github.com/michaelsproul/rust_nibble_vec,MIT,Michael Sproul <micsproul@gmail.com>
 nix,https://github.com/nix-rust/nix,MIT,The nix-rust Project Developers
 nkeys,https://github.com/wasmcloud/nkeys,Apache-2.0,wasmCloud Team
