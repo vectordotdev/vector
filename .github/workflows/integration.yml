@@ -99,7 +99,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: >-
+          command: |
             # Parse the JSON and check if the specific IT value is 'true'
             should_run=$(jq '."${{ matrix.service }}"' int_tests_changes.json)
 
