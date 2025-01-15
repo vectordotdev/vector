@@ -531,10 +531,11 @@ impl IngestorProcess {
 
         let object = object_result?;
 
-        info!(
+        debug!(
             message = "Got S3 object from SQS notification.",
             bucket = s3_event.s3.bucket.name,
-            key = s3_event.s3.object.key
+            key = s3_event.s3.object.key,
+            internal_log_rate_limit = true
         );
 
         let metadata = object.metadata;
@@ -662,10 +663,11 @@ impl IngestorProcess {
                     let result = receiver.await;
                     match result {
                         BatchStatus::Delivered => {
-                            info!(
+                            debug!(
                                 message = "S3 object from SQS delivered.",
                                 bucket = s3_event.s3.bucket.name,
                                 key = s3_event.s3.object.key,
+                                internal_log_rate_limit = true
                             );
                             Ok(())
                         }
