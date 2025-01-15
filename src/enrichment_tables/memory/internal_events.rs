@@ -2,12 +2,12 @@ use metrics::{counter, gauge};
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::InternalEvent;
 
-/// Configuration of internal metrics for enrichment memory table
+/// Configuration of internal metrics for enrichment memory table.
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct MemoryTableInternalMetricsConfig {
-    /// Whether or not to include the "key" tag on internal metrics.
+    /// Determines whether to include the key tag on internal metrics.
     ///
     /// This is useful for distinguishing between different keys while monitoring. However, the tag's
     /// cardinality is unbounded.

@@ -17,27 +17,27 @@ use super::internal_events::MemoryTableInternalMetricsConfig;
 #[configurable_component(enrichment_table("memory"))]
 #[derive(Clone)]
 pub struct MemoryConfig {
-    /// TTL (time-to-live in seconds), used to limit lifetime of data stored in cache.
-    /// When TTL expires, data behind a specific key in cache is removed.
-    /// TTL is reset when replacing the key.
+    /// TTL (time-to-live in seconds) is used to limit the lifetime of data stored in the cache.
+    /// When TTL expires, data behind a specific key in the cache is removed.
+    /// TTL is reset when the key is replaced.
     #[serde(default = "default_ttl")]
     pub ttl: u64,
-    /// Scan interval for looking for expired records. This is provided
-    /// as an optimization, to ensure that TTL is updated, but without doing
+    /// The scan interval used to look for expired records. This is provided
+    /// as an optimization to ensure that TTL is updated, but without doing
     /// too many cache scans.
     #[serde(default = "default_scan_interval")]
     pub scan_interval: u64,
-    /// Interval for making writes visible in the table.
-    /// Longer interval might get better performance,
-    /// but data would be visible in the table after a longer delay.
-    /// Since every TTL scan makes its changes visible, this value
-    /// only makes sense if it is shorter than scan_interval
+    /// The interval used for making writes visible in the table.
+    /// Longer intervals might get better performance,
+    /// but there is a longer delay before the data is visible in the table.
+    /// Since every TTL scan makes its changes visible, only use this value
+    /// if it is shorter than the `scan_interval`.
     ///
     /// By default, all writes are made visible immediately.
     #[serde(default = "default_flush_interval")]
     pub flush_interval: u64,
-    /// Maximum size of the table in bytes. All insertions that would
-    /// cause this table to grow over this size are rejected.
+    /// Maximum size of the table in bytes. All insertions that make
+    /// this table bigger than the maximum size are rejected.
     ///
     /// By default, there is no size limit.
     #[serde(default = "default_max_byte_size")]
