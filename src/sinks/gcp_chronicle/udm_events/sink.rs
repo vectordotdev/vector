@@ -18,7 +18,6 @@ use vector_lib::{
 };
 
 use crate::{
-    codecs,
     gcp::GcpAuthenticator,
     http::HttpClient,
     sinks::{
@@ -45,7 +44,6 @@ struct ChronicleUDMEventsRequestBody {
 #[derive(Clone, Debug)]
 struct ChronicleUDMEventsEncoder {
     customer_id: String,
-    transformer: codecs::Transformer,
 }
 
 impl Encoder<Vec<Event>> for ChronicleUDMEventsEncoder {
@@ -58,7 +56,6 @@ impl Encoder<Vec<Event>> for ChronicleUDMEventsEncoder {
         let events = input
             .into_iter()
             .filter_map(|mut event| {
-                self.transformer.transform(&mut event);
                 if let Log(ref mut log_event) = event {
                     byte_size.add_event(log_event, log_event.estimated_json_encoded_size_of());
                     Some(log_event.clone())
@@ -90,11 +87,9 @@ struct ChronicleUDMEventsRequestBuilder {
 
 impl ChronicleUDMEventsRequestBuilder {
     fn new(config: &ChronicleUDMEventsConfig) -> crate::Result<Self> {
-        let transformer = config.chronicle_common.encoding.transformer();
         let compression = Compression::from(config.chronicle_common.compression);
         let encoder = ChronicleUDMEventsEncoder {
-            customer_id: config.chronicle_common.customer_id.clone(),
-            transformer,
+            customer_id: config.chronicle_common.customer_id.clone()
         };
         Ok(Self {
             encoder,
@@ -302,7 +297,6 @@ mod integration_tests {
                 endpoint = "{}"
                 customer_id = "customer id"
                 credentials_path = "{}"
-                encoding.codec = "json"
             "# },
             address, auth_path
         );

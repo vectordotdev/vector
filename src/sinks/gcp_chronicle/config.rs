@@ -3,7 +3,6 @@ use vector_lib::config::AcknowledgementsConfig;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
-    codecs::EncodingConfig,
     gcp::GcpAuthConfig,
     sinks::{
         gcp_chronicle::{
@@ -126,9 +125,6 @@ pub struct ChronicleCommonConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<ChronicleDefaultBatchSettings>,
-
-    #[configurable(derived)]
-    pub encoding: EncodingConfig,
 
     #[serde(default)]
     #[configurable(derived)]

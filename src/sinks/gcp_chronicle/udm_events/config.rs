@@ -37,7 +37,6 @@ impl GenerateConfig for ChronicleUDMEventsConfig {
             credentials_path = "/path/to/credentials.json"
             customer_id = "customer_id"
             compression = "gzip"
-            encoding.codec = "json"
         "#})
         .unwrap()
     }

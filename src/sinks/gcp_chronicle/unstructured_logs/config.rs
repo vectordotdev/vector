@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
+    codecs::EncodingConfig,
     config::{SinkConfig, SinkContext},
     http::HttpClient,
     schema,
@@ -45,6 +46,9 @@ pub struct ChronicleUnstructuredConfig {
     #[configurable(metadata(docs::examples = "chronicle_labels_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "A Chronicle label."))]
     pub labels: Option<HashMap<String, String>>,
+
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
 
     /// The type of log entries in a request.
     ///

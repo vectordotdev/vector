@@ -201,8 +201,8 @@ struct Label {
 
 impl ChronicleUnstructuredRequestBuilder {
     fn new(config: &ChronicleUnstructuredConfig) -> crate::Result<Self> {
-        let transformer = config.chronicle_common.encoding.transformer();
-        let serializer = config.chronicle_common.encoding.config().build()?;
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.config().build()?;
         let compression = Compression::from(config.chronicle_common.compression);
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
         let encoder = ChronicleUnstructuredEncoder {
