@@ -509,3 +509,4 @@ teledisk
 UMTS
 WCDMA
 XMODEM
+cbor
