@@ -300,7 +300,7 @@ jobs:
           }
           EOF
           )
-          
+
           echo "$json" > int_tests_changes.json
 
       - name: Upload JSON artifact
