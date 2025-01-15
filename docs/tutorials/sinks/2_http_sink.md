@@ -503,6 +503,7 @@ with socketserver.TCPServer(("", PORT), Handler) as httpd:
 ```
 
 Run the server:
+
 ```sh
 python3 simple_http_server.py
 ```
