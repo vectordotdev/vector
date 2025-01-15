@@ -74,6 +74,7 @@ jobs:
       - setup
     strategy:
       matrix:
+        # If you modify this list, please also update the `int_tests` job in changes.yml.
         service: [
           "amqp", "appsignal", "aws", "axiom", "azure", "clickhouse", "databend", "datadog-agent",
           "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "elasticsearch",
@@ -86,8 +87,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
-
-      - run: docker image prune -af ; docker container prune -f
 
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@v4
