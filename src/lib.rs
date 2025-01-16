@@ -22,6 +22,8 @@
 //! The main library to support building Vector.
 
 #[macro_use]
+extern crate cfg_if;
+#[macro_use]
 extern crate derivative;
 #[macro_use]
 extern crate tracing;

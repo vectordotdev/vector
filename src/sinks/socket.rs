@@ -41,15 +41,12 @@ pub enum Mode {
     Udp(UdpMode),
 
     /// Send over a Unix domain socket (UDS), in stream mode.
-    #[cfg(unix)]
     #[serde(alias = "unix")]
     UnixStream(UnixMode),
 
     /// Send over a Unix domain socket (UDS), in datagram mode.
     /// Unavailable on macOS, due to send(2)'s apparent non-blocking behavior,
     /// resulting in ENOBUFS errors which we currently don't handle.
-    #[cfg(unix)]
-    #[cfg_attr(target_os = "macos", serde(skip))]
     UnixDatagram(UnixMode),
 }
 
@@ -140,27 +137,41 @@ impl SinkConfig for SocketSinkConfig {
                 let encoder = Encoder::<()>::new(serializer);
                 config.build(transformer, encoder)
             }
-            #[cfg(unix)]
+            #[allow(unused)]
             Mode::UnixStream(UnixMode { config, encoding }) => {
-                let transformer = encoding.transformer();
-                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
-                let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(
-                    transformer,
-                    encoder,
-                    super::util::service::net::UnixMode::Stream,
-                )
+                cfg_if! {
+                    if #[cfg(unix)] {
+                        let transformer = encoding.transformer();
+                        let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                        let encoder = Encoder::<Framer>::new(framer, serializer);
+                        config.build(
+                            transformer,
+                            encoder,
+                            super::util::service::net::UnixMode::Stream,
+                        )
+                    }
+                    else {
+                        Err("UnixStream is supported only on unix/".into())
+                    }
+                }
             }
-            #[cfg(unix)]
+            #[allow(unused)]
             Mode::UnixDatagram(UnixMode { config, encoding }) => {
-                let transformer = encoding.transformer();
-                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
-                let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(
-                    transformer,
-                    encoder,
-                    super::util::service::net::UnixMode::Datagram,
-                )
+                cfg_if! {
+                    if #[cfg(all(unix, not(target_os = "macos")))] {
+                        let transformer = encoding.transformer();
+                        let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                        let encoder = Encoder::<Framer>::new(framer, serializer);
+                        config.build(
+                            transformer,
+                            encoder,
+                            super::util::service::net::UnixMode::Datagram,
+                        )
+                    }
+                    else {
+                        Err("UnixDatagram is supported only on unix and also it is not avalailable on macOS platforms.".into())
+                    }
+                }
             }
         }
     }

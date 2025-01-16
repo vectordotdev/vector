@@ -10884,6 +10884,7 @@ dependencies = [
  "byteorder",
  "bytes 1.9.0",
  "bytesize",
+ "cfg-if",
  "chrono",
  "chrono-tz",
  "clap",
