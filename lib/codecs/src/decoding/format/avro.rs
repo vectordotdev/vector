@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn deserialize_avro() {
         let schema = get_schema();
-
+        panic!();
         let event = Log {
             message: "hello from avro".to_owned(),
         };
