@@ -88,6 +88,8 @@ jobs:
         with:
           submodules: "recursive"
 
+      - run: docker image prune -af ; docker container prune -f
+
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@v4
         with:
