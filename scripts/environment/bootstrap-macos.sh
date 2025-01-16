@@ -15,6 +15,9 @@ brew install ruby@3 coreutils cue-lang/tap/cue protobuf
 # future
 brew reinstall rustup
 
+# Required for building aws-lc-rs
+brew install go
+
 gem install bundler
 
 echo "export PATH=\"/usr/local/opt/ruby/bin:\$PATH\"" >> "$HOME/.bash_profile"

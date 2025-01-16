@@ -45,7 +45,8 @@ apt-get install --yes --no-install-recommends \
     shellcheck \
     sudo \
     unzip \
-    wget
+    wget \
+    golang # Required for building aws-lc-rs
 
 # Cue
 TEMP=$(mktemp -d)
