@@ -3,25 +3,31 @@ use crate::enrichment_tables::memory::internal_events::{
     MemoryEnrichmentTableRead, MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
 };
 use crate::enrichment_tables::memory::MemoryConfig;
+use crate::internal_events::StreamClosedError;
+use crate::SourceSender;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
+use chrono::Utc;
 use evmap::shallow_copy::CopyValue;
 use evmap::{self};
 use evmap_derive::ShallowCopy;
+use futures::StreamExt;
 use thread_local::ThreadLocal;
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
+use vector_lib::config::LogNamespace;
+use vector_lib::shutdown::ShutdownSignal;
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::BoxStream;
-use tokio_stream::StreamExt;
 use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
-use vector_lib::event::{Event, EventStatus, Finalizable};
+use vector_lib::event::{Event, EventMetadata, EventStatus, Finalizable, LogEvent};
 use vector_lib::internal_event::{
-    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
+    ByteSize, BytesReceived, BytesSent, CountByteSize, EventsReceived, EventsSent,
+    InternalEventHandle, Output, Protocol,
 };
 use vector_lib::sink::StreamSink;
 use vrl::value::{KeyString, ObjectMap, Value};
@@ -200,6 +206,21 @@ impl Memory {
             });
         }
     }
+
+    pub(crate) fn as_source(
+        &self,
+        shutdown: ShutdownSignal,
+        out: SourceSender,
+        log_namespace: LogNamespace,
+    ) -> MemorySource {
+        MemorySource {
+            memory: self.clone(),
+            shutdown,
+            out,
+            log_namespace,
+            dump_batch_size: self.config.dump_batch_size.map(|d| d as usize),
+        }
+    }
 }
 
 impl Clone for Memory {
@@ -343,11 +364,102 @@ impl StreamSink<Event> for Memory {
     }
 }
 
+/// A struct that represents Memory when used as a source.
+pub struct MemorySource {
+    memory: Memory,
+    shutdown: ShutdownSignal,
+    out: SourceSender,
+    log_namespace: LogNamespace,
+    dump_batch_size: Option<usize>,
+}
+
+impl MemorySource {
+    pub(crate) async fn run(mut self) -> Result<(), ()> {
+        let events_received = register!(EventsReceived);
+        let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));
+        let mut interval = IntervalStream::new(interval(Duration::from_secs(
+            self.memory
+                .config
+                .dump_interval
+                .expect("Unexpected missing dump interval in memory table used as a source."),
+        )))
+        .take_until(self.shutdown);
+
+        while interval.next().await.is_some() {
+            let mut sent = 0_usize;
+            loop {
+                let mut events = Vec::new();
+                {
+                    let mut writer = self.memory.write_handle.lock().unwrap();
+                    if let Some(reader) = self.memory.get_read_handle().read() {
+                        let now = Instant::now();
+                        let utc_now = Utc::now();
+                        events = reader
+                            .iter()
+                            .skip(if self.memory.config.remove_after_dump {
+                                0
+                            } else {
+                                sent
+                            })
+                            .take(if let Some(batch_size) = self.dump_batch_size {
+                                batch_size
+                            } else {
+                                usize::MAX
+                            })
+                            .filter_map(|(k, v)| {
+                                if self.memory.config.remove_after_dump {
+                                    writer.write_handle.empty(k.clone());
+                                }
+                                v.get_one().map(|v| (k, v))
+                            })
+                            .filter_map(|(k, v)| {
+                                let mut event = Event::Log(LogEvent::from_map(
+                                    v.as_object_map(now, self.memory.config.ttl, k).ok()?,
+                                    EventMetadata::default(),
+                                ));
+                                let log = event.as_mut_log();
+                                self.log_namespace.insert_standard_vector_source_metadata(
+                                    log,
+                                    MemoryConfig::NAME,
+                                    utc_now,
+                                );
+
+                                Some(event)
+                            })
+                            .collect::<Vec<_>>();
+                        if self.memory.config.remove_after_dump {
+                            writer.write_handle.refresh();
+                        }
+                    }
+                }
+                let count = events.len();
+                let byte_size = events.size_of();
+                let json_size = events.estimated_json_encoded_size_of();
+                bytes_received.emit(ByteSize(byte_size));
+                events_received.emit(CountByteSize(count, json_size));
+                if self.out.send_batch(events).await.is_err() {
+                    emit!(StreamClosedError { count });
+                }
+
+                sent += count;
+                match self.dump_batch_size {
+                    None => break,
+                    Some(dump_batch_size) if count < dump_batch_size => break,
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use futures::{future::ready, StreamExt};
     use futures_util::stream;
     use std::time::Duration;
+    use tokio::time;
 
     use vector_lib::{
         event::{EventContainer, MetricValue},
@@ -359,7 +471,10 @@ mod tests {
     use crate::{
         enrichment_tables::memory::internal_events::InternalMetricsConfig,
         event::{Event, LogEvent},
-        test_util::components::{run_and_assert_sink_compliance, SINK_TAGS},
+        test_util::components::{
+            run_and_assert_sink_compliance, run_and_assert_source_compliance, SINK_TAGS,
+            SOURCE_TAGS,
+        },
     };
 
     fn build_memory_config(modfn: impl Fn(&mut MemoryConfig)) -> MemoryConfig {
@@ -825,5 +940,26 @@ mod tests {
             .expect("Insertions metric is missing!");
 
         assert!(insertions_counter.tag_value("key").is_none());
+    }
+
+    #[tokio::test]
+    async fn source_spec_compliance() {
+        let mut memory_config = MemoryConfig::default();
+        memory_config.dump_interval = Some(1);
+        let memory = memory_config.get_or_build_memory().await;
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
+
+        let mut events: Vec<Event> = run_and_assert_source_compliance(
+            memory_config,
+            time::Duration::from_secs(5),
+            &SOURCE_TAGS,
+        )
+        .await;
+
+        assert!(!events.is_empty());
+        let event = events.remove(0);
+        let log = event.as_log();
+
+        assert!(!log.value().is_empty());
     }
 }

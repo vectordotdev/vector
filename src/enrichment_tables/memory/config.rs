@@ -2,15 +2,20 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use crate::sinks::Healthcheck;
+use crate::sources::Source;
 use crate::{config::SinkContext, enrichment_tables::memory::Memory};
 use async_trait::async_trait;
 use futures::{future, FutureExt};
 use tokio::sync::Mutex;
-use vector_lib::config::{AcknowledgementsConfig, Input};
+use vector_lib::config::{AcknowledgementsConfig, DataType, Input, LogNamespace};
 use vector_lib::enrichment::Table;
+use vector_lib::id::ComponentKey;
+use vector_lib::schema::{self};
 use vector_lib::{configurable::configurable_component, sink::VectorSink};
+use vrl::path::OwnedTargetPath;
+use vrl::value::Kind;
 
-use crate::config::{EnrichmentTableConfig, SinkConfig};
+use crate::config::{EnrichmentTableConfig, SinkConfig, SourceConfig, SourceContext, SourceOutput};
 
 use super::internal_events::InternalMetricsConfig;
 
@@ -43,7 +48,34 @@ pub struct MemoryConfig {
     /// By default, there is no size limit.
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub max_byte_size: Option<u64>,
-
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
+    /// Interval for dumping all data from the table when used as a source.
+    ///
+    /// By default, no dumps happen and this table can't be used as a source,
+    /// unless a non-zero dump interval is provided
+    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
+    pub dump_interval: Option<u64>,
+    /// Batch size for data dumping. Used to prevent dumping entire table at
+    /// once and blocking the system.
+    ///
+    /// By default, batches are not used and entire table is dumped.
+    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
+    pub dump_batch_size: Option<u64>,
+    /// If set to true, all data will be removed from cache after dumping.
+    /// Only valid if used as a source and dump_interval > 0
+    ///
+    /// By default, dump will not remove data from cache
+    #[serde(default = "crate::serde::default_false")]
+    pub remove_after_dump: bool,
+    /// Key to use for this component when used as a source.
+    ///
+    /// If this table is used as a source, this has to be defined and must be different from the
+    /// component key.
+    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
+    pub source_key: Option<String>,
     /// Configuration of internal metrics
     #[configurable(derived)]
     #[serde(default)]
@@ -70,6 +102,11 @@ impl Default for MemoryConfig {
             flush_interval: None,
             memory: Arc::new(Mutex::new(None)),
             max_byte_size: None,
+            log_namespace: None,
+            dump_interval: None,
+            dump_batch_size: None,
+            remove_after_dump: false,
+            source_key: None,
             internal_metrics: InternalMetricsConfig::default(),
         }
     }
@@ -84,7 +121,8 @@ const fn default_scan_interval() -> NonZeroU64 {
 }
 
 impl MemoryConfig {
-    async fn get_or_build_memory(&self) -> Memory {
+    /// Just pub for now
+    pub async fn get_or_build_memory(&self) -> Memory {
         let mut boxed_memory = self.memory.lock().await;
         *boxed_memory
             .get_or_insert_with(|| Box::new(Memory::new(self.clone())))
@@ -100,8 +138,28 @@ impl EnrichmentTableConfig for MemoryConfig {
         Ok(Box::new(self.get_or_build_memory().await))
     }
 
-    fn sink_config(&self) -> Option<Box<dyn SinkConfig>> {
-        Some(Box::new(self.clone()))
+    fn sink_config(
+        &self,
+        default_key: &ComponentKey,
+    ) -> Option<(ComponentKey, Box<dyn SinkConfig>)> {
+        Some((default_key.clone(), Box::new(self.clone())))
+    }
+
+    fn source_config(
+        &self,
+        default_key: &ComponentKey,
+    ) -> Option<(ComponentKey, Box<dyn SourceConfig>)> {
+        if self.dump_interval.is_some() {
+            Some((
+                self.source_key
+                    .clone()
+                    .map(ComponentKey::from)
+                    .unwrap_or(default_key.clone()),
+                Box::new(self.clone()),
+            ))
+        } else {
+            None
+        }
     }
 }
 
@@ -120,6 +178,41 @@ impl SinkConfig for MemoryConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait]
+#[typetag::serde(name = "memory_enrichment_table")]
+impl SourceConfig for MemoryConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        let memory = self.get_or_build_memory().await;
+
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
+        Ok(Box::pin(
+            memory.as_source(cx.shutdown, cx.out, log_namespace).run(),
+        ))
+    }
+
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = match log_namespace {
+            LogNamespace::Legacy => schema::Definition::default_legacy_namespace(),
+            LogNamespace::Vector => {
+                schema::Definition::new_with_default_metadata(Kind::any_object(), [log_namespace])
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
+            }
+        }
+        .with_standard_vector_source_metadata();
+
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
