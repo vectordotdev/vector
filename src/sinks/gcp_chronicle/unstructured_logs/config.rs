@@ -91,7 +91,7 @@ impl SinkConfig for ChronicleUnstructuredConfig {
             .build(Scope::MalachiteIngestion)
             .await?;
 
-        let tls = TlsSettings::from_options(&self.chronicle_common.tls)?;
+        let tls = TlsSettings::from_options(self.chronicle_common.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
 
         let endpoint = self

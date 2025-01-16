@@ -5,7 +5,7 @@ features:
 test_filter: '::gcp_chronicle::'
 
 env:
-  CHRONICLE_ADDRESS: http://chronicle-emulator:3000
+  CHRONICLE_ADDRESS: http://gcp-chronicle-chronicle-emulator-1:3000
 
 matrix:
   version: [latest]

@@ -347,10 +347,10 @@ where
 
 #[cfg(all(test, feature = "chronicle-unstructured-integration-tests"))]
 mod integration_tests {
+    use indoc::indoc;
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
     use vector_lib::event::{BatchNotifier, BatchStatus};
-    use indoc::indoc;
 
     use super::*;
     use crate::test_util::{
@@ -394,10 +394,12 @@ mod integration_tests {
         trace_init();
 
         let log_type = random_string(10);
-        let (sink, healthcheck) =
-            config_build(&log_type, "/home/vector/scripts/integration/gcp-chronicle/auth.json")
-                .await
-                .expect("Building sink failed");
+        let (sink, healthcheck) = config_build(
+            &log_type,
+            "/home/vector/scripts/integration/gcp-chronicle/auth.json",
+        )
+        .await
+        .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
@@ -441,10 +443,12 @@ mod integration_tests {
         // The chronicle-emulator we are testing against is setup so a `log_type` of "INVALID"
         // will return a `400 BAD_REQUEST`.
         let log_type = "INVALID";
-        let (sink, healthcheck) =
-            config_build(log_type, "/home/vector/scripts/integration/gcp-chronicle/auth.json")
-                .await
-                .expect("Building sink failed");
+        let (sink, healthcheck) = config_build(
+            log_type,
+            "/home/vector/scripts/integration/gcp-chronicle/auth.json",
+        )
+        .await
+        .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 

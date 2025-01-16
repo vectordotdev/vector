@@ -89,7 +89,7 @@ impl ChronicleUDMEventsRequestBuilder {
     fn new(config: &ChronicleUDMEventsConfig) -> crate::Result<Self> {
         let compression = Compression::from(config.chronicle_common.compression);
         let encoder = ChronicleUDMEventsEncoder {
-            customer_id: config.chronicle_common.customer_id.clone()
+            customer_id: config.chronicle_common.customer_id.clone(),
         };
         Ok(Self {
             encoder,
@@ -263,10 +263,11 @@ where
 
 #[cfg(all(test, feature = "chronicle-udm-events-integration-tests"))]
 mod integration_tests {
+    use futures::{stream, Stream};
     use indoc::indoc;
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
-    use vector_lib::event::{BatchNotifier, BatchStatus};
+    use vector_lib::event::{BatchNotifier, BatchStatus, Event, EventArray};
 
     use super::*;
     use crate::test_util::{
@@ -274,20 +275,16 @@ mod integration_tests {
             run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
             SINK_TAGS,
         },
-        random_events_with_stream, random_string, trace_init,
+        map_event_batch_stream, random_events_with_stream, random_string, trace_init,
     };
+    use fakedata::logs::udm_event_line;
 
     const ADDRESS_ENV_VAR: &str = "CHRONICLE_ADDRESS";
 
-    #[derive(Clone, Debug, Deserialize, Serialize)]
-    pub struct UdmMetadata {
-        event_timestamp: String,
-        log_type: String,
-    }
-
-    #[derive(Clone, Debug, Deserialize, Serialize)]
+    #[derive(Debug, Deserialize, Serialize)]
     pub struct Log {
-        metadata: UdmMetadata,
+        log_type: String,
+        pub invalid: Option<bool>,
     }
 
     fn config(auth_path: &str) -> ChronicleUDMEventsConfig {
@@ -312,23 +309,43 @@ mod integration_tests {
         config(auth_path).build(cx).await
     }
 
+    fn udm_test_events_with_stream(
+        len: usize,
+        log_type: &String,
+        batch: Option<BatchNotifier>,
+    ) -> (Vec<Event>, impl Stream<Item = EventArray>) {
+        let generator = move |_| {
+            serde_json::from_str::<serde_json::Value>(&udm_event_line(log_type))
+                .map(|val| LogEvent::try_from(val).unwrap())
+                .map(Event::from)
+                .unwrap()
+        };
+        let lines = (0..len).map(generator).collect::<Vec<_>>();
+        let stream = map_event_batch_stream(stream::iter(lines.clone()), batch);
+
+        (lines, stream)
+    }
+
     #[tokio::test]
     async fn publish_events() {
         trace_init();
 
         let log_type = random_string(10);
-        let (sink, healthcheck) = config_build("/home/vector/scripts/integration/gcp-chronicle/auth.json")
-            .await
-            .expect("Building sink failed");
+        let (sink, healthcheck) =
+            config_build("/home/vector/scripts/integration/gcp-chronicle/auth.json")
+                .await
+                .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (input, events) = random_events_with_stream(100, 100, Some(batch));
+        let (input, events) = udm_test_events_with_stream(100, &log_type, Some(batch));
+
         run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let response = pull_messages(&log_type).await;
+
         assert_eq!(input.len(), response.len());
     }
 
@@ -336,7 +353,8 @@ mod integration_tests {
     async fn invalid_credentials() {
         trace_init();
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
-        let sink = config_build("/home/vector/scripts/integration/gcp-chronicle/invalidauth.json").await;
+        let sink =
+            config_build("/home/vector/scripts/integration/gcp-chronicle/invalidauth.json").await;
 
         assert!(sink.is_err())
     }
@@ -345,9 +363,10 @@ mod integration_tests {
     async fn publish_invalid_events() {
         trace_init();
 
-        let (sink, healthcheck) = config_build("/home/vector/scripts/integration/gcp-chronicle/auth.json")
-            .await
-            .expect("Building sink failed");
+        let (sink, healthcheck) =
+            config_build("/home/vector/scripts/integration/gcp-chronicle/auth.json")
+                .await
+                .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 

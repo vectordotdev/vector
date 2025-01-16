@@ -2,7 +2,7 @@ version: '3'
 
 services:
   chronicle-emulator:
-    image: chronicle-emulator:snapshot
+    image: docker.io/timberio/chronicle-emulator:${CONFIG_VERSION}
     ports:
     - 3000:3000
     volumes:
