@@ -4,12 +4,14 @@ use crate::enrichment_tables::memory::internal_events::{
 };
 use crate::enrichment_tables::memory::MemoryConfig;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use evmap::shallow_copy::CopyValue;
 use evmap::{self};
 use evmap_derive::ShallowCopy;
 use thread_local::ThreadLocal;
+use tokio::time::interval;
+use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use async_trait::async_trait;
@@ -62,30 +64,23 @@ impl MemoryEntry {
     }
 }
 
+#[derive(Default)]
 struct MemoryMetadata {
-    last_ttl_scan: Instant,
-    last_flush: Instant,
     byte_size: u64,
 }
 
-impl Default for MemoryMetadata {
-    fn default() -> Self {
-        let now = Instant::now();
-        Self {
-            last_ttl_scan: now,
-            last_flush: now,
-            byte_size: 0,
-        }
-    }
+// Used to ensure that these 2 are locked together
+struct MemoryWriter {
+    write_handle: evmap::WriteHandle<String, MemoryEntry>,
+    metadata: MemoryMetadata,
 }
 
 /// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a memory structure.
 pub struct Memory {
     read_handle_factory: evmap::ReadHandleFactory<String, MemoryEntry>,
     read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
-    write_handle: Arc<Mutex<evmap::WriteHandle<String, MemoryEntry>>>,
+    write_handle: Arc<Mutex<MemoryWriter>>,
     config: MemoryConfig,
-    metadata: Arc<Mutex<MemoryMetadata>>,
 }
 
 impl Memory {
@@ -96,8 +91,10 @@ impl Memory {
             config,
             read_handle_factory: read_handle.factory(),
             read_handle: ThreadLocal::new(),
-            write_handle: Arc::new(Mutex::new(write_handle)),
-            metadata: Arc::new(Mutex::new(MemoryMetadata::default())),
+            write_handle: Arc::new(Mutex::new(MemoryWriter {
+                write_handle,
+                metadata: MemoryMetadata::default(),
+            })),
         }
     }
 
@@ -108,8 +105,7 @@ impl Memory {
 
     fn handle_value(&mut self, value: ObjectMap) {
         // Panic: If the Mutex is poisoned
-        let mut handle = self.write_handle.lock().unwrap();
-        let mut metadata = self.metadata.lock().unwrap();
+        let mut writer = self.write_handle.lock().unwrap();
         let now = Instant::now();
 
         for (k, v) in value.into_iter() {
@@ -127,7 +123,10 @@ impl Memory {
             };
             let new_entry_size = new_entry_key.size_of() + new_entry.size_of();
             if self.config.max_byte_size > 0
-                && metadata.byte_size.saturating_add(new_entry_size as u64)
+                && writer
+                    .metadata
+                    .byte_size
+                    .saturating_add(new_entry_size as u64)
                     > self.config.max_byte_size
             {
                 // Reject new entries
@@ -137,57 +136,71 @@ impl Memory {
                 });
                 continue;
             }
-            metadata.byte_size = metadata.byte_size.saturating_add(new_entry_size as u64);
+            writer.metadata.byte_size = writer
+                .metadata
+                .byte_size
+                .saturating_add(new_entry_size as u64);
             emit!(MemoryEnrichmentTableInserted {
                 key: &new_entry_key,
                 include_key_metric_tag: self.config.internal_metrics.include_key_tag
             });
-            handle.update(new_entry_key, new_entry);
+            writer.write_handle.update(new_entry_key, new_entry);
         }
+
+        if self.config.flush_interval == 0 {
+            writer.write_handle.refresh();
+        }
+    }
+
+    fn scan_and_mark_for_deletion(&mut self) -> bool {
+        let mut writer = self.write_handle.lock().unwrap();
+        let now = Instant::now();
 
         let mut needs_flush = false;
-        if now.duration_since(metadata.last_ttl_scan).as_secs() >= self.config.scan_interval {
-            metadata.last_ttl_scan = now;
-            // Since evmap holds 2 separate maps for the data, we are free to directly remove
-            // elements via the writer, while we are iterating the reader
-            // Refresh will happen only after we manually invoke it after iteration
-            if let Some(reader) = self.get_read_handle().read() {
-                for (k, v) in reader.iter() {
-                    if let Some(entry) = v.get_one() {
-                        if entry.expired(now, self.config.ttl) {
-                            // Byte size is not reduced at this point, because the actual deletion
-                            // will only happen at refresh time
-                            handle.empty(k.clone());
-                            emit!(MemoryEnrichmentTableTtlExpired {
-                                key: k,
-                                include_key_metric_tag: self
-                                    .config
-                                    .internal_metrics
-                                    .include_key_tag
-                            });
-                            needs_flush = true;
-                        }
+        // Since evmap holds 2 separate maps for the data, we are free to directly remove
+        // elements via the writer, while we are iterating the reader
+        // Refresh will happen only after we manually invoke it after iteration
+        if let Some(reader) = self.get_read_handle().read() {
+            for (k, v) in reader.iter() {
+                if let Some(entry) = v.get_one() {
+                    if entry.expired(now, self.config.ttl) {
+                        // Byte size is not reduced at this point, because the actual deletion
+                        // will only happen at refresh time
+                        writer.write_handle.empty(k.clone());
+                        emit!(MemoryEnrichmentTableTtlExpired {
+                            key: k,
+                            include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                        });
+                        needs_flush = true;
                     }
                 }
-            };
-        } else if now.duration_since(metadata.last_flush).as_secs() >= self.config.flush_interval {
-            needs_flush = true;
-        }
-
-        if needs_flush {
-            metadata.last_flush = now;
-            handle.refresh();
-            if let Some(reader) = self.get_read_handle().read() {
-                let mut byte_size = 0;
-                for (k, v) in reader.iter() {
-                    byte_size += k.size_of() + v.get_one().size_of();
-                }
-                metadata.byte_size = byte_size as u64;
-                emit!(MemoryEnrichmentTableFlushed {
-                    new_objects_count: reader.len(),
-                    new_byte_size: byte_size
-                });
             }
+        };
+
+        needs_flush
+    }
+
+    fn scan(&mut self) {
+        let needs_flush = self.scan_and_mark_for_deletion();
+        if needs_flush {
+            self.flush();
+        }
+    }
+
+    fn flush(&mut self) {
+        let mut writer = self.write_handle.lock().unwrap();
+
+        writer.write_handle.refresh();
+        if let Some(reader) = self.get_read_handle().read() {
+            let mut byte_size = 0;
+            for (k, v) in reader.iter() {
+                byte_size += k.size_of() + v.get_one().size_of();
+            }
+            writer.metadata.byte_size = byte_size as u64;
+            emit!(MemoryEnrichmentTableFlushed {
+                new_objects_count: reader.len(),
+                new_byte_size: byte_size
+            });
         }
     }
 }
@@ -199,7 +212,6 @@ impl Clone for Memory {
             read_handle: ThreadLocal::new(),
             write_handle: Arc::clone(&self.write_handle),
             config: self.config.clone(),
-            metadata: Arc::clone(&self.metadata),
         }
     }
 }
@@ -285,21 +297,43 @@ impl StreamSink<Event> for Memory {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
-        while let Some(mut event) = input.next().await {
-            let event_byte_size = event.estimated_json_encoded_size_of();
+        let mut flush_interval =
+            IntervalStream::new(interval(Duration::from_secs(self.config.flush_interval)));
+        let mut scan_interval =
+            IntervalStream::new(interval(Duration::from_secs(self.config.scan_interval)));
 
-            let finalizers = event.take_finalizers();
+        loop {
+            tokio::select! {
+                event = input.next() => {
+                    let mut event = if let Some(event) = event {
+                        event
+                    } else {
+                        break;
+                    };
+                    let event_byte_size = event.estimated_json_encoded_size_of();
 
-            // Panic: This sink only accepts Logs, so this should never panic
-            let log = event.into_log();
+                    let finalizers = event.take_finalizers();
 
-            if let (Value::Object(map), _) = log.into_parts() {
-                self.handle_value(map)
-            };
+                    // Panic: This sink only accepts Logs, so this should never panic
+                    let log = event.into_log();
 
-            finalizers.update_status(EventStatus::Delivered);
-            events_sent.emit(CountByteSize(1, event_byte_size));
-            bytes_sent.emit(ByteSize(event_byte_size.get()));
+                    if let (Value::Object(map), _) = log.into_parts() {
+                        self.handle_value(map)
+                    };
+
+                    finalizers.update_status(EventStatus::Delivered);
+                    events_sent.emit(CountByteSize(1, event_byte_size));
+                    bytes_sent.emit(ByteSize(event_byte_size.get()));
+                }
+
+                Some(_) = flush_interval.next() => {
+                    self.flush();
+                }
+
+                Some(_) = scan_interval.next() => {
+                    self.scan();
+                }
+            }
         }
         Ok(())
     }
@@ -352,14 +386,14 @@ mod tests {
         let memory = Memory::new(build_memory_config(|c| c.ttl = ttl));
         {
             let mut handle = memory.write_handle.lock().unwrap();
-            handle.update(
+            handle.write_handle.update(
                 "test_key".to_string(),
                 MemoryEntry {
                     value: "5".to_string(),
                     update_time: (Instant::now() - Duration::from_secs(secs_to_subtract)).into(),
                 },
             );
-            handle.refresh();
+            handle.write_handle.refresh();
         }
 
         let condition = Condition::Equals {
@@ -386,14 +420,14 @@ mod tests {
         }));
         {
             let mut handle = memory.write_handle.lock().unwrap();
-            handle.update(
+            handle.write_handle.update(
                 "test_key".to_string(),
                 MemoryEntry {
                     value: "5".to_string(),
                     update_time: (Instant::now() - Duration::from_secs(ttl + 10)).into(),
                 },
             );
-            handle.refresh();
+            handle.write_handle.refresh();
         }
 
         // Finds the value before scan
@@ -411,7 +445,7 @@ mod tests {
         );
 
         // Force scan
-        memory.handle_value(ObjectMap::default());
+        memory.scan();
 
         // The value is not present anymore
         assert!(memory
@@ -448,14 +482,14 @@ mod tests {
         let mut memory = Memory::new(build_memory_config(|c| c.ttl = ttl));
         {
             let mut handle = memory.write_handle.lock().unwrap();
-            handle.update(
+            handle.write_handle.update(
                 "test_key".to_string(),
                 MemoryEntry {
                     value: "5".to_string(),
                     update_time: (Instant::now() - Duration::from_secs(ttl / 2)).into(),
                 },
             );
-            handle.refresh();
+            handle.write_handle.refresh();
         }
         let condition = Condition::Equals {
             field: "key",
