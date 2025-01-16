@@ -1,3 +1,4 @@
+use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use crate::sinks::Healthcheck;
@@ -26,7 +27,7 @@ pub struct MemoryConfig {
     /// as an optimization to ensure that TTL is updated, but without doing
     /// too many cache scans.
     #[serde(default = "default_scan_interval")]
-    pub scan_interval: u64,
+    pub scan_interval: NonZeroU64,
     /// The interval used for making writes visible in the table.
     /// Longer intervals might get better performance,
     /// but there is a longer delay before the data is visible in the table.
@@ -78,8 +79,8 @@ const fn default_ttl() -> u64 {
     600
 }
 
-const fn default_scan_interval() -> u64 {
-    30
+const fn default_scan_interval() -> NonZeroU64 {
+    NonZeroU64::new(30).unwrap()
 }
 
 const fn default_flush_interval() -> u64 {

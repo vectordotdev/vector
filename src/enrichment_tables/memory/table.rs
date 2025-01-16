@@ -298,9 +298,14 @@ impl StreamSink<Event> for Memory {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
         let mut flush_interval =
-            IntervalStream::new(interval(Duration::from_secs(self.config.flush_interval)));
-        let mut scan_interval =
-            IntervalStream::new(interval(Duration::from_secs(self.config.scan_interval)));
+            IntervalStream::new(interval(if self.config.flush_interval == 0 {
+                Duration::MAX
+            } else {
+                Duration::from_secs(self.config.flush_interval)
+            }));
+        let mut scan_interval = IntervalStream::new(interval(Duration::from_secs(
+            self.config.scan_interval.into(),
+        )));
 
         loop {
             tokio::select! {
@@ -416,7 +421,6 @@ mod tests {
         let ttl = 100;
         let mut memory = Memory::new(build_memory_config(|c| {
             c.ttl = ttl;
-            c.scan_interval = 0;
         }));
         {
             let mut handle = memory.write_handle.lock().unwrap();
