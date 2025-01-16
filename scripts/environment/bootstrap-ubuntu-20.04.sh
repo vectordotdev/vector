@@ -21,6 +21,12 @@ apt-get install --yes \
   apt-transport-https
 
 # Deps
+
+# Required for building aws-lc-rs
+add-apt-repository ppa:longsleep/golang-backports
+apt update
+apt install --yes --no-install-recommends golang-go
+
 apt-get install --yes --no-install-recommends \
     awscli \
     build-essential \
@@ -45,8 +51,7 @@ apt-get install --yes --no-install-recommends \
     shellcheck \
     sudo \
     unzip \
-    wget \
-    golang # Required for building aws-lc-rs
+    wget
 
 # Cue
 TEMP=$(mktemp -d)
