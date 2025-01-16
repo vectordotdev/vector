@@ -415,7 +415,7 @@ wiremock = "0.6.2"
 zstd = { version = "0.13.0", default-features = false }
 
 tokio-rustls = "0.26"
-rustls = "0.23"
+rustls = { version = "0.23", features = ["fips"] }
 rustls-pemfile = "0.3"
 rustls-pki-types = "1.9"
 
