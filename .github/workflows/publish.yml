@@ -266,16 +266,32 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts/vector*
 
-  build-x86_64-apple-darwin-packages:
-    name: Build Vector for x86_64-apple-darwin (.tar.gz)
-    runs-on: macos-latest-xlarge
+  build-apple-darwin-packages:
+    name: Build Vector for ${{ matrix.architecture }}-apple-darwin (.tar.gz)
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+    strategy:
+      matrix:
+        include:
+          # Refer to https://docs.github.com/en/actions/using-github-hosted-runners/using-larger-runners/about-larger-runners#about-macos-larger-runners.
+          - architecture: x86_64
+            runner: macos-latest-large
+          - architecture: arm64
+            runner: macos-latest-xlarge
     steps:
+      - name: Verify Runner Architecture
+        run: |
+          ARCH=$(uname -m)
+          echo "Detected architecture: $ARCH"
+          if [ "$ARCH" != "${{ matrix.architecture }}" ]; then
+            echo "Error: Expected ${{ matrix.architecture }} architecture, but got $ARCH!"
+            exit 1
+          fi
       - name: Checkout Vector
         uses: actions/checkout@v4
         with:
@@ -284,7 +300,7 @@ jobs:
         run: bash scripts/environment/bootstrap-macos.sh
       - name: Build Vector
         env:
-          TARGET: "x86_64-apple-darwin"
+          TARGET: "${{ matrix.architecture }}-apple-darwin"
           NATIVE_BUILD: true
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
@@ -292,8 +308,9 @@ jobs:
       - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v4
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.architecture }}-apple-darwin
           path: target/artifacts/vector*
+
 
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
@@ -447,25 +464,30 @@ jobs:
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     strategy:
       matrix:
-        runner: [macos-14, macos-15]
+        include:
+          - target: x86_64-apple-darwin
+            runner: macos-latest-large
+          - target: arm64-apple-darwin
+            runner: macos-latest-xlarge
     steps:
       - name: Checkout Vector
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (x86_64-apple-darwin)
+      - name: Download staged package artifacts (${{ matrix.target }})
         uses: actions/download-artifact@v4
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}
           path: target/artifacts
       - name: Verify macOS package
         run: |
-          tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz && vector-x86_64-apple-darwin/bin/vector --version
+          tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}.tar.gz \
+            && vector-${{ matrix.target }}/bin/vector --version
 
   publish-docker:
     name: Publish to Docker
@@ -497,7 +519,7 @@ jobs:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3.2.0
+        uses: docker/setup-qemu-action@v3.3.0
         with:
           platforms: all
       - name: Set up Docker Buildx
@@ -566,7 +588,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - build-armv7-unknown-linux-gnueabihf-packages
@@ -607,6 +629,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+          path: target/artifacts
+      - name: Download staged package artifacts (arm64-apple-darwin)
+        uses: actions/download-artifact@v4
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-arm64-apple-darwin
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-pc-windows-msvc)
         uses: actions/download-artifact@v4
@@ -651,7 +678,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-armv7-unknown-linux-musleabihf-packages
@@ -692,6 +719,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+          path: target/artifacts
+      - name: Download staged package artifacts (arm64-apple-darwin)
+        uses: actions/download-artifact@v4
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-arm64-apple-darwin
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-pc-windows-msvc)
         uses: actions/download-artifact@v4
@@ -759,7 +791,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-armv7-unknown-linux-musleabihf-packages
@@ -796,6 +828,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+          path: target/artifacts
+      - name: Download staged package artifacts (arm64-apple-darwin)
+        uses: actions/download-artifact@v4
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-arm64-apple-darwin
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-pc-windows-msvc)
         uses: actions/download-artifact@v4
