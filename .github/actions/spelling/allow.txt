@@ -256,6 +256,7 @@ buildroot
 bytestream
 callsites
 cdnskey
+chocpanda
 cncf
 codepath
 codepaths
