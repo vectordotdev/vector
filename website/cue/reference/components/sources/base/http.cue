@@ -32,18 +32,49 @@ base: components: sources: http: configuration: {
 		type: string: examples: ["0.0.0.0:80", "localhost:80"]
 	}
 	auth: {
-		description: "HTTP Basic authentication configuration."
-		required:    false
+		description: """
+			Configuration of the authentication strategy for server mode sinks and sources.
+
+			HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
+			HTTP header without any additional encryption beyond what is provided by the transport itself.
+			"""
+		required: false
 		type: object: options: {
 			password: {
-				description: "The password for basic authentication."
-				required:    true
-				type: string: examples: ["hunter2", "${PASSWORD}"]
+				description:   "The basic authentication password."
+				relevant_when: "strategy = \"basic\""
+				required:      true
+				type: string: examples: ["${PASSWORD}", "password"]
 			}
-			username: {
-				description: "The username for basic authentication."
+			source: {
+				description:   "The VRL boolean expression."
+				relevant_when: "strategy = \"custom\""
+				required:      true
+				type: string: {}
+			}
+			strategy: {
+				description: "The authentication strategy to use."
 				required:    true
-				type: string: examples: ["AzureDiamond", "admin"]
+				type: string: enum: {
+					basic: """
+						Basic authentication.
+
+						The username and password are concatenated and encoded via [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
+						"""
+					custom: """
+						Custom authentication using VRL code.
+
+						Takes in request and validates it using VRL code.
+						"""
+				}
+			}
+			user: {
+				description:   "The basic authentication username."
+				relevant_when: "strategy = \"basic\""
+				required:      true
+				type: string: examples: ["${USERNAME}", "username"]
 			}
 		}
 	}
