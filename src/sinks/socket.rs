@@ -207,8 +207,6 @@ mod test {
         future::ready,
         net::{SocketAddr, UdpSocket},
     };
-    #[cfg(unix)]
-    use std::{os::unix::net::UnixDatagram, path::PathBuf};
 
     use futures::stream::StreamExt;
     use futures_util::stream;
@@ -220,12 +218,17 @@ mod test {
     use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
     use vector_lib::codecs::JsonSerializerConfig;
-    #[cfg(unix)]
-    use vector_lib::codecs::NativeJsonSerializerConfig;
 
     use super::*;
-    #[cfg(unix)]
-    use crate::test_util::random_metrics_with_stream;
+
+    cfg_if! { if #[cfg(unix)] {
+        use vector_lib::codecs::NativeJsonSerializerConfig;
+        use crate::test_util::random_metrics_with_stream;
+        use std::path::PathBuf;
+    } }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    use std::os::unix::net::UnixDatagram;
+
     use crate::{
         config::SinkContext,
         event::{Event, LogEvent},
@@ -242,20 +245,20 @@ mod test {
 
     enum DatagramSocket {
         Udp(UdpSocket),
-        #[cfg(unix)]
+        #[cfg(all(unix, not(target_os = "macos")))]
         Unix(UnixDatagram),
     }
 
     enum DatagramSocketAddr {
         Udp(SocketAddr),
-        #[cfg(unix)]
+        #[cfg(all(unix, not(target_os = "macos")))]
         Unix(PathBuf),
     }
 
     async fn test_datagram(datagram_addr: DatagramSocketAddr) {
         let receiver = match &datagram_addr {
             DatagramSocketAddr::Udp(addr) => DatagramSocket::Udp(UdpSocket::bind(addr).unwrap()),
-            #[cfg(unix)]
+            #[cfg(all(unix, not(target_os = "macos")))]
             DatagramSocketAddr::Unix(path) => {
                 DatagramSocket::Unix(UnixDatagram::bind(path).unwrap())
             }
@@ -267,7 +270,7 @@ mod test {
                     config: UdpSinkConfig::from_address(addr.to_string()),
                     encoding: JsonSerializerConfig::default().into(),
                 }),
-                #[cfg(unix)]
+                #[cfg(all(unix, not(target_os = "macos")))]
                 DatagramSocketAddr::Unix(path) => Mode::UnixDatagram(UnixMode {
                     config: UnixSinkConfig::new(path.to_path_buf()),
                     encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
@@ -291,7 +294,7 @@ mod test {
             DatagramSocket::Udp(sock) => {
                 sock.recv_from(&mut buf).expect("Did not receive message").0
             }
-            #[cfg(unix)]
+            #[cfg(all(unix, not(target_os = "macos")))]
             DatagramSocket::Unix(sock) => sock.recv(&mut buf).expect("Did not receive message"),
         };
 
@@ -317,7 +320,7 @@ mod test {
         test_datagram(DatagramSocketAddr::Udp(next_addr_v6())).await;
     }
 
-    #[cfg(unix)]
+    #[cfg(all(unix, not(target_os = "macos")))]
     #[tokio::test]
     async fn unix_datagram() {
         trace_init();
