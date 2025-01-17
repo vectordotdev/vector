@@ -52,9 +52,9 @@ jobs:
       should_run: ${{ steps.check.outputs.should_run }}
     steps:
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: json-artifact
+          name: int_tests_changes
 
       - name: Check if all values are false
         id: check
@@ -74,7 +74,7 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     needs: check-all
-    if: ${{ needs.check.outputs.should_run }}
+    if: ${{ needs.check-all.outputs.should_run }}
     steps:
       - uses: actions/checkout@v4
 
@@ -97,6 +97,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - setup
+      - changes
     strategy:
       matrix:
         # If you modify this list, please also update the `int_tests` job in changes.yml.
