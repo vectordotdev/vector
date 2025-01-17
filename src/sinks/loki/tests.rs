@@ -53,6 +53,7 @@ async fn interpolate_labels() {
     );
     // make sure we can reuse fields across labels.
     assert_eq!(record.labels[3], ("label3".to_string(), "bar".to_string()));
+    // test
 }
 
 #[tokio::test]
