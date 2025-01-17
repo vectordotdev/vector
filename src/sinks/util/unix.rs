@@ -16,12 +16,13 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
-use vector_lib::internal_event::{BytesSent, Protocol};
 use vector_lib::json_size::JsonSize;
+use vector_lib::{
+    configurable::configurable_component,
+    internal_event::{BytesSent, Protocol},
+};
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
-use super::datagram::{send_datagrams, DatagramSocket};
-use crate::sinks::socket::UnixSinkConfig;
 use crate::{
     codecs::Transformer,
     event::{Event, Finalizable},
@@ -41,6 +42,8 @@ use crate::{
     },
 };
 
+use super::datagram::{send_datagrams, DatagramSocket};
+
 #[derive(Debug, Snafu)]
 pub enum UnixError {
     #[snafu(display("Failed connecting to socket at path {}: {}", path.display(), source))]
@@ -51,6 +54,17 @@ pub enum UnixError {
 
     #[snafu(display("Failed to bind socket: {}.", source))]
     FailedToBind { source: std::io::Error },
+}
+
+/// A Unix Domain Socket sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixSinkConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    pub path: PathBuf,
 }
 
 impl UnixSinkConfig {

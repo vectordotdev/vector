@@ -1,10 +1,11 @@
-use std::path::PathBuf;
 use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
 };
 use vector_lib::configurable::configurable_component;
 
+#[cfg(not(windows))]
+use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -82,6 +83,8 @@ pub struct UnixMode {
     encoding: EncodingConfigWithFraming,
 }
 
+// Workaround for https://github.com/vectordotdev/vector/issues/22198.
+#[cfg(windows)]
 /// A Unix Domain Socket sink.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -90,7 +93,7 @@ pub struct UnixSinkConfig {
     ///
     /// This should be an absolute path.
     #[configurable(metadata(docs::examples = "/path/to/socket"))]
-    pub path: PathBuf,
+    pub path: std::path::PathBuf,
 }
 
 impl GenerateConfig for SocketSinkConfig {
