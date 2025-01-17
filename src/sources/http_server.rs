@@ -1536,7 +1536,7 @@ mod tests {
             "GET",
             StatusCode::OK,
             Some(HttpServerAuthConfig::Basic {
-                user: "test".to_string(),
+                username: "test".to_string(),
                 password: "test".to_string().into(),
             }),
             true,
@@ -1562,7 +1562,7 @@ mod tests {
             "POST",
             StatusCode::OK,
             Some(HttpServerAuthConfig::Basic {
-                user: "test".to_string(),
+                username: "test".to_string(),
                 password: "test".to_string().into(),
             }),
             true,
@@ -1593,7 +1593,7 @@ mod tests {
             "POST",
             StatusCode::OK,
             Some(HttpServerAuthConfig::Basic {
-                user: "test".to_string(),
+                username: "test".to_string(),
                 password: "test".to_string().into(),
             }),
             true,

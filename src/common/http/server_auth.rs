@@ -37,7 +37,7 @@ pub enum HttpServerAuthConfig {
         /// The basic authentication username.
         #[configurable(metadata(docs::examples = "${USERNAME}"))]
         #[configurable(metadata(docs::examples = "username"))]
-        user: String,
+        username: String,
 
         /// The basic authentication password.
         #[configurable(metadata(docs::examples = "${PASSWORD}"))]
@@ -63,9 +63,9 @@ impl HttpServerAuthConfig {
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
     ) -> crate::Result<HttpServerAuthMatcher> {
         match self {
-            HttpServerAuthConfig::Basic { user, password } => {
+            HttpServerAuthConfig::Basic { username, password } => {
                 Ok(HttpServerAuthMatcher::AuthHeader(
-                    Authorization::basic(user, password.inner()).0.encode(),
+                    Authorization::basic(username, password.inner()).0.encode(),
                     "Invalid username/password",
                 ))
             }
@@ -210,7 +210,7 @@ mod tests {
     #[test]
     fn build_basic_auth_should_always_work() {
         let basic_auth = HttpServerAuthConfig::Basic {
-            user: random_string(16),
+            username: random_string(16),
             password: random_string(16).into(),
         };
 
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     fn build_basic_auth_should_use_username_password_related_message() {
         let basic_auth = HttpServerAuthConfig::Basic {
-            user: random_string(16),
+            username: random_string(16),
             password: random_string(16).into(),
         };
 
@@ -236,15 +236,18 @@ mod tests {
 
     #[test]
     fn build_basic_auth_should_use_encode_basic_header() {
-        let user = random_string(16);
+        let username = random_string(16);
         let password = random_string(16);
         let basic_auth = HttpServerAuthConfig::Basic {
-            user: user.clone(),
+            username: username.clone(),
             password: password.clone().into(),
         };
 
         let (header, _) = basic_auth.build(&Default::default()).unwrap().auth_header();
-        assert_eq!(Authorization::basic(&user, &password).0.encode(), header);
+        assert_eq!(
+            Authorization::basic(&username, &password).0.encode(),
+            header
+        );
     }
 
     #[test]
@@ -284,7 +287,7 @@ mod tests {
     #[test]
     fn basic_auth_matcher_should_return_401_when_missing_auth_header() {
         let basic_auth = HttpServerAuthConfig::Basic {
-            user: random_string(16),
+            username: random_string(16),
             password: random_string(16).into(),
         };
 
@@ -301,7 +304,7 @@ mod tests {
     #[test]
     fn basic_auth_matcher_should_return_401_and_with_wrong_credentials() {
         let basic_auth = HttpServerAuthConfig::Basic {
-            user: random_string(16),
+            username: random_string(16),
             password: random_string(16).into(),
         };
 
@@ -319,10 +322,10 @@ mod tests {
 
     #[test]
     fn basic_auth_matcher_should_return_ok_for_correct_credentials() {
-        let user = random_string(16);
+        let username = random_string(16);
         let password = random_string(16);
         let basic_auth = HttpServerAuthConfig::Basic {
-            user: user.clone(),
+            username: username.clone(),
             password: password.clone().into(),
         };
 
@@ -331,7 +334,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(
             AUTHORIZATION,
-            Authorization::basic(&user, &password).0.encode(),
+            Authorization::basic(&username, &password).0.encode(),
         );
         let result = matcher.handle_auth(&headers);
 
