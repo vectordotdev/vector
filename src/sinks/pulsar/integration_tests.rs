@@ -99,7 +99,7 @@ async fn pulsar_happy_tls() {
         endpoint: pulsar_address("pulsar+ssl", 6651),
         tls_options: Some(PulsarTlsOptions {
             ca_file: TEST_PEM_INTERMEDIATE_CA_PATH.into(),
-            allow_insecure_connection: None,
+            verify_certificate: None,
             verify_hostname: None,
         }),
         // overriden by test

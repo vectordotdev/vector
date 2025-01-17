@@ -185,12 +185,12 @@ pub struct TlsOptions {
     #[configurable(metadata(docs::examples = "/etc/certs/chain.pem"))]
     pub ca_file: String,
 
-    /// Allow insecure TLS connection if set to true
+    /// Enables certificate verification.    
     ///
-    /// Set to false if not specified.
-    pub allow_insecure_connection: Option<bool>,
+    /// Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+    pub verify_certificate: Option<bool>,
 
-    /// Whether hostname verification is enabled when insecure TLS connection is allowed
+    /// Whether hostname verification is enabled when verify_certificate is false
     ///
     /// Set to true if not specified.
     pub verify_hostname: Option<bool>,
@@ -289,8 +289,8 @@ impl PulsarSourceConfig {
         }
         if let Some(options) = &self.tls_options {
             builder = builder.with_certificate_chain_file(Path::new(&options.ca_file))?;
-            builder = builder
-                .with_allow_insecure_connection(options.allow_insecure_connection.unwrap_or(false));
+            builder =
+                builder.with_allow_insecure_connection(!options.verify_certificate.unwrap_or(true));
             builder = builder
                 .with_tls_hostname_verification_enabled(options.verify_hostname.unwrap_or(true));
         }
@@ -615,7 +615,7 @@ mod integration_tests {
             LogNamespace::Vector,
             Some(TlsOptions {
                 ca_file: TEST_PEM_INTERMEDIATE_CA_PATH.into(),
-                allow_insecure_connection: None,
+                verify_certificate: None,
                 verify_hostname: None,
             }),
         )
@@ -651,8 +651,8 @@ mod integration_tests {
             builder = builder
                 .with_certificate_chain_file(Path::new(&options.ca_file))
                 .unwrap();
-            builder = builder
-                .with_allow_insecure_connection(options.allow_insecure_connection.unwrap_or(false));
+            builder =
+                builder.with_allow_insecure_connection(!options.verify_certificate.unwrap_or(true));
             builder = builder
                 .with_tls_hostname_verification_enabled(options.verify_hostname.unwrap_or(true));
         }

@@ -543,23 +543,23 @@ base: components: sinks: pulsar: configuration: {
 		description: "TLS options configuration for the Pulsar client."
 		required:    false
 		type: object: options: {
-			allow_insecure_connection: {
+			ca_file: {
+				description: "File path containing a list of PEM encoded certificates."
+				required:    true
+				type: string: examples: ["/etc/certs/chain.pem"]
+			}
+			verify_certificate: {
 				description: """
-					Allow insecure TLS connection if set to true
+					Enables certificate verification.
 
-					Set to false if not specified.
+					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
 				required: false
 				type: bool: {}
 			}
-			ca_file: {
-				description: "File path containing a list of PEM encoded certificates"
-				required:    true
-				type: string: examples: ["/etc/certs/chain.pem"]
-			}
 			verify_hostname: {
 				description: """
-					Whether hostname verification is enabled when insecure TLS connection is allowed
+					Whether hostname verification is enabled when verify_certificate is false.
 
 					Set to true if not specified.
 					"""
