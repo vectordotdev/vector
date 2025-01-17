@@ -73,7 +73,6 @@ pub struct UdpMode {
 }
 
 /// Unix Domain Socket configuration.
-#[cfg(unix)]
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct UnixMode {
@@ -169,7 +168,7 @@ impl SinkConfig for SocketSinkConfig {
                         )
                     }
                     else {
-                        Err("UnixDatagram is supported only on unix and also it is not avalailable on macOS platforms.".into())
+                        Err("UnixDatagram is supported only on unix and also it is not available on macOS platforms.".into())
                     }
                 }
             }
