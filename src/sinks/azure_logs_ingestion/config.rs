@@ -123,6 +123,8 @@ impl AzureLogsIngestionConfig {
         // https://github.com/Azure/azure-sdk-for-rust/blob/main/sdk/identity/azure_identity/CHANGELOG.md
         let credential: Arc<dyn TokenCredential> = azure_identity::create_credential()?;
 
+        // TODO this needs to change with toolchain 1.83.0, as per commit ca084cc (#22068)
+        //let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
 
