@@ -146,10 +146,6 @@ impl SinkConfig for SocketSinkConfig {
                 let encoder = Encoder::<()>::new(serializer);
                 config.build(transformer, encoder)
             }
-            #[cfg(not(unix))]
-            Mode::UnixStream(UnixMode { _config, _encoding }) => {
-                Err("UnixStream mode is supported only on Unix.".into())
-            }
             #[cfg(unix)]
             Mode::UnixStream(UnixMode { config, encoding }) => {
                 let transformer = encoding.transformer();
@@ -181,8 +177,8 @@ impl SinkConfig for SocketSinkConfig {
                 }
             }
             #[cfg(not(unix))]
-            Mode::UnixDatagram(UnixMode { _config, _encoding }) => {
-                Err("UnixDatagram is available only on Unix platforms.".into())
+            Mode::UnixStream(_) | Mode::UnixDatagram(_) => {
+                Err("Unix modes are supported only on Unix platforms.".into())
             }
         }
     }
@@ -191,9 +187,7 @@ impl SinkConfig for SocketSinkConfig {
         let encoder_input_type = match &self.mode {
             Mode::Tcp(TcpMode { encoding, .. }) => encoding.config().1.input_type(),
             Mode::Udp(UdpMode { encoding, .. }) => encoding.config().input_type(),
-            #[cfg(unix)]
             Mode::UnixStream(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
-            #[cfg(unix)]
             Mode::UnixDatagram(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
         };
         Input::new(encoder_input_type)
