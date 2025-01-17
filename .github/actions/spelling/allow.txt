@@ -476,6 +476,12 @@ otel
 otelcol
 siv
 onig
+aviv
+dammam
+doha
+mumbai
+paulo
+turin
 AIXM
 AUTOSAR
 CDMA
