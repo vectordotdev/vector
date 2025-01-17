@@ -18,6 +18,7 @@ $env:NUGET_ENABLE_ENHANCED_HTTP_RETRY = "true"
 
 choco install make
 choco install protoc
+choco install nasm # required by aws-lc-rs
 
 # Set a specific override path for libclang.
 echo "LIBCLANG_PATH=$( (gcm clang).source -replace "clang.exe" )" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append

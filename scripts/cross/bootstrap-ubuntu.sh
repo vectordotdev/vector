@@ -10,6 +10,7 @@ apt-get install -y \
   wget \
 
 # Required for building aws-lc-rs
+apt install software-properties-common
 add-apt-repository ppa:longsleep/golang-backports
 apt update
 apt install --yes --no-install-recommends golang-go
