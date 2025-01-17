@@ -60,7 +60,7 @@ jobs:
         id: check
         run: |
           # Check if all values are 'false'
-          json=$(cat all-changes.json)
+          json=$(cat int_tests_changes.json)
           all_false=$(echo "$json" | jq -r 'to_entries | all(.value == false)')
           
           if [[ "$all_false" == "true" ]]; then
@@ -96,8 +96,8 @@ jobs:
   integration-tests:
     runs-on: ubuntu-20.04
     needs:
-      - setup
       - changes
+      - setup
     strategy:
       matrix:
         # If you modify this list, please also update the `int_tests` job in changes.yml.
