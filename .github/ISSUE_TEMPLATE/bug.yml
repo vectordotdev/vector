@@ -1,7 +1,6 @@
 name: Bug
 description: 🐛 Let us know about an unexpected error, a crash, or an incorrect behavior.
-type:
-  - 'Bug'
+type: 'Bug'
 labels:
   - 'type: bug'
 body:
