@@ -3,17 +3,16 @@ set -o errexit
 
 echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
 
+# Required for building aws-lc-rs
+apt install software-properties-common
+add-apt-repository ppa:longsleep/golang-backports
+
 apt-get update
 apt-get install -y \
   apt-transport-https \
   gnupg \
   wget \
-
-# Required for building aws-lc-rs
-apt install software-properties-common
-add-apt-repository ppa:longsleep/golang-backports
-apt update
-apt install --yes --no-install-recommends golang-go
+  golang-go
 
 # we need LLVM >= 3.9 for onig_sys/bindgen
 
