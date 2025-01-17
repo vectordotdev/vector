@@ -13,7 +13,7 @@ use futures::{
     StreamExt, TryStreamExt,
 };
 use futures_util::future;
-use http::StatusCode;
+use http::{header::AUTHORIZATION, StatusCode};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
     handshake::server::{ErrorResponse, Request, Response},
@@ -34,12 +34,11 @@ use vector_lib::{
 
 use crate::{
     codecs::{Encoder, Transformer},
-    common::server_auth::AuthMatcher,
-    config::SinkContext,
     internal_events::{
         WsListenerConnectionEstablished, WsListenerConnectionFailedError,
         WsListenerConnectionShutdown, WsListenerSendError,
     },
+    sources::util::http::HttpSourceAuth,
 };
 
 use super::WebSocketListenerSinkConfig;
@@ -50,25 +49,23 @@ pub struct WebSocketListenerSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     address: SocketAddr,
-    auth: Option<AuthMatcher>,
+    auth: HttpSourceAuth,
 }
 
 impl WebSocketListenerSink {
-    pub fn new(config: WebSocketListenerSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+    pub fn new(config: WebSocketListenerSinkConfig) -> crate::Result<Self> {
         let tls = MaybeTlsSettings::from_config(config.tls.as_ref(), true)?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
+        let auth = HttpSourceAuth::try_from(config.auth.as_ref())?;
         Ok(Self {
             peers: Arc::new(Mutex::new(HashMap::new())),
             tls,
             address: config.address,
             transformer,
             encoder,
-            auth: config
-                .auth
-                .map(|a| a.build(&cx.enrichment_tables))
-                .transpose()?,
+            auth,
         })
     }
 
@@ -84,7 +81,7 @@ impl WebSocketListenerSink {
     }
 
     async fn handle_connections(
-        auth: Option<AuthMatcher>,
+        auth: HttpSourceAuth,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         mut listener: MaybeTlsListener,
     ) {
@@ -96,22 +93,25 @@ impl WebSocketListenerSink {
     }
 
     async fn handle_connection(
-        auth: Option<AuthMatcher>,
+        auth: HttpSourceAuth,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         stream: MaybeTlsIncomingStream<TcpStream>,
     ) -> Result<(), ()> {
         let addr = stream.peer_addr();
         debug!("Incoming TCP connection from: {}", addr);
 
-        let header_callback = |req: &Request, response: Response| match auth
-            .map(|a| a.handle_auth(req.headers()))
-            .unwrap_or(Ok(()))
-        {
+        let header_callback = |req: &Request, response: Response| match auth.is_valid(
+            &req.headers()
+                .get(AUTHORIZATION)
+                .map(|h| h.to_str().ok())
+                .flatten()
+                .map(ToString::to_string),
+        ) {
             Ok(_) => Ok(response),
             Err(message) => {
                 let mut response = ErrorResponse::default();
                 *response.status_mut() = StatusCode::UNAUTHORIZED;
-                *response.body_mut() = Some(message.clone());
+                *response.body_mut() = Some(message.message().to_string());
                 debug!("Websocket handshake auth validation failed: {}", message);
                 Err(response)
             }

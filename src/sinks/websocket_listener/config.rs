@@ -5,9 +5,9 @@ use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::EncodingConfig,
-    common::server_auth::Auth,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     sinks::{Healthcheck, VectorSink},
+    sources::util::HttpSourceAuthConfig,
     tls::TlsEnableableConfig,
 };
 
@@ -42,7 +42,7 @@ pub struct WebSocketListenerSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 
     #[configurable(derived)]
-    pub auth: Option<Auth>,
+    pub auth: Option<HttpSourceAuthConfig>,
 }
 
 impl Default for WebSocketListenerSinkConfig {
@@ -60,8 +60,8 @@ impl Default for WebSocketListenerSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "websocket_listener")]
 impl SinkConfig for WebSocketListenerSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let ws_sink = WebSocketListenerSink::new(self.clone(), &cx)?;
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ws_sink = WebSocketListenerSink::new(self.clone())?;
 
         Ok((
             VectorSink::from_event_streamsink(ws_sink),

@@ -568,7 +568,6 @@ impl<'a> Builder<'a> {
             let cx = SinkContext {
                 healthcheck,
                 globals: self.config.global.clone(),
-                enrichment_tables: enrichment_tables.clone(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
                 schema: self.config.schema,
                 app_name: crate::get_app_name().to_string(),
