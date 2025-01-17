@@ -111,7 +111,7 @@ impl<'a> Builder<'a> {
     /// Builds the new pieces of the topology found in `self.diff`.
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
         let enrichment_tables = self.load_enrichment_tables().await;
-        let source_tasks = self.build_sources().await;
+        let source_tasks = self.build_sources(enrichment_tables).await;
         self.build_transforms(enrichment_tables).await;
         self.build_sinks(enrichment_tables).await;
 
@@ -203,7 +203,10 @@ impl<'a> Builder<'a> {
         &ENRICHMENT_TABLES
     }
 
-    async fn build_sources(&mut self) -> HashMap<ComponentKey, Task> {
+    async fn build_sources(
+        &mut self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> HashMap<ComponentKey, Task> {
         let mut source_tasks = HashMap::new();
 
         for (key, source) in self
@@ -322,6 +325,7 @@ impl<'a> Builder<'a> {
             let context = SourceContext {
                 key: key.clone(),
                 globals: self.config.global.clone(),
+                enrichment_tables: enrichment_tables.clone(),
                 shutdown: shutdown_signal,
                 out: pipeline,
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, &source.proxy),
@@ -568,6 +572,7 @@ impl<'a> Builder<'a> {
             let cx = SinkContext {
                 healthcheck,
                 globals: self.config.global.clone(),
+                enrichment_tables: enrichment_tables.clone(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
                 schema: self.config.schema,
                 app_name: crate::get_app_name().to_string(),
