@@ -136,28 +136,26 @@ impl SinkConfig for SocketSinkConfig {
                 let encoder = Encoder::<()>::new(serializer);
                 config.build(transformer, encoder)
             }
-            #[allow(unused)]
+            #[cfg(not(unix))]
+            Mode::UnixStream(UnixMode { _config, _encoding }) => {
+                Err("UnixStream mode is supported only on Unix.".into())
+            }
+            #[cfg(unix)]
             Mode::UnixStream(UnixMode { config, encoding }) => {
-                cfg_if! {
-                    if #[cfg(unix)] {
-                        let transformer = encoding.transformer();
-                        let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
-                        let encoder = Encoder::<Framer>::new(framer, serializer);
-                        config.build(
-                            transformer,
-                            encoder,
-                            super::util::service::net::UnixMode::Stream,
-                        )
-                    }
-                    else {
-                        Err("UnixStream is supported only on unix/".into())
-                    }
-                }
+                let transformer = encoding.transformer();
+                let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                let encoder = Encoder::<Framer>::new(framer, serializer);
+                config.build(
+                    transformer,
+                    encoder,
+                    super::util::service::net::UnixMode::Stream,
+                )
             }
             #[allow(unused)]
+            #[cfg(unix)]
             Mode::UnixDatagram(UnixMode { config, encoding }) => {
                 cfg_if! {
-                    if #[cfg(all(unix, not(target_os = "macos")))] {
+                    if #[cfg(not(target_os = "macos"))] {
                         let transformer = encoding.transformer();
                         let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
                         let encoder = Encoder::<Framer>::new(framer, serializer);
@@ -168,9 +166,13 @@ impl SinkConfig for SocketSinkConfig {
                         )
                     }
                     else {
-                        Err("UnixDatagram is supported only on unix and also it is not available on macOS platforms.".into())
+                        Err("UnixDatagram is not available on macOS platforms.".into())
                     }
                 }
+            }
+            #[cfg(not(unix))]
+            Mode::UnixDatagram(UnixMode { _config, _encoding }) => {
+                Err("UnixDatagram is available only on Unix platforms.".into())
             }
         }
     }
