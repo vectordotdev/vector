@@ -218,7 +218,7 @@ pub struct PulsarTlsOptions {
     #[configurable(metadata(docs::examples = "/etc/certs/chain.pem"))]
     pub ca_file: String,
 
-    /// Enables certificate verification.    
+    /// Enables certificate verification.
     ///
     /// Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
     pub verify_certificate: Option<bool>,
