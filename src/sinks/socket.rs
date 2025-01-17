@@ -1,11 +1,10 @@
+use std::path::PathBuf;
 use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
 };
 use vector_lib::configurable::configurable_component;
 
-#[cfg(unix)]
-use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -81,6 +80,17 @@ pub struct UnixMode {
 
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
+}
+
+/// A Unix Domain Socket sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixSinkConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    pub path: PathBuf,
 }
 
 impl GenerateConfig for SocketSinkConfig {
