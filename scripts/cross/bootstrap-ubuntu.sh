@@ -8,7 +8,11 @@ apt-get install -y \
   apt-transport-https \
   gnupg \
   wget \
-  golang # Required for building aws-lc-rs
+
+# Required for building aws-lc-rs
+add-apt-repository ppa:longsleep/golang-backports
+apt update
+apt install --yes --no-install-recommends golang-go
 
 # we need LLVM >= 3.9 for onig_sys/bindgen
 
