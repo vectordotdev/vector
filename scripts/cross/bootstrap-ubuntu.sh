@@ -4,7 +4,7 @@ set -o errexit
 echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
 
 # Required for building aws-lc-rs
-apt install software-properties-common
+apt install -y software-properties-common
 add-apt-repository ppa:longsleep/golang-backports
 
 apt-get update
