@@ -266,6 +266,12 @@ corejs
 coreutils
 csync
 curta
+aviv
+dammam
+doha
+mumbai
+paulo
+turin
 daemonset
 dalek
 databend
