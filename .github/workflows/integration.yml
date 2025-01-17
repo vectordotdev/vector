@@ -62,7 +62,7 @@ jobs:
           # Check if all values are 'false'
           json=$(cat int_tests_changes.json)
           all_false=$(echo "$json" | jq -r 'to_entries | all(.value == false)')
-          
+
           if [[ "$all_false" == "true" ]]; then
             echo "No changes detected. Skipping integration tests."
             echo "should_run=false" >> $GITHUB_OUTPUT
