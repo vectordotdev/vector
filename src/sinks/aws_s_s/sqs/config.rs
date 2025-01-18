@@ -54,8 +54,8 @@ impl SqsSinkConfig {
             self.region.region(),
             self.region.endpoint(),
             proxy,
-            &self.base_config.tls,
-            &None,
+            self.base_config.tls.as_ref(),
+            None,
         )
         .await
     }

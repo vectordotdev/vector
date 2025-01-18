@@ -25,7 +25,7 @@ impl PartialEq<AttributeIdent> for Ident {
     }
 }
 
-impl<'a> PartialEq<AttributeIdent> for &'a Ident {
+impl PartialEq<AttributeIdent> for &Ident {
     fn eq(&self, word: &AttributeIdent) -> bool {
         *self == word.0
     }
@@ -37,7 +37,7 @@ impl PartialEq<AttributeIdent> for Path {
     }
 }
 
-impl<'a> PartialEq<AttributeIdent> for &'a Path {
+impl PartialEq<AttributeIdent> for &Path {
     fn eq(&self, word: &AttributeIdent) -> bool {
         self.is_ident(word.0)
     }

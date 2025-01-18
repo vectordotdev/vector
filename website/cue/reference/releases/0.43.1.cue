@@ -10,6 +10,14 @@ releases: "0.43.1": {
 		This patch release contains fixes for regressions in 0.43.0.
 		"""
 
+	known_issues: [
+		"""
+			The `vector-0.43.1-x86_64-apple-darwin.tar.gz` executable has the wrong architecture, see
+			[#22129](https://github.com/vectordotdev/vector/issues/22129). This will be fixed in
+			`v0.44`.
+			""",
+	]
+
 	changelog: [
 		{
 			type: "fix"

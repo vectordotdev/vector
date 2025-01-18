@@ -14,7 +14,7 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 			description: """
 				Whether or not end-to-end acknowledgements are enabled.
 
-				When enabled for a sink, any source connected to that sink, where the source supports
+				When enabled for a sink, any source connected to that sink where the source supports
 				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
 				connected** sinks before acknowledging them at the source.
 
@@ -504,16 +504,30 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 		description: "The GCP region to use."
 		required:    false
 		type: string: enum: {
-			asia: "APAC region."
-			eu:   "EU region."
-			us:   "US region."
+			asia:      "APAC region (this is the same as the Singapore region endpoint retained for backwards compatibility)"
+			canada:    "Canada Region"
+			dammam:    "Dammam Region"
+			doha:      "Doha Region"
+			eu:        "European Multi region"
+			frankfurt: "Frankfurt Region"
+			london:    "London Region"
+			mumbai:    "Mumbai Region"
+			paris:     "Paris Region"
+			singapore: "Singapore Region"
+			sydney:    "Sydney Region"
+			são_paulo: "SãoPaulo Region"
+			tel_aviv:  "TelAviv Region"
+			tokyo:     "Tokyo Region"
+			turin:     "Turin Region"
+			us:        "US Multi region"
+			zurich:    "Zurich Region"
 		}
 	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
 
 			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
@@ -535,7 +549,7 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
 																when latency increases.
 
-																Note that the new limit is rounded down after applying this ratio.
+																**Note**: The new limit is rounded down after applying this ratio.
 																"""
 						required: false
 						type: float: default: 0.9
@@ -555,9 +569,9 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 					}
 					initial_concurrency: {
 						description: """
-																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
-																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
 																`adaptive_concurrency_limit` metric.
 																"""
@@ -568,7 +582,7 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 						description: """
 																The maximum concurrency limit.
 
-																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
 																"""
 						required: false
 						type: uint: default: 200
@@ -602,7 +616,7 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 						default: "adaptive"
 						enum: {
 							adaptive: """
-															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
 															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
 															"""

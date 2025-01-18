@@ -123,7 +123,7 @@ where
         inner: &'inner mut dyn io::Write,
     }
 
-    impl<'inner> io::Write for Tracked<'inner> {
+    impl io::Write for Tracked<'_> {
         fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
             #[allow(clippy::disallowed_methods)] // We pass on the result of `write` to the caller.
             let n = self.inner.write(buf)?;

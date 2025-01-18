@@ -126,7 +126,7 @@ impl SinkConfig for ClickhouseConfig {
 
         let auth = self.auth.choose_one(&self.endpoint.auth)?;
 
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
 
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 

@@ -13,7 +13,7 @@ The week before the release:
 - [ ] Create a new release branch from master to freeze commits
   - `git fetch && git checkout origin/master && git checkout -b v0.<new version number> && git push -u`
 - [ ] Create a new release preparation branch from `master`
-  - `git checkout -b prepare-v0.<new version number> && git push -u`
+  - `git checkout -b website-prepare-v0.<new version number> && git push -u`
 - [ ] Pin VRL to latest released version rather than `main`
 - [ ] Check if there is a newer version of [Alpine](https://alpinelinux.org/releases/) or
       [Debian](https://www.debian.org/releases/) available to update the release images in
@@ -54,11 +54,13 @@ On the day of release:
     - The deployment is done by Amplify. You can see
       the [deployment logs here](https://dd-corpsite.datadoghq.com/logs?query=service%3Awebsites-vector%20branch%3Awebsite&agg_m=count&agg_m_source=base&agg_t=count&cols=host%2Cservice&fromUser=true&messageDisplay=inline&refresh_mode=sliding&storage=hot&stream_sort=time%2Casc&viz=stream).
 - [ ] Release Linux packages. See [`vector-release` usage](https://github.com/DataDog/vector-release#usage).
+  - Note: the pipeline inputs are the version number `v0.<new version number>` and a personal GitHub token.
   - [ ] Manually trigger the `trigger-package-release-pipeline-prod-stable` job.
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).
 - [ ] Once Helm chart is released, updated Vector manifests
     - Run `cargo vdev build manifests` and open a PR with changes
 - [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
-- [ ] Bump the release number in the `Cargo.toml` on master to the next major release
+- [ ] Bump the release number in the `Cargo.toml` on master to the next major release.
+  - Also, update `Cargo.lock` with: `cargo update -p vector`
 - [ ] Kick-off post-mortems for any regressions resolved by the release

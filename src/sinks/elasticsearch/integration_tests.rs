@@ -71,7 +71,7 @@ impl ElasticsearchCommon {
                         &OpenSearchServiceType::Managed,
                         &mut request,
                         provider,
-                        &Some(region.clone()),
+                        Some(region),
                     )
                     .await?
                 }

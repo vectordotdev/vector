@@ -5,7 +5,8 @@ use bytes::{Bytes, BytesMut};
 
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
-use http::{header::HeaderValue, Request, StatusCode, Uri};
+use http::header::{self, HeaderName, HeaderValue};
+use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use indoc::indoc;
 use serde::Serialize;
@@ -69,14 +70,56 @@ pub enum GcsHealthcheckError {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {
-    /// EU region.
+    /// European Multi region
     Eu,
 
-    /// US region.
+    /// US Multi region
     Us,
 
-    /// APAC region.
+    /// APAC region (this is the same as the Singapore region endpoint retained for backwards compatibility)
     Asia,
+
+    /// SãoPaulo Region
+    SãoPaulo,
+
+    /// Canada Region
+    Canada,
+
+    /// Dammam Region
+    Dammam,
+
+    /// Doha Region
+    Doha,
+
+    /// Frankfurt Region
+    Frankfurt,
+
+    /// London Region
+    London,
+
+    /// Mumbai Region
+    Mumbai,
+
+    /// Paris Region
+    Paris,
+
+    /// Singapore Region
+    Singapore,
+
+    /// Sydney Region
+    Sydney,
+
+    /// TelAviv Region
+    TelAviv,
+
+    /// Tokyo Region
+    Tokyo,
+
+    /// Turin Region
+    Turin,
+
+    /// Zurich Region
+    Zurich,
 }
 
 impl Region {
@@ -86,6 +129,22 @@ impl Region {
             Region::Eu => "https://europe-malachiteingestion-pa.googleapis.com",
             Region::Us => "https://malachiteingestion-pa.googleapis.com",
             Region::Asia => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::SãoPaulo => "https://southamerica-east1-malachiteingestion-pa.googleapis.com",
+            Region::Canada => {
+                "https://northamerica-northeast2-malachiteingestion-pa.googleapis.com"
+            }
+            Region::Dammam => "https://me-central2-malachiteingestion-pa.googleapis.com",
+            Region::Doha => "https://me-central1-malachiteingestion-pa.googleapis.com",
+            Region::Frankfurt => "https://europe-west3-malachiteingestion-pa.googleapis.com",
+            Region::London => "https://europe-west2-malachiteingestion-pa.googleapis.com",
+            Region::Mumbai => "https://asia-south1-malachiteingestion-pa.googleapis.com",
+            Region::Paris => "https://europe-west9-malachiteingestion-pa.googleapis.com",
+            Region::Singapore => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::Sydney => "https://australia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::TelAviv => "https://me-west1-malachiteingestion-pa.googleapis.com",
+            Region::Tokyo => "https://asia-northeast1-malachiteingestion-pa.googleapis.com",
+            Region::Turin => "https://europe-west12-malachiteingestion-pa.googleapis.com",
+            Region::Zurich => "https://europe-west6-malachiteingestion-pa.googleapis.com",
         }
     }
 }
@@ -240,7 +299,7 @@ impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = self.auth.build(Scope::MalachiteIngestion).await?;
 
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
 
         let endpoint = self.create_endpoint("v2/unstructuredlogentries:batchCreate")?;
@@ -318,6 +377,7 @@ impl ChronicleUnstructuredConfig {
 pub struct ChronicleRequest {
     pub body: Bytes,
     pub finalizers: EventFinalizers,
+    pub headers: HashMap<HeaderName, HeaderValue>,
     metadata: RequestMetadata,
 }
 
@@ -471,7 +531,33 @@ impl RequestBuilder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleRequestBui
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
+        let mut headers = HashMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+
+        match payload.compressed_byte_size {
+            Some(compressed_byte_size) => {
+                headers.insert(
+                    header::CONTENT_LENGTH,
+                    HeaderValue::from_str(&compressed_byte_size.to_string()).unwrap(),
+                );
+                headers.insert(
+                    header::CONTENT_ENCODING,
+                    HeaderValue::from_str(self.compression.content_encoding().unwrap()).unwrap(),
+                );
+            }
+            None => {
+                headers.insert(
+                    header::CONTENT_LENGTH,
+                    HeaderValue::from_str(&payload.uncompressed_byte_size.to_string()).unwrap(),
+                );
+            }
+        }
+
         ChronicleRequest {
+            headers,
             body: payload.into_payload().bytes,
             finalizers,
             metadata,
@@ -547,17 +633,12 @@ impl Service<ChronicleRequest> for ChronicleService {
 
     fn call(&mut self, request: ChronicleRequest) -> Self::Future {
         let mut builder = Request::post(&self.base_url);
-        let headers = builder.headers_mut().unwrap();
-        headers.insert(
-            "content-type",
-            HeaderValue::from_str("application/json").unwrap(),
-        );
-        headers.insert(
-            "content-length",
-            HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
-        );
-
         let metadata = request.get_metadata().clone();
+
+        let headers = builder.headers_mut().unwrap();
+        for (name, value) in request.headers {
+            headers.insert(name, value);
+        }
 
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
         self.creds.apply(&mut http_request);

@@ -13,12 +13,12 @@ serde.workspace = true
 serde_json.workspace = true
 
 # Error handling
-anyhow = { version = "1.0.94", default-features = false, features = ["std"] }
+anyhow = { version = "1.0.95", default-features = false, features = ["std"] }
 
 # Tokio / Futures
 futures.workspace = true
-tokio = { version = "1.41.1", default-features = false, features = ["macros", "rt", "sync"] }
-tokio-stream = { version = "0.1.16", default-features = false, features = ["sync"] }
+tokio = { version = "1.43.0", default-features = false, features = ["macros", "rt", "sync"] }
+tokio-stream = { version = "0.1.17", default-features = false, features = ["sync"] }
 
 # GraphQL
 graphql_client = { version = "0.14.0", default-features = false, features = ["graphql_query_derive"] }
