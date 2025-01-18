@@ -515,7 +515,7 @@ base: components: sources: http_client: configuration: {
 			options: "*": {
 				description: "A query string parameter and it's value(s)."
 				required:    true
-				type: array: items: type: string: {}
+				type: string: {}
 			}
 		}
 	}

@@ -10,6 +10,7 @@ use snafu::ResultExt;
 use std::{collections::HashMap, time::Duration};
 use tokio_util::codec::Decoder as _;
 
+use crate::http::QueryParameters;
 use crate::sources::util::http_client;
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -78,7 +79,7 @@ pub struct HttpClientConfig {
         docs::additional_props_description = "A query string parameter and it's value(s)."
     ))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
-    pub query: HashMap<String, Vec<String>>,
+    pub query: QueryParameters,
 
     /// Decoder to use on the HTTP responses.
     #[configurable(derived)]
