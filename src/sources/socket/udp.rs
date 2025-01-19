@@ -52,7 +52,7 @@ pub struct UdpConfig {
     /// TODO: document that we use `IPv4Addr` and not `SocketAddr` for the multicast groups because
     /// the `join_multicast_v6` is not supported due to the need of using an interface index.s
     #[serde(default)]
-    multicast_groups: Vec<Ipv4Addr>,
+    pub(super) multicast_groups: Vec<Ipv4Addr>,
 
     /// The maximum buffer size of incoming messages.
     ///
@@ -167,10 +167,14 @@ pub(super) fn udp(
             })?;
 
         if !config.multicast_groups.is_empty() {
+            socket.set_multicast_loop_v4(true).unwrap();
             let listen_addr = match config.address() {
                 SocketListenAddr::SocketAddr(SocketAddr::V4(addr)) => addr,
                 SocketListenAddr::SocketAddr(SocketAddr::V6(_)) => {
-                    todo!("handle this error, IPv6 multicast is not supported")
+                    // We could support Ipv6 multicast with the
+                    // https://doc.rust-lang.org/std/net/struct.UdpSocket.html#method.join_multicast_v6 method
+                    // and specifying the interface index as `0`, in order to bind all interfaces.
+                    panic!("IPv6 multicast is not supported")
                 }
                 // TODO: if we need to support systemd{N} fd sockets, we should use the
                 // `UdpSocket::local_addr` method to get the address of the socket.
@@ -179,7 +183,9 @@ pub(super) fn udp(
                 // socket is bound to, and not `IP_ADDR_ANY`. We need to use the same address
                 // for the multicast group join that the user has set in the config.
                 // if systemd{N} fd sockets are required to work too, we should investigate on this.
-                SocketListenAddr::SystemdFd(_) => todo!("handle this error"),
+                SocketListenAddr::SystemdFd(_) => {
+                    panic!("Multicast for systemd fd sockets is not supported")
+                }
             };
             for group_addr in config.multicast_groups {
                 socket
@@ -191,7 +197,7 @@ pub(super) fn udp(
                             error,
                         })
                     })?;
-                // TODO: add debug (or info) logs here to inform the user that the socket has joined the multicast group.
+                info!(message = "Joined multicast group.", group = %group_addr);
             }
         }
 
@@ -216,7 +222,7 @@ pub(super) fn udp(
             buf.resize(max_length + 1, 0);
             tokio::select! {
                 recv = socket.recv_from(&mut buf) => {
-                    let (byte_size, address) = match recv {
+                    let (byte_size, address) = match dbg!(recv) {
                         Ok(res) => res,
                         Err(error) => {
                             #[cfg(windows)]
