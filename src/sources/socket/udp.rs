@@ -176,13 +176,6 @@ pub(super) fn udp(
                     // and specifying the interface index as `0`, in order to bind all interfaces.
                     panic!("IPv6 multicast is not supported")
                 }
-                // TODO: if we need to support systemd{N} fd sockets, we should use the
-                // `UdpSocket::local_addr` method to get the address of the socket.
-                // that method can fail and I wonder if the user sets `IP_ADDR_ANY` (`0.0.0.0`) in the config,
-                // the `UdpSocket::local_addr` would return the real interface address that the
-                // socket is bound to, and not `IP_ADDR_ANY`. We need to use the same address
-                // for the multicast group join that the user has set in the config.
-                // if systemd{N} fd sockets are required to work too, we should investigate on this.
                 SocketListenAddr::SystemdFd(_) => {
                     panic!("Multicast for systemd fd sockets is not supported")
                 }
