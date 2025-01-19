@@ -1352,10 +1352,7 @@ mod test {
             let (tx, mut rx) = SourceSender::new_test();
             let socket_address = next_addr_any();
             let multicast_ip_addresses = (2..12)
-                .map(|i| {
-                    let ip_address = format!("224.0.0.{i}").parse().unwrap();
-                    ip_address
-                })
+                .map(|i| format!("224.0.0.{i}").parse().unwrap())
                 .collect::<Vec<Ipv4Addr>>();
             let multicast_ip_socket_addresses = multicast_ip_addresses
                 .iter()
