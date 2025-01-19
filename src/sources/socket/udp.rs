@@ -191,7 +191,6 @@ pub(super) fn udp(
                 socket
                     .join_multicast_v4(group_addr, *listen_addr.ip())
                     .map_err(|error| {
-                        // TODO: is this considered a `SocketBindError`? or should we create a new error for this case?
                         emit!(SocketBindError {
                             mode: SocketMode::Udp,
                             error,
