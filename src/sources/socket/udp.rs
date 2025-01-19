@@ -55,7 +55,7 @@ pub struct UdpConfig {
     /// is an IPv4 address (IPv6 and systemd file descriptor as source's address are not supported
     /// with multicast groups).
     #[serde(default)]
-    #[configurable(metadata(docs::examples = r#"["224.0.0.2", s"224.0.0.4"]"#))]
+    #[configurable(metadata(docs::examples = "['224.0.0.2', '224.0.0.4']"))]
     pub(super) multicast_groups: Vec<Ipv4Addr>,
 
     /// The maximum buffer size of incoming messages.
