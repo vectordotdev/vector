@@ -1421,10 +1421,9 @@ mod test {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, _rx) = SourceSender::new_test();
             let socket_address = next_addr_any();
-            // This is not a valid multicast address
-            let multicast_ip_address: Ipv4Addr = "192.168.0.3".parse().unwrap();
+            let invalid_multicast_ip_address: Ipv4Addr = "192.168.0.3".parse().unwrap();
             let mut config = UdpConfig::from_address(socket_address.into());
-            config.multicast_groups = vec![multicast_ip_address];
+            config.multicast_groups = vec![invalid_multicast_ip_address];
             init_udp_with_config(tx, config).await;
         })
         .await;
