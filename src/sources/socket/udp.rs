@@ -222,7 +222,7 @@ pub(super) fn udp(
             buf.resize(max_length + 1, 0);
             tokio::select! {
                 recv = socket.recv_from(&mut buf) => {
-                    let (byte_size, address) = match dbg!(recv) {
+                    let (byte_size, address) = match recv {
                         Ok(res) => res,
                         Err(error) => {
                             #[cfg(windows)]
