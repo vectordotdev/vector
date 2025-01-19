@@ -49,7 +49,7 @@ pub struct UdpConfig {
     /// If any other address is used (such as `127.0.0.1` or an specific interface address), the
     /// listening interface will filter out all multicast packets received,
     /// as their target IP would be the one of the multicast group
-    /// and it will not match the socket's binded IP.
+    /// and it will not match the socket's bound IP.
     ///
     /// Note that this setting will only work if the source's address
     /// is an IPv4 address (IPv6 and systemd file descriptor as source's address are not supported
