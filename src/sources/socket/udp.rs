@@ -43,15 +43,19 @@ pub struct UdpConfig {
     #[configurable(derived)]
     address: SocketListenAddr,
 
-    /// TODO: document this.
-    /// TODO: The join multicast method should fail if the address is not SocketListenAddr::SocketAddr.
-    /// multicast wont work with systemd{N} fd sockets.
-    /// Also, if the address is IPv4, the multicast address should be IPv4 too.
-    /// TODO: should we support a list of groups or a single group? The `join_multicast` method supports
-    /// just one group per call.
-    /// TODO: document that we use `IPv4Addr` and not `SocketAddr` for the multicast groups because
-    /// the `join_multicast_v6` is not supported due to the need of using an interface index.s
+    /// List of IPv4 multicast groups to join on socket's binding process.
+    ///
+    /// In order to read multicast packets, this source's listening address should be set to `0.0.0.0`.
+    /// If any other address is used (such as `127.0.0.1` or an specific interface address), the
+    /// listening interface will filter out all multicast packets received,
+    /// as their target IP would be the one of the multicast group
+    /// and it will not match the socket's binded IP.
+    ///
+    /// Note that this setting will only work if the source's address
+    /// is an IPv4 address (IPv6 and systemd file descriptor as source's address are not supported
+    /// with multicast groups).
     #[serde(default)]
+    #[configurable(metadata(docs::examples = r#"["224.0.0.2", s"224.0.0.4"]"#))]
     pub(super) multicast_groups: Vec<Ipv4Addr>,
 
     /// The maximum buffer size of incoming messages.
