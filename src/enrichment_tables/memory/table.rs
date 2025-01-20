@@ -122,19 +122,20 @@ impl Memory {
                 update_time: now.into(),
             };
             let new_entry_size = new_entry_key.size_of() + new_entry.size_of();
-            if self.config.max_byte_size > 0
-                && writer
+            if let Some(max_byte_size) = self.config.max_byte_size {
+                if writer
                     .metadata
                     .byte_size
                     .saturating_add(new_entry_size as u64)
-                    > self.config.max_byte_size
-            {
-                // Reject new entries
-                emit!(MemoryEnrichmentTableInsertFailed {
-                    key: &new_entry_key,
-                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
-                });
-                continue;
+                    > max_byte_size
+                {
+                    // Reject new entries
+                    emit!(MemoryEnrichmentTableInsertFailed {
+                        key: &new_entry_key,
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                    });
+                    continue;
+                }
             }
             writer.metadata.byte_size = writer
                 .metadata
@@ -147,7 +148,7 @@ impl Memory {
             writer.write_handle.update(new_entry_key, new_entry);
         }
 
-        if self.config.flush_interval == 0 {
+        if self.config.flush_interval.is_none() {
             writer.write_handle.refresh();
         }
     }
@@ -297,12 +298,12 @@ impl StreamSink<Event> for Memory {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
-        let mut flush_interval =
-            IntervalStream::new(interval(if self.config.flush_interval == 0 {
-                Duration::MAX
-            } else {
-                Duration::from_secs(self.config.flush_interval)
-            }));
+        let mut flush_interval = IntervalStream::new(interval(
+            self.config
+                .flush_interval
+                .map(Duration::from_secs)
+                .unwrap_or(Duration::MAX),
+        ));
         let mut scan_interval = IntervalStream::new(interval(Duration::from_secs(
             self.config.scan_interval.into(),
         )));

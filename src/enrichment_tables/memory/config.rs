@@ -35,14 +35,14 @@ pub struct MemoryConfig {
     /// if it is shorter than the `scan_interval`.
     ///
     /// By default, all writes are made visible immediately.
-    #[serde(default = "default_flush_interval")]
-    pub flush_interval: u64,
+    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
+    pub flush_interval: Option<u64>,
     /// Maximum size of the table in bytes. All insertions that make
     /// this table bigger than the maximum size are rejected.
     ///
     /// By default, there is no size limit.
-    #[serde(default = "default_max_byte_size")]
-    pub max_byte_size: u64,
+    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
+    pub max_byte_size: Option<u64>,
 
     /// Configuration of internal metrics
     #[configurable(derived)]
@@ -67,9 +67,9 @@ impl Default for MemoryConfig {
         Self {
             ttl: default_ttl(),
             scan_interval: default_scan_interval(),
-            flush_interval: default_flush_interval(),
+            flush_interval: None,
             memory: Arc::new(Mutex::new(None)),
-            max_byte_size: default_max_byte_size(),
+            max_byte_size: None,
             internal_metrics: MemoryTableInternalMetricsConfig::default(),
         }
     }
@@ -81,14 +81,6 @@ const fn default_ttl() -> u64 {
 
 const fn default_scan_interval() -> NonZeroU64 {
     NonZeroU64::new(30).unwrap()
-}
-
-const fn default_flush_interval() -> u64 {
-    0
-}
-
-const fn default_max_byte_size() -> u64 {
-    0
 }
 
 impl MemoryConfig {
