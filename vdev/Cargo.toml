@@ -22,7 +22,7 @@ hex = "0.4.3"
 indexmap.workspace = true
 indicatif = { version = "0.17.9", features = ["improved_unicode"] }
 itertools = "0.14.0"
-log = "0.4.22"
+log = "0.4.25"
 # watch https://github.com/epage/anstyle for official interop with Clap
 owo-colors = { version = "4.1.0", features = ["supports-colors"] }
 paste = "1.0.15"
