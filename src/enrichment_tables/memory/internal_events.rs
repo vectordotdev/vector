@@ -6,7 +6,7 @@ use vector_lib::internal_event::InternalEvent;
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[serde(deny_unknown_fields)]
-pub struct MemoryTableInternalMetricsConfig {
+pub struct InternalMetricsConfig {
     /// Determines whether to include the key tag on internal metrics.
     ///
     /// This is useful for distinguishing between different keys while monitoring. However, the tag's
