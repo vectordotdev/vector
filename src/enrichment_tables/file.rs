@@ -599,6 +599,64 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parse_file_with_headers() {
+        let dir = tempfile::tempdir().expect("Unable to create tempdir for enrichment table");
+        let path = dir.path().join("table.csv");
+        fs::write(path.clone(), "foo,bar\na,1\nb,2").expect("Failed to write enrichment table");
+
+        let config = FileConfig {
+            file: FileSettings {
+                path,
+                encoding: Encoding::Csv {
+                    include_headers: true,
+                    delimiter: default_delimiter(),
+                },
+            },
+            schema: HashMap::new(),
+        };
+        let data = config
+            .load_file(Default::default())
+            .expect("Failed to parse csv");
+        assert_eq!(vec!["foo".to_string(), "bar".to_string()], data.headers);
+        assert_eq!(
+            vec![
+                vec![Value::from("a"), Value::from("1")],
+                vec![Value::from("b"), Value::from("2")],
+            ],
+            data.data
+        );
+    }
+
+    #[test]
+    fn parse_file_no_headers() {
+        let dir = tempfile::tempdir().expect("Unable to create tempdir for enrichment table");
+        let path = dir.path().join("table.csv");
+        fs::write(path.clone(), "a,1\nb,2").expect("Failed to write enrichment table");
+
+        let config = FileConfig {
+            file: FileSettings {
+                path,
+                encoding: Encoding::Csv {
+                    include_headers: false,
+                    delimiter: default_delimiter(),
+                },
+            },
+            schema: HashMap::new(),
+        };
+        let data = config
+            .load_file(Default::default())
+            .expect("Failed to parse csv");
+        assert_eq!(vec!["0".to_string(), "1".to_string()], data.headers);
+        assert_eq!(
+            vec![
+                vec![Value::from("a"), Value::from("1")],
+                vec![Value::from("b"), Value::from("2")],
+            ],
+            data.data
+        );
+    }
+
+    #[test]
     fn parse_column() {
         let mut schema = HashMap::new();
         schema.insert("col1".to_string(), " string ".to_string());
