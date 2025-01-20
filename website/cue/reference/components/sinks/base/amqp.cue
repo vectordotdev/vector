@@ -413,6 +413,11 @@ base: components: sinks: amqp: configuration: {
 				required:    false
 				type: uint: {}
 			}
+			priority: {
+				description: "Priority for AMQP messages."
+				required:    false
+				type: uint: {}
+			}
 		}
 	}
 	routing_key: {

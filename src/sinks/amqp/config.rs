@@ -19,6 +19,9 @@ pub struct AmqpPropertiesConfig {
 
     /// Expiration for AMQP messages (in milliseconds)
     pub(crate) expiration_ms: Option<u64>,
+
+    /// Priority for AMQP messages.
+    pub(crate) priority: Option<u8>,
 }
 
 impl AmqpPropertiesConfig {
@@ -32,6 +35,9 @@ impl AmqpPropertiesConfig {
         }
         if let Some(expiration_ms) = &self.expiration_ms {
             prop = prop.with_expiration(ShortString::from(expiration_ms.to_string()));
+        }
+        if let Some(priority) = &self.priority {
+            prop = prop.with_priority(*priority);
         }
         prop
     }
