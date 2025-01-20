@@ -15,7 +15,10 @@ use super::{
     BuiltBuffer, TaskHandle,
 };
 use crate::{
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
+    config::{
+        ComponentKey, Config, ConfigDiff, EnrichmentTableOuter, HealthcheckOptions, Inputs,
+        OutputId, Resource,
+    },
     event::EventArray,
     extra_context::ExtraContext,
     shutdown::SourceShutdownCoordinator,
@@ -419,15 +422,22 @@ impl RunningTopology {
         let remove_sink = diff
             .sinks
             .removed_and_changed()
-            .map(|key| (key, self.config.sink(key).unwrap().resources(key)))
+            .map(|key| {
+                (
+                    key,
+                    self.config
+                        .sink(key)
+                        .map(|s| s.resources(key))
+                        .unwrap_or_default(),
+                )
+            })
             .chain(
                 diff.enrichment_tables
                     .removed_and_changed()
                     .filter_map(|key| {
                         self.config
                             .enrichment_table(key)
-                            .unwrap()
-                            .as_sink()
+                            .and_then(|t| t.as_sink())
                             .map(|s| (key, s.resources(key)))
                     }),
             );
@@ -438,15 +448,22 @@ impl RunningTopology {
         let add_sink = diff
             .sinks
             .changed_and_added()
-            .map(|key| (key, new_config.sink(key).unwrap().resources(key)))
+            .map(|key| {
+                (
+                    key,
+                    new_config
+                        .sink(key)
+                        .map(|s| s.resources(key))
+                        .unwrap_or_default(),
+                )
+            })
             .chain(
                 diff.enrichment_tables
                     .changed_and_added()
                     .filter_map(|key| {
                         self.config
                             .enrichment_table(key)
-                            .unwrap()
-                            .as_sink()
+                            .and_then(|t| t.as_sink())
                             .map(|s| (key, s.resources(key)))
                     }),
             );
@@ -472,28 +489,17 @@ impl RunningTopology {
             .to_change
             .iter()
             .filter(|&key| {
-                self.config
-                    .sink(key)
-                    .map(|s| s.buffer.clone())
-                    .unwrap_or_else(|| {
-                        self.config
-                            .enrichment_table(key)
-                            .unwrap()
-                            .as_sink()
-                            .unwrap()
-                            .buffer
-                    })
-                    == new_config
-                        .sink(key)
-                        .map(|s| s.buffer.clone())
-                        .unwrap_or_else(|| {
-                            self.config
-                                .enrichment_table(key)
-                                .unwrap()
-                                .as_sink()
-                                .unwrap()
-                                .buffer
-                        })
+                self.config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(EnrichmentTableOuter::as_sink)
+                        .map(|s| s.buffer)
+                }) == new_config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(EnrichmentTableOuter::as_sink)
+                        .map(|s| s.buffer)
+                })
             })
             .cloned()
             .collect::<HashSet<_>>();
@@ -513,8 +519,7 @@ impl RunningTopology {
             .chain(diff.enrichment_tables.to_remove.iter().filter(|key| {
                 self.config
                     .enrichment_table(key)
-                    .unwrap()
-                    .as_sink()
+                    .and_then(EnrichmentTableOuter::as_sink)
                     .is_some()
             }))
             .collect::<Vec<_>>();
@@ -534,8 +539,7 @@ impl RunningTopology {
             .chain(diff.enrichment_tables.to_change.iter().filter(|key| {
                 self.config
                     .enrichment_table(key)
-                    .unwrap()
-                    .as_sink()
+                    .and_then(EnrichmentTableOuter::as_sink)
                     .is_some()
             }))
             .collect::<Vec<_>>();
@@ -637,8 +641,7 @@ impl RunningTopology {
             let removed_sinks = diff.enrichment_tables.to_remove.iter().filter(|key| {
                 self.config
                     .enrichment_table(key)
-                    .unwrap()
-                    .as_sink()
+                    .and_then(EnrichmentTableOuter::as_sink)
                     .is_some()
             });
             for key in removed_sinks {
