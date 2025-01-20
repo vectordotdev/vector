@@ -192,6 +192,7 @@ impl FileConfig {
             .delimiter(delimiter as u8)
             .from_path(&self.file.path)?;
 
+        let first_row = reader.records().next();
         let headers = if include_headers {
             reader
                 .headers()?
@@ -201,14 +202,15 @@ impl FileConfig {
         } else {
             // If there are no headers in the datafile we make headers as the numerical index of
             // the column.
-            match reader.records().next() {
-                Some(Ok(row)) => (0..row.len()).map(|idx| idx.to_string()).collect(),
+            match first_row {
+                Some(Ok(ref row)) => (0..row.len()).map(|idx| idx.to_string()).collect(),
                 _ => Vec::new(),
             }
         };
 
-        let data = reader
-            .records()
+        let data = first_row
+            .into_iter()
+            .chain(reader.records())
             .map(|row| {
                 Ok(row?
                     .iter()
