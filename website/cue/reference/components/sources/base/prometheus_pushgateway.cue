@@ -45,7 +45,7 @@ base: components: sources: prometheus_pushgateway: configuration: {
 		description: """
 			Configuration of the authentication strategy for server mode sinks and sources.
 
-			HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
+			Use the HTTP authentication with HTTPS only. The authentication credentials are passed as an
 			HTTP header without any additional encryption beyond what is provided by the transport itself.
 			"""
 		required: false
@@ -69,7 +69,7 @@ base: components: sources: prometheus_pushgateway: configuration: {
 					basic: """
 						Basic authentication.
 
-						The username and password are concatenated and encoded via [base64][base64].
+						The username and password are concatenated and encoded using [base64][base64].
 
 						[base64]: https://en.wikipedia.org/wiki/Base64
 						"""
@@ -80,7 +80,7 @@ base: components: sources: prometheus_pushgateway: configuration: {
 						"""
 				}
 			}
-			user: {
+			username: {
 				description:   "The basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true

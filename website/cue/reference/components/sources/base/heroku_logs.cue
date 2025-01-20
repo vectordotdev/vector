@@ -66,7 +66,7 @@ base: components: sources: heroku_logs: configuration: {
 						"""
 				}
 			}
-			user: {
+			username: {
 				description:   "The basic authentication username."
 				relevant_when: "strategy = \"basic\""
 				required:      true
