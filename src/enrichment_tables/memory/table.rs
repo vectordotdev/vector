@@ -153,7 +153,7 @@ impl Memory {
     }
 
     fn scan_and_mark_for_deletion(&mut self) -> bool {
-        let mut writer = self.write_handle.lock()..expect("mutex poisoned");
+        let mut writer = self.write_handle.lock().expect("mutex poisoned");
         let now = Instant::now();
 
         let mut needs_flush = false;
@@ -188,7 +188,7 @@ impl Memory {
     }
 
     fn flush(&mut self) {
-        let mut writer = self.write_handle.lock()..expect("mutex poisoned");
+        let mut writer = self.write_handle.lock().expect("mutex poisoned");
 
         writer.write_handle.refresh();
         if let Some(reader) = self.get_read_handle().read() {
