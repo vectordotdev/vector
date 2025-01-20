@@ -52,7 +52,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         graceful_shutdown_duration,
         allow_empty: _,
     } = builder;
-    let sinks_and_table_sinks = sinks
+    let all_sinks = sinks
         .clone()
         .into_iter()
         .chain(
@@ -62,7 +62,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         )
         .collect::<IndexMap<_, _>>();
 
-    let graph = match Graph::new(&sources, &transforms, &sinks_and_table_sinks, schema) {
+    let graph = match Graph::new(&sources, &transforms, &all_sinks, schema) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);
