@@ -104,8 +104,7 @@ impl Memory {
     }
 
     fn handle_value(&mut self, value: ObjectMap) {
-        // Panic: If the Mutex is poisoned
-        let mut writer = self.write_handle.lock().unwrap();
+        let mut writer = self.write_handle.lock().expect("mutex poisoned");
         let now = Instant::now();
 
         for (k, v) in value.into_iter() {
@@ -154,7 +153,7 @@ impl Memory {
     }
 
     fn scan_and_mark_for_deletion(&mut self) -> bool {
-        let mut writer = self.write_handle.lock().unwrap();
+        let mut writer = self.write_handle.lock()..expect("mutex poisoned");
         let now = Instant::now();
 
         let mut needs_flush = false;
@@ -189,7 +188,7 @@ impl Memory {
     }
 
     fn flush(&mut self) {
-        let mut writer = self.write_handle.lock().unwrap();
+        let mut writer = self.write_handle.lock()..expect("mutex poisoned");
 
         writer.write_handle.refresh();
         if let Some(reader) = self.get_read_handle().read() {
