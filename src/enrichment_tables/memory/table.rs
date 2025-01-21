@@ -464,7 +464,7 @@ mod tests {
         let ttl = 100;
         let mut memory = Memory::new(build_memory_config(|c| {
             c.ttl = ttl;
-            c.flush_interval = 10;
+            c.flush_interval = Some(10);
         }));
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
@@ -524,7 +524,7 @@ mod tests {
     #[test]
     fn ignores_all_values_over_byte_size_limit() {
         let mut memory = Memory::new(build_memory_config(|c| {
-            c.max_byte_size = 1;
+            c.max_byte_size = Some(1);
         }));
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
@@ -545,7 +545,7 @@ mod tests {
         let ttl = 100;
         let mut memory = Memory::new(build_memory_config(|c| {
             c.ttl = ttl;
-            c.max_byte_size = 150;
+            c.max_byte_size = Some(150);
         }));
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
         memory.handle_value(ObjectMap::from([("rejected_key".into(), Value::from(5))]));
