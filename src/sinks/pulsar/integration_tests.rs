@@ -97,7 +97,7 @@ async fn pulsar_happy() {
 async fn pulsar_happy_tls() {
     let cnf = PulsarSinkConfig {
         endpoint: pulsar_address("pulsar+ssl", 6651),
-        tls_options: Some(PulsarTlsOptions {
+        tls: Some(PulsarTlsOptions {
             ca_file: TEST_PEM_INTERMEDIATE_CA_PATH.into(),
             verify_certificate: None,
             verify_hostname: None,

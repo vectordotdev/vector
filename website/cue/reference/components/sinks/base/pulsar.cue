@@ -539,7 +539,7 @@ base: components: sinks: pulsar: configuration: {
 		required: false
 		type: string: {}
 	}
-	tls_options: {
+	tls: {
 		description: "TLS options configuration for the Pulsar client."
 		required:    false
 		type: object: options: {

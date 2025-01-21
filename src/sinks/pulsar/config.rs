@@ -85,7 +85,7 @@ pub struct PulsarSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(crate) tls_options: Option<PulsarTlsOptions>,
+    pub(crate) tls: Option<PulsarTlsOptions>,
 }
 
 /// Event batching behavior.
@@ -244,7 +244,7 @@ impl Default for PulsarSinkConfig {
             auth: None,
             acknowledgements: Default::default(),
             connection_retry_options: None,
-            tls_options: None,
+            tls: None,
         }
     }
 }
@@ -316,7 +316,7 @@ impl PulsarSinkConfig {
         let operation_retry_opts = OperationRetryOptions::default();
         builder = builder.with_operation_retry_options(operation_retry_opts);
 
-        if let Some(options) = &self.tls_options {
+        if let Some(options) = &self.tls {
             builder = builder.with_certificate_chain_file(Path::new(&options.ca_file))?;
             builder =
                 builder.with_allow_insecure_connection(!options.verify_certificate.unwrap_or(true));

@@ -104,7 +104,7 @@ pub struct PulsarSourceConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    tls_options: Option<TlsOptions>,
+    tls: Option<TlsOptions>,
 }
 
 /// Authentication configuration.
@@ -287,7 +287,7 @@ impl PulsarSourceConfig {
                 ),
             };
         }
-        if let Some(options) = &self.tls_options {
+        if let Some(options) = &self.tls {
             builder = builder.with_certificate_chain_file(Path::new(&options.ca_file))?;
             builder =
                 builder.with_allow_insecure_connection(!options.verify_certificate.unwrap_or(true));
@@ -626,7 +626,7 @@ mod integration_tests {
         endpoint: &str,
         acknowledgements: bool,
         log_namespace: LogNamespace,
-        tls_options: Option<TlsOptions>,
+        tls: Option<TlsOptions>,
     ) {
         trace_init();
 
@@ -644,10 +644,10 @@ mod integration_tests {
             decoding: DeserializerConfig::Bytes,
             acknowledgements: acknowledgements.into(),
             log_namespace: None,
-            tls_options: tls_options.clone(),
+            tls: tls.clone(),
         };
         let mut builder = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor);
-        if let Some(options) = &tls_options {
+        if let Some(options) = &tls {
             builder = builder
                 .with_certificate_chain_file(Path::new(&options.ca_file))
                 .unwrap();
