@@ -287,8 +287,9 @@ configuration: {
 
 						This enrichment table only supports lookup with key field.
 
-						To write data into this table, you have to define inputs to use this the table as a sink. They are expected to produce objects, where each key-value pair
-						is stored as a separate record in the table.
+						To write data into this table, you have to define inputs to use this the table as a sink.
+						They are expected to produce objects, where each key-value pair is stored as a separate
+						record in the table. [Read more on how to use this component](\(urls.vector_enrichment_memory_how_it_works)).
 						"""
 					type: object: options: {
 						inputs: base.components.sinks.configuration.inputs
