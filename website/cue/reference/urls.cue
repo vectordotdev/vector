@@ -293,6 +293,7 @@ urls: {
 	kafka_partitioning_docs:                    "https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Partitioningandbootstrapping"
 	kafka_protocol:                             "https://kafka.apache.org/protocol"
 	kafka_sasl:                                 "https://docs.confluent.io/current/kafka/authentication_sasl/index.html"
+	keep:										"https://keephq.dev"
 	klog:                                       "\(github)/kubernetes/klog"
 	kubectl:                                    "\(kubernetes)/docs/reference/kubectl/overview/"
 	kubernetes:                                 "https://kubernetes.io"
