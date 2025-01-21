@@ -464,14 +464,14 @@ transforms:
     inputs: ["demo_logs_test"]
     source: |
       . = parse_json!(.message)
-      userid = get!(., path: ["user-identifier"])
+      user_id = get!(., path: ["user-identifier"])
 
       # Look for existing value in the table, using "user-identifier" as key
-      existing, err = get_enrichment_table_record("memory_table", { "key": userid })
+      existing, err = get_enrichment_table_record("memory_table", { "key": user_id })
 
       if err == null {
         # Value found, just use the cached value
-        # In this case existing looks like this { "key": userid, "value": {}, "ttl": 50 }
+        # In this case existing looks like this { "key": user_id, "value": {}, "ttl": 50 }
         # Where value is the value we cached, ttl is the time left before this value is removed from
         # the cache and key is the key we queried the table with
         . = existing.value
