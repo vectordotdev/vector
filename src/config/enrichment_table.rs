@@ -45,6 +45,18 @@ where
         }
     }
 
+    // Components are currently built in a way that they match exactly one of the roles (source,
+    // transform, sink, enrichment table). Due to specific requirements of the "memory" enrichment
+    // table, it has to fulfill 2 of these roles (sink and enrichment table). To reduce the impact
+    // of this very specific requirement, any enrichment table can now be optionally mapped into a
+    // sink, but this will only work for a "memory" enrichment table, since other tables will not
+    // have a "sink_config" present.
+    // This is also not ideal, since `SinkOuter` is not meant to represent the actual configuration,
+    // but it should just be a representation of that config used for deserialization.
+    // In the future, if more such components come up, it would be good to limit such "Outer"
+    // components to deserialization and build up the components and the topology in a more granular
+    // way, with each having "modules" for inputs (making them valid as sinks), for healthchecks,
+    // for providing outputs, etc.
     pub fn as_sink(&self) -> Option<SinkOuter<T>> {
         self.inner.sink_config().map(|sink| SinkOuter {
             graph: self.graph.clone(),
