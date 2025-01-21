@@ -1,3 +1,3 @@
-Tls options to set custom certificate chain are now available for `pulsar` sink and source.
+The `pulsar` source and sink now support configuration of TLS options via the `tls` configuration field.
 
 authors: pomacanthidae
