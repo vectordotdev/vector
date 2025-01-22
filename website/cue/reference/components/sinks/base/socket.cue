@@ -355,7 +355,9 @@ base: components: sinks: socket: configuration: {
 						description: """
 																The path to the protobuf descriptor set file.
 
-																This file is the output of `protoc -o <path> ...`
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
 																"""
 						required: true
 						type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
@@ -383,7 +385,7 @@ base: components: sinks: socket: configuration: {
 	}
 	framing: {
 		description:   "Framing configuration."
-		relevant_when: "mode = \"tcp\" or mode = \"unix_stream\" or mode = \"unix_datagram\""
+		relevant_when: "mode = \"tcp\" or mode = \"unix_stream\""
 		required:      false
 		type: object: options: {
 			character_delimited: {
@@ -453,13 +455,8 @@ base: components: sinks: socket: configuration: {
 		description: "The type of socket to use."
 		required:    true
 		type: string: enum: {
-			tcp: "Send over TCP."
-			udp: "Send over UDP."
-			unix_datagram: """
-				Send over a Unix domain socket (UDS), in datagram mode.
-				Unavailable on macOS, due to send(2)'s apparent non-blocking behavior,
-				resulting in ENOBUFS errors which we currently don't handle.
-				"""
+			tcp:         "Send over TCP."
+			udp:         "Send over UDP."
 			unix_stream: "Send over a Unix domain socket (UDS), in stream mode."
 		}
 	}
@@ -469,7 +466,7 @@ base: components: sinks: socket: configuration: {
 
 			This should be an absolute path.
 			"""
-		relevant_when: "mode = \"unix_stream\" or mode = \"unix_datagram\""
+		relevant_when: "mode = \"unix_stream\""
 		required:      true
 		type: string: examples: ["/path/to/socket"]
 	}

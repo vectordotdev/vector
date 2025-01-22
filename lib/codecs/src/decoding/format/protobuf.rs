@@ -66,10 +66,15 @@ impl ProtobufDeserializerConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Derivative)]
 #[derivative(Default)]
 pub struct ProtobufDeserializerOptions {
-    /// Path to desc file
+    /// The path to the protobuf descriptor set file.
+    ///
+    /// This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+    ///
+    /// You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
     pub desc_file: PathBuf,
 
-    /// message type. e.g package.message
+    /// The name of the message type to use for serializing.
+    #[configurable(metadata(docs::examples = "package.Message"))]
     pub message_type: String,
 }
 
