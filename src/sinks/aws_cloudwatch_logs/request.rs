@@ -3,7 +3,7 @@ use std::{
     pin::Pin,
     task::{ready, Context, Poll},
 };
-
+use std::collections::HashMap;
 use aws_sdk_cloudwatchlogs::{
     operation::{
         create_log_group::CreateLogGroupError,
@@ -40,6 +40,8 @@ struct Client {
     group_name: String,
     headers: IndexMap<HeaderName, HeaderValue>,
     retention_days: u32,
+    kms_key: Option<String>,
+    tags: Option<HashMap<String, String>>,
 }
 
 type ClientResult<T, E> = BoxFuture<'static, Result<T, SdkError<E, HttpResponse>>>;
@@ -63,6 +65,8 @@ impl CloudwatchFuture {
         create_missing_group: bool,
         create_missing_stream: bool,
         retention: Retention,
+        kms_key: Option<String>,
+        tags: Option<HashMap<String, String>>,
         mut events: Vec<Vec<InputLogEvent>>,
         token: Option<String>,
         token_tx: oneshot::Sender<Option<String>>,
@@ -74,6 +78,8 @@ impl CloudwatchFuture {
             group_name,
             headers,
             retention_days,
+            kms_key,
+            tags
         };
 
         let state = if let Some(token) = token {
@@ -288,10 +294,14 @@ impl Client {
     pub fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
+        let kms_key = self.kms_key.clone();
+        let tags = self.tags.clone();
         Box::pin(async move {
             client
                 .create_log_group()
                 .log_group_name(group_name)
+                .set_kms_key_id(kms_key)
+                .set_tags(tags)
                 .send()
                 .await?;
             Ok(())

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use futures::FutureExt;
 use serde::{de, Deserialize, Deserializer};
@@ -164,6 +165,14 @@ pub struct CloudwatchLogsSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub kms_key: Option<String>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub tags: Option<HashMap<String, String>>,
 }
 
 impl CloudwatchLogsSinkConfig {
@@ -248,6 +257,8 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         assume_role: Default::default(),
         auth: Default::default(),
         acknowledgements: Default::default(),
+        kms_key: Default::default(),
+        tags: Default::default(),
     }
 }
 
