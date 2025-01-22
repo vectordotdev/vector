@@ -70,9 +70,9 @@ components: sinks: keep: {
 	configuration: base.components.sinks.keep.configuration
 
 	input: {
-		logs: true
+		logs:    true
 		metrics: null
-		traces: false
+		traces:  false
 	}
 
 	how_it_works: {
@@ -85,10 +85,9 @@ components: sinks: keep: {
 				"""
 		}
 
-
 		configuration: {
 			title: "Configuration"
-			body:  """
+			body: """
 				In vector configuration source name needs to be "prometheus_alertmanager"
 				"""
 		}
