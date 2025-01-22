@@ -19,10 +19,6 @@ cmd_check() {
   cargo vdev check docs
 }
 
-cmd_fmt() {
-  list-docs-files | xargs cue fmt "$@"
-}
-
 cmd_list() {
   list-docs-files
 }
