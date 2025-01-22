@@ -2,7 +2,10 @@
 use crate::{amqp::AmqpConfig, sinks::prelude::*};
 use lapin::{types::ShortString, BasicProperties};
 use std::sync::Arc;
-use vector_lib::codecs::TextSerializerConfig;
+use vector_lib::{
+    codecs::TextSerializerConfig,
+    internal_event::{error_stage, error_type},
+};
 
 use super::sink::AmqpSink;
 
@@ -21,11 +24,11 @@ pub struct AmqpPropertiesConfig {
     pub(crate) expiration_ms: Option<u64>,
 
     /// Priority for AMQP messages.
-    pub(crate) priority: Option<u8>,
+    pub(crate) priority: Option<Template>,
 }
 
 impl AmqpPropertiesConfig {
-    pub(super) fn build(&self) -> BasicProperties {
+    pub(super) fn build(&self, event: &Event) -> Option<BasicProperties> {
         let mut prop = BasicProperties::default();
         if let Some(content_type) = &self.content_type {
             prop = prop.with_content_type(ShortString::from(content_type.clone()));
@@ -36,10 +39,36 @@ impl AmqpPropertiesConfig {
         if let Some(expiration_ms) = &self.expiration_ms {
             prop = prop.with_expiration(ShortString::from(expiration_ms.to_string()));
         }
-        if let Some(priority) = &self.priority {
-            prop = prop.with_priority(*priority);
+        if let Some(priority_template) = &self.priority {
+            let priority_string = priority_template
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("properties.priority"),
+                        drop_event: true,
+                    })
+                })
+                .ok()?;
+
+            // Valid template but invalid priorty type (not numeric) does not throw an error; instead warn.
+            // Fall back to no priority in those cases (equivalent to 0).
+            match priority_string.parse::<u8>() {
+                Ok(priority) => {
+                    prop = prop.with_priority(priority);
+                }
+                Err(error) => {
+                    warn!(
+                        message = "Failed to convert to numeric value for \"properties.priority\"",
+                        error = %error,
+                        error_type = error_type::CONVERSION_FAILED,
+                        stage = error_stage::PROCESSING,
+                        internal_log_rate_limit = true,
+                    );
+                }
+            }
         }
-        prop
+        Some(prop)
     }
 }
 

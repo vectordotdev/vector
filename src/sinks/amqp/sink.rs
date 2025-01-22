@@ -96,7 +96,7 @@ impl AmqpSink {
 
         let properties = match &self.properties {
             None => BasicProperties::default(),
-            Some(prop) => prop.build(),
+            Some(prop) => prop.build(&event)?,
         };
 
         Some(AmqpEvent {
