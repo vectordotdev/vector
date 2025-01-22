@@ -71,14 +71,7 @@ components: sinks: keep: {
 
 	input: {
 		logs: true
-		metrics: {
-			counter:      true
-			distribution: true
-			gauge:        true
-			histogram:    true
-			set:          true
-			summary:      true
-		}
+		metrics: null
 		traces: false
 	}
 
@@ -86,9 +79,17 @@ components: sinks: keep: {
 		setup: {
 			title: "Setup"
 			body:  """
-				1. Register for a free account at [cloud.axiom.co](\(urls.axiom_cloud))
+				1. Register for a free account at [platform.keephq.dev](\(urls.keep_platform))
 
-				2. Once registered, create a new dataset and create an API token for it
+				2. Go to providers tab and setup vector as a provider
+				"""
+		}
+
+
+		configuration: {
+			title: "Configuration"
+			body:  """
+				In vector configuration source name needs to be "prometheus_alertmanager"
 				"""
 		}
 	}
