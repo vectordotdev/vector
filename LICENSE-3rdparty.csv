@@ -148,6 +148,7 @@ const-oid,https://github.com/RustCrypto/formats/tree/master/const-oid,Apache-2.0
 const_fn,https://github.com/taiki-e/const_fn,Apache-2.0 OR MIT,The const_fn Authors
 convert_case,https://github.com/rutrum/convert-case,MIT,David Purdum <purdum41@gmail.com>
 convert_case,https://github.com/rutrum/convert-case,MIT,Rutrum <dave@rutrum.net>
+convert_case,https://github.com/rutrum/convert-case,MIT,rutrum <dave@rutrum.net>
 cookie-factory,https://github.com/rust-bakery/cookie-factory,MIT,"Geoffroy Couprie <geo.couprie@gmail.com>, Pierre Chifflier <chifflier@wzdftpd.net>"
 core-foundation,https://github.com/servo/core-foundation-rs,MIT  OR  Apache-2.0,The Servo Project Developers
 core2,https://github.com/bbqsrc/core2,Apache-2.0 OR MIT,Brendan Molloy <brendan@bbqsrc.net>
@@ -351,7 +352,7 @@ libz-sys,https://github.com/rust-lang/libz-sys,MIT OR Apache-2.0,"Alex Crichton 
 linked-hash-map,https://github.com/contain-rs/linked-hash-map,MIT OR Apache-2.0,"Stepan Koltsov <stepan.koltsov@gmail.com>, Andrew Paseltiner <apaseltiner@gmail.com>"
 linked_hash_set,https://github.com/alexheretic/linked-hash-set,Apache-2.0,Alex Butler <alexheretic@gmail.com>
 linux-raw-sys,https://github.com/sunfishcode/linux-raw-sys,Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT,Dan Gohman <dev@sunfishcode.online>
-listenfd,https://github.com/mitsuhiko/rust-listenfd,Apache-2.0,Armin Ronacher <armin.ronacher@active-4.com>
+listenfd,https://github.com/mitsuhiko/listenfd,Apache-2.0,Armin Ronacher <armin.ronacher@active-4.com>
 litemap,https://github.com/unicode-org/icu4x,Unicode-3.0,The ICU4X Project Developers
 lockfree-object-pool,https://github.com/EVaillant/lockfree-object-pool,BSL-1.0,Etienne Vaillant <vaillant.etienne@gmail.com>
 log,https://github.com/rust-lang/log,MIT OR Apache-2.0,The Rust Project Developers
@@ -637,6 +638,7 @@ tokio-postgres,https://github.com/sfackler/rust-postgres,MIT OR Apache-2.0,Steve
 tokio-retry,https://github.com/srijs/rust-tokio-retry,MIT,Sam Rijs <srijs@airpost.net>
 tokio-rustls,https://github.com/rustls/tokio-rustls,MIT OR Apache-2.0,The tokio-rustls Authors
 tokio-tungstenite,https://github.com/snapview/tokio-tungstenite,MIT,"Daniel Abramov <dabramov@snapview.de>, Alexey Galakhov <agalakhov@snapview.de>"
+tokio-websockets,https://github.com/Gelbpunkt/tokio-websockets,MIT,The tokio-websockets Authors
 toml,https://github.com/toml-rs/toml,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
 toml_edit,https://github.com/toml-rs/toml,MIT OR Apache-2.0,"Andronik Ordian <write@reusable.software>, Ed Page <eopage@gmail.com>"
 tonic,https://github.com/hyperium/tonic,MIT,Lucio Franco <luciofranco14@gmail.com>
@@ -653,6 +655,7 @@ triomphe,https://github.com/Manishearth/triomphe,MIT OR Apache-2.0,"Manish Goreg
 trust-dns-proto,https://github.com/bluejekyll/trust-dns,MIT OR Apache-2.0,Benjamin Fry <benjaminfry@me.com>
 trust-dns-resolver,https://github.com/bluejekyll/trust-dns,MIT OR Apache-2.0,Benjamin Fry <benjaminfry@me.com>
 try-lock,https://github.com/seanmonstar/try-lock,MIT,Sean McArthur <sean@seanmonstar.com>
+tryhard,https://github.com/EmbarkStudios/tryhard,MIT OR Apache-2.0,Embark <opensource@embark-studios.com>
 tungstenite,https://github.com/snapview/tungstenite-rs,MIT OR Apache-2.0,"Alexey Galakhov, Daniel Abramov"
 twox-hash,https://github.com/shepmaster/twox-hash,MIT,Jake Goulding <jake.goulding@gmail.com>
 typed-builder,https://github.com/idanarye/rust-typed-builder,MIT OR Apache-2.0,"IdanArye <idanarye@gmail.com>, Chris Morgan <me@chrismorgan.info>"
@@ -686,7 +689,6 @@ void,https://github.com/reem/rust-void,MIT,Jonathan Reem <jonathan.reem@gmail.co
 vrl,https://github.com/vectordotdev/vrl,MPL-2.0,Vector Contributors <vector@datadoghq.com>
 vsimd,https://github.com/Nugine/simd,MIT,The vsimd Authors
 vte,https://github.com/alacritty/vte,Apache-2.0 OR MIT,"Joe Wilm <joe@jwilm.com>, Christian Duerr <contact@christianduerr.com>"
-vte_generate_state_changes,https://github.com/jwilm/vte,Apache-2.0 OR MIT,Christian Duerr <contact@christianduerr.com>
 wait-timeout,https://github.com/alexcrichton/wait-timeout,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
 waker-fn,https://github.com/smol-rs/waker-fn,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 walkdir,https://github.com/BurntSushi/walkdir,Unlicense OR MIT,Andrew Gallant <jamslam@gmail.com>

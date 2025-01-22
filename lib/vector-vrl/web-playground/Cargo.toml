@@ -18,4 +18,4 @@ vector-vrl-functions = { path = "../functions" }
 enrichment = { path = "../../enrichment" }
 
 [build-dependencies]
-cargo-lock = "10.0.1"
+cargo-lock = "10.1.0"

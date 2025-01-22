@@ -45,10 +45,36 @@ jobs:
       int_tests: true
     secrets: inherit
 
+  check-all:
+    runs-on: ubuntu-latest
+    needs: changes
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - name: Download JSON artifact from changes.yml
+        uses: actions/download-artifact@v4
+        with:
+          name: int_tests_changes
+
+      - name: Check if all values are false
+        id: check
+        run: |
+          # Check if all values are 'false'
+          json=$(cat int_tests_changes.json)
+          all_false=$(echo "$json" | jq -r 'to_entries | all(.value == false)')
+
+          if [[ "$all_false" == "true" ]]; then
+            echo "No changes detected. Skipping integration tests."
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "Detected changes. Proceeding with integration tests."
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
   setup:
     runs-on: ubuntu-latest
-    needs:
-      - changes
+    needs: check-all
+    if: ${{ needs.check-all.outputs.should_run == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -88,6 +114,8 @@ jobs:
         with:
           submodules: "recursive"
 
+      - run: docker image prune -af ; docker container prune -f
+
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@v4
         with:
@@ -120,6 +148,8 @@ jobs:
     if: always()
     needs:
       - changes
+      - check-all
+      - setup
       - integration-tests
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}

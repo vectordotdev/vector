@@ -457,10 +457,55 @@ incoming events and the `BasicService` we created above.
 
 We can now run our new sink.
 
-Let's run a test HTTP server to accept the responses our sink sends:
+Here is a potential `simple_http_server.py` server to accept the responses our sink sends:
+
+```python
+import http.server
+import socketserver
+
+
+class RequestHandler(http.server.BaseHTTPRequestHandler):
+   def do_GET(self):
+      # Print the request line and headers
+      print(f"Request Line: {self.requestline}")
+      print("Headers:")
+      for header, value in self.headers.items():
+         print(f"{header}: {value}")
+
+      # Send a response
+      self.send_response(200)
+      self.send_header('Content-type', 'text/html')
+      self.end_headers()
+      self.wfile.write(b'GET request received')
+
+   def do_POST(self):
+      print(f"Request Line: {self.requestline}")
+      print("Headers:")
+      for header, value in self.headers.items():
+         print(f"{header}: {value}")
+
+      content_length = int(self.headers['Content-Length'])
+      post_data = self.rfile.read(content_length)
+      print(f"Body: {post_data.decode('utf-8')}")
+
+      self.send_response(200)
+      self.send_header('Content-type', 'text/html')
+      self.end_headers()
+      self.wfile.write(b'POST request received')
+
+
+PORT = 3000
+Handler = RequestHandler
+
+with socketserver.TCPServer(("", PORT), Handler) as httpd:
+   print(f"Serving HTTP on port {PORT}...")
+   httpd.serve_forever()
+```
+
+Run the server:
 
 ```sh
-docker run -p 3000:3000 plork/httpdump
+python3 simple_http_server.py
 ```
 
 Our sink has a new configuration field for the endpoint. Update it to look like:
