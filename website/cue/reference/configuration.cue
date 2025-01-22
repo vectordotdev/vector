@@ -117,10 +117,10 @@ configuration: {
 					required: true
 					type: string: {
 						enum: {
-							"file":    "Enrich data from a CSV file."
-							"geoip":   "Enrich data from a [GeoIp](\(urls.maxmind_geoip2)) [MaxMind](\(urls.maxmind)) database."
-							"mmdb":    "Enrich data from any [MaxMind](\(urls.maxmind)) database."
-							"memory":  "Enrich data from memory, which can be populated by using the table as a sink."
+							"file":   "Enrich data from a CSV file."
+							"geoip":  "Enrich data from a [GeoIp](\(urls.maxmind_geoip2)) [MaxMind](\(urls.maxmind)) database."
+							"mmdb":   "Enrich data from any [MaxMind](\(urls.maxmind)) database."
+							"memory": "Enrich data from memory, which can be populated by using the table as a sink."
 						}
 					}
 				}
