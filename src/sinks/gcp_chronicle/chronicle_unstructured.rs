@@ -70,14 +70,56 @@ pub enum GcsHealthcheckError {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {
-    /// EU region.
+    /// European Multi region
     Eu,
 
-    /// US region.
+    /// US Multi region
     Us,
 
-    /// APAC region.
+    /// APAC region (this is the same as the Singapore region endpoint retained for backwards compatibility)
     Asia,
+
+    /// SãoPaulo Region
+    SãoPaulo,
+
+    /// Canada Region
+    Canada,
+
+    /// Dammam Region
+    Dammam,
+
+    /// Doha Region
+    Doha,
+
+    /// Frankfurt Region
+    Frankfurt,
+
+    /// London Region
+    London,
+
+    /// Mumbai Region
+    Mumbai,
+
+    /// Paris Region
+    Paris,
+
+    /// Singapore Region
+    Singapore,
+
+    /// Sydney Region
+    Sydney,
+
+    /// TelAviv Region
+    TelAviv,
+
+    /// Tokyo Region
+    Tokyo,
+
+    /// Turin Region
+    Turin,
+
+    /// Zurich Region
+    Zurich,
 }
 
 impl Region {
@@ -87,6 +129,22 @@ impl Region {
             Region::Eu => "https://europe-malachiteingestion-pa.googleapis.com",
             Region::Us => "https://malachiteingestion-pa.googleapis.com",
             Region::Asia => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::SãoPaulo => "https://southamerica-east1-malachiteingestion-pa.googleapis.com",
+            Region::Canada => {
+                "https://northamerica-northeast2-malachiteingestion-pa.googleapis.com"
+            }
+            Region::Dammam => "https://me-central2-malachiteingestion-pa.googleapis.com",
+            Region::Doha => "https://me-central1-malachiteingestion-pa.googleapis.com",
+            Region::Frankfurt => "https://europe-west3-malachiteingestion-pa.googleapis.com",
+            Region::London => "https://europe-west2-malachiteingestion-pa.googleapis.com",
+            Region::Mumbai => "https://asia-south1-malachiteingestion-pa.googleapis.com",
+            Region::Paris => "https://europe-west9-malachiteingestion-pa.googleapis.com",
+            Region::Singapore => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::Sydney => "https://australia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::TelAviv => "https://me-west1-malachiteingestion-pa.googleapis.com",
+            Region::Tokyo => "https://asia-northeast1-malachiteingestion-pa.googleapis.com",
+            Region::Turin => "https://europe-west12-malachiteingestion-pa.googleapis.com",
+            Region::Zurich => "https://europe-west6-malachiteingestion-pa.googleapis.com",
         }
     }
 }

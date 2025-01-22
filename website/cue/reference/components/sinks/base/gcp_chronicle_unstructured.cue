@@ -504,9 +504,23 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 		description: "The GCP region to use."
 		required:    false
 		type: string: enum: {
-			asia: "APAC region."
-			eu:   "EU region."
-			us:   "US region."
+			asia:      "APAC region (this is the same as the Singapore region endpoint retained for backwards compatibility)"
+			canada:    "Canada Region"
+			dammam:    "Dammam Region"
+			doha:      "Doha Region"
+			eu:        "European Multi region"
+			frankfurt: "Frankfurt Region"
+			london:    "London Region"
+			mumbai:    "Mumbai Region"
+			paris:     "Paris Region"
+			singapore: "Singapore Region"
+			sydney:    "Sydney Region"
+			são_paulo: "SãoPaulo Region"
+			tel_aviv:  "TelAviv Region"
+			tokyo:     "Tokyo Region"
+			turin:     "Turin Region"
+			us:        "US Multi region"
+			zurich:    "Zurich Region"
 		}
 	}
 	request: {

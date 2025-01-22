@@ -442,7 +442,6 @@ PIDs
 PII
 plainify
 ple
-plork
 podspec
 Ponge
 POSINT
