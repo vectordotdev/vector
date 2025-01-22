@@ -21,6 +21,8 @@ pub mod log_to_metric;
 pub mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
+#[cfg(feature = "transforms-trace_to_log")]
+pub mod trace_to_log;
 #[cfg(feature = "transforms-remap")]
 pub mod remap;
 #[cfg(feature = "transforms-route")]
