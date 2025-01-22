@@ -13,9 +13,9 @@ use crate::{
 
 use super::sink::WebSocketListenerSink;
 
-/// Configuration for the `websocket_listener` sink.
+/// Configuration for the `websocket_server` sink.
 #[configurable_component(sink(
-    "websocket_listener",
+    "websocket_server",
     "Deliver observability event data to websocket clients."
 ))]
 #[derive(Clone, Debug)]
@@ -58,7 +58,7 @@ impl Default for WebSocketListenerSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "websocket_listener")]
+#[typetag::serde(name = "websocket_server")]
 impl SinkConfig for WebSocketListenerSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let ws_sink = WebSocketListenerSink::new(self.clone())?;

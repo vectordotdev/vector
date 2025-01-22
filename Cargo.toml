@@ -730,7 +730,7 @@ sinks-logs = [
   "sinks-vector",
   "sinks-webhdfs",
   "sinks-websocket",
-  "sinks-websocket-listener",
+  "sinks-websocket-server",
 ]
 sinks-metrics = [
   "sinks-appsignal",
@@ -799,7 +799,7 @@ sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build", "dep:prost"]
 sinks-websocket = ["dep:tokio-tungstenite"]
-sinks-websocket-listener = ["dep:tokio-tungstenite"]
+sinks-websocket-server = ["dep:tokio-tungstenite"]
 sinks-webhdfs = ["dep:opendal"]
 
 # Identifies that the build is a nightly build
