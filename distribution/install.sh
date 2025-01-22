@@ -713,11 +713,10 @@ check_help_for() {
 
 # Check if curl supports the --retry flag
 check_curl_for_retry_support() {
-  # Check if curl supports the --retry flag
   if check_help_for "notspecified" "curl" "--retry"; then
-    return 0  # Return true (success)
+    return 0
   else
-    return 1  # Return false (failure)
+    return 1
   fi
 }
 
