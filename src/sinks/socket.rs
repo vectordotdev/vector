@@ -221,6 +221,8 @@ mod test {
 
     use super::*;
 
+    #[cfg(target_os = "windows")]
+    use cfg_if::cfg_if;
     cfg_if! { if #[cfg(unix)] {
         use vector_lib::codecs::NativeJsonSerializerConfig;
         use crate::test_util::random_metrics_with_stream;
