@@ -560,7 +560,7 @@ jobs:
           if [ -f ${REPORT_MD} ]; then
             cat ${REPORT_MD} >> $GITHUB_STEP_SUMMARY
           else
-            echo "Did not find `report.md` file."
+            echo "Did not find ${REPORT_MD} file."
           fi
 
       - name: exit
