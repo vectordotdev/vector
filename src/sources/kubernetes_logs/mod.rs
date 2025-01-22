@@ -996,7 +996,7 @@ fn create_event(
 
     let legacy_offset_key = meta.offset_key.as_ref().map(LegacyKey::Overwrite);
     log_namespace.insert_source_metadata(
-        FileConfig::NAME,
+        Config::NAME,
         &mut event,
         legacy_offset_key,
         path!("offset"),
