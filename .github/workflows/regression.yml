@@ -551,11 +551,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: capture-artifacts
-          path: artifacts
+          path: downloads
 
       - name: Display Markdown Summary
         run: |
-          unzip artifacts/capture-artifacts.zip -d results
+          unzip downloads/capture-artifacts -d results
           REPORT_MD=results/report.md
           if [ -f ${REPORT_MD} ]; then
             cat ${REPORT_MD} >> $GITHUB_STEP_SUMMARY
