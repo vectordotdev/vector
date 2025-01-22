@@ -3,7 +3,7 @@ title: Keep
 description: Deliver log events to [Keep](https://www.keephq.dev)
 component_kind: sink
 layout: component
-tags: ["keep", "component", "sink", "logs", "metrics"]
+tags: ["keep", "component", "sink", "logs"]
 ---
 
 {{/*

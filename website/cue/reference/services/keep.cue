@@ -2,7 +2,7 @@ package metadata
 
 services: keep: {
 	name:     "Keep"
-	thing:    "\(name)"
+	thing:    "\(name) alerts"
 	url:      urls.keep
 	versions: null
 
