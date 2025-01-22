@@ -994,9 +994,14 @@ fn create_event(
         file,
     );
 
-    if let Some(offset_key) = offset_key {
-        log.try_insert(offset_key, offset);
-    }
+    let legacy_offset_key = meta.offset_key.as_ref().map(LegacyKey::Overwrite);
+    log_namespace.insert_source_metadata(
+        FileConfig::NAME,
+        &mut event,
+        legacy_offset_key,
+        path!("offset"),
+        offset,
+    );
 
     log_namespace.insert_vector_metadata(
         &mut log,
