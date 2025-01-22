@@ -594,21 +594,25 @@ downloader() {
     if [ "$1" = --check ]; then
         need_cmd "$_dld"
     elif [ "$_dld" = curl ]; then
-        check_curl_for_retry_support
-        _retry="$RETVAL"
+        if check_curl_for_retry_support; then
+          _retry=(--retry 3)
+        else
+          _retry=()
+        fi
+
         get_ciphersuites_for_curl
         _ciphersuites="$RETVAL"
         if [ -n "$_ciphersuites" ]; then
-            _err=$(curl "$_retry" --proto '=https' --tlsv1.2 --ciphers "$_ciphersuites" --silent --show-error --fail --location "$1" --output "$2" 2>&1)
+            _err=$(curl "${_retry[@]}" --proto '=https' --tlsv1.2 --ciphers "$_ciphersuites" --silent --show-error --fail --location "$1" --output "$2" 2>&1)
             _status=$?
         else
             echo "Warning: Not enforcing strong cipher suites for TLS, this is potentially less secure"
             if ! check_help_for "$3" curl --proto --tlsv1.2; then
                 echo "Warning: Not enforcing TLS v1.2, this is potentially less secure"
-                _err=$(curl "$_retry" --silent --show-error --fail --location "$1" --output "$2" 2>&1)
+                _err=$(curl "${_retry[@]}" --silent --show-error --fail --location "$1" --output "$2" 2>&1)
                 _status=$?
             else
-                _err=$(curl "$_retry" --proto '=https' --tlsv1.2 --silent --show-error --fail --location "$1" --output "$2" 2>&1)
+                _err=$(curl "${_retry[@]}" --proto '=https' --tlsv1.2 --silent --show-error --fail --location "$1" --output "$2" 2>&1)
                 _status=$?
             fi
         fi
@@ -707,16 +711,14 @@ check_help_for() {
     true # not strictly needed
 }
 
-# Check if curl supports the --retry flag, then pass it to the curl invocation.
+# Check if curl supports the --retry flag
 check_curl_for_retry_support() {
-  local _retry_supported=""
-  # "unspecified" is for arch, allows for possibility old OS using macports, homebrew, etc.
+  # Check if curl supports the --retry flag
   if check_help_for "notspecified" "curl" "--retry"; then
-    _retry_supported="--retry 3"
+    return 0  # Return true (success)
+  else
+    return 1  # Return false (failure)
   fi
-
-  RETVAL="$_retry_supported"
-
 }
 
 # Return cipher suite string specified by user, otherwise return strong TLS 1.2-1.3 cipher suites
