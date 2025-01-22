@@ -7,6 +7,7 @@ Airis
 Airpad
 Alcatel
 Alexey
+alertmanager
 Alibaba
 Allfine
 Allview
@@ -361,6 +362,7 @@ jsontag
 jvm
 kenton
 keepappkey
+keephq
 konqueror
 kube
 kubeadm
