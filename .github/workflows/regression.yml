@@ -547,6 +547,22 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
+      - name: Download capture-artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: capture-artifacts
+          path: artifacts
+
+      - name: Display Markdown Summary
+        run: |
+          unzip artifacts/capture-artifacts.zip -d results
+          REPORT_MD=results/report.md
+          if [ -f ${REPORT_MD} ]; then
+            cat ${REPORT_MD} >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Did not find `report.md` file."
+          fi
+
       - name: exit
         run: |
           echo "failed=${{ env.FAILED }}"
