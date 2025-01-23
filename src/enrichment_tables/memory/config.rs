@@ -80,7 +80,7 @@ const fn default_ttl() -> u64 {
 }
 
 const fn default_scan_interval() -> NonZeroU64 {
-    NonZeroU64::new(30).unwrap()
+    unsafe { NonZeroU64::new_unchecked(30) }
 }
 
 impl MemoryConfig {
