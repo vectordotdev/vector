@@ -94,14 +94,12 @@ impl Filter<LogEvent> for EventFilter {
             Field::Reserved(field) if field == "tags" => {
                 any_string_match_multiple(vec!["ddtags", "tags"], move |value| value == field)
             }
-            Field::Default(f) | Field::Attribute(f) | Field::Reserved(f) => {
-                Run::boxed(move |log: &LogEvent| {
-                    log.parse_path_and_get_value(f.as_str())
-                        .ok()
-                        .flatten()
-                        .is_some()
-                })
+            // A literal "source" field should string match in "source" and "ddsource" fields (OR condition).
+            Field::Reserved(field) if field == "source" => {
+                exists_match_multiple(vec!["ddsource", "source"])
             }
+
+            Field::Default(f) | Field::Attribute(f) | Field::Reserved(f) => exists_match(f),
         })
     }
 
@@ -132,6 +130,12 @@ impl Filter<LogEvent> for EventFilter {
                 array_match_multiple(vec!["ddtags", "tags"], move |values| {
                     values.contains(&value_bytes)
                 })
+            }
+            // A literal "source" field should string match in "source" and "ddsource" fields (OR condition).
+            Field::Reserved(field) if field == "source" => {
+                let to_match = to_match.to_owned();
+
+                string_match_multiple(vec!["ddsource", "source"], move |value| value == to_match)
             }
             // Reserved values are matched by string equality.
             Field::Reserved(field) => {
@@ -168,6 +172,15 @@ impl Filter<LogEvent> for EventFilter {
                     value.starts_with(&starts_with)
                 })
             }
+            // A literal "source" field should string match in "source" and "ddsource" fields (OR condition).
+            Field::Reserved(field) if field == "source" => {
+                let prefix = prefix.to_owned();
+
+                string_match_multiple(vec!["ddsource", "source"], move |value| {
+                    value.starts_with(&prefix)
+                })
+            }
+
             // All other field types are compared by complete value.
             Field::Reserved(field) | Field::Attribute(field) => {
                 let prefix = prefix.to_owned();
@@ -192,6 +205,12 @@ impl Filter<LogEvent> for EventFilter {
                 let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
 
                 any_string_match_multiple(vec!["ddtags", "tags"], move |value| re.is_match(&value))
+            }
+            // A literal "source" field should string match in "source" and "ddsource" fields (OR condition).
+            Field::Reserved(field) if field == "source" => {
+                let re = wildcard_regex(wildcard);
+
+                string_match_multiple(vec!["ddsource", "source"], move |value| re.is_match(&value))
             }
             Field::Reserved(field) | Field::Attribute(field) => {
                 let re = wildcard_regex(wildcard);
@@ -296,6 +315,15 @@ impl Filter<LogEvent> for EventFilter {
                     _ => false,
                 }
             }),
+            // A literal "source" field should string match in "source" and "ddsource" fields (OR condition).
+            Field::Reserved(field) if field == "source" => {
+                string_match_multiple(vec!["ddsource", "source"], move |lhs| match comparator {
+                    Comparison::Lt => lhs < rhs,
+                    Comparison::Lte => lhs <= rhs,
+                    Comparison::Gt => lhs > rhs,
+                    Comparison::Gte => lhs >= rhs,
+                })
+            }
             // All other tag types are compared by string.
             Field::Default(field) | Field::Reserved(field) => {
                 string_match(field, move |lhs| match comparator {
@@ -307,6 +335,21 @@ impl Filter<LogEvent> for EventFilter {
             }
         })
     }
+}
+
+// Returns a `Matcher` that returns true if the field exists.
+fn exists_match<S>(field: S) -> Box<dyn Matcher<LogEvent>>
+where
+    S: Into<String>,
+{
+    let field = field.into();
+
+    Run::boxed(move |log: &LogEvent| {
+        log.parse_path_and_get_value(field.as_str())
+            .ok()
+            .flatten()
+            .is_some()
+    })
 }
 
 /// Returns a `Matcher` that returns true if the field resolves to a string,
@@ -346,8 +389,32 @@ where
     })
 }
 
-/// Returns a `Matcher` that returns true if any provided field of log event resolves to an array of strings,
-/// where at least one string matches the provided `func`.
+// Returns a `Matcher` that returns true if any provided field exists.
+fn exists_match_multiple<S>(fields: Vec<S>) -> Box<dyn Matcher<LogEvent>>
+where
+    S: Into<String> + Clone + Send + Sync + 'static,
+{
+    Run::boxed(move |log: &LogEvent| {
+        fields
+            .iter()
+            .any(|field| exists_match(field.clone()).run(log))
+    })
+}
+
+/// Returns a `Matcher` that returns true if any provided field resolves to a string which
+/// matches the provided `func`.
+fn string_match_multiple<S, F>(fields: Vec<S>, func: F) -> Box<dyn Matcher<LogEvent>>
+where
+    S: Into<String> + Clone + Send + Sync + 'static,
+    F: Fn(Cow<str>) -> bool + Send + Sync + Clone + 'static,
+{
+    Run::boxed(move |log: &LogEvent| {
+        fields
+            .iter()
+            .any(|field| string_match(field.clone(), func.clone()).run(log))
+    })
+}
+
 fn any_string_match_multiple<S, F>(fields: Vec<S>, func: F) -> Box<dyn Matcher<LogEvent>>
 where
     S: Into<String> + Clone + Send + Sync + 'static,
@@ -1452,6 +1519,55 @@ mod test {
                 "-tags:a",
                 log_event!["ddtags" => vec!["d", "e", "f"]],
                 log_event!["ddtags" => vec!["a", "b", "c"]],
+            ),
+            // Special case: 'source' looks up on 'source' and 'ddsource' (OR condition)
+            // source
+            (
+                "source:foo",
+                log_event!["source" => "foo"],
+                log_event!["tags" => vec!["source:foo"]],
+            ),
+            (
+                "source:foo",
+                log_event!["source" => "foo"],
+                log_event!["source" => "foobar"],
+            ),
+            (
+                "source:foo",
+                log_event!["source" => "foo"],
+                log_event!["source" => r#"{"value": "foo"}"#],
+            ),
+            // ddsource
+            (
+                "source:foo",
+                log_event!["ddsource" => "foo"],
+                log_event!["tags" => vec!["ddsource:foo"]],
+            ),
+            (
+                "source:foo",
+                log_event!["ddsource" => "foo"],
+                log_event!["ddsource" => "foobar"],
+            ),
+            (
+                "source:foo",
+                log_event!["ddsource" => "foo"],
+                log_event!["ddsource" => r#"{"value": "foo"}"#],
+            ),
+            // both source and ddsource
+            (
+                "source:foo",
+                log_event!["source" => "foo", "ddsource" => "foo"],
+                log_event!["source" => "foobar", "ddsource" => "foobar"],
+            ),
+            (
+                "source:foo",
+                log_event!["source" => "foo", "ddsource" => "foobar"],
+                log_event!["source" => "foobar", "ddsource" => "foobar"],
+            ),
+            (
+                "source:foo",
+                log_event!["source" => "foobar", "ddsource" => "foo"],
+                log_event!["source" => "foobar", "ddsource" => "foobar"],
             ),
         ]
     }
