@@ -330,8 +330,23 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
         assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
-        kms_key: Some(create_kms_client_test().await.create_key().send().await.unwrap().key_metadata().unwrap().key_id().parse().unwrap()),
-        tags: Some(HashMap::from_iter(vec![("key".to_string(), "value".to_string())])),
+        kms_key: Some(
+            create_kms_client_test()
+                .await
+                .create_key()
+                .send()
+                .await
+                .unwrap()
+                .key_metadata()
+                .unwrap()
+                .key_id()
+                .parse()
+                .unwrap(),
+        ),
+        tags: Some(HashMap::from_iter(vec![(
+            "key".to_string(),
+            "value".to_string(),
+        )])),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -375,19 +390,6 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
 
     let kms_key = log_group.kms_key_id().unwrap();
     assert_eq!(kms_key, config.kms_key.unwrap());
-
-    // TODO: tags are not returned properly - investigate
-    /*let tags = create_client_test()
-        .await
-        .list_tags_for_resource()
-        .resource_arn(log_group.arn().unwrap())
-        .send()
-        .await
-        .unwrap()
-        .tags()
-        .unwrap()
-        .clone();
-    assert_eq!(tags, config.tags.unwrap());*/
 }
 
 #[tokio::test]
@@ -607,8 +609,8 @@ async fn create_kms_client_test() -> KMSClient {
         None,
         None,
     )
-        .await
-        .unwrap()
+    .await
+    .unwrap()
 }
 
 async fn ensure_group() {

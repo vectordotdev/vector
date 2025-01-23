@@ -1,9 +1,3 @@
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{ready, Context, Poll},
-};
-use std::collections::HashMap;
 use aws_sdk_cloudwatchlogs::{
     operation::{
         create_log_group::CreateLogGroupError,
@@ -19,6 +13,12 @@ use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkErro
 use futures::{future::BoxFuture, FutureExt};
 use http::{header::HeaderName, HeaderValue};
 use indexmap::IndexMap;
+use std::collections::HashMap;
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{ready, Context, Poll},
+};
 use tokio::sync::oneshot;
 
 use crate::sinks::aws_cloudwatch_logs::config::Retention;
@@ -79,7 +79,7 @@ impl CloudwatchFuture {
             headers,
             retention_days,
             kms_key,
-            tags
+            tags,
         };
 
         let state = if let Some(token) = token {
