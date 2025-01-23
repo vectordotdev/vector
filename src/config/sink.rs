@@ -65,11 +65,11 @@ where
     /// This must be a valid URI, which requires at least the scheme and host. All other
     /// components -- port, path, etc -- are allowed as well.
     #[configurable(deprecated, metadata(docs::hidden), validation(format = "uri"))]
-    healthcheck_uri: Option<UriSerde>,
+    pub healthcheck_uri: Option<UriSerde>,
 
     #[configurable(derived, metadata(docs::advanced))]
     #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
-    healthcheck: SinkHealthcheckOptions,
+    pub healthcheck: SinkHealthcheckOptions,
 
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
@@ -77,7 +77,7 @@ where
 
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
-    proxy: ProxyConfig,
+    pub proxy: ProxyConfig,
 
     #[serde(flatten)]
     #[configurable(metadata(docs::hidden))]

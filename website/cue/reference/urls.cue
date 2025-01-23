@@ -560,6 +560,8 @@ urls: {
 	vector_download:                            "/releases/latest/download/"
 	vector_download_nightly:                    "/releases/nightly/download/"
 	vector_enriching_transforms:                "/components/?functions%5B%5D=enrich"
+	vector_enrichment_memory:                   "/docs/reference/configuration/global-options/#enrichment_tables.memory"
+	vector_enrichment_memory_how_it_works:      "/docs/reference/configuration/#memory-enrichment-table"
 	vector_file_source:                         "/docs/reference/configuration/sources/file/"
 	vector_exec_source:                         "/docs/reference/configuration/sources/exec"
 	vector_file_source:                         "/docs/reference/configuration/sources/file/"
