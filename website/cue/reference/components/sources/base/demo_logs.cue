@@ -190,14 +190,23 @@ base: components: sources: demo_logs: configuration: {
 				required:      false
 				type: object: options: {
 					desc_file: {
-						description: "Path to desc file"
-						required:    false
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
+																"""
+						required: false
 						type: string: default: ""
 					}
 					message_type: {
-						description: "message type. e.g package.message"
+						description: "The name of the message type to use for serializing."
 						required:    false
-						type: string: default: ""
+						type: string: {
+							default: ""
+							examples: ["package.Message"]
+						}
 					}
 				}
 			}
