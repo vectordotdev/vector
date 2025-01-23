@@ -36,7 +36,7 @@ ordered-float = { version = "4.6.0", default-features = false }
 openssl = { version = "0.10.68", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.3", default-features = false }
 pin-project.workspace = true
-proptest = { version = "1.5", optional = true }
+proptest = { version = "1.6", optional = true }
 prost-types.workspace = true
 prost .workspace = true
 quanta = { version = "0.12.5", default-features = false }
@@ -81,7 +81,7 @@ criterion = { version = "0.5.1", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1"
 quickcheck_macros = "1"
-proptest = "1.5"
+proptest = "1.6"
 similar-asserts = "1.6.1"
 tokio-test = "0.4.4"
 toml.workspace = true
