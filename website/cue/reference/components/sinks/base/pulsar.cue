@@ -14,7 +14,7 @@ base: components: sinks: pulsar: configuration: {
 			description: """
 				Whether or not end-to-end acknowledgements are enabled.
 
-				When enabled for a sink, any source connected to that sink, where the source supports
+				When enabled for a sink, any source connected to that sink where the source supports
 				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
 				connected** sinks before acknowledging them at the source.
 
@@ -477,7 +477,9 @@ base: components: sinks: pulsar: configuration: {
 						description: """
 																The path to the protobuf descriptor set file.
 
-																This file is the output of `protoc -o <path> ...`
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
 																"""
 						required: true
 						type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
@@ -538,6 +540,35 @@ base: components: sinks: pulsar: configuration: {
 			"""
 		required: false
 		type: string: {}
+	}
+	tls: {
+		description: "TLS options configuration for the Pulsar client."
+		required:    false
+		type: object: options: {
+			ca_file: {
+				description: "File path containing a list of PEM encoded certificates."
+				required:    true
+				type: string: examples: ["/etc/certs/chain.pem"]
+			}
+			verify_certificate: {
+				description: """
+					Enables certificate verification.
+
+					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+					"""
+				required: false
+				type: bool: {}
+			}
+			verify_hostname: {
+				description: """
+					Whether hostname verification is enabled when verify_certificate is false.
+
+					Set to true if not specified.
+					"""
+				required: false
+				type: bool: {}
+			}
+		}
 	}
 	topic: {
 		description: "The Pulsar topic name to write events to."

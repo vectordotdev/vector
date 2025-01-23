@@ -144,7 +144,7 @@ a fixed concurrency limit.",
 
         let mut adaptive_schema = generate_const_string_schema("adaptive".to_string());
         let mut adaptive_metadata = Metadata::with_title(
-            "Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.",
+            "Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.",
         );
         adaptive_metadata
             .set_description("[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/");

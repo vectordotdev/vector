@@ -476,6 +476,12 @@ otel
 otelcol
 siv
 onig
+aviv
+dammam
+doha
+mumbai
+paulo
+turin
 AIXM
 AUTOSAR
 CDMA
@@ -509,3 +515,5 @@ teledisk
 UMTS
 WCDMA
 XMODEM
+cbor
+requestline
