@@ -166,12 +166,21 @@ pub struct CloudwatchLogsSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
+    /// The ARN of the [KMS key][kms_key] to use when encrypting log data.
+    ///
+    /// [kms_key]: https://docs.aws.amazon.com/kms/latest/developerguide/overview.html
     #[configurable(derived)]
     #[serde(default)]
     pub kms_key: Option<String>,
 
+    /// The Key-value pairs to be applied as [tags][tags] to the log group and stream.
+    ///
+    /// [tags]: https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/what-are-tags.html
     #[configurable(derived)]
     #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "A tag represented as a key-value pair"
+    ))]
     pub tags: Option<HashMap<String, String>>,
 }
 

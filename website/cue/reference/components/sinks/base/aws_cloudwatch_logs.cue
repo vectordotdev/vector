@@ -590,6 +590,15 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 			syntax: "template"
 		}
 	}
+	kms_key: {
+		description: """
+			The ARN of the [KMS key][kms_key] to use when encrypting log data.
+
+			[kms_key]: https://docs.aws.amazon.com/kms/latest/developerguide/overview.html
+			"""
+		required: false
+		type: string: {}
+	}
 	region: {
 		description: """
 			The [AWS region][aws_region] of the target service.
@@ -824,6 +833,19 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 		type: string: {
 			examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]
 			syntax: "template"
+		}
+	}
+	tags: {
+		description: """
+			The Key-value pairs to be applied as [tags][tags] to the log group and stream.
+
+			[tags]: https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/what-are-tags.html
+			"""
+		required: false
+		type: object: options: "*": {
+			description: "A tag represented as a key-value pair"
+			required:    true
+			type: string: {}
 		}
 	}
 	tls: {
