@@ -799,7 +799,8 @@ sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build", "dep:prost"]
 sinks-websocket = ["dep:tokio-tungstenite"]
-sinks-websocket-server = ["dep:tokio-tungstenite"]
+sinks-websocket-server = ["dep:tokio-tungstenite", "sources-utils-http-auth",
+"sources-utils-http-error", "sources-utils-http-prelude"]
 sinks-webhdfs = ["dep:opendal"]
 
 # Identifies that the build is a nightly build
