@@ -1,7 +1,7 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, num::NonZeroUsize};
 
-use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
+use vector_lib::{codecs::JsonSerializerConfig, lookup::lookup_v2::ConfigValuePath};
 
 use crate::{
     codecs::EncodingConfig,
@@ -42,6 +42,9 @@ pub struct WebSocketListenerSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 
     #[configurable(derived)]
+    pub message_buffering: Option<MessageBuffering>,
+
+    #[configurable(derived)]
     pub auth: Option<HttpServerAuthConfig>,
 }
 
@@ -52,9 +55,27 @@ impl Default for WebSocketListenerSinkConfig {
             encoding: JsonSerializerConfig::default().into(),
             tls: None,
             acknowledgements: Default::default(),
+            message_buffering: None,
             auth: None,
         }
     }
+}
+
+/// Message buffering
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct MessageBuffering {
+    /// Max events
+    #[serde(default = "default_max_events")]
+    pub max_events: NonZeroUsize,
+
+    /// Message id path
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub message_id_path: Option<ConfigValuePath>,
+}
+
+const fn default_max_events() -> NonZeroUsize {
+    unsafe { NonZeroUsize::new_unchecked(1000) }
 }
 
 #[async_trait::async_trait]

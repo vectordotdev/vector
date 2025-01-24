@@ -427,6 +427,22 @@ base: components: sinks: websocket_server: configuration: {
 			}
 		}
 	}
+	message_buffering: {
+		description: "Message buffering"
+		required:    false
+		type: object: options: {
+			max_events: {
+				description: "Max events"
+				required:    false
+				type: uint: default: 1000
+			}
+			message_id_path: {
+				description: "Message id path"
+				required:    false
+				type: string: {}
+			}
+		}
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
