@@ -3,7 +3,7 @@ use crate::enrichment_tables::memory::internal_events::{
     MemoryEnrichmentTableRead, MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
 };
 use crate::enrichment_tables::memory::MemoryConfig;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use evmap::shallow_copy::CopyValue;
@@ -103,7 +103,7 @@ impl Memory {
             .get_or(|| self.read_handle_factory.handle())
     }
 
-    fn handle_value(&mut self, value: ObjectMap) {
+    fn handle_value(&self, value: ObjectMap) {
         let mut writer = self.write_handle.lock().expect("mutex poisoned");
         let now = Instant::now();
 
@@ -148,12 +148,11 @@ impl Memory {
         }
 
         if self.config.flush_interval.is_none() {
-            writer.write_handle.refresh();
+            self.flush(writer);
         }
     }
 
-    fn scan_and_mark_for_deletion(&mut self) -> bool {
-        let mut writer = self.write_handle.lock().expect("mutex poisoned");
+    fn scan_and_mark_for_deletion(&self, writer: &mut MutexGuard<'_, MemoryWriter>) -> bool {
         let now = Instant::now();
 
         let mut needs_flush = false;
@@ -180,16 +179,14 @@ impl Memory {
         needs_flush
     }
 
-    fn scan(&mut self) {
-        let needs_flush = self.scan_and_mark_for_deletion();
+    fn scan(&self, mut writer: MutexGuard<'_, MemoryWriter>) {
+        let needs_flush = self.scan_and_mark_for_deletion(&mut writer);
         if needs_flush {
-            self.flush();
+            self.flush(writer);
         }
     }
 
-    fn flush(&mut self) {
-        let mut writer = self.write_handle.lock().expect("mutex poisoned");
-
+    fn flush(&self, mut writer: MutexGuard<'_, MemoryWriter>) {
         writer.write_handle.refresh();
         if let Some(reader) = self.get_read_handle().read() {
             let mut byte_size = 0;
@@ -332,11 +329,13 @@ impl StreamSink<Event> for Memory {
                 }
 
                 Some(_) = flush_interval.next() => {
-                    self.flush();
+                    let writer = self.write_handle.lock().expect("mutex poisoned");
+                    self.flush(writer);
                 }
 
                 Some(_) = scan_interval.next() => {
-                    self.scan();
+                    let writer = self.write_handle.lock().expect("mutex poisoned");
+                    self.scan(writer);
                 }
             }
         }
@@ -366,7 +365,7 @@ mod tests {
 
     #[test]
     fn finds_row() {
-        let mut memory = Memory::new(Default::default());
+        let memory = Memory::new(Default::default());
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
         let condition = Condition::Equals {
@@ -419,7 +418,7 @@ mod tests {
     #[test]
     fn removes_expired_records_on_scan_interval() {
         let ttl = 100;
-        let mut memory = Memory::new(build_memory_config(|c| {
+        let memory = Memory::new(build_memory_config(|c| {
             c.ttl = ttl;
         }));
         {
@@ -449,7 +448,8 @@ mod tests {
         );
 
         // Force scan
-        memory.scan();
+        let writer = memory.write_handle.lock().unwrap();
+        memory.scan(writer);
 
         // The value is not present anymore
         assert!(memory
@@ -462,7 +462,7 @@ mod tests {
     #[test]
     fn does_not_show_values_before_flush_interval() {
         let ttl = 100;
-        let mut memory = Memory::new(build_memory_config(|c| {
+        let memory = Memory::new(build_memory_config(|c| {
             c.ttl = ttl;
             c.flush_interval = Some(10);
         }));
@@ -483,7 +483,7 @@ mod tests {
     #[test]
     fn updates_ttl_on_value_replacement() {
         let ttl = 100;
-        let mut memory = Memory::new(build_memory_config(|c| c.ttl = ttl));
+        let memory = Memory::new(build_memory_config(|c| c.ttl = ttl));
         {
             let mut handle = memory.write_handle.lock().unwrap();
             handle.write_handle.update(
@@ -523,7 +523,7 @@ mod tests {
 
     #[test]
     fn ignores_all_values_over_byte_size_limit() {
-        let mut memory = Memory::new(build_memory_config(|c| {
+        let memory = Memory::new(build_memory_config(|c| {
             c.max_byte_size = Some(1);
         }));
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
@@ -543,7 +543,7 @@ mod tests {
     #[test]
     fn ignores_values_when_byte_size_limit_is_reached() {
         let ttl = 100;
-        let mut memory = Memory::new(build_memory_config(|c| {
+        let memory = Memory::new(build_memory_config(|c| {
             c.ttl = ttl;
             c.max_byte_size = Some(150);
         }));
