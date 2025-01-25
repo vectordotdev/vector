@@ -10,7 +10,7 @@ use snafu::ResultExt;
 use std::{collections::HashMap, time::Duration};
 use tokio_util::codec::Decoder as _;
 
-use crate::http::QueryParameters;
+use crate::http::{QueryParameterValue, QueryParameters};
 use crate::sources::util::http_client;
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -123,12 +123,19 @@ const fn default_http_method() -> HttpMethod {
     HttpMethod::Get
 }
 
-fn query_examples() -> HashMap<String, Vec<String>> {
+fn query_examples() -> QueryParameters {
     HashMap::<_, _>::from_iter([
-        ("field".to_owned(), vec!["value".to_owned()]),
+        (
+            "field".to_owned(),
+            QueryParameterValue::SingleParam("value".to_owned()),
+        ),
         (
             "fruit".to_owned(),
-            vec!["mango".to_owned(), "papaya".to_owned(), "kiwi".to_owned()],
+            QueryParameterValue::MultiParams(vec![
+                "mango".to_owned(),
+                "papaya".to_owned(),
+                "kiwi".to_owned(),
+            ]),
         ),
     ])
 }
