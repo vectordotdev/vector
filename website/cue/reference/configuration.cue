@@ -99,6 +99,7 @@ configuration: {
 
 				* [CSV](\(urls.csv)) files
 				* [MaxMind](\(urls.maxmind)) databases
+				* In-memory storage
 
 				For the lookup in the enrichment tables to be as performant as possible, the data is indexed according
 				to the fields that are used in the search. Note that indices can only be created for fields for which an
@@ -116,9 +117,10 @@ configuration: {
 					required: true
 					type: string: {
 						enum: {
-							"file":  "Enrich data from a CSV file."
-							"geoip": "Enrich data from a [GeoIp](\(urls.maxmind_geoip2)) [MaxMind](\(urls.maxmind)) database."
-							"mmdb":  "Enrich data from any [MaxMind](\(urls.maxmind)) database."
+							"file":   "Enrich data from a CSV file."
+							"geoip":  "Enrich data from a [GeoIp](\(urls.maxmind_geoip2)) [MaxMind](\(urls.maxmind)) database."
+							"mmdb":   "Enrich data from any [MaxMind](\(urls.maxmind)) database."
+							"memory": "Enrich data from memory, which can be populated by using the table as a sink."
 						}
 					}
 				}
@@ -272,6 +274,93 @@ configuration: {
 							required: true
 							type: string: {
 								examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
+							}
+						}
+					}
+				}
+			}
+			type: object: options: {
+				memory: {
+					required:    true
+					description: """
+						Configuration options for in-memory enrichment table.
+
+						This enrichment table only supports lookup with key field.
+
+						To write data into this table, you have to define inputs to use this the table as a sink.
+						They are expected to produce objects, where each key-value pair is stored as a separate
+						record in the table. [Read more on how to use this component](\(urls.vector_enrichment_memory_how_it_works)).
+						"""
+					type: object: options: {
+						inputs: base.components.sinks.configuration.inputs
+						ttl: {
+							description: """
+								TTL (time-to-live in seconds) is used to limit the lifetime of data stored in the cache.
+								When TTL expires, data behind a specific key in the cache is removed.
+								TTL is reset when the key is replaced.
+								"""
+							required: false
+							type: uint: {
+								default: 600
+								examples: [3600, 21600]
+							}
+						}
+						scan_interval: {
+							description: """
+								The scan interval used to look for expired records. This is provided
+								as an optimization to ensure that TTL is updated, but without doing
+								too many cache scans.
+								"""
+							required: false
+							type: uint: {
+								default: 30
+								examples: [600, 60]
+							}
+						}
+						flush_interval: {
+							description: """
+								The interval used for making writes visible in the table.
+								Longer intervals might get better performance,
+								but there is a longer delay before the data is visible in the table.
+								Since every TTL scan makes its changes visible, only use this value
+								if it is shorter than the `scan_interval`.
+
+								By default, all writes are made visible immediately.
+								"""
+							required: false
+							type: uint: {
+								default: 0
+								examples: [15, 30]
+							}
+						}
+						max_byte_size: {
+							description: """
+								Maximum size of the table in bytes. All insertions that make this table bigger than the maximum size are rejected.
+
+								By default, there is no size limit.
+								"""
+							required: false
+							type: uint: {
+								default: 0
+								examples: [64000, 1000000000]
+							}
+						}
+						internal_metrics: {
+							description: """
+								Configuration of internal metrics for enrichment memory table.
+								"""
+							required: false
+							type: object: options: {
+								include_key_tag: {
+									description: """
+										Determines whether to include the key tag on internal metrics.
+
+										This is useful for distinguishing between different keys while monitoring. However, the tag's
+										cardinality is unbounded.
+										"""
+									required: false
+									type: bool: default: false
+								}
 							}
 						}
 					}
