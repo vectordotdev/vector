@@ -594,8 +594,9 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 	}
 	kms_key: {
 		description: """
-			The ARN of the [KMS key][kms_key] to use when encrypting log data.
+			The [ARN][arn] (Amazon Resource Name) of the [KMS key][kms_key] to use when encrypting log data.
 
+			[arn]: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html
 			[kms_key]: https://docs.aws.amazon.com/kms/latest/developerguide/overview.html
 			"""
 		required: false
