@@ -17,6 +17,7 @@ use crate::stats;
 
 #[pin_project]
 pub(crate) struct Utilization<S> {
+    intervals: IntervalStream,
     timer_tx: UnboundedSender<UtilizationTimerMessage>,
     component_key: ComponentKey,
     inner: S,
@@ -58,6 +59,7 @@ where
         {
             debug!(component_id = ?this.component_key, "Couldn't send utilization start wait message from wrapped stream.");
         }
+        let _ = this.intervals.poll_next_unpin(cx);
         let result = ready!(this.inner.poll_next_unpin(cx));
         if this
             .timer_tx
@@ -228,6 +230,7 @@ pub(crate) fn wrap<S>(
     inner: S,
 ) -> Utilization<S> {
     Utilization {
+        intervals: IntervalStream::new(interval(Duration::from_secs(5))),
         timer_tx,
         component_key,
         inner,
