@@ -1,5 +1,5 @@
 name: Feature
-type: 'Bug'
+type: 'Feature'
 description: 🚀 Suggest a new feature.
 labels:
 - 'type: feature'
