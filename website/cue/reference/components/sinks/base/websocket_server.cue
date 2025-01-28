@@ -31,7 +31,7 @@ base: components: sinks: websocket_server: configuration: {
 		description: """
 			The socket address to listen for connections on.
 
-			It _must_ include a port.
+			This value _must_ include a port.
 			"""
 		required: true
 		type: string: examples: ["0.0.0.0:80", "localhost:80"]
