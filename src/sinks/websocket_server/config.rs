@@ -22,7 +22,7 @@ use super::sink::WebSocketListenerSink;
 pub struct WebSocketListenerSinkConfig {
     /// The socket address to listen for connections on.
     ///
-    /// It _must_ include a port.
+    /// This value _must_ include a port.
     #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
     #[configurable(metadata(docs::examples = "localhost:80"))]
     pub address: SocketAddr,
