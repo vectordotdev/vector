@@ -162,7 +162,126 @@ pub(super) async fn healthcheck(channel: Arc<lapin::Channel>) -> crate::Result<(
     Ok(())
 }
 
-#[test]
-pub fn generate_config() {
-    crate::test_util::test_generate_config::<AmqpSinkConfig>();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::format::{deserialize, Format};
+
+    #[test]
+    pub fn generate_config() {
+        crate::test_util::test_generate_config::<AmqpSinkConfig>();
+    }
+
+    fn assert_config_priority_eq(config: AmqpSinkConfig, event: &LogEvent, priority: u8) {
+        assert_eq!(
+            config
+                .properties
+                .unwrap()
+                .priority
+                .unwrap()
+                .render_string(event)
+                .unwrap(),
+            priority.to_string()
+        );
+    }
+
+    #[test]
+    pub fn parse_config_priority_static() {
+        for (format, config) in [
+            (
+                Format::Yaml,
+                r#"
+            exchange: "test"
+            routing_key: "user_id"
+            encoding:
+                codec: "json"
+            connection_string: "amqp://user:password@127.0.0.1:5672/"
+            properties:
+                priority: 1
+            "#,
+            ),
+            (
+                Format::Toml,
+                r#"
+            exchange = "test"
+            routing_key = "user_id"
+            encoding.codec = "json"
+            connection_string = "amqp://user:password@127.0.0.1:5672/"
+            properties = { priority = 1 }
+            "#,
+            ),
+            (
+                Format::Json,
+                r#"
+            {
+                "exchange": "test",
+                "routing_key": "user_id",
+                "encoding": {
+                    "codec": "json"
+                },
+                "connection_string": "amqp://user:password@127.0.0.1:5672/",
+                "properties": {
+                    "priority": 1
+                }
+            }
+            "#,
+            ),
+        ] {
+            let config: AmqpSinkConfig = deserialize(&config, format).unwrap();
+            let event = LogEvent::from_str_legacy("message");
+            assert_config_priority_eq(config, &event, 1);
+        }
+    }
+
+    #[test]
+    pub fn parse_config_priority_templated() {
+        for (format, config) in [
+            (
+                Format::Yaml,
+                r#"
+            exchange: "test"
+            routing_key: "user_id"
+            encoding:
+                codec: "json"
+            connection_string: "amqp://user:password@127.0.0.1:5672/"
+            properties:
+                priority: "{{ .priority }}"
+            "#,
+            ),
+            (
+                Format::Toml,
+                r#"
+            exchange = "test"
+            routing_key = "user_id"
+            encoding.codec = "json"
+            connection_string = "amqp://user:password@127.0.0.1:5672/"
+            properties = { priority = "{{ .priority }}" }
+            "#,
+            ),
+            (
+                Format::Json,
+                r#"
+            {
+                "exchange": "test",
+                "routing_key": "user_id",
+                "encoding": {
+                    "codec": "json"
+                },
+                "connection_string": "amqp://user:password@127.0.0.1:5672/",
+                "properties": {
+                    "priority": "{{ .priority }}"
+                }
+            }
+            "#,
+            ),
+        ] {
+            let config: AmqpSinkConfig = deserialize(&config, format).unwrap();
+            let event = {
+                let mut event = LogEvent::from_str_legacy("message");
+                event.insert("priority", 2);
+                event
+            };
+            assert_config_priority_eq(config, &event, 2);
+        }
+    }
 }

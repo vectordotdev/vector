@@ -456,11 +456,28 @@ mod tests {
             .unwrap();
         let f3 = Template::try_from("nofield").unwrap().get_fields();
         let f4 = Template::try_from("%F").unwrap().get_fields();
+        let f5 = Template::try_from(TemplateSource::String("{{ foo }}".to_string()))
+            .unwrap()
+            .get_fields()
+            .unwrap();
+        let f6 = Template::try_from(TemplateSource::SignedNumber(123))
+            .unwrap()
+            .get_fields();
+        let f7 = Template::try_from(TemplateSource::UnsignedNumber(123))
+            .unwrap()
+            .get_fields();
+        let f8 = Template::try_from(TemplateSource::FloatingPointNumber(123.123))
+            .unwrap()
+            .get_fields();
 
         assert_eq!(f1, vec!["foo"]);
         assert_eq!(f2, vec!["foo", "bar"]);
         assert_eq!(f3, None);
         assert_eq!(f4, None);
+        assert_eq!(f5, vec!["foo"]);
+        assert_eq!(f6, None);
+        assert_eq!(f7, None);
+        assert_eq!(f8, None);
     }
 
     #[test]
@@ -473,6 +490,17 @@ mod tests {
         assert!(Template::try_from("/kube-demo/{{ foo }}/%F")
             .unwrap()
             .is_dynamic());
+        assert!(!Template::try_from(TemplateSource::SignedNumber(123))
+            .unwrap()
+            .is_dynamic());
+        assert!(!Template::try_from(TemplateSource::UnsignedNumber(123))
+            .unwrap()
+            .is_dynamic());
+        assert!(
+            !Template::try_from(TemplateSource::FloatingPointNumber(123.123))
+                .unwrap()
+                .is_dynamic()
+        );
     }
 
     #[test]
@@ -481,6 +509,30 @@ mod tests {
         let template = Template::try_from("foo").unwrap();
 
         assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_signed_number() {
+        let event = Event::Log(LogEvent::from("hello world"));
+        let template = Template::try_from(TemplateSource::SignedNumber(123)).unwrap();
+
+        assert_eq!(Ok(Bytes::from("123")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_unsigned_number() {
+        let event = Event::Log(LogEvent::from("hello world"));
+        let template = Template::try_from(TemplateSource::UnsignedNumber(123)).unwrap();
+
+        assert_eq!(Ok(Bytes::from("123")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_float_number() {
+        let event = Event::Log(LogEvent::from("hello world"));
+        let template = Template::try_from(TemplateSource::FloatingPointNumber(123.123)).unwrap();
+
+        assert_eq!(Ok(Bytes::from("123.123")), template.render(&event))
     }
 
     #[test]
