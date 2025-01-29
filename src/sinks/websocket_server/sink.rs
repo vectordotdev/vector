@@ -35,8 +35,8 @@ use vector_lib::{
 use crate::{
     codecs::{Encoder, Transformer},
     internal_events::{
-        WsListenerConnectionEstablished, WsListenerConnectionFailedError,
-        WsListenerConnectionShutdown, WsListenerSendError,
+        ConnectionOpen, OpenGauge, WsListenerConnectionEstablished,
+        WsListenerConnectionFailedError, WsListenerConnectionShutdown, WsListenerSendError,
     },
     sources::util::http::HttpSourceAuth,
 };
@@ -85,9 +85,17 @@ impl WebSocketListenerSink {
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         mut listener: MaybeTlsListener,
     ) {
+        let open_gauge = OpenGauge::new();
+
         while let Ok(stream) = listener.accept().await {
             tokio::spawn(
-                Self::handle_connection(auth.clone(), Arc::clone(&peers), stream).in_current_span(),
+                Self::handle_connection(
+                    auth.clone(),
+                    Arc::clone(&peers),
+                    stream,
+                    open_gauge.clone(),
+                )
+                .in_current_span(),
             );
         }
     }
@@ -96,6 +104,7 @@ impl WebSocketListenerSink {
         auth: HttpSourceAuth,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         stream: MaybeTlsIncomingStream<TcpStream>,
+        open_gauge: OpenGauge,
     ) -> Result<(), ()> {
         let addr = stream.peer_addr();
         debug!("Incoming TCP connection from: {}", addr);
@@ -124,6 +133,8 @@ impl WebSocketListenerSink {
                     error: Box::new(err)
                 })
             })?;
+
+        let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
 
         // Insert the write part of this peer to the peer map.
         let (tx, rx) = unbounded();
