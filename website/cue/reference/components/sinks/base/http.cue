@@ -14,9 +14,9 @@ base: components: sinks: http: configuration: {
 			description: """
 				Whether or not end-to-end acknowledgements are enabled.
 
-				When enabled for a sink, any source connected to that sink where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
-				connected** sinks before acknowledging them at the source.
+				When enabled for a sink, any source that supports end-to-end
+				acknowledgements that is connected to that sink waits for events
+				to be acknowledged by **all connected sinks** before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -187,7 +187,7 @@ base: components: sinks: http: configuration: {
 					}
 					device_version: {
 						description: """
-																Identifies the version of the problem. In combination with device product and vendor, it composes the unique id of the device that sends messages.
+																Identifies the version of the problem. The combination of the device product, vendor and this value make up the unique id of the device that sends messages.
 																The value length must be less than or equal to 31.
 																"""
 						required: true
@@ -220,8 +220,8 @@ base: components: sinks: http: configuration: {
 																Reflects importance of the event.
 
 																It must point to a number from 0 to 10.
-																0 = Lowest, 10 = Highest.
-																Equals to "cef.severity" by default.
+																0 = lowest_importance, 10 = highest_importance.
+																Set to "cef.severity" by default.
 																"""
 						required: true
 						type: string: {}
@@ -229,7 +229,7 @@ base: components: sinks: http: configuration: {
 					version: {
 						description: """
 																CEF Version. Can be either 0 or 1.
-																Equals to "0" by default.
+																Set to "0" by default.
 																"""
 						required: true
 						type: string: enum: {
@@ -263,11 +263,11 @@ base: components: sinks: http: configuration: {
 						Vector's encoder currently adheres more strictly to the GELF spec, with
 						the exception that some characters such as `@`  are allowed in field names.
 
-						Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
-						by Graylog, and is much more relaxed than the GELF spec.
+						Other GELF codecs, such as Loki's, use a [Go SDK][implementation] that is maintained
+						by Graylog and is much more relaxed than the GELF spec.
 
 						Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
-						the codec may continue to relax the enforcement of specification.
+						the codec might continue to relax the enforcement of the specification.
 
 						[gelf]: https://docs.graylog.org/docs/gelf
 						[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
@@ -331,8 +331,8 @@ base: components: sinks: http: configuration: {
 				type: object: options: {
 					capacity: {
 						description: """
-																Set the capacity (in bytes) of the internal buffer used in the CSV writer.
-																This defaults to a reasonable setting.
+																Sets the capacity (in bytes) of the internal buffer used in the CSV writer.
+																This defaults to 8KB.
 																"""
 						required: false
 						type: uint: default: 8192
@@ -344,9 +344,9 @@ base: components: sinks: http: configuration: {
 					}
 					double_quote: {
 						description: """
-																Enable double quote escapes.
+																Enables double quote escapes.
 
-																This is enabled by default, but it may be disabled. When disabled, quotes in
+																This is enabled by default, but you can disable it. When disabled, quotes in
 																field data are escaped instead of doubled.
 																"""
 						required: false
@@ -359,20 +359,20 @@ base: components: sinks: http: configuration: {
 																In some variants of CSV, quotes are escaped using a special escape character
 																like \\ (instead of escaping quotes by doubling them).
 
-																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+																To use this, `double_quotes` needs to be disabled as well; otherwise, this setting is ignored.
 																"""
 						required: false
 						type: ascii_char: default: "\""
 					}
 					fields: {
 						description: """
-																Configures the fields that will be encoded, as well as the order in which they
+																Configures the fields that are encoded, as well as the order in which they
 																appear in the output.
 
-																If a field is not present in the event, the output will be an empty string.
+																If a field is not present in the event, the output for that field is an empty string.
 
-																Values of type `Array`, `Object`, and `Regex` are not supported and the
-																output will be an empty string.
+																Values of type `Array`, `Object`, and `Regex` are not supported, and the
+																output for any of these types is an empty string.
 																"""
 						required: true
 						type: array: items: type: string: {}
@@ -398,8 +398,8 @@ base: components: sinks: http: configuration: {
 								never: "Never writes quotes, even if it produces invalid CSV data."
 								non_numeric: """
 																			Puts quotes around all fields that are non-numeric.
-																			Namely, when writing a field that does not parse as a valid float or integer,
-																			then quotes are used even if they aren't strictly necessary.
+																			This means that when writing a field that does not parse as a valid float or integer,
+																			quotes are used even if they aren't strictly necessary.
 																			"""
 							}
 						}
@@ -806,7 +806,7 @@ base: components: sinks: http: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -828,7 +828,7 @@ base: components: sinks: http: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -869,7 +869,7 @@ base: components: sinks: http: configuration: {
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
