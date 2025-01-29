@@ -162,6 +162,7 @@ configuration: {
 									description: "The delimiter used to separate fields in each row of the CSV file."
 									common:      false
 									required:    false
+									relevant_when: "type = \"csv\""
 									type: string: {
 										default: ","
 										examples: [":"]
@@ -177,6 +178,7 @@ configuration: {
 										by their numerical index.
 										"""
 									required: false
+									relevant_when: "type = \"csv\""
 									common:   false
 									type: bool: default: true
 								}
