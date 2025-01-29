@@ -35,7 +35,7 @@ components: sinks: websocket_server: {
 				enabled_by_scheme:      true
 			}
 			to: {
-				service: services.websocket
+				service: services.websocket_client
 				interface: {
 					socket: {
 						direction: "incoming"
