@@ -10,9 +10,8 @@ use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
     pin_mut,
     stream::BoxStream,
-    StreamExt, TryStreamExt,
+    StreamExt,
 };
-use futures_util::future;
 use http::{header::AUTHORIZATION, StatusCode};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
@@ -149,22 +148,12 @@ impl WebSocketListenerSink {
             });
         }
 
-        let (outgoing, incoming) = ws_stream.split();
+        let (outgoing, _incoming) = ws_stream.split();
 
-        let broadcast_incoming = incoming.try_for_each(|msg| {
-            debug!(
-                "Received a message from {}: {}",
-                addr,
-                msg.to_text().unwrap()
-            );
+        let forward_data_to_client = rx.map(Ok).forward(outgoing);
 
-            future::ok(())
-        });
-
-        let receive_from_others = rx.map(Ok).forward(outgoing);
-
-        pin_mut!(broadcast_incoming, receive_from_others);
-        future::select(broadcast_incoming, receive_from_others).await;
+        pin_mut!(forward_data_to_client);
+        let _ = forward_data_to_client.await;
 
         {
             let mut peers = peers.lock().unwrap();
