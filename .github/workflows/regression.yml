@@ -554,6 +554,7 @@ jobs:
 
       - name: Display Markdown Summary
         run: |
+          ls -R
           unzip capture-artifacts -d results
           REPORT_MD=results/report.md
           if [ -f ${REPORT_MD} ]; then
