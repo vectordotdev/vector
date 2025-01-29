@@ -1,7 +1,13 @@
 //! Shared authentication config between components that use HTTP.
+use std::{collections::HashMap, fmt};
+
 use bytes::Bytes;
 use headers::{authorization::Credentials, Authorization};
 use http::{header::AUTHORIZATION, HeaderMap, HeaderValue, StatusCode};
+use serde::{
+    de::{Error, MapAccess, Visitor},
+    Deserialize,
+};
 use vector_config::configurable_component;
 use vector_lib::{
     compile_vrl,
@@ -23,9 +29,8 @@ use super::ErrorMessage;
 ///
 /// Use the HTTP authentication with HTTPS only. The authentication credentials are passed as an
 /// HTTP header without any additional encryption beyond what is provided by the transport itself.
-#[configurable_component]
+#[configurable_component(no_deser)]
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 #[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
 pub enum HttpServerAuthConfig {
     /// Basic authentication.
@@ -52,6 +57,74 @@ pub enum HttpServerAuthConfig {
         /// The VRL boolean expression.
         source: String,
     },
+}
+
+// Custom deserializer implementation to default `strategy` to `basic`
+impl<'de> Deserialize<'de> for HttpServerAuthConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct HttpServerAuthConfigVisitor;
+
+        const FIELD_KEYS: [&str; 4] = ["strategy", "username", "password", "source"];
+
+        impl<'de> Visitor<'de> for HttpServerAuthConfigVisitor {
+            type Value = HttpServerAuthConfig;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid authentication strategy (basic or custom)")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<HttpServerAuthConfig, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut fields: HashMap<&str, String> = HashMap::default();
+
+                while let Some(key) = map.next_key::<String>()? {
+                    if let Some(field_index) = FIELD_KEYS.iter().position(|k| *k == key.as_str()) {
+                        if fields.contains_key(FIELD_KEYS[field_index]) {
+                            return Err(Error::duplicate_field(FIELD_KEYS[field_index]));
+                        }
+                        fields.insert(FIELD_KEYS[field_index], map.next_value()?);
+                    } else {
+                        return Err(Error::unknown_field(&key, &FIELD_KEYS));
+                    }
+                }
+
+                // Default to "basic" if strategy is missing
+                let strategy = fields
+                    .get("strategy")
+                    .map(String::as_str)
+                    .unwrap_or_else(|| "basic");
+
+                match strategy {
+                    "basic" => {
+                        let username = fields
+                            .remove("username")
+                            .ok_or_else(|| Error::missing_field("username"))?;
+                        let password = fields
+                            .remove("password")
+                            .ok_or_else(|| Error::missing_field("password"))?;
+                        Ok(HttpServerAuthConfig::Basic {
+                            username,
+                            password: SensitiveString::from(password),
+                        })
+                    }
+                    "custom" => {
+                        let source = fields
+                            .remove("source")
+                            .ok_or_else(|| Error::missing_field("source"))?;
+                        Ok(HttpServerAuthConfig::Custom { source })
+                    }
+                    _ => Err(Error::unknown_variant(strategy, &["basic", "custom"])),
+                }
+            }
+        }
+
+        deserializer.deserialize_map(HttpServerAuthConfigVisitor)
+    }
 }
 
 impl HttpServerAuthConfig {
@@ -206,6 +279,63 @@ mod tests {
     use indoc::indoc;
 
     use super::*;
+
+    #[test]
+    fn config_should_default_to_basic() {
+        let config = indoc! { r#"
+            username: foo
+            password: bar
+            "#
+        };
+
+        let config: HttpServerAuthConfig = serde_yaml::from_str(config).unwrap();
+
+        assert!(matches!(config, HttpServerAuthConfig::Basic { .. }));
+        if let HttpServerAuthConfig::Basic { username, password } = config {
+            assert_eq!(username, "foo");
+            assert_eq!(password.inner(), "bar");
+        } else {
+            unreachable!();
+        }
+    }
+
+    #[test]
+    fn config_should_support_explicit_basic_strategy() {
+        let config = indoc! { r#"
+            strategy: basic
+            username: foo
+            password: bar
+            "#
+        };
+
+        let config: HttpServerAuthConfig = serde_yaml::from_str(config).unwrap();
+
+        assert!(matches!(config, HttpServerAuthConfig::Basic { .. }));
+        if let HttpServerAuthConfig::Basic { username, password } = config {
+            assert_eq!(username, "foo");
+            assert_eq!(password.inner(), "bar");
+        } else {
+            unreachable!();
+        }
+    }
+
+    #[test]
+    fn config_should_support_custom_strategy() {
+        let config = indoc! { r#"
+            strategy: custom
+            source: "true"
+            "#
+        };
+
+        let config: HttpServerAuthConfig = serde_yaml::from_str(config).unwrap();
+
+        assert!(matches!(config, HttpServerAuthConfig::Custom { .. }));
+        if let HttpServerAuthConfig::Custom { source } = config {
+            assert_eq!(source, "true");
+        } else {
+            unreachable!();
+        }
+    }
 
     #[test]
     fn build_basic_auth_should_always_work() {
