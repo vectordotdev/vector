@@ -224,51 +224,57 @@ impl HttpServerAuthMatcher {
                     ))
                 }
             }
-            HttpServerAuthMatcher::Vrl { program } => {
-                let mut target = VrlTarget::new(
-                    Event::Log(LogEvent::from_map(
-                        ObjectMap::from([(
-                            "headers".into(),
-                            Value::Object(
-                                headers
-                                    .iter()
-                                    .map(|(k, v)| {
-                                        (
-                                            KeyString::from(k.to_string()),
-                                            Value::Bytes(Bytes::copy_from_slice(v.as_bytes())),
-                                        )
-                                    })
-                                    .collect::<ObjectMap>(),
-                            ),
-                        )]),
-                        Default::default(),
-                    )),
-                    program.info(),
-                    false,
-                );
-                let timezone = TimeZone::default();
+            HttpServerAuthMatcher::Vrl { program } => self.handle_vrl_auth(headers, program),
+        }
+    }
 
-                let result = Runtime::default().resolve(&mut target, program, &timezone);
-                match result.map_err(|e| {
-                    warn!("Handling auth failed: {}", e);
-                    ErrorMessage::new(StatusCode::UNAUTHORIZED, "Auth failed".to_owned())
-                })? {
-                    vrl::core::Value::Boolean(result) => {
-                        if result {
-                            Ok(())
-                        } else {
-                            Err(ErrorMessage::new(
-                                StatusCode::UNAUTHORIZED,
-                                "Auth failed".to_owned(),
-                            ))
-                        }
-                    }
-                    _ => Err(ErrorMessage::new(
+    fn handle_vrl_auth(
+        &self,
+        headers: &HeaderMap<HeaderValue>,
+        program: &Program,
+    ) -> Result<(), ErrorMessage> {
+        let mut target = VrlTarget::new(
+            Event::Log(LogEvent::from_map(
+                ObjectMap::from([(
+                    "headers".into(),
+                    Value::Object(
+                        headers
+                            .iter()
+                            .map(|(k, v)| {
+                                (
+                                    KeyString::from(k.to_string()),
+                                    Value::Bytes(Bytes::copy_from_slice(v.as_bytes())),
+                                )
+                            })
+                            .collect::<ObjectMap>(),
+                    ),
+                )]),
+                Default::default(),
+            )),
+            program.info(),
+            false,
+        );
+        let timezone = TimeZone::default();
+
+        let result = Runtime::default().resolve(&mut target, program, &timezone);
+        match result.map_err(|e| {
+            warn!("Handling auth failed: {}", e);
+            ErrorMessage::new(StatusCode::UNAUTHORIZED, "Auth failed".to_owned())
+        })? {
+            vrl::core::Value::Boolean(result) => {
+                if result {
+                    Ok(())
+                } else {
+                    Err(ErrorMessage::new(
                         StatusCode::UNAUTHORIZED,
-                        "Invalid return value".to_owned(),
-                    )),
+                        "Auth failed".to_owned(),
+                    ))
                 }
             }
+            _ => Err(ErrorMessage::new(
+                StatusCode::UNAUTHORIZED,
+                "Invalid return value".to_owned(),
+            )),
         }
     }
 }
