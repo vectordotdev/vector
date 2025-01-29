@@ -547,7 +547,9 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 						description: """
 																The path to the protobuf descriptor set file.
 
-																This file is the output of `protoc -o <path> ...`
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
 																"""
 						required: true
 						type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
@@ -589,6 +591,16 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 			examples: ["group-name", "{{ file }}"]
 			syntax: "template"
 		}
+	}
+	kms_key: {
+		description: """
+			The [ARN][arn] (Amazon Resource Name) of the [KMS key][kms_key] to use when encrypting log data.
+
+			[arn]: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html
+			[kms_key]: https://docs.aws.amazon.com/kms/latest/developerguide/overview.html
+			"""
+		required: false
+		type: string: {}
 	}
 	region: {
 		description: """
@@ -824,6 +836,19 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 		type: string: {
 			examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]
 			syntax: "template"
+		}
+	}
+	tags: {
+		description: """
+			The Key-value pairs to be applied as [tags][tags] to the log group and stream.
+
+			[tags]: https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/what-are-tags.html
+			"""
+		required: false
+		type: object: options: "*": {
+			description: "A tag represented as a key-value pair"
+			required:    true
+			type: string: {}
 		}
 	}
 	tls: {

@@ -148,7 +148,7 @@ metrics = "0.24.1"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 pin-project = { version = "1.1.8", default-features = false }
-proptest = { version = "1.5" }
+proptest = { version = "1.6" }
 proptest-derive = { version = "0.5.1" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
@@ -177,6 +177,7 @@ vrl.workspace = true
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 snafu.workspace = true
+cfg-if.workspace = true
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
@@ -219,6 +220,7 @@ aws-sdk-sqs = { version = "1.3.0", default-features = false, features = ["behavi
 aws-sdk-sns = { version = "1.6.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-cloudwatch = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-cloudwatchlogs = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-kms = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-elasticsearch = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-firehose = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-kinesis = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
@@ -310,6 +312,8 @@ dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.17", default-features = false }
 encoding_rs = { version = "0.8.35", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.13", default-features = false }
+evmap = { version = "10.0.2", default-features = false, optional = true }
+evmap-derive = { version = "0.2.0", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
 flate2.workspace = true
 futures-util = { version = "0.3.29", default-features = false }
@@ -371,6 +375,7 @@ tokio-tungstenite = { version = "0.20.1", default-features = false, features = [
 toml.workspace = true
 tonic = { workspace = true, optional = true }
 hickory-proto = { workspace = true, optional = true }
+thread_local = { version = "1.1.8", default-features = false, optional = true }
 typetag = { version = "0.2.19", default-features = false }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }
@@ -524,9 +529,10 @@ protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
 # Enrichment Tables
-enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb"]
+enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 enrichment-tables-geoip = ["dep:maxminddb"]
 enrichment-tables-mmdb = ["dep:maxminddb"]
+enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
 codecs-syslog = ["vector-lib/syslog"]
@@ -721,6 +727,7 @@ sinks-logs = [
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
+  "sinks-keep",
   "sinks-loki",
   "sinks-mezmo",
   "sinks-mqtt",
@@ -757,7 +764,7 @@ sinks-metrics = [
 
 sinks-amqp = ["lapin"]
 sinks-appsignal = []
-sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs"]
+sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs", "dep:aws-sdk-kms"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "dep:aws-sdk-cloudwatch"]
 sinks-aws_kinesis_firehose = ["aws-core", "dep:aws-sdk-firehose"]
 sinks-aws_kinesis_streams = ["aws-core", "dep:aws-sdk-kinesis"]
@@ -787,6 +794,7 @@ sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
 sinks-kafka = ["dep:rdkafka"]
+sinks-keep = []
 sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
 sinks-mqtt = ["dep:rumqttc"]
@@ -979,7 +987,7 @@ remap-benches = ["transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
-enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb"]
+enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 proptest = ["dep:proptest", "dep:proptest-derive", "vrl/proptest"]
 
 [[bench]]
