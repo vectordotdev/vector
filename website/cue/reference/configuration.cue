@@ -159,9 +159,9 @@ configuration: {
 								}
 
 								delimiter: {
-									description: "The delimiter used to separate fields in each row of the CSV file."
-									common:      false
-									required:    false
+									description:   "The delimiter used to separate fields in each row of the CSV file."
+									common:        false
+									required:      false
 									relevant_when: "type = \"csv\""
 									type: string: {
 										default: ","
@@ -177,9 +177,9 @@ configuration: {
 										If you set it to `false`, there are no headers and the columns are referred to
 										by their numerical index.
 										"""
-									required: false
+									required:      false
 									relevant_when: "type = \"csv\""
-									common:   false
+									common:        false
 									type: bool: default: true
 								}
 							}
@@ -619,7 +619,7 @@ configuration: {
 							"directory":           "Retrieve secrets from file contents in a directory."
 							"exec":                "Run a local command to retrieve secrets."
 							"aws_secrets_manager": "Retrieve secrets from AWS Secrets Manager."
-							"test": 			   "Secret backend for test."
+							"test":                "Secret backend for test."
 						}
 					}
 				}
@@ -629,7 +629,7 @@ configuration: {
 
 						When type is `directory`, this value is the path of the directory with secrets.
 						"""
-					required:    true
+					required:      true
 					relevant_when: "type = \"file\" or type = \"directory\""
 					type: string: {
 						examples: [
@@ -643,7 +643,7 @@ configuration: {
 					description: """
 						Remove trailing whitespace from file contents.
 						"""
-					required: false
+					required:      false
 					relevant_when: "type = \"directory\""
 					type: bool: default: false
 				}
@@ -651,7 +651,7 @@ configuration: {
 					description: """
 						Fixed value to replace all secrets with.
 						"""
-					required: false
+					required:      false
 					relevant_when: "type = \"test\""
 					type: string: {
 						examples: ["test"]
@@ -661,7 +661,7 @@ configuration: {
 					description: """
 						The command to be run, plus any arguments required.
 						"""
-					required: true
+					required:      true
 					relevant_when: "type = \"exec\""
 					type: array: {
 						examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrapper"]]
@@ -669,10 +669,10 @@ configuration: {
 					}
 				}
 				timeout: {
-					description: "The amount of time Vector will wait for the command to complete."
-					required:    false
+					description:   "The amount of time Vector will wait for the command to complete."
+					required:      false
 					relevant_when: "type = \"exec\""
-					common:      false
+					common:        false
 					type: uint: {
 						default: 5
 						unit:    "seconds"
@@ -682,7 +682,7 @@ configuration: {
 					description: """
 						The ID of the secret to be retrieved.
 						"""
-					required: true
+					required:      true
 					relevant_when: "type = \"aws_secrets_manager\""
 					type: string: {
 						examples: ["/secret/foo-bar"]
