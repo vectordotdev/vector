@@ -282,58 +282,53 @@ mod tests {
 
     #[test]
     fn config_should_default_to_basic() {
-        let config = indoc! { r#"
+        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r#"
             username: foo
             password: bar
             "#
-        };
+        })
+        .unwrap();
 
-        let config: HttpServerAuthConfig = serde_yaml::from_str(config).unwrap();
-
-        assert!(matches!(config, HttpServerAuthConfig::Basic { .. }));
         if let HttpServerAuthConfig::Basic { username, password } = config {
             assert_eq!(username, "foo");
             assert_eq!(password.inner(), "bar");
         } else {
-            unreachable!();
+            panic!("Expected HttpServerAuthConfig::Basic");
         }
     }
 
     #[test]
     fn config_should_support_explicit_basic_strategy() {
-        let config = indoc! { r#"
+        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r#"
             strategy: basic
             username: foo
             password: bar
             "#
-        };
+        })
+        .unwrap();
 
-        let config: HttpServerAuthConfig = serde_yaml::from_str(config).unwrap();
-
-        assert!(matches!(config, HttpServerAuthConfig::Basic { .. }));
         if let HttpServerAuthConfig::Basic { username, password } = config {
             assert_eq!(username, "foo");
             assert_eq!(password.inner(), "bar");
         } else {
-            unreachable!();
+            panic!("Expected HttpServerAuthConfig::Basic");
         }
     }
 
     #[test]
     fn config_should_support_custom_strategy() {
-        let config = indoc! { r#"
+        let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r#"
             strategy: custom
             source: "true"
             "#
-        };
-
-        let config: HttpServerAuthConfig = serde_yaml::from_str(config).unwrap();
+        })
+        .unwrap();
 
         assert!(matches!(config, HttpServerAuthConfig::Custom { .. }));
         if let HttpServerAuthConfig::Custom { source } = config {
             assert_eq!(source, "true");
         } else {
-            unreachable!();
+            panic!("Expected HttpServerAuthConfig::Custom");
         }
     }
 
