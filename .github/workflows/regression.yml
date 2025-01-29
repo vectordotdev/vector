@@ -548,11 +548,13 @@ jobs:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
       - name: Download capture-artifacts
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: capture-artifacts
 
       - name: Display Markdown Summary
+        continue-on-error: true
         run: |
           ls -R
           unzip capture-artifacts -d results
