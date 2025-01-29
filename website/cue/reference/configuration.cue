@@ -573,148 +573,119 @@ configuration: {
 				Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
 				in Vector config. Multiple backends can be configured. Use `SECRET[<backend_name>.<secret_key>]` to tell Vector to retrieve the secret. This placeholder is replaced by the secret
 				retrieved from the relevant backend.
+
+				When `type` is `exec`, the provided command will be run and provided a list of
+				secrets to fetch, determined from the configuration file, on stdin as JSON in the format:
+
+				```json
+				{"version": "1.0", "secrets": ["secret1", "secret2"]}
+				```
+
+				The executable is expected to respond with the values of these secrets on stdout, also as JSON, in the format:
+
+				```json
+				{
+					"secret1": {"value": "secret_value", "error": null},
+					"secret2": {"value": null, "error": "could not fetch the secret"}
+				}
+				```
+				If an `error` is returned for any secrets, or if the command exits with a non-zero status code,
+				Vector will log the errors and exit.
+
+				Otherwise, the secret must be a JSON text string with key/value pairs. For example:
+				```json
+				{
+					"username": "test",
+					"password": "example-password"
+				}
+				```
+
+				If an error occurred while reading the file or retrieving the secrets, Vector logs the error and exits.
+
+				Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+				configuration reload process.
+
 				"""
 			required: false
 			type: object: options: {
-				file: {
-					required: true
+				type: {
 					description: """
-						Retrieve secrets from a file path.
-
-						The secret must be a JSON text string with key/value pairs. For example:
-						```json
-						{
-							"username": "test",
-							"password": "example-password"
-						}
-						```
-
-						If an error occurs while reading the file, Vector will log the error and exit.
-
-						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
-						configuration reload process.
+						The type of secret backend to use.
 						"""
-					type: object: options: {
-						path: {
-							description: "The file path to read."
-							required:    true
-							type: string: {
-								examples: ["/path/to/secret.json"]
-							}
+					required: true
+					type: string: {
+						enum: {
+							"file":                "Retrieve secrets from a file path."
+							"directory":           "Retrieve secrets from file contents in a directory."
+							"exec":                "Run a local command to retrieve secrets."
+							"aws_secrets_manager": "Retrieve secrets from AWS Secrets Manager."
+							"test": 			   "Secret backend for test."
 						}
 					}
 				}
-				directory: {
-					required: true
+				path: {
 					description: """
-						Retrieve secrets from file contents in a directory.
+						When type is `file`, this value is the file path to read.
 
-						The directory must contain files with names corresponding to secret keys.
-
-						If an error occurs while reading the file, Vector will log the error and exit.
-
-						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
-						configuration reload process.
+						When type is `directory`, this value is the path of the directory with secrets.
 						"""
-					type: object: options: {
-						path: {
-							description: """
-								The path of the directory with secrets.
-								"""
-							required: true
-							type: string: {
-								examples: [
-									"${CREDENTIALS_DIRECTORY}", // https://systemd.io/CREDENTIALS
-									"/path/to/secrets-directory",
-								]
-							}
-						}
-						remove_trailing_whitespace: {
-							description: """
-								Remove trailing whitespace from file contents.
-								"""
-							required: false
-							type: bool: default: false
-						}
+					required:    true
+					relevant_when: "type = \"file\" or type = \"directory\""
+					type: string: {
+						examples: [
+							"/path/to/secret.json",
+							"${CREDENTIALS_DIRECTORY}", // https://systemd.io/CREDENTIALS
+							"/path/to/secrets-directory",
+						]
 					}
 				}
-				exec: {
-					required: true
+				remove_trailing_whitespace: {
 					description: """
-						Run a local command to retrieve secrets.
-
-						The provided command will be run and provided a list of
-						secrets to fetch, determined from the configuration file, on stdin as JSON in the format:
-
-						```json
-						{"version": "1.0", "secrets": ["secret1", "secret2"]}
-						```
-
-						The executable is expected to respond with the values of these secrets on stdout, also as JSON, in the format:
-
-						```json
-						{
-							"secret1": {"value": "secret_value", "error": null},
-							"secret2": {"value": null, "error": "could not fetch the secret"}
-						}
-						```
-
-						If an `error` is returned for any secrets, or if the command exits with a non-zero status code,
-						Vector will log the errors and exit.
-
-						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
-						configuration reload process.
+						Remove trailing whitespace from file contents.
 						"""
-					type: object: options: {
-						command: {
-							description: """
-								The command to be run, plus any arguments required.
-								"""
-							required: true
-							type: array: {
-								examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrapper"]]
-								items: type: string: {}
-							}
-						}
-						timeout: {
-							description: "The amount of time Vector will wait for the command to complete."
-							required:    false
-							common:      false
-							type: uint: {
-								default: 5
-								unit:    "seconds"
-							}
-						}
+					required: false
+					relevant_when: "type = \"directory\""
+					type: bool: default: false
+				}
+				replacement: {
+					description: """
+						Fixed value to replace all secrets with.
+						"""
+					required: false
+					relevant_when: "type = \"test\""
+					type: string: {
+						examples: ["test"]
 					}
 				}
-				aws_secrets_manager: {
-					required: true
+				command: {
 					description: """
-						Retrieve secrets from AWS Secrets Manager.
-
-						The secret must be a JSON text string with key/value pairs. For example:
-						```json
-						{
-							"username": "test",
-							"password": "example-password"
-						}
-						```
-
-						If an error occurred retrieving the secrets, Vector logs the error and exits.
-
-						Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
-						configuration reload process.
+						The command to be run, plus any arguments required.
 						"""
-					type: object: options: {
-						secret_id: {
-							description: """
-								The ID of the secret to be retrieved.
-								"""
-							required: true
-							type: string: {
-								examples: ["/secret/foo-bar"]
-							}
-						}
+					required: true
+					relevant_when: "type = \"exec\""
+					type: array: {
+						examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrapper"]]
+						items: type: string: {}
+					}
+				}
+				timeout: {
+					description: "The amount of time Vector will wait for the command to complete."
+					required:    false
+					relevant_when: "type = \"exec\""
+					common:      false
+					type: uint: {
+						default: 5
+						unit:    "seconds"
+					}
+				}
+				secret_id: {
+					description: """
+						The ID of the secret to be retrieved.
+						"""
+					required: true
+					relevant_when: "type = \"aws_secrets_manager\""
+					type: string: {
+						examples: ["/secret/foo-bar"]
 					}
 				}
 			}
