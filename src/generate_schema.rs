@@ -1,3 +1,5 @@
+//! Vector `generate-schema` command implementation.
+
 use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
@@ -7,13 +9,15 @@ use crate::config::ConfigBuilder;
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
+/// Command line options for the `generate-schema` command.
 pub struct Opts {
     /// File path to
     #[arg(short, long)]
     pub(crate) output_path: Option<PathBuf>,
 }
 
-#[allow(clippy::print_stdout, print_stderr)]
+/// Execute the `generate-schema` command.
+#[allow(clippy::print_stdout, clippy::print_stderr)]
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match generate_root_schema::<ConfigBuilder>() {
         Ok(schema) => {
@@ -37,17 +41,12 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                     }
                 };
             } else {
-                {
-                    println!("{json}");
-                }
+                println!("{json}");
             }
             exitcode::OK
         }
         Err(e) => {
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!("error while generating schema: {:?}", e);
-            }
+            eprintln!("error while generating schema: {:?}", e);
             exitcode::SOFTWARE
         }
     }
