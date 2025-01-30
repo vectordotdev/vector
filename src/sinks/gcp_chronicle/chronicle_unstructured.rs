@@ -237,7 +237,7 @@ pub struct ChronicleUnstructuredConfig {
     #[configurable(metadata(docs::examples = "WINDOWS_DNS", docs::examples = "{{ log_type }}"))]
     pub log_type: Template,
 
-    /// The default log_type to attach to events if the template in `log_type` cannot be resolved
+    /// The default `log_type` to attach to events if the template in `log_type` cannot be resolved.
     #[configurable(metadata(docs::examples = "VECTOR_DEV"))]
     pub fallback_log_type: Option<String>,
 

@@ -464,6 +464,11 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 		required:    false
 		type: string: examples: ["127.0.0.1:8080", "example.com:12345"]
 	}
+	fallback_log_type: {
+		description: "The default `log_type` to attach to events if the template in `log_type` cannot be resolved."
+		required:    false
+		type: string: examples: ["VECTOR_DEV"]
+	}
 	labels: {
 		description: "A set of labels that are attached to each batch of events."
 		required:    false
@@ -710,11 +715,6 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 				}
 			}
 		}
-	}
-	fallback_log_type: {
-		description: "The default log_type to attach to events if the template in `log_type` cannot be resolved"
-		required:    false
-		type: string: examples: ["VECTOR_DEV"]
 	}
 	tls: {
 		description: "TLS configuration."
