@@ -9,14 +9,22 @@ pub struct ChroniclePartitionKey {
 }
 
 /// Partitions items based on the generated key for the given event.
-pub struct ChroniclePartitioner{log_type: Template, template_fallback_log_type: Option<String>, namespace_template: Option<Template>}
+pub struct ChroniclePartitioner {
+    log_type: Template,
+    template_fallback_log_type: Option<String>,
+    namespace_template: Option<Template>,
+}
 
 impl ChroniclePartitioner {
-    pub const fn new(log_type: Template, template_fallback_log_type: Option<String>, namespace_template: Option<Template>) -> Self {
+    pub const fn new(
+        log_type: Template,
+        template_fallback_log_type: Option<String>,
+        namespace_template: Option<Template>,
+    ) -> Self {
         Self {
             log_type,
             template_fallback_log_type,
-            namespace_template
+            namespace_template,
         }
     }
 }
