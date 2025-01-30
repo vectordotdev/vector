@@ -33,7 +33,7 @@ impl Partitioner for ChroniclePartitioner {
                 if let Some(template_fallback_log_type) = &self.template_fallback_log_type {
                     emit!(TemplateRenderingError {
                         error,
-                        field: Some("key_prefix"),
+                        field: Some("log_type"),
                         drop_event: false,
                     });
                     Ok(template_fallback_log_type.clone())
