@@ -10,9 +10,7 @@ aliases: [ "/docs/guides/developer/config-autocompletion.md" ]
 ---
 
 {{< requirement >}}
-Before you begin, this guide assumes the following:
-
-* You understand the [basic Vector concepts][concepts]
+This guide assumes you understand [basic Vector concepts][concepts]
 
 [concepts]: /docs/about/concepts
 {{< /requirement >}}
