@@ -17,8 +17,8 @@ Before you begin, this guide assumes the following:
 [concepts]: /docs/about/concepts
 {{< /requirement >}}
 
-Vector provides CLI [sub-commands][subcommands] to perform various tasks apart from running pipelines. This short guide focuses on how to
-use the `generate-schema` sub-command to generate the Vector schema with your Vector binary and how to provide its output to an IDE to
+Vector provides CLI [subcommands][subcommands] to perform various tasks apart from running pipelines. This short guide focuses on how to
+use the `generate-schema` subcommand to generate the Vector schema with your Vector binary and how to provide its output to an IDE to
 enable autocompletion.
 
 ## How to use `generate-schema`
