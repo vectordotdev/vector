@@ -48,7 +48,7 @@ Follow the guide [here][vscode].
 
 <img src="/gifs/guides/config-autocomplete.gif" alt="Config Autocomplete GIF"/>
 
-With this setup the IDE will provide real-time suggestions and should save you some trips to the [Vector docs][docs]!
+With this setup, the IDE will provide real-time suggestions and reduce visits to the [Vector docs][docs].
 
 [subcommands]: https://github.com/vectordotdev/vector/blob/master/src/cli.rs#L268-L321
 
