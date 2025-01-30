@@ -711,6 +711,11 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 			}
 		}
 	}
+	template_fallback_log_type: {
+		description: "The default log_type to attach to events if the template in `log_type` cannot be resolved"
+		required:    false
+		type: string: examples: ["VECTOR_DEV"]
+	}
 	tls: {
 		description: "TLS configuration."
 		required:    false
