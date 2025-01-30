@@ -257,6 +257,7 @@ buildroot
 bytestream
 callsites
 cdnskey
+chocpanda
 cncf
 codepath
 codepaths
@@ -267,6 +268,12 @@ corejs
 coreutils
 csync
 curta
+aviv
+dammam
+doha
+mumbai
+paulo
+turin
 daemonset
 dalek
 databend

@@ -1,0 +1,19 @@
+features:
+- chronicle-unstructured-integration-tests
+- chronicle-udm-events-integration-tests
+
+test_filter: '::gcp_chronicle::'
+
+env:
+  CHRONICLE_ADDRESS: http://gcp-chronicle-chronicle-emulator-1:3000
+
+matrix:
+  version: [latest]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/sinks/gcp_chronicle/**"
+- "src/sinks/util/**"
+- "src/gcp.rs"
+- "scripts/integration/gcp-chronicle/**"

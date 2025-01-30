@@ -129,6 +129,23 @@ pub fn json_log_line() -> String {
     )
 }
 
+pub fn udm_event_line(log_type: &String) -> String {
+    // Example log line:
+    // {"metadata":{"event_timestamp":"2025-01-14T05:01:00.000Z","event_type":"USER_LOGIN","product_name":"Acme SSO","vendor_name":"Acme"},
+    // "principal":{"ip":["10.1.2.3"]},"target":{"application":"Acme Connect","user":{"user_display_name":"Mary Jane","userid":"mary@altostrat.com"}},
+    // "extensions":{"auth":{"type":"MACHINE","mechanism":["NETWORK"]}}}
+    let user = username();
+    let email = format!("{}@{}", user, domain());
+    format!(
+        "{{\"metadata\":{{\"event_timestamp\": \"{}\", \"event_type\":\"USER_LOGIN\",\"product_name\":\"Acme SSO\",\"vendor_name\":\"Acme\", \"log_type\":\"{}\"}},\"principal\":{{\"ip\":[\"{}\"],\"target\":{{\"application\":\"Acme Connect\",\"user\":{{\"user_display_name\":\"{}\",\"userid\":\"{}\"}},\"extensions\":{{\"auth\":{{\"type\":\"MACHINE\",\"mechanism\":[\"NETWORK\"]}}}}}}}}}}",
+        timestamp_json(),
+        log_type,
+        ipv4_address(),
+        user,
+        email
+    )
+}
+
 // Formatted timestamps
 fn timestamp_apache_common() -> DelayedFormat<StrftimeItems<'static>> {
     Local::now().format(APACHE_COMMON_TIME_FORMAT)

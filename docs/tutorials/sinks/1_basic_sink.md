@@ -181,7 +181,6 @@ build with just the components required. We need to add this feature to the
   sinks-azure_monitor_logs = []
 + sinks-basic = []
   sinks-blackhole = []
-  sinks-chronicle = []
 ```
 
 Add it to our list of log sinks:
@@ -200,7 +199,6 @@ sinks-logs = [
   "sinks-azure_monitor_logs",
 + "sinks-basic",
   "sinks-blackhole",
-  "sinks-chronicle",
 ```
 
 # Acknowledgements

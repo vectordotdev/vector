@@ -711,7 +711,8 @@ sinks-logs = [
   "sinks-azure_blob",
   "sinks-azure_monitor_logs",
   "sinks-blackhole",
-  "sinks-chronicle",
+  "sinks-gcp-chronicle-unstructured",
+  "sinks-gcp-chronicle-udm-events",
   "sinks-clickhouse",
   "sinks-console",
   "sinks-databend",
@@ -775,7 +776,6 @@ sinks-axiom = ["sinks-http"]
 sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
-sinks-chronicle = []
 sinks-clickhouse = []
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
@@ -785,8 +785,9 @@ sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
 sinks-datadog_traces = ["protobuf-build", "dep:prost", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sinks-elasticsearch = ["transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
-sinks-gcp = ["sinks-gcp-chronicle", "dep:base64", "gcp"]
-sinks-gcp-chronicle = ["gcp"]
+sinks-gcp = ["sinks-gcp-chronicle-unstructured", "sinks-gcp-chronicle-udm-events", "gcp"]
+sinks-gcp-chronicle-unstructured = ["gcp"]
+sinks-gcp-chronicle-udm-events = ["gcp", "dep:fakedata"]
 sinks-greptimedb_metrics = ["dep:greptimedb-ingester"]
 sinks-greptimedb_logs = ["dep:greptimedb-ingester"]
 sinks-honeycomb = []
@@ -825,7 +826,8 @@ all-integration-tests = [
   "aws-integration-tests",
   "axiom-integration-tests",
   "azure-integration-tests",
-  "chronicle-integration-tests",
+  "chronicle-unstructured-integration-tests",
+  "chronicle-udm-events-integration-tests",
   "clickhouse-integration-tests",
   "databend-integration-tests",
   "datadog-agent-integration-tests",
@@ -889,7 +891,8 @@ aws-sqs-integration-tests = ["sinks-aws_sqs"]
 aws-sns-integration-tests = ["sinks-aws_sns"]
 axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
-chronicle-integration-tests = ["sinks-gcp"]
+chronicle-unstructured-integration-tests = ["sinks-gcp"]
+chronicle-udm-events-integration-tests = ["sinks-gcp"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
 databend-integration-tests = ["sinks-databend"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]
