@@ -1,6 +1,6 @@
 ---
 title: Getting Started Guides
 description: Getting Started
-weight: 3
+weight: 1
 tags: [ "getting started", "guides", "guide" ]
 ---
