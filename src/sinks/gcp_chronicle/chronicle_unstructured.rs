@@ -239,7 +239,7 @@ pub struct ChronicleUnstructuredConfig {
 
     /// The default log_type to attach to events if the template in `log_type` cannot be resolved
     #[configurable(metadata(docs::examples = "VECTOR_DEV"))]
-    pub template_fallback_log_type: Option<String>,
+    pub fallback_log_type: Option<String>,
 
     #[configurable(derived)]
     #[serde(
@@ -265,7 +265,7 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
             namespace = "namespace"
             compression = "gzip"
             log_type = "log_type"
-            template_fallback_log_type = "VECTOR_DEV"
+            fallback_log_type = "VECTOR_DEV"
             encoding.codec = "text"
         "#})
         .unwrap()
@@ -360,7 +360,7 @@ impl ChronicleUnstructuredConfig {
     fn partitioner(&self) -> crate::Result<ChroniclePartitioner> {
         Ok(ChroniclePartitioner::new(
             self.log_type.clone(),
-            self.template_fallback_log_type.clone(),
+            self.fallback_log_type.clone(),
             self.namespace.clone(),
         ))
     }

@@ -11,19 +11,19 @@ pub struct ChroniclePartitionKey {
 /// Partitions items based on the generated key for the given event.
 pub struct ChroniclePartitioner {
     log_type: Template,
-    template_fallback_log_type: Option<String>,
+    fallback_log_type: Option<String>,
     namespace_template: Option<Template>,
 }
 
 impl ChroniclePartitioner {
     pub const fn new(
         log_type: Template,
-        template_fallback_log_type: Option<String>,
+        fallback_log_type: Option<String>,
         namespace_template: Option<Template>,
     ) -> Self {
         Self {
             log_type,
-            template_fallback_log_type,
+            fallback_log_type,
             namespace_template,
         }
     }
@@ -38,13 +38,13 @@ impl Partitioner for ChroniclePartitioner {
             .log_type
             .render_string(item)
             .or_else(|error| {
-                if let Some(template_fallback_log_type) = &self.template_fallback_log_type {
+                if let Some(fallback_log_type) = &self.fallback_log_type {
                     emit!(TemplateRenderingError {
                         error,
                         field: Some("log_type"),
                         drop_event: false,
                     });
-                    Ok(template_fallback_log_type.clone())
+                    Ok(fallback_log_type.clone())
                 } else {
                     Err(emit!(TemplateRenderingError {
                         error,
