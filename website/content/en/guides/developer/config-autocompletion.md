@@ -4,9 +4,9 @@ short: Config Autocompletion
 description: Learn how to generate the Vector schema and use it for IDE autocompletion.
 author_github: https://github.com/pront
 domain: dev
-weight: 5
 tags: [ "dev", "ide", "autocompletion", "config", "guides", "guide" ]
 aliases: [ "/docs/guides/developer/config-autocompletion.md" ]
+weight: 1
 ---
 
 {{< requirement >}}
