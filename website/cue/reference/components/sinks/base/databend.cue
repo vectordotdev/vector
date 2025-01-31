@@ -14,9 +14,9 @@ base: components: sinks: databend: configuration: {
 			description: """
 				Whether or not end-to-end acknowledgements are enabled.
 
-				When enabled for a sink, any source connected to that sink where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
-				connected** sinks before acknowledging them at the source.
+				When enabled for a sink, any source that supports end-to-end
+				acknowledgements that is connected to that sink waits for events
+				to be acknowledged by **all connected sinks** before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -151,8 +151,8 @@ base: components: sinks: databend: configuration: {
 				type: object: options: {
 					capacity: {
 						description: """
-																Set the capacity (in bytes) of the internal buffer used in the CSV writer.
-																This defaults to a reasonable setting.
+																Sets the capacity (in bytes) of the internal buffer used in the CSV writer.
+																This defaults to 8KB.
 																"""
 						required: false
 						type: uint: default: 8192
@@ -164,9 +164,9 @@ base: components: sinks: databend: configuration: {
 					}
 					double_quote: {
 						description: """
-																Enable double quote escapes.
+																Enables double quote escapes.
 
-																This is enabled by default, but it may be disabled. When disabled, quotes in
+																This is enabled by default, but you can disable it. When disabled, quotes in
 																field data are escaped instead of doubled.
 																"""
 						required: false
@@ -179,20 +179,20 @@ base: components: sinks: databend: configuration: {
 																In some variants of CSV, quotes are escaped using a special escape character
 																like \\ (instead of escaping quotes by doubling them).
 
-																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+																To use this, `double_quotes` needs to be disabled as well; otherwise, this setting is ignored.
 																"""
 						required: false
 						type: ascii_char: default: "\""
 					}
 					fields: {
 						description: """
-																Configures the fields that will be encoded, as well as the order in which they
+																Configures the fields that are encoded, as well as the order in which they
 																appear in the output.
 
-																If a field is not present in the event, the output will be an empty string.
+																If a field is not present in the event, the output for that field is an empty string.
 
-																Values of type `Array`, `Object`, and `Regex` are not supported and the
-																output will be an empty string.
+																Values of type `Array`, `Object`, and `Regex` are not supported, and the
+																output for any of these types is an empty string.
 																"""
 						required: true
 						type: array: items: type: string: {}
@@ -218,8 +218,8 @@ base: components: sinks: databend: configuration: {
 								never: "Never writes quotes, even if it produces invalid CSV data."
 								non_numeric: """
 																			Puts quotes around all fields that are non-numeric.
-																			Namely, when writing a field that does not parse as a valid float or integer,
-																			then quotes are used even if they aren't strictly necessary.
+																			This means that when writing a field that does not parse as a valid float or integer,
+																			quotes are used even if they aren't strictly necessary.
 																			"""
 							}
 						}
@@ -503,7 +503,7 @@ base: components: sinks: databend: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -525,7 +525,7 @@ base: components: sinks: databend: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -566,7 +566,7 @@ base: components: sinks: databend: configuration: {
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
