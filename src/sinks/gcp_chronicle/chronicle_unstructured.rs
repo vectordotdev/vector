@@ -237,6 +237,10 @@ pub struct ChronicleUnstructuredConfig {
     #[configurable(metadata(docs::examples = "WINDOWS_DNS", docs::examples = "{{ log_type }}"))]
     pub log_type: Template,
 
+    /// The default `log_type` to attach to events if the template in `log_type` cannot be resolved.
+    #[configurable(metadata(docs::examples = "VECTOR_DEV"))]
+    pub fallback_log_type: Option<String>,
+
     #[configurable(derived)]
     #[serde(
         default,
@@ -261,6 +265,7 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
             namespace = "namespace"
             compression = "gzip"
             log_type = "log_type"
+            fallback_log_type = "VECTOR_DEV"
             encoding.codec = "text"
         "#})
         .unwrap()
@@ -355,6 +360,7 @@ impl ChronicleUnstructuredConfig {
     fn partitioner(&self) -> crate::Result<ChroniclePartitioner> {
         Ok(ChroniclePartitioner::new(
             self.log_type.clone(),
+            self.fallback_log_type.clone(),
             self.namespace.clone(),
         ))
     }
