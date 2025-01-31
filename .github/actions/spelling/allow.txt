@@ -520,3 +520,6 @@ WCDMA
 XMODEM
 cbor
 requestline
+jetbrains
+JetBrains
+gifs
