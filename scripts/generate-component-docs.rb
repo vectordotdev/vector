@@ -1742,7 +1742,7 @@ end
 schema_path = ARGV[0]
 root_schema = JSON.parse(File.read(schema_path))
 
-component_types = %w[source transform sink global_options]
+component_types = %w[source transform sink global_option]
 
 # First off, we generate the component type configuration bases. These are the high-level
 # configuration settings that are universal on a per-component type basis.

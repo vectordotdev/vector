@@ -1,6 +1,6 @@
 package metadata
 
-base: components: global_optionss: enrichment_tables: configuration: {
+base: components: global_options: enrichment_tables: configuration: {
 	file: {
 		description:   "File-specific settings."
 		relevant_when: "type = \"file\""
