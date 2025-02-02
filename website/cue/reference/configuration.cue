@@ -1,978 +1,502 @@
 package metadata
 
-configuration: {
-	configuration: #Schema
-	how_it_works:  #HowItWorks
-}
+configuration: configuration: {
+	enrichment_tables: {
+		type: object: options: {
+			file: {
+				type: object: options: {
+					encoding: {
+						type: object: options: {
+							delimiter: {
+								type: string: default: ","
+								description: "The delimiter used to separate fields in each row of the CSV file."
+								required:    false
+							}
+							include_headers: {
+								type: bool: default: true
+								description: """
+																	Whether or not the file contains column headers.
 
-configuration: {
-	configuration: {
-		acknowledgements: {
-			common:      true
-			description: "Controls how acknowledgements are handled by all sources. These settings may be overridden in individual sources."
-			required:    false
-			type: object: options: {
-				enabled: {
-					common:      true
-					description: "Controls if sources will wait for destination sinks to deliver the events, or persist them to a disk buffer, before acknowledging receipt. If set to `true`, all capable sources will have acknowledgements enabled."
-					warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
+																	When set to `true`, the first row of the CSV file will be read as the header row, and
+																	the values will be used for the names of each column. This is the default behavior.
+
+																	When set to `false`, columns are referred to by their numerical index.
+																	"""
+								required: false
+							}
+							type: {
+								required: true
+								type: string: enum: csv: """
+																				Decodes the file as a [CSV][csv] (comma-separated values) file.
+
+																				[csv]: https://wikipedia.org/wiki/Comma-separated_values
+																				"""
+								description: "File encoding type."
+							}
+						}
+						description: "File encoding configuration."
+						required:    true
+					}
+					path: {
+						type: string: {}
+						description: """
+													The path of the enrichment table file.
+
+													Currently, only [CSV][csv] files are supported.
+
+													[csv]: https://en.wikipedia.org/wiki/Comma-separated_values
+													"""
+						required: true
+					}
+				}
+				description:   "File-specific settings."
+				required:      true
+				relevant_when: "type = \"file\""
+			}
+			schema: {
+				type: object: options: "*": {
+					type: string: {}
+					required:    true
+					description: "represent mapped log field names and types."
+				}
+				description: """
+					Key/value pairs representing mapped log field names and types.
+
+					This is used to coerce log fields from strings into their proper types. The available types are listed in the `Types` list below.
+
+					Timestamp coercions need to be prefaced with `timestamp|`, for example `"timestamp|%F"`. Timestamp specifiers can use either of the following:
+
+					1. One of the built-in-formats listed in the `Timestamp Formats` table below.
+					2. The [time format specifiers][chrono_fmt] from Rust’s `chrono` library.
+
+					### Types
+
+					- **`bool`**
+					- **`string`**
+					- **`float`**
+					- **`integer`**
+					- **`date`**
+					- **`timestamp`** (see the table below for formats)
+
+					### Timestamp Formats
+
+					| Format               | Description                                                                      | Example                          |
+					|----------------------|----------------------------------------------------------------------------------|----------------------------------|
+					| `%F %T`              | `YYYY-MM-DD HH:MM:SS`                                                            | `2020-12-01 02:37:54`            |
+					| `%v %T`              | `DD-Mmm-YYYY HH:MM:SS`                                                           | `01-Dec-2020 02:37:54`           |
+					| `%FT%T`              | [ISO 8601][iso8601]/[RFC 3339][rfc3339], without time zone                       | `2020-12-01T02:37:54`            |
+					| `%FT%TZ`             | [ISO 8601][iso8601]/[RFC 3339][rfc3339], UTC                                     | `2020-12-01T09:37:54Z`           |
+					| `%+`                 | [ISO 8601][iso8601]/[RFC 3339][rfc3339], UTC, with time zone                     | `2020-12-01T02:37:54-07:00`      |
+					| `%a, %d %b %Y %T`    | [RFC 822][rfc822]/[RFC 2822][rfc2822], without time zone                         | `Tue, 01 Dec 2020 02:37:54`      |
+					| `%a %b %e %T %Y`     | [ctime][ctime] format                                                            | `Tue Dec 1 02:37:54 2020`        |
+					| `%s`                 | [UNIX timestamp][unix_ts]                                                        | `1606790274`                     |
+					| `%a %d %b %T %Y`     | [date][date] command, without time zone                                          | `Tue 01 Dec 02:37:54 2020`       |
+					| `%a %d %b %T %Z %Y`  | [date][date] command, with time zone                                             | `Tue 01 Dec 02:37:54 PST 2020`   |
+					| `%a %d %b %T %z %Y`  | [date][date] command, with numeric time zone                                     | `Tue 01 Dec 02:37:54 -0700 2020` |
+					| `%a %d %b %T %#z %Y` | [date][date] command, with numeric time zone (minutes can be missing or present) | `Tue 01 Dec 02:37:54 -07 2020`   |
+
+					[date]: https://man7.org/linux/man-pages/man1/date.1.html
+					[ctime]: https://www.cplusplus.com/reference/ctime
+					[unix_ts]: https://en.wikipedia.org/wiki/Unix_time
+					[rfc822]: https://tools.ietf.org/html/rfc822#section-5
+					[rfc2822]: https://tools.ietf.org/html/rfc2822#section-3.3
+					[iso8601]: https://en.wikipedia.org/wiki/ISO_8601
+					[rfc3339]: https://tools.ietf.org/html/rfc3339
+					[chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
+					"""
+				required:      false
+				relevant_when: "type = \"file\""
+			}
+			flush_interval: {
+				type: uint: {}
+				description: """
+					The interval used for making writes visible in the table.
+					Longer intervals might get better performance,
+					but there is a longer delay before the data is visible in the table.
+					Since every TTL scan makes its changes visible, only use this value
+					if it is shorter than the `scan_interval`.
+
+					By default, all writes are made visible immediately.
+					"""
+				required:      false
+				relevant_when: "type = \"memory\""
+			}
+			internal_metrics: {
+				type: object: options: include_key_tag: {
+					type: bool: default: false
+					description: """
+						Determines whether to include the key tag on internal metrics.
+
+						This is useful for distinguishing between different keys while monitoring. However, the tag's
+						cardinality is unbounded.
+						"""
 					required: false
-					type: bool: default: false
 				}
+				description:   "Configuration of internal metrics"
+				required:      false
+				relevant_when: "type = \"memory\""
 			}
-		}
+			max_byte_size: {
+				type: uint: {}
+				description: """
+					Maximum size of the table in bytes. All insertions that make
+					this table bigger than the maximum size are rejected.
 
-		data_dir: {
-			common: false
-			description: """
-				The directory used for persisting Vector state, such
-				as on-disk buffers, file checkpoints, and more.
-				Please make sure the Vector project has write
-				permissions to this directory.
-				"""
-			required: false
-			type: string: {
-				default: "/var/lib/vector/"
-				examples: ["/var/lib/vector", "/var/local/lib/vector/", "/home/user/vector/"]
+					By default, there is no size limit.
+					"""
+				required:      false
+				relevant_when: "type = \"memory\""
 			}
-		}
-
-		expire_metrics: {
-			common: false
-			description: """
-				If set, Vector will configure the internal metrics system to automatically
-				remove all metrics that have not been updated in the given time.
-
-				If set to a negative value expiration is disabled.
-				"""
-			required: false
-			warnings: ["Deprecated, please use `expire_metrics_secs` instead."]
-			type: object: options: {
-				secs: {
-					common:      true
-					required:    false
-					description: "The whole number of seconds after which to expire metrics."
-					type: uint: {
-						default: null
-						examples: [60]
-						unit: "seconds"
-					}
-				}
-				nsecs: {
-					common:      true
-					required:    false
-					description: "The fractional number of seconds after which to expire metrics."
-					type: uint: {
-						default: null
-						examples: [0]
-						unit: "nanoseconds"
-					}
-				}
+			scan_interval: {
+				type: uint: default: 30
+				description: """
+					The scan interval used to look for expired records. This is provided
+					as an optimization to ensure that TTL is updated, but without doing
+					too many cache scans.
+					"""
+				required:      false
+				relevant_when: "type = \"memory\""
 			}
-		}
-
-		expire_metrics_secs: {
-			common: false
-			description: """
-				Vector will expire internal metrics that haven't been emitted/updated in the
-				configured interval (default 300 seconds).
-
-				Note that internal counters that are expired but are later updated will have their
-				values reset to zero. Be careful to set this value high enough to avoid expiring
-				critical but infrequently updated internal counters.
-
-				If set to a negative value expiration is disabled.
-				"""
-			required: false
-			type: float: {
-				default: 300.0
-				examples: [60.0]
-				unit: "seconds"
+			ttl: {
+				type: uint: default: 600
+				description: """
+					TTL (time-to-live in seconds) is used to limit the lifetime of data stored in the cache.
+					When TTL expires, data behind a specific key in the cache is removed.
+					TTL is reset when the key is replaced.
+					"""
+				required:      false
+				relevant_when: "type = \"memory\""
 			}
-		}
+			locale: {
+				type: string: default: "en"
+				description: """
+					The locale to use when querying the database.
 
-		enrichment_tables: {
-			common:      false
-			description: """
-				Configuration options for an [enrichment table](\(urls.enrichment_tables_concept)) to be used in a
-				[`remap`](\(urls.vector_remap_transform)) transform. Currently supported are:
+					MaxMind includes localized versions of some of the fields within their database, such as
+					country name. This setting can control which of those localized versions are returned by the
+					transform.
 
-				* [CSV](\(urls.csv)) files
-				* [MaxMind](\(urls.maxmind)) databases
-				* In-memory storage
+					More information on which portions of the geolocation data are localized, and what languages
+					are available, can be found [here][locale_docs].
 
-				For the lookup in the enrichment tables to be as performant as possible, the data is indexed according
-				to the fields that are used in the search. Note that indices can only be created for fields for which an
-				exact match is used in the condition. For range searches, an index isn't used and the enrichment table
-				drops back to a sequential scan of the data. A sequential scan shouldn't impact performance
-				significantly provided that there are only a few possible rows returned by the exact matches in the
-				condition. We don't recommend using a condition that uses only date range searches.
-				"""
-			required:    false
-			type: object: options: {
-				type: {
-					description: """
-						Determines the type of enrichment data that is to be loaded.
+					[locale_docs]: https://support.maxmind.com/hc/en-us/articles/4414877149467-IP-Geolocation-Data#h_01FRRGRYTGZB29ERDBZCX3MR8Q
+					"""
+				required:      false
+				relevant_when: "type = \"geoip\""
+			}
+			path: {
+				type: string: {}
+				description: """
+					Path to the [MaxMind GeoIP2][geoip2] or [GeoLite2 binary city database file][geolite2]
+					(**GeoLite2-City.mmdb**).
+
+					Other databases, such as the country database, are not supported.
+					`mmdb` enrichment table can be used for other databases.
+
+					[geoip2]: https://dev.maxmind.com/geoip/geoip2/downloadable
+					[geolite2]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
+					"""
+				required:      true
+				relevant_when: "type = \"geoip\" or type = \"mmdb\""
+			}
+			type: {
+				required: true
+				type: string: enum: {
+					file: "Exposes data from a static file as an enrichment table."
+					memory: """
+						Exposes data from a memory cache as an enrichment table. The cache can be written to using
+						a sink.
 						"""
-					required: true
-					type: string: {
-						enum: {
-							"file":   "Enrich data from a CSV file."
-							"geoip":  "Enrich data from a [GeoIp](\(urls.maxmind_geoip2)) [MaxMind](\(urls.maxmind)) database."
-							"mmdb":   "Enrich data from any [MaxMind](\(urls.maxmind)) database."
-							"memory": "Enrich data from memory, which can be populated by using the table as a sink."
-						}
-					}
-				}
-				file: {
-					required:    true
-					description: "Configuration options for the file that provides the enrichment table."
-					type: object: options: {
-						path: {
-							description: """
-								The path of the enrichment table file. Currently, only [CSV](\(urls.csv)) files are
-								supported.
-								"""
-							warnings: [
-								"In order to be used by Vector, you need to assign read access to the enrichment table file.",
-							]
-							required: true
-							type: string: {
-								examples: [
-									"/data/info.csv",
-									"./info.csv",
-								]
-							}
-						}
+					geoip: """
+						Exposes data from a [MaxMind][maxmind] [GeoIP2][geoip2] database as an enrichment table.
 
-						encoding: {
-							description: "Configuration options for the encoding of the enrichment table's file."
-							required:    true
-							type: object: options: {
-								type: {
-									description: """
-										The encoding of the file. Currently, only [CSV](\(urls.csv)) is supported.
-										"""
-									required:    false
-									common:      true
-									type: string: default: "csv"
-								}
-
-								delimiter: {
-									description:   "The delimiter used to separate fields in each row of the CSV file."
-									common:        false
-									required:      false
-									relevant_when: "type = \"csv\""
-									type: string: {
-										default: ","
-										examples: [":"]
-									}
-								}
-
-								include_headers: {
-									description: """
-										Set `include_headers` to `true` if the first row of the CSV file contains the
-										headers for each column. This is the default behavior.
-
-										If you set it to `false`, there are no headers and the columns are referred to
-										by their numerical index.
-										"""
-									required:      false
-									relevant_when: "type = \"csv\""
-									common:        false
-									type: bool: default: true
-								}
-							}
-						}
-
-						schema: {
-							description: _coercing_fields
-							required:    false
-							common:      true
-							type: object: {
-								examples: [
-									{
-										status:            "int"
-										duration:          "float"
-										success:           "bool"
-										timestamp_iso8601: "timestamp|%F"
-										timestamp_custom:  "timestamp|%a %b %e %T %Y"
-										timestamp_unix:    "timestamp|%F %T"
-									},
-								]
-
-								options: {}
-							}
-						}
-					}
-				}
-			}
-			type: object: options: {
-				geoip: {
-					required:    true
-					description: """
-						Configuration options for [MaxMind](\(urls.maxmind)) databases.
-
-						The following [MaxMind](\(urls.maxmind)) databases are currently supported:
-
-						* [GeoLite2-ASN.mmdb](\(urls.maxmind_geolite2_asn)) (free) — Determine the
-							autonomous system number and organization associated with an IP address.
-						* [GeoLite2-City.mmdb](\(urls.maxmind_geolite2_city)) (free) — Determine the
-							country, subdivisions, city, and postal code associated with IPv4 and IPv6
-							addresses worldwide.
-						* [GeoIP2-City.mmdb](\(urls.maxmind_geoip2_city)) (paid) — Determine the country,
-							subdivisions, city, and postal code associated with IPv4 and IPv6
-							addresses worldwide.
-						* [GeoIP2-ISP.mmdb](\(urls.maxmind_geoip2_isp)) (paid) — Determine the Internet
-							Service Provider (ISP), organization name, and autonomous system organization
-							and number associated with an IP address.
-						* [GeoIP2-Anonymous-IP.mmdb](\(urls.maxmind_geoip2_anonymous_ip)) (paid) — Determine
-							proxy, VPN, hosting, and other anonymous IP addresses.
-
-						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
-
-						This enrichment table only supports lookup with IP address.
+						[maxmind]: https://www.maxmind.com/
+						[geoip2]: https://www.maxmind.com/en/geoip2-databases
 						"""
-					type: object: options: {
-						path: {
-							description: """
-								Path to the database file.
-								"""
-							required: true
-							type: string: {
-								examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
-							}
-						}
-						locale: {
-							description: """
-								The locale to use to lookup the country name and region name for the city database.
-								See [Locations Files](https://dev.maxmind.com/geoip/docs/databases/city-and-country?lang=en)
-								"""
-							required: false
-							common:   false
-							type: string: {
-								default: "en"
-								examples: ["de", "en", "es", "fr", "ja", "pt-BR", "ru", "zh-CN"]
-							}
-						}
-					}
-				}
-			}
-			type: object: options: {
-				mmdb: {
-					required:    true
-					description: """
-						Configuration options for generic [MaxMind](\(urls.maxmind)) databases.
+					mmdb: """
+						Exposes data from a [MaxMind][maxmind] database as an enrichment table.
 
-						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
-
-						This enrichment table only supports lookup with IP address.
+						[maxmind]: https://www.maxmind.com/
 						"""
-					type: object: options: {
-						path: {
-							description: """
-								Path to the database file.
-								"""
-							required: true
-							type: string: {
-								examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
-							}
-						}
-					}
 				}
-			}
-			type: object: options: {
-				memory: {
-					required:    true
-					description: """
-						Configuration options for in-memory enrichment table.
-
-						This enrichment table only supports lookup with key field.
-
-						To write data into this table, you have to define inputs to use this the table as a sink.
-						They are expected to produce objects, where each key-value pair is stored as a separate
-						record in the table. [Read more on how to use this component](\(urls.vector_enrichment_memory_how_it_works)).
-						"""
-					type: object: options: {
-						inputs: base.components.sinks.configuration.inputs
-						ttl: {
-							description: """
-								TTL (time-to-live in seconds) is used to limit the lifetime of data stored in the cache.
-								When TTL expires, data behind a specific key in the cache is removed.
-								TTL is reset when the key is replaced.
-								"""
-							required: false
-							type: uint: {
-								default: 600
-								examples: [3600, 21600]
-							}
-						}
-						scan_interval: {
-							description: """
-								The scan interval used to look for expired records. This is provided
-								as an optimization to ensure that TTL is updated, but without doing
-								too many cache scans.
-								"""
-							required: false
-							type: uint: {
-								default: 30
-								examples: [600, 60]
-							}
-						}
-						flush_interval: {
-							description: """
-								The interval used for making writes visible in the table.
-								Longer intervals might get better performance,
-								but there is a longer delay before the data is visible in the table.
-								Since every TTL scan makes its changes visible, only use this value
-								if it is shorter than the `scan_interval`.
-
-								By default, all writes are made visible immediately.
-								"""
-							required: false
-							type: uint: {
-								default: 0
-								examples: [15, 30]
-							}
-						}
-						max_byte_size: {
-							description: """
-								Maximum size of the table in bytes. All insertions that make this table bigger than the maximum size are rejected.
-
-								By default, there is no size limit.
-								"""
-							required: false
-							type: uint: {
-								default: 0
-								examples: [64000, 1000000000]
-							}
-						}
-						internal_metrics: {
-							description: """
-								Configuration of internal metrics for enrichment memory table.
-								"""
-							required: false
-							type: object: options: {
-								include_key_tag: {
-									description: """
-										Determines whether to include the key tag on internal metrics.
-
-										This is useful for distinguishing between different keys while monitoring. However, the tag's
-										cardinality is unbounded.
-										"""
-									required: false
-									type: bool: default: false
-								}
-							}
-						}
-					}
-				}
+				description: "enrichment table type"
 			}
 		}
-		schema: {
-			common: false
-			description: """
-				Configures options for how Vector handles event schema.
-				"""
-			required: false
-			type: object: {
-				examples: []
-				options: {
-					log_namespace: {
-						common:      false
-						description: """
-							Globally enables / disables log namespacing. See [Log Namespacing](\(urls.log_namespacing_blog))
-							for more details. If you want to enable individual sources, there is a config
-							option in the source configuration.
-
-							Known issues:
-
-							- Enabling log namespacing doesn't work when disk buffers are used (see [#18574](https://github.com/vectordotdev/vector/issues/18574))
-							"""
-						required:    false
-						warnings: []
-						type: bool: default: false
-					}
-				}
-			}
-		}
-
-		telemetry: {
-			common: false
-			description: """
-				Configures options for how Vector emits telemetry.
-				"""
-			required: false
-			type: object: {
-				examples: []
-				options: {
-					tags: {
-						required: false
-						description: """
-							Controls which tags should be included with the `vector_component_sent_events_total` and
-							`vector_component_sent_event_bytes_total` metrics.
-							"""
-						type: object: {
-							examples: []
-							options: {
-								emit_source: {
-									common: true
-									description: """
-										Add a `source` tag with the source component the event was received from.
-
-										If there is no source component, for example if the event was generated by
-										the `lua` transform a `-` is emitted for this tag.
-										"""
-									required: false
-									type: bool: {
-										default: false
-									}
-								}
-								emit_service: {
-									common: false
-									description: """
-										Adds a `service` tag with the service component the event was received from.
-
-										For logs this is the field that has been determined to mean `service`. Each source may
-										define different fields for this. For example, with `syslog` events the `appname` field
-										is used.
-
-										Metric events will use the tag named `service`.
-
-										If no service is available a `-` is emitted for this tag.
-										"""
-									required: false
-									type: bool: {
-										default: false
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		log_schema: {
-			common:      false
-			description: """
-				Configures default log schema for all events. This is used by
-				Vector components to assign the fields on incoming
-				events.
-				These values are ignored if log namespacing is enabled. (See [Log Namespacing](\(urls.log_namespacing_blog)))
-				"""
-			required:    false
-			type: object: {
-				examples: []
-				options: {
-					message_key: {
-						common: true
-						description: """
-							Sets the event key to use for the event message field.
-							"""
-						required: false
-						type: string: {
-							default: "message"
-							examples: ["message", "@message"]
-						}
-					}
-
-					timestamp_key: {
-						common: true
-						description: """
-							Sets the event key to use for the event timestamp field.
-							"""
-						required: false
-						type: string: {
-							default: "timestamp"
-							examples: ["timestamp", "@timestamp"]
-						}
-					}
-
-					host_key: {
-						common: true
-						description: """
-							Sets the event key to use for the event host field.
-							"""
-						required: false
-						type: string: {
-							default: "host"
-							examples: ["host", "@host"]
-						}
-					}
-
-					source_type_key: {
-						common: true
-						description: """
-							Sets the event key to use for the event source type
-							field that is set by some sources.
-							"""
-						required: false
-						type: string: {
-							default: "source_type"
-							examples: ["source_type", "@source_type"]
-						}
-					}
-
-					metadata_key: {
-						common: true
-						description: """
-							Sets the event key to use for event metadata field (e.g. error or
-							abort annotations in the `remap` transform).
-							"""
-						required: false
-						type: string: {
-							default: "metadata"
-							examples: ["@metadata", "meta"]
-							syntax: "literal"
-						}
-					}
-				}
-			}
-		}
-
-		healthchecks: {
-			common: false
-			description: """
-				Configures health checks for all sinks.
-				"""
-			required: false
-			type: object: {
-				examples: []
-				options: {
-					enabled: {
-						common: true
-						description: """
-							Disables all health checks if false, otherwise sink specific
-							option overrides it.
-							"""
-						required: false
-						type: bool: {
-							default: true
-						}
-					}
-
-					require_healthy: {
-						common: false
-						description: """
-							Exit on startup if any sinks' health check fails. Overridden by
-							`--require-healthy` command line flag.
-							"""
-						required: false
-						type: bool: {
-							default: false
-						}
-					}
-				}
-			}
-		}
-
-		secret: {
-			common: false
-			description: """
-				Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
-				in Vector config. Multiple backends can be configured. Use `SECRET[<backend_name>.<secret_key>]` to tell Vector to retrieve the secret. This placeholder is replaced by the secret
-				retrieved from the relevant backend.
-
-				When `type` is `exec`, the provided command will be run and provided a list of
-				secrets to fetch, determined from the configuration file, on stdin as JSON in the format:
-
-				```json
-				{"version": "1.0", "secrets": ["secret1", "secret2"]}
-				```
-
-				The executable is expected to respond with the values of these secrets on stdout, also as JSON, in the format:
-
-				```json
-				{
-					"secret1": {"value": "secret_value", "error": null},
-					"secret2": {"value": null, "error": "could not fetch the secret"}
-				}
-				```
-				If an `error` is returned for any secrets, or if the command exits with a non-zero status code,
-				Vector will log the errors and exit.
-
-				Otherwise, the secret must be a JSON text string with key/value pairs. For example:
-				```json
-				{
-					"username": "test",
-					"password": "example-password"
-				}
-				```
-
-				If an error occurred while reading the file or retrieving the secrets, Vector logs the error and exits.
-
-				Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
-				configuration reload process.
-
-				"""
-			required: false
-			type: object: options: {
-				type: {
-					description: """
-						The type of secret backend to use.
-						"""
-					required: true
-					type: string: {
-						enum: {
-							"file":                "Retrieve secrets from a file path."
-							"directory":           "Retrieve secrets from file contents in a directory."
-							"exec":                "Run a local command to retrieve secrets."
-							"aws_secrets_manager": "Retrieve secrets from AWS Secrets Manager."
-							"test":                "Secret backend for test."
-						}
-					}
-				}
-				path: {
-					description: """
-						When type is `file`, this value is the file path to read.
-
-						When type is `directory`, this value is the path of the directory with secrets.
-						"""
-					required:      true
-					relevant_when: "type = \"file\" or type = \"directory\""
-					type: string: {
-						examples: [
-							"/path/to/secret.json",
-							"${CREDENTIALS_DIRECTORY}", // https://systemd.io/CREDENTIALS
-							"/path/to/secrets-directory",
-						]
-					}
-				}
-				remove_trailing_whitespace: {
-					description: """
-						Remove trailing whitespace from file contents.
-						"""
-					required:      false
-					relevant_when: "type = \"directory\""
-					type: bool: default: false
-				}
-				replacement: {
-					description: """
-						Fixed value to replace all secrets with.
-						"""
-					required:      false
-					relevant_when: "type = \"test\""
-					type: string: {
-						examples: ["test"]
-					}
-				}
-				command: {
-					description: """
-						The command to be run, plus any arguments required.
-						"""
-					required:      true
-					relevant_when: "type = \"exec\""
-					type: array: {
-						examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrapper"]]
-						items: type: string: {}
-					}
-				}
-				timeout: {
-					description:   "The amount of time Vector will wait for the command to complete."
-					required:      false
-					relevant_when: "type = \"exec\""
-					common:        false
-					type: uint: {
-						default: 5
-						unit:    "seconds"
-					}
-				}
-				secret_id: {
-					description: """
-						The ID of the secret to be retrieved.
-						"""
-					required:      true
-					relevant_when: "type = \"aws_secrets_manager\""
-					type: string: {
-						examples: ["/secret/foo-bar"]
-					}
-				}
-			}
-		}
-
-		timezone: {
-			common:      false
-			description: """
-				The name of the time zone to apply to timestamp conversions that do not contain an
-				explicit time zone. The time zone name may be any name in the
-				[TZ database](\(urls.tz_time_zones)), or `local` to indicate system local time.
-				"""
-			required:    false
-			type: string: {
-				default: "local"
-				examples: ["local", "America/NewYork", "EST5EDT"]
-			}
-		}
-
-		proxy: {
-			common:      false
-			description: "Configures an HTTP(S) proxy for Vector to use."
-			required:    false
-			type: object: options: {
-				enabled: {
-					common:      false
-					description: "If false the proxy will be disabled."
-					required:    false
-					type: bool: default: true
-				}
-				http: {
-					common:      false
-					description: "The URL to proxy HTTP requests through."
-					required:    false
-					type: string: {
-						default: null
-						examples: ["http://foo.bar:3128"]
-					}
-				}
-				https: {
-					common:      false
-					description: "The URL to proxy HTTPS requests through."
-					required:    false
-					type: string: {
-						default: null
-						examples: ["http://foo.bar:3128"]
-					}
-				}
-				no_proxy: {
-					common:      false
-					description: """
-							A list of hosts to avoid proxying. Allowed patterns here include:
-
-							Pattern | Example match
-							:-------|:-------------
-							Domain names | `example.com` matches requests to `example.com`
-							Wildcard domains | `.example.com` matches requests to `example.com` and its subdomains
-							IP addresses | `127.0.0.1` matches requests to 127.0.0.1
-							[CIDR](\(urls.cidr)) blocks | `192.168.0.0./16` matches requests to any IP addresses in this range
-							Splat | `*` matches all hosts
-							"""
-					required:    false
-
-					type: array: {
-						default: null
-						items: type: string: {
-							examples: ["localhost", ".foo.bar", "*"]
-						}
-					}
-				}
-			}
-		}
+		description: "Configurable enrichment tables."
 	}
+	secrets: {
+		type: object: options: {
+			path: {
+				type: string: {}
+				description:   "File path to read secrets from."
+				required:      true
+				relevant_when: "type = \"file\" or type = \"directory\""
+			}
+			remove_trailing_whitespace: {
+				type: bool: default: false
+				description:   "Remove trailing whitespace from file contents."
+				required:      false
+				relevant_when: "type = \"directory\""
+			}
+			command: {
+				type: array: items: type: string: {}
+				description: """
+					Command arguments to execute.
 
-	how_it_works: {
-		environment_variables: {
-			title: "Environment variables"
-			body: """
-				Vector interpolates environment variables within your configuration file
-				with the following syntax:
+					The path to the script or binary must be the first argument.
+					"""
+				required:      true
+				relevant_when: "type = \"exec\""
+			}
+			timeout: {
+				type: uint: default: 5
+				description:   "The timeout, in seconds, to wait for the command to complete."
+				required:      false
+				relevant_when: "type = \"exec\""
+			}
+			auth: {
+				type: object: options: {
+					access_key_id: {
+						type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
+						description: "The AWS access key ID."
+						required:    true
+					}
+					assume_role: {
+						type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
+						description: """
+													The ARN of an [IAM role][iam_role] to assume.
 
-				```toml title="vector.yaml"
-				transforms:
-					add_host:
-						inputs: ["apache_logs"]
-						type: "remap"
-						source: |
-							.host = get_env_var!("HOSTNAME")
-				```
-				"""
+													[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+													"""
+						required: true
+					}
+					external_id: {
+						type: string: examples: ["randomEXAMPLEidString"]
+						description: """
+													The optional unique external ID in conjunction with role to assume.
 
-			sub_sections: [
-				{
-					title: "Default values"
-					body: """
-						Default values can be supplied using `:-` or `-` syntax:
+													[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+													"""
+						required: false
+					}
+					region: {
+						type: string: examples: ["us-west-2"]
+						description: """
+													The [AWS region][aws_region] to send STS requests to.
 
-						```toml
-						option = "${ENV_VAR:-default}" # default value if variable is unset or empty
-						option = "${ENV_VAR-default}" # default value only if variable is unset
-						```
-						"""
-				},
-				{
-					title: "Required variables"
-					body: """
-						Environment variables that are required can be specified using `:?` or `?` syntax:
+													If not set, this defaults to the configured region
+													for the service itself.
 
-						```toml
-						option = "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
-						option = "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
-						```
-						"""
-				},
-				{
-					title: "Escaping"
-					body: """
-						You can escape environment variable by preceding them with a `$` character. For
-						example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above environment
-						variable example.
-						"""
-				},
-			]
-		}
-		secrets_management: {
-			title: "Secrets management"
-			body: """
-				Vector can retrieve secrets like a password or token by querying an external system in order to
-				avoid storing sensitive information in Vector configuration files. Secret backends used to retrieve
-				sensitive token are configured in a dedicated section (`secret`). In the rest of the configuration you should use
-				the `SECRET[<backend_name>.<secret_key>]` notation to interpolate the secret. Interpolation will happen immediately after
-				environment variables interpolation. While Vector supports multiple commands to retrieve secrets, a
-				secret backend cannot use the secret interpolation feature for its own configuration. Currently the only supported
-				kind of secret backend is the `exec` one that runs an external command to retrieve secrets.
+													[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+													"""
+						required: false
+					}
+					secret_access_key: {
+						type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+						description: "The AWS secret access key."
+						required:    true
+					}
+					session_name: {
+						type: string: examples: ["vector-indexer-role"]
+						description: """
+													The optional [RoleSessionName][role_session_name] is a unique session identifier for your assumed role.
 
-				The following example shows a simple configuration with two backends defined:
+													Should be unique per principal or reason.
+													If not set, session name will be autogenerated like assume-role-provider-1736428351340
 
-				```toml title="vector.yaml"
-				secret:
-					backend_1:
-						type: "exec"
-						command: ["/path/to/cmd1", "--some-option"]
-					backend_2:
-						type: "exec"
-						command: ["/path/to/cmd2"]
-
-				sinks:
-					dd_logs:
-						type: "datadog_logs"
-						default_api_key: "SECRET[backend_1.dd_api_key]"
-
-					splunk:
-						type: "splunk_hec"
-						default_token: "SECRET[backend_2.splunk_token]"
-				```
-
-				In that example Vector will retrieve the `dd_api_key` from `backen_1` and `splunk_token` from `backend_2`.
-				"""
-
-			sub_sections: [
-				{
-					title: "The `exec` backend"
-					body:  """
-						When using the `exec` type for a secret backend Vector and the external command are communicating using
-						the standard input and output. The communication is using plain text JSON. Vector spawns the specified
-						command, writes the secret retrieval query using JSON on the standard input of the child process and
-						reads its standard output expecting a JSON object. Standard error from the child process is read and
-						logged by Vector and can be used for troubleshooting.
-
-						The JSON object used for communication between an `exec` backend and Vector shall comply with the
-						[Datadog Agent executable API](\(urls.datadog_agent_exec_api)).
-
-						For example a query would look like:
-
-						```json
-						{
-							"version": "1.0",
-							"secrets": ["dd_api_key", "another_dd_api_key"]
+													[role_session_name]: https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
+													"""
+						required: false
+					}
+					credentials_file: {
+						type: string: examples: ["/my/aws/credentials"]
+						description: "Path to the credentials file."
+						required:    true
+					}
+					profile: {
+						type: string: {
+							default: "default"
+							examples: ["develop"]
 						}
-						```
+						description: """
+													The credentials profile to use.
 
-						A possible reply from a backend could then be:
-
-						```json
-						{
-							"dd_api_key": {"value": "A_DATADOG_API_KEY", "error": null},
-							"another_dd_api_key": {"value": null, "error": "unable to retrieve secret"}
+													Used to select AWS credentials from a provided credentials file.
+													"""
+						required: false
+					}
+					imds: {
+						type: object: options: {
+							connect_timeout_seconds: {
+								type: uint: {
+									default: 1
+									unit:    "seconds"
+								}
+								description: "Connect timeout for IMDS."
+								required:    false
+							}
+							max_attempts: {
+								type: uint: default: 4
+								description: "Number of IMDS retries for fetching tokens and metadata."
+								required:    false
+							}
+							read_timeout_seconds: {
+								type: uint: {
+									default: 1
+									unit:    "seconds"
+								}
+								description: "Read timeout for IMDS."
+								required:    false
+							}
 						}
-						```
+						description: "Configuration for authenticating with AWS through IMDS."
+						required:    false
+					}
+					load_timeout_secs: {
+						type: uint: {
+							examples: [30]
+							unit: "seconds"
+						}
+						description: """
+													Timeout for successfully loading any credentials, in seconds.
 
-						If a backend writes a JSON that does not follow the expected structure or reports an error for a
-						given secret Vector will refuse to load the configuration.
+													Relevant when the default credentials chain or `assume_role` is used.
+													"""
+						required: false
+					}
+				}
+				description:   "Configuration of the authentication strategy for interacting with AWS services."
+				required:      false
+				relevant_when: "type = \"aws_secrets_manager\""
+			}
+			secret_id: {
+				type: string: {}
+				description:   "ID of the secret to resolve."
+				required:      true
+				relevant_when: "type = \"aws_secrets_manager\""
+			}
+			tls: {
+				type: object: options: {
+					alpn_protocols: {
+						type: array: items: type: string: examples: ["h2"]
+						description: """
+													Sets the list of supported ALPN protocols.
 
-						Currently Vector will always query backend with `"version": "1.0"`.
-						"""
-				},
-			]
+													Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
+													that they are defined.
+													"""
+						required: false
+					}
+					ca_file: {
+						type: string: examples: ["/path/to/certificate_authority.crt"]
+						description: """
+													Absolute path to an additional CA certificate file.
+
+													The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+													"""
+						required: false
+					}
+					crt_file: {
+						type: string: examples: ["/path/to/host_certificate.crt"]
+						description: """
+													Absolute path to a certificate file used to identify this server.
+
+													The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+													an inline string in PEM format.
+
+													If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
+													"""
+						required: false
+					}
+					key_file: {
+						type: string: examples: ["/path/to/host_certificate.key"]
+						description: """
+													Absolute path to a private key file used to identify this server.
+
+													The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
+													"""
+						required: false
+					}
+					key_pass: {
+						type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+						description: """
+													Passphrase used to unlock the encrypted key file.
+
+													This has no effect unless `key_file` is set.
+													"""
+						required: false
+					}
+					server_name: {
+						type: string: examples: ["www.example.com"]
+						description: """
+													Server name to use when using Server Name Indication (SNI).
+
+													Only relevant for outgoing connections.
+													"""
+						required: false
+					}
+					verify_certificate: {
+						type: bool: {}
+						description: """
+													Enables certificate verification. For components that create a server, this requires that the
+													client connections have a valid client certificate. For components that initiate requests,
+													this validates that the upstream has a valid certificate.
+
+													If enabled, certificates must not be expired and must be issued by a trusted
+													issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
+													certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
+													so on, until the verification process reaches a root certificate.
+
+													Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+													"""
+						required: false
+					}
+					verify_hostname: {
+						type: bool: {}
+						description: """
+													Enables hostname verification.
+
+													If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+													the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+
+													Only relevant for outgoing connections.
+
+													Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+													"""
+						required: false
+					}
+				}
+				description:   "TLS configuration."
+				required:      false
+				relevant_when: "type = \"aws_secrets_manager\""
+			}
+			endpoint: {
+				type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
+				description:   "Custom endpoint for use with AWS-compatible services."
+				required:      false
+				relevant_when: "type = \"aws_secrets_manager\""
+			}
+			region: {
+				type: string: examples: ["us-east-1"]
+				description: """
+					The [AWS region][aws_region] of the target service.
+
+					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+					"""
+				required:      false
+				relevant_when: "type = \"aws_secrets_manager\""
+			}
+			type: {
+				required: true
+				type: string: enum: {
+					file:                "File."
+					directory:           "Directory."
+					exec:                "Exec."
+					aws_secrets_manager: "AWS Secrets Manager."
+				}
+				description: "secret type"
+			}
 		}
-		formats: {
-			title: "Formats"
-			body:  """
-				Vector supports [YAML](\(urls.yaml)), [TOML](\(urls.toml)), and [JSON](\(urls.json)) to
-				ensure Vector fits into your workflow. A side benefit of supporting YAML and JSON is that they
-				enable you to use data templating languages such as [ytt](\(urls.ytt)), [Jsonnet](\(urls.jsonnet)) and
-				[Cue](\(urls.cue)).
-				"""
-		}
-		location: {
-			title: "Location"
-			body: """
-				The location of your Vector configuration file depends on your installation method. For most Linux
-				based systems, the file can be found at `/etc/vector/vector.yaml`.
-
-				All files in `/etc/vector` are user configuration files and can be safely overridden to craft your
-				desired Vector configuration.
-				"""
-		}
-		multiple: {
-			title: "Multiple files"
-			body:  """
-				You can pass multiple configuration files when starting Vector:
-
-				```bash
-				vector --config vector1.yaml --config vector2.yaml
-				```
-
-				Or use a [globbing syntax](\(urls.globbing)):
-
-				```bash
-				vector --config /etc/vector/*.yaml
-				```
-				"""
-		}
-		automatic_namespacing: {
-			title: "Automatic namespacing of component files"
-			body: """
-				You can split your configuration files in component-type related folders.
-
-				For example, you can create the sink `foo` in the folder `/path/to/vector/config/sinks/foo.toml` and
-				configure it as follows:
-
-				```toml
-				type: "sink_type"
-				# here the sinks options
-				```
-
-				You can do the same for other kinds of components like `sources`, `transforms`, `tests` and `enrichment_tables`.
-
-				For vector to find and load the different configuration files, you need to load your configuration with
-				the `--config-dir` argument.
-
-				```bash
-				vector --config-dir /path/to/vector/config
-				```
-				"""
-		}
-		wildcards: {
-			title: "Wildcards in component names"
-			body: """
-				Vector supports wildcard characters (`*`) in component names when building your topology.
-
-				For example:
-
-				```yaml
-				sources:
-					app1_logs:
-						type: "file"
-						includes: ["/var/log/app1.log"]
-
-					app2_logs:
-						type: "file"
-						includes: ["/var/log/app.log"]
-
-					system_logs:
-						type: "file"
-						includes: ["/var/log/system.log"]
-
-				sinks:
-					app_logs:
-						type: "datadog_logs"
-						inputs: ["app*"]
-
-					archive:
-						type: "aws_s3"
-						inputs: ["*_logs"]
-				```
-				"""
-		}
+		description: "Configurable secret backends in Vector."
 	}
 }
