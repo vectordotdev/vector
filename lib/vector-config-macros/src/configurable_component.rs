@@ -84,8 +84,8 @@ impl TypedComponent {
                 ComponentType::EnrichmentTable => {
                     parse_quote! { ::vector_config::component::EnrichmentTableDescription }
                 }
-                ComponentType::GlobalOptions => {
-                    parse_quote! { ::vector_config::component::GlobalOptionsDescription }
+                ComponentType::GlobalOption => {
+                    parse_quote! { ::vector_config::component::GlobalOptionDescription }
                 }
                 ComponentType::Provider => {
                     parse_quote! { ::vector_config::component::ProviderDescription }
@@ -351,7 +351,7 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
 fn get_named_component_helper_ident(component_type: ComponentType) -> Ident {
     let attr = match component_type {
         ComponentType::EnrichmentTable => attrs::ENRICHMENT_TABLE_COMPONENT,
-        ComponentType::GlobalOptions => attrs::GLOBAL_OPTIONS_COMPONENT,
+        ComponentType::GlobalOption => attrs::GLOBAL_OPTION_COMPONENT,
         ComponentType::Provider => attrs::PROVIDER_COMPONENT,
         ComponentType::Secrets => attrs::SECRETS_COMPONENT,
         ComponentType::Sink => attrs::SINK_COMPONENT,

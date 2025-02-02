@@ -18,7 +18,7 @@ pub mod geoip;
 pub mod mmdb;
 
 /// Configurable enrichment tables.
-#[configurable_component(global_options("enrichment_tables", "enrichment table type"))]
+#[configurable_component(global_option("enrichment_tables", "enrichment table type"))]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(EnrichmentTableConfig)]
@@ -58,20 +58,3 @@ impl GenerateConfig for EnrichmentTables {
         .unwrap()
     }
 }
-
-// TODO: Use `enum_dispatch` here.
-// impl NamedComponent for EnrichmentTables {
-//     fn get_component_name(&self) -> &'static str {
-//         match self {
-//             Self::File(config) => config.get_component_name(),
-//             #[cfg(feature = "enrichment-tables-memory")]
-//             Self::Memory(config) => config.get_component_name(),
-//             #[cfg(feature = "enrichment-tables-geoip")]
-//             Self::Geoip(config) => config.get_component_name(),
-//             #[cfg(feature = "enrichment-tables-mmdb")]
-//             Self::Mmdb(config) => config.get_component_name(),
-//             #[allow(unreachable_patterns)]
-//             _ => unimplemented!(),
-//         }
-//     }
-// }

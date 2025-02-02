@@ -1,8 +1,8 @@
 /// An enrichment table component.
 pub struct EnrichmentTableComponent;
 
-// A global options component.
-pub struct GlobalOptionsComponent;
+// A global option component.
+pub struct GlobalOptionComponent;
 
 /// A provider component.
 pub struct ProviderComponent;
@@ -23,7 +23,7 @@ pub struct TransformComponent;
 pub trait ComponentMarker: sealed::Sealed {}
 
 impl ComponentMarker for EnrichmentTableComponent {}
-impl ComponentMarker for GlobalOptionsComponent {}
+impl ComponentMarker for GlobalOptionComponent {}
 impl ComponentMarker for ProviderComponent {}
 impl ComponentMarker for SecretsComponent {}
 impl ComponentMarker for SinkComponent {}
@@ -34,7 +34,7 @@ mod sealed {
     pub trait Sealed {}
 
     impl Sealed for super::EnrichmentTableComponent {}
-    impl Sealed for super::GlobalOptionsComponent {}
+    impl Sealed for super::GlobalOptionComponent {}
     impl Sealed for super::ProviderComponent {}
     impl Sealed for super::SecretsComponent {}
     impl Sealed for super::SinkComponent {}
