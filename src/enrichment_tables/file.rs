@@ -14,6 +14,7 @@ use crate::config::EnrichmentTableConfig;
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "File encoding type."))]
 pub enum Encoding {
     /// Decodes the file as a [CSV][csv] (comma-separated values) file.
     ///
@@ -111,6 +112,9 @@ pub struct FileConfig {
     /// [rfc3339]: https://tools.ietf.org/html/rfc3339
     /// [chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "represent mapped log field names and types."
+    ))]
     pub schema: HashMap<String, String>,
 }
 

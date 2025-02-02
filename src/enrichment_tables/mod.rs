@@ -4,7 +4,7 @@ use enum_dispatch::enum_dispatch;
 use vector_lib::configurable::configurable_component;
 pub use vector_lib::enrichment::{Condition, IndexHandle, Table};
 
-use crate::config::{EnrichmentTableConfig, GlobalOptions};
+use crate::config::{EnrichmentTableConfig, GenerateConfig, GlobalOptions};
 
 pub mod file;
 
@@ -18,10 +18,11 @@ pub mod geoip;
 pub mod mmdb;
 
 /// Configurable enrichment tables.
-#[configurable_component(global_options("enrichment_tables", "type"))]
+#[configurable_component(global_options("enrichment_tables", "enrichment table type"))]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(EnrichmentTableConfig)]
+#[configurable(metadata(docs::enum_tag_description = "enrichment table type"))]
 pub enum EnrichmentTables {
     /// Exposes data from a static file as an enrichment table.
     File(file::FileConfig),
@@ -43,6 +44,19 @@ pub enum EnrichmentTables {
     /// [maxmind]: https://www.maxmind.com/
     #[cfg(feature = "enrichment-tables-mmdb")]
     Mmdb(mmdb::MmdbConfig),
+}
+
+impl GenerateConfig for EnrichmentTables {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self::File(file::FileConfig {
+            file: file::FileSettings {
+                path: "path/to/file".into(),
+                encoding: file::Encoding::default(),
+            },
+            schema: Default::default(),
+        }))
+        .unwrap()
+    }
 }
 
 // TODO: Use `enum_dispatch` here.
