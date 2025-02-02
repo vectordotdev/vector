@@ -7,6 +7,7 @@ pub const COMPONENT_TYPE_SECRETS: &str = "secrets";
 pub const COMPONENT_TYPE_SINK: &str = "sink";
 pub const COMPONENT_TYPE_SOURCE: &str = "source";
 pub const COMPONENT_TYPE_TRANSFORM: &str = "transform";
+pub const COMPONENT_TYPE_GLOBAL_OPTIONS: &str = "global_options";
 pub const DOCS_META_ADDITIONAL_PROPS_DESC: &str = "docs::additional_props_description";
 pub const DOCS_META_ADVANCED: &str = "docs::advanced";
 pub const DOCS_META_COMPONENT_BASE_TYPE: &str = "docs::component_base_type";
@@ -32,6 +33,7 @@ pub const METADATA: &str = "_metadata";
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ComponentType {
     EnrichmentTable,
+    GlobalOptions,
     Provider,
     Secrets,
     Sink,
@@ -44,6 +46,7 @@ impl ComponentType {
     pub const fn as_str(&self) -> &'static str {
         match self {
             ComponentType::EnrichmentTable => COMPONENT_TYPE_ENRICHMENT_TABLE,
+            ComponentType::GlobalOptions => COMPONENT_TYPE_GLOBAL_OPTIONS,
             ComponentType::Provider => COMPONENT_TYPE_PROVIDER,
             ComponentType::Secrets => COMPONENT_TYPE_SECRETS,
             ComponentType::Sink => COMPONENT_TYPE_SINK,
@@ -63,6 +66,7 @@ impl<'a> TryFrom<&'a str> for ComponentType {
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         match value {
             COMPONENT_TYPE_ENRICHMENT_TABLE => Ok(ComponentType::EnrichmentTable),
+            COMPONENT_TYPE_GLOBAL_OPTIONS => Ok(ComponentType::GlobalOptions),
             COMPONENT_TYPE_PROVIDER => Ok(ComponentType::Provider),
             COMPONENT_TYPE_SECRETS => Ok(ComponentType::Secrets),
             COMPONENT_TYPE_SINK => Ok(ComponentType::Sink),

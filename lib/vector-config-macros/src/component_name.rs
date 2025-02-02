@@ -109,6 +109,7 @@ fn attr_to_component_name(attr: &Attribute) -> Result<Option<String>, Error> {
         attr.path(),
         &[
             attrs::ENRICHMENT_TABLE_COMPONENT,
+            attrs::GLOBAL_OPTIONS_COMPONENT,
             attrs::PROVIDER_COMPONENT,
             attrs::SINK_COMPONENT,
             attrs::SOURCE_COMPONENT,
