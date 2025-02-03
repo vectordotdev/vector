@@ -18,7 +18,7 @@ pub mod geoip;
 pub mod mmdb;
 
 /// Configurable enrichment tables.
-#[configurable_component(global_option("enrichment_tables", "enrichment table type"))]
+#[configurable_component(global_option("enrichment_tables"))]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(EnrichmentTableConfig)]

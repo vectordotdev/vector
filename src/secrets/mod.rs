@@ -16,7 +16,7 @@ mod test;
 
 /// Configurable secret backends in Vector.
 #[allow(clippy::large_enum_variant)]
-#[configurable_component(global_option("secrets", "secret type"))]
+#[configurable_component(global_option("secrets"))]
 #[derive(Clone, Debug)]
 #[enum_dispatch(SecretBackend)]
 #[serde(tag = "type", rename_all = "snake_case")]
