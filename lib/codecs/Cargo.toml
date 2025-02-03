@@ -44,7 +44,7 @@ vector-core = { path = "../vector-core", default-features = false, features = ["
 futures.workspace = true
 indoc = { version = "2", default-features = false }
 tokio = { version = "1", features = ["test-util"] }
-similar-asserts = "1.6.0"
+similar-asserts = "1.6.1"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 rstest = "0.24.0"
 tracing-test = "0.2.5"

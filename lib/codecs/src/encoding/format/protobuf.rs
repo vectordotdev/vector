@@ -47,7 +47,9 @@ impl ProtobufSerializerConfig {
 pub struct ProtobufSerializerOptions {
     /// The path to the protobuf descriptor set file.
     ///
-    /// This file is the output of `protoc -o <path> ...`
+    /// This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+    ///
+    /// You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
     #[configurable(metadata(docs::examples = "/etc/vector/protobuf_descriptor_set.desc"))]
     pub desc_file: PathBuf,
 
