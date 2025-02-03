@@ -556,9 +556,7 @@ jobs:
       - name: Display Markdown Summary
         continue-on-error: true
         run: |
-          ls -R
-          unzip capture-artifacts -d results
-          REPORT_MD=results/report.md
+          REPORT_MD=report.md
           if [ -f ${REPORT_MD} ]; then
             cat ${REPORT_MD} >> $GITHUB_STEP_SUMMARY
           else
