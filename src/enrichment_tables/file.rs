@@ -113,7 +113,7 @@ pub struct FileConfig {
     /// [chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
     #[configurable(metadata(
-        docs::additional_props_description = "represent mapped log field names and types."
+        docs::additional_props_description = "Represents mapped log field names and types."
     ))]
     pub schema: HashMap<String, String>,
 }
