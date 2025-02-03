@@ -77,7 +77,7 @@ pub struct FileConfig {
     /// 1. One of the built-in-formats listed in the `Timestamp Formats` table below.
     /// 2. The [time format specifiers][chrono_fmt] from Rust’s `chrono` library.
     ///
-    /// ### Types
+    /// Types
     ///
     /// - **`bool`**
     /// - **`string`**
@@ -86,7 +86,7 @@ pub struct FileConfig {
     /// - **`date`**
     /// - **`timestamp`** (see the table below for formats)
     ///
-    /// ### Timestamp Formats
+    /// Timestamp Formats
     ///
     /// | Format               | Description                                                                      | Example                          |
     /// |----------------------|----------------------------------------------------------------------------------|----------------------------------|

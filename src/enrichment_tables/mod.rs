@@ -17,7 +17,19 @@ pub mod geoip;
 #[cfg(feature = "enrichment-tables-mmdb")]
 pub mod mmdb;
 
-/// Configurable enrichment tables.
+/// Configuration options for an [enrichment table](\(urls.enrichment_tables_concept)) to be used in a
+/// [`remap`](\(urls.vector_remap_transform)) transform. Currently supported are:
+///
+/// * [CSV](\(urls.csv)) files
+/// * [MaxMind](\(urls.maxmind)) databases
+/// * In-memory storage
+///
+/// For the lookup in the enrichment tables to be as performant as possible, the data is indexed according
+/// to the fields that are used in the search. Note that indices can only be created for fields for which an
+/// exact match is used in the condition. For range searches, an index isn't used and the enrichment table
+/// drops back to a sequential scan of the data. A sequential scan shouldn't impact performance
+/// significantly provided that there are only a few possible rows returned by the exact matches in the
+/// condition. We don't recommend using a condition that uses only date range searches.
 #[configurable_component(global_option("enrichment_tables"))]
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
