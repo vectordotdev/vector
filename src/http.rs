@@ -10,7 +10,7 @@ use hyper::{
     client,
     client::{Client, HttpConnector},
 };
-use hyper_openssl::client::legacy::HttpsConnector;
+use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;

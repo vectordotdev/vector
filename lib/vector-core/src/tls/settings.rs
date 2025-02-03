@@ -342,7 +342,6 @@ impl TlsSettings {
             }
         }
 
-
         Ok(())
     }
 
