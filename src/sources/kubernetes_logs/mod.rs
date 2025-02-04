@@ -686,7 +686,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
-            acknowledgements: acknowledgements,
+            acknowledgements,
         })
     }
 
@@ -995,15 +995,21 @@ impl Source {
         let mut lifecycle = Lifecycle::new();
         {
             let (slot, shutdown) = lifecycle.add();
-            let fut = util::run_file_server(file_server, file_source_tx, shutdown, shutdown_checkpointer, checkpointer)
-                .map(|result| match result {
-                    Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => emit!(KubernetesLifecycleError {
-                        message: "File server exited with an error.",
-                        error,
-                        count: events_count,
-                    }),
-                });
+            let fut = util::run_file_server(
+                file_server,
+                file_source_tx,
+                shutdown,
+                shutdown_checkpointer,
+                checkpointer,
+            )
+            .map(|result| match result {
+                Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
+                Err(error) => emit!(KubernetesLifecycleError {
+                    message: "File server exited with an error.",
+                    error,
+                    count: events_count,
+                }),
+            });
             slot.bind(Box::pin(fut));
         }
         {
