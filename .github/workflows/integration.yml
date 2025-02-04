@@ -102,11 +102,12 @@ jobs:
     strategy:
       matrix:
         # If you modify this list, please also update the `int_tests` job in changes.yml.
+        # TODO Add "nats" back - https://github.com/vectordotdev/vector/issues/22363
         service: [
           "amqp", "appsignal", "aws", "axiom", "azure", "clickhouse", "databend", "datadog-agent",
           "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "elasticsearch",
           "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
-          "loki", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
+          "loki", "mongodb", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
           "redis", "splunk", "webhdfs"
         ]
     timeout-minutes: 90
