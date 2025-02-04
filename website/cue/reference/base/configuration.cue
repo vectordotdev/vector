@@ -2,8 +2,6 @@ package metadata
 
 base: configuration: configuration: {
 	enrichment_tables: {
-		common:   false
-		required: false
 		type: object: options: {
 			file: {
 				type: object: options: {
@@ -241,8 +239,6 @@ base: configuration: configuration: {
 			"""
 	}
 	secrets: {
-		common:   false
-		required: false
 		type: object: options: {
 			path: {
 				type: string: {}

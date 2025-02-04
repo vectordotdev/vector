@@ -1738,7 +1738,7 @@ def render_and_import_global_option_schema(unwrapped_resolved_schema, friendly_n
   config_map_path.prepend('config-schema-base')
   tmp_file_prefix = config_map_path.join('-')
 
-  final = { 'configuration' => data }
+  final = { 'base' => {'configuration' => data }}
   final_json = to_pretty_json(final)
 
   # Write the resolved schema as JSON, which we'll then use to import into a Cue file.
@@ -1760,7 +1760,7 @@ def render_and_import_global_option_schema_main(unwrapped_resolved_schema)
     unwrapped_resolved_schema,
     "configuration",
     [],
-    "configuration.cue"
+    "base/configuration.cue"
   )
 end
 
