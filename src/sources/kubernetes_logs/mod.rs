@@ -22,13 +22,17 @@ use kube::{
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
 use tokio::sync::oneshot;
-use vector_lib::{codecs::{BytesDeserializer, BytesDeserializerConfig}, event::{BatchNotifier, BatchStatus}, finalizer::OrderedFinalizer};
 use vector_lib::configurable::configurable_component;
 use vector_lib::file_source::{
     calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
     Fingerprinter, Line, ReadFrom, ReadFromConfig,
 };
 use vector_lib::lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
+use vector_lib::{
+    codecs::{BytesDeserializer, BytesDeserializerConfig},
+    event::{BatchNotifier, BatchStatus},
+    finalizer::OrderedFinalizer,
+};
 use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
@@ -37,12 +41,14 @@ use vector_lib::{
 use vrl::value::{kind::Collection, Kind};
 
 use crate::{
-    built_info::{PKG_NAME, PKG_VERSION}, serde::bool_or_struct, sources::{file::FinalizerEntry, kubernetes_logs::partial_events_merger::merge_partial_events}
+    built_info::{PKG_NAME, PKG_VERSION},
+    serde::bool_or_struct,
+    sources::{file::FinalizerEntry, kubernetes_logs::partial_events_merger::merge_partial_events},
 };
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig,
-        SourceContext, SourceOutput, SourceAcknowledgementsConfig,
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions,
+        SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::{
@@ -656,7 +662,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
-            acknowledgements: acknowledgements,
+            acknowledgements,
         })
     }
 
@@ -955,15 +961,21 @@ impl Source {
         let mut lifecycle = Lifecycle::new();
         {
             let (slot, shutdown) = lifecycle.add();
-            let fut = util::run_file_server(file_server, file_source_tx, shutdown, shutdown_checkpointer, checkpointer)
-                .map(|result| match result {
-                    Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => emit!(KubernetesLifecycleError {
-                        message: "File server exited with an error.",
-                        error,
-                        count: events_count,
-                    }),
-                });
+            let fut = util::run_file_server(
+                file_server,
+                file_source_tx,
+                shutdown,
+                shutdown_checkpointer,
+                checkpointer,
+            )
+            .map(|result| match result {
+                Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
+                Err(error) => emit!(KubernetesLifecycleError {
+                    message: "File server exited with an error.",
+                    error,
+                    count: events_count,
+                }),
+            });
             slot.bind(Box::pin(fut));
         }
         {
