@@ -1735,8 +1735,9 @@ end
 def render_and_import_base_global_option_schema(root_schema, global_options)
   global_option_schema = {}
   global_options.each do |component_name, schema_name|
-    unwrapped_resolved_schema = unwrap_resolved_schema(root_schema, schema_name, component_name)
-    global_option_schema[component_name] = unwrapped_resolved_schema
+    # global schema does not need unwrapping the schema, we call resolve_schema_by_name directly
+    resolved_schema = resolve_schema_by_name(root_schema, schema_name)
+    global_option_schema[component_name] = resolved_schema
   end
 
   render_and_import_schema(
