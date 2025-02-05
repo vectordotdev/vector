@@ -16,7 +16,7 @@ chrono.workspace = true
 chrono-tz.workspace = true
 crossbeam-utils = { version = "0.8.21", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
-dyn-clone = { version = "1.0.17", default-features = false }
+dyn-clone = { version = "1.0.18", default-features = false }
 enumflags2 = { version = "0.7.11", default-features = false }
 float_eq = { version = "1.0", default-features = false }
 futures.workspace = true
@@ -30,7 +30,7 @@ lookup = { package = "vector-lookup", path = "../vector-lookup" }
 metrics.workspace = true
 metrics-tracing-context.workspace = true
 metrics-util.workspace = true
-mlua = { version = "0.10.2", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.10.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.5", default-features = false, features = ["serialize"] }
 ordered-float = { version = "4.6.0", default-features = false }
 openssl = { version = "0.10.68", default-features = false, features = ["vendored"] }
