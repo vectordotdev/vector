@@ -898,25 +898,25 @@ mod test {
     }
 
     //////// UDP TESTS ////////
-    fn send_lines_udp(addr: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
-        send_lines_udp_from(next_addr(), addr, lines)
+    fn send_lines_udp(to: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
+        send_lines_udp_from(next_addr(), to, lines)
     }
 
     fn send_lines_udp_from(
         from: SocketAddr,
-        addr: SocketAddr,
+        to: SocketAddr,
         lines: impl IntoIterator<Item = String>,
     ) -> SocketAddr {
-        send_packets_udp_from(from, addr, lines.into_iter().map(|line| line.into()))
+        send_packets_udp_from(from, to, lines.into_iter().map(|line| line.into()))
     }
 
-    fn send_packets_udp(addr: SocketAddr, packets: impl IntoIterator<Item = Bytes>) -> SocketAddr {
-        send_packets_udp_from(next_addr(), addr, packets)
+    fn send_packets_udp(to: SocketAddr, packets: impl IntoIterator<Item = Bytes>) -> SocketAddr {
+        send_packets_udp_from(next_addr(), to, packets)
     }
 
     fn send_packets_udp_from(
         from: SocketAddr,
-        addr: SocketAddr,
+        to: SocketAddr,
         packets: impl IntoIterator<Item = Bytes>,
     ) -> SocketAddr {
         let socket = UdpSocket::bind(from)
@@ -927,7 +927,7 @@ mod test {
         for packet in packets {
             assert_eq!(
                 socket
-                    .send_to(&packet, addr)
+                    .send_to(&packet, to)
                     .map_err(|error| panic!("{:}", error))
                     .ok()
                     .unwrap(),
