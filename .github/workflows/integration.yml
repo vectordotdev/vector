@@ -37,7 +37,7 @@ env:
 
 jobs:
   changes:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     uses: ./.github/workflows/changes.yml
     with:
       base_ref: ${{ github.event.pull_request.base.ref }}
