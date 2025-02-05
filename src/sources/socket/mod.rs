@@ -1413,6 +1413,8 @@ mod test {
     }
 
     #[tokio::test]
+    // TODO: `init_udp_with_config` should return a `Result` instead of panicking, so we can
+    // assert that error here instead of marking this test as `should_panic`.
     #[should_panic]
     async fn udp_invalid_multicast_group() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
