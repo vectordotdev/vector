@@ -22,7 +22,8 @@ use crate::{
     codecs::Decoder,
     event::Event,
     internal_events::{
-        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        SocketBindError, SocketEventsReceived, SocketMode, SocketMulticastGroupJoinError,
+        SocketReceiveError, StreamClosedError,
     },
     net,
     serde::default_decoding,
@@ -185,12 +186,14 @@ pub(super) fn udp(
                 }
             };
             for group_addr in config.multicast_groups {
+                let interface = *listen_addr.ip();
                 socket
-                    .join_multicast_v4(group_addr, *listen_addr.ip())
+                    .join_multicast_v4(group_addr, interface)
                     .map_err(|error| {
-                        emit!(SocketBindError {
-                            mode: SocketMode::Udp,
+                        emit!(SocketMulticastGroupJoinError {
                             error,
+                            group_addr,
+                            interface,
                         })
                     })?;
                 info!(message = "Joined multicast group.", group = %group_addr);

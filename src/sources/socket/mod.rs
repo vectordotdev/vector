@@ -373,7 +373,10 @@ mod test {
         sources::util::net::SocketListenAddr,
         test_util::{
             collect_n, collect_n_limited,
-            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            components::{
+                assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
+                SOCKET_PUSH_SOURCE_TAGS,
+            },
             next_addr, next_addr_any, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
         tls::{self, TlsConfig, TlsEnableableConfig, TlsSourceConfig},
@@ -1413,11 +1416,8 @@ mod test {
     }
 
     #[tokio::test]
-    // TODO: `init_udp_with_config` (and `init_udp`) should return a `Result` instead of panicking, so we can
-    // assert that error here instead of marking this test as `should_panic`.
-    #[should_panic]
     async fn udp_invalid_multicast_group() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+        assert_source_error(&COMPONENT_ERROR_TAGS, async {
             let (tx, _rx) = SourceSender::new_test();
             let socket_address = next_addr_any();
             let invalid_multicast_ip_address: Ipv4Addr = "192.168.0.3".parse().unwrap();
