@@ -178,10 +178,10 @@ pub(super) fn udp(
                     // We could support Ipv6 multicast with the
                     // https://doc.rust-lang.org/std/net/struct.UdpSocket.html#method.join_multicast_v6 method
                     // and specifying the interface index as `0`, in order to bind all interfaces.
-                    panic!("IPv6 multicast is not supported")
+                    unimplemented!("IPv6 multicast is not supported")
                 }
                 SocketListenAddr::SystemdFd(_) => {
-                    panic!("Multicast for systemd fd sockets is not supported")
+                    unimplemented!("Multicast for systemd fd sockets is not supported")
                 }
             };
             for group_addr in config.multicast_groups {
