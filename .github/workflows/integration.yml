@@ -60,6 +60,11 @@ jobs:
       - name: Check if all values are false
         id: check
         run: |
+          # Always run the suite when the PR is in the merge queue
+          if [[ "${{ github.event_name }}" == "merge_group" ]] ; then
+            exit 0
+          fi
+
           # Check if all values are 'false'
           json=$(cat int_tests_changes.json)
           all_false=$(echo "$json" | jq -r 'to_entries | all(.value == false)')
