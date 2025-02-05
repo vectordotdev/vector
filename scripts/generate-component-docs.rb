@@ -1659,7 +1659,7 @@ def get_rendered_description_from_schema(schema)
   description.strip
 end
 
-def render_and_import_schema(root_schema, schema_name, friendly_name, config_map_path, cue_relative_path)
+def unwrap_resolved_schema(root_schema, schema_name, friendly_name)
   @logger.info "[*] Resolving schema definition for #{friendly_name}..."
 
   # Try and resolve the schema, unwrapping it as an object schema which is a requirement/expectation
@@ -1673,7 +1673,10 @@ def render_and_import_schema(root_schema, schema_name, friendly_name, config_map
     exit 1
   end
 
-  unwrapped_resolved_schema = sort_hash_nested(unwrapped_resolved_schema)
+  return sort_hash_nested(unwrapped_resolved_schema)
+end
+
+def render_and_import_schema(unwrapped_resolved_schema, friendly_name, config_map_path, cue_relative_path)
 
   # Set up the appropriate structure for the value based on the configuration map path. It defines
   # the nested levels of the map where our resolved schema should go, as well as a means to generate
@@ -1691,55 +1694,7 @@ def render_and_import_schema(root_schema, schema_name, friendly_name, config_map
   config_map_path.prepend('config-schema-base')
   tmp_file_prefix = config_map_path.join('-')
 
-  final = { 'base' => { 'components' => data } }
-  final_json = to_pretty_json(final)
-
-  # Write the resolved schema as JSON, which we'll then use to import into a Cue file.
-  json_output_file = write_to_temp_file(["config-schema-#{tmp_file_prefix}-", '.json'], final_json)
-  @logger.info "[✓]   Wrote #{friendly_name} schema to '#{json_output_file}'. (#{final_json.length} bytes)"
-
-  # Try importing it as Cue.
-  @logger.info "[*] Importing #{friendly_name} schema as Cue file..."
-  cue_output_file = "website/cue/reference/components/#{cue_relative_path}"
-  unless system(@cue_binary_path, 'import', '-f', '-o', cue_output_file, '-p', 'metadata', json_output_file)
-    @logger.error "[!]   Failed to import #{friendly_name} schema as valid Cue."
-    exit 1
-  end
-  @logger.info "[✓]   Imported #{friendly_name} schema to '#{cue_output_file}'."
-end
-
-def render_and_import_base_component_schema(root_schema, schema_name, component_type)
-  render_and_import_schema(
-    root_schema,
-    schema_name,
-    "base #{component_type} configuration",
-    ["#{component_type}s"],
-    "base/#{component_type}s.cue"
-  )
-end
-
-def render_and_import_component_schema(root_schema, schema_name, component_type, component_name)
-  render_and_import_schema(
-    root_schema,
-    schema_name,
-    "'#{component_name}' #{component_type} configuration",
-    ["#{component_type}s", component_name],
-    "#{component_type}s/base/#{component_name}.cue"
-  )
-end
-
-def render_and_import_global_option_schema(unwrapped_resolved_schema, friendly_name, config_map_path, cue_relative_path)
-  @logger.info "[*] Resolving schema definition for #{friendly_name}..."
-
-  data = {}
-  last = data
-  last['configuration'] = unwrapped_resolved_schema
-
-  config_map_path.prepend('config-schema-base')
-  tmp_file_prefix = config_map_path.join('-')
-
-  final = { 'base' => {'configuration' => data }}
-  final_json = to_pretty_json(final)
+  final_json = to_pretty_json(data)
 
   # Write the resolved schema as JSON, which we'll then use to import into a Cue file.
   json_output_file = write_to_temp_file(["config-schema-#{tmp_file_prefix}-", '.json'], final_json)
@@ -1755,11 +1710,39 @@ def render_and_import_global_option_schema(unwrapped_resolved_schema, friendly_n
   @logger.info "[✓]   Imported #{friendly_name} schema to '#{cue_output_file}'."
 end
 
-def render_and_import_global_option_schema_main(unwrapped_resolved_schema)
-  render_and_import_global_option_schema(
+def render_and_import_base_component_schema(root_schema, schema_name, component_type)
+  friendly_name = "base #{component_type} configuration"
+  unwrapped_resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
+  render_and_import_schema(
     unwrapped_resolved_schema,
+    friendly_name,
+    ["base", "components", "#{component_type}s"],
+    "components/base/#{component_type}s.cue"
+  )
+end
+
+def render_and_import_component_schema(root_schema, schema_name, component_type, component_name)
+  friendly_name = "'#{component_name}' #{component_type} configuration"
+  unwrapped_resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
+  render_and_import_schema(
+    unwrapped_resolved_schema,
+    friendly_name,
+    ["base", "components", "#{component_type}s", component_name],
+    "components/#{component_type}s/base/#{component_name}.cue"
+  )
+end
+
+def render_and_import_base_global_option_schema(root_schema, global_options)
+  global_option_schema = {}
+  global_options.each do |component_name, schema_name|
+    unwrapped_resolved_schema = unwrap_resolved_schema(root_schema, schema_name, component_name)
+    global_option_schema[component_name] = unwrapped_resolved_schema
+  end
+
+  render_and_import_schema(
+    global_option_schema,
     "configuration",
-    [],
+    ["base", "configuration"],
     "base/configuration.cue"
   )
 end
@@ -1818,19 +1801,4 @@ global_options = root_schema['definitions'].filter_map do |key, definition|
 end
 .reduce { |acc, item| nested_merge(acc, item) }
 
-global_option_schema = {}
-global_options.each do |component_name, schema_name|
-  resolved_schema = resolve_schema_by_name(root_schema, schema_name)
-
-  unwrapped_resolved_schema = resolved_schema.dig('type', 'object', 'options')
-  if unwrapped_resolved_schema.nil?
-    @logger.error 'Configuration types must always resolve to an object schema.'
-    exit 1
-  end
-
-  unwrapped_resolved_schema = sort_hash_nested(unwrapped_resolved_schema)
-
-  global_option_schema[component_name] = resolved_schema
-end
-
-render_and_import_global_option_schema_main(global_option_schema)
+render_and_import_base_global_option_schema(root_schema, global_options)
