@@ -17,11 +17,11 @@ pub mod geoip;
 #[cfg(feature = "enrichment-tables-mmdb")]
 pub mod mmdb;
 
-/// Configuration options for an [enrichment table](\(urls.enrichment_tables_concept)) to be used in a
-/// [`remap`](\(urls.vector_remap_transform)) transform. Currently supported are:
+/// Configuration options for an [enrichment table]((urls.enrichment_tables_concept)) to be used in a
+/// [`remap`]((urls.vector_remap_transform)) transform. Currently supported are:
 ///
-/// * [CSV](\(urls.csv)) files
-/// * [MaxMind](\(urls.maxmind)) databases
+/// * [CSV]((urls.csv)) files
+/// * [MaxMind]((urls.maxmind)) databases
 /// * In-memory storage
 ///
 /// For the lookup in the enrichment tables to be as performant as possible, the data is indexed according
