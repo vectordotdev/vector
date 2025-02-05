@@ -155,6 +155,8 @@ impl<E: std::fmt::Display> InternalEvent for SocketMulticastGroupJoinError<E> {
             error_type = error_type::IO_FAILED,
             stage = error_stage::RECEIVING,
             %mode,
+            %self.group_addr,
+            %self.interface,
             internal_log_rate_limit = true,
         );
         counter!(
@@ -163,6 +165,8 @@ impl<E: std::fmt::Display> InternalEvent for SocketMulticastGroupJoinError<E> {
             "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::RECEIVING,
             "mode" => mode,
+            "group_addr" => self.group_addr,
+            "interface" => self.interface,
         )
         .increment(1);
     }
