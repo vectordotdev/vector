@@ -238,7 +238,7 @@ base: configuration: configuration: {
 			condition. We don't recommend using a condition that uses only date range searches.
 			"""
 	}
-	secrets: {
+	secret: {
 		type: object: options: {
 			path: {
 				type: string: {}

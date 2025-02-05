@@ -49,7 +49,7 @@ mod test;
 /// Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
 /// configuration reload process.
 #[allow(clippy::large_enum_variant)]
-#[configurable_component(global_option("secrets"))]
+#[configurable_component(global_option("secret"))]
 #[derive(Clone, Debug)]
 #[enum_dispatch(SecretBackend)]
 #[serde(tag = "type", rename_all = "snake_case")]

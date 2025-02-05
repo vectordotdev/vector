@@ -295,9 +295,9 @@ configuration: {
 		}
 
 		// TODO: generate `common` and `required` fields from ruby according to some tags
-		secrets: base.configuration.configuration.secrets
-		secrets: common: false
-		secrets: required: false
+		secret: base.configuration.configuration.secret
+		secret: common: false
+		secret: required: false
 
 		timezone: {
 			common:      false
