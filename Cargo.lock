@@ -622,25 +622,25 @@ dependencies = [
 
 [[package]]
 name = "async-nats"
-version = "0.38.0"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76433c4de73442daedb3a59e991d94e85c14ebfc33db53dfcd347a21cd6ef4f8"
+checksum = "dbc1f1a75fd07f0f517322d103211f12d757658e91676def9a2e688774656c60"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.21.7",
  "bytes 1.9.0",
  "futures 0.3.31",
+ "http 0.2.9",
  "memchr",
- "nkeys",
+ "nkeys 0.3.2",
  "nuid",
  "once_cell",
- "pin-project",
- "portable-atomic",
  "rand 0.8.5",
  "regex",
  "ring",
- "rustls-native-certs 0.7.0",
- "rustls-pemfile 2.1.0",
- "rustls-webpki 0.102.8",
+ "rustls 0.21.11",
+ "rustls-native-certs 0.6.3",
+ "rustls-pemfile 1.0.4",
+ "rustls-webpki 0.101.7",
  "serde",
  "serde_json",
  "serde_nanos",
@@ -648,11 +648,9 @@ dependencies = [
  "thiserror 1.0.68",
  "time",
  "tokio",
- "tokio-rustls 0.26.1",
- "tokio-util",
- "tokio-websockets",
+ "tokio-retry",
+ "tokio-rustls 0.24.1",
  "tracing 0.1.41",
- "tryhard",
  "url",
 ]
 
@@ -6274,6 +6272,22 @@ dependencies = [
 
 [[package]]
 name = "nkeys"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aad178aad32087b19042ee36dfd450b73f5f934fbfb058b59b198684dfec4c47"
+dependencies = [
+ "byteorder",
+ "data-encoding",
+ "ed25519",
+ "ed25519-dalek",
+ "getrandom 0.2.15",
+ "log",
+ "rand 0.8.5",
+ "signatory",
+]
+
+[[package]]
+name = "nkeys"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f49e787f4c61cbd0f9320b31cc26e58719f6aa5068e34697dd3aea361412fe3"
@@ -8599,20 +8613,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustls"
-version = "0.23.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f287924602bf649d949c63dc8ac8b235fa5387d394020705b80c4eb597ce5b8"
-dependencies = [
- "once_cell",
- "ring",
- "rustls-pki-types",
- "rustls-webpki 0.102.8",
- "subtle",
- "zeroize",
-]
-
-[[package]]
 name = "rustls-native-certs"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8629,19 +8629,6 @@ name = "rustls-native-certs"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f1fb85efa936c42c6d5fc28d2629bb51e4b2f4b8a5211e297d599cc5a093792"
-dependencies = [
- "openssl-probe",
- "rustls-pemfile 2.1.0",
- "rustls-pki-types",
- "schannel",
- "security-framework",
-]
-
-[[package]]
-name = "rustls-native-certs"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcaf18a4f2be7326cd874a5fa579fae794320a0f388d365dca7e480e55f83f8a"
 dependencies = [
  "openssl-probe",
  "rustls-pemfile 2.1.0",
@@ -10074,16 +10061,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-rustls"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f6d0975eaace0cf0fcadee4e4aaa5da15b5c079146f2cffb67c113be122bf37"
-dependencies = [
- "rustls 0.23.21",
- "tokio",
-]
-
-[[package]]
 name = "tokio-stream"
 version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10145,27 +10122,6 @@ dependencies = [
  "pin-project-lite",
  "slab",
  "tokio",
-]
-
-[[package]]
-name = "tokio-websockets"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f591660438b3038dd04d16c938271c79e7e06260ad2ea2885a4861bfb238605d"
-dependencies = [
- "base64 0.22.1",
- "bytes 1.9.0",
- "futures-core",
- "futures-sink",
- "http 1.1.0",
- "httparse",
- "rand 0.8.5",
- "ring",
- "rustls-native-certs 0.8.0",
- "rustls-pki-types",
- "tokio",
- "tokio-rustls 0.26.1",
- "tokio-util",
 ]
 
 [[package]]
@@ -10625,17 +10581,6 @@ name = "try-lock"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3528ecfd12c466c6f163363caf2d02a71161dd5e1cc6ae7b34207ea2d42d81ed"
-
-[[package]]
-name = "tryhard"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c9f0a709784e86923586cff0d872dba54cd2d2e116b3bc57587d15737cfce9d"
-dependencies = [
- "futures 0.3.31",
- "pin-project-lite",
- "tokio",
-]
 
 [[package]]
 name = "tungstenite"
@@ -11103,7 +11048,7 @@ dependencies = [
  "netlink-packet-utils",
  "netlink-sys",
  "nix 0.26.2",
- "nkeys",
+ "nkeys 0.4.4",
  "nom",
  "notify",
  "num-format",
