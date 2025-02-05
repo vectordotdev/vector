@@ -1332,7 +1332,7 @@ mod test {
             init_udp_with_config(tx, config).await;
 
             // We must send packets to the same interface the `socket_address` is bound to
-            // in order to receive the multicast packets this `from` socket sends
+            // in order to receive the multicast packets the `from` socket sends.
             // To do so, we use the `IPADDR_ANY` address
             let from = next_addr_any();
             send_lines_udp_from(from, multicast_socket_address, ["test".to_string()]);
