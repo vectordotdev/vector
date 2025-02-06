@@ -71,7 +71,6 @@ fn get_processed_event_timestamp(
     timestamp_key: Option<OptionalTargetPath>,
     auto_extract_timestamp: bool,
 ) -> HecProcessedEvent {
-    // TODO: this was added to trigger tests, remove me, do not merge
     let mut event = Event::Log(LogEvent::from("hello world"));
     event
         .as_mut_log()
