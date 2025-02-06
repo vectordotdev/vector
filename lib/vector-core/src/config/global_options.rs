@@ -5,6 +5,7 @@ use vector_common::TimeZone;
 use vector_config::configurable_component;
 
 use super::super::default_data_dir;
+use super::metrics_expiration::PerMetricSetExpiration;
 use super::Telemetry;
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
 use crate::serde::bool_or_struct;
@@ -103,6 +104,11 @@ pub struct GlobalOptions {
     /// that metrics live long enough to be emitted and captured,
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     pub expire_metrics_secs: Option<f64>,
+
+    /// The amount of time, in seconds, that internal metrics will persist after having not been
+    /// updated before they expire and are removed, configured per metric set
+    #[serde(skip_serializing_if = "crate::serde::is_default")]
+    pub expire_metrics_per_metric_set: Option<Vec<PerMetricSetExpiration>>,
 }
 
 impl GlobalOptions {
@@ -230,6 +236,19 @@ impl GlobalOptions {
                 proxy: self.proxy.merge(&with.proxy),
                 expire_metrics: self.expire_metrics.or(with.expire_metrics),
                 expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
+                // TODO: maybe do some better merging here
+                expire_metrics_per_metric_set: self.expire_metrics_per_metric_set.clone().map(
+                    |e| {
+                        e.into_iter()
+                            .chain(
+                                with.expire_metrics_per_metric_set
+                                    .unwrap_or_default()
+                                    .iter()
+                                    .cloned(),
+                            )
+                            .collect()
+                    },
+                ),
             })
         } else {
             Err(errors)
