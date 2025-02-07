@@ -237,6 +237,8 @@ base: configuration: configuration: {
 			significantly provided that there are only a few possible rows returned by the exact matches in the
 			condition. We don't recommend using a condition that uses only date range searches.
 			"""
+		common:   false
+		required: false
 	}
 	secret: {
 		type: object: options: {
@@ -547,5 +549,7 @@ base: configuration: configuration: {
 			Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
 			configuration reload process.
 			"""
+		common:   false
+		required: false
 	}
 }

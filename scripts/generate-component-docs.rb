@@ -798,6 +798,17 @@ def resolve_schema(root_schema, schema)
     end
   end
 
+  # required for global option configuration
+  is_common_field = get_schema_metadata(schema, 'docs::common')
+  if !is_common_field.nil?
+    resolved['common'] = is_common_field
+  end
+  
+  is_required_field = get_schema_metadata(schema, 'docs::required')
+  if !is_required_field.nil?
+    resolved['required'] = is_required_field
+  end
+
   # Reconcile the resolve schema, which essentially gives us a chance to, once the schema is
   # entirely resolved, check it for logical inconsistencies, fix up anything that we reasonably can,
   # and so on.
