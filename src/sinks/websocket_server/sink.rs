@@ -34,8 +34,8 @@ use vector_lib::{
 use crate::{
     codecs::{Encoder, Transformer},
     internal_events::{
-        ConnectionOpen, OpenGauge, WsListenerConnectionEstablished,
-        WsListenerConnectionFailedError, WsListenerConnectionShutdown, WsListenerSendError,
+        ConnectionOpen, OpenGauge, WsConnectionFailedError, WsListenerConnectionEstablished,
+        WsListenerConnectionShutdown, WsListenerSendError,
     },
     sources::util::http::HttpSourceAuth,
 };
@@ -128,7 +128,7 @@ impl WebSocketListenerSink {
             .await
             .map_err(|err| {
                 debug!("Error during websocket handshake: {}", err);
-                emit!(WsListenerConnectionFailedError {
+                emit!(WsConnectionFailedError {
                     error: Box::new(err)
                 })
             })?;

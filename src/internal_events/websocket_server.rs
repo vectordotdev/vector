@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::fmt::Debug;
 
 use futures::channel::mpsc::TrySendError;
@@ -22,35 +21,6 @@ impl InternalEvent for WsListenerConnectionEstablished {
 
     fn name(&self) -> Option<&'static str> {
         Some("WsListenerConnectionEstablished")
-    }
-}
-
-#[derive(Debug)]
-pub struct WsListenerConnectionFailedError {
-    pub error: Box<dyn Error>,
-}
-
-impl InternalEvent for WsListenerConnectionFailedError {
-    fn emit(self) {
-        error!(
-            message = "WebSocket connection failed.",
-            error = %self.error,
-            error_code = "ws_connection_error",
-            error_type = error_type::CONNECTION_FAILED,
-            stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total",
-            "error_code" => "ws_connection_failed",
-            "error_type" => error_type::CONNECTION_FAILED,
-            "stage" => error_stage::SENDING,
-        )
-        .increment(1);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WsListenerConnectionFailed")
     }
 }
 
@@ -81,14 +51,14 @@ impl InternalEvent for WsListenerSendError {
         error!(
             message = "WebSocket message send error.",
             error = %self.error,
-            error_code = "ws_connection_error",
+            error_code = "ws_server_connection_error",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
             internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
-            "error_code" => "ws_connection_error",
+            "error_code" => "ws_server_connection_error",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         )
