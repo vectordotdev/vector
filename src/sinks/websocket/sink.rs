@@ -457,7 +457,7 @@ mod tests {
 
         let addr = next_addr();
         let tls_config = Some(TlsEnableableConfig::test_config());
-        let tls = MaybeTlsSettings::from_config(&tls_config, true).unwrap();
+        let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true).unwrap();
 
         let config = WebSocketSinkConfig {
             uri: format!("wss://{}", addr),

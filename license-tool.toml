@@ -1,12 +1,17 @@
 [overrides]
 "backon" = { origin = "https://github.com/Xuanwo/backon" }
 "bollard-stubs" = { origin = "https://github.com/fussybeaver/bollard" }
+"crunchy" = { origin = "https://github.com/eira-fransham/crunchy" }
 "openssl-macros" = { origin = "https://github.com/sfackler/rust-openssl" }
 "serde_nanos" = { origin = "https://github.com/caspervonb/serde_nanos" }
+
+# rust-license-tool can't find the license for jsonpath-rust 0.5.1
+"jsonpath-rust" = { license = "MIT", origin = "https://github.com/besok/jsonpath-rust" }
 
 # `ring` has a custom license that is mostly "ISC-style" but parts of it also fall under OpenSSL licensing.
 "ring-0.16.20" = { license = "ISC AND Custom" }
 "ring-0.17.5" = { license = "ISC AND Custom" }
+"ring-0.17.8" = { license = "ISC AND Custom" }
 
 # `rustls-webpki` doesn't specify their license in the metadata, but the file contains the ISC terms.
 "rustls-webpki-0.100.1" = { license = "ISC" }

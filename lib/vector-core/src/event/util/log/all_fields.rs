@@ -64,22 +64,22 @@ pub struct FieldsIter<'a> {
     path: Vec<PathComponent<'a>>,
     /// Treat array as a single value and don't traverse each element.
     skip_array_elements: bool,
-    /// Add quoting to field names containing periods.
-    quote_meta: bool,
+    /// Surround invalid fields with quotes to make them parsable.
+    quote_invalid_fields: bool,
 }
 
 impl<'a> FieldsIter<'a> {
     fn new(
         path_prefix: Option<PathPrefix>,
         fields: &'a ObjectMap,
-        quote_meta: bool,
+        quote_invalid_fields: bool,
     ) -> FieldsIter<'a> {
         FieldsIter {
             path_prefix,
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
             skip_array_elements: false,
-            quote_meta,
+            quote_invalid_fields,
         }
     }
 
@@ -91,7 +91,7 @@ impl<'a> FieldsIter<'a> {
             stack: vec![LeafIter::Root((value, false))],
             path: vec![],
             skip_array_elements: false,
-            quote_meta: false,
+            quote_invalid_fields: true,
         }
     }
 
@@ -101,7 +101,7 @@ impl<'a> FieldsIter<'a> {
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],
             skip_array_elements: true,
-            quote_meta: false,
+            quote_invalid_fields: true,
         }
     }
 
@@ -143,7 +143,7 @@ impl<'a> FieldsIter<'a> {
             match path_iter.next() {
                 None => break res.into(),
                 Some(PathComponent::Key(key)) => {
-                    if self.quote_meta && !IS_VALID_PATH_SEGMENT.is_match(key) {
+                    if self.quote_invalid_fields && !IS_VALID_PATH_SEGMENT.is_match(key) {
                         res.push_str(&format!("\"{key}\""));
                     } else {
                         res.push_str(key);
@@ -196,7 +196,7 @@ impl<'a> Iterator for FieldsIter<'a> {
     }
 }
 
-impl<'a> Serialize for FieldsIter<'a> {
+impl Serialize for FieldsIter<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

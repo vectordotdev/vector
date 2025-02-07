@@ -81,7 +81,7 @@ impl ElasticsearchCommon {
                     .ok_or(ParseError::RegionRequired)?;
                 Some(Auth::Aws {
                     credentials_provider: aws
-                        .credentials_provider(region.clone(), proxy_config, &config.tls)
+                        .credentials_provider(region.clone(), proxy_config, config.tls.as_ref())
                         .await?,
                     region,
                 })
@@ -141,7 +141,7 @@ impl ElasticsearchCommon {
         };
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 
-        let tls_settings = TlsSettings::from_options(&config.tls)?;
+        let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
         let config = config.clone();
         let request = config.request;
 
@@ -172,7 +172,7 @@ impl ElasticsearchCommon {
                 ElasticsearchApiVersion::Auto => {
                     match get_version(
                         &base_url,
-                        &auth,
+                        auth.as_ref(),
                         #[cfg(feature = "aws-core")]
                         &service_type,
                         &request,
@@ -285,7 +285,7 @@ impl ElasticsearchCommon {
         } else {
             match get(
                 &self.base_url,
-                &self.auth,
+                self.auth.as_ref(),
                 #[cfg(feature = "aws-core")]
                 &self.service_type,
                 &self.request,
@@ -307,7 +307,7 @@ pub async fn sign_request(
     service_type: &OpenSearchServiceType,
     request: &mut http::Request<Bytes>,
     credentials_provider: &aws_credential_types::provider::SharedCredentialsProvider,
-    region: &Option<aws_types::region::Region>,
+    region: Option<&aws_types::region::Region>,
 ) -> crate::Result<()> {
     // Amazon OpenSearch Serverless requires the x-amz-content-sha256 header when calculating
     // the AWS v4 signature:
@@ -324,7 +324,7 @@ pub async fn sign_request(
 
 async fn get_version(
     base_url: &str,
-    auth: &Option<Auth>,
+    auth: Option<&Auth>,
     #[cfg(feature = "aws-core")] service_type: &OpenSearchServiceType,
     request: &RequestConfig,
     tls_settings: &TlsSettings,
@@ -371,7 +371,7 @@ async fn get_version(
 
 async fn get(
     base_url: &str,
-    auth: &Option<Auth>,
+    auth: Option<&Auth>,
     #[cfg(feature = "aws-core")] service_type: &OpenSearchServiceType,
     request: &RequestConfig,
     client: HttpClient,
@@ -395,7 +395,7 @@ async fn get(
                 region,
             } => {
                 let region = region.clone();
-                sign_request(service_type, &mut request, provider, &Some(region)).await?;
+                sign_request(service_type, &mut request, provider, Some(&region)).await?;
             }
         }
     }

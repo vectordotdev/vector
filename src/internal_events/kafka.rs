@@ -14,7 +14,7 @@ pub struct KafkaBytesReceived<'a> {
     pub partition: i32,
 }
 
-impl<'a> InternalEvent for KafkaBytesReceived<'a> {
+impl InternalEvent for KafkaBytesReceived<'_> {
     fn emit(self) {
         trace!(
             message = "Bytes received.",
@@ -41,7 +41,7 @@ pub struct KafkaEventsReceived<'a> {
     pub partition: i32,
 }
 
-impl<'a> InternalEvent for KafkaEventsReceived<'a> {
+impl InternalEvent for KafkaEventsReceived<'_> {
     fn emit(self) {
         trace!(
             message = "Events received.",

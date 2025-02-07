@@ -28,14 +28,13 @@ use crate::tcp::{self, TcpKeepaliveConfig};
 
 impl TlsSettings {
     pub fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
-        match self.identity {
-            None => Err(TlsError::MissingRequiredIdentity),
-            Some(_) => {
-                let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls())
-                    .context(CreateAcceptorSnafu)?;
-                self.apply_context_base(&mut acceptor, true)?;
-                Ok(acceptor.build())
-            }
+        if self.identity.is_none() {
+            Err(TlsError::MissingRequiredIdentity)
+        } else {
+            let mut acceptor =
+                SslAcceptor::mozilla_intermediate(SslMethod::tls()).context(CreateAcceptorSnafu)?;
+            self.apply_context_base(&mut acceptor, true)?;
+            Ok(acceptor.build())
         }
     }
 }

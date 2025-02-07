@@ -23,7 +23,7 @@ pub struct GrpcServerResponseSent<'a, B> {
     pub latency: Duration,
 }
 
-impl<'a, B> InternalEvent for GrpcServerResponseSent<'a, B> {
+impl<B> InternalEvent for GrpcServerResponseSent<'_, B> {
     fn emit(self) {
         let grpc_code = self
             .response

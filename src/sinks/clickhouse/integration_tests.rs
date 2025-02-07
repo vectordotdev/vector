@@ -96,7 +96,7 @@ async fn skip_unknown_fields() {
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
         table: table.clone().try_into().unwrap(),
-        skip_unknown_fields: true,
+        skip_unknown_fields: Some(true),
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
