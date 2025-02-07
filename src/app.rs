@@ -518,7 +518,7 @@ pub async fn load_configs(
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
 
-    let watched_paths = config_paths
+    let mut watched_paths = config_paths
         .iter()
         .map(<&PathBuf>::from)
         .collect::<Vec<_>>();
@@ -536,14 +536,10 @@ pub async fn load_configs(
     .await
     .map_err(handle_config_errors)?;
 
-    let mut watched_component_paths = Vec::new();
-
     if let Some(watcher_conf) = watcher_conf {
-        for (name, sink) in config.sinks() {
-            let files = sink.inner.files_to_watch();
-            let component_config =
-                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
-            watched_component_paths.push(component_config);
+        for (_, sink) in config.sinks() {
+            let mut files = sink.inner.files_to_watch();
+            watched_paths.append(&mut files);
         }
 
         info!(
@@ -552,17 +548,11 @@ pub async fn load_configs(
         );
 
         // Start listening for config changes.
-        config::watcher::spawn_thread(
-            watcher_conf,
-            signal_handler.clone_tx(),
-            watched_paths,
-            watched_component_paths,
-            None,
-        )
-        .map_err(|error| {
-            error!(message = "Unable to start config watcher.", %error);
-            exitcode::CONFIG
-        })?;
+        config::watcher::spawn_thread(watcher_conf, signal_handler.clone_tx(), watched_paths, None)
+            .map_err(|error| {
+                error!(message = "Unable to start config watcher.", %error);
+                exitcode::CONFIG
+            })?;
     }
 
     config::init_log_schema(config.global.log_schema.clone(), true);
