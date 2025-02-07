@@ -67,6 +67,9 @@ pub mod mock;
 
 pub mod stats;
 
+#[cfg(test)]
+pub mod integration;
+
 #[macro_export]
 macro_rules! assert_downcast_matches {
     ($e:expr, $t:ty, $v:pat) => {{

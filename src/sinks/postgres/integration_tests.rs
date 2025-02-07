@@ -1,3 +1,4 @@
+use crate::test_util::integration::postgres::pg_url;
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{postgres::PostgresConfig, util::test::load_sink},
@@ -16,10 +17,6 @@ use std::future::ready;
 use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 
 const POSTGRES_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
-
-fn pg_url() -> String {
-    std::env::var("PG_URL").expect("PG_URL must be set")
-}
 
 fn create_event(id: i64) -> Event {
     let mut event = LogEvent::from("raw log line");
