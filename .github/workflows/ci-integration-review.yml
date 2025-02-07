@@ -138,15 +138,16 @@ jobs:
           max_attempts: 3
           command: bash scripts/ci-int-e2e-test.sh e2e datadog-logs
 
-      - name: datadog-e2e-metrics
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-metrics')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 35
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh e2e datadog-metrics
+  # TODO: Uncomment once https://github.com/vectordotdev/vector/issues/22379 is fixed.
+  #      - name: datadog-e2e-metrics
+  #        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-metrics')
+  #          || startsWith(github.event.review.body, '/ci-run-integration-all')
+  #          || startsWith(github.event.review.body, '/ci-run-all') }}
+  #        uses: nick-fields/retry@v3
+  #        with:
+  #          timeout_minutes: 35
+  #          max_attempts: 3
+  #          command: bash scripts/ci-int-e2e-test.sh e2e datadog-metrics
 
   update-pr-status:
     name: Signal result to PR
