@@ -157,7 +157,7 @@ impl WebSocketListenerSink {
 
         {
             let mut peers = peers.lock().unwrap();
-            debug!("{} disconnected", &addr);
+            debug!("{} disconnected.", &addr);
             peers.remove(&addr);
             emit!(WsListenerConnectionShutdown {
                 client_count: peers.len()
