@@ -93,9 +93,9 @@ configuration: {
 
 		// TODO: generate `common` and `required` fields from ruby according to some tags
 		enrichment_tables: base.configuration.configuration.enrichment_tables
-		enrichment_tables: common: false
+		enrichment_tables: common:   false
 		enrichment_tables: required: false
-		
+
 		schema: {
 			common: false
 			description: """
@@ -296,7 +296,7 @@ configuration: {
 
 		// TODO: generate `common` and `required` fields from ruby according to some tags
 		secret: base.configuration.configuration.secret
-		secret: common: false
+		secret: common:   false
 		secret: required: false
 
 		timezone: {
