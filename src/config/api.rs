@@ -1,6 +1,5 @@
 use std::net::{Ipv4Addr, SocketAddr};
 
-use crate::config::GenerateConfig;
 use url::Url;
 use vector_lib::configurable::configurable_component;
 
@@ -39,11 +38,7 @@ pub struct Options {
     pub graphql: bool,
 }
 
-impl GenerateConfig for Options {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(Options);
 
 impl Default for Options {
     fn default() -> Self {
