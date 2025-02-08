@@ -52,9 +52,9 @@ pub struct FluentConfig {
 }
 
 /// Listening mode for the `fluent` source.
-#[configurable_component]
+#[configurable_component(no_deser)]
 #[derive(Clone, Debug)]
-#[serde(untagged, rename_all = "snake_case")]
+#[serde(tag = "mode", rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
 #[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum FluentMode {
@@ -64,6 +64,92 @@ pub enum FluentMode {
     /// Listen on unix stream socket
     #[cfg(unix)]
     Unix(FluentUnixConfig),
+}
+
+// Serde doesn't provide a way to specify a default tagged variant when deserializing
+// So we use a somewhat arcane setup with an untagged and tagged versions to allow
+// users to not have to specify mode = tcp
+mod deser {
+    use super::*;
+
+    #[derive(Deserialize)]
+    #[serde(tag = "mode")]
+    enum FluentModeTagged {
+        #[serde(rename = "tcp")]
+        Tcp(FluentTcpConfig),
+
+        #[cfg(unix)]
+        #[serde(rename = "unix")]
+        Unix(FluentUnixConfig),
+    }
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum FluentModeDe {
+        Tagged(FluentModeTagged),
+
+        // Note: this must be last as serde attempts variants in order
+        Untagged(FluentTcpConfig),
+    }
+
+    impl<'de> Deserialize<'de> for FluentMode {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            Ok(match FluentModeDe::deserialize(deserializer)? {
+                FluentModeDe::Tagged(FluentModeTagged::Tcp(config)) => FluentMode::Tcp(config),
+                #[cfg(unix)]
+                FluentModeDe::Tagged(FluentModeTagged::Unix(config)) => FluentMode::Unix(config),
+                FluentModeDe::Untagged(config) => FluentMode::Tcp(config),
+            })
+        }
+    }
+
+    #[cfg(all(test, unix))]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_serde() {
+            let a = serde_json::json!(
+                {
+                    "address": "0.0.0.0:2020",
+                    "connection_limit": 2,
+                }
+            );
+            let s: FluentConfig = serde_json::from_value(a).unwrap();
+            assert!(matches!(s.mode, FluentMode::Tcp(c) if c.connection_limit.unwrap() == 2));
+
+            let a = serde_json::json!(
+                {
+                    "mode": "tcp",
+                    "address": "0.0.0.0:2020",
+                    "connection_limit": 2,
+                }
+            );
+            let s: FluentConfig = serde_json::from_value(a).unwrap();
+            assert!(matches!(s.mode, FluentMode::Tcp(c) if c.connection_limit.unwrap() == 2));
+
+            let a = serde_json::json!(
+                {
+                    "mode": "unix",
+                    "address": "0.0.0.0:2020",
+                    "connection_limit": 2,
+                }
+            );
+            serde_json::from_value::<FluentConfig>(a).unwrap_err();
+
+            let a = serde_json::json!(
+                {
+                    "mode": "unix",
+                    "path": "/foo"
+                }
+            );
+            let s: FluentConfig = serde_json::from_value(a).unwrap();
+            assert!(matches!(s.mode, FluentMode::Unix(c) if c.path.to_string_lossy() == "/foo"));
+        }
+    }
 }
 
 /// Configuration for the `fluent` TCP source.
