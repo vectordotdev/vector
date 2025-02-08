@@ -14,6 +14,7 @@ use crate::config::EnrichmentTableConfig;
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "File encoding type."))]
 pub enum Encoding {
     /// Decodes the file as a [CSV][csv] (comma-separated values) file.
     ///
@@ -76,7 +77,7 @@ pub struct FileConfig {
     /// 1. One of the built-in-formats listed in the `Timestamp Formats` table below.
     /// 2. The [time format specifiers][chrono_fmt] from Rust’s `chrono` library.
     ///
-    /// ### Types
+    /// Types
     ///
     /// - **`bool`**
     /// - **`string`**
@@ -85,7 +86,7 @@ pub struct FileConfig {
     /// - **`date`**
     /// - **`timestamp`** (see the table below for formats)
     ///
-    /// ### Timestamp Formats
+    /// Timestamp Formats
     ///
     /// | Format               | Description                                                                      | Example                          |
     /// |----------------------|----------------------------------------------------------------------------------|----------------------------------|
@@ -111,6 +112,9 @@ pub struct FileConfig {
     /// [rfc3339]: https://tools.ietf.org/html/rfc3339
     /// [chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "Represents mapped log field names and types."
+    ))]
     pub schema: HashMap<String, String>,
 }
 
