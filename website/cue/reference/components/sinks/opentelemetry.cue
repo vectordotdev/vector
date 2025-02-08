@@ -158,6 +158,78 @@ components: sinks: opentelemetry: {
 				VECTOR_LOG=debug cargo run -- --config /path/to/vector/config.yaml
 				```
 
+				In the console for the OTEL Collector you can see the logs and their contents as they come in.
+
+				Here's an example of a JSON payload you might see from Vector:
+
+				```json
+				{
+				  "host": "localhost",
+				  "resourceLogs": [
+					{
+					  "resource": {
+						"attributes": [
+						  {
+							"key": "source_type",
+							"value": {
+							  "stringValue": "demo_logs"
+							}
+						  },
+						  {
+							"key": "service.name",
+							"value": {
+							  "stringValue": "shaneIxD"
+							}
+						  },
+						  {
+							"key": "host.hostname",
+							"value": {
+							  "stringValue": "random.org"
+							}
+						  }
+						]
+					  },
+					  "scopeLogs": [
+						{
+						  "logRecords": [
+							{
+							  "attributes": [
+								{
+								  "key": "syslog.procid",
+								  "value": {
+									"stringValue": "7906"
+								  }
+								},
+								{
+								  "key": "syslog.facility",
+								  "value": {
+									"stringValue": "local0"
+								  }
+								},
+								{
+								  "key": "syslog.version",
+								  "value": {
+									"stringValue": "1"
+								  }
+								}
+							  ],
+							  "body": {
+								"stringValue": "Maybe we just shouldn't use computers"
+							  },
+							  "severityText": "WARN",
+							  "timeUnixNano": 1737045415051000000
+							}
+						  ],
+						  "scope": {
+							"name": "ID856"
+						  }
+						}
+					  ]
+					}
+				  ]
+				}
+				```
+
 				"""
 		}
 	}

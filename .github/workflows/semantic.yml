@@ -184,6 +184,7 @@ jobs:
             sample transform
             tag_cardinality_limit transform
             throttle transform
+            amqp sink
             apex sink
             aws_cloudwatch_logs sink
             aws_cloudwatch_metrics sink

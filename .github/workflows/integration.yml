@@ -7,6 +7,7 @@
 name: Integration Test Suite
 
 on:
+  workflow_dispatch:
   pull_request:
   merge_group:
     types: [checks_requested]
@@ -36,19 +37,51 @@ env:
 
 jobs:
   changes:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     uses: ./.github/workflows/changes.yml
     with:
-      base_ref: ${{ github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.pull_request.head.ref }}
+      base_ref: ${{ github.event.pull_request.base.ref || github.event.merge_group.base_ref  }}
+      head_ref: ${{ github.event.pull_request.head.ref || github.event.merge_group.head_ref  }}
       source: false
       int_tests: true
     secrets: inherit
 
+  check-all:
+    runs-on: ubuntu-latest
+    needs: changes
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - name: Download JSON artifact from changes.yml
+        uses: actions/download-artifact@v4
+        with:
+          name: int_tests_changes
+
+      - name: Check if all values are false
+        id: check
+        run: |
+          # Always run the suite when the PR is in the merge queue
+          if [[ "${{ github.event_name }}" == "merge_group" ]] ; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Check if all values are 'false'
+          json=$(cat int_tests_changes.json)
+          all_false=$(echo "$json" | jq -r 'to_entries | all(.value == false)')
+
+          if [[ "$all_false" == "true" ]]; then
+            echo "No changes detected. Skipping integration tests."
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "Detected changes. Proceeding with integration tests."
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
   setup:
     runs-on: ubuntu-latest
-    needs:
-      - changes
+    needs: check-all
+    if: ${{ needs.check-all.outputs.should_run == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -74,13 +107,14 @@ jobs:
       - setup
     strategy:
       matrix:
+        # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/22379 is fixed.
         # If you modify this list, please also update the `int_tests` job in changes.yml.
         service: [
           "amqp", "appsignal", "aws", "axiom", "azure", "clickhouse", "databend", "datadog-agent",
           "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "elasticsearch",
           "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
           "loki", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
-          "redis", "splunk", "webhdfs"
+          "redis", "webhdfs"
         ]
     timeout-minutes: 90
     steps:
@@ -122,6 +156,8 @@ jobs:
     if: always()
     needs:
       - changes
+      - check-all
+      - setup
       - integration-tests
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
