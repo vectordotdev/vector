@@ -7,7 +7,8 @@ use futures::future::BoxFuture;
 use sqlx::types::Json;
 use sqlx::{Error as PostgresError, Pool, Postgres};
 use tower::Service;
-use vector_lib::event::{EventFinalizers, EventStatus, Finalizable, LogEvent};
+use vector_lib::codecs::JsonSerializerConfig;
+use vector_lib::event::{Event, EventFinalizers, EventStatus, Finalizable};
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::stream::DriverResponse;
 use vector_lib::EstimatedJsonEncodedSizeOf;
@@ -47,13 +48,13 @@ impl PostgresService {
 // TODO: do we need this clone?
 #[derive(Clone)]
 pub struct PostgresRequest {
-    pub events: Vec<LogEvent>,
+    pub events: Vec<Event>,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
 }
 
-impl From<Vec<LogEvent>> for PostgresRequest {
-    fn from(mut events: Vec<LogEvent>) -> Self {
+impl From<Vec<Event>> for PostgresRequest {
+    fn from(mut events: Vec<Event>) -> Self {
         let finalizers = events.take_finalizers();
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let events_size = NonZeroUsize::new(events.estimated_json_encoded_size_of().get())
@@ -105,7 +106,11 @@ impl DriverResponse for PostgresResponse {
 
 impl Service<PostgresRequest> for PostgresService {
     type Response = PostgresResponse;
-    type Error = PostgresError;
+    // TODO: previosly, we had here `slqx::PostgresError`, but as
+    // `JsonSerializer::to_json_value` returns a Result<Value, vector_common:Error>
+    // we have to use other kind of error here. Should we declare in this file
+    // a new Error enum with two variants: PostgresError(sqlx::PostgresError) and VectorCommonError(vector_common:Error)?
+    type Error = vector_common::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
@@ -117,12 +122,20 @@ impl Service<PostgresRequest> for PostgresService {
         let future = async move {
             let table = service.table;
             let metadata = request.metadata;
+            // TODO: is this ok?
+            let json_serializer = JsonSerializerConfig::default().build();
+            let serialized_values = request
+                .events
+                .into_iter()
+                .map(|event| json_serializer.to_json_value(event))
+                .collect::<Result<Vec<_>, _>>()?;
+
             // TODO: If a single item of the batch fails, the whole batch will fail its insert.
             // Is this intended behaviour?
             sqlx::query(&format!(
                 "INSERT INTO {table} SELECT * FROM jsonb_populate_recordset(NULL::{table}, $1)"
             ))
-            .bind(Json(request.events))
+            .bind(Json(serialized_values))
             .execute(&service.connection_pool)
             .await?;
 

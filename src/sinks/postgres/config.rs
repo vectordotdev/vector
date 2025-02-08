@@ -109,7 +109,7 @@ impl SinkConfig for PostgresConfig {
 
     // TODO: allow for Input::all()
     fn input(&self) -> Input {
-        Input::log()
+        Input::all()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

@@ -14,9 +14,19 @@ use futures::stream;
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection, FromRow, PgConnection};
 use std::future::ready;
-use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vector_lib::event::{
+    BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, Metric, MetricKind,
+    MetricValue,
+};
 
 const POSTGRES_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
+
+fn timestamp() -> DateTime<Utc> {
+    let timestamp = Utc::now();
+    // Postgres does not support nanosecond-resolution, so we truncate the timestamp to microsecond-resolution.
+    // https://www.postgresql.org/docs/current/datatype-datetime.html
+    DateTime::from_timestamp_micros(timestamp.timestamp_micros()).unwrap()
+}
 
 fn create_event(id: i64) -> Event {
     let mut event = LogEvent::from("raw log line");
@@ -24,12 +34,7 @@ fn create_event(id: i64) -> Event {
     event.insert("host", "example.com");
     let event_payload = event.clone().into_parts().0;
     event.insert("payload", event_payload);
-    let timestamp = Utc::now();
-    // Postgres does not support nanosecond-resolution, so we truncate the timestamp to microsecond-resolution.
-    // https://www.postgresql.org/docs/current/datatype-datetime.html
-    let timestamp_microsecond_resolution =
-        DateTime::from_timestamp_micros(timestamp.timestamp_micros());
-    event.insert("timestamp", timestamp_microsecond_resolution);
+    event.insert("timestamp", timestamp());
     event.into()
 }
 
@@ -52,6 +57,16 @@ struct TestEvent {
     timestamp: DateTime<Utc>,
     message: String,
     payload: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+struct TestCounterMetric {
+    name: String,
+    namespace: String,
+    tags: serde_json::Value,
+    timestamp: DateTime<Utc>,
+    kind: String,
+    counter: serde_json::Value,
 }
 
 async fn prepare_config() -> (PostgresConfig, String, PgConnection) {
@@ -171,6 +186,44 @@ async fn insert_multiple_events() {
         .map(|event| serde_json::to_value(event).unwrap())
         .collect::<Vec<_>>();
     assert_eq!(expected_values, actual_values);
+}
+
+#[tokio::test]
+async fn insert_metric() {
+    trace_init();
+
+    let (config, table, mut connection) = prepare_config().await;
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (name TEXT, namespace TEXT, tags JSONB, timestamp TIMESTAMP WITH TIME ZONE,
+        kind TEXT, counter JSONB)"
+    );
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let metric = Metric::new(
+        "counter",
+        MetricKind::Absolute,
+        MetricValue::Counter { value: 1.0 },
+    )
+    .with_namespace(Some("vector"))
+    .with_tags(Some(metric_tags!("some_tag" => "some_value")))
+    .with_timestamp(Some(timestamp()));
+    let expected_metric_value = serde_json::to_value(&metric).unwrap();
+    let input_event = Event::from(metric);
+
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event)), &POSTGRES_SINK_TAGS)
+        .await;
+
+    let select_all_sql = format!("SELECT * FROM {table}");
+    let inserted_metric: TestCounterMetric = sqlx::query_as(&select_all_sql)
+        .fetch_one(&mut connection)
+        .await
+        .unwrap();
+    let inserted_metric_value = serde_json::to_value(&inserted_metric).unwrap();
+    assert_eq!(inserted_metric_value, expected_metric_value);
 }
 
 // Using null::{table} with jsonb_populate_recordset does not work with default values.
