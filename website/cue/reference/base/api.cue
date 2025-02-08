@@ -33,10 +33,10 @@ base: api: configuration: api: {
 	playground: {
 		common: false
 		description: """
-			Whether the [GraphQL Playground]((urls.graphql_playground)) is enabled
-			\tfor the API. The Playground is accessible via the `/playground` endpoint
-			\tof the address set using the `bind` parameter. Note that the `playground`
-			\tendpoint will only be enabled if the `graphql` endpoint is also enabled.
+			Whether the [GraphQL Playground](https://github.com/graphql/graphql-playground) is enabled
+			for the API. The Playground is accessible via the `/playground` endpoint
+			of the address set using the `bind` parameter. Note that the `playground`
+			endpoint will only be enabled if the `graphql` endpoint is also enabled.
 			"""
 		required: false
 		type: bool: default: true
