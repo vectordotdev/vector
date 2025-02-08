@@ -223,11 +223,11 @@ base: configuration: configuration: {
 			}
 		}
 		description: """
-			Configuration options for an [enrichment table]((urls.enrichment_tables_concept)) to be used in a
-			[`remap`]((urls.vector_remap_transform)) transform. Currently supported are:
+			Configuration options for an [enrichment table](https://vector.dev/docs/reference/glossary/#enrichment-tables) to be used in a
+			[`remap`](https://vector.dev/docs/reference/configuration/transforms/remap/) transform. Currently supported are:
 
-			* [CSV]((urls.csv)) files
-			* [MaxMind]((urls.maxmind)) databases
+			* [CSV](https://en.wikipedia.org/wiki/Comma-separated_values) files
+			* [MaxMind](https://www.maxmind.com/en/home) databases
 			* In-memory storage
 
 			For the lookup in the enrichment tables to be as performant as possible, the data is indexed according
