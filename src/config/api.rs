@@ -1,10 +1,11 @@
 use std::net::{Ipv4Addr, SocketAddr};
 
+use crate::config::GenerateConfig;
 use url::Url;
 use vector_lib::configurable::configurable_component;
 
 /// API options.
-#[configurable_component]
+#[configurable_component(api("api"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
@@ -12,17 +13,32 @@ pub struct Options {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
-    /// The socket address to listen on for the API endpoint.
+    /// The network address to which the API should bind. If you're running
+    /// Vector in a Docker container, make sure to bind to `0.0.0.0`. Otherwise
+    /// the API will not be exposed outside the container.
     #[serde(default = "default_address")]
+    #[configurable(metadata(docs::examples = "0.0.0.0:8686"))]
+    #[configurable(metadata(docs::examples = "127.0.0.1:1234"))]
     pub address: Option<SocketAddr>,
 
-    /// Whether or not to expose the GraphQL playground on the API endpoint.
+    /// Whether the [GraphQL Playground]((urls.graphql_playground)) is enabled
+    /// for the API. The Playground is accessible via the `/playground` endpoint
+    /// of the address set using the `bind` parameter. Note that the `playground`
+    /// endpoint will only be enabled if the `graphql` endpoint is also enabled.
     #[serde(default = "default_playground")]
     pub playground: bool,
 
-    /// Whether or not the GraphQL endpoint is enabled
+    /// Whether the endpoint for receiving and processing GraphQL queries is
+    /// enabled for the API. The endpoint is accessible via the `/graphql`
+    /// endpoint of the address set using the `bind` parameter.
     #[serde(default = "default_graphql", skip_serializing_if = "is_true")]
     pub graphql: bool,
+}
+
+impl GenerateConfig for Options {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self::default()).unwrap()
+    }
 }
 
 impl Default for Options {
