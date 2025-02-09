@@ -3,6 +3,7 @@ use std::{
     sync::Arc,
 };
 
+use glob::Pattern;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_lib::api_client::{
@@ -13,8 +14,22 @@ use vector_lib::api_client::{
 use super::state::{self, OutputMetrics};
 use crate::{config::ComponentKey, top::state::SentEventsMetric};
 
+fn is_component_allowed(component_id: &str, components_patterns: &[Pattern]) -> bool {
+    if components_patterns.is_empty() {
+        return true;
+    }
+
+    components_patterns
+        .iter()
+        .any(|pattern| pattern.matches(component_id))
+}
+
 /// Components that have been added
-async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
+async fn component_added(
+    client: Arc<SubscriptionClient>,
+    tx: state::EventTx,
+    components_patterns: Vec<Pattern>,
+) {
     tokio::pin! {
         let stream = client.component_added();
     };
@@ -22,7 +37,11 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_added;
-            let key = ComponentKey::from(c.component_id);
+            let component_id = c.component_id;
+            if !is_component_allowed(&component_id, &components_patterns) {
+                continue;
+            }
+            let key = ComponentKey::from(component_id);
             _ = tx
                 .send(state::EventType::ComponentAdded(state::ComponentRow {
                     key,
@@ -315,11 +334,16 @@ pub fn subscribe(
     client: SubscriptionClient,
     tx: state::EventTx,
     interval: i64,
+    components_patterns: Vec<Pattern>,
 ) -> Vec<JoinHandle<()>> {
     let client = Arc::new(client);
 
     vec![
-        tokio::spawn(component_added(Arc::clone(&client), tx.clone())),
+        tokio::spawn(component_added(
+            Arc::clone(&client),
+            tx.clone(),
+            components_patterns,
+        )),
         tokio::spawn(component_removed(Arc::clone(&client), tx.clone())),
         tokio::spawn(received_bytes_totals(
             Arc::clone(&client),
@@ -365,7 +389,10 @@ pub fn subscribe(
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
 /// will be handled by subscriptions.
-pub async fn init_components(client: &Client) -> Result<state::State, ()> {
+pub async fn init_components(
+    client: &Client,
+    components_patterns: &[Pattern],
+) -> Result<state::State, ()> {
     // Execute a query to get the latest components, and aggregate metrics for each resource.
     // Since we don't know currently have a mechanism for scrolling/paging through results,
     // we're using an artificially high page size to capture all likely component configurations.
@@ -378,10 +405,11 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
         .components
         .edges
         .into_iter()
-        .flat_map(|edge| {
+        .filter(|edge| is_component_allowed(&edge.node.component_id, components_patterns))
+        .map(|edge| {
             let d = edge.node;
             let key = ComponentKey::from(d.component_id);
-            Some((
+            (
                 key.clone(),
                 state::ComponentRow {
                     key,
@@ -405,7 +433,7 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                     allocated_bytes: 0,
                     errors: 0,
                 },
-            ))
+            )
         })
         .collect::<BTreeMap<_, _>>();
 
