@@ -122,7 +122,9 @@ impl Service<PostgresRequest> for PostgresService {
         let future = async move {
             let table = service.table;
             let metadata = request.metadata;
-            // TODO: is this ok?
+            // TODO: Is it ok to use `JsonSerializer` here? I wanted to avoid
+            // the ``{"metric":{ .. }`, `{"log":{ .. }` nesting of `Event`,
+            // and desired the same output as `encoding.codec="json"`.
             let json_serializer = JsonSerializerConfig::default().build();
             let serialized_values = request
                 .events
