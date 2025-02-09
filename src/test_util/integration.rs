@@ -1,6 +1,6 @@
 #[cfg(any(
     feature = "postgres_sink-integration-tests",
-    feature = "postgres_sink-integration-tests"
+    feature = "postgresql_metrics-integration-tests"
 ))]
 pub mod postgres {
     use std::path::PathBuf;
