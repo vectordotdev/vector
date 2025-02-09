@@ -10,7 +10,7 @@ use crate::{
         temp_table, trace_init,
     },
 };
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use futures::stream;
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
@@ -73,10 +73,7 @@ fn create_span(resource: &str) -> ObjectMap {
         ("trace_id".into(), Value::Integer(123)),
         ("span_id".into(), Value::Integer(456)),
         ("parent_id".into(), Value::Integer(789)),
-        (
-            "start".into(),
-            Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64)),
-        ),
+        ("start".into(), Value::from(timestamp())),
         ("duration".into(), Value::Integer(1_000_000)),
         ("error".into(), Value::Integer(404)),
         (
@@ -138,9 +135,26 @@ struct TestTrace {
     error_tps: i64,
     host: String,
     language: String,
-    spans: Vec<serde_json::Value>,
+    spans: Vec<TestTraceSpan>,
     target_tps: i64,
     trace_id: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, FromRow)]
+#[sqlx(type_name = "trace_span")]
+struct TestTraceSpan {
+    service: String,
+    name: String,
+    resource: String,
+    r#type: String,
+    trace_id: i64,
+    span_id: i64,
+    parent_id: i64,
+    start: DateTime<Utc>,
+    duration: i64,
+    error: i64,
+    meta: serde_json::Value,
+    metrics: serde_json::Value,
 }
 
 async fn prepare_config() -> (PostgresConfig, String, PgConnection) {
@@ -268,8 +282,9 @@ async fn insert_metric() {
 
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    // TODO: modify counter to use a composite type instead of jsonb
     let create_table_sql = format!(
-        "CREATE TABLE {table} (name TEXT, namespace TEXT, tags JSONB, timestamp TIMESTAMP WITH TIME ZONE,
+        "CREATE TABLE {table} (name TEXT, namespace TEXT, tags JSONB, timestamp TIMESTAMPTZ,
         kind TEXT, counter JSONB)"
     );
     sqlx::query(&create_table_sql)
@@ -299,9 +314,24 @@ async fn insert_trace() {
 
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let drop_type_sql = "DROP TYPE IF EXISTS trace_span CASCADE";
+    sqlx::query(&drop_type_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+    let create_trace_span_type_sql = format!(
+        "CREATE TYPE trace_span AS
+        (service TEXT, name TEXT, resource TEXT, type TEXT, trace_id BIGINT,
+        span_id BIGINT, parent_id BIGINT, start TIMESTAMPTZ, duration BIGINT,
+        error BIGINT, meta JSONB, metrics JSONB)"
+    );
+    sqlx::query(&create_trace_span_type_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
     let create_table_sql = format!(
         "CREATE TABLE {table} (agent_version TEXT, env TEXT, error_tps BIGINT, host TEXT,
-        language TEXT, spans JSONB[], target_tps BIGINT, trace_id BIGINT)"
+        language TEXT, spans trace_span[], target_tps BIGINT, trace_id BIGINT)"
     );
     sqlx::query(&create_table_sql)
         .execute(&mut connection)
