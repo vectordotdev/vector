@@ -108,7 +108,7 @@ impl Service<PostgresRequest> for PostgresService {
     // TODO: previosly, we had here `slqx::PostgresError`, but as
     // `JsonSerializer::to_json_value` returns a Result<Value, vector_common:Error>
     // we have to use other kind of error here. Should we declare in this file
-    // a new Error enum with two variants: PostgresError(sqlx::PostgresError) and VectorCommonError(vector_common:Error)?
+    // a new Error enum with two variants: PostgresError(sqlx::Error) and VectorCommonError(vector_common:Error)?
     type Error = vector_common::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
