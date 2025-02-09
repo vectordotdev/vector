@@ -11344,6 +11344,7 @@ dependencies = [
  "http 0.2.9",
  "hyper-proxy",
  "indexmap 2.7.1",
+ "inventory",
  "ipnet",
  "metrics",
  "metrics-tracing-context",

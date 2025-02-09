@@ -25,6 +25,7 @@ headers = { version = "0.3.9", default-features = false }
 http = { version = "0.2.9", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap.workspace = true
+inventory = { version = "0.3" }
 ipnet = { version = "2", default-features = false, features = ["serde", "std"] }
 lookup = { package = "vector-lookup", path = "../vector-lookup" }
 metrics.workspace = true
