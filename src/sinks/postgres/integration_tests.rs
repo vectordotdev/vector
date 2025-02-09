@@ -1,6 +1,7 @@
 use crate::test_util::integration::postgres::pg_url;
 use crate::{
     config::{SinkConfig, SinkContext},
+    event::{ObjectMap, TraceEvent, Value},
     sinks::{postgres::PostgresConfig, util::test::load_sink},
     test_util::{
         components::{
@@ -9,8 +10,9 @@ use crate::{
         temp_table, trace_init,
     },
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use futures::stream;
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection, FromRow, PgConnection};
 use std::future::ready;
@@ -18,6 +20,7 @@ use vector_lib::event::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, Metric, MetricKind,
     MetricValue,
 };
+use vrl::event_path;
 
 const POSTGRES_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
@@ -50,6 +53,65 @@ fn create_events(count: usize) -> (Vec<Event>, BatchStatusReceiver) {
     (events, receiver)
 }
 
+fn create_metric(name: &str) -> Metric {
+    Metric::new(
+        name,
+        MetricKind::Absolute,
+        MetricValue::Counter { value: 1.0 },
+    )
+    .with_namespace(Some("vector"))
+    .with_tags(Some(metric_tags!("some_tag" => "some_value")))
+    .with_timestamp(Some(timestamp()))
+}
+
+fn create_span(resource: &str) -> ObjectMap {
+    ObjectMap::from([
+        ("service".into(), Value::from("a_service")),
+        ("name".into(), Value::from("a_name")),
+        ("resource".into(), Value::from(resource)),
+        ("type".into(), Value::from("a_type")),
+        ("trace_id".into(), Value::Integer(123)),
+        ("span_id".into(), Value::Integer(456)),
+        ("parent_id".into(), Value::Integer(789)),
+        (
+            "start".into(),
+            Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64)),
+        ),
+        ("duration".into(), Value::Integer(1_000_000)),
+        ("error".into(), Value::Integer(404)),
+        (
+            "meta".into(),
+            Value::Object(ObjectMap::from([
+                ("foo".into(), Value::from("bar")),
+                ("bar".into(), Value::from("baz")),
+            ])),
+        ),
+        (
+            "metrics".into(),
+            Value::Object(ObjectMap::from([
+                ("a_metric".into(), Value::Float(NotNan::new(0.577).unwrap())),
+                ("_top_level".into(), Value::Float(NotNan::new(1.0).unwrap())),
+            ])),
+        ),
+    ])
+}
+
+pub fn create_trace(resource: &str) -> TraceEvent {
+    let mut t = TraceEvent::default();
+    t.insert(event_path!("language"), "a_language");
+    t.insert(event_path!("agent_version"), "1.23456");
+    t.insert(event_path!("host"), "a_host");
+    t.insert(event_path!("env"), "an_env");
+    t.insert(event_path!("trace_id"), Value::Integer(123));
+    t.insert(event_path!("target_tps"), Value::Integer(10));
+    t.insert(event_path!("error_tps"), Value::Integer(5));
+    t.insert(
+        event_path!("spans"),
+        Value::Array(vec![Value::from(create_span(resource))]),
+    );
+    t
+}
+
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 struct TestEvent {
     id: i64,
@@ -67,6 +129,18 @@ struct TestCounterMetric {
     timestamp: DateTime<Utc>,
     kind: String,
     counter: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+struct TestTrace {
+    agent_version: String,
+    env: String,
+    error_tps: i64,
+    host: String,
+    language: String,
+    spans: Vec<serde_json::Value>,
+    target_tps: i64,
+    trace_id: i64,
 }
 
 async fn prepare_config() -> (PostgresConfig, String, PgConnection) {
@@ -203,14 +277,7 @@ async fn insert_metric() {
         .await
         .unwrap();
 
-    let metric = Metric::new(
-        "counter",
-        MetricKind::Absolute,
-        MetricValue::Counter { value: 1.0 },
-    )
-    .with_namespace(Some("vector"))
-    .with_tags(Some(metric_tags!("some_tag" => "some_value")))
-    .with_timestamp(Some(timestamp()));
+    let metric = create_metric("counter");
     let expected_metric_value = serde_json::to_value(&metric).unwrap();
     let input_event = Event::from(metric);
 
@@ -224,6 +291,37 @@ async fn insert_metric() {
         .unwrap();
     let inserted_metric_value = serde_json::to_value(&inserted_metric).unwrap();
     assert_eq!(inserted_metric_value, expected_metric_value);
+}
+
+#[tokio::test]
+async fn insert_trace() {
+    trace_init();
+
+    let (config, table, mut connection) = prepare_config().await;
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (agent_version TEXT, env TEXT, error_tps BIGINT, host TEXT,
+        language TEXT, spans JSONB[], target_tps BIGINT, trace_id BIGINT)"
+    );
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let trace = create_trace("a_trace");
+    let expected_trace_value = serde_json::to_value(&trace).unwrap();
+    let input_event = Event::from(trace);
+
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event)), &POSTGRES_SINK_TAGS)
+        .await;
+
+    let select_all_sql = format!("SELECT * FROM {table}");
+    let inserted_trace: TestTrace = sqlx::query_as(&select_all_sql)
+        .fetch_one(&mut connection)
+        .await
+        .unwrap();
+    let inserted_trace_value = serde_json::to_value(&inserted_trace).unwrap();
+    assert_eq!(inserted_trace_value, expected_trace_value);
 }
 
 // Using null::{table} with jsonb_populate_recordset does not work with default values.
