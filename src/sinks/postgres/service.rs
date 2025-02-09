@@ -46,7 +46,7 @@ impl PostgresService {
 }
 
 // TODO: do we need this clone?
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct PostgresRequest {
     pub events: Vec<Event>,
     pub finalizers: EventFinalizers,
