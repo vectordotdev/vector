@@ -479,3 +479,26 @@ async fn insertion_fails_missing_table() {
     .await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 }
+
+#[tokio::test]
+async fn insertion_fails_primary_key_violation() {
+    trace_init();
+
+    let (config, table, mut connection) = prepare_config().await;
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql =
+        format!("CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)");
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let event = create_event(0);
+    run_and_assert_sink_error(
+        sink,
+        // We send the same event twice to trigger a primary key violation on column `id`.
+        stream::iter(vec![event.clone(), event]),
+        &COMPONENT_ERROR_TAGS,
+    )
+    .await;
+}
