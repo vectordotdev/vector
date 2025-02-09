@@ -366,7 +366,7 @@ semver = { version = "1.0.25", default-features = false, features = ["serde", "s
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
 socket2 = { version = "0.5.8", default-features = false }
-sqlx = { version = "0.8.3", default-fetures = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional=true }
+sqlx = { version = "0.8.3", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional=true }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
