@@ -315,7 +315,7 @@ async fn insert_trace() {
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
     let drop_type_sql = "DROP TYPE IF EXISTS trace_span CASCADE";
-    sqlx::query(&drop_type_sql)
+    sqlx::query(drop_type_sql)
         .execute(&mut connection)
         .await
         .unwrap();
@@ -323,7 +323,7 @@ async fn insert_trace() {
         (service TEXT, name TEXT, resource TEXT, type TEXT, trace_id BIGINT,
         span_id BIGINT, parent_id BIGINT, start TIMESTAMPTZ, duration BIGINT,
         error BIGINT, meta JSONB, metrics JSONB)";
-    sqlx::query(&create_trace_span_type_sql)
+    sqlx::query(create_trace_span_type_sql)
         .execute(&mut connection)
         .await
         .unwrap();
