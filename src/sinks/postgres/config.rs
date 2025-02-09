@@ -66,7 +66,7 @@ impl GenerateConfig for PostgresConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"endpoint = "postgres://user:password@localhost/default"
-            table = "default"
+            table = "table"
         "#,
         )
         .unwrap()
