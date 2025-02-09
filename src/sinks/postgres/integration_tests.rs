@@ -319,12 +319,10 @@ async fn insert_trace() {
         .execute(&mut connection)
         .await
         .unwrap();
-    let create_trace_span_type_sql = format!(
-        "CREATE TYPE trace_span AS
+    let create_trace_span_type_sql = "CREATE TYPE trace_span AS
         (service TEXT, name TEXT, resource TEXT, type TEXT, trace_id BIGINT,
         span_id BIGINT, parent_id BIGINT, start TIMESTAMPTZ, duration BIGINT,
-        error BIGINT, meta JSONB, metrics JSONB)"
-    );
+        error BIGINT, meta JSONB, metrics JSONB)";
     sqlx::query(&create_trace_span_type_sql)
         .execute(&mut connection)
         .await
