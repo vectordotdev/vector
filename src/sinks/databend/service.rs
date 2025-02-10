@@ -4,8 +4,8 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use chrono::Utc;
-use databend_client::error::Error as DatabendError;
 use databend_client::APIClient as DatabendAPIClient;
+use databend_client::Error as DatabendError;
 use futures::future::BoxFuture;
 use rand::{thread_rng, Rng};
 use rand_distr::Alphanumeric;
@@ -26,7 +26,7 @@ impl RetryLogic for DatabendRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            DatabendError::InvalidResponse(qe) => match qe.code {
+            DatabendError::Response { status, .. } => match status.as_u16() {
                 429 => true,
                 // general server error
                 500 => true,
@@ -115,7 +115,6 @@ impl DatabendService {
         let database = self
             .client
             .current_database()
-            .await
             .unwrap_or("default".to_string());
         let suffix = thread_rng()
             .sample_iter(&Alphanumeric)
@@ -158,8 +157,8 @@ impl Service<DatabendRequest> for DatabendService {
 
         let future = async move {
             let metadata = request.get_metadata().clone();
-            let protocol = service.client.scheme.as_str();
-            let host_port = format!("{}:{}", service.client.host, service.client.port);
+            let protocol = service.client.scheme();
+            let host_port = format!("{}:{}", service.client.host(), service.client.port());
             let endpoint = host_port.as_str();
             let byte_size = request.data.len();
             service.insert_with_stage(request.data).await?;
