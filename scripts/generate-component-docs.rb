@@ -1745,19 +1745,17 @@ end
 
 def render_and_import_base_global_option_schema(root_schema, global_options)
   global_option_schema = {}
+
   global_options.each do |component_name, schema_name|
     friendly_name = "'#{component_name}' #{schema_name} configuration"
-    unwrapped_resolved_schema_result = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
 
-    # since global options are flattened configuration, we need to merge them into a single object
     if component_name == "global_option"
-      unwrapped_resolved_schema_result.each do |component_name, schema|
-        global_option_schema[component_name] = schema
-      end
-    # deal with secret, enrichment_tables, and other global options
+      # Flattening global options
+      unwrap_resolved_schema(root_schema, schema_name, friendly_name)
+        .each { |name, schema| global_option_schema[name] = schema }
     else
-      resolved_schema = resolve_schema_by_name(root_schema, schema_name)
-      global_option_schema[component_name] = resolved_schema
+      # Resolving and assigning other global options
+      global_option_schema[component_name] = resolve_schema_by_name(root_schema, schema_name)
     end
   end
 
