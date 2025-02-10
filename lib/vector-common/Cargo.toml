@@ -35,7 +35,7 @@ tokenize = []
 
 [dependencies]
 async-stream = "0.3.6"
-bytes = { version = "1.9.0", default-features = false, optional = true }
+bytes = { version = "1.10.0", default-features = false, optional = true }
 chrono.workspace = true
 crossbeam-utils = { version = "0.8.21", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
