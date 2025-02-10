@@ -1,5 +1,3 @@
-Custom authorization strategy is now supported for sources running
-HTTP servers (`http_server` source, `prometheus` source, `datadog_agent`, etc.).
-If strategy is not explicitly defined, it defaults to `basic`, which is the current behavior.
+Sources running HTTP servers (`http_server` source, `prometheus` source, `datadog_agent`, etc.) now support a new `custom` authorization strategy . If a strategy is not explicitly defined, it defaults to `basic`, which is the current behavior.
 
 authors: esensar
