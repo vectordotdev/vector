@@ -192,18 +192,6 @@ pub enum HttpServerAuthMatcher {
 }
 
 impl HttpServerAuthMatcher {
-    #[cfg(test)]
-    fn auth_header(self) -> (HeaderValue, &'static str) {
-        match self {
-            HttpServerAuthMatcher::AuthHeader(header_value, error_message) => {
-                (header_value, error_message)
-            }
-            HttpServerAuthMatcher::Vrl { .. } => {
-                panic!("Expected HttpServerAuthMatcher::AuthHeader")
-            }
-        }
-    }
-
     /// Compares passed headers to the matcher
     pub fn handle_auth(&self, headers: &HeaderMap<HeaderValue>) -> Result<(), ErrorMessage> {
         match self {
@@ -285,6 +273,19 @@ mod tests {
     use indoc::indoc;
 
     use super::*;
+
+    impl HttpServerAuthMatcher {
+        fn auth_header(self) -> (HeaderValue, &'static str) {
+            match self {
+                HttpServerAuthMatcher::AuthHeader(header_value, error_message) => {
+                    (header_value, error_message)
+                }
+                HttpServerAuthMatcher::Vrl { .. } => {
+                    panic!("Expected HttpServerAuthMatcher::AuthHeader")
+                }
+            }
+        }
+    }
 
     #[test]
     fn config_should_default_to_basic() {
