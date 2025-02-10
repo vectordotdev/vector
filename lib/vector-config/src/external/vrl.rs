@@ -53,9 +53,16 @@ impl Configurable for VrlValue {
 }
 
 impl ToValue for VrlValue {
+    /// Converts a `VrlValue` into a `serde_json::Value`.
+    ///
+    /// This conversion should always succeed, though it may result in a loss
+    /// of type information for some value types.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if serialization fails, which is not expected
+    /// under normal circumstances.
     fn to_value(&self) -> Value {
-        // As far as I can tell, this should always succeed, although
-        // it will lose type information for some value types
         serde_json::to_value(self).expect("Unable to serialize VRL value")
     }
 }
