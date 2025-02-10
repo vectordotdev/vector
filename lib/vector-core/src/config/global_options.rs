@@ -2,7 +2,7 @@ use std::{fs::DirBuilder, path::PathBuf, time::Duration};
 
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
-use vector_config::{component::GenerateConfig, configurable_component};
+use vector_config::{configurable_component, impl_generate_config_from_default};
 
 use super::super::default_data_dir;
 use super::Telemetry;
@@ -113,11 +113,7 @@ pub struct GlobalOptions {
     pub expire_metrics_secs: Option<f64>,
 }
 
-impl GenerateConfig for GlobalOptions {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(GlobalOptions);
 
 impl GlobalOptions {
     /// Resolve the `data_dir` option in either the global or local config, and
