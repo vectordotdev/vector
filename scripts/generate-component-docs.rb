@@ -803,7 +803,7 @@ def resolve_schema(root_schema, schema)
   if !is_common_field.nil?
     resolved['common'] = is_common_field
   end
-  
+
   is_required_field = get_schema_metadata(schema, 'docs::required')
   if !is_required_field.nil?
     resolved['required'] = is_required_field
