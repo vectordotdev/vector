@@ -32,6 +32,7 @@ use super::ErrorMessage;
 #[configurable_component(no_deser)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[configurable(metadata(docs::enum_tag_description = "The authentication strategy to use."))]
+#[serde(tag = "strategy", rename_all = "snake_case")]
 pub enum HttpServerAuthConfig {
     /// Basic authentication.
     ///
