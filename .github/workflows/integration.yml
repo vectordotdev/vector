@@ -8,7 +8,6 @@ name: Integration Test Suite
 
 on:
   workflow_dispatch:
-  pull_request:
   merge_group:
     types: [checks_requested]
 
