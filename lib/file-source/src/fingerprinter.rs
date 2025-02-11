@@ -81,10 +81,8 @@ impl FileFingerprint {
             BytesChecksum(_) => false,
             FirstLinesChecksum(_) => false,
             DevInode(_, _) => false,
-            // full_content_checksum and modification_time type fingerprints
-            // are read from the beginning when update detected
-            FullContentChecksum(_) => true,
-            ModificationTime(_, _) => true,
+            FullContentChecksum(_) => false,
+            ModificationTime(_, _) => false,
             Unknown(_) => false,
         }
     }
