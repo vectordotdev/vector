@@ -226,6 +226,21 @@ impl GlobalOptions {
         let mut telemetry = self.telemetry.clone();
         telemetry.merge(&with.telemetry);
 
+        // TODO: maybe do some better merging here
+        let mut merged_expire_metrics_per_metric_set = None;
+        if self.expire_metrics_per_metric_set.is_some()
+            || with.expire_metrics_per_metric_set.is_some()
+        {
+            merged_expire_metrics_per_metric_set = Some(
+                self.expire_metrics_per_metric_set
+                    .iter()
+                    .flatten()
+                    .cloned()
+                    .chain(with.expire_metrics_per_metric_set.iter().flatten().cloned())
+                    .collect(),
+            );
+        }
+
         if errors.is_empty() {
             Ok(Self {
                 data_dir,
@@ -236,19 +251,7 @@ impl GlobalOptions {
                 proxy: self.proxy.merge(&with.proxy),
                 expire_metrics: self.expire_metrics.or(with.expire_metrics),
                 expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
-                // TODO: maybe do some better merging here
-                expire_metrics_per_metric_set: self.expire_metrics_per_metric_set.clone().map(
-                    |e| {
-                        e.into_iter()
-                            .chain(
-                                with.expire_metrics_per_metric_set
-                                    .unwrap_or_default()
-                                    .iter()
-                                    .cloned(),
-                            )
-                            .collect()
-                    },
-                ),
+                expire_metrics_per_metric_set: merged_expire_metrics_per_metric_set,
             })
         } else {
             Err(errors)
