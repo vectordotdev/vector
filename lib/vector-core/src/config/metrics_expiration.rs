@@ -1,4 +1,18 @@
-use vector_config::configurable_component;
+use std::collections::BTreeSet;
+
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use vector_config::{
+    attributes::CustomAttribute,
+    configurable_component,
+    schema::{
+        apply_base_metadata, generate_const_string_schema, generate_one_of_schema,
+        generate_string_schema, generate_struct_schema, SchemaObject,
+    },
+    Configurable, Metadata, ToValue,
+};
+use vector_config_common::constants::LOGICAL_NAME;
 
 /// Per metric set expiration options.
 #[configurable_component]
@@ -37,10 +51,8 @@ pub enum MetricNameMatcherConfig {
 }
 
 /// Configuration for metric labels matcher.
-#[configurable_component]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[configurable(metadata(docs::enum_tag_description = "Matcher for metric labels."))]
 pub enum MetricLabelMatcherConfig {
     /// Checks that any of the provided matchers can be applied to given metric.
     Any {
@@ -66,6 +78,110 @@ pub enum MetricLabelMatcherConfig {
         /// Pattern to compare metric label value to.
         value_pattern: String,
     },
+}
+
+impl ToValue for MetricLabelMatcherConfig {
+    fn to_value(&self) -> Value {
+        serde_json::to_value(self).expect("Could not convert label matcher settings to JSON")
+    }
+}
+
+fn generate_type_string_schema(
+    logical_name: &str,
+    title: Option<&'static str>,
+    description: &'static str,
+) -> SchemaObject {
+    let mut const_schema = generate_const_string_schema(logical_name.to_lowercase());
+    let mut const_metadata = Metadata::with_description(description);
+    if let Some(title) = title {
+        const_metadata.set_title(title);
+    }
+    const_metadata.add_custom_attribute(CustomAttribute::kv(LOGICAL_NAME, logical_name));
+    apply_base_metadata(&mut const_schema, const_metadata);
+    const_schema
+}
+
+// NOTE: Custom implementation of configurable to avoid stack overflow when running `generate_schema`
+// due to cycle in schema (MetricLabelMatcherConfig can contain multiple MetricLabelMatcherConfig
+// instances)
+impl Configurable for MetricLabelMatcherConfig {
+    fn generate_schema(
+        _gen: &std::cell::RefCell<vector_config::schema::SchemaGenerator>,
+    ) -> Result<vector_config::schema::SchemaObject, vector_config::GenerateError>
+    where
+        Self: Sized,
+    {
+        let string_metadata = Self::metadata();
+
+        let any_subschema = generate_type_string_schema(
+            "Any",
+            Some("Any label match"),
+            "Checks that any of the provided matchers can be applied to given metric.",
+        );
+        let all_subschema = generate_type_string_schema(
+            "All",
+            Some("All label match"),
+            "Checks that all of the provided matchers can be applied to given metric.",
+        );
+        let exact_subschema = generate_type_string_schema(
+            "Exact",
+            Some("Exact label match"),
+            "Looks for an exact match of one label key value pair.",
+        );
+        let regex_subschema = generate_type_string_schema(
+            "Regex",
+            Some("Regex label match"),
+            "Compares label value with given key to the provided pattern.",
+        );
+
+        let mut type_subschema = generate_one_of_schema(&[
+            any_subschema,
+            all_subschema,
+            exact_subschema,
+            regex_subschema,
+        ]);
+        apply_base_metadata(&mut type_subschema, string_metadata);
+
+        let mut required = BTreeSet::new();
+        required.insert("type".to_string());
+
+        let mut properties = IndexMap::new();
+        properties.insert("type".to_string(), type_subschema.clone());
+        properties.insert("key".to_string(), generate_string_schema());
+        properties.insert("value".to_string(), generate_string_schema());
+        properties.insert("value_pattern".to_string(), generate_string_schema());
+        properties.insert("matchers".to_string(), generate_string_schema());
+
+        let mut full_subschema = generate_struct_schema(properties, required, None);
+        let mut full_metadata =
+            Metadata::with_description("Configuration for metric labels matcher.");
+        full_metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
+        apply_base_metadata(&mut full_subschema, full_metadata);
+
+        Ok(full_subschema)
+    }
+
+    fn referenceable_name() -> Option<&'static str>
+    where
+        Self: Sized,
+    {
+        Some(std::any::type_name::<Self>())
+    }
+
+    fn metadata() -> vector_config::Metadata
+    where
+        Self: Sized,
+    {
+        let mut metadata = Metadata::default();
+        metadata.set_description("Configuration for metric labels matcher.");
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            "docs::enum_tag_description",
+            "Matcher for metric labels.",
+        ));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "internal"));
+        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tag_field", "type"));
+        metadata
+    }
 }
 
 /// Tests to confirm complex examples configuration
