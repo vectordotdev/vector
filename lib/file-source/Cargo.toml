@@ -23,7 +23,7 @@ default-features = false
 features = []
 
 [dependencies.bytes]
-version = "1.9.0"
+version = "1.10.0"
 default-features = false
 features = []
 
@@ -75,7 +75,7 @@ features = ["full"]
 [dev-dependencies]
 criterion = "0.5"
 quickcheck = "1"
-tempfile = "3.15.0"
+tempfile = "3.16.0"
 similar-asserts = "1.6.1"
 
 [[bench]]

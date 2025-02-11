@@ -86,7 +86,7 @@ backon,https://github.com/Xuanwo/backon,Apache-2.0,Xuanwo <github@xuanwo.io>
 backtrace,https://github.com/rust-lang/backtrace-rs,MIT OR Apache-2.0,The Rust Project Developers
 base16,https://github.com/thomcc/rust-base16,CC0-1.0,Thom Chiovoloni <tchiovoloni@mozilla.com>
 base16ct,https://github.com/RustCrypto/formats/tree/master/base16ct,Apache-2.0 OR MIT,RustCrypto Developers
-base62,https://github.com/fbernier/base62,MIT,"François Bernier <frankbernier@gmail.com>, Chai T. Rex <ChaiTRex@users.noreply.github.com>, Kevin Darlington <kevin@outroot.com>, Christopher Tarquini <code@tarq.io>"
+base62,https://github.com/fbernier/base62,MIT,"François Bernier <frankbernier@gmail.com>, Chai T. Rex <ChaiTRex@users.noreply.github.com>"
 base64,https://github.com/marshallpierce/rust-base64,MIT OR Apache-2.0,"Alice Maz <alice@alicemaz.com>, Marshall Pierce <marshall@mpierce.org>"
 base64,https://github.com/marshallpierce/rust-base64,MIT OR Apache-2.0,Marshall Pierce <marshall@mpierce.org>
 base64-simd,https://github.com/Nugine/simd,MIT,The base64-simd Authors
@@ -147,7 +147,6 @@ concurrent-queue,https://github.com/smol-rs/concurrent-queue,Apache-2.0 OR MIT,"
 const-oid,https://github.com/RustCrypto/formats/tree/master/const-oid,Apache-2.0 OR MIT,RustCrypto Developers
 const_fn,https://github.com/taiki-e/const_fn,Apache-2.0 OR MIT,The const_fn Authors
 convert_case,https://github.com/rutrum/convert-case,MIT,David Purdum <purdum41@gmail.com>
-convert_case,https://github.com/rutrum/convert-case,MIT,Rutrum <dave@rutrum.net>
 convert_case,https://github.com/rutrum/convert-case,MIT,rutrum <dave@rutrum.net>
 cookie-factory,https://github.com/rust-bakery/cookie-factory,MIT,"Geoffroy Couprie <geo.couprie@gmail.com>, Pierre Chifflier <chifflier@wzdftpd.net>"
 core-foundation,https://github.com/servo/core-foundation-rs,MIT  OR  Apache-2.0,The Servo Project Developers
@@ -288,7 +287,6 @@ http-serde,https://gitlab.com/kornelski/http-serde,Apache-2.0 OR MIT,Kornel <kor
 http-types,https://github.com/http-rs/http-types,MIT OR Apache-2.0,Yoshua Wuyts <yoshuawuyts@gmail.com>
 httparse,https://github.com/seanmonstar/httparse,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
 httpdate,https://github.com/pyfisch/httpdate,MIT OR Apache-2.0,Pyfisch <pyfisch@posteo.org>
-humantime,https://github.com/tailhook/humantime,MIT OR Apache-2.0,Paul Colomiets <paul@colomiets.name>
 hyper,https://github.com/hyperium/hyper,MIT,Sean McArthur <sean@seanmonstar.com>
 hyper-named-pipe,https://github.com/fussybeaver/hyper-named-pipe,Apache-2.0,The hyper-named-pipe Authors
 hyper-openssl,https://github.com/sfackler/hyper-openssl,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
