@@ -42,12 +42,12 @@ pub enum MetricNameMatcherConfig {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "Matcher for metric labels."))]
 pub enum MetricLabelMatcherConfig {
-    /// Checks that any of the given matchers can be applied to given metric.
+    /// Checks that any of the provided matchers can be applied to given metric.
     Any {
         /// List of matchers to check.
         matchers: Vec<MetricLabelMatcherConfig>,
     },
-    /// Checks that all of the given matchers can be applied to given metric.
+    /// Checks that all of the provided matchers can be applied to given metric.
     All {
         /// List of matchers to check.
         matchers: Vec<MetricLabelMatcherConfig>,
@@ -56,14 +56,14 @@ pub enum MetricLabelMatcherConfig {
     Exact {
         /// Metric key to look for.
         key: String,
-        /// The exact metric value.
+        /// The exact metric label value.
         value: String,
     },
     /// Compares label value with given key to the provided pattern.
     Regex {
         /// Metric key to look for.
         key: String,
-        /// Pattern to compare metric value to.
+        /// Pattern to compare metric label value to.
         value_pattern: String,
     },
 }

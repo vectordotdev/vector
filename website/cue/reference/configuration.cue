@@ -91,6 +91,111 @@ configuration: {
 			}
 		}
 
+		expire_metrics_per_metric_set: {
+			common: false
+			description: """
+				This allows configuring different expiration intervals for different metric sets.
+				By default this is empty and any metric not matched by one of these sets will use
+				the global default value, defined using `expire_metrics_secs`.
+				"""
+			required: false
+
+			type: array: {
+				default: []
+
+				items: type: object: options: {
+					name: {
+						description: """
+						Metric name to apply this expiration to. Ignores metric name if not defined.
+						"""
+						required: false
+						type: object: options: {
+							type: {
+								required: true
+								type: string: enum: {
+									exact: "Only considers exact name matches."
+									regex: "Compares metric name to the provided pattern."
+								}
+								description: "metric name matcher type"
+							}
+							value: {
+								required: true
+								type: string: {}
+								description: "The exact metric name."
+								relevant_when: "type = \"exact\""
+							}
+							pattern: {
+								required: true
+								type: string: {}
+								description: "Pattern to compare to."
+								relevant_when: "type = \"regex\""
+							}
+						}
+					}
+					labels: {
+						description: """
+						Labels to apply this expiration. Ignores labels if not defined.
+						"""
+						required: false
+						type: object: options: {
+							type: {
+								required: true
+								type: string: enum: {
+									exact: "Looks for an exact match of one label key value pair."
+									regex: "Compares label value with given key to the provided pattern."
+									all: "Checks that all of the provided matchers can be applied to given metric."
+									any: "Checks that any of the provided matchers can be applied to given metric."
+								}
+								description: "metric name matcher type"
+							}
+							key: {
+								required: true
+								type: string: {}
+								description: "Metric key to look for."
+								relevant_when: "type = \"exact\" or type = \"regex\""
+							}
+							value: {
+								required: true
+								type: string: {}
+								description: "The exact metric label value."
+								relevant_when: "type = \"exact\""
+							}
+							pattern: {
+								required: true
+								type: string: {}
+								description: "Pattern to compare metric label value to."
+								relevant_when: "type = \"regex\""
+							}
+							matchers: {
+								required: true
+								type: array: items: type: object: {}
+								description: """
+								List of matchers to check. Each matcher has the same
+								options as the `labels` object.
+								"""
+								relevant_when: "type = \"all\" or type = \"any\""
+							}
+						}
+					}
+					expire_secs: {
+						common: false
+						description: """
+							The amount of time, in seconds, that internal metrics will persist after having not been
+							updated before they expire and are removed.
+
+							Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
+							that metrics live long enough to be emitted and captured,
+							"""
+						required: false
+						type: float: {
+							examples: [60.0]
+							unit: "seconds"
+						}
+					}
+				}
+			}
+		}
+
 		// TODO: generate `common` and `required` fields from ruby according to some tags
 		enrichment_tables: base.configuration.configuration.enrichment_tables
 		enrichment_tables: common:   false
