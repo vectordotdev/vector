@@ -235,7 +235,7 @@ where
             let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
-                if !watcher.should_read() {
+                if !watcher.should_read() || watcher.sleepping() {
                     continue;
                 }
                 // if data ready time to current is less than trigger wait sec,
@@ -296,6 +296,22 @@ where
                 // Do not move on to newer files if we are behind on an older file
                 if self.oldest_first && maxed_out_reading_single_file {
                     break;
+                }
+
+                // full_content and update_time not need to get the increase data when file is update
+                // every update of the file can be treated as a new file
+                // so older watch will be sleep after read the full content
+                let should_sleep = match file_id {
+                    crate::FileFingerprint::BytesChecksum(_) | 
+                    crate::FileFingerprint::FirstLinesChecksum(_) |
+                    crate::FileFingerprint::DevInode(_, _) | 
+                    crate::FileFingerprint::Unknown(_) => false,
+                
+                    crate::FileFingerprint::FullContentChecksum(_) |
+                    crate::FileFingerprint::ModificationTime(_, _) => true,
+                };
+                if should_sleep {
+                    watcher.set_sleep();
                 }
             }
 
@@ -425,6 +441,21 @@ where
                     self.emitter.emit_file_added(&path);
                 }
                 watcher.set_file_findable(true);
+                
+                let new_watch_path = watcher.path.clone().into_os_string().into_string().unwrap();
+                // Remove FileWatchers which is sleepping 
+                // and watch path is same with the new watcher.
+                fp_map.retain(|file_id, watcher| {
+                    let watched_path = watcher.path.clone().into_os_string().into_string().unwrap();
+                    if watcher.sleepping() && watched_path == new_watch_path {
+                        self.emitter
+                            .emit_file_unwatched(&watcher.path, watcher.reached_eof());
+                        checkpoints.set_dead(*file_id);
+                        false
+                    } else {
+                        true
+                    }
+                });
                 fp_map.insert(file_id, watcher);
             }
             Err(error) => self.emitter.emit_file_watch_error(&path, error),

@@ -42,6 +42,7 @@ pub struct FileWatcher {
     devno: u64,
     inode: u64,
     is_dead: bool,
+    is_sleep: bool,
     reached_eof: bool,
     last_read_attempt: Instant,
     last_read_success: Instant,
@@ -148,6 +149,7 @@ impl FileWatcher {
             devno,
             inode: ino,
             is_dead: false,
+            is_sleep: false,
             reached_eof: false,
             last_read_attempt: ts,
             last_read_success: ts,
@@ -200,6 +202,14 @@ impl FileWatcher {
 
     pub fn dead(&self) -> bool {
         self.is_dead
+    }
+
+    pub fn set_sleep(&mut self) {
+        self.is_sleep = true;
+    }
+
+    pub fn sleepping(&self) -> bool {
+        self.is_sleep
     }
 
     pub fn get_file_position(&self) -> FilePosition {
