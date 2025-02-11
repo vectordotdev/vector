@@ -107,7 +107,7 @@ pub struct GlobalOptions {
     /// updated before they expire and are removed.
     ///
     /// Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
-    /// that metrics live long enough to be emitted and captured,
+    /// so metrics live long enough to be emitted and captured.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::common = false, docs::required = false))]
     pub expire_metrics_secs: Option<f64>,

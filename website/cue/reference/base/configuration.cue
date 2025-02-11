@@ -600,7 +600,7 @@ base: configuration: configuration: {
 			updated before they expire and are removed.
 
 			Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
-			that metrics live long enough to be emitted and captured,
+			so metrics live long enough to be emitted and captured.
 			"""
 		required: false
 		type: float: {}
