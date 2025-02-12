@@ -237,6 +237,8 @@ base: configuration: configuration: {
 			significantly provided that there are only a few possible rows returned by the exact matches in the
 			condition. We don't recommend using a condition that uses only date range searches.
 			"""
+		common:   false
+		required: false
 	}
 	secret: {
 		type: object: options: {
@@ -547,5 +549,224 @@ base: configuration: configuration: {
 			Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
 			configuration reload process.
 			"""
+		common:   false
+		required: false
+	}
+	acknowledgements: {
+		common: true
+		description: """
+			Controls how acknowledgements are handled for all sinks by default.
+
+			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event
+			acknowledgement.
+
+			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			"""
+		required: false
+		type: object: options: enabled: {
+			description: """
+				Whether or not end-to-end acknowledgements are enabled.
+
+				When enabled for a sink, any source that supports end-to-end
+				acknowledgements that is connected to that sink waits for events
+				to be acknowledged by **all connected sinks** before acknowledging them at the source.
+
+				Enabling or disabling acknowledgements at the sink level takes precedence over any global
+				[`acknowledgements`][global_acks] configuration.
+
+				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+				"""
+			required: false
+			type: bool: {}
+		}
+	}
+	data_dir: {
+		common: false
+		description: """
+			The directory used for persisting Vector state data.
+
+			This is the directory where Vector will store any state data, such as disk buffers, file
+			checkpoints, and more.
+
+			Vector must have write permissions to this directory.
+			"""
+		required: false
+		type: string: default: "/var/lib/vector/"
+	}
+	expire_metrics_secs: {
+		common: false
+		description: """
+			The amount of time, in seconds, that internal metrics will persist after having not been
+			updated before they expire and are removed.
+
+			Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
+			so metrics live long enough to be emitted and captured.
+			"""
+		required: false
+		type: float: {}
+	}
+	log_schema: {
+		common: false
+		description: """
+			Default log schema for all events.
+
+			This is used if a component does not have its own specific log schema. All events use a log
+			schema, whether or not the default is used, to assign event fields on incoming events.
+			"""
+		required: false
+		type: object: options: {
+			host_key: {
+				description: """
+					The name of the event field to treat as the host which sent the message.
+
+					This field will generally represent a real host, or container, that generated the message,
+					but is somewhat source-dependent.
+					"""
+				required: false
+				type: string: default: ".host"
+			}
+			message_key: {
+				description: """
+					The name of the event field to treat as the event message.
+
+					This would be the field that holds the raw message, such as a raw log line.
+					"""
+				required: false
+				type: string: default: ".message"
+			}
+			metadata_key: {
+				description: """
+					The name of the event field to set the event metadata in.
+
+					Generally, this field will be set by Vector to hold event-specific metadata, such as
+					annotations by the `remap` transform when an error or abort is encountered.
+					"""
+				required: false
+				type: string: default: ".metadata"
+			}
+			source_type_key: {
+				description: """
+					The name of the event field to set the source identifier in.
+
+					This field will be set by the Vector source that the event was created in.
+					"""
+				required: false
+				type: string: default: ".source_type"
+			}
+			timestamp_key: {
+				description: "The name of the event field to treat as the event timestamp."
+				required:    false
+				type: string: default: ".timestamp"
+			}
+		}
+	}
+	proxy: {
+		common: false
+		description: """
+			Proxy configuration.
+
+			Configure to proxy traffic through an HTTP(S) proxy when making external requests.
+
+			Similar to common proxy configuration convention, you can set different proxies
+			to use based on the type of traffic being proxied. You can also set specific hosts that
+			should not be proxied.
+			"""
+		required: false
+		type: object: options: {
+			enabled: {
+				description: "Enables proxying support."
+				required:    false
+				type: bool: default: true
+			}
+			http: {
+				description: """
+					Proxy endpoint to use when proxying HTTP traffic.
+
+					Must be a valid URI string.
+					"""
+				required: false
+				type: string: examples: ["http://foo.bar:3128"]
+			}
+			https: {
+				description: """
+					Proxy endpoint to use when proxying HTTPS traffic.
+
+					Must be a valid URI string.
+					"""
+				required: false
+				type: string: examples: ["http://foo.bar:3128"]
+			}
+			no_proxy: {
+				description: """
+					A list of hosts to avoid proxying.
+
+					Multiple patterns are allowed:
+
+					| Pattern             | Example match                                                               |
+					| ------------------- | --------------------------------------------------------------------------- |
+					| Domain names        | `example.com` matches requests to `example.com`                     |
+					| Wildcard domains    | `.example.com` matches requests to `example.com` and its subdomains |
+					| IP addresses        | `127.0.0.1` matches requests to `127.0.0.1`                         |
+					| [CIDR][cidr] blocks | `192.168.0.0/16` matches requests to any IP addresses in this range     |
+					| Splat               | `*` matches all hosts                                                   |
+
+					[cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
+					"""
+				required: false
+				type: array: {
+					default: []
+					items: type: string: examples: ["localhost", ".foo.bar", "*"]
+				}
+			}
+		}
+	}
+	telemetry: {
+		common: false
+		description: """
+			Telemetry options.
+
+			Determines whether `source` and `service` tags should be emitted with the
+			`component_sent_*` and `component_received_*` events.
+			"""
+		required: false
+		type: object: options: tags: {
+			description: "Configures whether to emit certain tags"
+			required:    false
+			type: object: options: {
+				emit_service: {
+					description: """
+						True if the `service` tag should be emitted
+						in the `component_received_*` and `component_sent_*`
+						telemetry.
+						"""
+					required: false
+					type: bool: default: false
+				}
+				emit_source: {
+					description: """
+						True if the `source` tag should be emitted
+						in the `component_received_*` and `component_sent_*`
+						telemetry.
+						"""
+					required: false
+					type: bool: default: false
+				}
+			}
+		}
+	}
+	timezone: {
+		common: false
+		description: """
+			The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone.
+
+			The time zone name may be any name in the [TZ database][tzdb] or `local` to indicate system
+			local time.
+
+			Note that in Vector/VRL all timestamps are represented in UTC.
+
+			[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+			"""
+		required: false
+		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
 }
