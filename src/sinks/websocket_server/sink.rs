@@ -12,7 +12,7 @@ use futures::{
     stream::BoxStream,
     StreamExt,
 };
-use http::{header::AUTHORIZATION, StatusCode};
+use http::StatusCode;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
     handshake::server::{ErrorResponse, Request, Response},
@@ -33,11 +33,12 @@ use vector_lib::{
 
 use crate::{
     codecs::{Encoder, Transformer},
+    common::http::server_auth::HttpServerAuthMatcher,
     internal_events::{
         ConnectionOpen, OpenGauge, WsConnectionFailedError, WsListenerConnectionEstablished,
         WsListenerConnectionShutdown, WsListenerSendError,
     },
-    sources::util::http::HttpSourceAuth,
+    sinks::prelude::*,
 };
 
 use super::WebSocketListenerSinkConfig;
@@ -48,16 +49,19 @@ pub struct WebSocketListenerSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     address: SocketAddr,
-    auth: HttpSourceAuth,
+    auth: Option<HttpServerAuthMatcher>,
 }
 
 impl WebSocketListenerSink {
-    pub fn new(config: WebSocketListenerSinkConfig) -> crate::Result<Self> {
+    pub fn new(config: WebSocketListenerSinkConfig, cx: SinkContext) -> crate::Result<Self> {
         let tls = MaybeTlsSettings::from_config(config.tls.as_ref(), true)?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
-        let auth = HttpSourceAuth::try_from(config.auth.as_ref())?;
+        let auth = config
+            .auth
+            .map(|config| config.build(&cx.enrichment_tables))
+            .transpose()?;
         Ok(Self {
             peers: Arc::new(Mutex::new(HashMap::new())),
             tls,
@@ -80,7 +84,7 @@ impl WebSocketListenerSink {
     }
 
     async fn handle_connections(
-        auth: HttpSourceAuth,
+        auth: Option<HttpServerAuthMatcher>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         mut listener: MaybeTlsListener,
     ) {
@@ -100,7 +104,7 @@ impl WebSocketListenerSink {
     }
 
     async fn handle_connection(
-        auth: HttpSourceAuth,
+        auth: Option<HttpServerAuthMatcher>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         stream: MaybeTlsIncomingStream<TcpStream>,
         open_gauge: OpenGauge,
@@ -108,19 +112,19 @@ impl WebSocketListenerSink {
         let addr = stream.peer_addr();
         debug!("Incoming TCP connection from: {}", addr);
 
-        let header_callback = |req: &Request, response: Response| match auth.is_valid(
-            &req.headers()
-                .get(AUTHORIZATION)
-                .and_then(|h| h.to_str().ok())
-                .map(ToString::to_string),
-        ) {
-            Ok(_) => Ok(response),
-            Err(message) => {
-                let mut response = ErrorResponse::default();
-                *response.status_mut() = StatusCode::UNAUTHORIZED;
-                *response.body_mut() = Some(message.message().to_string());
-                debug!("Websocket handshake auth validation failed: {}", message);
-                Err(response)
+        let header_callback = |req: &Request, response: Response| {
+            let Some(auth) = auth else {
+                return Ok(response);
+            };
+            match auth.handle_auth(req.headers()) {
+                Ok(_) => Ok(response),
+                Err(message) => {
+                    let mut response = ErrorResponse::default();
+                    *response.status_mut() = StatusCode::UNAUTHORIZED;
+                    *response.body_mut() = Some(message.message().to_string());
+                    debug!("Websocket handshake auth validation failed: {}", message);
+                    Err(response)
+                }
             }
         };
 
@@ -334,10 +338,13 @@ mod tests {
     async fn sink_spec_compliance() {
         let event = Event::Log(LogEvent::from("foo"));
 
-        let sink = WebSocketListenerSink::new(WebSocketListenerSinkConfig {
-            address: next_addr(),
-            ..Default::default()
-        })
+        let sink = WebSocketListenerSink::new(
+            WebSocketListenerSinkConfig {
+                address: next_addr(),
+                ..Default::default()
+            },
+            SinkContext::default(),
+        )
         .unwrap();
 
         run_and_assert_sink_compliance(
@@ -355,7 +362,7 @@ mod tests {
     where
         S: Stream<Item = Event> + Send + 'static,
     {
-        let sink = WebSocketListenerSink::new(config).unwrap();
+        let sink = WebSocketListenerSink::new(config, SinkContext::default()).unwrap();
 
         let compliance_assertion = tokio::spawn(run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(sink),
