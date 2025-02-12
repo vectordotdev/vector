@@ -111,7 +111,7 @@ impl<'a> Builder<'a> {
     /// Builds the new pieces of the topology found in `self.diff`.
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
         let enrichment_tables = self.load_enrichment_tables().await;
-        let source_tasks = self.build_sources().await;
+        let source_tasks = self.build_sources(enrichment_tables).await;
         self.build_transforms(enrichment_tables).await;
         self.build_sinks(enrichment_tables).await;
 
@@ -155,7 +155,7 @@ impl<'a> Builder<'a> {
         let mut enrichment_tables = HashMap::new();
 
         // Build enrichment tables
-        'tables: for (name, table) in self.config.enrichment_tables.iter() {
+        'tables: for (name, table_outer) in self.config.enrichment_tables.iter() {
             let table_name = name.to_string();
             if ENRICHMENT_TABLES.needs_reload(&table_name) {
                 let indexes = if !self.diff.enrichment_tables.is_added(name) {
@@ -166,7 +166,7 @@ impl<'a> Builder<'a> {
                     None
                 };
 
-                let mut table = match table.inner.build(&self.config.global).await {
+                let mut table = match table_outer.inner.build(&self.config.global).await {
                     Ok(table) => table,
                     Err(error) => {
                         self.errors
@@ -203,7 +203,10 @@ impl<'a> Builder<'a> {
         &ENRICHMENT_TABLES
     }
 
-    async fn build_sources(&mut self) -> HashMap<ComponentKey, Task> {
+    async fn build_sources(
+        &mut self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> HashMap<ComponentKey, Task> {
         let mut source_tasks = HashMap::new();
 
         for (key, source) in self
@@ -322,6 +325,7 @@ impl<'a> Builder<'a> {
             let context = SourceContext {
                 key: key.clone(),
                 globals: self.config.global.clone(),
+                enrichment_tables: enrichment_tables.clone(),
                 shutdown: shutdown_signal,
                 out: pipeline,
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, &source.proxy),
@@ -506,10 +510,22 @@ impl<'a> Builder<'a> {
     }
 
     async fn build_sinks(&mut self, enrichment_tables: &vector_lib::enrichment::TableRegistry) {
+        let table_sinks = self
+            .config
+            .enrichment_tables
+            .iter()
+            .filter_map(|(key, table)| table.as_sink().map(|s| (key, s)))
+            .collect::<Vec<_>>();
         for (key, sink) in self
             .config
             .sinks()
             .filter(|(key, _)| self.diff.sinks.contains_new(key))
+            .chain(
+                table_sinks
+                    .iter()
+                    .map(|(key, sink)| (*key, sink))
+                    .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
+            )
         {
             debug!(component = %key, "Building new sink.");
 
@@ -568,6 +584,7 @@ impl<'a> Builder<'a> {
             let cx = SinkContext {
                 healthcheck,
                 globals: self.config.global.clone(),
+                enrichment_tables: enrichment_tables.clone(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
                 schema: self.config.schema,
                 app_name: crate::get_app_name().to_string(),

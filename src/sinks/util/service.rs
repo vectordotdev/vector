@@ -101,7 +101,7 @@ impl TowerRequestConfigDefaults for GlobalTowerRequestConfigDefaults {}
 
 /// Middleware settings for outbound requests.
 ///
-/// Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+/// Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
 ///
 /// Note that the retry backoff policy follows the Fibonacci sequence.
 #[serde_as]

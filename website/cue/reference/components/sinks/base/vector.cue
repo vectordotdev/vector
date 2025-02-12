@@ -14,9 +14,9 @@ base: components: sinks: vector: configuration: {
 			description: """
 				Whether or not end-to-end acknowledgements are enabled.
 
-				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
-				connected** sinks before acknowledging them at the source.
+				When enabled for a sink, any source that supports end-to-end
+				acknowledgements that is connected to that sink waits for events
+				to be acknowledged by **all connected sinks** before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -85,7 +85,7 @@ base: components: sinks: vector: configuration: {
 		description: """
 			Middleware settings for outbound requests.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
 
 			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
@@ -107,7 +107,7 @@ base: components: sinks: vector: configuration: {
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
 																when latency increases.
 
-																Note that the new limit is rounded down after applying this ratio.
+																**Note**: The new limit is rounded down after applying this ratio.
 																"""
 						required: false
 						type: float: default: 0.9
@@ -127,9 +127,9 @@ base: components: sinks: vector: configuration: {
 					}
 					initial_concurrency: {
 						description: """
-																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
-																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
 																`adaptive_concurrency_limit` metric.
 																"""
@@ -140,7 +140,7 @@ base: components: sinks: vector: configuration: {
 						description: """
 																The maximum concurrency limit.
 
-																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
 																"""
 						required: false
 						type: uint: default: 200
@@ -174,7 +174,7 @@ base: components: sinks: vector: configuration: {
 						default: "adaptive"
 						enum: {
 							adaptive: """
-															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
 															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
 															"""
@@ -275,7 +275,7 @@ base: components: sinks: vector: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -297,7 +297,7 @@ base: components: sinks: vector: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -348,7 +348,7 @@ base: components: sinks: vector: configuration: {
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

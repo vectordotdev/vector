@@ -6,7 +6,7 @@ services:
   mock-localstack:
     image: docker.io/localstack/localstack:3
     environment:
-    - SERVICES=kinesis,s3,cloudwatch,es,firehose,sqs,sns,logs
+    - SERVICES=kinesis,s3,cloudwatch,es,firehose,kms,sqs,sns,logs
   mock-ecs:
     image: docker.io/amazon/amazon-ecs-local-container-endpoints:latest
     volumes:

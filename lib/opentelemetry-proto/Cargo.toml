@@ -10,7 +10,7 @@ prost-build.workspace = true
 tonic-build.workspace = true
 
 [dependencies]
-bytes = { version = "1.9.0", default-features = false, features = ["serde"] }
+bytes = { version = "1.10.0", default-features = false, features = ["serde"] }
 chrono.workspace = true
 hex = { version = "0.4.3", default-features = false, features = ["std"] }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false }

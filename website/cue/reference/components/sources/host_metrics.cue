@@ -177,6 +177,23 @@ components: sources: host_metrics: {
 		network_transmit_packets_drop_total: _host & _network_nomac & {description: "The number of packets dropped during transmits on this interface."}
 		network_transmit_packets_total: _host & _network_nomac & {description: "The number of packets transmitted on this interface."}
 
+		// Host tcp
+		tcp_connections_total: _host & _tcp_linux & _tcp_gauge & {description: "The number of TCP connections."}
+		tcp_tx_queued_bytes_total: _host & _tcp_linux & {
+			description: "The number of bytes in the send queue across all connections."
+			type:        "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["tcp"]
+			}
+		}
+		tcp_rx_queued_bytes_total: _host & _tcp_linux & {
+			description: "The number of bytes in the receive queue across all connections."
+			type:        "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["tcp"]
+			}
+		}
+
 		// Helpers
 		_host: {
 			default_namespace: "host"
@@ -276,6 +293,19 @@ components: sources: host_metrics: {
 			type: "gauge"
 			tags: _host_metrics_tags & {
 				collector: examples: ["process"]
+			}
+		}
+
+		_tcp_linux: {relevant_when: "OS is Linux"}
+		_tcp_gauge: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["tcp"]
+				state: {
+					description: "The connection state."
+					required:    true
+					examples: ["established", "time_wait"]
+				}
 			}
 		}
 	}

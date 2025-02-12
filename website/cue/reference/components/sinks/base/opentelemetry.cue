@@ -17,9 +17,9 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 				description: """
 					Whether or not end-to-end acknowledgements are enabled.
 
-					When enabled for a sink, any source connected to that sink, where the source supports
-					end-to-end acknowledgements as well, waits for events to be acknowledged by **all
-					connected** sinks before acknowledging them at the source.
+					When enabled for a sink, any source that supports end-to-end
+					acknowledgements that is connected to that sink waits for events
+					to be acknowledged by **all connected sinks** before acknowledging them at the source.
 
 					Enabling or disabling acknowledgements at the sink level takes precedence over any global
 					[`acknowledgements`][global_acks] configuration.
@@ -190,7 +190,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 						}
 						device_version: {
 							description: """
-																				Identifies the version of the problem. In combination with device product and vendor, it composes the unique id of the device that sends messages.
+																				Identifies the version of the problem. The combination of the device product, vendor and this value make up the unique id of the device that sends messages.
 																				The value length must be less than or equal to 31.
 																				"""
 							required: true
@@ -223,8 +223,8 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 																				Reflects importance of the event.
 
 																				It must point to a number from 0 to 10.
-																				0 = Lowest, 10 = Highest.
-																				Equals to "cef.severity" by default.
+																				0 = lowest_importance, 10 = highest_importance.
+																				Set to "cef.severity" by default.
 																				"""
 							required: true
 							type: string: {}
@@ -232,7 +232,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 						version: {
 							description: """
 																				CEF Version. Can be either 0 or 1.
-																				Equals to "0" by default.
+																				Set to "0" by default.
 																				"""
 							required: true
 							type: string: enum: {
@@ -266,11 +266,11 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 																			Vector's encoder currently adheres more strictly to the GELF spec, with
 																			the exception that some characters such as `@`  are allowed in field names.
 
-																			Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
-																			by Graylog, and is much more relaxed than the GELF spec.
+																			Other GELF codecs, such as Loki's, use a [Go SDK][implementation] that is maintained
+																			by Graylog and is much more relaxed than the GELF spec.
 
 																			Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
-																			the codec may continue to relax the enforcement of specification.
+																			the codec might continue to relax the enforcement of the specification.
 
 																			[gelf]: https://docs.graylog.org/docs/gelf
 																			[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
@@ -334,8 +334,8 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 					type: object: options: {
 						capacity: {
 							description: """
-																				Set the capacity (in bytes) of the internal buffer used in the CSV writer.
-																				This defaults to a reasonable setting.
+																				Sets the capacity (in bytes) of the internal buffer used in the CSV writer.
+																				This defaults to 8KB.
 																				"""
 							required: false
 							type: uint: default: 8192
@@ -347,9 +347,9 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 						}
 						double_quote: {
 							description: """
-																				Enable double quote escapes.
+																				Enables double quote escapes.
 
-																				This is enabled by default, but it may be disabled. When disabled, quotes in
+																				This is enabled by default, but you can disable it. When disabled, quotes in
 																				field data are escaped instead of doubled.
 																				"""
 							required: false
@@ -362,20 +362,20 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 																				In some variants of CSV, quotes are escaped using a special escape character
 																				like \\ (instead of escaping quotes by doubling them).
 
-																				To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+																				To use this, `double_quotes` needs to be disabled as well; otherwise, this setting is ignored.
 																				"""
 							required: false
 							type: ascii_char: default: "\""
 						}
 						fields: {
 							description: """
-																				Configures the fields that will be encoded, as well as the order in which they
+																				Configures the fields that are encoded, as well as the order in which they
 																				appear in the output.
 
-																				If a field is not present in the event, the output will be an empty string.
+																				If a field is not present in the event, the output for that field is an empty string.
 
-																				Values of type `Array`, `Object`, and `Regex` are not supported and the
-																				output will be an empty string.
+																				Values of type `Array`, `Object`, and `Regex` are not supported, and the
+																				output for any of these types is an empty string.
 																				"""
 							required: true
 							type: array: items: type: string: {}
@@ -401,8 +401,8 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 									never: "Never writes quotes, even if it produces invalid CSV data."
 									non_numeric: """
 																							Puts quotes around all fields that are non-numeric.
-																							Namely, when writing a field that does not parse as a valid float or integer,
-																							then quotes are used even if they aren't strictly necessary.
+																							This means that when writing a field that does not parse as a valid float or integer,
+																							quotes are used even if they aren't strictly necessary.
 																							"""
 								}
 							}
@@ -459,7 +459,9 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 							description: """
 																				The path to the protobuf descriptor set file.
 
-																				This file is the output of `protoc -o <path> ...`
+																				This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+																				You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
 																				"""
 							required: true
 							type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
@@ -622,7 +624,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 																				Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
 																				when latency increases.
 
-																				Note that the new limit is rounded down after applying this ratio.
+																				**Note**: The new limit is rounded down after applying this ratio.
 																				"""
 							required: false
 							type: float: default: 0.9
@@ -642,9 +644,9 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 						}
 						initial_concurrency: {
 							description: """
-																				The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+																				The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
-																				It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																				Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																				long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
 																				`adaptive_concurrency_limit` metric.
 																				"""
@@ -655,7 +657,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 							description: """
 																				The maximum concurrency limit.
 
-																				The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																				The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
 																				"""
 							required: false
 							type: uint: default: 200
@@ -689,7 +691,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 							default: "adaptive"
 							enum: {
 								adaptive: """
-																			Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+																			Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
 																			[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
 																			"""
@@ -805,7 +807,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 					description: """
 						Sets the list of supported ALPN protocols.
 
-						Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+						Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 						that they are defined.
 						"""
 					required: false
@@ -827,7 +829,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 						The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 						an inline string in PEM format.
 
-						If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+						If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 						"""
 					required: false
 					type: string: examples: ["/path/to/host_certificate.crt"]
@@ -868,7 +870,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 						If enabled, certificates must not be expired and must be issued by a trusted
 						issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 						certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-						so on until the verification process reaches a root certificate.
+						so on, until the verification process reaches a root certificate.
 
 						Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 						"""
