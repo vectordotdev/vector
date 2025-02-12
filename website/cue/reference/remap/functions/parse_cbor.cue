@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: parse_cbor: {
-	category: "Parse"
+	category:    "Parse"
 	description: """
 		Parses the `value` as [CBOR](\(urls.cbor)).
 		"""
@@ -13,9 +13,9 @@ remap: functions: parse_cbor: {
 
 	arguments: [
 		{
-			name: "value"
+			name:        "value"
 			description: "The CBOR payload to parse."
-			required: true
+			required:    true
 			type: ["string"]
 		},
 	]
