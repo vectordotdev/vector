@@ -3,7 +3,7 @@ package metadata
 remap: functions: shannon_entropy: {
 	category:    "String"
 	description: """
-		Generates [shannon entropy](\(urls.shannon_entropy)) from given string. It can generate it
+		Generates [Shannon entropy](\(urls.shannon_entropy)) from given string. It can generate it
 		based on string bytes, codepoints or graphemes.
 		"""
 
@@ -17,7 +17,7 @@ remap: functions: shannon_entropy: {
 		{
 			name: "segmentation"
 			description: """
-				Defines how to split the string to calculate entropy, based on occurences of
+				Defines how to split the string to calculate entropy, based on occurrences of
 				segments.
 
 				Byte segmentation is the fastest, but it might give undesired results when handling
