@@ -479,6 +479,7 @@ urls: {
 	sha1:                                       "\(wikipedia)/wiki/SHA-1"
 	sha2:                                       "\(wikipedia)/wiki/SHA-2"
 	sha3:                                       "\(wikipedia)/wiki/SHA-3"
+	shannon_entropy:                            "\(wikipedia)/wiki/Entropy_(information_theory)"
 	signal:                                     "\(wikipedia)/wiki/Signal_(IPC)"
 	snake_case:                                 "\(wikipedia)/wiki/Snake_case"
 	snappy:                                     "https://google.github.io/snappy/"
