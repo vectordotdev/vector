@@ -18,7 +18,7 @@ logs to an HTTP server for further processing and/or storage.
 
 In the following sections we will examine the tools we have at our disposal.
 
-<img src="/img/guides/debugging-meme.png"  alt="debugging-meme" width="500"/>
+<img src="/img/guides/debugging-meme.png"  alt="debugging-meme" width="400"/>
 
 ## Vector Tools
 
@@ -506,7 +506,7 @@ Now we can observe internal metrics such as how many events our components recei
 In this section we will create some scenarios where the sink produces errors and we will show how to change the sink config to overcome
 them.
 
-### Unsupported Compression
+### Scenario 1 - Unsupported Compression
 
 Now that we have something that works, we want to add compression.
 
@@ -547,7 +547,7 @@ We now observe the following metrics:
 
 If we had access to the server downstream, we would see the following error:
 
-```yaml
+```text
 📥 Received POST request:
 🔗 Path: /logs
 📜 Headers:
@@ -570,7 +570,7 @@ compression: zlib
 Reloading depns on the deployments e.g. `systemctl kill -s HUP --kill-who=main vector.service`.
 You can read more in https://vector.dev/docs/administration/management.
 
-### Temporary Server Disruptions
+### Scenario 2 - Temporary Server Disruptions
 
 ##### Step 1
 
@@ -643,9 +643,48 @@ Notice how the `component_sent_events_total` metrics for `sinks_0` is now increa
 }
 ```
 
-### Batching
+### Scenario 3 - Smaller Batching
 
-Show a batch in the server (array of JSON events)
+For this scenario, let's assume our downstream server has a strict limit on the maximum payload size. Also, assume Vector sets the maximum
+batch to 10 MBs. Note: always refer to the docs for as the source of truth for this value.
+
+```text
+📥 Received POST request:
+🔗 Path: /logs
+📜 Headers:
+   content-type: application/json
+   content-encoding: deflate
+   accept-encoding: zstd,gzip,deflate,br
+   user-agent: Vector/0.45.0-custom-bac0c2015 (aarch64-apple-darwin debug=full)
+   host: localhost:8000
+   content-length: 1e+07
+🗜️ Payload was zlib-compressed. Decompressed successfully.
+📦 JSON Payload: [
+  {
+    "group": 0,
+    "key": "a",
+    "property": "foo"
+  },
+  {
+    "group": 0,
+    "key": "a",
+    "property": "foo"
+  },
+  // Assume a lot more bytes...
+],
+❌ Error: Maximum payload size exceeded. Rejecting payloads over 8192 bytes.
+```
+
+Hmm, does Vector expose any relevant settings?
+
+Yes, this behavior can be changed using [batch settings]({{< ref "/docs/reference/configuration/sinks/http/#batch" >}})!
+
+We can add to significantly reduce the batch size:
+
+```yaml
+    batch:
+      max_events: 4
+```
 
 ### Final Config
 
@@ -703,7 +742,7 @@ sinks:
         pretty: true
     compression: zlib
     batch:
-      max_events: 2
+      max_events: 4
 
   sink_1:
     type: console
@@ -716,3 +755,6 @@ sinks:
 ```
 
 </details>
+
+Now that we have a final configuration, we can also write
+[Vector configuration unit tests]({{< ref "/docs/reference/configuration/unit-tests/" >}}).

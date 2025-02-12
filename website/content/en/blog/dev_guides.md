@@ -10,6 +10,8 @@ badges:
 tags: [ "dev", "debugging", "guides", "guide" ]
 ---
 
+TODO: Add more sections to this, since we have a lot of new features like exclusive route and OTEL sink.
+
 # Announcement
 
 We recently added a new guide category, [Developer]({{< ref "guides/developer/_index.md" >}})!
