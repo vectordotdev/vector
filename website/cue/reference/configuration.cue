@@ -10,7 +10,7 @@ configuration: {
 
 	configuration: {
 		// expire_metrics's type is a little bit tricky, we could not generate `uint` from `docs::type_override` metadata macro easily.
-		// So we have to define it manually, it might be ok since it would be deprecated soon.
+		// So we have to define it manually, which is okay because it is already deprecated and it will be deleted soon.
 		expire_metrics: {
 			common: false
 			description: """
