@@ -79,7 +79,7 @@ components: transforms: "remap": {
 		event_data_model: {
 			title: "Event Data Model"
 			body:  """
-				You can use the `remap` transform to handle both all event types.
+				You can use the `remap` transform to handle all event types.
 				Note that currently the `remap` cannot alter event types and the output type is the same as the input type.
 				For example, a log event can only be emitted as a log event and cannot be converted to a metric.
 
