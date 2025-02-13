@@ -607,6 +607,8 @@ urls: {
 	vector_release_policy:                      "https://github.com/vectordotdev/vector/blob/master/docs/RELEASING.md"
 	vector_remap_transform:                     "/docs/reference/configuration/transforms/remap/"
 	vector_remap_transform_multiple:            "/docs/reference/configuration/transforms/remap/#emitting-multiple-log-events"
+	vector_log_to_metric_transform:             "/docs/reference/configuration/transforms/log_to_metric/"
+	vector_metric_to_log_transform:             "/docs/reference/configuration/transforms/metric_to_log/"
 	vector_repo:                                "\(github)/vectordotdev/vector"
 	vector_roles:                               "/docs/setup/deployment/roles"
 	vector_route_transform:                     "/docs/reference/configuration/transforms/route"
