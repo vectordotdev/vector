@@ -4,7 +4,7 @@ remap: functions: shannon_entropy: {
 	category:    "String"
 	description: """
 		Generates [Shannon entropy](\(urls.shannon_entropy)) from given string. It can generate it
-		based on string bytes, codepoints or graphemes.
+		based on string bytes, codepoints, or graphemes.
 		"""
 
 	arguments: [
