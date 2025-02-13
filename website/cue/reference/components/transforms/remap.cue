@@ -82,7 +82,8 @@ components: transforms: "remap": {
 				You can use the remap transform to handle all event types (log, metric, trace).
 				The `remap` transform cannot convert from one event type to another, the input type must match the output type.
 				For example, a log event can only be remap-ed and outputted as a log event and cannot be converted to a metric.
-				See [Log to Metric](\(urls.vector_log_to_metric_transform)) and
+
+				For converting from one type to another, please see [Log to Metric](\(urls.vector_log_to_metric_transform)) and
 				[Metric to Log](\(urls.vector_metric_to_log_transform)) transforms.
 
 				Log events in the `remap` transform correspond directly to Vector's [log schema](\(urls.vector_log)),
