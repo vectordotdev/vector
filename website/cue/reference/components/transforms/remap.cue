@@ -46,7 +46,7 @@ components: transforms: "remap": {
 			set:          true
 			summary:      true
 		}
-		traces: false
+		traces: true
 	}
 
 	examples: [
@@ -79,7 +79,9 @@ components: transforms: "remap": {
 		event_data_model: {
 			title: "Event Data Model"
 			body:  """
-				You can use the `remap` transform to handle both log and metric events.
+				You can use the `remap` transform to handle both all event types.
+				Note that currently the `remap` cannot alter event types and the output type is the same as the input type.
+				For example, a log event can only be emitted as a log event and it cannot be converted to a metric.
 
 				Log events in the `remap` transform correspond directly to Vector's [log schema](\(urls.vector_log)),
 				which means that the transform has access to the whole event and no restrictions on how the event can be
