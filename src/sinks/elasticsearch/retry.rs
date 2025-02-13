@@ -1,11 +1,12 @@
+use bytes::Bytes;
 use http::StatusCode;
 use serde::Deserialize;
 
 use crate::{
     http::HttpError,
     sinks::{
-        elasticsearch::service::ElasticsearchResponse,
-        util::retries::{RetryAction, RetryLogic},
+        elasticsearch::service::{ElasticsearchRequest, ElasticsearchResponse},
+        util::retries::{RetryAction, RetryLogic, RetryPartialFunction},
     },
 };
 
@@ -89,6 +90,19 @@ pub struct ElasticsearchRetryLogic {
     pub retry_partial: bool,
 }
 
+// construct a closure by EsRetryClosure { closure: Box::new(|req: ElasticsearchRequest| { new_req }) }
+struct EsRetryClosure {
+    closure: Box<dyn Fn(ElasticsearchRequest) -> ElasticsearchRequest + Send + Sync>,
+}
+
+impl RetryPartialFunction for EsRetryClosure {
+    fn modify_request(&self, request: Box<dyn std::any::Any>) -> Box<dyn std::any::Any> {
+        let request = request.downcast::<ElasticsearchRequest>().unwrap();
+        let new_request = (self.closure)(*request);
+        Box::new(new_request)
+    }
+}
+
 impl RetryLogic for ElasticsearchRetryLogic {
     type Error = HttpError;
     type Response = ElasticsearchResponse;
@@ -127,21 +141,54 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                 // We will retry if there exists at least one item that
                                 // failed with a retriable error.
                                 // Those are backpressure and server errors.
-                                if let Some((status, error)) =
+                                let status_codes: Vec<bool> = resp
+                                    .iter_status()
+                                    .map(|(status, _)| {
+                                        status == StatusCode::TOO_MANY_REQUESTS
+                                            || status.is_server_error()
+                                    })
+                                    .collect::<Vec<_>>();
+                                if let Some((_status, _error)) =
                                     resp.iter_status().find(|(status, _)| {
                                         *status == StatusCode::TOO_MANY_REQUESTS
                                             || status.is_server_error()
                                     })
                                 {
-                                    let msg = if let Some(error) = error {
-                                        format!(
-                                            "partial error, status: {}, error type: {}, reason: {}",
-                                            status, error.err_type, error.reason
-                                        )
-                                    } else {
-                                        format!("partial error, status: {}", status)
-                                    };
-                                    return RetryAction::Retry(msg.into());
+                                    return RetryAction::RetryPartial(Box::new(EsRetryClosure {
+                                        closure: Box::new(move |req: ElasticsearchRequest| {
+                                            let byte_slice: &[u8] = req.payload.as_ref();
+                                            let string_data: &str =
+                                                std::str::from_utf8(byte_slice).unwrap();
+                                            let lines: Vec<&str> = string_data.lines().collect();
+                                            let mut grouped_lines = Vec::new();
+                                            for chunk in lines.chunks(2) {
+                                                let group = chunk.join("\n");
+                                                grouped_lines.push(group);
+                                            }
+                                            if grouped_lines.len() != status_codes.len() {
+                                                req
+                                            } else {
+                                                let payload = grouped_lines
+                                                    .into_iter()
+                                                    .zip(<std::vec::Vec<bool> as Clone>::clone(
+                                                        &status_codes,
+                                                    ))
+                                                    .filter(|&(_, flag)| flag)
+                                                    .map(|(item, _)| item)
+                                                    .collect::<Vec<_>>();
+                                                let mut req = req.clone();
+                                                // change batch_size
+                                                req.batch_size = payload.len();
+                                                // change payload
+                                                req.payload = Bytes::from(
+                                                    (payload.join("\n") + "\n").into_bytes(),
+                                                );
+                                                // println!("NEW REQ <DEBUG> {:?}", req);
+                                                // TODO: need to fix some metadata here
+                                                req
+                                            }
+                                        }),
+                                    }));
                                 }
                             }
 
@@ -204,7 +251,7 @@ mod tests {
                 event_status: EventStatus::Errored,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
-            RetryAction::Retry(_)
+            RetryAction::RetryPartial(_)
         ));
     }
 

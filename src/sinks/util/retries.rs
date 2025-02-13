@@ -17,10 +17,16 @@ use crate::Error;
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
     Retry(Cow<'static, str>),
+    /// Indicate that a portion of this request should be retried with a generic function
+    RetryPartial(Box<dyn RetryPartialFunction>),
     /// Indicate that this request should not be retried with a reason
     DontRetry(Cow<'static, str>),
     /// Indicate that this request should not be retried but the request was successful
     Successful,
+}
+
+pub trait RetryPartialFunction {
+    fn modify_request(&self, request: Box<dyn std::any::Any>) -> Box<dyn std::any::Any>;
 }
 
 pub trait RetryLogic: Clone + Send + Sync + 'static {
@@ -154,8 +160,27 @@ where
                     Some(self.build_retry())
                 }
 
+                RetryAction::RetryPartial(rebuild_request_fn) => {
+                    if self.remaining_attempts == 0 {
+                        error!(
+                            message =
+                                "OK/retry response but retries exhausted; dropping the request.",
+                            internal_log_rate_limit = true,
+                        );
+                        return None;
+                    }
+                    // here to modify the request Req, delete those successful requests from it.
+                    let output = rebuild_request_fn.modify_request(Box::new(req.clone()));
+                    *req = *output.downcast::<Req>().unwrap();
+                    error!(
+                        message = "OK/retrying partial after response.",
+                        internal_log_rate_limit = true
+                    );
+                    Some(self.build_retry())
+                }
+
                 RetryAction::DontRetry(reason) => {
-                    error!(message = "Not retriable; dropping the request.", reason = ?reason, internal_log_rate_limit = true);
+                    error!(message = "OK/Not retriable; dropping the request.", reason = ?reason, internal_log_rate_limit = true);
                     None
                 }
 
@@ -217,7 +242,7 @@ impl Future for RetryPolicyFuture {
 
 impl RetryAction {
     pub const fn is_retryable(&self) -> bool {
-        matches!(self, RetryAction::Retry(_))
+        matches!(self, RetryAction::Retry(_) | RetryAction::RetryPartial(_))
     }
 
     pub const fn is_not_retryable(&self) -> bool {
