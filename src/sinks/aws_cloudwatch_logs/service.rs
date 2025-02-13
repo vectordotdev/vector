@@ -46,15 +46,18 @@ use crate::sinks::{
 };
 
 type Svc = Buffer<
-    ConcurrencyLimit<
+    Vec<InputLogEvent>,
+    <ConcurrencyLimit<
         RateLimit<
             Retry<
                 FibonacciRetryPolicy<CloudwatchRetryLogic<()>>,
-                Buffer<Timeout<CloudwatchLogsSvc>, Vec<InputLogEvent>>,
+                Buffer<
+                    Vec<InputLogEvent>,
+                    <Timeout<CloudwatchLogsSvc> as Service<Vec<InputLogEvent>>>::Future,
+                >,
             >,
         >,
-    >,
-    Vec<InputLogEvent>,
+    > as Service<Vec<InputLogEvent>>>::Future,
 >;
 
 #[derive(Debug)]
