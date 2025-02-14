@@ -42,16 +42,14 @@ Screen:
 The [internal_metrics](https://vector.dev/docs/reference/configuration/sources/internal_metrics/) source can be used to inspect component
 metrics in detail.
 
-For example, you can connect this source to a sink:
+For example, you can connect this source to a sink and collect the internal metrics:
 
 ```yaml
 data_dir: /var/lib/vector/
 sources:
   source0:
-    namespace: vector
-    scrape_interval_secs: 1.0
     type: internal_metrics
-    tags: { }
+    scrape_interval_secs: 1.0
 
 sinks:
   sink0:
