@@ -5,7 +5,7 @@ base: api: configuration: api: {
 		common: true
 		description: """
 			The network address to which the API should bind. If you're running
-			\tVector in a Docker container, make sure to bind to `0.0.0.0`. Otherwise
+			\tVector in a Docker container, bind to `0.0.0.0`. Otherwise
 			\tthe API will not be exposed outside the container.
 			"""
 		required: false
