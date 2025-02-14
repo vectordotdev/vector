@@ -11,6 +11,7 @@ use vector_lib::configurable::configurable_component;
 pub struct Options {
     /// Whether the GraphQL API is enabled for this Vector instance.
     #[serde(default = "default_enabled")]
+    #[configurable(metadata(docs::common = true, docs::required = false))]
     pub enabled: bool,
 
     /// The network address to which the API should bind. If you're running
@@ -19,6 +20,7 @@ pub struct Options {
     #[serde(default = "default_address")]
     #[configurable(metadata(docs::examples = "0.0.0.0:8686"))]
     #[configurable(metadata(docs::examples = "127.0.0.1:1234"))]
+    #[configurable(metadata(docs::common = true, docs::required = false))]
     pub address: Option<SocketAddr>,
 
     /// Whether the [GraphQL Playground]((urls.graphql_playground)) is enabled
@@ -26,12 +28,14 @@ pub struct Options {
     ///	of the address set using the `bind` parameter. Note that the `playground`
     ///	endpoint will only be enabled if the `graphql` endpoint is also enabled.
     #[serde(default = "default_playground")]
+    #[configurable(metadata(docs::common = false, docs::required = false))]
     pub playground: bool,
 
     /// Whether the endpoint for receiving and processing GraphQL queries is
     ///	enabled for the API. The endpoint is accessible via the `/graphql`
     ///	endpoint of the address set using the `bind` parameter.
     #[serde(default = "default_graphql", skip_serializing_if = "is_true")]
+    #[configurable(metadata(docs::common = true, docs::required = false))]
     pub graphql: bool,
 }
 

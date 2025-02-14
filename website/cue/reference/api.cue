@@ -17,23 +17,7 @@ api: {
 		Vector in real-time.
 		"""
 	schema_json_url: "https://github.com/vectordotdev/vector/blob/master/lib/vector-api-client/graphql/schema.json"
-	configuration: base.api.configuration.api
-	configuration: enabled: {
-		common: true
-		required: false
-	}
-	configuration: address: {
-		common: true
-		required: false
-	}
-	configuration: playground: {
-		common: false
-		required: false
-	}
-	configuration: graphql: {
-		common: true
-		required: false
-	}
+	configuration:   base.api.configuration.api
 
 	endpoints: {
 		"/graphql": {
