@@ -4,5 +4,3 @@ description: Guides for writing Vector configurations, development, and debuggin
 weight: 4
 tags: [ "dev", "guides", "guide", "debug" ]
 ---
-
-``
