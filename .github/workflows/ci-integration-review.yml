@@ -55,7 +55,7 @@ jobs:
     name: (PR review) Signal pending to PR
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    if: startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all')
+    if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-e2e') || contains(github.event.review.body, '/ci-run-all')
     steps:
       - name: Generate authentication token
         id: generate_token
