@@ -14,17 +14,20 @@ _In this blog post we want to highlight some recently added features and guides.
 
 # Features
 
-* A new OpenTelemetry sink is now available! You can find a
+* A new OpenTelemetry sink is now available. You can find a
   [quickstart guide here]({{< ref "/docs/reference/configuration/sinks/opentelemetry/#quickstart" >}}).
   * We have more plans here such as gRPC support and smart grouping at the sink.
 * We introduced a new exclusive route transform. You can read more in our
   [release highlight]({{< ref "/highlights/2024-11-07-exclusive_route" >}}).
 * Apple Silicon builds are now available in our [downloads page]({{< ref "/download" >}}).
   Note that these are available for since `v0.44.0`.
+* The VRL function library keeps growing thanks to community contributions! You can read more:
+  * [0.21.0 Features]({{< ref "/releases/0.44.0/#new-features" >}})
+  * [0.20.0 Features]({{< ref "/releases/0.43.0/#new-features" >}})
 
 ## Guides
 
-We recently added a new guide category: [Development]({{< ref "guides/developer/_index.md" >}})!
+We recently added a new guide category: [Development]({{< ref "guides/developer/_index.md" >}}).
 
 ## Debugging Guide
 
