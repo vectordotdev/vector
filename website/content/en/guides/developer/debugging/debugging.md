@@ -539,7 +539,8 @@ sinks:
     compression: gzip
 ```
 
-However, our downstream component can only de-compress `zlib` payloads.  
+However, our downstream component can only de-compress `zlib` payloads.
+
 We now observe the following metrics:
 
 ```json
