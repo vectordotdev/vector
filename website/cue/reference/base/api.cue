@@ -5,8 +5,8 @@ base: api: configuration: api: {
 		common: true
 		description: """
 			The network address to which the API should bind. If you're running
-			\tVector in a Docker container, bind to `0.0.0.0`. Otherwise
-			\tthe API will not be exposed outside the container.
+			Vector in a Docker container, bind to `0.0.0.0`. Otherwise
+			the API will not be exposed outside the container.
 			"""
 		required: false
 		type: string: {
@@ -24,8 +24,8 @@ base: api: configuration: api: {
 		common: true
 		description: """
 			Whether the endpoint for receiving and processing GraphQL queries is
-			\tenabled for the API. The endpoint is accessible via the `/graphql`
-			\tendpoint of the address set using the `bind` parameter.
+			enabled for the API. The endpoint is accessible via the `/graphql`
+			endpoint of the address set using the `bind` parameter.
 			"""
 		required: false
 		type: bool: default: true
