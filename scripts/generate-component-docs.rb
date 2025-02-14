@@ -1743,6 +1743,22 @@ def render_and_import_component_schema(root_schema, schema_name, component_type,
   )
 end
 
+def render_and_import_base_api_schema(root_schema, apis)
+  api_schema = {}
+  apis.each do |component_name, schema_name|
+    friendly_name = "'#{component_name}' #{schema_name} configuration"
+    resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
+    api_schema[component_name] = resolved_schema
+  end
+
+  render_and_import_schema(
+    api_schema,
+    "configuration",
+    ["base", "api"],
+    "base/api.cue"
+  )
+end
+
 def render_and_import_base_global_option_schema(root_schema, global_options)
   global_option_schema = {}
 
@@ -1812,6 +1828,16 @@ all_components.each do |component_type, components|
     render_and_import_component_schema(root_schema, schema_name, component_type, component_name)
   end
 end
+
+apis = root_schema['definitions'].filter_map do |key, definition|
+  component_type = get_schema_metadata(definition, 'docs::component_type')
+  component_name = get_schema_metadata(definition, 'docs::component_name')
+  { component_name => key } if component_type == "api"
+end
+.reduce { |acc, item| nested_merge(acc, item) }
+
+render_and_import_base_api_schema(root_schema, apis)
+
 
 # At last, we generate the global options configuration.
 global_options = root_schema['definitions'].filter_map do |key, definition|
