@@ -37,7 +37,7 @@ pub struct Opts {
     no_reconnect: bool,
 
     /// Components IDs to observe (comma-separated; accepts glob patterns)
-    #[arg(default_value = "*", value_delimiter(','), long)]
+    #[arg(default_value = "*", value_delimiter(','), short = 'c', long)]
     components: Vec<Pattern>,
 }
 
