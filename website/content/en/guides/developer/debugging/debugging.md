@@ -70,7 +70,7 @@ are sent downstream.
 Command:
 
 ```shell
-vector tap --ouputs-of my_source_0,my_transform_0
+vector tap --outputs-of source_0,transform_0
 ```
 
 Screen:
