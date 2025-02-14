@@ -88,7 +88,7 @@ configuration: {
 									exact: "Only considers exact name matches."
 									regex: "Compares metric name to the provided pattern."
 								}
-								description: "metric name matcher type"
+								description: "Metric name matcher type."
 							}
 							value: {
 								required: true
@@ -106,7 +106,7 @@ configuration: {
 					}
 					labels: {
 						description: """
-						Labels to apply this expiration. Ignores labels if not defined.
+						Labels to apply this expiration to. Ignores labels if not defined.
 						"""
 						required: false
 						type: object: options: {
@@ -118,7 +118,7 @@ configuration: {
 									all: "Checks that all of the provided matchers can be applied to given metric."
 									any: "Checks that any of the provided matchers can be applied to given metric."
 								}
-								description: "metric name matcher type"
+								description: "Metric label matcher type."
 							}
 							key: {
 								required: true

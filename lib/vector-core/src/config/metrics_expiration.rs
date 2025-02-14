@@ -21,7 +21,7 @@ pub struct PerMetricSetExpiration {
     /// Metric name to apply this expiration to. Ignores metric name if not defined.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub name: Option<MetricNameMatcherConfig>,
-    /// Labels to apply this expiration. Ignores labels if not defined.
+    /// Labels to apply this expiration to. Ignores labels if not defined.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub labels: Option<MetricLabelMatcherConfig>,
     /// The amount of time, in seconds, that internal metrics will persist after having not been
@@ -36,7 +36,7 @@ pub struct PerMetricSetExpiration {
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[configurable(metadata(docs::enum_tag_description = "Matcher for metric name."))]
+#[configurable(metadata(docs::enum_tag_description = "Metric name matcher type."))]
 pub enum MetricNameMatcherConfig {
     /// Only considers exact name matches.
     Exact {
@@ -176,7 +176,7 @@ impl Configurable for MetricLabelMatcherConfig {
         metadata.set_description("Configuration for metric labels matcher.");
         metadata.add_custom_attribute(CustomAttribute::kv(
             "docs::enum_tag_description",
-            "Matcher for metric labels.",
+            "Matcher label matcher type.",
         ));
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "internal"));
         metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tag_field", "type"));
