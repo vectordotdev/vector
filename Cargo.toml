@@ -936,7 +936,8 @@ all-e2e-tests = [
 e2e-tests-datadog = [
   "sources-datadog_agent",
   "sinks-datadog_logs",
-  "sinks-datadog_metrics"
+  "sinks-datadog_metrics",
+  "dep:async-compression"
 ]
 
 vector-api-tests = [
