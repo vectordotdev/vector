@@ -15,7 +15,7 @@ pub struct Options {
     pub enabled: bool,
 
     /// The network address to which the API should bind. If you're running
-    ///	Vector in a Docker container, make sure to bind to `0.0.0.0`. Otherwise
+    ///	Vector in a Docker container, bind to `0.0.0.0`. Otherwise
     ///	the API will not be exposed outside the container.
     #[serde(default = "default_address")]
     #[configurable(metadata(docs::examples = "0.0.0.0:8686"))]
