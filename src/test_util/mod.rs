@@ -65,8 +65,8 @@ pub mod metrics;
 #[cfg(test)]
 pub mod mock;
 
-pub mod stats;
 pub mod compression;
+pub mod stats;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
