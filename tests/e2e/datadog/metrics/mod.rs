@@ -62,21 +62,24 @@ async fn validate() {
     sketches::validate().await;
 }
 
-async fn compress_with_zstd(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+async fn compress_with_zstd(data: &[u8]) -> Vec<u8> {
     let reader = BufReader::new(data);
     let mut encoder = ZstdEncoder::new(reader);
     let mut compressed_data = Vec::new();
-    encoder.read_to_end(&mut compressed_data).await?;
-    Ok(compressed_data)
+    encoder
+        .read_to_end(&mut compressed_data)
+        .await
+        .expect("unexpected compression error");
+    compressed_data
 }
 
 #[tokio::test]
-async fn test_decompress_payload_zstd() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_decompress_payload_zstd() {
     let original_data = b"Hello, Zstd!";
-    let compressed_data = compress_with_zstd(original_data).await?;
+    let compressed_data = compress_with_zstd(original_data).await;
 
-    let decompressed_data = decompress_payload(compressed_data.as_slice()).await?;
+    let decompressed_data = decompress_payload(compressed_data.as_slice())
+        .await
+        .expect("decompression failed");
     assert_eq!(decompressed_data, original_data);
-
-    Ok(())
 }
