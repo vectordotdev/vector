@@ -6,3 +6,5 @@ By default, all components are shown with a glob pattern of `*`.
 The glob pattern semantics can be found in the [`glob` crate documentation](https://docs.rs/glob/latest/glob/).
 
 Example usage: `vector top --components "demo*"` will only show the components that match the glob pattern `demo*`.
+
+authors: jorgehermo9
