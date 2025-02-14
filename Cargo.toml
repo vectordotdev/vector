@@ -144,6 +144,7 @@ futures = { version = "0.3.31", default-features = false, features = ["compat", 
 glob = { version = "0.3.2", default-features = false }
 hickory-proto = { version = "0.24.3", default-features = false, features = ["dnssec"] }
 indexmap = { version = "2.7.1", default-features = false, features = ["serde", "std"] }
+inventory = { version = "0.3" }
 metrics = "0.24.1"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }

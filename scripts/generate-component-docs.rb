@@ -798,6 +798,17 @@ def resolve_schema(root_schema, schema)
     end
   end
 
+  # required for global option configuration
+  is_common_field = get_schema_metadata(schema, 'docs::common')
+  if !is_common_field.nil?
+    resolved['common'] = is_common_field
+  end
+
+  is_required_field = get_schema_metadata(schema, 'docs::required')
+  if !is_required_field.nil?
+    resolved['required'] = is_required_field
+  end
+
   # Reconcile the resolve schema, which essentially gives us a chance to, once the schema is
   # entirely resolved, check it for logical inconsistencies, fix up anything that we reasonably can,
   # and so on.
@@ -1734,10 +1745,18 @@ end
 
 def render_and_import_base_global_option_schema(root_schema, global_options)
   global_option_schema = {}
+
   global_options.each do |component_name, schema_name|
-    # global schema does not need unwrapped schema, we call resolve_schema_by_name directly
-    resolved_schema = resolve_schema_by_name(root_schema, schema_name)
-    global_option_schema[component_name] = resolved_schema
+    friendly_name = "'#{component_name}' #{schema_name} configuration"
+
+    if component_name == "global_option"
+      # Flattening global options
+      unwrap_resolved_schema(root_schema, schema_name, friendly_name)
+        .each { |name, schema| global_option_schema[name] = schema }
+    else
+      # Resolving and assigning other global options
+      global_option_schema[component_name] = resolve_schema_by_name(root_schema, schema_name)
+    end
   end
 
   render_and_import_schema(

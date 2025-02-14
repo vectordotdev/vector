@@ -6,37 +6,11 @@ configuration: {
 }
 
 configuration: {
+	configuration: base.configuration.configuration
+
 	configuration: {
-		acknowledgements: {
-			common:      true
-			description: "Controls how acknowledgements are handled by all sources. These settings may be overridden in individual sources."
-			required:    false
-			type: object: options: {
-				enabled: {
-					common:      true
-					description: "Controls if sources will wait for destination sinks to deliver the events, or persist them to a disk buffer, before acknowledging receipt. If set to `true`, all capable sources will have acknowledgements enabled."
-					warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
-					required: false
-					type: bool: default: false
-				}
-			}
-		}
-
-		data_dir: {
-			common: false
-			description: """
-				The directory used for persisting Vector state, such
-				as on-disk buffers, file checkpoints, and more.
-				Please make sure the Vector project has write
-				permissions to this directory.
-				"""
-			required: false
-			type: string: {
-				default: "/var/lib/vector/"
-				examples: ["/var/lib/vector", "/var/local/lib/vector/", "/home/user/vector/"]
-			}
-		}
-
+		// expire_metrics's type is a little bit tricky, we could not generate `uint` from `docs::type_override` metadata macro easily.
+		// So we have to define it manually, which is okay because it is already deprecated and it will be deleted soon.
 		expire_metrics: {
 			common: false
 			description: """
@@ -68,8 +42,6 @@ configuration: {
 						unit: "nanoseconds"
 					}
 				}
-			}
-		}
 
 		expire_metrics_secs: {
 			common: false
