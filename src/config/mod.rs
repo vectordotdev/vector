@@ -8,7 +8,13 @@ use std::{
     time::Duration,
 };
 
-use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
+use crate::{
+    conditions,
+    event::{Metric, Value},
+    secrets::SecretBackends,
+    serde::OneOrMany,
+};
+
 use indexmap::IndexMap;
 use serde::Serialize;
 
@@ -473,24 +479,6 @@ impl TestDefinition<OutputId> {
     }
 }
 
-/// Value for a log field.
-#[configurable_component]
-#[derive(Clone, Debug)]
-#[serde(untagged)]
-pub enum TestInputValue {
-    /// A string.
-    String(String),
-
-    /// An integer.
-    Integer(i64),
-
-    /// A floating-point number.
-    Float(f64),
-
-    /// A boolean.
-    Boolean(bool),
-}
-
 /// A unit test input.
 ///
 /// An input describes not only the type of event to insert, but also which transform within the
@@ -522,7 +510,7 @@ pub struct TestInput {
     /// The set of log fields to use when creating a log input event.
     ///
     /// Only relevant when `type` is `log`.
-    pub log_fields: Option<IndexMap<String, TestInputValue>>,
+    pub log_fields: Option<IndexMap<String, Value>>,
 
     /// The metric to use as an input event.
     ///

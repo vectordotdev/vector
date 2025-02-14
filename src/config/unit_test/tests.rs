@@ -805,6 +805,9 @@ async fn test_log_input() {
                 message = "this is the message"
                 int_val = 5
                 bool_val = true
+                arr_val = [1, 2, "hi", false]
+                obj_val = { a =  true, b = "b", c = 5 }
+
 
             [[tests.outputs]]
               extract_from = "foo"
@@ -816,6 +819,10 @@ async fn test_log_input() {
                     assert_eq!(.message, "this is the message")
                     assert!(.bool_val)
                     assert_eq!(.int_val, 5)
+                    assert_eq!(.arr_val, [1, 2, "hi", false])
+                    assert!(.obj_val.a)
+                    assert_eq!(.obj_val.b, "b")
+                    assert_eq!(.obj_val.c, 5)
                 """
       "#})
     .unwrap();
