@@ -23,12 +23,18 @@ pub struct PerMetricSetExpiration {
     pub name: Option<MetricNameMatcherConfig>,
     /// Labels to apply this expiration to. Ignores labels if not defined.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(
+        docs::enum_tag_field = "type",
+        docs::enum_tagging = "internal",
+        docs::enum_tag_description = "Metric label matcher type."
+    ))]
     pub labels: Option<MetricLabelMatcherConfig>,
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
     ///
     /// Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
     /// so that metrics live long enough to be emitted and captured.
+    #[configurable(metadata(docs::examples = 60.0))]
     pub expire_secs: f64,
 }
 
@@ -174,12 +180,6 @@ impl Configurable for MetricLabelMatcherConfig {
     {
         let mut metadata = Metadata::default();
         metadata.set_description("Configuration for metric labels matcher.");
-        metadata.add_custom_attribute(CustomAttribute::kv(
-            "docs::enum_tag_description",
-            "Matcher label matcher type.",
-        ));
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tagging", "internal"));
-        metadata.add_custom_attribute(CustomAttribute::kv("docs::enum_tag_field", "type"));
         metadata
     }
 }

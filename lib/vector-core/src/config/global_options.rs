@@ -113,8 +113,9 @@ pub struct GlobalOptions {
     #[configurable(metadata(docs::common = false, docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 
-    /// The amount of time, in seconds, that internal metrics will persist after having not been
-    /// updated before they expire and are removed, configured per metric set
+    /// This allows configuring different expiration intervals for different metric sets.
+    /// By default this is empty and any metric not matched by one of these sets will use
+    /// the global default value, defined using `expire_metrics_secs`.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     pub expire_metrics_per_metric_set: Option<Vec<PerMetricSetExpiration>>,
 }
