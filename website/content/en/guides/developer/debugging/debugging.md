@@ -5,13 +5,13 @@ description: Step by step guide for debugging pipelines
 tags: [ "dev", "debugging", "guides", "guide" ]
 author_github: https://github.com/pront
 domain: dev
-aliases: [ "/docs/guides/developer/config-autocompletion.md" ]
+aliases: [ "/docs/guides/developer/debugging.md" ]
 weight: 1
 ---
 
 # Debugging Guide
 
-This guide will describe an imaginary use case and how to progressively resolve issues using dev tools and Vector commands.
+This guide will describe an imaginary use case and how to progressively resolve issues using command line tools and Vector commands.
 
 Imagine we have two sources, and we want to assign group IDs to Vector logs based on the source. Finally, we want to send those modified
 logs to an HTTP server for further processing and/or storage.
@@ -42,6 +42,25 @@ Screen:
 The [internal_metrics](https://vector.dev/docs/reference/configuration/sources/internal_metrics/) source can be used to inspect component
 metrics in detail.
 
+For example, you can connect this source to a sink:
+
+```yaml
+data_dir: /var/lib/vector/
+sources:
+  source0:
+    namespace: vector
+    scrape_interval_secs: 1.0
+    type: internal_metrics
+    tags: { }
+
+sinks:
+  sink0:
+    type: prometheus_exporter
+    inputs:
+      - source0
+    address: 0.0.0.0:9598
+```
+
 ### Vector Tap
 
 With [vector tap](https://vector.dev/guides/level-up/vector-tap-guide/) you see the input and/or outputs of your components.
@@ -51,7 +70,7 @@ are sent downstream.
 Command:
 
 ```shell
-vector tap
+vector tap --ouputs-of my_source_0,my_transform_0
 ```
 
 Screen:
@@ -567,7 +586,7 @@ So now the fix is obvious, we can change the compression and reload the Vector c
 compression: zlib
 ```
 
-Reloading depns on the deployments e.g. `systemctl kill -s HUP --kill-who=main vector.service`.
+Reloading depends on the deployments e.g. `systemctl kill -s HUP --kill-who=main vector.service`.
 You can read more in https://vector.dev/docs/administration/management.
 
 ### Scenario 2 - Temporary Server Disruptions
@@ -646,7 +665,7 @@ Notice how the `component_sent_events_total` metrics for `sinks_0` is now increa
 ### Scenario 3 - Smaller Batching
 
 For this scenario, let's assume our downstream server has a strict limit on the maximum payload size. Also, assume Vector sets the maximum
-batch to 10 MBs. Note: always refer to the docs for as the source of truth for this value.
+batch to 10MB. Note: always refer to the docs for as the source of truth for this value.
 
 ```text
 📥 Received POST request:
