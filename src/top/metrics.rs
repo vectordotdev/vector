@@ -14,7 +14,7 @@ use vector_lib::api_client::{
 use super::state::{self, OutputMetrics};
 use crate::{config::ComponentKey, top::state::SentEventsMetric};
 
-fn is_component_allowed(component_id: &str, components_patterns: &[Pattern]) -> bool {
+fn component_matches_patterns(component_id: &str, components_patterns: &[Pattern]) -> bool {
     if components_patterns.is_empty() {
         return true;
     }
@@ -38,7 +38,7 @@ async fn component_added(
         if let Some(d) = res.data {
             let c = d.component_added;
             let component_id = c.component_id;
-            if !is_component_allowed(&component_id, &components_patterns) {
+            if !component_matches_patterns(&component_id, &components_patterns) {
                 continue;
             }
             let key = ComponentKey::from(component_id);
@@ -405,7 +405,7 @@ pub async fn init_components(
         .components
         .edges
         .into_iter()
-        .filter(|edge| is_component_allowed(&edge.node.component_id, components_patterns))
+        .filter(|edge| component_matches_patterns(&edge.node.component_id, components_patterns))
         .map(|edge| {
             let d = edge.node;
             let key = ComponentKey::from(d.component_id);
