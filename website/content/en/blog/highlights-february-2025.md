@@ -12,7 +12,7 @@ tags: [ "features", "dev", "debugging", "guides", "guide" ]
 
 _In this blog post we want to highlight some recently added features and guides._
 
-# Features
+## Features
 
 * A new OpenTelemetry sink is now available. You can find a
   [quickstart guide here]({{< ref "/docs/reference/configuration/sinks/opentelemetry/#quickstart" >}}).
@@ -25,17 +25,17 @@ _In this blog post we want to highlight some recently added features and guides.
   * [0.21.0 Features]({{< ref "/releases/0.44.0/#new-features" >}})
   * [0.20.0 Features]({{< ref "/releases/0.43.0/#new-features" >}})
 
-## Guides
+### Guides
 
 We recently added a new guide category: [Development]({{< ref "guides/developer/_index.md" >}}).
 
-## Debugging Guide
+### Debugging Guide
 
 You can find the new [debugging guide here]({{< ref "guides/developer/debugging/debugging/" >}}). The goal of this guide is to serve as a
 starting point for Vector users who are experiencing issues with their Vector configurations and deployments. In addition, it highlights
 debugging tools that Vector offers.
 
-## IDE Support
+### IDE Support
 
 You can find the new [config autocompletion guide here]({{< ref "guides/developer/config-autocompletion/" >}}).
 We supported generating a Vector config schema for a while. This guide demonstrates how we can leverage this schema and import it into

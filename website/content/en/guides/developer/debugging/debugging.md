@@ -9,7 +9,7 @@ aliases: [ "/docs/guides/developer/debugging.md" ]
 weight: 1
 ---
 
-# Debugging Guide
+## Debugging Guide
 
 This guide will describe an imaginary use case and how to progressively resolve issues using command line tools and Vector commands.
 
@@ -20,9 +20,9 @@ In the following sections we will examine the tools we have at our disposal.
 
 <img src="/img/guides/debugging-meme.png"  alt="debugging-meme" width="400"/>
 
-## Vector Tools
+### Vector Tools
 
-### Vector top
+#### Vector top
 
 Use [vector top](https://vector.dev/docs/reference/cli/#top) to display topology and metrics in the console.
 For example, you can inspect how many events are produced by sources vs how many events reach the sinks.
@@ -37,7 +37,7 @@ Screen:
 
 <img src="/img/guides/vector-top.png"  alt="top-screen"/>
 
-### The internal metrics source
+#### The internal metrics source
 
 The [internal_metrics](https://vector.dev/docs/reference/configuration/sources/internal_metrics/) source can be used to inspect component
 metrics in detail.
@@ -59,7 +59,7 @@ sinks:
     address: 0.0.0.0:9598
 ```
 
-### Vector Tap
+#### Vector Tap
 
 With [vector tap](https://vector.dev/guides/level-up/vector-tap-guide/) you see the input and/or outputs of your components.
 Here, it is worth mentioning a caveat, sinks don't have outputs thus we cannot tap them. This means we cannot inspect actual payloads that
@@ -75,7 +75,7 @@ Screen:
 
 <img src="/img/guides/vector-tap.png"  alt="tap-screen"/>
 
-### Console
+#### Console
 
 Note that the [console sink](https://vector.dev/docs/reference/configuration/sinks/console/) can also be very useful here. For example:
 
@@ -91,12 +91,12 @@ my_console_sink:
       pretty: true
 ```
 
-## Python HTTP Server
+### Python HTTP Server
 
 The following code implements a Python server that imitates a downstream system to which Vector publishes logs. We will use this server
 to demonstrate a few scenarios.
 
-### Code
+#### Code
 
 <details>
   <summary> 👉 Click to expand the script 👈</summary>
@@ -237,9 +237,10 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n🛑 Server shutting down.")
   ```
+
 </details>
 
-#### Description
+##### Description
 
 This Python server is a simple HTTP debugging tool that:
 
@@ -249,7 +250,7 @@ This Python server is a simple HTTP debugging tool that:
 * Handles both raw JSON and zlib-compressed JSON payloads. Rejects other payloads.
 * By default, it starts on port 8000 and returns HTTP 200 OK unless modified.
 
-### Usage
+#### Usage
 
 Run command:
 
@@ -263,9 +264,9 @@ Change return status:
 curl -X POST http://localhost:8000/set_status -H "Content-Type: application/json" -d '{"status": 404}'
 ```
 
-## Walkthrough
+### Walkthrough
 
-### Initial Vector Config
+#### Initial Vector Config
 
 <details>
   <summary> 👉 Click to view the whole config 👈</summary>
@@ -332,7 +333,7 @@ sinks:
 
 </details>
 
-#### Globals
+##### Globals
 
 ```yaml
 api:
@@ -341,7 +342,7 @@ api:
 
 Required by `vector tap`.
 
-#### Sources
+##### Sources
 
 ```yaml
 sources:
@@ -364,7 +365,7 @@ sources:
 
 The above two sources emulate incoming events.
 
-#### Transforms
+##### Transforms
 
 ```yaml
 transforms:
@@ -384,7 +385,7 @@ transforms:
 This guide doesn't focus on transforms like [Remap](https://vector.dev/docs/reference/configuration/transforms/remap/). At this point, I
 would like to highlight https://playground.vrl.dev/ for quick iterations.
 
-#### Sinks
+##### Sinks
 
 ```yaml
   sink_0:
@@ -396,9 +397,10 @@ would like to highlight https://playground.vrl.dev/ for quick iterations.
       codec: json
 ```
 
-### Vector Config with internal metrics
+#### Vector Config with internal metrics
 
-#### Full Config Preview
+##### Full Config Preview
+
 <details>
   <summary> 👉 Click to view the whole config 👈</summary>
 
@@ -462,7 +464,7 @@ sinks:
 
 </details>
 
-#### Description
+##### Description
 
 Note that we added a new source:
 
@@ -518,12 +520,12 @@ Now we can observe internal metrics such as how many events our components recei
 }
 ```
 
-## Scenarios
+### Scenarios
 
 In this section we will create some scenarios where the sink produces errors and we will show how to change the sink config to overcome
 them.
 
-### Scenario 1 - Unsupported Compression
+#### Scenario 1 - Unsupported Compression
 
 Now that we have something that works, we want to add compression.
 
@@ -588,7 +590,7 @@ compression: zlib
 Reloading depends on the deployments e.g. `systemctl kill -s HUP --kill-who=main vector.service`.
 You can read more in https://vector.dev/docs/administration/management.
 
-### Scenario 2 - Temporary Server Disruptions
+#### Scenario 2 - Temporary Server Disruptions
 
 ##### Step 1
 
@@ -661,7 +663,7 @@ Notice how the `component_sent_events_total` metrics for `sinks_0` is now increa
 }
 ```
 
-### Scenario 3 - Smaller Batching
+#### Scenario 3 - Smaller Batching
 
 For this scenario, let's assume our downstream server has a strict limit on the maximum payload size. Also, assume Vector sets the maximum
 batch to 10MB. Note: always refer to the docs for as the source of truth for this value.
@@ -704,7 +706,7 @@ We can add to significantly reduce the batch size:
       max_events: 4
 ```
 
-### Final Config
+#### Final Config
 
 <details>
   <summary> 👉 Click to view the whole config 👈</summary>
