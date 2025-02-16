@@ -31,10 +31,10 @@ impl RetryLogic for PostgresRetryLogic {
             return false;
         };
 
-        match postgres_error {
-            sqlx::Error::Io(_) | sqlx::Error::PoolTimedOut => true,
-            _ => false,
-        }
+        matches!(
+            postgres_error,
+            sqlx::Error::Io(_) | sqlx::Error::PoolTimedOut
+        )
     }
 }
 
@@ -69,7 +69,7 @@ impl TryFrom<Vec<Event>> for PostgresRequest {
         let finalizers = events.take_finalizers();
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let events_size = NonZeroUsize::new(events.estimated_json_encoded_size_of().get())
-            .ok_or_else(|| "payload should never be zero length")?;
+            .ok_or("payload should never be zero length")?;
         let metadata = metadata_builder.with_request_size(events_size);
         Ok(PostgresRequest {
             events,
