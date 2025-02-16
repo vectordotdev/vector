@@ -4,8 +4,9 @@ use std::task::{Context, Poll};
 use crate::internal_events::EndpointBytesSent;
 use crate::sinks::prelude::{RequestMetadataBuilder, RetryLogic};
 use futures::future::BoxFuture;
+use snafu::{ResultExt, Snafu};
 use sqlx::types::Json;
-use sqlx::{Error as PostgresError, Pool, Postgres};
+use sqlx::{Pool, Postgres};
 use tower::Service;
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::event::{Event, EventFinalizers, EventStatus, Finalizable};
@@ -19,12 +20,21 @@ const POSTGRES_PROTOCOL: &str = "postgres";
 pub struct PostgresRetryLogic;
 
 impl RetryLogic for PostgresRetryLogic {
-    type Error = PostgresError;
+    type Error = PostgresServiceError;
     type Response = PostgresResponse;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        // TODO: Implement this
-        false
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        let PostgresServiceError::Postgres {
+            source: postgres_error,
+        } = error
+        else {
+            return false;
+        };
+
+        match postgres_error {
+            sqlx::Error::Io(_) | sqlx::Error::PoolTimedOut => true,
+            _ => false,
+        }
     }
 }
 
@@ -104,13 +114,18 @@ impl DriverResponse for PostgresResponse {
     }
 }
 
+#[derive(Debug, Snafu)]
+pub enum PostgresServiceError {
+    #[snafu(display("Database error: {source}"))]
+    Postgres { source: sqlx::Error },
+
+    #[snafu(display("Serialization error: {source}"))]
+    VectorCommon { source: vector_common::Error },
+}
+
 impl Service<PostgresRequest> for PostgresService {
     type Response = PostgresResponse;
-    // TODO: previosly, we had here `slqx::PostgresError`, but as
-    // `JsonSerializer::to_json_value` returns a Result<Value, vector_common:Error>
-    // we have to use other kind of error here. Should we declare in this file
-    // a new Error enum with two variants: PostgresError(sqlx::Error) and VectorCommonError(vector_common:Error)?
-    type Error = vector_common::Error;
+    type Error = PostgresServiceError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
@@ -122,15 +137,13 @@ impl Service<PostgresRequest> for PostgresService {
         let future = async move {
             let table = service.table;
             let metadata = request.metadata;
-            // TODO: Is it ok to use `JsonSerializer` here? I wanted to avoid
-            // the ``{"metric":{ .. }`, `{"log":{ .. }` nesting of `Event`,
-            // and desired the same output as `encoding.codec="json"`.
             let json_serializer = JsonSerializerConfig::default().build();
             let serialized_values = request
                 .events
                 .into_iter()
                 .map(|event| json_serializer.to_json_value(event))
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Result<Vec<_>, _>>()
+                .context(VectorCommonSnafu)?;
 
             // TODO: If a single item of the batch fails, the whole batch will fail its insert.
             // Is this intended behaviour?
@@ -139,7 +152,8 @@ impl Service<PostgresRequest> for PostgresService {
             ))
             .bind(Json(serialized_values))
             .execute(&service.connection_pool)
-            .await?;
+            .await
+            .context(PostgresSnafu)?;
 
             emit!(EndpointBytesSent {
                 byte_size: metadata.request_encoded_size(),
