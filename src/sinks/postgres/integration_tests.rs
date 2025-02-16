@@ -7,7 +7,7 @@ use crate::{
         components::{
             run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
         },
-        temp_table, trace_init,
+        random_table_name, trace_init,
     },
 };
 use chrono::{DateTime, Utc};
@@ -158,7 +158,7 @@ struct TestTraceSpan {
 }
 
 async fn prepare_config() -> (PostgresConfig, String, PgConnection) {
-    let table = temp_table();
+    let table = random_table_name();
     let endpoint = pg_url();
     let config_str = format!(
         r#"
@@ -190,7 +190,7 @@ async fn healthcheck_passes() {
 async fn healthcheck_fails() {
     trace_init();
 
-    let table = temp_table();
+    let table = random_table_name();
     let endpoint = "postgres://user:pass?host=/unknown_socket_path".to_string();
     let config_str = format!(
         r#"

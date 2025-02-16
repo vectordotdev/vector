@@ -13,7 +13,7 @@ use crate::{
     sinks::util::UriSerde,
     test_util::{
         components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
-        temp_table, trace_init,
+        random_table_name, trace_init,
     },
 };
 
@@ -34,7 +34,7 @@ fn make_event() -> (Event, BatchStatusReceiver) {
 async fn prepare_config(codec: &str, compression: &str) -> (String, String, DatabendAPIClient) {
     trace_init();
 
-    let table = temp_table();
+    let table = random_table_name();
     let endpoint = databend_endpoint();
     let _endpoint: UriSerde = endpoint.parse().unwrap();
 

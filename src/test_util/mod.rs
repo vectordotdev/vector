@@ -234,7 +234,7 @@ pub fn temp_dir() -> PathBuf {
     path.join(dir_name)
 }
 
-pub fn temp_table() -> String {
+pub fn random_table_name() -> String {
     format!("test_{}", random_string(10).to_lowercase())
 }
 
