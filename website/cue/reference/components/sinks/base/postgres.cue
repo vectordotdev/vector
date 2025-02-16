@@ -28,8 +28,19 @@ base: components: sinks: postgres: configuration: {
 		}
 	}
 	batch: {
-		description: "Event batching behavior."
-		required:    false
+		description: """
+			Event batching behavior.
+
+			Note that as PostgreSQL's `jsonb_populate_recordset` function is used to insert events,
+			a single event in the batch can make the whole batch to fail. For example, if a single event within the batch triggers
+			a unique constraint violation in the destination table, the whole event batch will fail.
+
+			As a workaround, [triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html) on constraint violations
+			can be defined at a database level to change the behavior of the insert operation on specific tables.
+			Alternatively, setting `max_events` batch setting to `1` will make each event to be inserted independently,
+			so events that trigger a constraint violation will not affect the rest of the events.
+			"""
+		required: false
 		type: object: options: {
 			max_bytes: {
 				description: """
@@ -60,8 +71,12 @@ base: components: sinks: postgres: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The connection string for the PostgreSQL server. It can contain the username and password."
-		required:    true
+		description: """
+			The PostgreSQL server connection string. It can contain the username and password.
+			See [PostgreSQL documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) about connection strings for more information
+			about valid formats and options that can be used.
+			"""
+		required: true
 		type: string: {}
 	}
 	pool_size: {
@@ -259,8 +274,13 @@ base: components: sinks: postgres: configuration: {
 		}
 	}
 	table: {
-		description: "The table that data is inserted into."
-		required:    true
+		description: """
+			The table that data is inserted into. This table parameter is vulnerable
+			to SQL injection attacks as Vector does not validate or sanitize it, you must not use untrusted input.
+			This parameter will be directly interpoled in the SQL query statement,
+			as table names as parameters in prepared statements are not allowed in PostgreSQL.
+			"""
+		required: true
 		type: string: {}
 	}
 }
