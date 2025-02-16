@@ -35,6 +35,8 @@ pub struct PostgresConfig {
     // TODO: if I used UriSerde instead of String, I couldn't get a url string to use
     // in the connection pool, as the password would be redacted with UriSerde::to_string
     /// The connection string for the PostgreSQL server. It can contain the username and password.
+    /// See [PostgreSQL documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) about connection strings for more information
+    /// about the format and options that can be used.
     pub endpoint: String,
 
     /// The table that data is inserted into.
@@ -45,6 +47,7 @@ pub struct PostgresConfig {
     #[serde(default = "default_pool_size")]
     pub pool_size: u32,
 
+    /// TEST COMMENT
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
