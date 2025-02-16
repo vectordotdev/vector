@@ -52,18 +52,20 @@ pub struct PostgresRequest {
     pub metadata: RequestMetadata,
 }
 
-impl From<Vec<Event>> for PostgresRequest {
-    fn from(mut events: Vec<Event>) -> Self {
+impl TryFrom<Vec<Event>> for PostgresRequest {
+    type Error = String;
+
+    fn try_from(mut events: Vec<Event>) -> Result<Self, Self::Error> {
         let finalizers = events.take_finalizers();
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let events_size = NonZeroUsize::new(events.estimated_json_encoded_size_of().get())
-            .expect("payload should never be zero length");
+            .ok_or_else(|| "payload should never be zero length")?;
         let metadata = metadata_builder.with_request_size(events_size);
-        PostgresRequest {
+        Ok(PostgresRequest {
             events,
             finalizers,
             metadata,
-        }
+        })
     }
 }
 

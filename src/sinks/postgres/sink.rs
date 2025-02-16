@@ -22,7 +22,15 @@ impl PostgresSink {
             // TODO: is this batch setting ok?
             .batched(self.batch_settings.as_byte_size_config())
             // TODO: use request builder?
-            .map(PostgresRequest::from)
+            .filter_map(|events| async move {
+                match PostgresRequest::try_from(events) {
+                    Ok(request) => Some(request),
+                    Err(e) => {
+                        warn!(message = "Error creating postgres sink's request", error = %e);
+                        None
+                    }
+                }
+            })
             .into_driver(self.service)
             .run()
             .await
