@@ -34,12 +34,15 @@ const fn default_pool_size() -> u32 {
 pub struct PostgresConfig {
     // TODO: if I used UriSerde instead of String, I couldn't get a url string to use
     // in the connection pool, as the password would be redacted with UriSerde::to_string
-    /// The connection string for the PostgreSQL server. It can contain the username and password.
+    /// The PostgreSQL server connection string. It can contain the username and password.
     /// See [PostgreSQL documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) about connection strings for more information
-    /// about the format and options that can be used.
+    /// about valid formats and options that can be used.
     pub endpoint: String,
 
-    /// The table that data is inserted into.
+    /// The table that data is inserted into. This table parameter is vulnerable
+    /// to SQL injection attacks as Vector does not validate or sanitize it, you must not use untrusted input.
+    /// This parameter will be directly interpoled in the SQL query statement,
+    /// as table names as parameters in prepared statements are not allowed in PostgreSQL.
     pub table: String,
 
     /// The postgres connection pool size. See [this](https://docs.rs/sqlx/latest/sqlx/struct.Pool.html#why-use-a-pool) for more
@@ -47,7 +50,16 @@ pub struct PostgresConfig {
     #[serde(default = "default_pool_size")]
     pub pool_size: u32,
 
-    /// TEST COMMENT
+    /// Event batching behavior.
+    ///
+    /// Note that as PostgreSQL's `jsonb_populate_recordset` function is used to insert events,
+    /// a single event in the batch can make the whole batch to fail. For example, if a single event within the batch triggers
+    /// a unique constraint violation in the destination table, the whole event batch will fail.
+    ///
+    /// As a workaround, [triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html) on constraint violations
+    /// can be defined at a database level to change the behavior of the insert operation on specific tables.
+    /// Alternatively, setting `max_events` batch setting to `1` will make each event to be inserted independently,
+    ///  so events that trigger a constraint violation will not affect the rest of the events.
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
