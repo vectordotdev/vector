@@ -95,13 +95,7 @@ fn create_span(resource: &str) -> ObjectMap {
 
 pub fn create_trace(resource: &str) -> TraceEvent {
     let mut t = TraceEvent::default();
-    t.insert(event_path!("language"), "a_language");
-    t.insert(event_path!("agent_version"), "1.23456");
-    t.insert(event_path!("host"), "a_host");
-    t.insert(event_path!("env"), "an_env");
     t.insert(event_path!("trace_id"), Value::Integer(123));
-    t.insert(event_path!("target_tps"), Value::Integer(10));
-    t.insert(event_path!("error_tps"), Value::Integer(5));
     t.insert(
         event_path!("spans"),
         Value::Array(vec![Value::from(create_span(resource))]),
@@ -130,14 +124,8 @@ struct TestCounterMetric {
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 struct TestTrace {
-    agent_version: String,
-    env: String,
-    error_tps: i64,
-    host: String,
-    language: String,
-    spans: Vec<TestTraceSpan>,
-    target_tps: i64,
     trace_id: i64,
+    spans: Vec<TestTraceSpan>,
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::Type, FromRow)]
@@ -327,16 +315,13 @@ async fn insert_trace() {
         .execute(&mut connection)
         .await
         .unwrap();
-    let create_table_sql = format!(
-        "CREATE TABLE {table} (agent_version TEXT, env TEXT, error_tps BIGINT, host TEXT,
-        language TEXT, spans trace_span[], target_tps BIGINT, trace_id BIGINT)"
-    );
+    let create_table_sql = format!("CREATE TABLE {table} (trace_id BIGINT, spans trace_span[])");
     sqlx::query(&create_table_sql)
         .execute(&mut connection)
         .await
         .unwrap();
 
-    let trace = create_trace("a_trace");
+    let trace = create_trace("a_resource");
     let expected_trace_value = serde_json::to_value(&trace).unwrap();
     let input_event = Event::from(trace);
 
