@@ -58,7 +58,6 @@ impl From<Vec<Event>> for PostgresRequest {
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let events_size = NonZeroUsize::new(events.estimated_json_encoded_size_of().get())
             .expect("payload should never be zero length");
-        // TODO: is this metadata creation correct?
         let metadata = metadata_builder.with_request_size(events_size);
         PostgresRequest {
             events,
