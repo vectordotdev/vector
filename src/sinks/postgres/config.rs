@@ -59,7 +59,7 @@ pub struct PostgresConfig {
     /// As a workaround, [triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html) on constraint violations
     /// can be defined at a database level to change the behavior of the insert operation on specific tables.
     /// Alternatively, setting `max_events` batch setting to `1` will make each event to be inserted independently,
-    ///  so events that trigger a constraint violation will not affect the rest of the events.
+    /// so events that trigger a constraint violation will not affect the rest of the events.
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
