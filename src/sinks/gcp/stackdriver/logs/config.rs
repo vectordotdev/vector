@@ -121,7 +121,8 @@ pub(super) enum StackdriverLogName {
     ///	Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
     #[serde(rename = "billing_account_id")]
     #[configurable(metadata(docs::examples = "012345-6789AB-CDEF01"))]
-    BillingAccount(String),
+    #[configurable(metadata(docs::templateable))]
+    BillingAccount(Template),
 
     /// The folder ID to which to publish logs.
     ///
@@ -132,7 +133,8 @@ pub(super) enum StackdriverLogName {
     /// [folder_docs]: https://cloud.google.com/resource-manager/docs/creating-managing-folders
     #[serde(rename = "folder_id")]
     #[configurable(metadata(docs::examples = "My Folder"))]
-    Folder(String),
+    #[configurable(metadata(docs::templateable))]
+    Folder(Template),
 
     /// The organization ID to which to publish logs.
     ///
@@ -141,7 +143,8 @@ pub(super) enum StackdriverLogName {
     ///	Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
     #[serde(rename = "organization_id")]
     #[configurable(metadata(docs::examples = "622418129737"))]
-    Organization(String),
+    #[configurable(metadata(docs::templateable))]
+    Organization(Template),
 
     /// The project ID to which to publish logs.
     ///
@@ -153,7 +156,8 @@ pub(super) enum StackdriverLogName {
     #[derivative(Default)]
     #[serde(rename = "project_id")]
     #[configurable(metadata(docs::examples = "vector-123456"))]
-    Project(String),
+    #[configurable(metadata(docs::templateable))]
+    Project(Template),
 }
 
 /// A monitored resource.
