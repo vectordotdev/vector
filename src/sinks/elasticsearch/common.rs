@@ -321,7 +321,7 @@ pub async fn sign_request(
     credentials_provider: &aws_credential_types::provider::SharedCredentialsProvider,
     region: Option<&aws_types::region::Region>,
 ) -> crate::Result<()> {
-    // Amazon OpenSearch Serverless requires the x-amz-content-sha256 header when calculating
+    // Amazon OpenSearch Serverless and Managed require the x-amz-content-sha256 header when calculating
     // the AWS v4 signature:
     // https://docs.aws.amazon.com/opensearch-service/latest/developerguide/serverless-clients.html#serverless-signing
     crate::aws::sign_request(
@@ -329,7 +329,7 @@ pub async fn sign_request(
         request,
         credentials_provider,
         region,
-        *service_type == OpenSearchServiceType::Serverless,
+        *service_type == OpenSearchServiceType::Serverless | OpenSearchServiceType::Managed,
     )
     .await
 }
