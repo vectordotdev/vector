@@ -325,7 +325,6 @@ async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
-    // TODO: Generate different keys here for table sources!
     let table_sources = config
         .enrichment_tables
         .iter()
