@@ -111,6 +111,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
         else {
             return Err(SendError(item));
         };
+
         self.inner
             .data
             .push((permits, item))
