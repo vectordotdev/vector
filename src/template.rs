@@ -36,6 +36,38 @@ pub enum TemplateRenderingError {
     MissingKeys { missing_keys: Vec<String> },
 }
 
+/// The source of a template. May be a constant (such as numeric values) or a template string.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(untagged)]
+enum TemplateSource {
+    /// A signed number constant.
+    SignedNumber(i64),
+    /// An unsigned number constant.
+    UnsignedNumber(u64),
+    /// A floating-point number constant.
+    FloatingPointNumber(f64),
+    /// A string, which may be a template.
+    String(String),
+}
+
+impl Default for TemplateSource {
+    fn default() -> Self {
+        Self::String(Default::default())
+    }
+}
+
+impl ToString for TemplateSource {
+    fn to_string(&self) -> String {
+        match self {
+            Self::SignedNumber(i) => i.to_string(),
+            Self::UnsignedNumber(u) => u.to_string(),
+            Self::FloatingPointNumber(f) => f.to_string(),
+            Self::String(s) => s.clone(),
+        }
+    }
+}
+
 /// A templated field.
 ///
 /// In many cases, components can be configured so that part of the component's functionality can be
@@ -50,7 +82,7 @@ pub enum TemplateRenderingError {
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-#[serde(try_from = "String", into = "String")]
+#[serde(try_from = "TemplateSource", into = "TemplateSource")]
 pub struct Template {
     src: String,
 
@@ -65,6 +97,20 @@ pub struct Template {
 
     #[serde(skip)]
     tz_offset: Option<FixedOffset>,
+}
+
+impl TryFrom<TemplateSource> for Template {
+    type Error = TemplateParseError;
+
+    fn try_from(src: TemplateSource) -> Result<Self, Self::Error> {
+        Template::try_from(src.to_string())
+    }
+}
+
+impl Into<TemplateSource> for Template {
+    fn into(self) -> TemplateSource {
+        TemplateSource::String(self.src.clone())
+    }
 }
 
 impl TryFrom<&str> for Template {
@@ -410,11 +456,28 @@ mod tests {
             .unwrap();
         let f3 = Template::try_from("nofield").unwrap().get_fields();
         let f4 = Template::try_from("%F").unwrap().get_fields();
+        let f5 = Template::try_from(TemplateSource::String("{{ foo }}".to_string()))
+            .unwrap()
+            .get_fields()
+            .unwrap();
+        let f6 = Template::try_from(TemplateSource::SignedNumber(123))
+            .unwrap()
+            .get_fields();
+        let f7 = Template::try_from(TemplateSource::UnsignedNumber(123))
+            .unwrap()
+            .get_fields();
+        let f8 = Template::try_from(TemplateSource::FloatingPointNumber(123.123))
+            .unwrap()
+            .get_fields();
 
         assert_eq!(f1, vec!["foo"]);
         assert_eq!(f2, vec!["foo", "bar"]);
         assert_eq!(f3, None);
         assert_eq!(f4, None);
+        assert_eq!(f5, vec!["foo"]);
+        assert_eq!(f6, None);
+        assert_eq!(f7, None);
+        assert_eq!(f8, None);
     }
 
     #[test]
@@ -427,6 +490,17 @@ mod tests {
         assert!(Template::try_from("/kube-demo/{{ foo }}/%F")
             .unwrap()
             .is_dynamic());
+        assert!(!Template::try_from(TemplateSource::SignedNumber(123))
+            .unwrap()
+            .is_dynamic());
+        assert!(!Template::try_from(TemplateSource::UnsignedNumber(123))
+            .unwrap()
+            .is_dynamic());
+        assert!(
+            !Template::try_from(TemplateSource::FloatingPointNumber(123.123))
+                .unwrap()
+                .is_dynamic()
+        );
     }
 
     #[test]
@@ -435,6 +509,30 @@ mod tests {
         let template = Template::try_from("foo").unwrap();
 
         assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_signed_number() {
+        let event = Event::Log(LogEvent::from("hello world"));
+        let template = Template::try_from(TemplateSource::SignedNumber(123)).unwrap();
+
+        assert_eq!(Ok(Bytes::from("123")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_unsigned_number() {
+        let event = Event::Log(LogEvent::from("hello world"));
+        let template = Template::try_from(TemplateSource::UnsignedNumber(123)).unwrap();
+
+        assert_eq!(Ok(Bytes::from("123")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_float_number() {
+        let event = Event::Log(LogEvent::from("hello world"));
+        let template = Template::try_from(TemplateSource::FloatingPointNumber(123.123)).unwrap();
+
+        assert_eq!(Ok(Bytes::from("123.123")), template.render(&event))
     }
 
     #[test]
