@@ -106,7 +106,7 @@ fn encode_valid() {
         json,
         serde_json::json!({
             "logName":"projects/project/logs/testlogs",
-            "jsonPayload":{"message":"hello world"},
+            "textPayload":{"message":"hello world"},
             "severity":100,
             "resource":{
                 "type":"generic_node",
@@ -151,7 +151,7 @@ fn encode_inserts_timestamp() {
         json,
         serde_json::json!({
             "logName":"projects/project/logs/testlogs",
-            "jsonPayload":{"message":"hello world","timestamp":"2020-01-01T12:30:00Z"},
+            "textPayload":{"message":"hello world"},
             "severity":100,
             "resource":{
                 "type":"generic_node",
@@ -248,7 +248,7 @@ async fn correct_request() {
                 {
                     "logName": "projects/project/logs/testlogs",
                     "severity": 0,
-                    "jsonPayload": {
+                    "textPayload": {
                         "message": "hello"
                     },
                     "resource": {
@@ -261,7 +261,7 @@ async fn correct_request() {
                 {
                     "logName": "projects/project/logs/testlogs",
                     "severity": 0,
-                    "jsonPayload": {
+                    "textPayload": {
                         "message": "world"
                     },
                     "resource": {
