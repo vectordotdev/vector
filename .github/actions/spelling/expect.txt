@@ -467,6 +467,7 @@ rcode
 rdkafka
 rdparty
 readnone
+recordset
 rediss
 redoctober
 regexes

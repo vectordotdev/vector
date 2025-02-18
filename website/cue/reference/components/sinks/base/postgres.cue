@@ -277,7 +277,7 @@ base: components: sinks: postgres: configuration: {
 		description: """
 			The table that data is inserted into. This table parameter is vulnerable
 			to SQL injection attacks as Vector does not validate or sanitize it, you must not use untrusted input.
-			This parameter will be directly interpoled in the SQL query statement,
+			This parameter will be directly interpolated in the SQL query statement,
 			as table names as parameters in prepared statements are not allowed in PostgreSQL.
 			"""
 		required: true
