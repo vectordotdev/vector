@@ -121,8 +121,7 @@ const fn default_scan_interval() -> NonZeroU64 {
 }
 
 impl MemoryConfig {
-    /// Just pub for now
-    pub async fn get_or_build_memory(&self) -> Memory {
+    pub(super) async fn get_or_build_memory(&self) -> Memory {
         let mut boxed_memory = self.memory.lock().await;
         *boxed_memory
             .get_or_insert_with(|| Box::new(Memory::new(self.clone())))
