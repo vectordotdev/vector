@@ -991,6 +991,7 @@ mod test {
             .build(SourceContext {
                 key: source_key.clone(),
                 globals: GlobalOptions::default(),
+                enrichment_tables: Default::default(),
                 shutdown: shutdown_signal,
                 out: sender,
                 proxy: Default::default(),

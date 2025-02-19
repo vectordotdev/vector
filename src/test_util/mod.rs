@@ -65,6 +65,7 @@ pub mod metrics;
 #[cfg(test)]
 pub mod mock;
 
+pub mod compression;
 pub mod stats;
 
 #[macro_export]
