@@ -9,7 +9,7 @@ use tokio_postgres::{
 
 #[configurable_component(sink("postgres"))]
 #[derive(Clone, Debug)]
-/// A basic sink that dumps its output to stdout.
+/// Write the input to a postgres tables
 pub struct BasicConfig {
     #[configurable(derived)]
     #[serde(
