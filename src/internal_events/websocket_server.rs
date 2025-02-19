@@ -14,7 +14,7 @@ pub struct WsListenerConnectionEstablished {
 
 impl InternalEvent for WsListenerConnectionEstablished {
     fn emit(self) {
-        debug!(message = "Websocket client connected.");
+        debug!(message = "Websocket client connected. Client count: {self.client_count}");
         counter!("connection_established_total").increment(1);
         gauge!("active_clients").set(self.client_count as f64);
     }
@@ -31,7 +31,7 @@ pub struct WsListenerConnectionShutdown {
 
 impl InternalEvent for WsListenerConnectionShutdown {
     fn emit(self) {
-        warn!(message = "Client connection closed.");
+        warn!(message = "Client connection closed. Client count: {self.client_count}.");
         counter!("connection_shutdown_total").increment(1);
         gauge!("active_clients").set(self.client_count as f64);
     }
