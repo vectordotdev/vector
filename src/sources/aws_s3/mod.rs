@@ -130,6 +130,12 @@ pub struct AwsS3Config {
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
+
+    /// Specifies which addressing style to use.
+    ///
+    /// This controls if the bucket name is in the hostname or part of the URL.
+    #[serde(default = "crate::serde::default_true")]
+    pub force_path_style: bool,
 }
 
 const fn default_framing() -> FramingConfig {
@@ -230,11 +236,10 @@ impl AwsS3Config {
     ) -> crate::Result<sqs::Ingestor> {
         let region = self.region.region();
         let endpoint = self.region.endpoint();
-        let force_path_style_value: bool = true;
 
         let s3_client = create_client::<S3ClientBuilder>(
             &S3ClientBuilder {
-                force_path_style: Some(force_path_style_value),
+                force_path_style: Some(self.force_path_style),
             },
             &self.auth,
             region.clone(),
