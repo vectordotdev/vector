@@ -21,4 +21,4 @@ vector-core = { path = "../vector-core" }
 [dev-dependencies]
 proptest = "1.6"
 rand = "0.8.5"
-rand_distr = "0.4.3"
+rand_distr = "0.5.0"
