@@ -1,3 +1,5 @@
+use std::net::Ipv4Addr;
+
 use metrics::{counter, histogram};
 use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 use vector_lib::{
@@ -130,6 +132,44 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
             "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::RECEIVING,
             "mode" => mode,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug)]
+pub struct SocketMulticastGroupJoinError<E> {
+    pub error: E,
+    pub group_addr: Ipv4Addr,
+    pub interface: Ipv4Addr,
+}
+
+impl<E: std::fmt::Display> InternalEvent for SocketMulticastGroupJoinError<E> {
+    fn emit(self) {
+        // Multicast groups are only used in UDP mode
+        let mode = SocketMode::Udp.as_str();
+        let group_addr = self.group_addr.to_string();
+        let interface = self.interface.to_string();
+
+        error!(
+            message = "Error joining multicast group.",
+            error = %self.error,
+            error_code = "socket_multicast_group_join",
+            error_type = error_type::IO_FAILED,
+            stage = error_stage::RECEIVING,
+            %mode,
+            %group_addr,
+            %interface,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "socket_multicast_group_join",
+            "error_type" => error_type::IO_FAILED,
+            "stage" => error_stage::RECEIVING,
+            "mode" => mode,
+            "group_addr" => group_addr,
+            "interface" => interface,
         )
         .increment(1);
     }
