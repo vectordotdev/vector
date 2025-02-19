@@ -107,6 +107,28 @@ base: configuration: configuration: {
 				required:      false
 				relevant_when: "type = \"file\""
 			}
+			dump_batch_size: {
+				type: uint: {}
+				description: """
+					Batch size for data dumping. Used to prevent dumping entire table at
+					once and blocking the system.
+
+					By default, batches are not used and entire table is dumped.
+					"""
+				required:      false
+				relevant_when: "type = \"memory\""
+			}
+			dump_interval: {
+				type: uint: {}
+				description: """
+					Interval for dumping all data from the table when used as a source.
+
+					By default, no dumps happen and this table can't be used as a source,
+					unless a non-zero dump interval is provided
+					"""
+				required:      false
+				relevant_when: "type = \"memory\""
+			}
 			flush_interval: {
 				type: uint: {}
 				description: """
@@ -147,12 +169,34 @@ base: configuration: configuration: {
 				required:      false
 				relevant_when: "type = \"memory\""
 			}
+			remove_after_dump: {
+				type: bool: default: false
+				description: """
+					If set to true, all data will be removed from cache after dumping.
+					Only valid if used as a source and dump_interval > 0
+
+					By default, dump will not remove data from cache
+					"""
+				required:      false
+				relevant_when: "type = \"memory\""
+			}
 			scan_interval: {
 				type: uint: default: 30
 				description: """
 					The scan interval used to look for expired records. This is provided
 					as an optimization to ensure that TTL is updated, but without doing
 					too many cache scans.
+					"""
+				required:      false
+				relevant_when: "type = \"memory\""
+			}
+			source_key: {
+				type: string: {}
+				description: """
+					Key to use for this component when used as a source.
+
+					If this table is used as a source, this has to be defined and must be different from the
+					component key.
 					"""
 				required:      false
 				relevant_when: "type = \"memory\""
