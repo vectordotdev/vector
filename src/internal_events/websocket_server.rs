@@ -31,7 +31,7 @@ pub struct WsListenerConnectionShutdown {
 
 impl InternalEvent for WsListenerConnectionShutdown {
     fn emit(self) {
-        warn!(message = "Client connection closed. Client count: {self.client_count}.");
+        info!(message = "Client connection closed. Client count: {self.client_count}.");
         counter!("connection_shutdown_total").increment(1);
         gauge!("active_clients").set(self.client_count as f64);
     }
