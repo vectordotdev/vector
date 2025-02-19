@@ -371,7 +371,7 @@ stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
-tokio-postgres = { version = "0.7.13", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-postgres = { version = "0.7.13", default-features = false, features = ["runtime", "with-chrono-0_4", "with-serde_json-1"], optional = true }
 tokio-tungstenite = { version = "0.20.1", default-features = false, features = ["connect"], optional = true }
 toml.workspace = true
 tonic = { workspace = true, optional = true }
@@ -737,6 +737,7 @@ sinks-logs = [
   "sinks-new_relic_logs",
   "sinks-opentelemetry",
   "sinks-papertrail",
+  "sinks-postgres",
   "sinks-pulsar",
   "sinks-redis",
   "sinks-sematext",
@@ -805,6 +806,7 @@ sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-opentelemetry = ["sinks-http"]
 sinks-papertrail = ["dep:syslog"]
+sinks-postgres = ["dep:tokio-postgres"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "dep:lru"]
 sinks-redis = ["dep:redis"]
