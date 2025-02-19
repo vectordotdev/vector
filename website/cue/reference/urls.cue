@@ -105,6 +105,7 @@ urls: {
 	bind_dnstap:                                "https://kb.isc.org/docs/aa-01342"
 	b_tree_map:                                 "https://doc.rust-lang.org/std/collections/struct.BTreeMap.html"
 	cargo_audit:                                "\(github)/RustSec/cargo-audit"
+	cbor:                                       "https://cbor.io"
 	centos:                                     "https://www.centos.org/"
 	charset_standard:                           "\(encoding_standard)#names-and-labels"
 	chrono_time_formats:                        "https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers"
