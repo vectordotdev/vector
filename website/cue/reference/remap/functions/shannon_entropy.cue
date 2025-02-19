@@ -43,21 +43,21 @@ remap: functions: shannon_entropy: {
 			source: #"""
 				floor(shannon_entropy("vector.dev"), precision: 4)
 				"""#
-			return: "2.9219"
+			return: 2.9219
 		},
 		{
 			title: "UTF-8 string with bytes segmentation"
 			source: #"""
 				floor(shannon_entropy("test123%456.فوائد.net."), precision: 4)
 				"""#
-			return: "4.0784"
+			return: 4.0784
 		},
 		{
 			title: "UTF-8 string with grapheme segmentation"
 			source: #"""
-				floor(shannon_entropy("test123%456.فوائد.net."), precision: 4)
+				floor(shannon_entropy("test123%456.فوائد.net.", segmentation: "grapheme"), precision: 4)
 				"""#
-			return: "3.9362"
+			return: 3.9362
 		},
 	]
 }
