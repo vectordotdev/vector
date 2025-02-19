@@ -36,7 +36,11 @@ pub mod mmdb;
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(EnrichmentTableConfig)]
-#[configurable(metadata(docs::enum_tag_description = "enrichment table type"))]
+#[configurable(metadata(
+    docs::enum_tag_description = "enrichment table type",
+    docs::common = false,
+    docs::required = false,
+))]
 pub enum EnrichmentTables {
     /// Exposes data from a static file as an enrichment table.
     File(file::FileConfig),
