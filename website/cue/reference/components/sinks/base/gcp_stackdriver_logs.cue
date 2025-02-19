@@ -141,6 +141,15 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		required: true
 		type: string: {}
 	}
+	labels: {
+		description: "A map of key, value pairs that provides additional information about the log entry."
+		required:    false
+		type: object: options: "*": {
+			description: "A key, value pair that describes a log entry."
+			required:    true
+			type: string: syntax: "template"
+		}
+	}
 	log_id: {
 		description: """
 			The log ID to which to publish logs.

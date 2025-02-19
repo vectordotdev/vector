@@ -61,6 +61,13 @@ pub(super) struct StackdriverConfig {
     /// The monitored resource to associate the logs with.
     pub(super) resource: StackdriverResource,
 
+    /// A map of key, value pairs that provides additional information about the log entry.
+    #[configurable(metadata(
+        docs::additional_props_description = "A key, value pair that describes a log entry."
+    ))]
+    #[serde(default)]
+    pub(super) labels: HashMap<String, Template>,
+
     /// The field of the log event from which to take the outgoing log’s `severity` field.
     ///
     /// The named field is removed from the log event if present, and must be either an integer
@@ -208,6 +215,7 @@ impl SinkConfig for StackdriverConfig {
                 self.encoding.clone(),
                 self.log_id.clone(),
                 self.log_name.clone(),
+                self.labels.clone(),
                 self.resource.clone(),
                 self.severity_key.clone(),
             ),

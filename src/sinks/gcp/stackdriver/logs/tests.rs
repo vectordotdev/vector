@@ -76,6 +76,10 @@ fn encode_valid() {
         transformer,
         Template::try_from("{{ log_id }}").unwrap(),
         StackdriverLogName::Project("project".to_owned()),
+        HashMap::from([(
+            "user_label_1".to_owned(),
+            Template::try_from("value_1").unwrap(),
+        )]),
         StackdriverResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([
@@ -108,6 +112,7 @@ fn encode_valid() {
             "logName":"projects/project/logs/testlogs",
             "jsonPayload":{"message":"hello world"},
             "severity":100,
+            "labels":{"user_label_1":"value_1"},
             "resource":{
                 "type":"generic_node",
                 "labels":{"namespace":"office","node_id":"10.10.10.1"}
@@ -124,6 +129,10 @@ fn encode_inserts_timestamp() {
         transformer,
         Template::try_from("testlogs").unwrap(),
         StackdriverLogName::Project("project".to_owned()),
+        HashMap::from([(
+            "user_label_1".to_owned(),
+            Template::try_from("value_1").unwrap(),
+        )]),
         StackdriverResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([(
@@ -153,6 +162,7 @@ fn encode_inserts_timestamp() {
             "logName":"projects/project/logs/testlogs",
             "jsonPayload":{"message":"hello world","timestamp":"2020-01-01T12:30:00Z"},
             "severity":100,
+            "labels":{"user_label_1":"value_1"},
             "resource":{
                 "type":"generic_node",
                 "labels":{"namespace":"office"}},
@@ -198,6 +208,10 @@ async fn correct_request() {
         transformer,
         Template::try_from("testlogs").unwrap(),
         StackdriverLogName::Project("project".to_owned()),
+        HashMap::from([(
+            "user_label_1".to_owned(),
+            Template::try_from("value_1").unwrap(),
+        )]),
         StackdriverResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([(
@@ -251,6 +265,9 @@ async fn correct_request() {
                     "jsonPayload": {
                         "message": "hello"
                     },
+                    "labels": {
+                        "user_label_1": "value_1"
+                    },
                     "resource": {
                         "type": "generic_node",
                         "labels": {
@@ -263,6 +280,9 @@ async fn correct_request() {
                     "severity": 0,
                     "jsonPayload": {
                         "message": "world"
+                    },
+                    "labels": {
+                        "user_label_1": "value_1"
                     },
                     "resource": {
                         "type": "generic_node",
