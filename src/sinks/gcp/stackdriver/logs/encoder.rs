@@ -19,6 +19,7 @@ pub(super) struct StackdriverLogsEncoder {
     transformer: Transformer,
     log_id: Template,
     log_name: StackdriverLogName,
+    labels: HashMap<String, Template>,
     resource: StackdriverResource,
     severity_key: Option<ConfigValuePath>,
 }
@@ -29,6 +30,7 @@ impl StackdriverLogsEncoder {
         transformer: Transformer,
         log_id: Template,
         log_name: StackdriverLogName,
+        labels: HashMap<String, Template>,
         resource: StackdriverResource,
         severity_key: Option<ConfigValuePath>,
     ) -> Self {
@@ -36,13 +38,28 @@ impl StackdriverLogsEncoder {
             transformer,
             log_id,
             log_name,
+            labels,
             resource,
             severity_key,
         }
     }
 
     pub(super) fn encode_event(&self, event: Event) -> Option<serde_json::Value> {
-        let mut labels = HashMap::with_capacity(self.resource.labels.len());
+        let mut labels = HashMap::with_capacity(self.labels.len());
+        for (key, template) in &self.labels {
+            let value = template
+                .render_string(&event)
+                .map_err(|error| {
+                    emit!(crate::internal_events::TemplateRenderingError {
+                        error,
+                        field: Some("labels"),
+                        drop_event: true,
+                    });
+                })
+                .ok()?;
+            labels.insert(key.clone(), value);
+        }
+        let mut resource_labels = HashMap::with_capacity(self.resource.labels.len());
         for (key, template) in &self.resource.labels {
             let value = template
                 .render_string(&event)
@@ -54,7 +71,7 @@ impl StackdriverLogsEncoder {
                     });
                 })
                 .ok()?;
-            labels.insert(key.clone(), value);
+            resource_labels.insert(key.clone(), value);
         }
         let log_name = self
             .log_name(&event)
@@ -84,11 +101,12 @@ impl StackdriverLogsEncoder {
         entry.insert("logName".into(), json!(log_name));
         entry.insert("jsonPayload".into(), json!(log));
         entry.insert("severity".into(), json!(severity));
+        entry.insert("labels".into(), json!(labels));
         entry.insert(
             "resource".into(),
             json!({
                 "type": self.resource.type_,
-                "labels": labels,
+                "labels": resource_labels,
             }),
         );
 
