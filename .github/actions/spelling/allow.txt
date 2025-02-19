@@ -440,6 +440,7 @@ rsyslogd
 scriptblock
 servlet
 Sinjo
+shannon
 sublocation
 sundar
 svcb
