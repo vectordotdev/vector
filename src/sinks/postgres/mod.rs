@@ -10,7 +10,7 @@ use tokio_postgres::{
 #[configurable_component(sink("postgres"))]
 #[derive(Clone, Debug)]
 /// Write the input to a postgres tables
-pub struct BasicConfig {
+pub struct PostgresConfig {
     #[configurable(derived)]
     #[serde(
         default,
@@ -35,19 +35,15 @@ pub struct BasicConfig {
     pub password: Option<String>,
 }
 
-impl GenerateConfig for BasicConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str("").unwrap()
-    }
-}
+impl_generate_config_from_default!(PostgresConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "postgres")]
-impl SinkConfig for BasicConfig {
+impl SinkConfig for PostgresConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let healthcheck = Box::pin(async move { Ok(()) });
 
-        let BasicConfig {
+        let PostgresConfig {
             host,
             port,
             user,
@@ -90,8 +86,7 @@ impl SinkConfig for BasicConfig {
                     .map(|(i, _)| format!("${}", i + 1))
                     .join(",")
             ))
-            .await
-            .unwrap();
+            .await?;
 
         let sink = VectorSink::from_event_streamsink(PostgresSink {
             client,
@@ -159,7 +154,11 @@ impl<'a> ToSql for Wrapper<'a> {
 
                 let member_type = match *ty.kind() {
                     tokio_postgres::types::Kind::Array(ref member) => member,
-                    _ => panic!("expected array type"),
+                    _ => {
+                        return Err(Box::new(
+                            tokio_postgres::types::WrongType::new::<Vec<Value>>(ty.clone()),
+                        ))
+                    }
                 };
 
                 // Arrays are normally one indexed by default but oidvector and int2vector *require* zero indexing
@@ -215,7 +214,7 @@ impl PostgresSink {
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let Self { statement, .. } = self.as_ref();
 
-        while let Some(event) = input.next().await {
+        while let Some(mut event) = input.next().await {
             match event {
                 Event::Log(log_event) => {
                     let (v, mut metadata) = log_event.into_parts();
@@ -246,7 +245,10 @@ impl PostgresSink {
                     };
                     metadata.take_finalizers().update_status(status)
                 }
-                _ => todo!("Only logs are implemented so far"),
+                _ => {
+                    error!("Only logs are implemented so far");
+                    event.take_finalizers().update_status(EventStatus::Rejected);
+                }
             }
         }
 
