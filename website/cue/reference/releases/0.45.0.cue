@@ -14,7 +14,7 @@ releases: "0.45.0": {
 
 		This release contains a few notable new features along with the numerous enhancements and fixes as listed below:
 
-		- A new type of `enrichment_table` - `memory` was introduced! This table can also act
+		- A new type of `enrichment_table`, `memory`, was introduced! This table can also act
 		  can also act as a sink! This enables new interesting use cases, for instance this table
 		  can be used as a cache or as an interface with an external key value store.
 		- A new `websocket_server` sink that acts as a websocket server and broadcasts events to all connected clients.
