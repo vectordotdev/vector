@@ -16,6 +16,7 @@ components: sinks: websocket_server: {
 	features: {
 		acknowledgements: true
 		auto_generated:   true
+		has_auth:         true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
