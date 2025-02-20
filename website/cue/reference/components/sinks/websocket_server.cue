@@ -90,14 +90,14 @@ components: sinks: websocket_server: {
 			body: """
 				The `message_buffering` configuration option can be used to enable this feature. It can
 				be used to define a number of events to be buffered, to enable replay for clients that
-				may want to continue from last message after disconnection. To provide clients with the
-				message ID, `message_buffering.message_id_path` needs to be defined, which will be used
+				may want to continue from the last message after disconnection. To provide clients with the
+				message ID, `message_buffering.message_id_path` needs to be defined, which is used
 				to encode the ID inside outgoing messages. The buffer is backed by a ring buffer, so
 				oldest messages will be lost when the size limit is reached.
 
 				Once clients have the ID, on future connections that ID can be sent in the
-				`last_received` query parameter and all buffered messages since that message will be
-				sent to the client immediately on connection. If the message can't be found, entire
+				`last_received` query parameter and all buffered messages since that message are
+				sent to the client immediately on connection. If the message can't be found, the entire
 				buffer will be replayed.
 
 				Example config:
