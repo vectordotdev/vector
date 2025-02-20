@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::sinks::prelude::*;
 use bytes::{Buf, BufMut};
 use chrono::{DateTime, Utc};
@@ -6,9 +8,11 @@ use tokio_postgres::{
     types::{to_sql_checked, IsNull, ToSql},
     NoTls,
 };
+use vector_lib::event::EventMetadata;
+use vrl::value::KeyString;
 
 #[configurable_component(sink("postgres"))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 /// Write the input to a postgres tables
 pub struct PostgresConfig {
     #[configurable(derived)]
@@ -212,8 +216,6 @@ impl<'a> ToSql for Wrapper<'a> {
 
 impl PostgresSink {
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let Self { statement, .. } = self.as_ref();
-
         while let Some(mut event) = input.next().await {
             match event {
                 Event::Log(log_event) => {
@@ -229,29 +231,38 @@ impl PostgresSink {
                             return Err(());
                         }
                     };
-
-                    let p = self
-                        .columns
-                        .iter()
-                        .map(|k| v.get(k.as_str()).unwrap_or(&Value::Null))
-                        .map(Wrapper);
-
-                    let status = match self.client.execute_raw(statement, p).await {
-                        Ok(_) => EventStatus::Delivered,
-                        Err(err) => {
-                            error!("{err}");
-                            EventStatus::Rejected
-                        }
-                    };
-                    metadata.take_finalizers().update_status(status)
+                    self.store_log((v, metadata)).await?
                 }
+                Event::Trace(trace) => self.store_log(trace.into_parts()).await?,
                 _ => {
                     error!("Only logs are implemented so far");
                     event.take_finalizers().update_status(EventStatus::Rejected);
                 }
             }
         }
+        Ok(())
+    }
 
+    async fn store_log(
+        &self,
+        event: (BTreeMap<KeyString, Value>, EventMetadata),
+    ) -> Result<(), ()> {
+        let (v, mut metadata) = event;
+
+        let p = self
+            .columns
+            .iter()
+            .map(|k| v.get(k.as_str()).unwrap_or(&Value::Null))
+            .map(Wrapper);
+
+        let status = match self.client.execute_raw(&self.statement, p).await {
+            Ok(_) => EventStatus::Delivered,
+            Err(err) => {
+                error!("{err}");
+                EventStatus::Rejected
+            }
+        };
+        metadata.take_finalizers().update_status(status);
         Ok(())
     }
 }
