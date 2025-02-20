@@ -20,6 +20,7 @@ use tokio_tungstenite::tungstenite::{
 };
 use tokio_util::codec::Encoder as _;
 use tracing::Instrument;
+use url::Url;
 use uuid::Uuid;
 use vector_lib::{
     event::{Event, EventStatus, MaybeAsLogMut},
@@ -115,6 +116,9 @@ impl WebSocketListenerSink {
         stream: MaybeTlsIncomingStream<TcpStream>,
         open_gauge: OpenGauge,
     ) -> Result<(), ()> {
+        // Base url for parsing request URLs that may be relative
+        // It should never panic, since valid URL is hard-coded
+        let base_url = Url::parse("ws://localhost").unwrap();
         let addr = stream.peer_addr();
         debug!("Incoming TCP connection from: {}", addr);
 
@@ -126,7 +130,10 @@ impl WebSocketListenerSink {
                 // Even if we can't find the provided message ID, we should dump whatever we have
                 // buffered so far, because the provided message ID might have expired by now
                 should_replay = true;
-                if let Ok(url) = url::Url::parse(req.uri().to_string().as_str()) {
+                if let Ok(url) = Url::options()
+                    .base_url(Some(&base_url))
+                    .parse(req.uri().to_string().as_str())
+                {
                     if let Some((_, last_received_param_value)) =
                         url.query_pairs().find(|(k, _)| k == "last_received")
                     {
