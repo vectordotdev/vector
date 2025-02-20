@@ -72,7 +72,7 @@ impl SinkConfig for PostgresConfig {
 
         let client = Arc::new(client);
 
-        let health_client = client.clone();
+        let health_client = Arc::clone(&client);
 
         let healthcheck = Box::pin(async move {
             health_client
@@ -138,7 +138,7 @@ impl StreamSink<Event> for PostgresSink {
 #[derive(Debug)]
 struct Wrapper<'a>(&'a Value);
 
-impl<'a> ToSql for Wrapper<'a> {
+impl ToSql for Wrapper<'_> {
     fn to_sql(
         &self,
         ty: &tokio_postgres::types::Type,
