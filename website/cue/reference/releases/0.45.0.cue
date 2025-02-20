@@ -10,6 +10,31 @@ releases: "0.45.0": {
 		{
 			type: "feat"
 			description: """
+				VRL was updated to v0.22.0. This includes the following changes:
+
+				#### Breaking Changes & Upgrade Guide
+
+				- Removed deprecated `ellipsis` argument from the `truncate` function. Use `suffix` instead. (https://github.com/vectordotdev/vrl/pull/1188)
+				- Fixed `slice` type definition. This is a breaking change because it might change the fallibility of the `slice` function. VRL scripts will
+				  need to be updated accordingly. (https://github.com/vectordotdev/vrl/pull/1246)
+
+				#### New Features
+
+				- Added new `to_syslog_facility_code` function to convert syslog facility keyword to syslog facility code. (https://github.com/vectordotdev/vrl/pull/1221)
+				- Downgrade "can't abort infallible function" error to a warning. (https://github.com/vectordotdev/vrl/pull/1247)
+				- `ip_cidr_contains` method now also accepts an array of CIDRs. (https://github.com/vectordotdev/vrl/pull/1248)
+				- Faster bytes to Unicode string convertions by using SIMD instructions provided by simdutf8 crate. (https://github.com/vectordotdev/vrl/pull/1249)
+				- Added `shannon_entropy` function to generate [entropy](https://en.wikipedia.org/wiki/Entropy_(information_theory)) from a string. (https://github.com/vectordotdev/vrl/pull/1267)
+
+				#### Fixes
+
+				- Fix decimals parsing in parse_duration function (https://github.com/vectordotdev/vrl/pull/1223)
+				- Fix `parse_nginx_log` function when a format is set to error and an error message contains comma. (https://github.com/vectordotdev/vrl/pull/1280)
+				"""
+		},
+		{
+			type: "feat"
+			description: """
 				Allows users to specify a KMS key and tags for newly created AWS CloudWatch log groups.
 				"""
 			contributors: ["johannesfloriangeiger"]
@@ -42,14 +67,14 @@ releases: "0.45.0": {
 				The `host_metrics` source has a new collector, `tcp`. The `tcp`
 				collector exposes three metrics related to the TCP stack of the
 				system:
-				
+
 				* `tcp_connections_total`: The total number of TCP connections. It
 				  includes the `state` of the connection as a tag.
 				* `tcp_tx_queued_bytes_total`: The sum of the number of bytes in the
 				   send queue across all connections.
 				* `tcp_rx_queued_bytes_total`: The sum of the number of bytes in the
 				  receive queue across all connections.
-				
+
 				This collector is enabled only on Linux systems.
 				"""
 			contributors: ["aryan9600"]
@@ -128,7 +153,7 @@ releases: "0.45.0": {
 			type: "enhancement"
 			description: """
 				In datadog search syntax, allow the following queries to match on several fields (OR condition):
-				
+
 				- `tags` will lookup the fields `tags` and `ddtags`
 				- `source` will lookup the fields `source` and `ddsource`
 				"""
