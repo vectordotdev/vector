@@ -78,11 +78,24 @@ impl SinkConfig for BasicConfig {
             }
         });
 
-        let columns = client.query("SELECT column_name from INFORMATION_SCHEMA.COLUMNS WHERE table_name = $1 AND table_schema = $2", &[&table, &schema]).await?.into_iter().map(|x| x.get(0)).collect();
+        let columns: Vec<_> = client.query("SELECT column_name from INFORMATION_SCHEMA.COLUMNS WHERE table_name = $1 AND table_schema = $2", &[&table, &schema]).await?.into_iter().map(|x| x.get(0)).collect();
+
+        let statement = client
+            .prepare(&format!(
+                "INSERT INTO {table} ({}) VALUES ({})",
+                columns.iter().map(|v| format!("\"{v}\"")).join(","),
+                columns
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| format!("${}", i + 1))
+                    .join(",")
+            ))
+            .await
+            .unwrap();
 
         let sink = VectorSink::from_event_streamsink(PostgresSink {
             client,
-            table: table.to_owned(),
+            statement,
             columns,
         });
 
@@ -100,7 +113,7 @@ impl SinkConfig for BasicConfig {
 
 struct PostgresSink {
     client: tokio_postgres::Client,
-    table: String,
+    statement: tokio_postgres::Statement,
     columns: Vec<String>,
 }
 
@@ -158,23 +171,9 @@ impl<'a> ToSql for Wrapper<'a> {
 
 impl PostgresSink {
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let Self { table, .. } = self.as_ref();
+        let Self { statement, .. } = self.as_ref();
 
-        let statement = self
-            .client
-            .prepare(&format!(
-                "INSERT INTO {table} ({}) VALUES ({})",
-                self.columns.iter().map(|v| format!("\"{v}\"")).join(","),
-                self.columns
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| format!("${}", i + 1))
-                    .join(",")
-            ))
-            .await
-            .unwrap();
-
-        while let Some(event) = input.next().await {
+                while let Some(event) = input.next().await {
             match event {
                 Event::Log(log_event) => {
                     let (v, mut metadata) = log_event.into_parts();
@@ -196,7 +195,7 @@ impl PostgresSink {
                         .map(|k| v.get(k.as_str()).unwrap_or(&Value::Null))
                         .map(Wrapper);
 
-                    let status = match self.client.execute_raw(&statement, p).await {
+                    let status = match self.client.execute_raw(statement, p).await {
                         Ok(_) => EventStatus::Delivered,
                         Err(err) => {
                             error!("{err}");
