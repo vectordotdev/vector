@@ -9,7 +9,7 @@ releases: "0.45.0": {
 	description: """
 		The Vector team is pleased to announce version 0.45.0!
 
-		Be sure to check out the [upgrade guide](/highlights/2025-01-13-0-44-0-upgrade-guide) for
+		Be sure to check out the [upgrade guide](/highlights/2025-02-24-0-45-0-upgrade-guide) for
 		breaking changes in this release.
 
 		This release contains a few notable new features along with the numerous enhancements and fixes as listed below:
