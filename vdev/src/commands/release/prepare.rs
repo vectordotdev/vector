@@ -35,7 +35,7 @@ fn create_release_branches(new_version: &Version) -> Result<()> {
     // Step 1: Create a new release branch
     git::run_and_check_output(&["fetch"])?;
     git::checkout_main_branch()?;
-    let release_branch = format!("v0.{new_version}");
+    let release_branch = format!("v{}.{}", new_version.major, new_version.minor);
     git::create_branch(release_branch.as_str())?;
     git::push_and_set_upstream(release_branch.as_str())?;
 
