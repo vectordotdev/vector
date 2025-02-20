@@ -7,7 +7,7 @@ releases: "0.45.0": {
 	whats_next: []
 
 	description: """
-		The Vector team is pleased to announce version 0.44.0!
+		The Vector team is pleased to announce version 0.45.0!
 
 		Be sure to check out the [upgrade guide](/highlights/2025-01-13-0-44-0-upgrade-guide) for
 		breaking changes in this release.
