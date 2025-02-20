@@ -28,7 +28,7 @@ required-features = ["default-no-api-client"]
 
 [[bin]]
 name = "secret-backend-example"
-path = "src/config/loading/secret_backend_example.rs"
+path = "src/config/loading/secreft_backend_example.rs"
 test = false
 bench = false
 required-features = ["secret-backend-example"]
