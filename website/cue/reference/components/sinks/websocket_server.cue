@@ -97,7 +97,7 @@ components: sinks: websocket_server: {
 
 			Once clients have the ID, on future connections that ID can be sent in the
 			`last_received` query parameter and all buffered messages since that message will be
-			sent to the client immediatelly on connection. If the message can't be found, entire
+			sent to the client immediately on connection. If the message can't be found, entire
 			buffer will be replayed.
 
 			Example config:
