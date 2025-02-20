@@ -34,4 +34,4 @@ serde_yaml = "0.9.34"
 sha2 = "0.10.8"
 tempfile = "3.17.0"
 toml.workspace = true
-semver = "1.0.25"
+semver.workspace = true
