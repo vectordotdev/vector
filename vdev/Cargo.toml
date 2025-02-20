@@ -33,6 +33,5 @@ serde_json.workspace = true
 serde_yaml = "0.9.34"
 sha2 = "0.10.8"
 tempfile = "3.17.0"
-# Not using the workspace dependency in order to enable the order preservation feature.
-toml = { version = "0.8.20", default-features = false, features = ["display", "parse", "preserve_order"] }
+toml.workspace = true
 semver = "1.0.25"
