@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use crate::sinks::prelude::*;
 use bytes::{Buf, BufMut};
@@ -45,9 +45,7 @@ impl_generate_config_from_default!(PostgresConfig);
 #[typetag::serde(name = "postgres")]
 impl SinkConfig for PostgresConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let healthcheck = Box::pin(async move { Ok(()) });
-
-        let PostgresConfig {
+                let PostgresConfig {
             host,
             port,
             user,
@@ -71,6 +69,17 @@ impl SinkConfig for PostgresConfig {
             NoTls,
         )
         .await?;
+
+        let client = Arc::new(client);
+
+        let health_client = client.clone();
+
+        let healthcheck = Box::pin(async move {
+            health_client
+                .query_one("SELECT 1", Default::default())
+                .await?;
+            Ok(())
+        });
 
         tokio::spawn(async move {
             if let Err(e) = connection.await {
@@ -111,7 +120,7 @@ impl SinkConfig for PostgresConfig {
 }
 
 struct PostgresSink {
-    client: tokio_postgres::Client,
+    client: Arc<tokio_postgres::Client>,
     statement: tokio_postgres::Statement,
     columns: Vec<String>,
 }
