@@ -167,7 +167,7 @@ releases: "0.45.0": {
 		{
 			type: "enhancement"
 			description: """
-				In datadog search syntax, allow the following queries to match on several fields (OR condition):
+				When using the Datadog Search syntax as a condition on components that support it, the following now support matching on multiple fields (using OR):
 
 				- `tags` will lookup the fields `tags` and `ddtags`
 				- `source` will lookup the fields `source` and `ddsource`
