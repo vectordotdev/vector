@@ -18,7 +18,7 @@ releases: "0.45.0": {
 		  can also act as a sink! This enables new interesting use cases, for instance this table
 		  can be used as a cache or as an interface with an external key value store.
 		- A new `websocket_server` sink that acts as a websocket server and broadcasts events to all connected clients.
-		- The `tag_cardinality_limit` transform now supports customizing limits for metrics, based on metric name and optionally namespace.
+		- The `tag_cardinality_limit` transform now supports customizing limits for metrics, based on metric name and namespace.
 		"""
 
 	changelog: [
