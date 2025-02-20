@@ -179,7 +179,16 @@ impl PostgresSink {
                 Event::Log(log_event) => {
                     let (v, mut metadata) = log_event.into_parts();
 
-                    let v = v.into_object().unwrap();
+                    let v = match v.into_object() {
+                        Some(object) => object,
+                        None => {
+                            error!("Log value was not an object");
+                            metadata
+                                .take_finalizers()
+                                .update_status(EventStatus::Rejected);
+                            return Err(());
+                        }
+                    };
 
                     let p = self
                         .columns
