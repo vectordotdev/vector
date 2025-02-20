@@ -38,7 +38,7 @@ releases: "0.45.0": {
 				- Added new `to_syslog_facility_code` function to convert syslog facility keyword to syslog facility code. (https://github.com/vectordotdev/vrl/pull/1221)
 				- Downgrade "can't abort infallible function" error to a warning. (https://github.com/vectordotdev/vrl/pull/1247)
 				- `ip_cidr_contains` method now also accepts an array of CIDRs. (https://github.com/vectordotdev/vrl/pull/1248)
-				- Faster bytes to Unicode string convertions by using SIMD instructions provided by simdutf8 crate. (https://github.com/vectordotdev/vrl/pull/1249)
+				- Faster bytes to Unicode string conversions by using SIMD instructions provided by simdutf8 crate. (https://github.com/vectordotdev/vrl/pull/1249)
 				- Added `shannon_entropy` function to generate [entropy](https://en.wikipedia.org/wiki/Entropy_(information_theory)) from a string. (https://github.com/vectordotdev/vrl/pull/1267)
 
 				#### Fixes
