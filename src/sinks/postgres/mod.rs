@@ -45,7 +45,7 @@ impl_generate_config_from_default!(PostgresConfig);
 #[typetag::serde(name = "postgres")]
 impl SinkConfig for PostgresConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-                let PostgresConfig {
+        let PostgresConfig {
             host,
             port,
             user,
@@ -230,19 +230,26 @@ impl PostgresSink {
                 Event::Log(log_event) => {
                     let (v, mut metadata) = log_event.into_parts();
 
-                    let v = match v.into_object() {
-                        Some(object) => object,
-                        None => {
-                            error!("Log value was not an object");
+                    match v {
+                        Value::Object(btree_map) => {
+                            self.store_trace((btree_map, metadata)).await?;
+                        }
+                        v if self.columns.len() == 1 => {
+                            self.client
+                                .execute(&self.statement, &[&Wrapper(&v)])
+                                .await
+                                .map_err(|_| ())?;
+                        }
+                        _ => {
+                            error!("Either the Value must be an object or the tables must have exactly one column");
                             metadata
                                 .take_finalizers()
                                 .update_status(EventStatus::Rejected);
                             return Err(());
                         }
-                    };
-                    self.store_log((v, metadata)).await?
+                    }
                 }
-                Event::Trace(trace) => self.store_log(trace.into_parts()).await?,
+                Event::Trace(trace) => self.store_trace(trace.into_parts()).await?,
                 _ => {
                     error!("Only logs are implemented so far");
                     event.take_finalizers().update_status(EventStatus::Rejected);
@@ -252,7 +259,7 @@ impl PostgresSink {
         Ok(())
     }
 
-    async fn store_log(
+    async fn store_trace(
         &self,
         event: (BTreeMap<KeyString, Value>, EventMetadata),
     ) -> Result<(), ()> {
