@@ -139,7 +139,7 @@ releases: "0.45.0": {
 		{
 			type: "fix"
 			description: """
-				Allow users to specify `session_name` when using aws auth.
+				Allow users to specify `session_name` when using AWS authentication in a component.
 				"""
 			contributors: ["akutta"]
 		},
