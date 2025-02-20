@@ -156,6 +156,7 @@ prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
 prost-types = { version = "0.12", default-features = false }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
+semver = { version = "1.0.25", default-features = false, features = ["serde", "std"] }
 serde_json = { version = "1.0.138", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.217", default-features = false, features = ["alloc", "derive", "rc"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
@@ -179,6 +180,7 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 snafu.workspace = true
 cfg-if.workspace = true
+semver.workspace = true
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
@@ -363,7 +365,6 @@ regex = { version = "1.11.1", default-features = false, features = ["std", "perf
 roaring = { version = "0.10.10", default-features = false, features = ["std"], optional = true }
 rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
-semver = { version = "1.0.25", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
 socket2 = { version = "0.5.8", default-features = false }
@@ -596,7 +597,7 @@ sources-amqp = ["lapin"]
 sources-apache_metrics = ["sources-utils-http-client"]
 sources-aws_ecs_metrics = ["sources-utils-http-client"]
 sources-aws_kinesis_firehose = ["dep:base64"]
-sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:semver", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
+sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-http-error", "protobuf-build", "dep:prost"]
 sources-demo_logs = ["dep:fakedata"]
