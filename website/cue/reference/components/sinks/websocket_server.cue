@@ -83,4 +83,6 @@ components: sinks: websocket_server: {
 		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total
 		connection_shutdown_total:    components.sources.internal_metrics.output.metrics.connection_shutdown_total
 	}
+
+	configuration: base.components.sinks.websocket_server.configuration
 }
