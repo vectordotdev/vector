@@ -117,8 +117,7 @@ impl WebSocketListenerSink {
         open_gauge: OpenGauge,
     ) -> Result<(), ()> {
         // Base url for parsing request URLs that may be relative
-        // It should never panic, since valid URL is hard-coded
-        let base_url = Url::parse("ws://localhost").unwrap();
+        let base_url = Url::parse("ws://localhost").ok();
         let addr = stream.peer_addr();
         debug!("Incoming TCP connection from: {}", addr);
 
@@ -131,7 +130,7 @@ impl WebSocketListenerSink {
                 // buffered so far, because the provided message ID might have expired by now
                 should_replay = true;
                 if let Ok(url) = Url::options()
-                    .base_url(Some(&base_url))
+                    .base_url(base_url.as_ref())
                     .parse(req.uri().to_string().as_str())
                 {
                     if let Some((_, last_received_param_value)) =
