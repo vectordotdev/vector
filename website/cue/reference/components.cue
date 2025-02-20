@@ -1290,7 +1290,7 @@ components: {
 					\(kind)s:
 					  \(Name)_\(kind):
 						type: "\(Name)"
-						...
+						# ...
 						auth:
 						  strategy: "custom"
 						  source: |-
@@ -1311,7 +1311,7 @@ components: {
 							  # No errors, so we can return true
 							  true
 							}
-						...
+						# ...
 					```
 					"""
 				}
