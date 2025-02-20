@@ -65,6 +65,7 @@ pub(super) struct StackdriverConfig {
     #[configurable(metadata(
         docs::additional_props_description = "A key, value pair that describes a log entry."
     ))]
+    #[configurable(metadata(docs::examples = "labels_examples()"))]
     #[serde(default)]
     pub(super) labels: HashMap<String, Template>,
 
@@ -109,6 +110,13 @@ pub(super) struct StackdriverConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+}
+
+fn labels_examples() -> HashMap<String, String> {
+    let mut example = HashMap::new();
+    example.insert("user_label_1".to_string(), "value_1".to_string());
+    example.insert("user_label_2".to_string(), "{{ template_value_2 }}".to_string());
+    example
 }
 
 pub(super) fn default_endpoint() -> String {

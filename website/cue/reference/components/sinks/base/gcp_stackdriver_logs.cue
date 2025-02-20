@@ -144,10 +144,16 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 	labels: {
 		description: "A map of key, value pairs that provides additional information about the log entry."
 		required:    false
-		type: object: options: "*": {
-			description: "A key, value pair that describes a log entry."
-			required:    true
-			type: string: syntax: "template"
+		type: object: {
+			examples: [{
+				user_label_1: "value_1"
+				user_label_2: "{{ template_value_2 }}"
+			}]
+			options: "*": {
+				description: "A key, value pair that describes a log entry."
+				required:    true
+				type: string: syntax: "template"
+			}
 		}
 	}
 	log_id: {
