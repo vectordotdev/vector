@@ -235,10 +235,15 @@ impl PostgresSink {
                             self.store_trace((btree_map, metadata)).await?;
                         }
                         v if self.columns.len() == 1 => {
-                            self.client
+                            match self
+                                .client
                                 .execute(&self.statement, &[&Wrapper(&v)])
                                 .await
-                                .map_err(|_| ())?;
+                                .map_err(|_| ())
+                            {
+                                Ok(_) => metadata.update_status(EventStatus::Delivered),
+                                Err(_) => metadata.update_status(EventStatus::Rejected),
+                            }
                         }
                         _ => {
                             error!("Either the Value must be an object or the tables must have exactly one column");
