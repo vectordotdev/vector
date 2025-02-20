@@ -88,33 +88,33 @@ components: sinks: websocket_server: {
 		simple_configuration: {
 			title: "Example configuration"
 			body: """
-			The `websocket_server` sink component can be useful when data needs to be broadcasted to
-			a number of clients. Here is an example of a very simple websocket server sink
-			configuration:
+				The `websocket_server` sink component can be useful when data needs to be broadcasted to
+				a number of clients. Here is an example of a very simple websocket server sink
+				configuration:
 
-			```yaml
-			sources:
-				demo_logs_test:
-					type: "demo_logs"
-					format: "json"
+				```yaml
+				sources:
+					demo_logs_test:
+						type: "demo_logs"
+						format: "json"
 
-			sinks:
-				websocket_sink:
-					inputs: ["demo_logs_test"]
-					type: "websocket_listener"
-					address: "0.0.0.0:1234"
-					auth:
-						username: "test"
-						password: "test"
-					encoding:
-						codec: "json"
-			```
+				sinks:
+					websocket_sink:
+						inputs: ["demo_logs_test"]
+						type: "websocket_listener"
+						address: "0.0.0.0:1234"
+						auth:
+							username: "test"
+							password: "test"
+						encoding:
+							codec: "json"
+				```
 
-			With this configuration, a websocket server will listen for connections on 1234 port.
-			For clients to connect, they need to provide credentials in the Authorization header,
-			because `auth` configuration is defined (by default, no auth is required). In this case,
-			it requires Basic auth with defined username and password.
-			"""
+				With this configuration, a websocket server will listen for connections on 1234 port.
+				For clients to connect, they need to provide credentials in the Authorization header,
+				because `auth` configuration is defined (by default, no auth is required). In this case,
+				it requires Basic auth with defined username and password.
+				"""
 		}
 	}
 }
