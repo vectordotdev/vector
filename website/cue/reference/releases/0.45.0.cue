@@ -6,6 +6,21 @@ releases: "0.45.0": {
 
 	whats_next: []
 
+	description: """
+		The Vector team is pleased to announce version 0.44.0!
+
+		Be sure to check out the [upgrade guide](/highlights/2025-01-13-0-44-0-upgrade-guide) for
+		breaking changes in this release.
+
+		This release contains a few notable new features along with the numerous enhancements and fixes as listed below:
+
+		- A new type of `enrichment_table` - `memory` was introduced! This table can also act
+		  can also act as a sink! This enables new interesting use cases, for instance this table
+		  can be used as a cache or as an interface with an external key value store.
+		- A new `websocket_server` sink that acts as a websocket server and broadcasts events to all connected clients.
+		- The `tag_cardinality_limit` transform now supports customizing limits for metrics, based on metric name and optionally namespace.
+		"""
+
 	changelog: [
 		{
 			type: "feat"
@@ -57,7 +72,7 @@ releases: "0.45.0": {
 		{
 			type: "feat"
 			description: """
-				A new sink for keep was added
+				A new sink for [Keep](\(urls.keep)) was added.
 				"""
 			contributors: ["sainad2222"]
 		},
