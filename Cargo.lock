@@ -11078,6 +11078,7 @@ dependencies = [
  "pin-project",
  "portpicker",
  "postgres-openssl",
+ "postgres-protocol",
  "proptest",
  "proptest-derive",
  "prost 0.12.6",

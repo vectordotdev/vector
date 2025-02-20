@@ -1,5 +1,5 @@
 use crate::sinks::prelude::*;
-use bytes::Buf;
+use bytes::{Buf, BufMut};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use tokio_postgres::{
@@ -146,8 +146,46 @@ impl<'a> ToSql for Wrapper<'a> {
             Value::Float(not_nan) => not_nan.to_sql(ty, out),
             Value::Boolean(b) => b.to_sql(ty, out),
             Value::Timestamp(date_time) => date_time.to_sql(ty, out),
-            Value::Object(btree_map) => serde_json::to_value(btree_map).unwrap().to_sql(ty, out),
-            Value::Array(values) => values.iter().map(Wrapper).collect_vec().to_sql(ty, out),
+            Value::Object(btree_map) => {
+                serde_json::to_writer(out.writer(), btree_map)?;
+                Ok(IsNull::No)
+            }
+            Value::Array(values) => {
+                // Taken from postgres-types/lib.rs `impl<T: ToSql> ToSql for &[T]`
+                //
+                // There is no function that serializes an iterator, only a method on slices,
+                // but we should not have to allocate a new `Vec<Wrapper<&Value>>` just to
+                // serialize the `Vec<Value>` we already have
+
+                let member_type = match *ty.kind() {
+                    tokio_postgres::types::Kind::Array(ref member) => member,
+                    _ => panic!("expected array type"),
+                };
+
+                // Arrays are normally one indexed by default but oidvector and int2vector *require* zero indexing
+                let lower_bound = match *ty {
+                    tokio_postgres::types::Type::OID_VECTOR
+                    | tokio_postgres::types::Type::INT2_VECTOR => 0,
+                    _ => 1,
+                };
+
+                let dimension = postgres_protocol::types::ArrayDimension {
+                    len: values.len().try_into()?,
+                    lower_bound,
+                };
+
+                postgres_protocol::types::array_to_sql(
+                    Some(dimension),
+                    member_type.oid(),
+                    values.iter().map(Wrapper),
+                    |e, w| match e.to_sql(member_type, w)? {
+                        IsNull::No => Ok(postgres_protocol::IsNull::No),
+                        IsNull::Yes => Ok(postgres_protocol::IsNull::Yes),
+                    },
+                    out,
+                )?;
+                Ok(IsNull::No)
+            }
             Value::Null => Ok(IsNull::Yes),
         }
     }
@@ -164,6 +202,10 @@ impl<'a> ToSql for Wrapper<'a> {
             || DateTime::<Utc>::accepts(ty)
             || serde_json::Value::accepts(ty)
             || Option::<u32>::accepts(ty)
+            || match *ty.kind() {
+                tokio_postgres::types::Kind::Array(ref member) => Self::accepts(member),
+                _ => false,
+            }
     }
 
     to_sql_checked!();
@@ -173,7 +215,7 @@ impl PostgresSink {
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let Self { statement, .. } = self.as_ref();
 
-                while let Some(event) = input.next().await {
+        while let Some(event) = input.next().await {
             match event {
                 Event::Log(log_event) => {
                     let (v, mut metadata) = log_event.into_parts();

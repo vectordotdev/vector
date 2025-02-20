@@ -391,6 +391,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 mlua = { version = "0.10.3", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
 sysinfo = "0.32.1"
 byteorder = "1.5.0"
+postgres-protocol = { version = "0.6.8", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7.0"
@@ -806,7 +807,7 @@ sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-opentelemetry = ["sinks-http"]
 sinks-papertrail = ["dep:syslog"]
-sinks-postgres = ["dep:tokio-postgres"]
+sinks-postgres = ["dep:tokio-postgres", "dep:postgres-protocol"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "dep:lru"]
 sinks-redis = ["dep:redis"]
@@ -995,6 +996,7 @@ codecs-benches = []
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
 proptest = ["dep:proptest", "dep:proptest-derive", "vrl/proptest"]
+postgres-protocol = ["dep:postgres-protocol"]
 
 [[bench]]
 name = "default"
