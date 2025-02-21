@@ -1,6 +1,6 @@
 `vector top` now supports to filter out components by their component id via glob patterns with a new `--components` option.
 This is very similar to `vector tap` `--outputs-of` and `--inputs-of` options. This can be useful
-in cases where we have a lot of components that does not fit in the terminal (as scrolling is not supported yet in `vector top`).
+in cases where you have a lot of components and they don't fit in the terminal (as scrolling is not supported yet in `vector top`).
 By default, all components are shown with a glob pattern of `*`.
 
 The glob pattern semantics can be found in the [`glob` crate documentation](https://docs.rs/glob/latest/glob/).
