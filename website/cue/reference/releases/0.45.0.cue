@@ -12,13 +12,13 @@ package metadata
 		Be sure to check out the [upgrade guide](/highlights/2025-02-24-0-45-0-upgrade-guide) for
 		breaking changes in this release.
 
-		This release contains a few notable new features along with the numerous enhancements and fixes as listed below:
+		This release contains a few notable new features, along with numerous enhancements and fixes as listed below:
 
-		- A new type of `enrichment_table`, `memory`, was introduced! This table can also act
-		  can also act as a sink! This enables new interesting use cases, for instance this table
+		- A new type of `enrichment_table`, called `memory`, was introduced! This table can also act
+		  can also act as a sink, which enables several new use cases. For instance, this table
 		  can be used as a cache or as an interface with an external key value store.
-		- A new `websocket_server` sink that acts as a websocket server and broadcasts events to all connected clients rather than only the first connected client.
-		- The `tag_cardinality_limit` transform now supports customizing limits for metrics, based on metric name and namespace.
+		- A new `websocket_server` sink that acts as a websocket server and broadcasts events to all connected clients, rather than just the first connected client.
+		- The `tag_cardinality_limit` transform now supports customizing limits for metrics that are based on the metric name and namespace.
 		"""
 
 	changelog: [
@@ -36,7 +36,7 @@ package metadata
 				#### New Features
 
 				- Added new `to_syslog_facility_code` function to convert syslog facility keyword to syslog facility code. (https://github.com/vectordotdev/vrl/pull/1221)
-				- Downgrade "can't abort infallible function" error to a warning. (https://github.com/vectordotdev/vrl/pull/1247)
+				- Downgraded the "can't abort infallible function" error to a warning. (https://github.com/vectordotdev/vrl/pull/1247)
 				- `ip_cidr_contains` method now also accepts an array of CIDRs. (https://github.com/vectordotdev/vrl/pull/1248)
 				- Faster bytes to Unicode string conversions by using SIMD instructions provided by simdutf8 crate. (https://github.com/vectordotdev/vrl/pull/1249)
 				- Added `shannon_entropy` function to generate [entropy](https://en.wikipedia.org/wiki/Entropy_(information_theory)) from a string. (https://github.com/vectordotdev/vrl/pull/1267)
@@ -44,7 +44,7 @@ package metadata
 				#### Fixes
 
 				- Fix decimals parsing in parse_duration function (https://github.com/vectordotdev/vrl/pull/1223)
-				- Fix `parse_nginx_log` function when a format is set to error and an error message contains comma. (https://github.com/vectordotdev/vrl/pull/1280)
+				- Fix `parse_nginx_log` function when a format is set to error and an error message contains a comma. (https://github.com/vectordotdev/vrl/pull/1280)
 				"""
 		},
 		{
@@ -57,7 +57,7 @@ package metadata
 		{
 			type: "feat"
 			description: """
-				Query parameters can now contain either `single value` or array of `multiple values`.
+				Query parameters can now contain either `single value` or an array of `multiple values`.
 				For example:
 
 				```yaml
@@ -72,8 +72,8 @@ package metadata
 		{
 			type: "feat"
 			description: """
-				Add a new type of `enrichment_table` - `memory`, which can also act as a sink, taking in all the
-				data and storing it per key, enabling it to be read from as all other enrichment tables.
+				Add a new type of `enrichment_table` - `memory`, which can also act as a sink, ingesting all the
+				data and storing it per key, enabling it to be read from all other enrichment tables.
 				"""
 			contributors: ["esensar"]
 		},
@@ -112,7 +112,7 @@ package metadata
 		{
 			type: "feat"
 			description: """
-				The `tag_cardinality_limit` transform now supports customizing limits for specific metrics, matched by metric name and optionally its namespace.
+				The `tag_cardinality_limit` transform now supports customizing limits for specific metrics, matched by metric name and optionally, its namespace.
 				"""
 			contributors: ["esensar"]
 		},
@@ -126,7 +126,7 @@ package metadata
 		{
 			type: "feat"
 			description: """
-				Sources running HTTP servers (`http_server` source, `prometheus` source, `datadog_agent`, etc.) now support a new `custom` authorization strategy.
+				Sources running HTTP servers (`http_server` source, `prometheus` source, `datadog_agent`, and so on) now support a new `custom` authorization strategy.
 				If a strategy is not explicitly defined, it defaults to `basic`, which is the current behavior.
 
 				You can read more in this [how it works](/docs/reference/configuration/sources/http_server/#authorization-configuration) section.
@@ -186,8 +186,8 @@ package metadata
 			type: "feat"
 			description: """
 				Add a new virtual memory metric `process_memory_virtual_usage` to the process host metrics collector.
-				This method returns the size of virtual memory, that is,
-				the amount of memory that the process can access, whether it is currently mapped in physical RAM or not.
+				This method returns the size of virtual memory 
+				(the amount of memory that the process can access), whether it is currently mapped in a physical RAM or not.
 				"""
 			contributors: ["nionata"]
 		},
@@ -196,8 +196,8 @@ package metadata
 			description: """
 				When using the Datadog Search syntax as a condition on components that support it, the following now support matching on multiple fields (using OR):
 
-				- `tags` will lookup the fields `tags` and `ddtags`
-				- `source` will lookup the fields `source` and `ddsource`
+				- `tags` will look up the fields `tags` and `ddtags`
+				- `source` will look up the fields `source` and `ddsource`
 				"""
 			contributors: ["20agbekodo"]
 		},
