@@ -78,7 +78,7 @@ package metadata
 			contributors: ["esensar"]
 		},
 		{
-			type: "feat"
+			type:        "feat"
 			description: """
 				A new sink for [Keep](\(urls.keep)) was added.
 				"""
