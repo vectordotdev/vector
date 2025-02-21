@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use rand::{
-    distributions::{Distribution, Uniform},
+    distr::{Distribution, Uniform},
     seq::SliceRandom,
 };
 use vector::{event::metric::Sample, sinks::util::statistic::DistributionStatistic};
