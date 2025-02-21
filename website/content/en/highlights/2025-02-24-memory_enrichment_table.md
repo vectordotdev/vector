@@ -115,7 +115,7 @@ if you have another source that can populate the cache:
     flush_interval: 5
 ```
 
-We plan to make this component even more flexible in the future, for example it can also act as a
+We plan to make this component even more flexible in the future. For example, it can also act as a
 source. This exercise raises some interesting questions on component flexibility. The end goal is
 treating components as nodes in a graph. This would open up even more interesting possibilities,
 such as chaining sinks.
