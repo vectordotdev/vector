@@ -1,6 +1,6 @@
 package metadata
 
-releases: "0.45.0": {
+Ï: "0.45.0": {
 	date:     "2025-02-20"
 	codename: ""
 
@@ -58,6 +58,14 @@ releases: "0.45.0": {
 			type: "feat"
 			description: """
 				Query parameters can now contain either `single value` or array of `multiple values`.
+				For example:
+
+				```yaml
+				singe_key: single_value
+				"match[]":
+					- '{job="somejob"}'
+					- '{__name__=~"job:.*"}'
+				```
 				"""
 			contributors: ["sainad2222"]
 		},
@@ -118,7 +126,10 @@ releases: "0.45.0": {
 		{
 			type: "feat"
 			description: """
-				Sources running HTTP servers (`http_server` source, `prometheus` source, `datadog_agent`, etc.) now support a new `custom` authorization strategy . If a strategy is not explicitly defined, it defaults to `basic`, which is the current behavior.
+				Sources running HTTP servers (`http_server` source, `prometheus` source, `datadog_agent`, etc.) now support a new `custom` authorization strategy.
+				If a strategy is not explicitly defined, it defaults to `basic`, which is the current behavior.
+
+				You can read more in this [how it works](/docs/reference/configuration/sources/http_server/#authorization-configuration) section.
 				"""
 			contributors: ["esensar"]
 		},
@@ -174,7 +185,9 @@ releases: "0.45.0": {
 		{
 			type: "feat"
 			description: """
-				Add virtual memory metric to the process host metrics collector.
+				Add a new virtual memory metric `process_memory_virtual_usage` to the process host metrics collector.
+				This method returns the size of virtual memory, that is,
+				the amount of memory that the process can access, whether it is currently mapped in physical RAM or not.
 				"""
 			contributors: ["nionata"]
 		},
