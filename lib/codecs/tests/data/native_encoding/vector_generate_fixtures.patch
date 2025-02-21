@@ -3,11 +3,12 @@ index 0f51fc830..aadf99841 100644
 --- a/lib/vector-core/Cargo.toml
 +++ b/lib/vector-core/Cargo.toml
 @@ -95,7 +95,7 @@ rand = "0.8.5"
+ rand_distr = "0.4.3"
  tracing-subscriber = { version = "0.3.17", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
  vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 -vrl = { version = "0.9.0", features = ["cli", "test", "test_framework", "arbitrary"] }
 +vrl = { path = "../../../vrl", features = ["cli", "test", "test_framework", "arbitrary"] }
-
+ 
  [features]
  api = ["dep:async-graphql"]
 diff --git a/lib/vector-core/src/event/test/common.rs b/lib/vector-core/src/event/test/common.rs
@@ -17,7 +18,7 @@ index c7ccca952..f851288ce 100644
 @@ -26,6 +26,15 @@ const ALPHABET: [&str; 27] = [
      "t", "u", "v", "w", "x", "y", "z", "_",
  ];
-
+ 
 +fn make_simple_f64(g: &mut Gen) -> f64 {
 +    let mut value = f64::arbitrary(g) % MAX_F64_SIZE;
 +    while value.is_nan() || value == -0.0 {
@@ -77,12 +78,12 @@ index c7ccca952..f851288ce 100644
                          return f;
                      }
 @@ -219,6 +229,8 @@ impl Arbitrary for MetricValue {
-
+ 
                  let mut sketch = AgentDDSketch::with_agent_defaults();
                  sketch.insert_many(&samples);
 +                sketch.sum = make_simple_f64(g);
 +                sketch.avg = make_simple_f64(g);
-
+ 
                  MetricValue::Sketch {
                      sketch: MetricSketch::AgentDDSketch(sketch),
 @@ -368,7 +380,7 @@ impl Arbitrary for MetricValue {
@@ -104,7 +105,7 @@ index c7ccca952..f851288ce 100644
 +            value: make_simple_f64(g),
          }
      }
-
+ 
 @@ -428,7 +440,7 @@ impl Arbitrary for Quantile {
  impl Arbitrary for Bucket {
      fn arbitrary(g: &mut Gen) -> Self {
@@ -149,14 +150,14 @@ index 3d0f80bb5..fcc6bcc97 100644
 +++ b/lib/vector-core/src/metrics/ddsketch.rs
 @@ -229,10 +229,10 @@ pub struct AgentDDSketch {
      max: f64,
-
+ 
      /// The sum of all observations within the sketch.
 -    sum: f64,
 +    pub sum: f64,
-
+ 
      /// The average value of all observations within the sketch.
 -    avg: f64,
 +    pub avg: f64,
  }
-
+ 
  impl AgentDDSketch {
