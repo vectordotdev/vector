@@ -155,7 +155,7 @@ prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
 prost-types = { version = "0.12", default-features = false }
-rand = { version = "0.9.0", default-features = false, features = ["small_rng"] }
+rand = { version = "0.9.0", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
 semver = { version = "1.0.25", default-features = false, features = ["serde", "std"] }
 serde_json = { version = "1.0.138", default-features = false, features = ["raw_value", "std"] }
