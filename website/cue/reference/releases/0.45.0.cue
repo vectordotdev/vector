@@ -146,7 +146,21 @@ releases: "0.45.0": {
 		{
 			type: "enhancement"
 			description: """
-				Add support for more chronicle regional endpoints as listed - https://cloud.google.com/chronicle/docs/reference/ingestion-api#regional_endpoints
+				Add support for more Google Chronicle regional endpoints:
+				- SãoPaulo
+				- Canada
+				- Dammam
+				- Doha
+				- Frankfurt
+				- London
+				- Mumbai
+				- Paris
+				- Singapore
+				- Sydney
+				- TelAviv
+				- Tokyo
+				- Turin
+				- Zurich
 				"""
 			contributors: ["chocpanda"]
 		},
