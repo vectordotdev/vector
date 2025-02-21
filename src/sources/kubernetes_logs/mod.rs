@@ -1189,12 +1189,21 @@ fn prepare_label_selector(selector: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt;
     use similar_asserts::assert_eq;
-    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
-    use vector_lib::{config::LogNamespace, schema::Definition};
+    use tempfile::tempdir_in;
+    use std::{fs::{self, File}, future::Future, io::Write};
+    use tokio::time::{timeout, sleep, Duration};
+    use vector_lib::{config::{GlobalOptions, LogNamespace, SourceAcknowledgementsConfig}, id::ComponentKey, lookup::{owned_value_path, OwnedTargetPath}, schema::Definition};
     use vrl::value::{kind::Collection, Kind};
 
-    use crate::config::SourceConfig;
+    use crate::{
+        config::{SourceConfig, SourceContext},
+        event::{Event, EventStatus},
+        shutdown::ShutdownSignal,
+        SourceSender,
+        test_util::components::{assert_source_compliance, FILE_SOURCE_TAGS},
+    };
 
     use super::Config;
 
@@ -1552,5 +1561,132 @@ mod tests {
                 )
             )
         )
+    }
+
+    #[tokio::test]
+    async fn file_start_position_server_restart_with_file_rotation_no_acknowledge() {
+        file_start_position_server_restart_with_file_rotation(NoAcks).await
+    }
+
+    #[tokio::test]
+    async fn file_start_position_server_restart_with_file_rotation_acknowledged() {
+        file_start_position_server_restart_with_file_rotation(Acks).await
+    }
+
+    async fn file_start_position_server_restart_with_file_rotation(acking: AckingMode) {
+        let dir = tempdir_in("/var/log/pods/").unwrap();
+        let mut config = Config {
+            self_node_name: "qwe".to_owned(),
+            ..Default::default()
+        };
+
+        let path = dir.path().join("file");
+        let path_for_old_file = dir.path().join("file.old");
+        // Run server first time, collect some lines.
+        {
+            let received = run_kubernetes_source(&mut config, true, acking, async {
+                let mut file = File::create(&path).unwrap();
+                sleep_500_millis().await;
+                writeln!(&mut file, "first line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
+
+            let lines = extract_messages_string(received);
+            assert_eq!(lines, vec!["first line"]);
+        }
+        // Perform 'file rotation' to archive old lines.
+        fs::rename(&path, &path_for_old_file).expect("could not rename");
+        // Restart the server and make sure it does not re-read the old file
+        // even though it has a new name.
+        {
+            let received = run_kubernetes_source(&mut config, false, acking, async {
+                let mut file = File::create(&path).unwrap();
+                sleep_500_millis().await;
+                writeln!(&mut file, "second line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
+
+            let lines = extract_messages_string(received);
+            assert_eq!(lines, vec!["second line"]);
+        }
+    }
+
+    async fn sleep_500_millis() {
+        sleep(Duration::from_millis(500)).await;
+    }
+
+    fn extract_messages_string(received: Vec<Event>) -> Vec<String> {
+        received
+            .into_iter()
+            .map(Event::into_log)
+            .map(|log| log.get_message().unwrap().to_string_lossy().into_owned())
+            .collect()
+    }
+
+    #[derive(Clone, Copy, Eq, PartialEq)]
+    enum AckingMode {
+        NoAcks,      // No acknowledgement handling and no finalization
+        Unfinalized, // Acknowledgement handling but no finalization
+        Acks,        // Full acknowledgements and proper finalization
+    }
+    use AckingMode::*;
+
+    async fn run_kubernetes_source(
+        config: &mut Config,
+        wait_shutdown: bool,
+        acking_mode: AckingMode,
+        inner: impl Future<Output = ()>,
+    ) -> Vec<Event> {
+        let acks = !matches!(acking_mode, NoAcks);
+        assert_source_compliance(&FILE_SOURCE_TAGS, async move {
+            let (tx, rx) = if acking_mode == Acks {
+                let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+                (tx, rx.boxed())
+            } else {
+                let (tx, rx) = SourceSender::new_test();
+                (tx, rx.boxed())
+            };
+
+            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+
+            config.acknowledgements = SourceAcknowledgementsConfig::from(acks);
+            let source = config.build(SourceContext {
+                key: ComponentKey::from("default"),
+                globals: GlobalOptions::default(),
+                shutdown: shutdown,
+                out: tx,
+                proxy: Default::default(),
+                acknowledgements: acks,
+                schema_definitions: Default::default(),
+                schema: Default::default(),
+                extra_context: Default::default(),
+            }).await.unwrap();
+
+            tokio::spawn(source);
+
+            inner.await;
+
+            drop(trigger_shutdown);
+
+            let result = if acking_mode == Unfinalized {
+                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
+                    .collect::<Vec<_>>()
+                    .await
+            } else {
+                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+                    .await
+                    .expect(
+                        "Unclosed channel: may indicate file-server could not shutdown gracefully.",
+                    )
+            };
+            if wait_shutdown {
+                shutdown_done.await;
+            }
+
+            result
+        })
+        .await
     }
 }
