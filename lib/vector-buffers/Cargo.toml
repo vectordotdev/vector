@@ -42,7 +42,7 @@ metrics-tracing-context.workspace = true
 metrics-util = { workspace = true, features = ["debugging"] }
 proptest = "1.6"
 quickcheck = "1.0"
-rand = "0.9.0"
+rand.workspace = true
 serde_yaml = { version = "0.9", default-features = false }
 temp-dir = "0.1.14"
 tokio-test = "0.4.4"
