@@ -116,6 +116,6 @@ if you have another source that can populate the cache:
 ```
 
 We plan to make this component even more flexible in the future. For example, it can also act as a
-source. This exercise raises some interesting questions on component flexibility. The end goal is
-treating components as nodes in a graph. This would open up even more interesting possibilities,
-such as chaining sinks.
+source. This exercise raises some important questions on component flexibility. The end goal is
+treating components as nodes in a graph, unlocking even greater possibilities, such as chaining
+sinks.
