@@ -1,14 +1,18 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 use crate::sinks::prelude::*;
 use bytes::{Buf, BufMut};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
+use serde::Serialize;
 use tokio_postgres::{
-    types::{to_sql_checked, IsNull, ToSql},
+    types::{accepts, to_sql_checked, BorrowToSql, IsNull, ToSql},
     NoTls,
 };
-use vector_lib::event::EventMetadata;
+use vector_lib::event::{
+    metric::{MetricData, MetricSeries, MetricTime},
+    EventMetadata, Metric, MetricValue,
+};
 use vrl::value::KeyString;
 
 #[configurable_component(sink("postgres"))]
@@ -223,9 +227,32 @@ impl ToSql for Wrapper<'_> {
     to_sql_checked!();
 }
 
+/// Allows for zero-copy SQL conversion for any struct that is
+/// Serializable into a JSON object
+#[derive(Debug)]
+struct JsonObjWrapper<Inner>(Inner);
+
+impl<Inner: Serialize + Debug> ToSql for JsonObjWrapper<Inner> {
+    fn to_sql(
+        &self,
+        _: &tokio_postgres::types::Type,
+        out: &mut bytes::BytesMut,
+    ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>>
+    where
+        Self: Sized,
+    {
+        serde_json::to_writer(out.writer(), &self.0)?;
+        Ok(IsNull::No)
+    }
+
+    accepts!(JSON, JSONB);
+
+    to_sql_checked!();
+}
+
 impl PostgresSink {
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        while let Some(mut event) = input.next().await {
+        while let Some(event) = input.next().await {
             match event {
                 Event::Log(log_event) => {
                     let (v, mut metadata) = log_event.into_parts();
@@ -255,10 +282,7 @@ impl PostgresSink {
                     }
                 }
                 Event::Trace(trace) => self.store_trace(trace.into_parts()).await?,
-                _ => {
-                    error!("Only logs are implemented so far");
-                    event.take_finalizers().update_status(EventStatus::Rejected);
-                }
+                Event::Metric(metric) => self.store_metric(metric).await?,
             }
         }
         Ok(())
@@ -275,6 +299,60 @@ impl PostgresSink {
             .iter()
             .map(|k| v.get(k.as_str()).unwrap_or(&Value::Null))
             .map(Wrapper);
+
+        let status = match self.client.execute_raw(&self.statement, p).await {
+            Ok(_) => EventStatus::Delivered,
+            Err(err) => {
+                error!("{err}");
+                EventStatus::Rejected
+            }
+        };
+        metadata.take_finalizers().update_status(status);
+        Ok(())
+    }
+
+    async fn store_metric(&self, metric: Metric) -> Result<(), ()> {
+        let (series, data, mut metadata) = metric.into_parts();
+        let MetricSeries { ref name, tags } = series;
+        let tags = tags.map(JsonObjWrapper);
+        let MetricData {
+            time: MetricTime {
+                timestamp,
+                interval_ms,
+            },
+            kind,
+            value,
+        } = data;
+        let interval_ms = interval_ms.map(|i| i.get());
+        let value_wrapped = JsonObjWrapper(value);
+
+        // Same semantics as serializing the metric into a JSON object
+        // and then indexing into the resulting map, but without allocation
+        let p = self
+            .columns
+            .iter()
+            .map(|c| match (c.as_str(), &value_wrapped.0) {
+                ("name", _) => name.name.borrow_to_sql(),
+                ("tags", _) => tags.borrow_to_sql(),
+                ("timestamp", _) => timestamp.borrow_to_sql(),
+                ("interval_ms", _) => interval_ms.borrow_to_sql(),
+                ("kind", _) => match kind {
+                    vector_lib::event::MetricKind::Incremental => "Incremental".borrow_to_sql(),
+                    vector_lib::event::MetricKind::Absolute => "Absolute".borrow_to_sql(),
+                },
+                ("aggregated_histogram", MetricValue::AggregatedHistogram { .. }) => {
+                    value_wrapped.borrow_to_sql()
+                }
+                ("aggregated_summary", MetricValue::AggregatedSummary { .. }) => {
+                    value_wrapped.borrow_to_sql()
+                }
+                ("counter", MetricValue::Counter { .. }) => value_wrapped.borrow_to_sql(),
+                ("distribution", MetricValue::Distribution { .. }) => value_wrapped.borrow_to_sql(),
+                ("gauge", MetricValue::Gauge { .. }) => value_wrapped.borrow_to_sql(),
+                ("set", MetricValue::Set { .. }) => value_wrapped.borrow_to_sql(),
+                ("sketch", MetricValue::Sketch { .. }) => value_wrapped.borrow_to_sql(),
+                _ => Wrapper(&Value::Null).borrow_to_sql(),
+            });
 
         let status = match self.client.execute_raw(&self.statement, p).await {
             Ok(_) => EventStatus::Delivered,
