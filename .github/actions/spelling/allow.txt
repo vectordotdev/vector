@@ -524,3 +524,4 @@ requestline
 jetbrains
 JetBrains
 gifs
+simdutf
