@@ -1,6 +1,6 @@
 package metadata
 
-Ï: "0.45.0": {
+releases: "0.45.0": {
 	date:     "2025-02-20"
 	codename: ""
 
