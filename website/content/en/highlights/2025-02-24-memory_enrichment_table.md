@@ -42,15 +42,15 @@ transforms:
     inputs: [ "demo_logs_test" ]
     source: |
       . = parse_json!(.message)
-      userid = get!(., path: ["user-identifier"])
+      user_id = get!(., path: ["user-identifier"])
 
       # Check if we already have a cached value for this user in the enrichment table
-      existing, err = get_enrichment_table_record("memory_table", { "key": userid })
+      existing, err = get_enrichment_table_record("memory_table", { "key": user_id })
 
       if err == null {
         # A cached value exists; reuse it.
         # The `existing` object has this structure:
-        # { "key": userid, "value": {...}, "ttl": 50 }
+        # { "key": user_id, "value": {...}, "ttl": 50 }
         . = existing.value
         .source = "cache"
       } else {
