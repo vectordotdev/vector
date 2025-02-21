@@ -12,7 +12,8 @@ badges:
 ---
 
 We are excited to announce the `memory` enrichment table!
-Special thanks to https://github.com/esensar for this contribution.
+
+Special thanks to [@esensar](https://github.com/esensar) for this contribution.
 
 ## Data Model
 
