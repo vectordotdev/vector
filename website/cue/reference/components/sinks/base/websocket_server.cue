@@ -428,17 +428,26 @@ base: components: sinks: websocket_server: configuration: {
 		}
 	}
 	message_buffering: {
-		description: "Message buffering"
+		description: "Configuration for message buffering which enables message replay for clients that connect later."
 		required:    false
 		type: object: options: {
 			max_events: {
-				description: "Max events"
-				required:    false
+				description: """
+					Max events to hold in buffer.
+
+					When the buffer is full, oldest messages are overwritten.
+					"""
+				required: false
 				type: uint: default: 1000
 			}
 			message_id_path: {
-				description: "Message id path"
-				required:    false
+				description: """
+					Message ID path.
+
+					This has to be defined to expose message ID to clients in the messages. Using that ID,
+					clients can request replay starting from the message ID of their choosing.
+					"""
+				required: false
 				type: string: {}
 			}
 		}
