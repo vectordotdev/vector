@@ -135,7 +135,7 @@ components: sinks: websocket_server: {
 				To provide more details about connected clients, this component supports
 				defining additional custom tags to attach to metrics. Additional tags are only applied
 				to `connection_established_total`, `active_clients`, `component_errors_total`,
-				`connection_shutdown_total`, `websocket_messages_sent_total` and
+				`connection_shutdown_total`, `websocket_messages_sent_total`, and
 				`websocket_bytes_sent_total`.
 
 				Example configuration:
@@ -163,7 +163,7 @@ components: sinks: websocket_server: {
 				```
 
 				This configuration adds a fixed tag (`test_extra_tag`) to each metric with the value, 
-				`test_value`. It also puts `Authorization` header found in connection requests
+				`test_value`. It also puts the `Authorization` header found in connection requests
 				into the `user_auth` tag, IP address of the client under the `client_ip` tag, full
 				connection URL under the `full_url` tag and the `last_received` query parameter under
 				the `last_received_query` tag.
