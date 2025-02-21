@@ -186,8 +186,8 @@ releases: "0.45.0": {
 			type: "feat"
 			description: """
 				Add a new virtual memory metric `process_memory_virtual_usage` to the process host metrics collector.
-				This method returns the size of virtual memory 
-				(the amount of memory that the process can access), whether it is currently mapped in a physical RAM or not.
+				This method returns the size of virtual memory (the amount of memory that the
+				process can access), whether it is currently mapped in a physical RAM or not.
 				"""
 			contributors: ["nionata"]
 		},
