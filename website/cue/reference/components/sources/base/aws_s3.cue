@@ -414,7 +414,7 @@ base: components: sources: aws_s3: configuration: {
 		description: """
 			Specifies which addressing style to use.
 
-			This controls if the bucket name is in the hostname or part of the URL.
+			This controls whether the bucket name is in the hostname, or part of the URL.
 			"""
 		required: false
 		type: bool: default: true
