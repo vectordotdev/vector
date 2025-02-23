@@ -57,13 +57,13 @@ impl Default for TemplateSource {
     }
 }
 
-impl ToString for TemplateSource {
-    fn to_string(&self) -> String {
+impl fmt::Display for TemplateSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::SignedNumber(i) => i.to_string(),
-            Self::UnsignedNumber(u) => u.to_string(),
-            Self::FloatingPointNumber(f) => f.to_string(),
-            Self::String(s) => s.clone(),
+            Self::SignedNumber(i) => write!(f, "{}", i),
+            Self::UnsignedNumber(u) => write!(f, "{}", u),
+            Self::FloatingPointNumber(fp) => write!(f, "{}", fp),
+            Self::String(s) => write!(f, "{}", s),
         }
     }
 }
@@ -107,9 +107,9 @@ impl TryFrom<TemplateSource> for Template {
     }
 }
 
-impl Into<TemplateSource> for Template {
-    fn into(self) -> TemplateSource {
-        TemplateSource::String(self.src.clone())
+impl From<Template> for TemplateSource {
+    fn from(template: Template) -> TemplateSource {
+        TemplateSource::String(template.src)
     }
 }
 
