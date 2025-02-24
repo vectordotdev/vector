@@ -21,7 +21,6 @@ jobs:
             const fs = require('fs').promises;
             const path = require('path');
             const crypto = require('crypto');
-            const { context } = require('@actions/github');
 
             async function createAndValidateArtifact() {
               try {

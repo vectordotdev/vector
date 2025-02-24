@@ -39,7 +39,6 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          const { context } = require('@actions/github');
           const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
              owner: context.repo.owner,
              repo: context.repo.repo,
@@ -141,7 +140,6 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          const { context } = require('@actions/github');
           const prNumber = fs.readFileSync('./pr/number', 'utf8');
           const issueNumber = parseInt(prNumber);
           const { APP_ID, APP_NAME, SANITIZED_BRANCH_NAME } = process.env;
