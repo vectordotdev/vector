@@ -20,7 +20,6 @@ jobs:
           script: |
             const fs = require('fs').promises;
             const path = require('path');
-            const core = require('@actions/core');
             const crypto = require('crypto');
             const { context } = require('@actions/github');
 
