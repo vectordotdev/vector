@@ -2260,7 +2260,7 @@ dependencies = [
  "ordered-float 4.6.0",
  "prost 0.12.6",
  "prost-reflect",
- "rand 0.8.5",
+ "rand 0.9.0",
  "regex",
  "rstest",
  "serde",
@@ -3538,7 +3538,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "fakedata_generator",
- "rand 0.8.5",
+ "rand 0.9.0",
 ]
 
 [[package]]
@@ -5297,7 +5297,7 @@ dependencies = [
  "indoc",
  "k8s-openapi 0.16.0",
  "k8s-test-framework",
- "rand 0.8.5",
+ "rand 0.9.0",
  "regex",
  "reqwest 0.11.26",
  "serde_json",
@@ -7245,7 +7245,7 @@ dependencies = [
 name = "portpicker"
 version = "1.0.0"
 dependencies = [
- "rand 0.8.5",
+ "rand 0.9.0",
 ]
 
 [[package]]
@@ -7966,12 +7966,12 @@ dependencies = [
 
 [[package]]
 name = "rand_distr"
-version = "0.4.3"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32cb0b9bc82b0a0876c2dd994a7e7a2683d3e7390ca40e6886785ef0c7e3ee31"
+checksum = "6a8615d50dcf34fa31f7ab52692afec947c4dd0ab803cc87cb3b0b4570ff7463"
 dependencies = [
  "num-traits",
- "rand 0.8.5",
+ "rand 0.9.0",
 ]
 
 [[package]]
@@ -11085,7 +11085,7 @@ dependencies = [
  "prost-types 0.12.6",
  "pulsar",
  "quickcheck",
- "rand 0.8.5",
+ "rand 0.9.0",
  "rand_distr",
  "ratatui",
  "rdkafka",
@@ -11199,7 +11199,7 @@ dependencies = [
  "paste",
  "proptest",
  "quickcheck",
- "rand 0.8.5",
+ "rand 0.9.0",
  "rkyv",
  "serde",
  "serde_yaml 0.9.34+deprecated",
@@ -11337,7 +11337,7 @@ dependencies = [
  "quanta",
  "quickcheck",
  "quickcheck_macros",
- "rand 0.8.5",
+ "rand 0.9.0",
  "rand_distr",
  "regex",
  "ryu",
@@ -11412,7 +11412,7 @@ dependencies = [
  "futures-util",
  "pin-project",
  "proptest",
- "rand 0.8.5",
+ "rand 0.9.0",
  "rand_distr",
  "tokio",
  "tokio-util",
