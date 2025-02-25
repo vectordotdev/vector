@@ -138,8 +138,8 @@ transforms:
       # If the log message contains the phrase "Great Scott!", set the new field
       # "critical" to true, otherwise set it to false. If the "contains" function
       # errors, log the error (instead of aborting the script, as above).
-      if (is_critical, err = contains(.message, "Great Scott!"); err != null) {
-        log(err, level: "error")
+      if (is_critical = contains(.message, "Great Scott!"); is_critical) {
+        log("It contains 'Great Scott!'", level: "info")
       }
 
       .critical = is_critical
