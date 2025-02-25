@@ -4593,7 +4593,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.8",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -7641,7 +7641,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.11.0",
  "proc-macro2 1.0.93",
  "quote 1.0.38",
  "syn 2.0.98",
@@ -10952,7 +10952,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.45.0"
+version = "0.46.0"
 dependencies = [
  "apache-avro",
  "approx",
@@ -11510,7 +11510,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.22.0"
-source = "git+https://github.com/vectordotdev/vrl?branch=main#fd95f9d041053dda99afcd01e666d4c8a9d2d449"
+source = "git+https://github.com/vectordotdev/vrl?branch=main#37f4dc7e88cf6fc81d9b29823cdaaa7cc99dd367"
 dependencies = [
  "aes",
  "aes-siv",
