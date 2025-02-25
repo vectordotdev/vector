@@ -2,7 +2,10 @@
 use crate::{amqp::AmqpConfig, sinks::prelude::*};
 use lapin::{types::ShortString, BasicProperties};
 use std::sync::Arc;
-use vector_lib::codecs::TextSerializerConfig;
+use vector_lib::{
+    codecs::TextSerializerConfig,
+    internal_event::{error_stage, error_type},
+};
 
 use super::sink::AmqpSink;
 
@@ -19,10 +22,13 @@ pub struct AmqpPropertiesConfig {
 
     /// Expiration for AMQP messages (in milliseconds)
     pub(crate) expiration_ms: Option<u64>,
+
+    /// Priority for AMQP messages.
+    pub(crate) priority: Option<Template>,
 }
 
 impl AmqpPropertiesConfig {
-    pub(super) fn build(&self) -> BasicProperties {
+    pub(super) fn build(&self, event: &Event) -> Option<BasicProperties> {
         let mut prop = BasicProperties::default();
         if let Some(content_type) = &self.content_type {
             prop = prop.with_content_type(ShortString::from(content_type.clone()));
@@ -33,7 +39,36 @@ impl AmqpPropertiesConfig {
         if let Some(expiration_ms) = &self.expiration_ms {
             prop = prop.with_expiration(ShortString::from(expiration_ms.to_string()));
         }
-        prop
+        if let Some(priority_template) = &self.priority {
+            let priority_string = priority_template
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("properties.priority"),
+                        drop_event: true,
+                    })
+                })
+                .ok()?;
+
+            // Valid template but invalid priorty type (not numeric) does not throw an error; instead warn.
+            // Fall back to no priority in those cases (equivalent to 0).
+            match priority_string.parse::<u8>() {
+                Ok(priority) => {
+                    prop = prop.with_priority(priority);
+                }
+                Err(error) => {
+                    warn!(
+                        message = "Failed to convert to numeric value for \"properties.priority\"",
+                        error = %error,
+                        error_type = error_type::CONVERSION_FAILED,
+                        stage = error_stage::PROCESSING,
+                        internal_log_rate_limit = true,
+                    );
+                }
+            }
+        }
+        Some(prop)
     }
 }
 
@@ -127,7 +162,126 @@ pub(super) async fn healthcheck(channel: Arc<lapin::Channel>) -> crate::Result<(
     Ok(())
 }
 
-#[test]
-pub fn generate_config() {
-    crate::test_util::test_generate_config::<AmqpSinkConfig>();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::format::{deserialize, Format};
+
+    #[test]
+    pub fn generate_config() {
+        crate::test_util::test_generate_config::<AmqpSinkConfig>();
+    }
+
+    fn assert_config_priority_eq(config: AmqpSinkConfig, event: &LogEvent, priority: u8) {
+        assert_eq!(
+            config
+                .properties
+                .unwrap()
+                .priority
+                .unwrap()
+                .render_string(event)
+                .unwrap(),
+            priority.to_string()
+        );
+    }
+
+    #[test]
+    pub fn parse_config_priority_static() {
+        for (format, config) in [
+            (
+                Format::Yaml,
+                r#"
+            exchange: "test"
+            routing_key: "user_id"
+            encoding:
+                codec: "json"
+            connection_string: "amqp://user:password@127.0.0.1:5672/"
+            properties:
+                priority: 1
+            "#,
+            ),
+            (
+                Format::Toml,
+                r#"
+            exchange = "test"
+            routing_key = "user_id"
+            encoding.codec = "json"
+            connection_string = "amqp://user:password@127.0.0.1:5672/"
+            properties = { priority = 1 }
+            "#,
+            ),
+            (
+                Format::Json,
+                r#"
+            {
+                "exchange": "test",
+                "routing_key": "user_id",
+                "encoding": {
+                    "codec": "json"
+                },
+                "connection_string": "amqp://user:password@127.0.0.1:5672/",
+                "properties": {
+                    "priority": 1
+                }
+            }
+            "#,
+            ),
+        ] {
+            let config: AmqpSinkConfig = deserialize(&config, format).unwrap();
+            let event = LogEvent::from_str_legacy("message");
+            assert_config_priority_eq(config, &event, 1);
+        }
+    }
+
+    #[test]
+    pub fn parse_config_priority_templated() {
+        for (format, config) in [
+            (
+                Format::Yaml,
+                r#"
+            exchange: "test"
+            routing_key: "user_id"
+            encoding:
+                codec: "json"
+            connection_string: "amqp://user:password@127.0.0.1:5672/"
+            properties:
+                priority: "{{ .priority }}"
+            "#,
+            ),
+            (
+                Format::Toml,
+                r#"
+            exchange = "test"
+            routing_key = "user_id"
+            encoding.codec = "json"
+            connection_string = "amqp://user:password@127.0.0.1:5672/"
+            properties = { priority = "{{ .priority }}" }
+            "#,
+            ),
+            (
+                Format::Json,
+                r#"
+            {
+                "exchange": "test",
+                "routing_key": "user_id",
+                "encoding": {
+                    "codec": "json"
+                },
+                "connection_string": "amqp://user:password@127.0.0.1:5672/",
+                "properties": {
+                    "priority": "{{ .priority }}"
+                }
+            }
+            "#,
+            ),
+        ] {
+            let config: AmqpSinkConfig = deserialize(&config, format).unwrap();
+            let event = {
+                let mut event = LogEvent::from_str_legacy("message");
+                event.insert("priority", 2);
+                event
+            };
+            assert_config_priority_eq(config, &event, 2);
+        }
+    }
 }
