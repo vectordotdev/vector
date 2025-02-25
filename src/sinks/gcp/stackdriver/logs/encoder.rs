@@ -106,10 +106,22 @@ impl StackdriverLogsEncoder {
         let log_id = self.log_id.render_string(event)?;
 
         Ok(match &self.log_name {
-            BillingAccount(acct) => format!("billingAccounts/{}/logs/{}", acct, log_id),
-            Folder(folder) => format!("folders/{}/logs/{}", folder, log_id),
-            Organization(org) => format!("organizations/{}/logs/{}", org, log_id),
-            Project(project) => format!("projects/{}/logs/{}", project, log_id),
+            BillingAccount(acct) => {
+                let account_id = acct.render_string(event)?;
+                format!("billingAccounts/{}/logs/{}", account_id, log_id)
+            }
+            Folder(folder) => {
+                let folder_id = folder.render_string(event)?;
+                format!("folders/{}/logs/{}", folder_id, log_id)
+            }
+            Organization(org) => {
+                let org_id = org.render_string(event)?;
+                format!("organizations/{}/logs/{}", org_id, log_id)
+            }
+            Project(project) => {
+                let project_id = project.render_string(event)?;
+                format!("projects/{}/logs/{}", project_id, log_id)
+            }
         })
     }
 }
