@@ -36,8 +36,8 @@ jobs:
 
                 // Get branch name and validate
                 const branchName = context.payload.pull_request.head.ref;
-                // Validate branch name (only allow alphanumeric, dash, underscore, slash and dot)
-                const branchNameRegex = /^[a-zA-Z0-9_\-\.\/]+$/;
+                // Validate branch name (only allow alphanumeric, dash, and underscore)
+                const branchNameRegex = /^[a-zA-Z0-9_\-]+$/;
                 if (!branchNameRegex.test(branchName)) {
                   core.setFailed(`Invalid branch name detected: ${branchName}`);
                   return;

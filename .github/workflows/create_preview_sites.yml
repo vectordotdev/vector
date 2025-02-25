@@ -67,6 +67,13 @@ jobs:
           const branchName = fs.readFileSync(path.join('pr', 'branch'), 'utf8').trim();
           const prNumber = fs.readFileSync(path.join('pr', 'number'), 'utf8').trim();
           const integrity = fs.readFileSync(path.join('pr', 'integrity'), 'utf8').trim();
+          
+          // Validate branch name again (only allow alphanumeric, dash, and underscore)
+          const branchNameRegex = /^[a-zA-Z0-9_\-]+$/;
+          if (!branchNameRegex.test(branchName)) {
+            core.setFailed(`Invalid branch name detected: ${branchName}`);
+            return;
+          }
 
           const sanitizedBranchName = branchName.replace(/[\/\.]/g, '-');
           core.exportVariable('SANITIZED_BRANCH_NAME', sanitizedBranchName);
