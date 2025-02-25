@@ -467,6 +467,7 @@ rcode
 rdkafka
 rdparty
 readnone
+recordset
 rediss
 redoctober
 regexes
@@ -541,6 +542,7 @@ spencergilbert
 spinlock
 SPOF
 spog
+sqlx
 srcaddr
 srcport
 SREs
