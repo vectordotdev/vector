@@ -1,6 +1,6 @@
 use super::{default_all_processes, example_processes, FilterList, HostMetrics};
 use std::ffi::OsStr;
-use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, UpdateKind};
 use vector_lib::configurable::configurable_component;
 #[cfg(target_os = "linux")]
 use vector_lib::metric_tags;
