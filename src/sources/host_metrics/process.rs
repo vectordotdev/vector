@@ -1,6 +1,6 @@
 use super::{default_all_processes, example_processes, FilterList, HostMetrics};
 use std::ffi::OsStr;
-use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, UpdateKind};
 use vector_lib::configurable::configurable_component;
 #[cfg(target_os = "linux")]
 use vector_lib::metric_tags;
@@ -21,9 +21,8 @@ const MEMORY_USAGE: &str = "process_memory_usage";
 const MEMORY_VIRTUAL_USAGE: &str = "process_memory_virtual_usage";
 
 impl HostMetrics {
-    pub async fn process_metrics(&self, output: &mut super::MetricsBuffer) {
-        let mut sys = System::new();
-        sys.refresh_processes_specifics(
+    pub async fn process_metrics(&mut self, output: &mut super::MetricsBuffer) {
+        self.system.refresh_processes_specifics(
             ProcessesToUpdate::All,
             true,
             ProcessRefreshKind::new()
@@ -33,7 +32,7 @@ impl HostMetrics {
         );
         output.name = "process";
         let sep = OsStr::new(" ");
-        for (pid, process) in sys.processes().iter().filter(|&(_, proc)| {
+        for (pid, process) in self.system.processes().iter().filter(|&(_, proc)| {
             self.config
                 .process
                 .processes
