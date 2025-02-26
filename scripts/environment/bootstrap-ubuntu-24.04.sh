@@ -75,13 +75,12 @@ locale-gen en_US.UTF-8
 dpkg-reconfigure locales
 
 if ! command -v rustup ; then
-  # Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 20.04 images _and_
-  # by our own Ubuntu 20.04 images
+  # https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md#rust-tools
   curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 fi
 
-# Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 20.04 images _and_
-# by our own Ubuntu 20.04 images, so this is really just make sure the path is configured.
+# Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 24.04 images _and_
+# by our own Ubuntu 24.04 images, so this is really just make sure the path is configured.
 if [ -n "${CI-}" ] ; then
     echo "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
     # we often run into OOM issues in CI due to the low memory vs. CPU ratio on c5 instances
