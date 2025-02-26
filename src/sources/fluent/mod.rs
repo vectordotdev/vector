@@ -66,9 +66,11 @@ pub enum FluentMode {
     Unix(FluentUnixConfig),
 }
 
-// Serde doesn't provide a way to specify a default tagged variant when deserializing
-// So we use a somewhat arcane setup with an untagged and tagged versions to allow
-// users to not have to specify mode = tcp
+/// Serde doesn't provide a way to specify a default tagged variant when deserializing
+/// So we use a somewhat arcane setup with an untagged and tagged versions to allow
+/// users to not have to specify mode = tcp
+///
+/// See [serde-rs/serde#2231](https://github.com/serde-rs/serde/issues/2231)
 mod deser {
     use super::*;
 
@@ -106,48 +108,56 @@ mod deser {
         }
     }
 
-    #[cfg(all(test, unix))]
+    #[cfg(test)]
     mod tests {
         use super::*;
 
         #[test]
-        fn test_serde() {
-            let a = serde_json::json!(
-                {
-                    "address": "0.0.0.0:2020",
-                    "connection_limit": 2,
-                }
-            );
-            let s: FluentConfig = serde_json::from_value(a).unwrap();
-            assert!(matches!(s.mode, FluentMode::Tcp(c) if c.connection_limit.unwrap() == 2));
+        fn test_tcp_default_mode() {
+            let json_data = serde_json::json!({
+                "address": "0.0.0.0:2020",
+                "connection_limit": 2
+            });
 
-            let a = serde_json::json!(
-                {
-                    "mode": "tcp",
-                    "address": "0.0.0.0:2020",
-                    "connection_limit": 2,
-                }
-            );
-            let s: FluentConfig = serde_json::from_value(a).unwrap();
-            assert!(matches!(s.mode, FluentMode::Tcp(c) if c.connection_limit.unwrap() == 2));
+            let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
+            assert!(matches!(parsed.mode, FluentMode::Tcp(c) if c.connection_limit.unwrap() == 2));
+        }
 
-            let a = serde_json::json!(
-                {
-                    "mode": "unix",
-                    "address": "0.0.0.0:2020",
-                    "connection_limit": 2,
-                }
-            );
-            serde_json::from_value::<FluentConfig>(a).unwrap_err();
+        #[test]
+        fn test_tcp_explicit_mode() {
+            let json_data = serde_json::json!({
+                "mode": "tcp",
+                "address": "0.0.0.0:2020",
+                "connection_limit": 2
+            });
 
-            let a = serde_json::json!(
-                {
-                    "mode": "unix",
-                    "path": "/foo"
-                }
+            let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
+            assert!(matches!(parsed.mode, FluentMode::Tcp(c) if c.connection_limit.unwrap() == 2));
+        }
+
+        #[test]
+        fn test_invalid_unix_mode() {
+            let json_data = serde_json::json!({
+                "mode": "unix",
+                "address": "0.0.0.0:2020",
+                "connection_limit": 2
+            });
+
+            assert!(serde_json::from_value::<FluentConfig>(json_data).is_err());
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn test_valid_unix_mode() {
+            let json_data = serde_json::json!({
+                "mode": "unix",
+                "path": "/foo"
+            });
+
+            let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
+            assert!(
+                matches!(parsed.mode, FluentMode::Unix(c) if c.path.to_string_lossy() == "/foo")
             );
-            let s: FluentConfig = serde_json::from_value(a).unwrap();
-            assert!(matches!(s.mode, FluentMode::Unix(c) if c.path.to_string_lossy() == "/foo"));
         }
     }
 }
