@@ -141,6 +141,32 @@ base: components: sinks: gcp_stackdriver_logs: configuration: {
 		required: true
 		type: string: {}
 	}
+	labels: {
+		description: "A map of key, value pairs that provides additional information about the log entry."
+		required:    false
+		type: object: {
+			examples: [{
+				label_1: "value_1"
+				label_2: "{{ template_value_2 }}"
+			}]
+			options: "*": {
+				description: "A key, value pair that describes a log entry."
+				required:    true
+				type: string: syntax: "template"
+			}
+		}
+	}
+	labels_key: {
+		description: """
+			The value of this field is used to retrieve the associated labels from the `jsonPayload`
+			and extract their values to set as LogEntry labels.
+			"""
+		required: false
+		type: string: {
+			default: "logging.googleapis.com/labels"
+			examples: ["logging.googleapis.com/labels"]
+		}
+	}
 	log_id: {
 		description: """
 			The log ID to which to publish logs.
