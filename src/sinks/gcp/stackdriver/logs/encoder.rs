@@ -42,7 +42,7 @@ impl StackdriverLogsEncoder {
     }
 
     pub(super) fn encode_event(&self, event: Event) -> Option<serde_json::Value> {
-        let mut labels = HashMap::with_capacity(self.resource.labels.len());
+        let mut resource_labels = HashMap::with_capacity(self.resource.labels.len());
         for (key, template) in &self.resource.labels {
             let value = template
                 .render_string(&event)
@@ -54,7 +54,7 @@ impl StackdriverLogsEncoder {
                     });
                 })
                 .ok()?;
-            labels.insert(key.clone(), value);
+            resource_labels.insert(key.clone(), value);
         }
         let log_name = self
             .log_name(&event)
@@ -75,28 +75,39 @@ impl StackdriverLogsEncoder {
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
+        let labels = log.remove("labels");
+        let timestamp = log.remove_timestamp();
+        let payload = log
+            .get_message()
+            .map(|i| json!(i))
+            .unwrap_or_else(|| json!(log));
+
         let mut event = Event::Log(log);
         self.transformer.transform(&mut event);
 
-        let log = event.into_log();
-
-        let mut entry = Map::with_capacity(5);
+        let mut entry = Map::with_capacity(10);
+        if let serde_json::Value::String(_) = payload {
+            entry.insert("textPayload".into(), payload);
+        } else {
+            entry.insert("jsonPayload".into(), payload);
+        }
         entry.insert("logName".into(), json!(log_name));
-        entry.insert("jsonPayload".into(), json!(log));
         entry.insert("severity".into(), json!(severity));
         entry.insert(
             "resource".into(),
             json!({
                 "type": self.resource.type_,
-                "labels": labels,
+                "labels": resource_labels,
             }),
         );
-
-        // If the event contains a timestamp, send it in the main message so gcp can pick it up.
-        if let Some(timestamp) = log.get_timestamp() {
+        if let Some(timestamp) = timestamp {
             entry.insert("timestamp".into(), json!(timestamp));
         }
+        if let Some(labels) = labels {
+            entry.insert("labels".into(), json!(labels));
+        }
 
+        println!("{}", json!(entry));
         Some(json!(entry))
     }
 
