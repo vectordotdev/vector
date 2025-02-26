@@ -126,11 +126,12 @@ impl WebSocketListenerSink {
             .filter_map(|(key, value)| match value {
                 ExtraMetricTagsConfig::Fixed { value } => Some((key.clone(), value.clone())),
                 ExtraMetricTagsConfig::IpAddress { with_port } => {
-                    if *with_port {
-                        Some((key.clone(), addr.to_string()))
-                    } else {
-                        Some((key.clone(), addr.ip().to_string()))
-                    }
+let tag_value = if *with_port {
+                    addr.to_string()
+                } else {
+                    addr.ip().to_string()
+                };
+                Some((key, tag_value))
                 }
                 _ => None,
             })
