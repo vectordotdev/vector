@@ -21,6 +21,12 @@ releases: "0.45.0": {
 		- The `tag_cardinality_limit` transform now supports customizing limits for metrics that are based on the metric name and namespace.
 		"""
 
+	known_issues: [
+		"""
+			Enrichment tables names can clash with names of sources, transforms and sinks in configuration, causing crash at startup. To avoid the crash you can rename enrichment table to some other name that is not used by any other component.
+			""",
+	]
+
 	changelog: [
 		{
 			type: "feat"
