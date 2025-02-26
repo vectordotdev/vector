@@ -168,7 +168,7 @@ pub(super) struct StackdriverLabelConfig {
     /// and extract their values to set as LogEntry labels.
     #[configurable(metadata(docs::examples = "logging.googleapis.com/labels"))]
     #[serde(default = "default_labels_key")]
-    pub(super) labels_key: String,
+    pub(super) labels_key: Option<String>,
 
     /// A map of key, value pairs that provides additional information about the log entry.
     #[configurable(metadata(
@@ -186,8 +186,8 @@ fn labels_examples() -> HashMap<String, String> {
     example
 }
 
-fn default_labels_key() -> String {
-    "logging.googleapis.com/labels".to_string()
+fn default_labels_key() -> Option<String> {
+    Some("logging.googleapis.com/labels".to_string())
 }
 
 /// A monitored resource.

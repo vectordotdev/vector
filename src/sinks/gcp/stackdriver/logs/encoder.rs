@@ -93,15 +93,20 @@ impl StackdriverLogsEncoder {
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
+        let labels_key = self
+            .label_config
+            .labels_key
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| "logging.googleapis.com/labels".into());
+
         // merge log_labels in the specified labels_key into the labels map.
-        if let Some(log_labels) = log.remove(event_path!(self.label_config.labels_key.as_str())) {
-            if let Value::Object(log_labels) = log_labels {
-                labels.extend(
-                    log_labels
-                        .into_iter()
-                        .map(|(k, v)| (k.to_string(), v.to_string_lossy().into_owned())),
-                );
-            }
+        if let Some(Value::Object(log_labels)) = log.remove(event_path!(labels_key)) {
+            labels.extend(
+                log_labels
+                    .into_iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string_lossy().into_owned())),
+            );
         }
 
         let mut event = Event::Log(log);
