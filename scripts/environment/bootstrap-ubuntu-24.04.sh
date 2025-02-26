@@ -1,4 +1,7 @@
 #! /usr/bin/env bash
+# Refer to https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
+# for all runner information such as OS version and installed software.
+
 set -e -o verbose
 
 if [ -n "$RUSTFLAGS" ]
@@ -22,7 +25,6 @@ apt-get install --yes \
 
 # Deps
 apt-get install --yes --no-install-recommends \
-    awscli \
     build-essential \
     ca-certificates \
     cmake \
