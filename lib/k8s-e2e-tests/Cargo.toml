@@ -18,7 +18,7 @@ tokio = { version = "1.43.0", features = ["full"] }
 indoc = "2.0.5"
 env_logger = "0.11"
 tracing = { version = "0.1", features = ["log"] }
-rand = "0.8"
+rand.workspace = true
 
 [features]
 e2e-tests = []

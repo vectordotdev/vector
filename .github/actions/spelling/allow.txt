@@ -523,4 +523,6 @@ requestline
 jetbrains
 JetBrains
 gifs
+meme
+simdutf
 vhosts

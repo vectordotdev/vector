@@ -21,13 +21,11 @@ if ! dd-rust-license-tool --help >& /dev/null ; then
   rustup run stable cargo install dd-rust-license-tool --version 1.0.2 --force --locked
 fi
 
-if [[ "$(wasm-pack --version)" != "wasm-pack 0.13.0" ]] ; then
-    echo "wasm-pack version 0.13.0 is not installed"
-    # We are using the version from git due to the bug: https://github.com/vectordotdev/vector/pull/16060#issuecomment-1428429602
-    echo "running cargo install --git https://github.com/rustwasm/wasm-pack.git --rev e3582b7 wasm-pack"
-    cargo install --force --git https://github.com/rustwasm/wasm-pack.git --rev e3582b7 wasm-pack
+if [[ "$(wasm-pack --version)" != "wasm-pack 0.13.1" ]] ; then
+    echo "wasm-pack version 0.13.1 is not installed"
+    cargo install --force --locked --version 0.13.1 wasm-pack
 else
-    echo "wasm-pack version 0.13.0 is installed already"
+    echo "wasm-pack version 0.13.1 is installed already"
 fi
 
 # Currently fixing this to version 0.30 since version 0.31 has introduced

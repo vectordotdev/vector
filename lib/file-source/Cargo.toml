@@ -75,7 +75,7 @@ features = ["full"]
 [dev-dependencies]
 criterion = "0.5"
 quickcheck = "1"
-tempfile = "3.16.0"
+tempfile.workspace = true
 similar-asserts = "1.6.1"
 
 [[bench]]
