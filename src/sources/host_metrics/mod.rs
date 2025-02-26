@@ -372,6 +372,7 @@ impl HostMetrics {
         let root_cgroup = cgroups::CGroupRoot::new(&cgroups);
         Self {
             config,
+            system: System::new(),
             root_cgroup,
             events_received: register!(EventsReceived),
         }
