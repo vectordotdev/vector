@@ -78,6 +78,10 @@ pub(super) struct Inner {
     /// An internal vector id that can be used to identify this event across all components.
     #[derivative(PartialEq = "ignore")]
     pub(crate) source_event_id: Option<Uuid>,
+
+    /// Metadata for every field that might be added by Datadog-specific components.
+    #[serde(default)]
+    pub(crate) datadog_log_metadata: Option<DatadogLogMetadata>,
 }
 
 /// Metric Origin metadata for submission to Datadog.
@@ -119,6 +123,34 @@ impl DatadogMetricOriginMetadata {
     /// Returns a reference to the `OriginService`.
     pub fn service(&self) -> Option<u32> {
         self.origin_service
+    }
+}
+/// Metric Origin metadata for submission to Datadog.
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Serialize)]
+pub struct DatadogLogMetadata {
+    /// Identifier for every child event in the split array processor
+    /// This is a list in case of multiple split array processors
+    split_array_child_event_ids: Option<Vec<Uuid>>,
+}
+
+impl DatadogLogMetadata {
+    /// Creates a new `DatadogLogMetadata`.
+    /// Only used for logs, within Datadog use.
+    #[must_use]
+    pub fn new(split_array_child_event_ids: Option<Vec<Uuid>>) -> Self {
+        Self {
+            split_array_child_event_ids,
+        }
+    }
+
+    /// Returns a reference to `split_array_child_event_ids`.
+    pub fn split_array_child_event_ids(&self) -> Option<Vec<Uuid>> {
+        self.split_array_child_event_ids.clone()
+    }
+
+    ///Sets the `split_array_child_event_ids` in the `datadog_log_metadata` to the provided value.
+    pub fn set_split_array_child_event_ids(&mut self, split_array_child_event_ids: Vec<Uuid>) {
+        self.split_array_child_event_ids = Some(split_array_child_event_ids);
     }
 }
 
@@ -239,6 +271,11 @@ impl EventMetadata {
     pub fn source_event_id(&self) -> Option<Uuid> {
         self.0.source_event_id
     }
+
+    /// Returns a reference to the `DatadogLogMetadata`.
+    pub fn datadog_log_metadata(&self) -> Option<&DatadogLogMetadata> {
+        self.0.datadog_log_metadata.as_ref()
+    }
 }
 
 impl Default for Inner {
@@ -254,6 +291,7 @@ impl Default for Inner {
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
             source_event_id: Some(Uuid::now_v7()),
+            datadog_log_metadata: None,
         }
     }
 }
@@ -335,6 +373,13 @@ impl EventMetadata {
     #[must_use]
     pub fn with_source_event_id(mut self, source_event_id: Option<Uuid>) -> Self {
         self.get_mut().source_event_id = source_event_id;
+        self
+    }
+
+    /// Replaces the existing `DatadogLogMetadata` with the given one.
+    #[must_use]
+    pub fn with_datadog_log_metadata(mut self, datadog_log_metadata: DatadogLogMetadata) -> Self {
+        self.get_mut().datadog_log_metadata = Some(datadog_log_metadata);
         self
     }
 

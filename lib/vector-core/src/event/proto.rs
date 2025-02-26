@@ -600,6 +600,28 @@ impl From<DatadogOriginMetadata> for super::DatadogMetricOriginMetadata {
         )
     }
 }
+impl From<super::DatadogLogMetadata> for DatadogLogMetadata {
+    fn from(value: super::DatadogLogMetadata) -> Self {
+        Self {
+            split_array_child_event_ids: value
+                .split_array_child_event_ids()
+                .map(|ids| ids.into_iter().map(|id| id.as_bytes().to_vec()).collect())
+                .unwrap_or_default(),
+        }
+    }
+}
+
+impl From<DatadogLogMetadata> for super::DatadogLogMetadata {
+    fn from(value: DatadogLogMetadata) -> Self {
+        Self::new(Some(
+            value
+                .split_array_child_event_ids
+                .into_iter()
+                .filter_map(|id| Uuid::from_slice(&id).ok())
+                .collect(),
+        ))
+    }
+}
 
 impl From<crate::config::OutputId> for OutputId {
     fn from(value: crate::config::OutputId) -> Self {
@@ -626,6 +648,7 @@ impl From<EventMetadata> for Metadata {
             upstream_id,
             datadog_origin_metadata,
             source_event_id,
+            datadog_log_metadata,
             ..
         } = value.into_owned();
 
@@ -634,6 +657,7 @@ impl From<EventMetadata> for Metadata {
         Self {
             value: Some(encode_value(value)),
             datadog_origin_metadata: datadog_origin_metadata.map(Into::into),
+            datadog_log_metadata: datadog_log_metadata.map(Into::into),
             source_id: source_id.map(|s| s.to_string()),
             source_type: source_type.map(|s| s.to_string()),
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
@@ -669,6 +693,10 @@ impl From<Metadata> for EventMetadata {
 
         if let Some(origin_metadata) = value.datadog_origin_metadata {
             metadata = metadata.with_origin_metadata(origin_metadata.into());
+        }
+
+        if let Some(datadog_log_metadata) = value.datadog_log_metadata {
+            metadata = metadata.with_datadog_log_metadata(datadog_log_metadata.into());
         }
 
         let maybe_source_event_id = if value.source_event_id.is_empty() {

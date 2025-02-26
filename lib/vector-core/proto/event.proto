@@ -86,6 +86,10 @@ message OutputId {
   optional string port = 2;
 }
 
+message DatadogLogMetadata {
+  repeated bytes split_array_child_event_ids = 1;
+}
+
 message Metadata {
   Value value = 1;
   DatadogOriginMetadata datadog_origin_metadata = 2;
@@ -94,6 +98,7 @@ message Metadata {
   OutputId upstream_id = 5;
   Secrets secrets = 6;
   bytes source_event_id = 7;
+  DatadogLogMetadata datadog_log_metadata = 8;
 }
 
 message Metric {
