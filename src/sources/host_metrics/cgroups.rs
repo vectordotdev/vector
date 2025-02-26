@@ -416,11 +416,11 @@ define_stat_struct! { MemoryStat(
 )}
 
 fn is_dir(path: impl AsRef<Path>) -> bool {
-    std::fs::metadata(path.as_ref()).map_or(false, |metadata| metadata.is_dir())
+    std::fs::metadata(path.as_ref()).is_ok_and(|metadata| metadata.is_dir())
 }
 
 fn is_file(path: impl AsRef<Path>) -> bool {
-    std::fs::metadata(path.as_ref()).map_or(false, |metadata| metadata.is_file())
+    std::fs::metadata(path.as_ref()).is_ok_and(|metadata| metadata.is_file())
 }
 
 /// Join a base directory path with a cgroup name.
