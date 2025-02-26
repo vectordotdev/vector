@@ -46,7 +46,7 @@ impl Registry {
         let recency = recency.as_ref();
 
         for (key, counter) in self.registry.get_counter_handles() {
-            if recency.map_or(true, |recency| {
+            if recency.is_none_or(|recency| {
                 recency.should_store_counter(&key, &counter, &self.registry)
             }) {
                 // NOTE this will truncate if the value is greater than 2**52.
@@ -57,7 +57,7 @@ impl Registry {
             }
         }
         for (key, gauge) in self.registry.get_gauge_handles() {
-            if recency.map_or(true, |recency| {
+            if recency.is_none_or(|recency| {
                 recency.should_store_gauge(&key, &gauge, &self.registry)
             }) {
                 let value = gauge.get_inner().load(Ordering::Relaxed);
@@ -66,7 +66,7 @@ impl Registry {
             }
         }
         for (key, histogram) in self.registry.get_histogram_handles() {
-            if recency.map_or(true, |recency| {
+            if recency.is_none_or(|recency| {
                 recency.should_store_histogram(&key, &histogram, &self.registry)
             }) {
                 let value = histogram.get_inner().make_metric();

@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    convert::identity,
-};
+use std::collections::{HashMap, HashSet};
 
 use tracing::debug;
 use vector_config_common::schema::{
@@ -355,7 +352,7 @@ fn is_markable_schema(definitions: &Map<String, Schema>, schema: &SchemaObject) 
             .any(|schema| is_markable_schema(definitions, schema));
         let has_referenced_object_subschema = subschemas
             .iter()
-            .map(|subschema| {
+            .any(|subschema| {
                 subschema
                     .reference
                     .as_ref()
@@ -364,15 +361,14 @@ fn is_markable_schema(definitions: &Map<String, Schema>, schema: &SchemaObject) 
                         definitions.get_key_value(reference)
                     })
                     .and_then(|(name, schema)| schema.as_object().map(|schema| (name, schema)))
-                    .map_or(false, |(name, schema)| {
+                    .is_some_and(|(name, schema)| {
                         debug!(
                             "Following schema reference '{}' for subschema markability.",
                             name
                         );
                         is_markable_schema(definitions, schema)
                     })
-            })
-            .any(identity);
+            });
 
         debug!(
             "Schema {} object subschema(s) and {} referenced subschemas.",

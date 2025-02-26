@@ -117,7 +117,7 @@ impl<'a> SchemaQueryBuilder<'a> {
                             let attr_matched = match self_attribute {
                                 CustomAttribute::Flag(key) => schema_attributes
                                     .get(key)
-                                    .map_or(false, |value| matches!(value, Value::Bool(true))),
+                                    .is_some_and(|value| matches!(value, Value::Bool(true))),
                                 CustomAttribute::KeyValue {
                                     key,
                                     value: attr_value,
