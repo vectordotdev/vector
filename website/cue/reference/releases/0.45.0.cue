@@ -23,7 +23,7 @@ releases: "0.45.0": {
 
 	known_issues: [
 		"""
-			Enrichment tables names can clash with names of sources, transforms and sinks in configuration, causing crash at startup. To avoid the crash you can rename enrichment table to some other name that is not used by any other component.
+			To prevent a crash at startup, avoid name clashes between enrichment table names and other components like sources, transforms, and sinks in the configuration. To resolve this, you can rename the enrichment table to a unique name that isn't already used by any other component.
 			""",
 	]
 
