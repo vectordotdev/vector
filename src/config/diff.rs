@@ -1,14 +1,17 @@
 use std::collections::HashSet;
 
 use indexmap::IndexMap;
+use vector_lib::config::OutputId;
 
-use super::{ComponentKey, Config};
+use super::{ComponentKey, Config, EnrichmentTableOuter};
 
 #[derive(Debug)]
 pub struct ConfigDiff {
     pub sources: Difference,
     pub transforms: Difference,
     pub sinks: Difference,
+    /// This difference does not only contain the actual enrichment_tables keys, but also keys that
+    /// may be used for their source and sink components (if available).
     pub enrichment_tables: Difference,
 }
 
@@ -22,7 +25,10 @@ impl ConfigDiff {
             sources: Difference::new(&old.sources, &new.sources),
             transforms: Difference::new(&old.transforms, &new.transforms),
             sinks: Difference::new(&old.sinks, &new.sinks),
-            enrichment_tables: Difference::new(&old.enrichment_tables, &new.enrichment_tables),
+            enrichment_tables: Difference::new_tables(
+                &old.enrichment_tables,
+                &new.enrichment_tables,
+            ),
         }
     }
 
@@ -74,6 +80,47 @@ impl Difference {
     {
         let old_names = old.keys().cloned().collect::<HashSet<_>>();
         let new_names = new.keys().cloned().collect::<HashSet<_>>();
+
+        let to_change = old_names
+            .intersection(&new_names)
+            .filter(|&n| {
+                // This is a hack around the issue of comparing two
+                // trait objects. Json is used here over toml since
+                // toml does not support serializing `None`
+                // to_value is used specifically (instead of string)
+                // to avoid problems comparing serialized HashMaps,
+                // which can iterate in varied orders.
+                let old_value = serde_json::to_value(&old[n]).unwrap();
+                let new_value = serde_json::to_value(&new[n]).unwrap();
+                old_value != new_value
+            })
+            .cloned()
+            .collect::<HashSet<_>>();
+
+        let to_remove = &old_names - &new_names;
+        let to_add = &new_names - &old_names;
+
+        Self {
+            to_remove,
+            to_change,
+            to_add,
+        }
+    }
+
+    fn new_tables(
+        old: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
+        new: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
+    ) -> Self {
+        let old_names = old
+            .iter()
+            .flat_map(|(k, t)| vec![t.as_source(k).map(|(k, _)| k), t.as_sink(k).map(|(k, _)| k)])
+            .flatten()
+            .collect::<HashSet<_>>();
+        let new_names = new
+            .iter()
+            .flat_map(|(k, t)| vec![t.as_source(k).map(|(k, _)| k), t.as_sink(k).map(|(k, _)| k)])
+            .flatten()
+            .collect::<HashSet<_>>();
 
         let to_change = old_names
             .intersection(&new_names)
