@@ -122,22 +122,20 @@ impl<'a> SchemaQueryBuilder<'a> {
                                     key,
                                     value: attr_value,
                                 } => {
-                                    schema_attributes
-                                        .get(key)
-                                        .is_some_and(|value| match value {
-                                            // Check string values directly.
-                                            Value::String(schema_attr_value) => {
-                                                schema_attr_value == attr_value
-                                            }
-                                            // For arrays, try and convert each item to a string, and
-                                            // for the values that are strings, see if they match.
-                                            Value::Array(schema_attr_values) => {
-                                                schema_attr_values.iter().any(|value| {
-                                                    value.as_str().is_some_and(|s| s == attr_value)
-                                                })
-                                            }
-                                            _ => false,
-                                        })
+                                    schema_attributes.get(key).is_some_and(|value| match value {
+                                        // Check string values directly.
+                                        Value::String(schema_attr_value) => {
+                                            schema_attr_value == attr_value
+                                        }
+                                        // For arrays, try and convert each item to a string, and
+                                        // for the values that are strings, see if they match.
+                                        Value::Array(schema_attr_values) => {
+                                            schema_attr_values.iter().any(|value| {
+                                                value.as_str().is_some_and(|s| s == attr_value)
+                                            })
+                                        }
+                                        _ => false,
+                                    })
                                 }
                             };
 

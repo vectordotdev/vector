@@ -221,7 +221,8 @@ mod tests {
         .collect::<Vec<_>>()
         .await
         .into_iter()
-        .flatten().collect()
+        .flatten()
+        .collect()
     }
 
     // taken from <https://github.com/hyperium/tonic/blob/5aa8ae1fec27377cd4c2a41d309945d7e38087d0/examples/src/grpc-web/client.rs#L45-L75>

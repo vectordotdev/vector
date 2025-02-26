@@ -350,25 +350,23 @@ fn is_markable_schema(definitions: &Map<String, Schema>, schema: &SchemaObject) 
         let has_object_subschema = subschemas
             .iter()
             .any(|schema| is_markable_schema(definitions, schema));
-        let has_referenced_object_subschema = subschemas
-            .iter()
-            .any(|subschema| {
-                subschema
-                    .reference
-                    .as_ref()
-                    .and_then(|reference| {
-                        let reference = get_cleaned_schema_reference(reference);
-                        definitions.get_key_value(reference)
-                    })
-                    .and_then(|(name, schema)| schema.as_object().map(|schema| (name, schema)))
-                    .is_some_and(|(name, schema)| {
-                        debug!(
-                            "Following schema reference '{}' for subschema markability.",
-                            name
-                        );
-                        is_markable_schema(definitions, schema)
-                    })
-            });
+        let has_referenced_object_subschema = subschemas.iter().any(|subschema| {
+            subschema
+                .reference
+                .as_ref()
+                .and_then(|reference| {
+                    let reference = get_cleaned_schema_reference(reference);
+                    definitions.get_key_value(reference)
+                })
+                .and_then(|(name, schema)| schema.as_object().map(|schema| (name, schema)))
+                .is_some_and(|(name, schema)| {
+                    debug!(
+                        "Following schema reference '{}' for subschema markability.",
+                        name
+                    );
+                    is_markable_schema(definitions, schema)
+                })
+        });
 
         debug!(
             "Schema {} object subschema(s) and {} referenced subschemas.",

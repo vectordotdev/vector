@@ -102,7 +102,8 @@ fn reparse_groups(
                         buckets[i].count = buckets[i].count.saturating_sub(buckets[i - 1].count);
                     }
                     let drop_last = buckets
-                        .last().is_some_and(|bucket| bucket.bucket == f64::INFINITY);
+                        .last()
+                        .is_some_and(|bucket| bucket.bucket == f64::INFINITY);
                     if drop_last {
                         buckets.pop();
                     }
