@@ -698,7 +698,7 @@ impl RunningTopology {
         let added_changed_tables: Vec<&ComponentKey> = diff
             .enrichment_tables
             .changed_and_added()
-            .filter(|k| new_pieces.tasks.contains_key(k))
+            .filter(|k| new_pieces.inputs.contains_key(k))
             .collect();
         for key in added_changed_tables {
             debug!(component = %key, "Connecting inputs for enrichment table sink.");
