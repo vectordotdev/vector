@@ -5,6 +5,7 @@ use std::{collections::HashMap, io};
 use bytes::BytesMut;
 use serde_json::{json, to_vec, Map};
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use vrl::event_path;
 use vrl::path::PathPrefix;
 
 use crate::{
@@ -12,14 +13,14 @@ use crate::{
     template::TemplateRenderingError,
 };
 
-use super::config::{StackdriverLogName, StackdriverResource};
+use super::config::{StackdriverLabelConfig, StackdriverLogName, StackdriverResource};
 
 #[derive(Clone, Debug)]
 pub(super) struct StackdriverLogsEncoder {
     transformer: Transformer,
     log_id: Template,
     log_name: StackdriverLogName,
-    labels: HashMap<String, Template>,
+    label_config: StackdriverLabelConfig,
     resource: StackdriverResource,
     severity_key: Option<ConfigValuePath>,
 }
@@ -30,7 +31,7 @@ impl StackdriverLogsEncoder {
         transformer: Transformer,
         log_id: Template,
         log_name: StackdriverLogName,
-        labels: HashMap<String, Template>,
+        label_config: StackdriverLabelConfig,
         resource: StackdriverResource,
         severity_key: Option<ConfigValuePath>,
     ) -> Self {
@@ -38,15 +39,15 @@ impl StackdriverLogsEncoder {
             transformer,
             log_id,
             log_name,
-            labels,
+            label_config,
             resource,
             severity_key,
         }
     }
 
     pub(super) fn encode_event(&self, event: Event) -> Option<serde_json::Value> {
-        let mut labels = HashMap::with_capacity(self.labels.len());
-        for (key, template) in &self.labels {
+        let mut labels = HashMap::with_capacity(self.label_config.labels.len());
+        for (key, template) in &self.label_config.labels {
             let value = template
                 .render_string(&event)
                 .map_err(|error| {
@@ -91,6 +92,17 @@ impl StackdriverLogsEncoder {
             .and_then(|key| log.remove((PathPrefix::Event, &key.0)))
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
+
+        // merge log_labels in the specified labels_key into the labels map.
+        if let Some(log_labels) = log.remove(event_path!(self.label_config.labels_key.as_str())) {
+            if let Value::Object(log_labels) = log_labels {
+                labels.extend(
+                    log_labels
+                        .into_iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string_lossy().into_owned())),
+                );
+            }
+        }
 
         let mut event = Event::Log(log);
         self.transformer.transform(&mut event);
