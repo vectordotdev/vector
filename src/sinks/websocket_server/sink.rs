@@ -87,6 +87,36 @@ impl WebSocketListenerSink {
         }
     }
 
+    fn extract_extra_tags(
+        extra_tags_config: &HashMap<String, ExtraMetricTagsConfig>,
+        base_url: Option<&Url>,
+        req: &Request,
+    ) -> Vec<(String, String)> {
+        extra_tags_config
+            .iter()
+            .filter_map(|(key, value)| match value {
+                ExtraMetricTagsConfig::Header { name } => req
+                    .headers()
+                    .get(name)
+                    .and_then(|h| h.to_str().ok())
+                    .map(ToString::to_string)
+                    .map(|header| (key.clone(), header)),
+                ExtraMetricTagsConfig::Url => Some((key.clone(), req.uri().to_string())),
+                ExtraMetricTagsConfig::Query { name } => Url::options()
+                    .base_url(base_url)
+                    .parse(req.uri().to_string().as_str())
+                    .ok()
+                    .and_then(|url| {
+                        url.query_pairs()
+                            .find(|(k, _)| k == name)
+                            .map(|(_, value)| value.to_string())
+                    })
+                    .map(|value| (key.clone(), value)),
+                _ => None,
+            })
+            .collect()
+    }
+
     async fn handle_connections(
         auth: Option<HttpServerAuthMatcher>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
@@ -126,53 +156,33 @@ impl WebSocketListenerSink {
             .filter_map(|(key, value)| match value {
                 ExtraMetricTagsConfig::Fixed { value } => Some((key.clone(), value.clone())),
                 ExtraMetricTagsConfig::IpAddress { with_port } => {
-let tag_value = if *with_port {
-                    addr.to_string()
-                } else {
-                    addr.ip().to_string()
-                };
-                Some((key, tag_value))
+                    let tag_value = if *with_port {
+                        addr.to_string()
+                    } else {
+                        addr.ip().to_string()
+                    };
+                    Some((key.clone(), tag_value))
                 }
                 _ => None,
             })
             .collect();
 
-        let mut extract_extra_tags = |req: &Request| {
-            extra_tags_config
-                .iter()
-                .filter_map(|(key, value)| match value {
-                    ExtraMetricTagsConfig::Header { name } => req
-                        .headers()
-                        .get(name)
-                        .and_then(|h| h.to_str().ok())
-                        .map(ToString::to_string)
-                        .map(|header| (key.clone(), header)),
-                    ExtraMetricTagsConfig::Url => Some((key.clone(), req.uri().to_string())),
-                    ExtraMetricTagsConfig::Query { name } => Url::options()
-                        .base_url(base_url.as_ref())
-                        .parse(req.uri().to_string().as_str())
-                        .ok()
-                        .and_then(|url| {
-                            url.query_pairs()
-                                .find(|(k, _)| k == name)
-                                .map(|(_, value)| value.to_string())
-                        })
-                        .map(|value| (key.clone(), value)),
-                    _ => None,
-                })
-                .for_each(|(key, value)| {
-                    extra_tags.push((key, value));
-                });
-        };
-
         let header_callback = |req: &Request, response: Response| {
             let Some(auth) = auth else {
-                extract_extra_tags(req);
+                extra_tags.append(&mut Self::extract_extra_tags(
+                    &extra_tags_config,
+                    base_url.as_ref(),
+                    req,
+                ));
                 return Ok(response);
             };
             match auth.handle_auth(req.headers()) {
                 Ok(_) => {
-                    extract_extra_tags(req);
+                    extra_tags.append(&mut Self::extract_extra_tags(
+                        &extra_tags_config,
+                        base_url.as_ref(),
+                        req,
+                    ));
                     Ok(response)
                 }
                 Err(message) => {
