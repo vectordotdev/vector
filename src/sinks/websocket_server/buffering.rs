@@ -108,17 +108,27 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
         }
 
         let base_url = Url::parse("ws://localhost").ok();
-        if let Ok(url) = Url::options()
+        match Url::options()
             .base_url(base_url.as_ref())
             .parse(request.uri().to_string().as_str())
         {
-            if let Some((_, last_received_param_value)) = url
-                .query_pairs()
-                .find(|(k, _)| k == LAST_RECEIVED_QUERY_PARAM_NAME)
-            {
-                if let Ok(last_received_val) = Uuid::parse_str(&last_received_param_value) {
-                    return BufferReplayRequest::with_replay_from(last_received_val);
+            Ok(url) => {
+                if let Some((_, last_received_param_value)) = url
+                    .query_pairs()
+                    .find(|(k, _)| k == LAST_RECEIVED_QUERY_PARAM_NAME)
+                {
+                    match Uuid::parse_str(&last_received_param_value) {
+                        Ok(last_received_val) => {
+                            return BufferReplayRequest::with_replay_from(last_received_val)
+                        }
+                        Err(err) => {
+                            warn!(message = "Parsing last received message UUID failed.", %err)
+                        }
+                    }
                 }
+            }
+            Err(err) => {
+                warn!(message = "Parsing request URL for websocket connection request failed.", %err)
             }
         }
 
