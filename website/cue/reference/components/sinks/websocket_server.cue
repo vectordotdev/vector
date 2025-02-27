@@ -126,7 +126,7 @@ components: sinks: websocket_server: {
 				be used to define a number of events to be buffered, which would enable replay for clients that
 				may want to continue from the last message after disconnection. To provide clients with the
 				message ID, `message_buffering.message_id_path` needs to be defined, which is used
-				to encode the ID inside outgoing messages. The buffer is backed by a ring buffer, so
+				to encode the outgoing messages ID. The buffer is backed by a ring buffer, so
 				the oldest messages will be lost when the size limit is reached.
 
 				Once clients have the ID, on future connections that the ID can be sent in the
