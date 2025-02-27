@@ -96,9 +96,8 @@ impl StackdriverLogsEncoder {
         let labels_key = self
             .label_config
             .labels_key
-            .as_ref()
-            .map(|s| s.as_str())
-            .unwrap_or_else(|| "logging.googleapis.com/labels".into());
+            .as_deref()
+            .unwrap_or("logging.googleapis.com/labels");
 
         // merge log_labels in the specified labels_key into the labels map.
         if let Some(Value::Object(log_labels)) = log.remove(event_path!(labels_key)) {
