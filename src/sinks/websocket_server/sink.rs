@@ -226,14 +226,11 @@ impl StreamSink<Event> for WebSocketListenerSink {
 
         let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
 
-        let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
-            if let Some(MessageBuffering { ref max_events, .. }) = self.message_buffering {
-                max_events.get()
-            } else {
-                0
-            },
-        )));
-
+let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
+    self.message_buffering
+        .as_ref()
+        .map_or(0, |mb| mb.max_events.get()),
+)));
         tokio::spawn(
             Self::handle_connections(
                 self.auth,
