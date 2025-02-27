@@ -83,16 +83,18 @@ pub struct ComponentConfig {
 }
 
 impl ComponentConfig {
-    pub const fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
+    pub fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
         Self {
             config_paths,
             component_key,
         }
     }
 
-    pub fn contains(&self, config_paths: &[PathBuf]) -> Option<ComponentKey> {
-        if config_paths.iter().any(|p| self.config_paths.contains(p)) {
-            return Some(self.component_key.clone());
+    pub fn contains(&self, config_paths: &Vec<PathBuf>) -> Option<ComponentKey> {
+        for i in config_paths {
+            if self.config_paths.contains(&i) {
+                return Some(self.component_key.clone())
+            }
         }
         None
     }
