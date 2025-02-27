@@ -127,12 +127,11 @@ components: sinks: websocket_server: {
 				may want to continue from the last message after disconnection. To provide clients with the
 				message ID, `message_buffering.message_id_path` needs to be defined, which is used
 				to encode the outgoing messages ID. The buffer is backed by a ring buffer, so
-				the oldest messages will be lost when the size limit is reached.
+				the oldest messages are discarded when the size limit is reached.
 
-				Once clients have the ID, on future connections that the ID can be sent in the
-				`last_received` query parameter and all buffered messages since that message are
-				sent to the client immediately on connection. If the message can't be found, the entire
-				buffer is replayed.
+				After clients have the ID, they can send it in the `last_received` query parameter on future connections.
+				All buffered messages since that ID are then sent to the client immediately upon connection.
+				If the message can't be found, the entire buffer is replayed.
 
 				Example config:
 				```yaml
