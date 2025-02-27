@@ -13,7 +13,9 @@ use crate::{
     template::TemplateRenderingError,
 };
 
-use super::config::{StackdriverLabelConfig, StackdriverLogName, StackdriverResource};
+use super::config::{
+    default_labels_key, StackdriverLabelConfig, StackdriverLogName, StackdriverResource,
+};
 
 #[derive(Clone, Debug)]
 pub(super) struct StackdriverLogsEncoder {
@@ -93,11 +95,13 @@ impl StackdriverLogsEncoder {
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
+        let default_labels_key = default_labels_key();
         let labels_key = self
             .label_config
             .labels_key
             .as_deref()
-            .unwrap_or("logging.googleapis.com/labels");
+            .or_else(|| default_labels_key.as_deref())
+            .unwrap();
 
         // merge log_labels in the specified labels_key into the labels map.
         if let Some(Value::Object(log_labels)) = log.remove(event_path!(labels_key)) {

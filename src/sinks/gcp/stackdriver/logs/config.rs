@@ -186,7 +186,7 @@ fn labels_examples() -> HashMap<String, String> {
     example
 }
 
-fn default_labels_key() -> Option<String> {
+pub(super) fn default_labels_key() -> Option<String> {
     Some("logging.googleapis.com/labels".to_string())
 }
 

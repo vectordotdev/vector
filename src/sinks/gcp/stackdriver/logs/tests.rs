@@ -79,7 +79,7 @@ fn encode_valid() {
         Template::try_from("{{ log_id }}").unwrap(),
         StackdriverLogName::Project("project".to_owned()),
         StackdriverLabelConfig {
-            labels_key: Some("logging.googleapis.com/labels".to_owned()),
+            labels_key: None,
             labels: HashMap::from([(
                 "config_user_label_1".to_owned(),
                 Template::try_from("config_user_value_1").unwrap(),
@@ -143,7 +143,7 @@ fn encode_inserts_timestamp() {
         Template::try_from("testlogs").unwrap(),
         StackdriverLogName::Project("project".to_owned()),
         StackdriverLabelConfig {
-            labels_key: Some("user_label_key".to_owned()),
+            labels_key: None,
             labels: HashMap::from([(
                 "config_user_label_1".to_owned(),
                 Template::try_from("value_1").unwrap(),
@@ -225,7 +225,7 @@ async fn correct_request() {
         Template::try_from("testlogs").unwrap(),
         StackdriverLogName::Project("project".to_owned()),
         StackdriverLabelConfig {
-            labels_key: Some("user_label_key".to_owned()),
+            labels_key: None,
             labels: HashMap::from([(
                 "config_user_label_1".to_owned(),
                 Template::try_from("value_1").unwrap(),
