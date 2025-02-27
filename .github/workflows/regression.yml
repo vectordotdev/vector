@@ -184,7 +184,7 @@ jobs:
 
   build-baseline:
     name: Build baseline Vector container
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - should-run-gate
@@ -223,7 +223,7 @@ jobs:
 
   build-comparison:
     name: Build comparison Vector container
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - should-run-gate

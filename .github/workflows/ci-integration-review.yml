@@ -84,7 +84,7 @@ jobs:
 
   integration-tests:
     needs: prep-pr
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
       matrix:
@@ -117,7 +117,7 @@ jobs:
 
   e2e-tests:
     needs: prep-pr
-    runs-on: ubuntu-20.04-8core
+    runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
