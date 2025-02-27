@@ -133,8 +133,9 @@ pub struct AwsS3Config {
 
     /// Specifies which addressing style to use.
     ///
-    /// This controls if the bucket name is in the hostname or part of the URL.
-    #[serde(default = "crate::serde::default_true")]
+    /// This controls whether the bucket name is in the hostname, or part of the URL.
+    #[serde(default = "default_true")]
+    #[derivative(Default(value = "default_true()"))]
     pub force_path_style: bool,
 }
 
@@ -143,6 +144,10 @@ const fn default_framing() -> FramingConfig {
     FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
         newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
     })
+}
+
+const fn default_true() -> bool {
+    true
 }
 
 impl_generate_config_from_default!(AwsS3Config);
