@@ -6,7 +6,7 @@ author_github: https://github.com/pront
 domain: dev
 tags: [ "dev", "ide", "autocompletion", "config", "guides", "guide" ]
 aliases: [ "/docs/guides/developer/config-autocompletion.md" ]
-weight: 1
+weight: 2
 ---
 
 {{< requirement >}}
