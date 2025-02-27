@@ -122,11 +122,10 @@ components: sinks: websocket_server: {
 		message_buffering: {
 			title: "Message buffering"
 			body: """
-				The `message_buffering` configuration option can be used to enable this feature. It can
-				be used to define a number of events to be buffered, which would enable replay for clients that
-				may want to continue from the last message after disconnection. To provide clients with the
-				message ID, `message_buffering.message_id_path` needs to be defined, which is used
-				to encode the outgoing messages ID. The buffer is backed by a ring buffer, so
+				The `message_buffering` configuration option enables event buffering. It defines the number
+				of events to buffer, allowing clients to replay messages after a disconnection.
+				To provide clients with the message ID, define `message_buffering.message_id_path`.
+				This encodes the outgoing messages ID. The buffer is backed by a ring buffer, so
 				the oldest messages are discarded when the size limit is reached.
 
 				After clients have the ID, they can send it in the `last_received` query parameter on future connections.
