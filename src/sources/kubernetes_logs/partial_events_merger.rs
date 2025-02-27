@@ -33,7 +33,7 @@ impl PartialEventMergeState {
     ) {
         let mut bytes_mut = BytesMut::new();
         if let Some(bucket) = self.buckets.get_mut(file) {
-            // don't bother continuing to process events that are already too big
+            // don't bother continuing to process new partial events that match existing ones that are already too big
             if bucket.too_big {
                 return;
             }
@@ -49,22 +49,36 @@ impl PartialEventMergeState {
                 // drop event if it's bigger than max allowed
                 if bytes_mut.len() > max_merged_line_bytes {
                     bucket.too_big = true;
+                    warn!(
+                        message = "Found line that exceeds max_merged_line_bytes; discarding.",
+                        internal_log_rate_limit = true
+                    );
                 }
 
                 *prev_value = bytes_mut.freeze();
             }
         } else {
+            // new event
+
             if let Some(Value::Bytes(event_bytes)) = event.get(message_path) {
                 bytes_mut.extend_from_slice(event_bytes);
             }
 
-            // new event
+            let too_big = bytes_mut.len() > max_merged_line_bytes;
+
+            if too_big {
+                warn!(
+                    message = "Found line that exceeds max_merged_line_bytes; discarding.",
+                    internal_log_rate_limit = true
+                );
+            }
+
             self.buckets.insert(
                 file.to_owned(),
                 Bucket {
                     event,
                     expiration: Instant::now() + expiration_time,
-                    too_big: bytes_mut.len() > max_merged_line_bytes,
+                    too_big,
                 },
             );
         }
