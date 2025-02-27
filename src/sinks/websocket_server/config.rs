@@ -1,7 +1,7 @@
-use std::{net::SocketAddr, num::NonZeroUsize};
+use std::net::SocketAddr;
 
+use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
-use vector_lib::{codecs::JsonSerializerConfig, lookup::lookup_v2::ConfigValuePath};
 
 use crate::{
     codecs::EncodingConfig,
@@ -11,6 +11,7 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
+use super::buffering::MessageBufferingConfig;
 use super::sink::WebSocketListenerSink;
 
 /// Configuration for the `websocket_server` sink.
@@ -42,7 +43,7 @@ pub struct WebSocketListenerSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 
     #[configurable(derived)]
-    pub message_buffering: Option<MessageBuffering>,
+    pub message_buffering: Option<MessageBufferingConfig>,
 
     #[configurable(derived)]
     pub auth: Option<HttpServerAuthConfig>,
@@ -59,28 +60,6 @@ impl Default for WebSocketListenerSinkConfig {
             auth: None,
         }
     }
-}
-
-/// Configuration for message buffering which enables message replay for clients that connect later.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct MessageBuffering {
-    /// Max events to hold in buffer.
-    ///
-    /// When the buffer is full, oldest messages are overwritten.
-    #[serde(default = "default_max_events")]
-    pub max_events: NonZeroUsize,
-
-    /// Message ID path.
-    ///
-    /// This has to be defined to expose message ID to clients in the messages. Using that ID,
-    /// clients can request replay starting from the message ID of their choosing.
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    pub message_id_path: Option<ConfigValuePath>,
-}
-
-const fn default_max_events() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(1000) }
 }
 
 #[async_trait::async_trait]

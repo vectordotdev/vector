@@ -5,7 +5,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
     pin_mut,
@@ -20,10 +20,9 @@ use tokio_tungstenite::tungstenite::{
 };
 use tokio_util::codec::Encoder as _;
 use tracing::Instrument;
-use url::Url;
 use uuid::Uuid;
 use vector_lib::{
-    event::{Event, EventStatus, MaybeAsLogMut},
+    event::{Event, EventStatus},
     finalization::Finalizable,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
@@ -40,10 +39,13 @@ use crate::{
         ConnectionOpen, OpenGauge, WsConnectionFailedError, WsListenerConnectionEstablished,
         WsListenerConnectionShutdown, WsListenerSendError,
     },
-    sinks::prelude::*,
+    sinks::{
+        prelude::*,
+        websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
+    },
 };
 
-use super::{config::MessageBuffering, WebSocketListenerSinkConfig};
+use super::{buffering::MessageBufferingConfig, WebSocketListenerSinkConfig};
 
 pub struct WebSocketListenerSink {
     peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
@@ -52,7 +54,7 @@ pub struct WebSocketListenerSink {
     encoder: Encoder<()>,
     address: SocketAddr,
     auth: Option<HttpServerAuthMatcher>,
-    message_buffering: Option<MessageBuffering>,
+    message_buffering: Option<MessageBufferingConfig>,
 }
 
 impl WebSocketListenerSink {
@@ -89,6 +91,7 @@ impl WebSocketListenerSink {
 
     async fn handle_connections(
         auth: Option<HttpServerAuthMatcher>,
+        message_buffering: Option<MessageBufferingConfig>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
         mut listener: MaybeTlsListener,
@@ -99,6 +102,7 @@ impl WebSocketListenerSink {
             tokio::spawn(
                 Self::handle_connection(
                     auth.clone(),
+                    message_buffering.clone(),
                     Arc::clone(&peers),
                     Arc::clone(&buffer),
                     stream,
@@ -111,37 +115,19 @@ impl WebSocketListenerSink {
 
     async fn handle_connection(
         auth: Option<HttpServerAuthMatcher>,
+        message_buffering: Option<MessageBufferingConfig>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
         stream: MaybeTlsIncomingStream<TcpStream>,
         open_gauge: OpenGauge,
     ) -> Result<(), ()> {
         // Base url for parsing request URLs that may be relative
-        let base_url = Url::parse("ws://localhost").ok();
         let addr = stream.peer_addr();
         debug!("Incoming TCP connection from: {}", addr);
 
-        let mut last_received = None;
-        let mut should_replay = false;
+        let mut buffer_replay = BufferReplayRequest::NO_REPLAY;
         let header_callback = |req: &Request, response: Response| {
-            let query_params = req.uri().query().unwrap_or("");
-            if query_params.contains("last_received") {
-                // Even if we can't find the provided message ID, we should dump whatever we have
-                // buffered so far, because the provided message ID might have expired by now
-                should_replay = true;
-                if let Ok(url) = Url::options()
-                    .base_url(base_url.as_ref())
-                    .parse(req.uri().to_string().as_str())
-                {
-                    if let Some((_, last_received_param_value)) =
-                        url.query_pairs().find(|(k, _)| k == "last_received")
-                    {
-                        if let Ok(last_received_val) = Uuid::parse_str(&last_received_param_value) {
-                            last_received = Some(last_received_val);
-                        }
-                    }
-                }
-            }
+            buffer_replay = message_buffering.extract_message_replay_request(req);
             let Some(auth) = auth else {
                 return Ok(response);
             };
@@ -173,18 +159,11 @@ impl WebSocketListenerSink {
 
         {
             let mut peers = peers.lock().unwrap();
-            if should_replay {
-                let buffered_messages = buffer.lock().unwrap();
-
-                for (_, message) in buffered_messages
-                    .iter()
-                    .filter(|(id, _)| Some(*id) > last_received)
-                {
-                    if let Err(error) = tx.unbounded_send(message.clone()) {
-                        emit!(WsListenerSendError { error });
-                    }
+            buffer_replay.replay_messages(&buffer.lock().unwrap(), |(_, message)| {
+                if let Err(error) = tx.unbounded_send(message.clone()) {
+                    emit!(WsListenerSendError { error });
                 }
-            }
+            });
 
             debug!("WebSocket connection established: {}", addr);
 
@@ -226,14 +205,13 @@ impl StreamSink<Event> for WebSocketListenerSink {
 
         let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
 
-let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
-    self.message_buffering
-        .as_ref()
-        .map_or(0, |mb| mb.max_events.get()),
-)));
+        let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
+            self.message_buffering.buffer_capacity(),
+        )));
         tokio::spawn(
             Self::handle_connections(
                 self.auth,
+                self.message_buffering.clone(),
                 Arc::clone(&self.peers),
                 Arc::clone(&message_buffer),
                 listener,
@@ -243,23 +221,13 @@ let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
 
         while input.as_mut().peek().await.is_some() {
             let mut event = input.next().await.unwrap();
-            let message_id = Uuid::now_v7();
             let finalizers = event.take_finalizers();
 
             self.transformer.transform(&mut event);
 
-            if let Some(MessageBuffering {
-                message_id_path: Some(ref message_id_path),
-                ..
-            }) = self.message_buffering
-            {
-                if let Some(log) = event.maybe_as_log_mut() {
-                    let mut buffer = [0; 36];
-                    let uuid = message_id.hyphenated().encode_lower(&mut buffer);
-                    log.value_mut()
-                        .insert(message_id_path, Bytes::copy_from_slice(uuid.as_bytes()));
-                }
-            }
+            let message_id = self
+                .message_buffering
+                .add_replay_message_id_to_event(&mut event);
 
             let event_byte_size = event.estimated_json_encoded_size_of();
 
@@ -275,9 +243,9 @@ let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
                     };
                     let message_len = message.len();
 
-                    if let Some(ref buffering_config) = self.message_buffering {
+                    if self.message_buffering.should_buffer() {
                         let mut buffer = message_buffer.lock().unwrap();
-                        if buffer.len() + 1 >= buffering_config.max_events.get() {
+                        if buffer.len() + 1 >= buffer.capacity() {
                             buffer.pop_front();
                         }
                         buffer.push_back((message_id, message.clone()));
@@ -318,7 +286,6 @@ mod tests {
 
     use crate::{
         event::{Event, LogEvent},
-        sinks::websocket_server::config::MessageBuffering,
         test_util::{
             components::{run_and_assert_sink_compliance, SINK_TAGS},
             next_addr,
@@ -442,7 +409,7 @@ mod tests {
         let websocket_sink = start_websocket_server_sink(
             WebSocketListenerSinkConfig {
                 address,
-                message_buffering: Some(MessageBuffering {
+                message_buffering: Some(MessageBufferingConfig {
                     max_events: NonZeroUsize::new(1).unwrap(),
                     message_id_path: None,
                 }),
@@ -485,7 +452,7 @@ mod tests {
         let websocket_sink = start_websocket_server_sink(
             WebSocketListenerSinkConfig {
                 address,
-                message_buffering: Some(MessageBuffering {
+                message_buffering: Some(MessageBufferingConfig {
                     max_events: NonZeroUsize::new(1).unwrap(),
                     message_id_path: None,
                 }),
