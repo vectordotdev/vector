@@ -16,7 +16,8 @@ use vector_lib::{
 pub struct MessageBufferingConfig {
     /// Max events to hold in buffer.
     ///
-    /// When the buffer is full, oldest messages are overwritten.
+    /// The buffer is backed by a ring buffer, so the oldest messages will be lost when the size
+    /// limit is reached.
     #[serde(default = "default_max_events")]
     pub max_events: NonZeroUsize,
 
