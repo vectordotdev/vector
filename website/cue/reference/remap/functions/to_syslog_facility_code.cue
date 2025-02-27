@@ -18,10 +18,7 @@ remap: functions: to_syslog_facility_code: {
 	internal_failure_reasons: [
 		"`value` is not a valid Syslog facility keyword.",
 	]
-	return: {
-		types: ["integer"]
-		rules: []
-	}
+	return: types: ["integer"]
 
 	examples: [
 		{
