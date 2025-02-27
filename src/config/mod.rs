@@ -71,6 +71,30 @@ pub use vector_lib::{
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct ComponentConfig {
+    pub config_paths: Vec<PathBuf>,
+    pub component_key: ComponentKey,
+}
+
+impl ComponentConfig {
+    pub fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
+        Self {
+            config_paths,
+            component_key,
+        }
+    }
+
+    pub fn contains(&self, config_paths: &Vec<PathBuf>) -> Option<ComponentKey> {
+        for i in config_paths {
+            if self.config_paths.contains(&i) {
+                return Some(self.component_key.clone())
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ConfigPath {
     File(PathBuf, FormatHint),
     Dir(PathBuf),
