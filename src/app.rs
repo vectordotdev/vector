@@ -18,7 +18,7 @@ use crate::extra_context::ExtraContext;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts, WatchConfigMethod},
-    config::{self, Config, ConfigPath},
+    config::{self, Config, ConfigPath, ComponentConfig},
     heartbeat,
     internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
@@ -491,7 +491,7 @@ pub async fn load_configs(
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
 
-    let mut watched_paths = config_paths
+    let watched_paths = config_paths
         .iter()
         .map(<&PathBuf>::from)
         .collect::<Vec<_>>();
@@ -509,10 +509,13 @@ pub async fn load_configs(
     .await
     .map_err(handle_config_errors)?;
 
+    let mut watched_component_paths = Vec::new();
+
     if let Some(watcher_conf) = watcher_conf {
-        for (_, sink) in config.sinks() {
-            let mut files = sink.inner.files_to_watch();
-            watched_paths.append(&mut files);
+        for (name, sink) in config.sinks() {
+            let files = sink.inner.files_to_watch();
+            let component_config = ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
+            watched_component_paths.push(component_config);
         }
 
         info!(
