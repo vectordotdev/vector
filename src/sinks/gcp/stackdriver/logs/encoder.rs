@@ -100,7 +100,7 @@ impl StackdriverLogsEncoder {
             .label_config
             .labels_key
             .as_deref()
-            .or_else(|| default_labels_key.as_deref())
+            .or(default_labels_key.as_deref())
             .unwrap();
 
         // merge log_labels in the specified labels_key into the labels map.
