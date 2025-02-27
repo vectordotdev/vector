@@ -238,12 +238,12 @@ mod tests {
         AF_INET,
     };
 
-    use crate::sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer};
-
     use super::{
         fetch_nl_inet_hdrs, parse_nl_inet_hdrs, TcpStats, STATE, TCP_CONNS_TOTAL,
         TCP_RX_QUEUED_BYTES_TOTAL, TCP_TX_QUEUED_BYTES_TOTAL,
     };
+    use crate::sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer};
+    use crate::test_util::next_addr;
 
     #[test]
     fn parses_nl_inet_hdrs() {
@@ -276,7 +276,8 @@ mod tests {
     #[tokio::test]
     async fn fetches_nl_net_hdrs() {
         // start a TCP server
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = next_addr();
+        let listener = TcpListener::bind(addr).await.unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
             // accept a connection
@@ -307,7 +308,8 @@ mod tests {
 
     #[tokio::test]
     async fn generates_tcp_metrics() {
-        let _listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = next_addr();
+        let _listener = TcpListener::bind(&addr).await.unwrap();
 
         let mut buffer = MetricsBuffer::new(None);
         HostMetrics::new(HostMetricsConfig::default())
