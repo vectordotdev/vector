@@ -119,5 +119,33 @@ components: sinks: websocket_server: {
 				it requires Basic auth with defined username and password.
 				"""
 		}
+		message_buffering: {
+			title: "Message buffering"
+			body: """
+				The `message_buffering` configuration option enables event buffering. It defines the number
+				of events to buffer, allowing clients to replay messages after a disconnection.
+				To provide clients with the message ID, define `message_buffering.message_id_path`.
+				This encodes the outgoing messages ID. The buffer is backed by a ring buffer, so
+				the oldest messages are discarded when the size limit is reached.
+
+				After clients have the ID, they can send it in the `last_received` query parameter on future connections.
+				All buffered messages since that ID are then sent to the client immediately upon connection.
+				If the message can't be found, the entire buffer is replayed.
+
+				Example config:
+				```yaml
+				sinks:
+					websocket_export:
+						type: websocket_server
+						inputs: ["demo_logs_test"]
+						address: "0.0.0.0:1234"
+							message_buffering:
+								max_events: 1000
+								message_id_path: "message_id"
+						encoding:
+							codec: "json"
+				```
+				"""
+		}
 	}
 }
