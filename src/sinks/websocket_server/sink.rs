@@ -8,9 +8,9 @@ use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
-    pin_mut,
+    future, pin_mut,
     stream::BoxStream,
-    StreamExt,
+    StreamExt, TryStreamExt,
 };
 use http::StatusCode;
 use tokio::net::TcpStream;
@@ -48,7 +48,6 @@ use crate::{
 use super::{buffering::MessageBufferingConfig, WebSocketListenerSinkConfig};
 
 pub struct WebSocketListenerSink {
-    peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
     tls: MaybeTlsSettings,
     transformer: Transformer,
     encoder: Encoder<()>,
@@ -67,8 +66,8 @@ impl WebSocketListenerSink {
             .auth
             .map(|config| config.build(&cx.enrichment_tables))
             .transpose()?;
+
         Ok(Self {
-            peers: Arc::new(Mutex::new(HashMap::new())),
             tls,
             address: config.address,
             transformer,
@@ -93,6 +92,7 @@ impl WebSocketListenerSink {
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
+        client_checkpoints: Arc<Mutex<HashMap<String, Uuid>>>,
         buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
         mut listener: MaybeTlsListener,
     ) {
@@ -104,6 +104,7 @@ impl WebSocketListenerSink {
                     auth.clone(),
                     message_buffering.clone(),
                     Arc::clone(&peers),
+                    Arc::clone(&client_checkpoints),
                     Arc::clone(&buffer),
                     stream,
                     open_gauge.clone(),
@@ -117,6 +118,7 @@ impl WebSocketListenerSink {
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
+        client_checkpoints: Arc<Mutex<HashMap<String, Uuid>>>,
         buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
         stream: MaybeTlsIncomingStream<TcpStream>,
         open_gauge: OpenGauge,
@@ -126,8 +128,20 @@ impl WebSocketListenerSink {
         debug!("Incoming TCP connection from: {}", addr);
 
         let mut buffer_replay = BufferReplayRequest::NO_REPLAY;
+        let mut client_checkpoint_key = None;
+
         let header_callback = |req: &Request, response: Response| {
-            buffer_replay = message_buffering.extract_message_replay_request(req);
+            client_checkpoint_key = message_buffering.client_key(req, &addr);
+            buffer_replay = message_buffering.extract_message_replay_request(
+                req,
+                client_checkpoint_key.clone().and_then(|key| {
+                    client_checkpoints
+                        .lock()
+                        .expect("mutex poisoned")
+                        .get(&key)
+                        .cloned()
+                }),
+            );
             let Some(auth) = auth else {
                 return Ok(response);
             };
@@ -173,12 +187,30 @@ impl WebSocketListenerSink {
             });
         }
 
-        let (outgoing, _incoming) = ws_stream.split();
+        let (outgoing, incoming) = ws_stream.split();
 
+        let incoming_data_handler = incoming.try_for_each(|msg| {
+            let ip = addr.ip();
+            debug!("Received a message from {}: {}", ip, msg.to_text().unwrap());
+            if let Some(client_key) = &client_checkpoint_key {
+                if let Some(checkpoint) = message_buffering.handle_ack_request(msg) {
+                    debug!(
+                        "Inserting checkpoint for {}({}): {}",
+                        client_key, ip, checkpoint
+                    );
+                    client_checkpoints
+                        .lock()
+                        .unwrap()
+                        .insert(client_key.clone(), checkpoint);
+                }
+            }
+
+            future::ok(())
+        });
         let forward_data_to_client = rx.map(Ok).forward(outgoing);
 
-        pin_mut!(forward_data_to_client);
-        let _ = forward_data_to_client.await;
+        pin_mut!(forward_data_to_client, incoming_data_handler);
+        future::select(forward_data_to_client, incoming_data_handler).await;
 
         {
             let mut peers = peers.lock().unwrap();
@@ -205,14 +237,18 @@ impl StreamSink<Event> for WebSocketListenerSink {
 
         let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
 
+        let peers = Arc::new(Mutex::new(HashMap::default()));
         let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
             self.message_buffering.buffer_capacity(),
         )));
+        let client_checkpoints = Arc::new(Mutex::new(HashMap::default()));
+
         tokio::spawn(
             Self::handle_connections(
                 self.auth,
                 self.message_buffering.clone(),
-                Arc::clone(&self.peers),
+                Arc::clone(&peers),
+                Arc::clone(&client_checkpoints),
                 Arc::clone(&message_buffer),
                 listener,
             )
@@ -251,7 +287,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
                         buffer.push_back((message_id, message.clone()));
                     }
 
-                    let peers = self.peers.lock().unwrap();
+                    let peers = peers.lock().unwrap();
                     let broadcast_recipients = peers.iter().map(|(_, ws_sink)| ws_sink);
                     for recp in broadcast_recipients {
                         if let Err(error) = recp.unbounded_send(message.clone()) {
@@ -412,6 +448,7 @@ mod tests {
                 message_buffering: Some(MessageBufferingConfig {
                     max_events: NonZeroUsize::new(1).unwrap(),
                     message_id_path: None,
+                    client_ack_support: None,
                 }),
                 ..Default::default()
             },
@@ -455,6 +492,7 @@ mod tests {
                 message_buffering: Some(MessageBufferingConfig {
                     max_events: NonZeroUsize::new(1).unwrap(),
                     message_id_path: None,
+                    client_ack_support: None,
                 }),
                 ..Default::default()
             },
