@@ -7,6 +7,8 @@ use std::{
     thread,
 };
 
+use crate::config::ComponentConfig;
+
 use notify::{recommended_watcher, EventKind, RecursiveMode};
 
 use crate::Error;
@@ -67,9 +69,19 @@ pub fn spawn_thread<'a>(
     watcher_conf: WatcherConfig,
     signal_tx: crate::signal::SignalTx,
     config_paths: impl IntoIterator<Item = &'a PathBuf> + 'a,
+    component_configs: Vec<ComponentConfig>,
     delay: impl Into<Option<Duration>>,
 ) -> Result<(), Error> {
-    let config_paths: Vec<_> = config_paths.into_iter().cloned().collect();
+    let mut config_paths: Vec<_> = config_paths.into_iter().cloned().collect();
+    let mut component_config_paths: Vec<_> = component_configs
+        .clone()
+        .into_iter()
+        .map(|p| p.config_paths.clone())
+        .flatten()
+        .collect();
+
+    config_paths.append(&mut component_config_paths);
+
     let delay = delay.into().unwrap_or(CONFIG_WATCH_DELAY);
 
     // Create watcher now so not to miss any changes happening between
@@ -92,6 +104,19 @@ pub fn spawn_thread<'a>(
 
                     debug!(message = "Consumed file change events for delay.", delay = ?delay);
 
+                    let component_keys: Vec<_> = component_configs
+                        .clone()
+                        .into_iter()
+                        .map(|p| p.contains(&event.paths))
+                        .flatten()
+                        .collect();
+
+                    for component_key in component_keys {
+                        info!("Component {} configuration changed.", component_key);
+                        _ = signal_tx.send(crate::signal::SignalTo::ReloadComponent(component_key)).map_err(|error| {
+                            error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
+                        });
+                    }
                     // We need to read paths to resolve any inode changes that may have happened.
                     // And we need to do it before raising sighup to avoid missing any change.
                     if let Err(error) = watcher.add_paths(&config_paths) {
@@ -182,12 +207,13 @@ mod tests {
         let dir = temp_dir().to_path_buf();
         let file_path = dir.join("vector.toml");
         let watcher_conf = WatcherConfig::RecommendedWatcher;
-
+        let component_file_path = Vec::new(dir.join("tls.cert"), dir.join("tls.key"));
+        let component_config = ComponentConfig::new(component_file_path, ComponentKey::from("http"));
         std::fs::create_dir(&dir).unwrap();
         let mut file = File::create(&file_path).unwrap();
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
-        spawn_thread(watcher_conf, signal_tx, &[dir], delay).unwrap();
+        spawn_thread(watcher_conf, signal_tx, &[dir], component_file_path, delay).unwrap();
 
         if !test(&mut file, delay * 5, signal_rx).await {
             panic!("Test timed out");
