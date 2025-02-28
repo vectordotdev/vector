@@ -57,7 +57,8 @@ GO_TAR_FILE="go${GO_VERSION}.linux-amd64.tar.gz"
 wget https://go.dev/dl/${GO_TAR_FILE}
 tar -C /usr/local -xzf ${GO_TAR_FILE}
 rm ${GO_TAR_FILE}
+ln -s /usr/local/go/bin/go /usr/local/bin/go
 
-# Set Go binary in PATH globally
-echo "export PATH=\$PATH:/usr/local/go/bin" >> /etc/profile
-. /etc/profile
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+cargo install --force --locked bindgen-cli
+. "$HOME/.cargo/env"
