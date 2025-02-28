@@ -8,3 +8,4 @@ There is a Makefile to ease the process of compiling the test binary file. It re
 
 * `make generate-test-payload`
   * this script will generate the required *_pb2.py and serialise a test message.
+
