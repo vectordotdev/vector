@@ -551,7 +551,7 @@ pub async fn load_configs(
         );
 
         // Start listening for config changes.
-        config::watcher::spawn_thread(watcher_conf, signal_handler.clone_tx(), watched_paths, None)
+        config::watcher::spawn_thread(watcher_conf, signal_handler.clone_tx(), watched_paths, watched_component_paths, None)
             .map_err(|error| {
                 error!(message = "Unable to start config watcher.", %error);
                 exitcode::CONFIG
