@@ -26,6 +26,11 @@ apt-get install -y \
       llvm-9 \
       unzip
 
+# aws-lc-rs dependencies
+apt-get install -y \
+ build-essential \
+ libssl-dev
+
 # Go installation is required for building aws-lc-rs
 # https://github.com/aws/aws-lc/issues/2129
 GO_VERSION="1.24.0"
