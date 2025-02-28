@@ -147,6 +147,7 @@ where
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::env;
     use std::path::PathBuf;
 
     use bytes::{BufMut, Bytes};
@@ -382,9 +383,13 @@ mod tests {
         assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
     }
 
+    fn test_data_dir() -> PathBuf {
+        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("tests/data/protobuf")
+    }
+
     #[test]
     fn test_encode_batch_protobuf_single() {
-        let message_raw = std::fs::read("tests/data/protobuf/test_proto.pb").unwrap();
+        let message_raw = std::fs::read(test_data_dir().join("test_proto.pb")).unwrap();
         let input_proto_size = message_raw.len();
 
         // default LengthDelimitedCoderOptions.length_field_length is 4
@@ -396,7 +401,7 @@ mod tests {
 
         let config = ProtobufSerializerConfig {
             protobuf: ProtobufSerializerOptions {
-                desc_file: PathBuf::from("tests/data/protobuf/test_proto.desc"),
+                desc_file: test_data_dir().join("test_proto.desc"),
                 message_type: "test_proto.User".to_string(),
             },
         };
@@ -435,7 +440,7 @@ mod tests {
 
     #[test]
     fn test_encode_batch_protobuf_multiple() {
-        let message_raw = std::fs::read("tests/data/protobuf/test_proto.pb").unwrap();
+        let message_raw = std::fs::read(test_data_dir().join("test_proto.pb")).unwrap();
         let messages = vec![message_raw.clone(), message_raw.clone()];
         let total_input_proto_size: usize = messages.iter().map(|m| m.len()).sum();
 
@@ -450,7 +455,7 @@ mod tests {
 
         let config = ProtobufSerializerConfig {
             protobuf: ProtobufSerializerOptions {
-                desc_file: PathBuf::from("tests/data/protobuf/test_proto.desc"),
+                desc_file: test_data_dir().join("test_proto.desc"),
                 message_type: "test_proto.User".to_string(),
             },
         };
