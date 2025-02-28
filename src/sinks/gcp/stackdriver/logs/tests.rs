@@ -75,7 +75,7 @@ fn encode_valid() {
     let encoder = StackdriverLogsEncoder::new(
         transformer,
         Template::try_from("{{ log_id }}").unwrap(),
-        StackdriverLogName::Project("project".to_owned()),
+        StackdriverLogName::Project(Template::try_from("{{ my_project_id }}".to_owned()).unwrap()),
         StackdriverResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([
@@ -97,6 +97,7 @@ fn encode_valid() {
         ("anumber", "100"),
         ("node_id", "10.10.10.1"),
         ("log_id", "testlogs"),
+        ("my_project_id", "project-123"),
     ]
     .iter()
     .copied()
@@ -105,8 +106,8 @@ fn encode_valid() {
     assert_eq!(
         json,
         serde_json::json!({
-            "logName":"projects/project/logs/testlogs",
-            "jsonPayload":{"message":"hello world"},
+            "logName":"projects/project-123/logs/testlogs",
+            "jsonPayload":{"message":"hello world", "my_project_id":"project-123"},
             "severity":100,
             "resource":{
                 "type":"generic_node",
@@ -123,7 +124,7 @@ fn encode_inserts_timestamp() {
     let encoder = StackdriverLogsEncoder::new(
         transformer,
         Template::try_from("testlogs").unwrap(),
-        StackdriverLogName::Project("project".to_owned()),
+        StackdriverLogName::Project(Template::try_from("project".to_owned()).unwrap()),
         StackdriverResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([(
@@ -197,7 +198,7 @@ async fn correct_request() {
     let encoder = StackdriverLogsEncoder::new(
         transformer,
         Template::try_from("testlogs").unwrap(),
-        StackdriverLogName::Project("project".to_owned()),
+        StackdriverLogName::Project(Template::try_from("project".to_owned()).unwrap()),
         StackdriverResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([(
@@ -236,7 +237,6 @@ async fn correct_request() {
 
     let (parts, body) = request.into_parts();
     let json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
-
     assert_eq!(
         &parts.uri.to_string(),
         "https://logging.googleapis.com/v2/entries:write"
