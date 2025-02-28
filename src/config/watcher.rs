@@ -111,12 +111,6 @@ pub fn spawn_thread<'a>(
                         .flatten()
                         .collect();
 
-                    for component_key in component_keys {
-                        info!("Component {} configuration changed.", component_key);
-                        _ = signal_tx.send(crate::signal::SignalTo::ReloadComponent(component_key)).map_err(|error| {
-                            error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
-                        });
-                    }
                     // We need to read paths to resolve any inode changes that may have happened.
                     // And we need to do it before raising sighup to avoid missing any change.
                     if let Err(error) = watcher.add_paths(&config_paths) {
@@ -127,11 +121,13 @@ pub fn spawn_thread<'a>(
                     debug!(message = "Reloaded paths.");
 
                     info!("Configuration file changed.");
-                    if !component_keys.is_empty() {
-                        info!("Component {:?} configuration changed.", component_keys);
-                        _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(component_keys)).map_err(|error| {
-                            error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
-                        });
+                    if component_keys.len() > 0 {
+                        for component_key in component_keys {
+                            info!("Component {} configuration changed.", component_key);
+                            _ = signal_tx.send(crate::signal::SignalTo::ReloadComponent(component_key)).map_err(|error| {
+                                error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
+                            });
+                        }
                     } else {
                         _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk)
                             .map_err(|error| {
