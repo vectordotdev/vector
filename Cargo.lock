@@ -11120,6 +11120,7 @@ dependencies = [
  "async-trait",
  "aws-config",
  "aws-credential-types",
+ "aws-lc-sys",
  "aws-sdk-cloudwatch",
  "aws-sdk-cloudwatchlogs",
  "aws-sdk-elasticsearch",
