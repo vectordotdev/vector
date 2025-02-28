@@ -27,9 +27,28 @@ apt-get install -y \
       unzip
 
 # aws-lc-rs dependencies
+apt-get update
 apt-get install -y \
- build-essential \
- libssl-dev
+  gcc-arm-linux-gnueabihf \
+  g++-arm-linux-gnueabihf \
+  gcc-aarch64-linux-gnu \
+  g++-aarch64-linux-gnu \
+  libc6-dev-armhf-cross \
+  libc6-dev-arm64-cross \
+  clang \
+  cmake \
+  libssl-dev \
+  libclang-dev \
+  libsasl2-dev
+
+# Required by the `rdkafka-sys` Rust dependency
+ZLIB_VERSION=1.3.1
+wget https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz
+tar xzvf  zlib-${ZLIB_VERSION}.tar.gz
+cd zlib-${ZLIB_VERSION}
+./configure
+make
+make install
 
 # Go installation is required for building aws-lc-rs
 # https://github.com/aws/aws-lc/issues/2129
