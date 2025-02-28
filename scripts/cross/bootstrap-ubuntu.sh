@@ -25,3 +25,15 @@ apt-get install -y \
       libclang1-9 \
       llvm-9 \
       unzip
+
+# Go installation is required for building aws-lc-rs
+# https://github.com/aws/aws-lc/issues/2129
+GO_VERSION="1.24.0"
+GO_TAR_FILE="go${GO_VERSION}.linux-amd64.tar.gz"
+wget https://go.dev/dl/${GO_TAR_FILE}
+tar -C /usr/local -xzf ${GO_TAR_FILE}
+rm ${GO_TAR_FILE}
+
+# Set Go binary in PATH globally
+echo "export PATH=\$PATH:/usr/local/go/bin" >> /etc/profile
+. /etc/profile
