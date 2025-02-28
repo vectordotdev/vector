@@ -18,7 +18,7 @@ use crate::extra_context::ExtraContext;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts, WatchConfigMethod},
-    config::{self, Config, ConfigPath, ComponentConfig},
+    config::{self, Config, ConfigPath, ComponentConfig, ComponentKey},
     heartbeat,
     internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
@@ -336,9 +336,31 @@ async fn handle_signal(
     allow_empty_config: bool,
 ) -> Option<SignalTo> {
     match signal {
+        Ok(SignalTo::ReloadComponent(component_key)) => {
+            let mut topology_controller = topology_controller.lock().await;
+
+            // Reload paths
+            if let Some(paths) = config::process_paths(config_paths) {
+                topology_controller.config_paths = paths;
+            }
+
+            // Reload config
+            let new_config = config::load_from_paths_with_provider_and_secrets(
+                &topology_controller.config_paths,
+                signal_handler,
+                allow_empty_config,
+            )
+                .await;
+
+            reload_config_from_result(
+                topology_controller,
+                new_config,
+                Some(&component_key))
+                .await
+        }
         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
             let topology_controller = topology_controller.lock().await;
-            reload_config_from_result(topology_controller, config_builder.build()).await
+            reload_config_from_result(topology_controller, config_builder.build(), None).await
         }
         Ok(SignalTo::ReloadFromDisk) => {
             let mut topology_controller = topology_controller.lock().await;
@@ -354,9 +376,9 @@ async fn handle_signal(
                 signal_handler,
                 allow_empty_config,
             )
-            .await;
+                .await;
 
-            reload_config_from_result(topology_controller, new_config).await
+            reload_config_from_result(topology_controller, new_config, None).await
         }
         Err(RecvError::Lagged(amt)) => {
             warn!("Overflow, dropped {} signals.", amt);
@@ -370,9 +392,10 @@ async fn handle_signal(
 async fn reload_config_from_result(
     mut topology_controller: MutexGuard<'_, TopologyController>,
     config: Result<Config, Vec<String>>,
+    component_to_reload: Option<&ComponentKey>
 ) -> Option<SignalTo> {
     match config {
-        Ok(new_config) => match topology_controller.reload(new_config).await {
+        Ok(new_config) => match topology_controller.reload(new_config, component_to_reload).await {
             ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
             _ => None,
         },

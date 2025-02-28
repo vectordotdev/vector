@@ -227,6 +227,7 @@ impl RunningTopology {
         &mut self,
         new_config: Config,
         extra_context: ExtraContext,
+        component_to_reload: Option<&ComponentKey>,
     ) -> Result<bool, ()> {
         info!("Reloading running topology with new configuration.");
 
@@ -244,7 +245,7 @@ impl RunningTopology {
         //
         // We also shutdown any component that is simply being removed entirely.
         let diff = ConfigDiff::new(&self.config, &new_config);
-        let buffers = self.shutdown_diff(&diff, &new_config).await;
+        let buffers = self.shutdown_diff(&diff, &new_config, component_to_reload).await;
 
         // Gives windows some time to make available any port
         // released by shutdown components.
@@ -349,6 +350,7 @@ impl RunningTopology {
         &mut self,
         diff: &ConfigDiff,
         new_config: &Config,
+        component_to_reload: Option<&ComponentKey>,
     ) -> HashMap<ComponentKey, BuiltBuffer> {
         // First, we shutdown any changed/removed sources. This ensures that we can allow downstream
         // components to terminate naturally by virtue of the flow of events stopping.
@@ -532,7 +534,7 @@ impl RunningTopology {
         // they can naturally shutdown and allow us to recover their buffers if possible.
         let mut buffer_tx = HashMap::new();
 
-        let sinks_to_change = diff
+        let mut sinks_to_change = diff
             .sinks
             .to_change
             .iter()
@@ -543,6 +545,12 @@ impl RunningTopology {
                     .is_some()
             }))
             .collect::<Vec<_>>();
+
+        match component_to_reload {
+            Some(component) => sinks_to_change.push(component),
+            _ => (),
+        }
+
         for key in &sinks_to_change {
             debug!(component = %key, "Changing sink.");
             if reuse_buffers.contains(key) {
