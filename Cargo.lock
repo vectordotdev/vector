@@ -835,11 +835,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-lc-fips-sys"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29003a681b2b9465c1139bfb726da452a841a8b025f35953f3bce71139f10b21"
+dependencies = [
+ "bindgen 0.69.5",
+ "cc",
+ "cmake",
+ "dunce",
+ "fs_extra",
+ "paste",
+ "regex",
+]
+
+[[package]]
 name = "aws-lc-rs"
 version = "1.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cd755adf9707cf671e31d944a189be3deaaeee11c8bc1d669bb8022ac90fbd0"
 dependencies = [
+ "aws-lc-fips-sys",
  "aws-lc-sys",
  "paste",
  "untrusted 0.7.1",
@@ -852,7 +868,7 @@ version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f9dd2e03ee80ca2822dd6ea431163d2ef259f2066a4d6ccaca6d9dcb386aa43"
 dependencies = [
- "bindgen",
+ "bindgen 0.69.5",
  "cc",
  "cmake",
  "dunce",
@@ -1666,7 +1682,7 @@ dependencies = [
  "bitflags 2.8.0",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.12.1",
  "lazy_static",
  "lazycell",
  "log",
@@ -1678,6 +1694,26 @@ dependencies = [
  "shlex",
  "syn 2.0.98",
  "which 4.4.2",
+]
+
+[[package]]
+name = "bindgen"
+version = "0.71.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f58bf3d7db68cfbac37cfc485a8d711e87e064c3d0fe0435b92f7a407f9d6b3"
+dependencies = [
+ "bitflags 2.8.0",
+ "cexpr",
+ "clang-sys",
+ "itertools 0.13.0",
+ "log",
+ "prettyplease 0.2.15",
+ "proc-macro2 1.0.93",
+ "quote 1.0.38",
+ "regex",
+ "rustc-hash 2.1.1",
+ "shlex",
+ "syn 2.0.98",
 ]
 
 [[package]]
@@ -5656,7 +5692,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -6062,7 +6098,7 @@ dependencies = [
  "mlua_derive",
  "num-traits",
  "parking_lot",
- "rustc-hash 2.0.0",
+ "rustc-hash 2.1.1",
 ]
 
 [[package]]
@@ -8623,9 +8659,9 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rustc-hash"
-version = "2.0.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "583034fd73374156e66797ed8e5b0d5690409c9226b22d87cb7f19821c05d152"
+checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
 
 [[package]]
 name = "rustc_version"
@@ -11145,6 +11181,7 @@ dependencies = [
  "azure_storage",
  "azure_storage_blobs",
  "base64 0.22.1",
+ "bindgen 0.71.1",
  "bloomy",
  "bollard",
  "byteorder",
