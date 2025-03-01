@@ -61,4 +61,4 @@ ln -s /usr/local/go/bin/go /usr/local/bin/go
 
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 cargo install --force --locked bindgen-cli
-. "$HOME/.cargo/env"
+ln -s "$(dirname $(which cargo))/"* /usr/local/bin/
