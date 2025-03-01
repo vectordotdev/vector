@@ -270,7 +270,6 @@ async fn insert_metric() {
 
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
-    // TODO: modify counter to use a composite type instead of jsonb
     let create_table_sql = format!(
         "CREATE TABLE {table} (name TEXT, namespace TEXT, tags JSONB, timestamp TIMESTAMPTZ,
         kind TEXT, counter JSONB)"
