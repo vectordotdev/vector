@@ -32,8 +32,6 @@ const fn default_pool_size() -> u32 {
 #[derive(Clone, Default, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PostgresConfig {
-    // TODO: if I used UriSerde instead of String, I couldn't get a url string to use
-    // in the connection pool, as the password would be redacted with UriSerde::to_string
     /// The PostgreSQL server connection string. It can contain the username and password.
     /// See [PostgreSQL documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) about connection strings for more information
     /// about valid formats and options that can be used.
