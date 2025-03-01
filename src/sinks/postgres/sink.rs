@@ -19,9 +19,7 @@ impl PostgresSink {
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
-            // TODO: is this batch setting ok?
             .batched(self.batch_settings.as_byte_size_config())
-            // TODO: use request builder?
             .filter_map(|events| async move {
                 match PostgresRequest::try_from(events) {
                     Ok(request) => Some(request),
