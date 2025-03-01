@@ -122,7 +122,6 @@ impl SinkConfig for PostgresConfig {
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
-    // TODO: allow for Input::all()
     fn input(&self) -> Input {
         Input::all()
     }
