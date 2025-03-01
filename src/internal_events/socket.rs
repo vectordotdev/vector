@@ -122,7 +122,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
             error = %self.error,
             error_code = "socket_bind",
             error_type = error_type::IO_FAILED,
-            stage = error_stage::RECEIVING,
+            stage = error_stage::INITIALIZING,
             %mode,
             internal_log_rate_limit = true,
         );
@@ -130,7 +130,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
             "component_errors_total",
             "error_code" => "socket_bind",
             "error_type" => error_type::IO_FAILED,
-            "stage" => error_stage::RECEIVING,
+            "stage" => error_stage::INITIALIZING,
             "mode" => mode,
         )
         .increment(1);
@@ -156,7 +156,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketMulticastGroupJoinError<E> {
             error = %self.error,
             error_code = "socket_multicast_group_join",
             error_type = error_type::IO_FAILED,
-            stage = error_stage::RECEIVING,
+            stage = error_stage::INITIALIZING,
             %mode,
             %group_addr,
             %interface,
@@ -166,7 +166,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketMulticastGroupJoinError<E> {
             "component_errors_total",
             "error_code" => "socket_multicast_group_join",
             "error_type" => error_type::IO_FAILED,
-            "stage" => error_stage::RECEIVING,
+            "stage" => error_stage::INITIALIZING,
             "mode" => mode,
             "group_addr" => group_addr,
             "interface" => interface,
