@@ -105,7 +105,6 @@ impl DriverResponse for PostgresResponse {
     }
 
     fn events_sent(&self) -> &GroupedCountByteSize {
-        // TODO: Is this correct?
         self.metadata.events_estimated_json_encoded_byte_size()
     }
 
@@ -145,8 +144,6 @@ impl Service<PostgresRequest> for PostgresService {
                 .collect::<Result<Vec<_>, _>>()
                 .context(VectorCommonSnafu)?;
 
-            // TODO: If a single item of the batch fails, the whole batch will fail its insert.
-            // Is this intended behaviour?
             sqlx::query(&format!(
                 "INSERT INTO {table} SELECT * FROM jsonb_populate_recordset(NULL::{table}, $1)"
             ))
