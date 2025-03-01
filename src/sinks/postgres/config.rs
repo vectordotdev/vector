@@ -90,9 +90,6 @@ impl GenerateConfig for PostgresConfig {
 #[typetag::serde(name = "postgres")]
 impl SinkConfig for PostgresConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // TODO: make connection pool configurable. Or should we just have one connection per sink?
-        // TODO: it seems that the number of connections in the pool does not affect the throughput of the sink
-        // does the sink execute batches in parallel?
         let connection_pool = PgPoolOptions::new()
             .max_connections(self.pool_size)
             .connect(&self.endpoint)
@@ -107,8 +104,6 @@ impl SinkConfig for PostgresConfig {
         let service = PostgresService::new(
             connection_pool,
             self.table.clone(),
-            // TODO: this endpoint is used for metrics' tags. It could contain passwords,
-            // will it be redacted there?
             endpoint_uri.to_string(),
         );
         let service = ServiceBuilder::new()
