@@ -86,6 +86,8 @@ pub mod new_relic;
 pub mod opendal_common;
 #[cfg(feature = "sinks-opentelemetry")]
 pub mod opentelemetry;
+#[cfg(feature = "sinks-opentelemetry_metrics")]
+pub mod opentelemetry_metrics;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]
