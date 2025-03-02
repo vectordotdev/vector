@@ -142,7 +142,7 @@ impl Default for AggregationTemporalityConfig {
 
 /// Encoding configuration for OpenTelemetry Metrics.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[configurable(description = "Configures how events are encoded into raw bytes.")]
 pub struct OpentelemetryMetricsEncodingConfig {
     #[serde(flatten)]
@@ -150,15 +150,6 @@ pub struct OpentelemetryMetricsEncodingConfig {
 
     #[serde(flatten)]
     transformer: Transformer,
-}
-
-impl Default for OpentelemetryMetricsEncodingConfig {
-    fn default() -> Self {
-        Self {
-            encoding: JsonSerializerConfig::default(),
-            transformer: Transformer::default(),
-        }
-    }
 }
 
 impl_generate_config_from_default!(OpentelemetryMetricsSinkConfig);
