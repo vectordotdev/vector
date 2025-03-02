@@ -1,7 +1,10 @@
 #[cfg(test)]
 mod tests;
 
-use std::{str::FromStr, task::{Context, Poll}};
+use std::{
+    str::FromStr,
+    task::{Context, Poll},
+};
 
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use futures_util::future;
@@ -9,7 +12,9 @@ use http::Request;
 use hyper::Body;
 use tower::Service;
 use vector_lib::{
-    codecs::JsonSerializerConfig, configurable::configurable_component, opentelemetry::proto::{
+    codecs::JsonSerializerConfig,
+    configurable::configurable_component,
+    opentelemetry::proto::{
         collector::metrics::v1::ExportMetricsServiceRequest,
         common::v1::{any_value, AnyValue, InstrumentationScope, KeyValue},
         metrics::v1::{
@@ -17,7 +22,10 @@ use vector_lib::{
             HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
         },
         resource::v1::Resource,
-    }, sink::VectorSink, tls::TlsEnableableConfig, ByteSizeOf, EstimatedJsonEncodedSizeOf
+    },
+    sink::VectorSink,
+    tls::TlsEnableableConfig,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -34,7 +42,7 @@ use crate::{
         http::HttpStatusRetryLogic,
         Compression, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
         TowerRequestConfig,
-    }
+    },
 };
 
 use super::util::{service::TowerRequestConfigDefaults, UriSerde};
@@ -183,10 +191,7 @@ impl SinkConfig for OpentelemetryMetricsSinkConfig {
 /// Healthcheck for the `opentelemetry_metrics` sink.
 ///
 /// Reference https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/extension/healthcheckextension/README.md
-async fn healthcheck(
-    uri: UriSerde,
-    client: HttpClient,
-) -> crate::Result<()> {
+async fn healthcheck(uri: UriSerde, client: HttpClient) -> crate::Result<()> {
     let uri = uri.with_default_parts();
     let request = Request::head(&uri.uri).body(Body::empty()).unwrap();
 
