@@ -142,7 +142,7 @@ clap = { version = "4.5.30", default-features = false, features = ["derive", "er
 flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.2", default-features = false }
-hickory-proto = { version = "0.25.0-alpha.4", default-features = false, features = ["dnssec-openssl"] }
+hickory-proto = { version = "0.25.0-alpha.5", default-features = false, features = ["dnssec-ring"] }
 indexmap = { version = "2.7.1", default-features = false, features = ["serde", "std"] }
 inventory = { version = "0.3" }
 metrics = "0.24.1"
