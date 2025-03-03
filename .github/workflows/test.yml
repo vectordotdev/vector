@@ -64,6 +64,13 @@ jobs:
 
       - run: bash scripts/environment/prepare.sh
 
+      - name: Build VRL Playground
+        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
+        run: |
+          cd lib/vector-vrl/web-playground/
+          sudo -E ~/.cargo/bin/rustup target add wasm32-unknown-unknown
+          wasm-pack build --target web --out-dir public/pkg
+
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
 
@@ -121,13 +128,6 @@ jobs:
       - name: VRL - Linux
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
         run: cargo vdev test-vrl
-
-      - name: Build VRL Playground
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
-        run: |
-          cd lib/vector-vrl/web-playground/
-          # The following needs to install `wasm32-unknown-unknown`.
-          sudo -E wasm-pack build --target web --out-dir public/pkg
 
   # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   all-checks:
