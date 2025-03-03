@@ -80,8 +80,6 @@ if ! command -v rustup ; then
   # https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md#rust-tools
   curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 fi
-# Ensure the active toolchain is installed.
-rustup toolchain install
 
 # Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 24.04 images _and_
 # by our own Ubuntu 24.04 images, so this is really just make sure the path is configured.
@@ -92,6 +90,9 @@ if [ -n "${CI-}" ] ; then
 else
     echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> "${HOME}/.bash_profile"
 fi
+
+# Ensure the active toolchain is installed.
+rustup toolchain install
 
 # Docker.
 if ! [ -x "$(command -v docker)" ]; then
