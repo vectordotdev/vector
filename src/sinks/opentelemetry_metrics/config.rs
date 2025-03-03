@@ -174,7 +174,7 @@ mod tests {
     use super::*;
     use indoc::indoc;
     use wiremock::{
-        matchers::{method, path},
+        matchers::method,
         Mock, MockServer, ResponseTemplate,
     };
 
@@ -202,13 +202,12 @@ mod tests {
         let mock_server = MockServer::start().await;
 
         Mock::given(method("HEAD"))
-            .and(path("/health"))
             .respond_with(ResponseTemplate::new(200))
             .mount(&mock_server)
             .await;
 
         let client = HttpClient::new(None, &Default::default()).unwrap();
-        let endpoint = format!("{}/health", mock_server.uri());
+        let endpoint = mock_server.uri();
 
         healthcheck(endpoint, client).await.unwrap();
     }
@@ -218,13 +217,12 @@ mod tests {
         let mock_server = MockServer::start().await;
 
         Mock::given(method("HEAD"))
-            .and(path("/health"))
             .respond_with(ResponseTemplate::new(500))
             .mount(&mock_server)
             .await;
 
         let client = HttpClient::new(None, &Default::default()).unwrap();
-        let endpoint = format!("{}/health", mock_server.uri());
+        let endpoint = mock_server.uri();
 
         assert!(healthcheck(endpoint, client).await.is_err());
     }
