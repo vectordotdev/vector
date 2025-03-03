@@ -136,9 +136,9 @@ members = [
 [workspace.dependencies]
 anyhow = "1.0.96"
 cfg-if = { version = "1.0.0", default-features = false }
-chrono = { version = "0.4.39", default-features = false, features = ["clock", "serde"] }
+chrono = { version = "0.4.40", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.1", default-features = false, features = ["serde"] }
-clap = { version = "4.5.30", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.31", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.2", default-features = false }
@@ -299,7 +299,7 @@ greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingest
 
 # External libs
 arc-swap = { version = "1.7", default-features = false, optional = true }
-async-compression = { version = "0.4.18", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.4.20", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.22.1", default-features = false, optional = true }
@@ -380,7 +380,7 @@ toml.workspace = true
 tonic = { workspace = true, optional = true }
 hickory-proto = { workspace = true, optional = true }
 thread_local = { version = "1.1.8", default-features = false, optional = true }
-typetag = { version = "0.2.19", default-features = false }
+typetag = { version = "0.2.20", default-features = false }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }
 zstd = { version = "0.13.0", default-features = false }
@@ -438,7 +438,7 @@ tower-test = "0.4.0"
 vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
 
-wiremock = "0.6.2"
+wiremock = "0.6.3"
 zstd = { version = "0.13.0", default-features = false }
 
 [patch.crates-io]
