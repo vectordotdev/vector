@@ -396,7 +396,7 @@ sysinfo = "0.32.1"
 byteorder = "1.5.0"
 
 [target.'cfg(windows)'.dependencies]
-windows-service = "0.7.0"
+windows-service = "0.8.0"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.26.2", default-features = false, features = ["socket", "signal"] }
