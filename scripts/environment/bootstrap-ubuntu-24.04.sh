@@ -83,6 +83,8 @@ fi
 
 # Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 24.04 images _and_
 # by our own Ubuntu 24.04 images, so this is really just make sure the path is configured.
+CARGO_OVERRIDE_DIR="${HOME}/.cargo"
+CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
 if [ -n "${CI-}" ] ; then
     echo "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
     # we often run into OOM issues in CI due to the low memory vs. CPU ratio on c5 instances
@@ -92,7 +94,7 @@ else
 fi
 
 # Ensure the active toolchain is installed.
-rustup toolchain install
+"${CARGO_BIN_DIR}/rustup" toolchain install
 
 # Docker.
 if ! [ -x "$(command -v docker)" ]; then
@@ -132,7 +134,6 @@ fi
 apt-get clean
 
 # Set up the default "deny all warnings" build flags
-CARGO_OVERRIDE_DIR="${HOME}/.cargo"
 CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
 cat <<EOF >>"$CARGO_OVERRIDE_CONF"
 [target.'cfg(linux)']
@@ -161,7 +162,6 @@ if [ -z "${DISABLE_MOLD:-""}" ] ; then
 
     # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
     # anything linking calls to use `mold` instead of `ld`, etc.
-    CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
     mkdir -p "$CARGO_BIN_DIR"
 
     RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
