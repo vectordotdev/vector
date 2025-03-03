@@ -8,6 +8,7 @@ use vector_lib::opentelemetry::proto::{
 };
 
 use super::*;
+use crate::http::HttpClient;
 use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use crate::sinks::opentelemetry_metrics::metric::Data;
 
