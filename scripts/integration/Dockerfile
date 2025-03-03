@@ -3,17 +3,19 @@ FROM docker.io/rust:${RUST_VERSION}-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libc6-dev \
     cmake \
     curl \
     g++ \
-    libclang1 \
+    llvm \
+    libclang-dev \
     libsasl2-dev \
     libssl-dev \
-    llvm \
     pkg-config \
     zlib1g-dev \
     unzip \
     git \
+    golang-go \
   && rm -rf /var/lib/apt/lists/*
 
 RUN rustup run "${RUST_VERSION}" cargo install cargo-nextest --version 0.9.72 --locked
