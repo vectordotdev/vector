@@ -112,6 +112,7 @@ components: sources: host_metrics: {
 		process_runtime: _host & _process_counter & {description: "The process uptime."}
 		process_cpu_usage: _host & _process_gauge & {description: "The process CPU usage."}
 		process_memory_usage: _host & _process_gauge & {description: "The process memory usage."}
+		process_memory_virtual_usage: _host & _process_gauge & {description: "The process virtual memory usage."}
 
 		// Host cgroups
 		cgroup_cpu_usage_seconds_total: _host & _cgroup_cpu & {description: "The total amount CPU time used by this cgroup and its descendants, in seconds."}
@@ -175,6 +176,23 @@ components: sources: host_metrics: {
 		network_transmit_errs_total: _host & _network_counter & {description: "The number of errors encountered during transmits on this interface."}
 		network_transmit_packets_drop_total: _host & _network_nomac & {description: "The number of packets dropped during transmits on this interface."}
 		network_transmit_packets_total: _host & _network_nomac & {description: "The number of packets transmitted on this interface."}
+
+		// Host tcp
+		tcp_connections_total: _host & _tcp_linux & _tcp_gauge & {description: "The number of TCP connections."}
+		tcp_tx_queued_bytes_total: _host & _tcp_linux & {
+			description: "The number of bytes in the send queue across all connections."
+			type:        "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["tcp"]
+			}
+		}
+		tcp_rx_queued_bytes_total: _host & _tcp_linux & {
+			description: "The number of bytes in the receive queue across all connections."
+			type:        "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["tcp"]
+			}
+		}
 
 		// Helpers
 		_host: {
@@ -275,6 +293,19 @@ components: sources: host_metrics: {
 			type: "gauge"
 			tags: _host_metrics_tags & {
 				collector: examples: ["process"]
+			}
+		}
+
+		_tcp_linux: {relevant_when: "OS is Linux"}
+		_tcp_gauge: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["tcp"]
+				state: {
+					description: "The connection state."
+					required:    true
+					examples: ["established", "time_wait"]
+				}
 			}
 		}
 	}

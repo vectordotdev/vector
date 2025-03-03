@@ -38,7 +38,7 @@ fn detect_container_tool() -> OsString {
             .stderr(Stdio::null())
             .spawn()
             .and_then(|mut child| child.wait())
-            .map_or(false, |status| status.success())
+            .is_ok_and(|status| status.success())
         {
             return OsString::from(String::from(tool));
         }

@@ -4,11 +4,12 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: vector
+  namespace: default
   labels:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Aggregator
-    app.kubernetes.io/version: "0.43.1-distroless-libc"
+    app.kubernetes.io/version: "0.45.0-distroless-libc"
   annotations: {}
 spec:
   replicas: 1
@@ -33,7 +34,7 @@ spec:
       dnsPolicy: ClusterFirst
       containers:
         - name: vector
-          image: "timberio/vector:0.43.1-distroless-libc"
+          image: "timberio/vector:0.45.0-distroless-libc"
           imagePullPolicy: IfNotPresent
           args:
             - --config-dir

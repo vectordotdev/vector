@@ -7,6 +7,7 @@ Airis
 Airpad
 Alcatel
 Alexey
+alertmanager
 Alibaba
 Allfine
 Allview
@@ -360,6 +361,8 @@ jsonnet
 jsontag
 jvm
 kenton
+keepappkey
+keephq
 konqueror
 kube
 kubeadm
@@ -438,6 +441,7 @@ scriptblock
 servlet
 Sinjo
 sublocation
+shannon
 sundar
 svcb
 snyk
@@ -476,6 +480,12 @@ otel
 otelcol
 siv
 onig
+aviv
+dammam
+doha
+mumbai
+paulo
+turin
 AIXM
 AUTOSAR
 CDMA
@@ -509,3 +519,11 @@ teledisk
 UMTS
 WCDMA
 XMODEM
+cbor
+requestline
+jetbrains
+JetBrains
+gifs
+meme
+simdutf
+vhosts

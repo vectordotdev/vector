@@ -78,7 +78,7 @@ bytesize
 califrag
 califragilistic
 CAROOT
-CBOR
+cbor
 cddl
 cdylib
 cef
@@ -442,7 +442,6 @@ PIDs
 PII
 plainify
 ple
-plork
 podspec
 Ponge
 POSINT

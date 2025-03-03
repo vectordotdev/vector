@@ -17,6 +17,7 @@ components: sources: http_server: {
 
 	features: {
 		acknowledgements: true
+		has_auth:         true
 		multiline: enabled: false
 		codecs: {
 			enabled:         true

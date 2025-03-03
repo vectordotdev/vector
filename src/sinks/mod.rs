@@ -70,6 +70,8 @@ pub mod humio;
 pub mod influxdb;
 #[cfg(feature = "sinks-kafka")]
 pub mod kafka;
+#[cfg(feature = "sinks-keep")]
+pub mod keep;
 #[cfg(feature = "sinks-loki")]
 pub mod loki;
 #[cfg(feature = "sinks-mezmo")]
@@ -108,6 +110,8 @@ pub mod vector;
 pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
+#[cfg(feature = "sinks-websocket-server")]
+pub mod websocket_server;
 
 pub use vector_lib::{config::Input, sink::VectorSink};
 
