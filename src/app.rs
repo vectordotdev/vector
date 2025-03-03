@@ -336,7 +336,7 @@ async fn handle_signal(
     allow_empty_config: bool,
 ) -> Option<SignalTo> {
     match signal {
-        Ok(SignalTo::ReloadComponent(component_key)) => {
+        Ok(SignalTo::ReloadComponents(component_keys)) => {
             let mut topology_controller = topology_controller.lock().await;
 
             // Reload paths
@@ -355,7 +355,7 @@ async fn handle_signal(
             reload_config_from_result(
                 topology_controller,
                 new_config,
-                Some(&component_key))
+                Some(component_keys.iter().map(AsRef::as_ref).collect()))
                 .await
         }
         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
@@ -392,10 +392,10 @@ async fn handle_signal(
 async fn reload_config_from_result(
     mut topology_controller: MutexGuard<'_, TopologyController>,
     config: Result<Config, Vec<String>>,
-    component_to_reload: Option<&ComponentKey>
+    components_to_reload: Option<Vec<&ComponentKey>>
 ) -> Option<SignalTo> {
     match config {
-        Ok(new_config) => match topology_controller.reload(new_config, component_to_reload).await {
+        Ok(new_config) => match topology_controller.reload(new_config, components_to_reload).await {
             ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
             _ => None,
         },

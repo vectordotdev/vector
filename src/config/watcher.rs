@@ -122,12 +122,10 @@ pub fn spawn_thread<'a>(
 
                     info!("Configuration file changed.");
                     if component_keys.len() > 0 {
-                        for component_key in component_keys {
-                            info!("Component {} configuration changed.", component_key);
-                            _ = signal_tx.send(crate::signal::SignalTo::ReloadComponent(component_key)).map_err(|error| {
-                                error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
-                            });
-                        }
+                        info!("Component {:?} configuration changed.", component_keys);
+                        _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(component_keys)).map_err(|error| {
+                            error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
+                        });
                     } else {
                         _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk)
                             .map_err(|error| {
