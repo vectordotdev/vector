@@ -165,7 +165,7 @@ components: sinks: websocket_server: {
 				This configuration adds a fixed tag (`test_extra_tag`) to each metric with the value, 
 				`test_value`. It also puts the `Authorization` header found in connection requests
 				into the `user_auth` tag, IP address of the client under the `client_ip` tag, full
-				connection URL under the `full_url` tag and the `last_received` query parameter under
+				connection URL under the `full_url` tag, and the `last_received` query parameter under
 				the `last_received_query` tag.
 				"""
 		}
