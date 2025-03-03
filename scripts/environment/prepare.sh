@@ -3,7 +3,7 @@ set -e -o verbose
 
 git config --global --add safe.directory /git/vectordotdev/vector
 
-rustup install
+rustup toolchain install
 rustup show
 if [[ "$(cargo-deb --version)" != "2.0.2" ]] ; then
   rustup run stable cargo install cargo-deb --version 2.0.0 --force --locked
