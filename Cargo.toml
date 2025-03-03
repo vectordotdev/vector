@@ -139,7 +139,7 @@ cfg-if = { version = "1.0.0", default-features = false }
 chrono = { version = "0.4.39", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.1", default-features = false, features = ["serde"] }
 clap = { version = "4.5.30", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
-flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
+flate2 = { version = "1.1.0", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.2", default-features = false }
 hickory-proto = { version = "0.24.4", default-features = false, features = ["dnssec"] }
