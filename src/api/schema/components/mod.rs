@@ -301,7 +301,14 @@ pub fn update_config(config: &Config) {
     }
 
     // Sinks
-    for (component_key, sink) in config.sinks() {
+    let table_sinks = config
+        .enrichment_tables()
+        .filter_map(|(k, e)| e.as_sink().map(|s| (k, s)))
+        .collect::<Vec<_>>();
+    for (component_key, sink) in config
+        .sinks()
+        .chain(table_sinks.iter().map(|(key, sink)| (*key, sink)))
+    {
         new_components.insert(
             component_key.clone(),
             Component::Sink(sink::Sink(sink::Data {

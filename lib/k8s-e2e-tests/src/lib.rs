@@ -10,6 +10,8 @@ use k8s_openapi::{
 use k8s_test_framework::{
     test_pod, wait_for_resource::WaitFor, CommandBuilder, Framework, Interface, Manager, Reader,
 };
+use rand::distr::{Alphanumeric, SampleString};
+use rand::rng;
 use tracing::{debug, error, info};
 
 pub mod metrics;
@@ -21,16 +23,9 @@ pub fn init() {
 }
 
 pub fn get_namespace() -> String {
-    use rand::Rng;
-
-    // Generate a random alphanumeric (lowercase) string to ensure each test is run with unique
-    // names.
+    // Generate a random alphanumeric (lowercase) string to ensure each test is run with unique names.
     // There is a 36 ^ 5 chance of a name collision, which is likely to be an acceptable risk.
-    let id: String = rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(5)
-        .map(|num| (num as char).to_ascii_lowercase())
-        .collect();
+    let id = Alphanumeric.sample_string(&mut rng(), 5).to_lowercase();
 
     format!("vector-{}", id)
 }

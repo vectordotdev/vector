@@ -8,7 +8,7 @@ license = "MIT"
 
 [dependencies]
 base64 = { version = "0.22.1", default-features = false }
-bytes = { version = "1.9.0", default-features = false, features = ["serde"] }
+bytes = { version = "1.10.0", default-features = false, features = ["serde"] }
 chrono.workspace = true
 dnsmsg-parser = { path = "../dnsmsg-parser" }
 hickory-proto.workspace = true

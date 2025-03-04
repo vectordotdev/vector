@@ -1009,6 +1009,7 @@ mod test {
             .build(SourceContext {
                 key: source_key.clone(),
                 globals: GlobalOptions::default(),
+                enrichment_tables: Default::default(),
                 shutdown: shutdown_signal,
                 out: sender,
                 proxy: Default::default(),
@@ -1663,11 +1664,11 @@ mod test {
 
             let events = collect_n(rx, 2).await;
             assert_eq!(
-                events[1].as_log()[log_schema().message_key().unwrap().to_string()],
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 big_message.into()
             );
             assert_eq!(
-                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+                events[1].as_log()[log_schema().message_key().unwrap().to_string()],
                 another_big_message.into()
             );
         })

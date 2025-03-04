@@ -8,5 +8,5 @@ publish = false
 [dependencies]
 arc-swap = { version = "1.7.1", default-features = false }
 chrono.workspace = true
-dyn-clone = { version = "1.0.17", default-features = false }
+dyn-clone = { version = "1.0.18", default-features = false }
 vrl.workspace = true

@@ -284,14 +284,23 @@ base: components: sources: pulsar: configuration: {
 				required:      false
 				type: object: options: {
 					desc_file: {
-						description: "Path to desc file"
-						required:    false
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
+																"""
+						required: false
 						type: string: default: ""
 					}
 					message_type: {
-						description: "message type. e.g package.message"
+						description: "The name of the message type to use for serializing."
 						required:    false
-						type: string: default: ""
+						type: string: {
+							default: ""
+							examples: ["package.Message"]
+						}
 					}
 				}
 			}
@@ -540,6 +549,35 @@ base: components: sources: pulsar: configuration: {
 		description: "The Pulsar subscription name."
 		required:    false
 		type: string: examples: ["subscription_name"]
+	}
+	tls: {
+		description: "TLS options configuration for the Pulsar client."
+		required:    false
+		type: object: options: {
+			ca_file: {
+				description: "File path containing a list of PEM encoded certificates"
+				required:    true
+				type: string: examples: ["/etc/certs/chain.pem"]
+			}
+			verify_certificate: {
+				description: """
+					Enables certificate verification.
+
+					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+					"""
+				required: false
+				type: bool: {}
+			}
+			verify_hostname: {
+				description: """
+					Whether hostname verification is enabled when verify_certificate is false
+
+					Set to true if not specified.
+					"""
+				required: false
+				type: bool: {}
+			}
+		}
 	}
 	topics: {
 		description: "The Pulsar topic names to read events from."

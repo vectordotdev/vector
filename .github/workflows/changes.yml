@@ -129,7 +129,7 @@ on:
 jobs:
   # Detects changes that are not specific to integration tests
   source:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.source }}
     outputs:
