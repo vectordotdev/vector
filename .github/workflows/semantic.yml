@@ -236,6 +236,7 @@ jobs:
             statsd sink
             vector sink
             websocket sink
+            websocket_server sink
             blog website
             css website
             guides website

@@ -535,7 +535,7 @@ const fn get_timestamp_millis(value: &Value) -> Option<i64> {
 #[cfg(test)]
 mod tests {
     use chrono::{DateTime, Duration};
-    use rand::{thread_rng, Rng};
+    use rand::{rng, Rng};
     use tokio::time::timeout;
     use vector_lib::event::{LogEvent, Metric, MetricKind, MetricValue, TraceEvent};
     use vrl::event_path;
@@ -581,7 +581,7 @@ mod tests {
     async fn emit_and_test(make_event: impl FnOnce(DateTime<Utc>) -> Event) {
         metrics::init_test();
         let (mut sender, _stream) = SourceSender::new_test();
-        let millis = thread_rng().gen_range(10..10000);
+        let millis = rng().random_range(10..10000);
         let timestamp = Utc::now() - Duration::milliseconds(millis);
         let expected = millis as f64 / 1000.0;
 

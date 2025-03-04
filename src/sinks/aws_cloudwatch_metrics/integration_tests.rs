@@ -115,7 +115,7 @@ async fn cloudwatch_metrics_namespace_partitioning() {
         }
     }
 
-    events.shuffle(&mut rand::thread_rng());
+    events.shuffle(&mut rand::rng());
 
     run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
 }
