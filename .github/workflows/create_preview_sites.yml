@@ -145,16 +145,16 @@ jobs:
                 req.on('error', (error) => {
                   reject(error);
                 });
-                  
+
                 req.write(JSON.stringify({
                   app_id: appId,
                   branch_name: sanitizedBranchName,
                 }));
-    
+
                 req.end();
               });
             };
-     
+
             const response = await makeRequest();
 
             if (!response.ok) {
