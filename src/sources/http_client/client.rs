@@ -5,10 +5,13 @@ use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
+use regex::Regex;
 use serde_with::serde_as;
 use snafu::ResultExt;
+use std::sync::LazyLock;
 use std::{collections::HashMap, time::Duration};
 use tokio_util::codec::Decoder as _;
+use vrl::diagnostic::Formatter;
 
 use crate::http::{QueryParameterValue, QueryParameters};
 use crate::sources::util::http_client;
@@ -32,11 +35,28 @@ use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
+use vector_lib::config::{log_schema, LogNamespace, SourceOutput};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
-    config::{log_schema, LogNamespace, SourceOutput},
-    event::Event,
+    compile_vrl,
+    event::{Event, LogEvent, VrlTarget},
+    TimeZone,
 };
+use vrl::compiler::CompilationResult;
+use vrl::{
+    compiler::{runtime::Runtime, CompileConfig, Function},
+    core::Value,
+    prelude::TypeState,
+};
+
+static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>.+)\}\}").unwrap());
+static FUNCTIONS: LazyLock<Vec<Box<dyn Function>>> = LazyLock::new(|| {
+    vrl::stdlib::all()
+        .into_iter()
+        .chain(vector_lib::enrichment::vrl_functions())
+        .chain(vector_vrl_functions::all())
+        .collect()
+});
 
 /// Configuration for the `http_client` source.
 #[serde_as]
@@ -74,9 +94,14 @@ pub struct HttpClientConfig {
     ///
     /// The parameters provided in this option are appended to any parameters
     /// manually provided in the `endpoint` option.
+    ///
+    /// VRL functions are supported within query parameters. You can
+    /// use functions like `now()` to dynamically modify query
+    /// parameter values. The VRL function must be wrapped in `{{ ... }}`
+    /// e.g. {{ now() }}
     #[serde(default)]
     #[configurable(metadata(
-        docs::additional_props_description = "A query string parameter and it's value(s)."
+        docs::additional_props_description = "A query string parameter and its value(s)."
     ))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: QueryParameters,
@@ -96,7 +121,7 @@ pub struct HttpClientConfig {
     /// One or more values for the same header can be provided.
     #[serde(default)]
     #[configurable(metadata(
-        docs::additional_props_description = "An HTTP request header and it's value(s)."
+        docs::additional_props_description = "An HTTP request header and its value(s)."
     ))]
     #[configurable(metadata(docs::examples = "headers_examples()"))]
     pub headers: HashMap<String, Vec<String>>,
@@ -136,6 +161,10 @@ fn query_examples() -> QueryParameters {
                 "papaya".to_owned(),
                 "kiwi".to_owned(),
             ]),
+        ),
+        (
+            "start_time".to_owned(),
+            QueryParameterValue::SingleParam("\"{{ now() }}\"".to_owned()),
         ),
     ])
 }
@@ -178,16 +207,78 @@ impl Default for HttpClientConfig {
 
 impl_generate_config_from_default!(HttpClientConfig);
 
+fn process_vrl(query_str: &str) -> Option<String> {
+    let state = TypeState::default();
+    let mut config = CompileConfig::default();
+    config.set_read_only();
+
+    // Strip {{ }} from the string
+    let raw_vrl_string = RE.replace_all(query_str, |caps: &regex::Captures| {
+        let expression = &caps[1];
+        expression.to_string()
+    });
+
+    match compile_vrl(&raw_vrl_string, &FUNCTIONS, &state, config) {
+        Ok(CompilationResult {
+            program,
+            warnings,
+            config: _,
+        }) => {
+            if !warnings.is_empty() {
+                let warnings_str = Formatter::new(&raw_vrl_string, warnings)
+                    .colored()
+                    .to_string();
+                warn!(message = "VRL compilation warning.", %warnings_str);
+            }
+
+            let mut target = VrlTarget::new(
+                Event::Log(LogEvent::from(Value::from(raw_vrl_string))),
+                program.info(),
+                false,
+            );
+
+            let timezone = TimeZone::default();
+            if let Ok(value) = Runtime::default().resolve(&mut target, &program, &timezone) {
+                // Trim quotes from the string, so that key1: {{ upcase("foo")}} will resolve
+                // properly as endpoint.com/key1=FOO and not endpoint.com/key1="FOO"
+                return Some(value.to_string().trim_matches('"').to_string());
+            }
+        }
+        Err(diagnostics) => {
+            let error_str = Formatter::new(&raw_vrl_string, diagnostics)
+                .colored()
+                .to_string();
+            warn!(message = "VRL compilation error.", %error_str);
+        }
+    }
+    None
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "http_client")]
 impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
-        // build the url
+        // Check if we have any VRL expressions in the query parameters
+        let has_vrl_expressions = self.query.iter().any(|(_, value)| match value {
+            QueryParameterValue::SingleParam(param) => RE.is_match(param),
+            QueryParameterValue::MultiParams(params) => params.iter().any(|p| RE.is_match(p)),
+        });
+
+        // Build the base URLs
         let endpoints = [self.endpoint.clone()];
-        let urls = endpoints
+        let urls: Vec<Uri> = endpoints
             .iter()
             .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
-            .map(|r| r.map(|uri| build_url(&uri, &self.query)))
+            .map(|r| {
+                if has_vrl_expressions {
+                    // For URLs with VRL expressions, don't add query parameters here
+                    // They'll be added dynamically during the HTTP request
+                    r
+                } else {
+                    // For URLs without VRL expressions, add query parameters now
+                    r.map(|uri| build_url(&uri, &self.query))
+                }
+            })
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
@@ -199,10 +290,15 @@ impl SourceConfig for HttpClientConfig {
 
         let content_type = self.decoding.content_type(&self.framing).to_string();
 
-        // the only specific context needed is the codec decoding
+        // Create context with the config for dynamic query parameter evaluation
         let context = HttpClientContext {
             decoder,
             log_namespace,
+            config: if has_vrl_expressions {
+                Some(self.clone())
+            } else {
+                None
+            },
         };
 
         warn_if_interval_too_low(self.timeout, self.interval);
@@ -259,6 +355,10 @@ impl HttpClientConfig {
 pub struct HttpClientContext {
     pub decoder: Decoder,
     pub log_namespace: LogNamespace,
+    /// The original config is stored for dynamic query parameter evaluation
+    /// This is used to evaluate VRL expressions like {{ now() }} on each request
+    /// rather than just once during initialization
+    config: Option<HttpClientConfig>,
 }
 
 impl HttpClientContext {
@@ -294,6 +394,27 @@ impl HttpClientBuilder for HttpClientContext {
     }
 }
 
+/// Process any VRL expressions in query parameters
+fn process_query_value(value: &QueryParameterValue) -> QueryParameterValue {
+    match value {
+        QueryParameterValue::SingleParam(param) => QueryParameterValue::SingleParam(
+            process_vrl(param)
+                .filter(|_| RE.is_match(param))
+                .unwrap_or_else(|| param.to_string()),
+        ),
+        QueryParameterValue::MultiParams(params) => QueryParameterValue::MultiParams(
+            params
+                .iter()
+                .map(|param| {
+                    process_vrl(param)
+                        .filter(|_| RE.is_match(param))
+                        .unwrap_or_else(|| param.to_string())
+                })
+                .collect(),
+        ),
+    }
+}
+
 impl http_client::HttpClientContext for HttpClientContext {
     /// Decodes the HTTP response body into events per the decoder configured.
     fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
@@ -304,6 +425,51 @@ impl http_client::HttpClientContext for HttpClientContext {
         let events = self.decode_events(&mut buf);
 
         Some(events)
+    }
+
+    /// Process the URL dynamically before each request
+    fn process_url(&self, url: &Uri) -> Option<Uri> {
+        // If we don't have a config, it means the query doesn't have any VRL parameters,
+        // so we can short-circuit here and just use the original URL
+        let config: &HttpClientConfig = self.config.as_ref()?;
+
+        let mut processed_query = HashMap::new();
+        let mut has_vrl_params = false;
+
+        // Process query parameters for each request
+        for (param_name, query_value) in &config.query {
+            let processed_value = process_query_value(query_value);
+
+            // Check if any parameters were modified
+            if processed_value != *query_value {
+                has_vrl_params = true;
+            }
+
+            // Store the processed query parameter
+            processed_query.insert(param_name.to_string(), processed_value);
+        }
+
+        if has_vrl_params {
+            // Extract the base URI without query parameters to avoid parameter duplication
+            let base_uri = Uri::builder()
+                .scheme(
+                    url.scheme()
+                        .cloned()
+                        .unwrap_or_else(|| http::uri::Scheme::try_from("http").unwrap()),
+                )
+                .authority(
+                    url.authority()
+                        .cloned()
+                        .unwrap_or_else(|| http::uri::Authority::try_from("localhost").unwrap()),
+                )
+                .path_and_query(url.path().to_string())
+                .build()
+                .ok()?;
+
+            Some(build_url(&base_uri, &processed_query))
+        } else {
+            None
+        }
     }
 
     /// Enriches events with source_type, timestamp
