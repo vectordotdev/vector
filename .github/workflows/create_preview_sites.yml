@@ -133,7 +133,7 @@ jobs:
                     'X-Hub-Signature': signature,
                   }
                 };
-                  
+
                 const req = https.request(endpoint, options, (res) => {
                   let data = '';
                   res.on('data', (chunk) => { data += chunk; });
@@ -141,7 +141,7 @@ jobs:
                     resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
                   });
                 });
-                  
+
                 req.on('error', (error) => {
                   reject(error);
                 });
@@ -150,13 +150,13 @@ jobs:
                   app_id: appId,
                   branch_name: sanitizedBranchName,
                 }));
-                  
+    
                 req.end();
               });
             };
-                  
+     
             const response = await makeRequest();
-                  
+
             if (!response.ok) {
               core.setFailed(`Request failed with response code ${response.status}`);
             }
