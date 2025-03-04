@@ -126,7 +126,7 @@ jobs:
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
         run: |
           cd lib/vector-vrl/web-playground/
-          sudo -E ~/.cargo/bin/rustup target add wasm32-unknown-unknown
+          ~/.cargo/bin/rustup target add wasm32-unknown-unknown
           wasm-pack build --target web --out-dir public/pkg
 
   # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
