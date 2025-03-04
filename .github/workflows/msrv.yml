@@ -20,7 +20,6 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: |
           # We usually run `scripts/environment/prepare.sh` but in this case we only need the toolchain.
-          TOOLCHAIN="$(rustup show active-toolchain | awk '{print $1;}')"
-          rustup toolchain install "${TOOLCHAIN}"
+          rustup show active-toolchain || rustup toolchain install
       - run: cargo install cargo-msrv --version 0.15.1
       - run: cargo msrv verify
