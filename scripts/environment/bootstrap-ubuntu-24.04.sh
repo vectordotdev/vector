@@ -93,9 +93,6 @@ else
     echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> "${HOME}/.bash_profile"
 fi
 
-# Ensure the active toolchain is installed.
-"${CARGO_BIN_DIR}/rustup" toolchain install
-
 # Docker.
 if ! [ -x "$(command -v docker)" ]; then
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
