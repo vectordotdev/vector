@@ -5,10 +5,13 @@ use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
+use regex::Regex;
 use serde_with::serde_as;
 use snafu::ResultExt;
+use std::sync::LazyLock;
 use std::{collections::HashMap, time::Duration};
 use tokio_util::codec::Decoder as _;
+use vrl::diagnostic::Formatter;
 
 use crate::http::{QueryParameterValue, QueryParameters};
 use crate::sources::util::http_client;
@@ -32,11 +35,28 @@ use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
+use vector_lib::config::{log_schema, LogNamespace, SourceOutput};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
-    config::{log_schema, LogNamespace, SourceOutput},
-    event::Event,
+    compile_vrl,
+    event::{Event, LogEvent, VrlTarget},
+    TimeZone,
 };
+use vrl::compiler::CompilationResult;
+use vrl::{
+    compiler::{runtime::Runtime, CompileConfig, Function},
+    core::Value,
+    prelude::TypeState,
+};
+
+static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>.+)\}\}").unwrap());
+static FUNCTIONS: LazyLock<Vec<Box<dyn Function>>> = LazyLock::new(|| {
+    vrl::stdlib::all()
+        .into_iter()
+        .chain(vector_lib::enrichment::vrl_functions())
+        .chain(vector_vrl_functions::all())
+        .collect()
+});
 
 /// Configuration for the `http_client` source.
 #[serde_as]
@@ -74,9 +94,14 @@ pub struct HttpClientConfig {
     ///
     /// The parameters provided in this option are appended to any parameters
     /// manually provided in the `endpoint` option.
+    ///
+    /// VRL functions are supported within query parameters. You can
+    /// use functions like `now()` to dynamically modify query
+    /// parameter values. The VRL function must be wrapped in `{{ ... }}`
+    /// e.g. {{ now() }}
     #[serde(default)]
     #[configurable(metadata(
-        docs::additional_props_description = "A query string parameter and it's value(s)."
+        docs::additional_props_description = "A query string parameter and its value(s)."
     ))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: QueryParameters,
@@ -96,7 +121,7 @@ pub struct HttpClientConfig {
     /// One or more values for the same header can be provided.
     #[serde(default)]
     #[configurable(metadata(
-        docs::additional_props_description = "An HTTP request header and it's value(s)."
+        docs::additional_props_description = "An HTTP request header and its value(s)."
     ))]
     #[configurable(metadata(docs::examples = "headers_examples()"))]
     pub headers: HashMap<String, Vec<String>>,
@@ -136,6 +161,10 @@ fn query_examples() -> QueryParameters {
                 "papaya".to_owned(),
                 "kiwi".to_owned(),
             ]),
+        ),
+        (
+            "start_time".to_owned(),
+            QueryParameterValue::SingleParam("\"{{ now() }}\"".to_owned()),
         ),
     ])
 }
@@ -178,16 +207,75 @@ impl Default for HttpClientConfig {
 
 impl_generate_config_from_default!(HttpClientConfig);
 
+fn process_vrl(query_str: &str) -> Option<String> {
+    let state = TypeState::default();
+    let mut config = CompileConfig::default();
+    config.set_read_only();
+
+    // Strip {{ }} from the string
+    let raw_vrl_string = RE.replace_all(query_str, |caps: &regex::Captures| {
+        let expression = &caps[1];
+        expression.to_string()
+    });
+
+    match compile_vrl(&raw_vrl_string, &FUNCTIONS, &state, config) {
+        Ok(CompilationResult {
+            program,
+            warnings,
+            config: _,
+        }) => {
+            if !warnings.is_empty() {
+                let warnings_str = Formatter::new(&raw_vrl_string, warnings)
+                    .colored()
+                    .to_string();
+                warn!(message = "VRL compilation warning", %warnings_str);
+            }
+
+            let mut target = VrlTarget::new(
+                Event::Log(LogEvent::from(Value::from(raw_vrl_string))),
+                program.info(),
+                false,
+            );
+
+            let timezone = TimeZone::default();
+            if let Ok(value) = Runtime::default().resolve(&mut target, &program, &timezone) {
+                // Trim quotes from the string, so that key1: {{ upcase("foo")}} will resolve
+                // properly as endpoint.com/key1=FOO and not endpoint.com/key1="FOO"
+                return Some(value.to_string().trim_matches('"').to_string());
+            }
+        }
+        Err(diagnostics) => {
+            let error_str = Formatter::new(&raw_vrl_string, diagnostics)
+                .colored()
+                .to_string();
+            warn!(message = "VRL compilation error", %error_str);
+        }
+    }
+    None
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "http_client")]
 impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
-        // build the url
+        let mut processed_query = self.query.clone();
+        for (param_name, query_value) in self.query.iter() {
+            match query_value {
+                QueryParameterValue::SingleParam(param) => {
+                    self.process_single_param(param_name, param, &mut processed_query);
+                }
+                QueryParameterValue::MultiParams(params) => {
+                    self.process_multi_params(param_name, params, &mut processed_query);
+                }
+            }
+        }
+
+        // Build the URL with the processed query parameters
         let endpoints = [self.endpoint.clone()];
         let urls = endpoints
             .iter()
             .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
-            .map(|r| r.map(|uri| build_url(&uri, &self.query)))
+            .map(|r| r.map(|uri| build_url(&uri, &processed_query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
@@ -251,6 +339,49 @@ impl HttpClientConfig {
             log_namespace.unwrap_or_else(|| self.log_namespace.unwrap_or(false).into());
 
         DecodingConfig::new(framing, decoding, log_namespace)
+    }
+
+    fn process_single_param(
+        &self,
+        param_name: &str,
+        param: &str,
+        processed_query: &mut HashMap<String, QueryParameterValue>,
+    ) {
+        let processed_param = self.parse_param(param);
+        processed_query.insert(
+            param_name.to_string(),
+            QueryParameterValue::SingleParam(processed_param),
+        );
+    }
+
+    fn process_multi_params(
+        &self,
+        param_name: &str,
+        params: &[String],
+        processed_query: &mut HashMap<String, QueryParameterValue>,
+    ) {
+        let processed_params: Vec<String> =
+            params.iter().map(|param| self.parse_param(param)).collect();
+
+        processed_query.insert(
+            param_name.to_string(),
+            QueryParameterValue::MultiParams(processed_params),
+        );
+    }
+
+    /// Resolve any VRL expressions in the parameter, if they exist
+    fn parse_param(&self, param: &str) -> String {
+        let mut parsed_param = param.to_string();
+
+        if let Some(cap) = RE.captures(param) {
+            if let Some(vrl_expr) = cap.name("key") {
+                let query_str = process_vrl(vrl_expr.as_str())
+                    .unwrap_or_else(|| panic!("Failed to process VRL in query parameter"));
+
+                parsed_param = parsed_param.replace(&cap[0], &query_str);
+            }
+        }
+        parsed_param
     }
 }
 
