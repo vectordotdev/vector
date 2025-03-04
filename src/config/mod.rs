@@ -93,7 +93,7 @@ impl ComponentConfig {
     pub fn contains(&self, config_paths: &Vec<PathBuf>) -> Option<ComponentKey> {
         for i in config_paths {
             if self.config_paths.contains(&i) {
-                return Some(self.component_key.clone())
+                return Some(self.component_key.clone());
             }
         }
         None

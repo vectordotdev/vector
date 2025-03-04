@@ -280,7 +280,8 @@ mod tests {
         let file_path = dir.join("vector.toml");
         let watcher_conf = WatcherConfig::RecommendedWatcher;
         let component_file_path = Vec::new(dir.join("tls.cert"), dir.join("tls.key"));
-        let component_config = ComponentConfig::new(component_file_path, ComponentKey::from("http"));
+        let component_config =
+            ComponentConfig::new(component_file_path, ComponentKey::from("http"));
         std::fs::create_dir(&dir).unwrap();
         let mut file = File::create(&file_path).unwrap();
 

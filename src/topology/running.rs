@@ -242,7 +242,9 @@ impl RunningTopology {
         //
         // We also shutdown any component that is simply being removed entirely.
         let diff = ConfigDiff::new(&self.config, &new_config);
-        let buffers = self.shutdown_diff(&diff, &new_config, components_to_reload).await;
+        let buffers = self
+            .shutdown_diff(&diff, &new_config, components_to_reload)
+            .await;
 
         // Gives windows some time to make available any port
         // released by shutdown components.
