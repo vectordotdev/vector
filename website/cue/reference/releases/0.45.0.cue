@@ -81,7 +81,7 @@ releases: "0.45.0": {
 				Add a new type of `enrichment_table` - `memory`, which can also act as a sink, ingesting all the
 				data and storing it per key, enabling it to be read from all other enrichment tables.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type:        "feat"
@@ -120,14 +120,14 @@ releases: "0.45.0": {
 			description: """
 				The `tag_cardinality_limit` transform now supports customizing limits for specific metrics, matched by metric name and optionally, its namespace.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "feat"
 			description: """
 				Add `websocket_server` sink that acts as a websocket server and broadcasts events to all clients.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "feat"
@@ -137,7 +137,7 @@ releases: "0.45.0": {
 
 				You can read more in this [how it works](/docs/reference/configuration/sources/http_server/#authorization-configuration) section.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "fix"
@@ -151,7 +151,7 @@ releases: "0.45.0": {
 			description: """
 				The `dnstap` source now uses [v20250201](https://github.com/dnstap/dnstap.pb/releases/tag/v20250201) dnstap protobuf schema.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "fix"
