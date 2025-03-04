@@ -9,6 +9,7 @@ use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
 use crate::{
+    common::http::{server_auth::HttpServerAuthConfig, ErrorMessage},
     config::{
         GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
@@ -18,7 +19,7 @@ use crate::{
     serde::bool_or_struct,
     sources::{
         self,
-        util::{decode, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{decode, http::HttpMethod, HttpSource},
     },
     tls::TlsEnableableConfig,
 };
@@ -41,7 +42,7 @@ pub struct PrometheusRemoteWriteConfig {
 
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
-    auth: Option<HttpSourceAuthConfig>,
+    auth: Option<HttpServerAuthConfig>,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]

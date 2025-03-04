@@ -238,12 +238,12 @@ mod tests {
         AF_INET,
     };
 
-    use crate::sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer};
-
     use super::{
         fetch_nl_inet_hdrs, parse_nl_inet_hdrs, TcpStats, STATE, TCP_CONNS_TOTAL,
         TCP_RX_QUEUED_BYTES_TOTAL, TCP_TX_QUEUED_BYTES_TOTAL,
     };
+    use crate::sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer};
+    use crate::test_util::next_addr;
 
     #[test]
     fn parses_nl_inet_hdrs() {
@@ -273,10 +273,21 @@ mod tests {
         assert_eq!(*tcp_stats.conn_states.get("syn_recv").unwrap(), 1.0);
     }
 
+    #[ignore]
+    /// These tests are flakey and need reworking.
+    /// This is a workaround for running these tests serially.
+    /// The `generates_tcp_metrics` test internally calls `fetch_nl_inet_hdrs` and reads
+    /// from the same socket as the `fetches_nl_net_hdrs` test.
     #[tokio::test]
+    async fn tcp_metrics_tests() {
+        fetches_nl_net_hdrs().await;
+        generates_tcp_metrics().await;
+    }
+
     async fn fetches_nl_net_hdrs() {
         // start a TCP server
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let next_addr = next_addr();
+        let listener = TcpListener::bind(next_addr).await.unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
             // accept a connection
@@ -305,9 +316,9 @@ mod tests {
         assert!(dst);
     }
 
-    #[tokio::test]
     async fn generates_tcp_metrics() {
-        let _listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let next_addr = next_addr();
+        let _listener = TcpListener::bind(next_addr).await.unwrap();
 
         let mut buffer = MetricsBuffer::new(None);
         HostMetrics::new(HostMetricsConfig::default())

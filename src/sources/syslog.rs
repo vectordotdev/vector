@@ -452,7 +452,7 @@ mod test {
     use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath};
 
     use chrono::prelude::*;
-    use rand::{thread_rng, Rng};
+    use rand::{rng, Rng};
     use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
@@ -1377,7 +1377,7 @@ mod test {
                 host: "hogwarts".to_owned(),
                 source_type: "syslog".to_owned(),
                 appname: "harry".to_owned(),
-                procid: thread_rng().gen_range(0..32768),
+                procid: rng().random_range(0..32768),
                 structured_data,
                 message: msg,
             }
@@ -1538,7 +1538,7 @@ mod test {
         max_children: usize,
         field_len: usize,
     ) -> StructuredData {
-        let amount = thread_rng().gen_range(0..max_children);
+        let amount = rng().random_range(0..max_children);
 
         random_maps(max_map_size, field_len)
             .filter(|m| !m.is_empty()) //syslog_rfc5424 ignores empty maps, tested separately

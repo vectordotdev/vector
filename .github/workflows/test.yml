@@ -35,7 +35,7 @@ jobs:
 
   checks:
     name: Checks
-    runs-on: ubuntu-20.04-8core
+    runs-on: ubuntu-24.04-8core
     timeout-minutes: 60
     needs: changes
     env:
@@ -58,7 +58,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
 
       - uses: ruby/setup-ruby@v1
 
@@ -126,12 +126,13 @@ jobs:
         if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
         run: |
           cd lib/vector-vrl/web-playground/
+          ~/.cargo/bin/rustup target add wasm32-unknown-unknown
           wasm-pack build --target web --out-dir public/pkg
 
   # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   all-checks:
     name: Test Suite
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: always()
     needs: [changes, checks]

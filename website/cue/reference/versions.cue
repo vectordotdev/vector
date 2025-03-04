@@ -2,6 +2,7 @@ package metadata
 
 // This has to be maintained manually because there's currently no way to sort versions programmatically
 versions: [string, ...string] & [
+	"0.45.0",
 	"0.44.0",
 	"0.43.1",
 	"0.43.0",
