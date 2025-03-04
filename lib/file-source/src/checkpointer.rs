@@ -105,7 +105,7 @@ impl CheckpointsView {
             .filter(|entry| {
                 let ts = entry.value();
                 let duration = now - *ts;
-                duration >= chrono::Duration::seconds(60)
+                duration >= chrono::Duration::seconds(1)
             })
             .map(|entry| *entry.key())
             .collect::<Vec<FileFingerprint>>();
