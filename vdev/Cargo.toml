@@ -24,7 +24,7 @@ indicatif = { version = "0.17.11", features = ["improved_unicode"] }
 itertools = "0.14.0"
 log = "0.4.26"
 # watch https://github.com/epage/anstyle for official interop with Clap
-owo-colors = { version = "4.1.0", features = ["supports-colors"] }
+owo-colors = { version = "4.2.0", features = ["supports-colors"] }
 paste = "1.0.15"
 regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
