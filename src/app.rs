@@ -18,7 +18,7 @@ use crate::extra_context::ExtraContext;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts, WatchConfigMethod},
-    config::{self, Config, ConfigPath, ComponentConfig, ComponentKey},
+    config::{self, ComponentConfig, ComponentKey, Config, ConfigPath},
     heartbeat,
     internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
@@ -350,13 +350,14 @@ async fn handle_signal(
                 signal_handler,
                 allow_empty_config,
             )
-                .await;
+            .await;
 
             reload_config_from_result(
                 topology_controller,
                 new_config,
-                Some(component_keys.iter().map(AsRef::as_ref).collect()))
-                .await
+                Some(component_keys.iter().map(AsRef::as_ref).collect()),
+            )
+            .await
         }
         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
             let topology_controller = topology_controller.lock().await;
@@ -376,7 +377,7 @@ async fn handle_signal(
                 signal_handler,
                 allow_empty_config,
             )
-                .await;
+            .await;
 
             reload_config_from_result(topology_controller, new_config, None).await
         }
@@ -392,10 +393,13 @@ async fn handle_signal(
 async fn reload_config_from_result(
     mut topology_controller: MutexGuard<'_, TopologyController>,
     config: Result<Config, Vec<String>>,
-    components_to_reload: Option<Vec<&ComponentKey>>
+    components_to_reload: Option<Vec<&ComponentKey>>,
 ) -> Option<SignalTo> {
     match config {
-        Ok(new_config) => match topology_controller.reload(new_config, components_to_reload).await {
+        Ok(new_config) => match topology_controller
+            .reload(new_config, components_to_reload)
+            .await
+        {
             ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
             _ => None,
         },
@@ -537,7 +541,8 @@ pub async fn load_configs(
     if let Some(watcher_conf) = watcher_conf {
         for (name, sink) in config.sinks() {
             let files = sink.inner.files_to_watch();
-            let component_config = ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
+            let component_config =
+                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
             watched_component_paths.push(component_config);
         }
 
@@ -547,11 +552,17 @@ pub async fn load_configs(
         );
 
         // Start listening for config changes.
-        config::watcher::spawn_thread(watcher_conf, signal_handler.clone_tx(), watched_paths, watched_component_paths, None)
-            .map_err(|error| {
-                error!(message = "Unable to start config watcher.", %error);
-                exitcode::CONFIG
-            })?;
+        config::watcher::spawn_thread(
+            watcher_conf,
+            signal_handler.clone_tx(),
+            watched_paths,
+            watched_component_paths,
+            None,
+        )
+        .map_err(|error| {
+            error!(message = "Unable to start config watcher.", %error);
+            exitcode::CONFIG
+        })?;
     }
 
     config::init_log_schema(config.global.log_schema.clone(), true);
