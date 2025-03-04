@@ -45,7 +45,18 @@ components: sinks: postgres: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
+		notices: [
+			"""
+				[PostgreSQL's default values](\(urls.postgresql_default_values)) defined in the destination table
+				are not supported. If the ingested event is missing a field which is present as a table column,
+				a `null` value will be inserted for that record even if that column has a default value defined.
+				This is a limitation of the `jsonb_populate_recordset` function of PostgreSQL.
+
+				As a workaround, you can add a `NOT NULL` constraint to the column, so when inserting an event which is missing that field
+				a `NOT NULL` constraint violation would be raised, and define a [constraint trigger](\(urls.postgresql_constraint_trigger))
+				to catch the exception and set the desired default value.
+				""",
+		]
 	}
 
 	configuration: base.components.sinks.postgres.configuration
@@ -95,10 +106,10 @@ components: sinks: postgres: {
 				Note that not all fields must be declared in the table, only the ones you want to store. If a field is not present in the table
 				but it is present in the event, it will be ignored.
 
-				When inserting the event into the table. PostgreSQL will do a best-effort job of converting the JSON serialized
+				When inserting the event into the table, PostgreSQL will do a best-effort job of converting the JSON serialized
 				event to the correct PostgreSQL data types.
-				The semantics of the insertion will follow the `jsonb_populate_record` function of PostgresSQL.
-				See [PostgreSQL documentation](\(urls.postgresql_json_functions)) about that function
+				The semantics of the insertion will follow the `jsonb_populate_record` function of PostgresSQL,
+				see [PostgreSQL documentation](\(urls.postgresql_json_functions)) about that function
 				for more details about the inserting behavior.
 				The correspondence between Vector types and PostgreSQL types can be found
 				in the [`sqlx` crate's documentation](\(urls.postgresql_sqlx_correspondence))
@@ -147,7 +158,7 @@ components: sinks: postgres: {
 				When using PostgreSQL [composite types](\(urls.postgresql_composite_types)), the sink will attempt to insert the event data into
 				the composite type, following its structure.
 
-				Following the previous example, if you want to store the `payload` column as a composite type instead of a `JSOB`,
+				Using the previous example, if you want to store the `payload` column as a composite type instead of `JSONB`,
 				you should create the following composite type:
 				```sql
 				CREATE TYPE payload_type AS (
@@ -192,7 +203,7 @@ components: sinks: postgres: {
 				);
 				```
 
-				And the following Vector configuration:
+				And with this Vector configuration:
 				```yaml
 				sources:
 				  internal_metrics:
@@ -205,7 +216,7 @@ components: sinks: postgres: {
 				    endpoint: postgres://postgres:password123@localhost/test
 				    table: metrics
 				```
-				Then, you can see those metric events ingested in the `metrics` table.
+				You can see those metric events ingested into the `metrics` table.
 				"""
 		}
 	}

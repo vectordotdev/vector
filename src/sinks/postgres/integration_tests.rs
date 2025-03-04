@@ -336,12 +336,8 @@ async fn insert_trace() {
     assert_eq!(inserted_trace_value, expected_trace_value);
 }
 
-// Using null::{table} with jsonb_populate_recordset does not work with default values.
-// it is like inserting null values explicitly, it does not use table's default values.
-// https://dba.stackexchange.com/questions/308114/use-default-value-instead-of-inserted-null
-// https://stackoverflow.com/questions/49992531/postgresql-insert-a-null-convert-to-default
-// TODO: this cannot be fixed without a workaround involving a trigger creation, which is beyond
-// Vector's job in the DB. We should document this limitation alongside with this test.
+// Using null::{table} with jsonb_populate_recordset does not work well with default values,
+// it is like inserting null values explicitly, it doesn't use table's default values.
 #[tokio::test]
 async fn default_columns_are_not_populated() {
     trace_init();
