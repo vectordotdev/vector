@@ -228,6 +228,145 @@ async fn request_query_applied() {
     }
 }
 
+/// VRL query parameters should be parsed correctly
+#[tokio::test]
+async fn request_query_vrl_applied() {
+    let in_addr = next_addr();
+
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::query::raw())
+        .map(|query| format!(r#"{{"data" : "{}"}}"#, query));
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    let events = run_compliance(HttpClientConfig {
+        endpoint: format!("http://{}/endpoint", in_addr),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        query: HashMap::from([
+            (
+                "key1".to_string(),
+                QueryParameterValue::SingleParam(
+                    "{{ upcase(\"bar\") + \"-\" + md5(\"baz\") }}".to_string(),
+                ),
+            ),
+            (
+                "key2".to_string(),
+                QueryParameterValue::MultiParams(vec![
+                    "\"bob ross\"".to_string(),
+                    "{{ mod(5, 2) }}".to_string(),
+                    "{{ camelcase(\"input-string\") }}".to_string(),
+                ]),
+            ),
+        ]),
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        method: HttpMethod::Get,
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    })
+    .await;
+
+    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+
+    let expected = HashMap::from([
+        (
+            "key1".to_string(),
+            vec!["BAR-73feffa4b7f6bb68e44cf984c85f6e88".to_string()],
+        ),
+        (
+            "key2".to_string(),
+            vec![
+                "\"bob ross\"".to_string(),
+                "1".to_string(),
+                "inputString".to_string(),
+            ],
+        ),
+    ]);
+
+    for log in logs {
+        let query = log.get("data").expect("data must be available");
+        let mut got: HashMap<String, Vec<String>> = HashMap::new();
+        for (k, v) in
+            url::form_urlencoded::parse(query.as_bytes().expect("byte conversion should succeed"))
+        {
+            got.entry(k.to_string()).or_default().push(v.to_string());
+        }
+        for v in got.values_mut() {
+            v.sort();
+        }
+        assert_eq!(got, expected);
+    }
+}
+
+/// VRL query parameters should dynamically update on each request
+#[tokio::test]
+async fn request_query_vrl_dynamic_updates() {
+    let in_addr = next_addr();
+
+    // A handler that returns the query parameters as part of the response
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::query::raw())
+        .map(|query| format!(r#"{{"data" : "{}"}}"#, query));
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    // The timestamp should be different for each event
+    let events = run_compliance(HttpClientConfig {
+        endpoint: format!("http://{}/endpoint", in_addr),
+        interval: Duration::from_millis(100),
+        timeout: TIMEOUT,
+        query: HashMap::from([(
+            "timestamp".to_string(),
+            QueryParameterValue::SingleParam(
+                "{{ to_unix_timestamp(now(), unit: \"milliseconds\") }}".to_string(),
+            ),
+        )]),
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        method: HttpMethod::Get,
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    })
+    .await;
+
+    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+
+    // Make sure we have at least 2 events to check for unique timestamps
+    assert!(
+        logs.len() >= 2,
+        "Expected at least 2 events, got {}",
+        logs.len()
+    );
+
+    let mut timestamps = Vec::new();
+    for log in logs {
+        let query = log.get("data").expect("data must be available");
+        let query_bytes = query.as_bytes().expect("byte conversion should succeed");
+
+        // Parse the timestamp value
+        for (k, v) in url::form_urlencoded::parse(query_bytes) {
+            if k == "timestamp" {
+                timestamps.push(v.to_string());
+            }
+        }
+    }
+
+    // Check that timestamps are unique (should be different for each request)
+    let unique_timestamps: std::collections::HashSet<String> = timestamps.iter().cloned().collect();
+    assert_eq!(
+        timestamps.len(),
+        unique_timestamps.len(),
+        "Expected all timestamps to be unique"
+    );
+}
+
 /// HTTP request headers configured by the user should be applied correctly.
 #[tokio::test]
 async fn headers_applied() {
