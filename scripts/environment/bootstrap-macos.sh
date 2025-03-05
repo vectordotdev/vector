@@ -14,8 +14,6 @@ brew install ruby@3 coreutils cue-lang/tap/cue protobuf
 # TODO(jszwedko): It's possible GHA just needs to update its images and this won't be needed in the
 # future
 brew reinstall rustup
-rustup show active-toolchain || rustup toolchain install
-rustup show
 
 gem install bundler
 
