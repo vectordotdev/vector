@@ -410,6 +410,15 @@ base: components: sources: aws_s3: configuration: {
 		required:    false
 		type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
 	}
+	force_path_style: {
+		description: """
+			Specifies which addressing style to use.
+
+			This controls whether the bucket name is in the hostname, or part of the URL.
+			"""
+		required: false
+		type: bool: default: true
+	}
 	framing: {
 		description: """
 			Framing configuration.

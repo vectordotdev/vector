@@ -515,88 +515,60 @@ def expand_schema_references(root_schema, unexpanded_schema)
   original_title = unexpanded_schema['title']
   original_description = unexpanded_schema['description']
 
-  loop do
-    expanded = false
+  # If the schema has a top level reference, we expand it.
+  schema_ref = schema['$ref']
+  if !schema_ref.nil?
+    expanded_schema_ref = get_cached_expanded_schema(schema_ref)
+    if expanded_schema_ref.nil?
+      @logger.debug "Expanding top-level schema ref of '#{schema_ref}'..."
 
-    # If the schema has a top level reference, we expand it.
-    schema_ref = schema['$ref']
-    if !schema_ref.nil?
-      expanded_schema_ref = get_cached_expanded_schema(schema_ref)
-      if expanded_schema_ref.nil?
-        @logger.debug "Expanding top-level schema ref of '#{schema_ref}'..."
+      unexpanded_schema_ref = get_schema_by_name(root_schema, schema_ref)
+      expanded_schema_ref = expand_schema_references(root_schema, unexpanded_schema_ref)
 
-        unexpanded_schema_ref = get_schema_by_name(root_schema, schema_ref)
-        expanded_schema_ref = expand_schema_references(root_schema, unexpanded_schema_ref)
-
-        @expanded_schema_cache[schema_ref] = expanded_schema_ref
-      end
-
-      schema.delete('$ref')
-      schema = nested_merge(expanded_schema_ref, schema)
-
-      expanded = true
+      @expanded_schema_cache[schema_ref] = expanded_schema_ref
     end
 
-    # If the schema is an array type and has a reference for its items, we expand that.
-    items_ref = schema.dig('items', '$ref')
-    if !items_ref.nil?
-      expanded_items_schema_ref = expand_schema_references(root_schema, schema['items'])
+    schema.delete('$ref')
+    schema = nested_merge(expanded_schema_ref, schema)
+  end
 
-      schema['items'].delete('$ref')
-      schema['items'] = nested_merge(expanded_items_schema_ref, schema['items'])
+  # If the schema is an array type and has a reference for its items, we expand that.
+  items_ref = schema.dig('items', '$ref')
+  if !items_ref.nil?
+    expanded_items_schema_ref = expand_schema_references(root_schema, schema['items'])
 
-      expanded = true
-    end
+    schema['items'].delete('$ref')
+    schema['items'] = nested_merge(expanded_items_schema_ref, schema['items'])
+  end
 
-    # If the schema has any object properties, we expand those.
-    if !schema['properties'].nil?
-      schema['properties'] = schema['properties'].transform_values { |property_schema|
-        new_property_schema = expand_schema_references(root_schema, property_schema)
-        if new_property_schema != property_schema
-          expanded = true
-        end
+  # If the schema has any object properties, we expand those.
+  if !schema['properties'].nil?
+    schema['properties'] = schema['properties'].transform_values { |property_schema|
+      new_property_schema = expand_schema_references(root_schema, property_schema)
+      new_property_schema
+    }
+  end
 
-        new_property_schema
-      }
-    end
+  # If the schema has any `allOf`/`oneOf` subschemas, we expand those, too.
+  if !schema['allOf'].nil?
+    schema['allOf'] = schema['allOf'].map { |subschema|
+      new_subschema = expand_schema_references(root_schema, subschema)
+      new_subschema
+    }
+  end
 
-    # If the schema has any `allOf`/`oneOf` subschemas, we expand those, too.
-    if !schema['allOf'].nil?
-      schema['allOf'] = schema['allOf'].map { |subschema|
-        new_subschema = expand_schema_references(root_schema, subschema)
-        if new_subschema != subschema
-          expanded = true
-        end
+  if !schema['oneOf'].nil?
+    schema['oneOf'] = schema['oneOf'].map { |subschema|
+      new_subschema = expand_schema_references(root_schema, subschema)
+      new_subschema
+    }
+  end
 
-        new_subschema
-      }
-    end
-
-    if !schema['oneOf'].nil?
-      schema['oneOf'] = schema['oneOf'].map { |subschema|
-        new_subschema = expand_schema_references(root_schema, subschema)
-        if new_subschema != subschema
-          expanded = true
-        end
-
-        new_subschema
-      }
-    end
-
-    if !schema['anyOf'].nil?
-      schema['anyOf'] = schema['anyOf'].map { |subschema|
-        new_subschema = expand_schema_references(root_schema, subschema)
-        if new_subschema != subschema
-          expanded = true
-        end
-
-        new_subschema
-      }
-    end
-
-    if !expanded
-      break
-    end
+  if !schema['anyOf'].nil?
+    schema['anyOf'] = schema['anyOf'].map { |subschema|
+      new_subschema = expand_schema_references(root_schema, subschema)
+      new_subschema
+    }
   end
 
   # If the original schema had either a title or description, we forcefully reset both of them back
@@ -1743,6 +1715,22 @@ def render_and_import_component_schema(root_schema, schema_name, component_type,
   )
 end
 
+def render_and_import_base_api_schema(root_schema, apis)
+  api_schema = {}
+  apis.each do |component_name, schema_name|
+    friendly_name = "'#{component_name}' #{schema_name} configuration"
+    resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
+    api_schema[component_name] = resolved_schema
+  end
+
+  render_and_import_schema(
+    api_schema,
+    "configuration",
+    ["base", "api"],
+    "base/api.cue"
+  )
+end
+
 def render_and_import_base_global_option_schema(root_schema, global_options)
   global_option_schema = {}
 
@@ -1812,6 +1800,16 @@ all_components.each do |component_type, components|
     render_and_import_component_schema(root_schema, schema_name, component_type, component_name)
   end
 end
+
+apis = root_schema['definitions'].filter_map do |key, definition|
+  component_type = get_schema_metadata(definition, 'docs::component_type')
+  component_name = get_schema_metadata(definition, 'docs::component_name')
+  { component_name => key } if component_type == "api"
+end
+.reduce { |acc, item| nested_merge(acc, item) }
+
+render_and_import_base_api_schema(root_schema, apis)
+
 
 # At last, we generate the global options configuration.
 global_options = root_schema['definitions'].filter_map do |key, definition|

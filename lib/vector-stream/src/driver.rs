@@ -360,9 +360,8 @@ mod tests {
         pub(crate) fn get_sleep_dur(&mut self) -> Duration {
             let lower = self.lower_bound_us;
             let upper = self.upper_bound_us;
-
-            // Generate a value between 10ms and 500ms, with a long tail shape to the distribution.
-            #[allow(clippy::cast_sign_loss)] // Value will be positive anyways
+            // Generate a value between `lower` and `upper`, with a long tail shape to the distribution.
+            #[allow(clippy::cast_sign_loss)] // Value will be positive anyway
             self.jitter
                 .sample_iter(&mut self.jitter_gen)
                 .map(|n| n * lower as f64)

@@ -97,6 +97,7 @@ pub fn derive_configurable(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(
     NamedComponent,
     attributes(
+        api_component,
         enrichment_table_component,
         global_option_component,
         provider_component,

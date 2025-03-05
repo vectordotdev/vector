@@ -404,7 +404,7 @@ mod tests {
     }
 
     fn make_config<P: Debug>(name: &str, value: Option<P>) -> GlobalOptions {
-        toml::from_str(&value.map_or(String::new(), |value| format!(r#"{name} = {value:?}"#)))
+        toml::from_str(&value.map_or(String::new(), |value| format!(r"{name} = {value:?}")))
             .unwrap()
     }
 }
