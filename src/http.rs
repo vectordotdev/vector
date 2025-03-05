@@ -462,8 +462,8 @@ impl MaxConnectionAgeLayer {
         // Ensure the jitter_factor is between 0.0 and 1.0
         let jitter_factor = jitter_factor.clamp(0.0, 1.0);
         // Generate a random jitter factor between `1 - jitter_factor`` and `1 + jitter_factor`.
-        let mut rng = rand::thread_rng();
-        let random_jitter_factor = rng.gen_range(-jitter_factor..=jitter_factor) + 1.;
+        let mut rng = rand::rng();
+        let random_jitter_factor = rng.random_range(-jitter_factor..=jitter_factor) + 1.;
         duration.mul_f64(random_jitter_factor)
     }
 }
