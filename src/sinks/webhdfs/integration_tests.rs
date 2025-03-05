@@ -4,7 +4,7 @@ use std::{
 };
 
 use futures::stream;
-use opendal::{Entry, Metakey};
+use opendal::Entry;
 use similar_asserts::assert_eq;
 use vector_lib::codecs::{encoding::FramingConfig, TextSerializerConfig};
 use vector_lib::event::{Event, LogEvent};
@@ -77,7 +77,6 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     let mut objects: Vec<Entry> = op
         .list_with("/")
         .recursive(true)
-        .metakey(Metakey::Mode)
         .await
         .unwrap();
 
