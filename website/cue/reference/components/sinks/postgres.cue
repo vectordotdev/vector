@@ -5,7 +5,7 @@ components: sinks: postgres: {
 
 	classes: {
 		commonly_used: false
-		delivery:      "at_least_once"
+		delivery:      "exactly_once"
 		development:   "beta"
 		egress_method: "batch"
 		stateful:      false
@@ -44,19 +44,19 @@ components: sinks: postgres: {
 
 	support: {
 		requirements: []
-		warnings: []
-		notices: [
+		warnings: [
 			"""
-				[PostgreSQL's default values](\(urls.postgresql_default_values)) defined in the destination table
-				are not supported. If the ingested event is missing a field which is present as a table column,
-				a `null` value will be inserted for that record even if that column has a default value defined.
-				This is a limitation of the `jsonb_populate_recordset` function of PostgreSQL.
+			[PostgreSQL's default values](\(urls.postgresql_default_values)) defined in the destination table
+			are not supported. If the ingested event is missing a field which is present as a table column,
+			a `null` value will be inserted for that record even if that column has a default value defined.
+			This is a limitation of the `jsonb_populate_recordset` function of PostgreSQL.
 
-				As a workaround, you can add a `NOT NULL` constraint to the column, so when inserting an event which is missing that field
-				a `NOT NULL` constraint violation would be raised, and define a [constraint trigger](\(urls.postgresql_constraint_trigger))
-				to catch the exception and set the desired default value.
-				""",
+			As a workaround, you can add a `NOT NULL` constraint to the column, so when inserting an event which is missing that field
+			a `NOT NULL` constraint violation would be raised, and define a [constraint trigger](\(urls.postgresql_constraint_trigger))
+			to catch the exception and set the desired default value.
+			""",
 		]
+		notices: []
 	}
 
 	configuration: base.components.sinks.postgres.configuration
