@@ -127,10 +127,10 @@ impl Lua {
         if !additional_paths.is_empty() {
             let package = lua
                 .globals()
-                .get::<_, mlua::Table<'_>>("package")
+                .get::<mlua::Table>("package")
                 .context(InvalidLuaSnafu)?;
             let current_paths = package
-                .get::<_, String>("path")
+                .get::<String>("path")
                 .unwrap_or_else(|_| ";".to_string());
             let paths = format!("{};{}", additional_paths, current_paths);
             package.set("path", paths).context(InvalidLuaSnafu)?;
@@ -155,20 +155,18 @@ impl Lua {
 
         globals.raw_set("event", LuaEvent { inner: event })?;
 
-        let func = lua.registry_value::<mlua::Function<'_>>(&self.vector_func)?;
-        func.call(())?;
+        let func = lua.registry_value::<mlua::Function>(&self.vector_func)?;
+        func.call::<()>(())?;
 
-        let result = globals
-            .raw_get::<_, Option<LuaEvent>>("event")
-            .map(|option| {
-                option.map(|lua_event| {
-                    let mut event = lua_event.inner;
-                    if let Some(source_id) = source_id {
-                        event.set_source_id(source_id);
-                    }
-                    event
-                })
-            });
+        let result = globals.raw_get::<Option<LuaEvent>>("event").map(|option| {
+            option.map(|lua_event| {
+                let mut event = lua_event.inner;
+                if let Some(source_id) = source_id {
+                    event.set_source_id(source_id);
+                }
+                event
+            })
+        });
 
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
@@ -222,10 +220,10 @@ impl TaskTransform<Event> for Lua {
 }
 
 impl mlua::UserData for LuaEvent {
-    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_method_mut(
             mlua::MetaMethod::NewIndex,
-            |_lua, this, (key, value): (String, Option<mlua::Value<'lua>>)| {
+            |_lua, this, (key, value): (String, Option<mlua::Value>)| {
                 let key_path = parse_target_path(key.as_str()).map_err(|e| e.into_lua_err())?;
                 match value {
                     Some(mlua::Value::String(string)) => {
@@ -377,9 +375,9 @@ mod tests {
         let mut log = LogEvent::default();
         log.insert("name", "Bob");
         let event = transform_one(
-            r#"
+            r"
               event = nil
-            "#,
+            ",
             log,
         );
 
@@ -476,9 +474,9 @@ mod tests {
     fn lua_non_string_key_read() {
         crate::test_util::trace_init();
         let mut transform = Lua::new(
-            r#"
+            r"
               print(event[false])
-            "#
+            "
             .to_string(),
             vec![],
         )
@@ -514,9 +512,9 @@ mod tests {
     fn lua_syntax_error() {
         crate::test_util::trace_init();
         let err = Lua::new(
-            r#"
+            r"
               1234 = sadf <>&*!#@
-            "#
+            "
             .to_string(),
             vec![],
         )
@@ -569,11 +567,11 @@ mod tests {
         event.insert("friend", "Alice");
 
         let event = transform_one(
-            r#"
+            r"
               for k,v in pairs(event) do
                 event[k] = k .. v
               end
-            "#,
+            ",
             event,
         )
         .unwrap();

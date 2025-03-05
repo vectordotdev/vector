@@ -15,7 +15,7 @@ pub struct ApacheMetricsEventsReceived<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
+impl InternalEvent for ApacheMetricsEventsReceived<'_> {
     // ## skip check-duplicate-events ##
     fn emit(self) {
         trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size, endpoint = %self.endpoint);

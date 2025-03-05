@@ -84,7 +84,7 @@ pub struct ParserConversionError<'a> {
     pub error: crate::types::Error,
 }
 
-impl<'a> InternalEvent for ParserConversionError<'a> {
+impl InternalEvent for ParserConversionError<'_> {
     fn emit(self) {
         error!(
             message = "Could not convert types.",

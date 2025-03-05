@@ -9,7 +9,7 @@ pub struct SematextMetricsInvalidMetricError<'a> {
     pub metric: &'a Metric,
 }
 
-impl<'a> InternalEvent for SematextMetricsInvalidMetricError<'a> {
+impl InternalEvent for SematextMetricsInvalidMetricError<'_> {
     fn emit(self) {
         let reason = "Invalid metric received.";
         error!(

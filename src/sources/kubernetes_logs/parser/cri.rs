@@ -244,7 +244,7 @@ pub mod tests {
             (
                 Bytes::from(
                     [
-                        r#"2016-10-06T00:17:10.113242941Z stdout P "#,
+                        r"2016-10-06T00:17:10.113242941Z stdout P ",
                         make_long_string("very long message ", 16 * 1024).as_str(),
                     ]
                     .join(""),

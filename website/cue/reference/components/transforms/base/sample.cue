@@ -6,6 +6,19 @@ base: components: transforms: sample: configuration: {
 		required:    false
 		type: condition: {}
 	}
+	group_by: {
+		description: """
+			The value to group events into separate buckets to be sampled independently.
+
+			If left unspecified, or if the event doesn't have `group_by`, then the event is not
+			sampled separately.
+			"""
+		required: false
+		type: string: {
+			examples: ["{{ service }}", "{{ hostname }}-{{ service }}"]
+			syntax: "template"
+		}
+	}
 	key_field: {
 		description: """
 			The name of the field whose value is hashed to determine if the event should be
@@ -34,5 +47,13 @@ base: components: transforms: sample: configuration: {
 		type: uint: examples: [
 			1500,
 		]
+	}
+	sample_rate_key: {
+		description: "The event key in which the sample rate is stored. If set to an empty string, the sample rate will not be added to the event."
+		required:    false
+		type: string: {
+			default: "sample_rate"
+			examples: ["sample_rate"]
+		}
 	}
 }

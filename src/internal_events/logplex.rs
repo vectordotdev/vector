@@ -11,7 +11,7 @@ pub struct HerokuLogplexRequestReceived<'a> {
     pub drain_token: &'a str,
 }
 
-impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
+impl InternalEvent for HerokuLogplexRequestReceived<'_> {
     fn emit(self) {
         debug!(
             message = "Handling logplex request.",

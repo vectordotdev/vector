@@ -52,6 +52,7 @@ impl EDE {
             27 => Some("Unsupported NSEC3 Iterations Value"),
             28 => Some("Unable to conform to policy"),
             29 => Some("Synthesized"),
+            30 => Some("Invalid Query Type"),
             _ => None,
         }
     }

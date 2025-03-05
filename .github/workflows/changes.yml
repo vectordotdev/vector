@@ -116,6 +116,8 @@ on:
         value: ${{ jobs.int_tests.outputs.splunk }}
       webhdfs:
         value: ${{ jobs.int_tests.outputs.webhdfs }}
+      all-changes-json:
+        value: ${{ jobs.int_tests.outputs.all-changes-json }}
       # e2e tests
       all-e2e:
         value: ${{ jobs.e2e_tests.outputs.all-tests }}
@@ -127,7 +129,7 @@ on:
 jobs:
   # Detects changes that are not specific to integration tests
   source:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.source }}
     outputs:
@@ -140,7 +142,7 @@ jobs:
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - uses: dorny/paths-filter@v3
       id: filter
@@ -196,7 +198,7 @@ jobs:
 
   # Detects changes that are specific to integration tests
   int_tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.int_tests }}
     outputs:
@@ -236,8 +238,9 @@ jobs:
       redis: ${{ steps.filter.outputs.redis }}
       splunk: ${{ steps.filter.outputs.splunk }}
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
+      all-changes-json: ${{ steps.aggregate.outputs.all-changes-json }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which
@@ -252,9 +255,63 @@ jobs:
           ref: ${{ inputs.head_ref }}
           filters: int_test_filters.yaml
 
+      # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
+      # `if` section of a job or step. In return, we can reduce a lot of redundant job configuration in integration.yml.
+      - name: Generate JSON for all outputs
+        id: aggregate
+        run: |
+          json=$(cat <<EOF
+          {
+            "amqp": ${{ steps.filter.outputs.amqp }},
+            "appsignal": ${{ steps.filter.outputs.appsignal }},
+            "aws": ${{ steps.filter.outputs.aws }},
+            "axiom": ${{ steps.filter.outputs.axiom }},
+            "azure": ${{ steps.filter.outputs.azure }},
+            "clickhouse": ${{ steps.filter.outputs.clickhouse }},
+            "databend": ${{ steps.filter.outputs.databend }},
+            "datadog-agent": ${{ steps.filter.outputs.datadog-agent }},
+            "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
+            "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
+            "datadog-traces": ${{ steps.filter.outputs.datadog-traces }},
+            "dnstap": ${{ steps.filter.outputs.dnstap }},
+            "docker-logs": ${{ steps.filter.outputs.docker-logs }},
+            "elasticsearch": ${{ steps.filter.outputs.elasticsearch }},
+            "eventstoredb": ${{ steps.filter.outputs.eventstoredb }},
+            "fluent": ${{ steps.filter.outputs.fluent }},
+            "gcp": ${{ steps.filter.outputs.gcp }},
+            "greptimedb": ${{ steps.filter.outputs.greptimedb }},
+            "humio": ${{ steps.filter.outputs.humio }},
+            "http-client": ${{ steps.filter.outputs.http-client }},
+            "influxdb": ${{ steps.filter.outputs.influxdb }},
+            "kafka": ${{ steps.filter.outputs.kafka }},
+            "logstash": ${{ steps.filter.outputs.logstash }},
+            "loki": ${{ steps.filter.outputs.loki }},
+            "mongodb": ${{ steps.filter.outputs.mongodb }},
+            "mqtt": ${{ steps.filter.outputs.mqtt }},
+            "nats": ${{ steps.filter.outputs.nats }},
+            "nginx": ${{ steps.filter.outputs.nginx }},
+            "opentelemetry": ${{ steps.filter.outputs.opentelemetry }},
+            "postgres": ${{ steps.filter.outputs.postgres }},
+            "prometheus": ${{ steps.filter.outputs.prometheus }},
+            "pulsar": ${{ steps.filter.outputs.pulsar }},
+            "redis": ${{ steps.filter.outputs.redis }},
+            "splunk": ${{ steps.filter.outputs.splunk }},
+            "webhdfs": ${{ steps.filter.outputs.webhdfs }}
+          }
+          EOF
+          )
+
+          echo "$json" > int_tests_changes.json
+
+      - name: Upload JSON artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: int_tests_changes
+          path: int_tests_changes.json
+
   # Detects changes that are specific to e2e tests
   e2e_tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.e2e_tests }}
     outputs:
@@ -262,7 +319,7 @@ jobs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       # creates a yaml file that contains the filters for each test,
       # extracted from the output of the `vdev int ci-paths` command, which

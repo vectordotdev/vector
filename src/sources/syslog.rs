@@ -195,7 +195,7 @@ impl SourceConfig for SyslogConfig {
                     .as_ref()
                     .and_then(|tls| tls.client_metadata_key.clone())
                     .and_then(|k| k.path);
-                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
+                let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true)?;
                 source.run(
                     address,
                     keepalive,
@@ -452,7 +452,7 @@ mod test {
     use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath};
 
     use chrono::prelude::*;
-    use rand::{thread_rng, Rng};
+    use rand::{rng, Rng};
     use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
@@ -853,7 +853,7 @@ mod test {
         let msg = "qwerty";
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r#"[incorrect x]"#, msg
+            r"[incorrect x]", msg
         );
 
         let mut expected = Event::Log(LogEvent::from(msg));
@@ -893,7 +893,7 @@ mod test {
 
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r#"[incorrect x=]"#, msg
+            r"[incorrect x=]", msg
         );
 
         let event = event_from_bytes(
@@ -918,7 +918,7 @@ mod test {
 
         let msg = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
-            r#"[empty]"#
+            r"[empty]"
         );
 
         let event = event_from_bytes("host", None, msg.into(), LogNamespace::Legacy).unwrap();
@@ -1377,7 +1377,7 @@ mod test {
                 host: "hogwarts".to_owned(),
                 source_type: "syslog".to_owned(),
                 appname: "harry".to_owned(),
-                procid: thread_rng().gen_range(0..32768),
+                procid: rng().random_range(0..32768),
                 structured_data,
                 message: msg,
             }
@@ -1538,7 +1538,7 @@ mod test {
         max_children: usize,
         field_len: usize,
     ) -> StructuredData {
-        let amount = thread_rng().gen_range(0..max_children);
+        let amount = rng().random_range(0..max_children);
 
         random_maps(max_map_size, field_len)
             .filter(|m| !m.is_empty()) //syslog_rfc5424 ignores empty maps, tested separately

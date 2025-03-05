@@ -8,7 +8,7 @@ pub struct LogToMetricFieldNullError<'a> {
     pub field: &'a str,
 }
 
-impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
+impl InternalEvent for LogToMetricFieldNullError<'_> {
     fn emit(self) {
         let reason = "Unable to convert null field.";
         error!(
@@ -37,7 +37,7 @@ pub struct LogToMetricParseFloatError<'a> {
     pub error: ParseFloatError,
 }
 
-impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
+impl InternalEvent for LogToMetricParseFloatError<'_> {
     fn emit(self) {
         let reason = "Failed to parse field as float.";
         error!(
@@ -68,7 +68,7 @@ pub struct MetricMetadataInvalidFieldValueError<'a> {
     pub field_value: &'a str,
 }
 
-impl<'a> InternalEvent for MetricMetadataInvalidFieldValueError<'a> {
+impl InternalEvent for MetricMetadataInvalidFieldValueError<'_> {
     fn emit(self) {
         let reason = "Field contained unsupported value.";
         error!(
@@ -98,7 +98,7 @@ pub struct MetricMetadataParseError<'a> {
     pub kind: &'a str,
 }
 
-impl<'a> InternalEvent for MetricMetadataParseError<'a> {
+impl InternalEvent for MetricMetadataParseError<'_> {
     fn emit(self) {
         let reason = "Failed to parse field as float.";
         error!(

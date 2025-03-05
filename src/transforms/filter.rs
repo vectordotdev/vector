@@ -34,7 +34,7 @@ impl From<AnyCondition> for FilterConfig {
 
 impl GenerateConfig for FilterConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(r#"condition = ".message = \"value\"""#).unwrap()
+        toml::from_str(r#"condition = ".message == \"value\"""#).unwrap()
     }
 }
 

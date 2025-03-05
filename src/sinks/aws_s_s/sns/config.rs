@@ -48,12 +48,13 @@ impl GenerateConfig for SnsSinkConfig {
 impl SnsSinkConfig {
     pub(super) async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SnsClient> {
         create_client::<SnsClientBuilder>(
+            &SnsClientBuilder {},
             &self.base_config.auth,
             self.region.region(),
             self.region.endpoint(),
             proxy,
-            &self.base_config.tls,
-            &None,
+            self.base_config.tls.as_ref(),
+            None,
         )
         .await
     }
@@ -108,7 +109,7 @@ pub(super) struct SnsClientBuilder;
 impl ClientBuilder for SnsClientBuilder {
     type Client = aws_sdk_sns::client::Client;
 
-    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+    fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_sns::client::Client::new(config)
     }
 }

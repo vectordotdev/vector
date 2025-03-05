@@ -110,7 +110,8 @@ async fn healthcheck_includes_auth() {
     let (rx, _trigger, server) = build_test_server(addr);
     tokio::spawn(server);
 
-    let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
+    let tls =
+        TlsSettings::from_options(config.tls.as_ref()).expect("could not create TLS settings");
     let proxy = ProxyConfig::default();
     let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 
@@ -139,7 +140,8 @@ async fn healthcheck_grafana_cloud() {
     )
     .unwrap();
 
-    let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
+    let tls =
+        TlsSettings::from_options(config.tls.as_ref()).expect("could not create TLS settings");
     let proxy = ProxyConfig::default();
     let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 

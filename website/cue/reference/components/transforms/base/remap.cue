@@ -46,6 +46,19 @@ base: components: transforms: remap: configuration: {
 		required: false
 		type: string: examples: ["./my/program.vrl"]
 	}
+	files: {
+		description: """
+			File paths to the [Vector Remap Language][vrl] (VRL) programs to execute for each event.
+
+			If a relative path is provided, its root is the current working directory.
+
+			Required if `source` or `file` are missing.
+
+			[vrl]: https://vector.dev/docs/reference/vrl
+			"""
+		required: false
+		type: array: items: type: string: examples: ["['./my/program.vrl', './my/program2.vrl']"]
+	}
 	metric_tag_values: {
 		description: """
 			When set to `single`, metric tag values are exposed as single strings, the

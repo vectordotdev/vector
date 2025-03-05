@@ -1,11 +1,11 @@
-use std::{collections::HashSet, error, fmt, future::ready, pin::Pin, sync::Arc};
+use std::sync::{Arc, LazyLock};
+use std::{collections::HashSet, error, fmt, future::ready, pin::Pin};
 
 use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
@@ -44,21 +44,22 @@ const VPC_ID_KEY: &str = "vpc-id";
 const ROLE_NAME_KEY: &str = "role-name";
 const TAGS_KEY: &str = "tags";
 
-static AVAILABILITY_ZONE: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone"));
-static LOCAL_HOSTNAME: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/local-hostname"));
-static LOCAL_IPV4: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/local-ipv4"));
-static PUBLIC_HOSTNAME: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/public-hostname"));
-static PUBLIC_IPV4: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/public-ipv4"));
-static ROLE_NAME: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/iam/security-credentials/"));
-static MAC: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/mac"));
-static DYNAMIC_DOCUMENT: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/dynamic/instance-identity/document"));
+static AVAILABILITY_ZONE: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone"));
+static LOCAL_HOSTNAME: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/local-hostname"));
+static LOCAL_IPV4: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/local-ipv4"));
+static PUBLIC_HOSTNAME: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/public-hostname"));
+static PUBLIC_IPV4: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/public-ipv4"));
+static ROLE_NAME: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/iam/security-credentials/"));
+static MAC: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/mac"));
+static DYNAMIC_DOCUMENT: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/dynamic/instance-identity/document"));
 static DEFAULT_FIELD_ALLOWLIST: &[&str] = &[
     AMI_ID_KEY,
     AVAILABILITY_ZONE_KEY,
@@ -73,8 +74,9 @@ static DEFAULT_FIELD_ALLOWLIST: &[&str] = &[
     VPC_ID_KEY,
     ROLE_NAME_KEY,
 ];
-static API_TOKEN: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/latest/api/token"));
-static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-token"));
+static API_TOKEN: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/api/token"));
+static TOKEN_HEADER: LazyLock<Bytes> = LazyLock::new(|| Bytes::from("X-aws-ec2-metadata-token"));
 
 /// Configuration for the `aws_ec2_metadata` transform.
 #[serde_as]

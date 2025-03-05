@@ -17,21 +17,35 @@ base: components: transforms: route: configuration: {
 	}
 	route: {
 		description: """
-			A table of route identifiers to logical conditions representing the filter of the route.
+			A map from route identifiers to logical conditions.
+			Each condition represents a filter which is applied to each event.
+
+			The following identifiers are reserved output names and thus cannot be used as route IDs:
+			- `_unmatched`
+			- `_default`
 
 			Each route can then be referenced as an input by other components with the name
 			`<transform_name>.<route_id>`. If an event doesn’t match any route, and if `reroute_unmatched`
 			is set to `true` (the default), it is sent to the `<transform_name>._unmatched` output.
 			Otherwise, the unmatched event is instead silently discarded.
-
-			Both `_unmatched`, as well as `_default`, are reserved output names and thus cannot be used
-			as a route name.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "An individual route."
-			required:    true
-			type: condition: {}
+		type: object: {
+			examples: [{
+				"foo-does-not-exist": {
+					source: "!exists(.foo)"
+					type:   "vrl"
+				}
+				"foo-exists": {
+					source: "exists(.foo)"
+					type:   "vrl"
+				}
+			}]
+			options: "*": {
+				description: "An individual route."
+				required:    true
+				type: condition: {}
+			}
 		}
 	}
 }

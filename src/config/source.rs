@@ -3,11 +3,10 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
-use vector_lib::configurable::attributes::CustomAttribute;
-use vector_lib::configurable::schema::{SchemaGenerator, SchemaObject};
-use vector_lib::configurable::{
-    configurable_component, Configurable, GenerateError, Metadata, NamedComponent,
-};
+use vector_config::{Configurable, GenerateError, Metadata, NamedComponent};
+use vector_config_common::attributes::CustomAttribute;
+use vector_config_common::schema::{SchemaGenerator, SchemaObject};
+use vector_config_macros::configurable_component;
 use vector_lib::{
     config::{
         AcknowledgementsConfig, GlobalOptions, LogNamespace, SourceAcknowledgementsConfig,
@@ -125,6 +124,7 @@ dyn_clone::clone_trait_object!(SourceConfig);
 pub struct SourceContext {
     pub key: ComponentKey,
     pub globals: GlobalOptions,
+    pub enrichment_tables: vector_lib::enrichment::TableRegistry,
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
@@ -154,6 +154,7 @@ impl SourceContext {
             Self {
                 key: key.clone(),
                 globals: GlobalOptions::default(),
+                enrichment_tables: Default::default(),
                 shutdown: shutdown_signal,
                 out,
                 proxy: Default::default(),
@@ -174,6 +175,7 @@ impl SourceContext {
         Self {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
+            enrichment_tables: Default::default(),
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: Default::default(),

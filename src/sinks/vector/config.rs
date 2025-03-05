@@ -109,7 +109,7 @@ fn default_config(address: &str) -> VectorConfig {
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let uri = with_default_scheme(&self.address, tls.is_tls())?;
 
         let client = new_client(&tls, cx.proxy())?;

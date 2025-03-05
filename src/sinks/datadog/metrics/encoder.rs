@@ -2,12 +2,11 @@ use std::{
     cmp,
     io::{self, Write},
     mem,
-    sync::{Arc, OnceLock},
+    sync::{Arc, LazyLock, OnceLock},
 };
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
-use once_cell::sync::Lazy;
 use snafu::{ResultExt, Snafu};
 use vector_lib::request_metadata::GroupedCountByteSize;
 use vector_lib::{
@@ -34,7 +33,7 @@ pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
 
 const DEFAULT_DD_ORIGIN_PRODUCT_VALUE: u32 = 14;
 
-pub(super) static ORIGIN_PRODUCT_VALUE: Lazy<u32> = Lazy::new(|| {
+pub(super) static ORIGIN_PRODUCT_VALUE: LazyLock<u32> = LazyLock::new(|| {
     option_env!("DD_ORIGIN_PRODUCT")
         .map(|p| {
             p.parse::<u32>()

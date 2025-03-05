@@ -9,4 +9,4 @@ license = "MPL-2.0"
 [dependencies]
 chrono.workspace = true
 fakedata_generator = "0.5.0"
-rand = "0.8.5"
+rand.workspace = true

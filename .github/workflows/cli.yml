@@ -3,10 +3,13 @@ name: CLI - Linux
 on:
   workflow_call:
 
+permissions:
+  statuses: write
+
 jobs:
   test-cli:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       CARGO_INCREMENTAL: 0
     steps:
@@ -21,13 +24,13 @@ jobs:
 
       - name: (PR review) Checkout review SHA
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Cache Cargo registry + index
         uses: actions/cache@v4
@@ -41,7 +44,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make test-cli

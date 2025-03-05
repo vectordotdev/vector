@@ -21,7 +21,7 @@ pub mod common {
         pub num_events: NonZeroUsize,
     }
 
-    pub fn default_cache_config() -> CacheConfig {
+    pub const fn default_cache_config() -> CacheConfig {
         CacheConfig {
             num_events: NonZeroUsize::new(5000).expect("static non-zero number"),
         }

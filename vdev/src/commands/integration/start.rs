@@ -22,7 +22,7 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         crate::commands::compose_tests::start::exec::<IntegrationTest>(
             &self.integration,
-            &self.environment,
+            self.environment.as_ref(),
             self.build_all,
         )
     }

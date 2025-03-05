@@ -13,7 +13,7 @@ pub struct AwsEcsMetricsEventsReceived<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for AwsEcsMetricsEventsReceived<'a> {
+impl InternalEvent for AwsEcsMetricsEventsReceived<'_> {
     fn emit(self) {
         trace!(
             message = "Events received.",
@@ -42,7 +42,7 @@ pub struct AwsEcsMetricsParseError<'a> {
     pub body: Cow<'a, str>,
 }
 
-impl<'a> InternalEvent for AwsEcsMetricsParseError<'a> {
+impl InternalEvent for AwsEcsMetricsParseError<'_> {
     fn emit(self) {
         error!(
             message = "Parsing error.",

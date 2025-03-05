@@ -160,6 +160,6 @@ impl WebHdfsConfig {
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
         let prefix = self.prefix.clone().try_into()?;
-        Ok(KeyPartitioner::new(prefix))
+        Ok(KeyPartitioner::new(prefix, None))
     }
 }

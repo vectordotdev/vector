@@ -17,7 +17,7 @@ base: components: transforms: metric_to_log: configuration: {
 		description: """
 			Controls how metric tag values are encoded.
 
-			When set to `single`, only the last non-bare value of tags are displayed with the
+			When set to `single`, only the last non-bare value of tags is displayed with the
 			metric.  When set to `full`, all metric tags are exposed as separate assignments as
 			described by [the `native_json` codec][vector_native_json].
 

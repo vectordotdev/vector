@@ -141,7 +141,7 @@ async fn retains_state_between_requests() {
     // This sink converts all incremental events to absolute, and
     // should accumulate their totals between batches.
     let outputs = send_request(
-        r#"batch.max_events = 1"#,
+        r"batch.max_events = 1",
         vec![
             create_inc_event("counter-1".into(), 12.0),
             create_inc_event("counter-2".into(), 13.0),
@@ -167,7 +167,7 @@ async fn retains_state_between_requests() {
 #[tokio::test]
 async fn aggregates_batches() {
     let outputs = send_request(
-        r#"batch.max_events = 3"#,
+        r"batch.max_events = 3",
         vec![
             create_inc_event("counter-1".into(), 12.0),
             create_inc_event("counter-1".into(), 14.0),
@@ -194,10 +194,10 @@ async fn aggregates_batches() {
 async fn doesnt_aggregate_batches() {
     let outputs = send_request(
         indoc! {
-            r#"
+            r"
             batch.max_events = 3
             batch.aggregate = false
-            "#
+            "
         },
         vec![
             create_inc_event("counter-1".into(), 12.0),

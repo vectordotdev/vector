@@ -2,7 +2,7 @@ use std::{fs::DirBuilder, path::PathBuf, time::Duration};
 
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
-use vector_config::configurable_component;
+use vector_config::{configurable_component, impl_generate_config_from_default};
 
 use super::super::default_data_dir;
 use super::Telemetry;
@@ -34,7 +34,7 @@ pub(crate) enum DataDirError {
 //
 // If this is modified, make sure those changes are reflected in the `ConfigBuilder::append`
 // function!
-#[configurable_component]
+#[configurable_component(global_option("global_option"))]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GlobalOptions {
     /// The directory used for persisting Vector state data.
@@ -44,6 +44,7 @@ pub struct GlobalOptions {
     ///
     /// Vector must have write permissions to this directory.
     #[serde(default = "crate::default_data_dir")]
+    #[configurable(metadata(docs::common = false))]
     pub data_dir: Option<PathBuf>,
 
     /// Default log schema for all events.
@@ -51,6 +52,7 @@ pub struct GlobalOptions {
     /// This is used if a component does not have its own specific log schema. All events use a log
     /// schema, whether or not the default is used, to assign event fields on incoming events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false, docs::required = false))]
     pub log_schema: LogSchema,
 
     /// Telemetry options.
@@ -58,6 +60,7 @@ pub struct GlobalOptions {
     /// Determines whether `source` and `service` tags should be emitted with the
     /// `component_sent_*` and `component_received_*` events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false, docs::required = false))]
     pub telemetry: Telemetry,
 
     /// The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone.
@@ -65,12 +68,16 @@ pub struct GlobalOptions {
     /// The time zone name may be any name in the [TZ database][tzdb] or `local` to indicate system
     /// local time.
     ///
+    /// Note that in Vector/VRL all timestamps are represented in UTC.
+    ///
     /// [tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false))]
     pub timezone: Option<TimeZone>,
 
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false, docs::required = false))]
     pub proxy: ProxyConfig,
 
     /// Controls how acknowledgements are handled for all sinks by default.
@@ -84,31 +91,29 @@ pub struct GlobalOptions {
         deserialize_with = "bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
+    #[configurable(metadata(docs::common = true, docs::required = false))]
     pub acknowledgements: AcknowledgementsConfig,
 
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
     ///
-    /// Not set by default, which allows all internal metrics to grow unbounded over time. If you
-    /// have a configuration that emits many high-cardinality metrics, you may want to consider
-    /// setting this to a value that ensures that metrics live long enough to be emitted and
-    /// captured, but not so long that they continue to build up indefinitely, as this will consume
-    /// a small amount of memory for each metric.
+    /// Deprecated: use expire_metrics_secs instead
     #[configurable(deprecated)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::hidden))]
     pub expire_metrics: Option<Duration>,
 
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
     ///
-    /// Not set by default, which allows all internal metrics to grow unbounded over time. If you
-    /// have a configuration that emits many high-cardinality metrics, you may want to consider
-    /// setting this to a value that ensures that metrics live long enough to be emitted and
-    /// captured, but not so long that they continue to build up indefinitely, as this will consume
-    /// a small amount of memory for each metric.
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    /// Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
+    /// so metrics live long enough to be emitted and captured.
+    #[serde(skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false, docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 }
+
+impl_generate_config_from_default!(GlobalOptions);
 
 impl GlobalOptions {
     /// Resolve the `data_dir` option in either the global or local config, and
@@ -170,11 +175,11 @@ impl GlobalOptions {
     pub fn merge(&self, with: Self) -> Result<Self, Vec<String>> {
         let mut errors = Vec::new();
 
-        if conflicts(&self.proxy.http, &with.proxy.http) {
+        if conflicts(self.proxy.http.as_ref(), with.proxy.http.as_ref()) {
             errors.push("conflicting values for 'proxy.http' found".to_owned());
         }
 
-        if conflicts(&self.proxy.https, &with.proxy.https) {
+        if conflicts(self.proxy.https.as_ref(), with.proxy.https.as_ref()) {
             errors.push("conflicting values for 'proxy.https' found".to_owned());
         }
 
@@ -182,15 +187,26 @@ impl GlobalOptions {
             errors.push("conflicting values for 'proxy.no_proxy' found".to_owned());
         }
 
-        if conflicts(&self.timezone, &with.timezone) {
+        if conflicts(self.timezone.as_ref(), with.timezone.as_ref()) {
             errors.push("conflicting values for 'timezone' found".to_owned());
         }
 
         if conflicts(
-            &self.acknowledgements.enabled,
-            &with.acknowledgements.enabled,
+            self.acknowledgements.enabled.as_ref(),
+            with.acknowledgements.enabled.as_ref(),
         ) {
             errors.push("conflicting values for 'acknowledgements' found".to_owned());
+        }
+
+        if conflicts(self.expire_metrics.as_ref(), with.expire_metrics.as_ref()) {
+            errors.push("conflicting values for 'expire_metrics' found".to_owned());
+        }
+
+        if conflicts(
+            self.expire_metrics_secs.as_ref(),
+            with.expire_metrics_secs.as_ref(),
+        ) {
+            errors.push("conflicting values for 'expire_metrics_secs' found".to_owned());
         }
 
         let data_dir = if self.data_dir.is_none() || self.data_dir == default_data_dir() {
@@ -236,7 +252,7 @@ impl GlobalOptions {
     }
 }
 
-fn conflicts<T: PartialEq>(this: &Option<T>, that: &Option<T>) -> bool {
+fn conflicts<T: PartialEq>(this: Option<&T>, that: Option<&T>) -> bool {
     matches!((this, that), (Some(this), Some(that)) if this != that)
 }
 
@@ -344,7 +360,12 @@ mod tests {
         assert_eq!(merge(Some(1.0), None), Ok(Some(1.0)));
         assert_eq!(merge(None, Some(2.0)), Ok(Some(2.0)));
         assert_eq!(merge(Some(3.0), Some(3.0)), Ok(Some(3.0)));
-        assert_eq!(merge(Some(4.0), Some(5.0)), Ok(Some(4.0))); // Uses minimum
+        assert_eq!(
+            merge(Some(4.0), Some(5.0)),
+            Err(vec![
+                "conflicting values for 'expire_metrics_secs' found".into()
+            ])
+        );
     }
 
     fn merge<P: Debug, T>(
@@ -360,7 +381,7 @@ mod tests {
     }
 
     fn make_config<P: Debug>(name: &str, value: Option<P>) -> GlobalOptions {
-        toml::from_str(&value.map_or(String::new(), |value| format!(r#"{name} = {value:?}"#)))
+        toml::from_str(&value.map_or(String::new(), |value| format!(r"{name} = {value:?}")))
             .unwrap()
     }
 }

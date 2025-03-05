@@ -81,9 +81,8 @@ async fn listen(
 
                 let span = info_span!("datagram");
                 let received_from = if !address.is_unnamed() {
-                    let path = address.as_pathname().map(|e| e.to_owned()).map(|path| {
-                        span.record("peer_path", field::debug(&path));
-                        path
+                    let path = address.as_pathname().map(|e| e.to_owned()).inspect(|path| {
+                        span.record("peer_path", field::debug(path));
                     });
 
                     path.map(|p| p.to_string_lossy().into_owned().into())

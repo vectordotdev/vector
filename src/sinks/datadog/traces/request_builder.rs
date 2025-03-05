@@ -71,7 +71,7 @@ pub struct DatadogTracesRequestBuilder {
 }
 
 impl DatadogTracesRequestBuilder {
-    pub fn new(
+    pub const fn new(
         api_key: Arc<str>,
         endpoint_configuration: DatadogTracesEndpointConfiguration,
         compression: Compression,

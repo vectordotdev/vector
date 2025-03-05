@@ -995,4 +995,40 @@ merge_strategies.bar = "concat"
         })
         .await
     }
+
+    #[tokio::test]
+    async fn merged_quoted_path() {
+        let config = toml::from_str::<ReduceConfig>(indoc!(
+            r#"
+            [ends_when]
+              type = "vrl"
+              source = "exists(.test_end)"
+            "#,
+        ))
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let e_1 = LogEvent::from(Value::from(btreemap! {"a b" => 1}));
+            tx.send(e_1.into()).await.unwrap();
+
+            let e_2 = LogEvent::from(Value::from(btreemap! {"a b" => 2, "test_end" => "done"}));
+            tx.send(e_2.into()).await.unwrap();
+
+            let output = out.recv().await.unwrap().into_log();
+            let expected_value = Value::from(btreemap! {
+                "a b" => 3,
+                "test_end" => "done"
+            });
+            assert_eq!(*output.value(), expected_value);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
+    }
 }

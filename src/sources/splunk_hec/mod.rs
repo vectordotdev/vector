@@ -144,7 +144,7 @@ fn default_socket_address() -> SocketAddr {
 #[typetag::serde(name = "splunk_hec")]
 impl SourceConfig for SplunkConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let shutdown = cx.shutdown.clone();
         let out = cx.out.clone();
         let source = SplunkSource::new(self, tls.http_protocol_name(), cx);
@@ -1445,7 +1445,7 @@ mod tests {
         b.body(message.to_owned())
     }
 
-    async fn send_with<'a>(
+    async fn send_with(
         address: SocketAddr,
         api: &str,
         message: &str,
@@ -1456,7 +1456,7 @@ mod tests {
         b.send().await.unwrap().status().as_u16()
     }
 
-    async fn send_with_response<'a>(
+    async fn send_with_response(
         address: SocketAddr,
         api: &str,
         message: &str,
@@ -1863,7 +1863,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(&format!("http://{}/services/collector/health", address))
+            .get(format!("http://{}/services/collector/health", address))
             .header("Authorization", format!("Splunk {}", "invalid token"))
             .send()
             .await
@@ -1877,7 +1877,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(&format!("http://{}/services/collector/health", address))
+            .get(format!("http://{}/services/collector/health", address))
             .send()
             .await
             .unwrap();

@@ -72,7 +72,7 @@ base: components: sources: host_metrics: configuration: {
 			"""
 		required: false
 		type: array: {
-			default: ["cpu", "disk", "filesystem", "load", "host", "memory", "network", "cgroups"]
+			default: ["cpu", "disk", "filesystem", "load", "host", "memory", "network", "process", "cgroups", "tcp"]
 			items: type: string: {
 				enum: {
 					cgroups: """
@@ -87,8 +87,10 @@ base: components: sources: host_metrics: configuration: {
 					load:       "Metrics related to the system load average."
 					memory:     "Metrics related to memory utilization."
 					network:    "Metrics related to network utilization."
+					process:    "Metrics related to Process utilization."
+					tcp:        "Metrics related to TCP connections."
 				}
-				examples: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network"]
+				examples: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network", "tcp"]
 			}
 		}
 	}
@@ -264,6 +266,43 @@ base: components: sources: host_metrics: configuration: {
 				examples: [{
 					excludes: ["dm-*"]
 					includes: ["sda"]
+				}]
+				options: {
+					excludes: {
+						description: """
+																Any patterns which should be excluded.
+
+																The patterns are matched using globbing.
+																"""
+						required: false
+						type: array: items: type: string: {}
+					}
+					includes: {
+						description: """
+																Any patterns which should be included.
+
+																The patterns are matched using globbing.
+																"""
+						required: false
+						type: array: {
+							default: ["*"]
+							items: type: string: {}
+						}
+					}
+				}
+			}
+		}
+	}
+	process: {
+		description: "Options for the process metrics collector."
+		required:    false
+		type: object: options: processes: {
+			description: "Lists of process name patterns to include or exclude."
+			required:    false
+			type: object: {
+				examples: [{
+					excludes: null
+					includes: ["docker"]
 				}]
 				options: {
 					excludes: {

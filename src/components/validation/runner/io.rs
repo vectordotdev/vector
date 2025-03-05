@@ -160,7 +160,7 @@ pub fn spawn_grpc_server<S>(
 
         let (trigger_shutdown, shutdown_signal, _) = ShutdownSignal::new_wired();
         let mut trigger_shutdown = Some(trigger_shutdown);
-        let tls_settings = MaybeTlsSettings::from_config(&None, true)
+        let tls_settings = MaybeTlsSettings::from_config(None, true)
             .expect("should not fail to get empty TLS settings");
 
         let server = run_grpc_server(

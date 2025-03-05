@@ -6,7 +6,9 @@
 {{ $version := .File.BaseFileName }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
-{{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "deprecation" "deprecations"}}
+{{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "deprecation" "deprecations" "chore" "chore"}}
+{{ $orderedGroups := slice "feat" "enhancement" "fix" "deprecation" "chore" }}
+
 <div class="max-w-3xl md:max-w-5xl px-6 lg:px-8 mx-auto">
   <div class="my-16">
     <div class="mb-4 md:mb-6">
@@ -83,11 +85,11 @@
           <div>
             <ul class="list-disc">
               {{ range . }}
-                <li>
+              <li>
                   <span class="prose dark:prose-dark">
                     {{ .| markdownify }}
                   </span>
-                </li>
+              </li>
               {{ end }}
             </ul>
           </div>
@@ -103,32 +105,34 @@
         </div>
 
         <div class="mt-6 flex flex-col space-y-8">
-          {{ range $k, $v := $groups }}
-          {{ $changes := where $release.changelog ".type" "eq" $k }}
+          {{ range $orderedGroups }}
+          {{ $key := . }}
+          {{ $value := index $groups $key }}
+          {{ $changes := where $release.changelog ".type" "eq" $key }}
           {{ if $changes }}
           {{ $numChanges := len $changes }}
-          {{ $heading := printf "%d %s" $numChanges $v }}
+          {{ $heading := printf "%d %s" $numChanges $value }}
           <div>
             <div class="prose dark:prose-dark max-w-none">
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
 
-            <ul class="prose dark:prose-dark list-disc">
+            <ul class="prose dark:prose-dark list-disc ml-6">
               {{ range $changes }}
-                <li>
+              <li>
                   <span class="prose dark:prose-dark">
                     {{ .description | markdownify }}
                   </span>
-                  {{ if gt (len .contributors) 0 }}
-                  <span class="prose dark:prose-dark">
+                {{ if gt (len .contributors) 0 }}
+                <span class="prose dark:prose-dark">
                     Thanks to
                     {{ range .contributors}}
                     <a href="https://github.com/{{ replace . "@" "" }}" rel="noopener" target="_blank">{{ . }}</a>
-                    {{ end }}
+                  {{ end }}
                     for contributing this change!
                   </span>
-                  {{ end }}
-                </li>
+                {{ end }}
+              </li>
               {{ end }}
             </ul>
           </div>
@@ -137,34 +141,36 @@
         </div>
       </div>
       {{ else }}
-        {{ if gt (len $release.commits) 0 }}
-        <div class="mt-8">
-          <div class="prose dark:prose-dark max-w-none">
-            {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
-          </div>
-
-          <div class="mt-6 flex flex-col space-y-8">
-            {{ range $k, $v := $groups }}
-            {{ $commits := where $release.commits ".type" "eq" $k }}
-            {{ if $commits }}
-            {{ $numCommits := len $commits }}
-            {{ $heading := printf "%d %s" $numCommits $v }}
-            <div>
-              <div class="prose dark:prose-dark max-w-none">
-                {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
-              </div>
-
-              <div class="mt-4 flex flex-col space-y-2">
-                {{ range $commits }}
-                {{ template "commit" . }}
-                {{ end }}
-              </div>
-            </div>
-            {{ end }}
-            {{ end }}
-          </div>
+      {{ if gt (len $release.commits) 0 }}
+      <div class="mt-8">
+        <div class="prose dark:prose-dark max-w-none">
+          {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
         </div>
-        {{ end }}
+
+        <div class="mt-6 flex flex-col space-y-8">
+          {{ range $orderedGroups }}
+          {{ $key := . }}
+          {{ $value := index $groups $key }}
+          {{ $commits := where $release.commits ".type" "eq" $key }}
+          {{ if $commits }}
+          {{ $numCommits := len $commits }}
+          {{ $heading := printf "%d %s" $numCommits $value }}
+          <div class="ml-6">
+            <div class="prose dark:prose-dark max-w-none">
+              {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
+            </div>
+
+            <div class="mt-4 flex flex-col space-y-2">
+              {{ range $commits }}
+              {{ template "commit" . }}
+              {{ end }}
+            </div>
+          </div>
+          {{ end }}
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
       {{ end }}
 
       {{ with $release.whats_next }}

@@ -152,7 +152,6 @@ releases: "0.30.0": {
 				The `tag_cardinality_limit` now includes the `metric_name` field on logs it produces
 				to more easily identify the metric that was limited.
 				"""
-			contributors: ["nomonamo"]
 			pr_numbers: [17295]
 		},
 		{

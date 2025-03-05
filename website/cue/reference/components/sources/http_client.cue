@@ -142,4 +142,24 @@ components: sources: http_client: {
 		http_client_responses_total:      components.sources.internal_metrics.output.metrics.http_client_responses_total
 		http_client_response_rtt_seconds: components.sources.internal_metrics.output.metrics.http_client_response_rtt_seconds
 	}
+
+	how_it_works: {
+		query_params_structure: {
+			title: "Query params structure"
+			body: """
+				Query params can either be single key value pair or a key with multiple values
+
+				```yaml
+				sources:
+					source0:
+						query:
+							field: value
+							fruit:
+								- mango
+								- papaya
+								- kiwi
+				```
+				"""
+		}
+	}
 }

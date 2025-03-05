@@ -14,7 +14,7 @@ pub struct NginxMetricsEventsReceived<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for NginxMetricsEventsReceived<'a> {
+impl InternalEvent for NginxMetricsEventsReceived<'_> {
     fn emit(self) {
         trace!(
             message = "Events received.",
@@ -40,7 +40,7 @@ pub struct NginxMetricsRequestError<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
+impl InternalEvent for NginxMetricsRequestError<'_> {
     fn emit(self) {
         error!(
             message = "Nginx request error.",
@@ -65,7 +65,7 @@ pub(crate) struct NginxMetricsStubStatusParseError<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for NginxMetricsStubStatusParseError<'a> {
+impl InternalEvent for NginxMetricsStubStatusParseError<'_> {
     fn emit(self) {
         error!(
             message = "NginxStubStatus parse error.",

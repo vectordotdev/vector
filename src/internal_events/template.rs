@@ -8,7 +8,7 @@ pub struct TemplateRenderingError<'a> {
     pub error: crate::template::TemplateRenderingError,
 }
 
-impl<'a> InternalEvent for TemplateRenderingError<'a> {
+impl InternalEvent for TemplateRenderingError<'_> {
     fn emit(self) {
         let mut msg = "Failed to render template".to_owned();
         if let Some(field) = self.field {

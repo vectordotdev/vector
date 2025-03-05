@@ -55,8 +55,8 @@ mod tests {
 
     #[test]
     fn optional() {
-        assert!(toml::from_str::<RegionOrEndpoint>(indoc! {r#"
-        "#})
+        assert!(toml::from_str::<RegionOrEndpoint>(indoc! {"
+        "})
         .is_ok());
     }
 

@@ -72,8 +72,10 @@ pub struct ClickhouseConfig {
     pub format: Format,
 
     /// Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema.
+    ///
+    /// If left unspecified, use the default provided by the `ClickHouse` server.
     #[serde(default)]
-    pub skip_unknown_fields: bool,
+    pub skip_unknown_fields: Option<bool>,
 
     /// Sets `date_time_input_format` to `best_effort`, allowing ClickHouse to properly parse RFC3339/ISO 8601.
     #[serde(default)]
@@ -124,7 +126,7 @@ impl SinkConfig for ClickhouseConfig {
 
         let auth = self.auth.choose_one(&self.endpoint.auth)?;
 
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
 
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 

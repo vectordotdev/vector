@@ -9,6 +9,7 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use flate2::bufread::MultiGzDecoder;
 use tracing::debug;
+use vector_common::constants::GZIP_MAGIC;
 
 use crate::{
     buffer::read_until_with_max_size, metadata_ext::PortableFileExt, FilePosition, ReadFrom,
@@ -293,7 +294,7 @@ fn is_gzipped(r: &mut io::BufReader<fs::File>) -> io::Result<bool> {
     let header_bytes = r.fill_buf()?;
     // WARN: The paired `BufReader::consume` is not called intentionally. If we
     // do we'll chop a decent part of the potential gzip stream off.
-    Ok(header_bytes.starts_with(&[0x1f, 0x8b]))
+    Ok(header_bytes.starts_with(GZIP_MAGIC))
 }
 
 fn null_reader() -> impl BufRead {

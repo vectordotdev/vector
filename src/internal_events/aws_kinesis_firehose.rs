@@ -11,7 +11,7 @@ pub struct AwsKinesisFirehoseRequestReceived<'a> {
     pub source_arn: Option<&'a str>,
 }
 
-impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
+impl InternalEvent for AwsKinesisFirehoseRequestReceived<'_> {
     fn emit(self) {
         debug!(
             message = "Handling AWS Kinesis Firehose request.",
@@ -39,7 +39,7 @@ impl<'a> AwsKinesisFirehoseRequestError<'a> {
     }
 }
 
-impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
+impl InternalEvent for AwsKinesisFirehoseRequestError<'_> {
     fn emit(self) {
         error!(
             message = "Error occurred while handling request.",

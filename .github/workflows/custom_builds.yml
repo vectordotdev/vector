@@ -1,5 +1,9 @@
 name: Custom Builds
 
+permissions:
+  contents: write
+  packages: write
+
 on:
   workflow_dispatch: {}
 

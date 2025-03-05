@@ -15,13 +15,13 @@ concurrency:
 
 jobs:
   validate-protos:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       # Run `git checkout`
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       # Install the `buf` CLI
-      - uses: bufbuild/buf-setup-action@v1.45.0
+      - uses: bufbuild/buf-setup-action@v1.50.0
       # Perform breaking change detection against the `master` branch
       - uses: bufbuild/buf-breaking-action@v1.1.4
         with:

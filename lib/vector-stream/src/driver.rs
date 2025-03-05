@@ -174,7 +174,7 @@ where
                                 request_id,
                                 finalizers,
                                 event_count,
-                                &bytes_sent,
+                                bytes_sent.as_ref(),
                                 &events_sent,
                             ))
                             .instrument(info_span!("request", request_id).or_current());
@@ -200,7 +200,7 @@ where
         request_id: usize,
         finalizers: EventFinalizers,
         event_count: usize,
-        bytes_sent: &Option<Registered<BytesSent>>,
+        bytes_sent: Option<&Registered<BytesSent>>,
         events_sent: &RegisteredEventCache<(), TaggedEventsSent>,
     ) {
         match result {
@@ -360,9 +360,8 @@ mod tests {
         pub(crate) fn get_sleep_dur(&mut self) -> Duration {
             let lower = self.lower_bound_us;
             let upper = self.upper_bound_us;
-
-            // Generate a value between 10ms and 500ms, with a long tail shape to the distribution.
-            #[allow(clippy::cast_sign_loss)] // Value will be positive anyways
+            // Generate a value between `lower` and `upper`, with a long tail shape to the distribution.
+            #[allow(clippy::cast_sign_loss)] // Value will be positive anyway
             self.jitter
                 .sample_iter(&mut self.jitter_gen)
                 .map(|n| n * lower as f64)

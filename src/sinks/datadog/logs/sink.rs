@@ -39,7 +39,7 @@ pub struct LogSinkBuilder<S> {
 }
 
 impl<S> LogSinkBuilder<S> {
-    pub fn new(
+    pub const fn new(
         transformer: Transformer,
         service: S,
         default_api_key: Arc<str>,

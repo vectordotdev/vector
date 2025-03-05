@@ -79,7 +79,7 @@ components: _kafka: {
 		librdkafka: {
 			title: "librdkafka"
 			body:  """
-				The `kafka` sink uses [`librdkafka`](\(urls.librdkafka)) under the hood. This
+				The `kafka` source and sink use [`librdkafka`](\(urls.librdkafka)) under the hood. This
 				is a battle-tested, high performance, and reliable library that facilitates
 				communication with Kafka. As Vector produces static MUSL builds,
 				this dependency is packaged with Vector, meaning you do not need to install it.

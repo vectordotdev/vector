@@ -32,7 +32,7 @@ pub struct DecoderDeserializeError<'a> {
     pub error: &'a crate::Error,
 }
 
-impl<'a> InternalEvent for DecoderDeserializeError<'a> {
+impl InternalEvent for DecoderDeserializeError<'_> {
     fn emit(self) {
         error!(
             message = "Failed deserializing frame.",
@@ -57,7 +57,7 @@ pub struct EncoderFramingError<'a> {
     pub error: &'a vector_lib::codecs::encoding::BoxedFramingError,
 }
 
-impl<'a> InternalEvent for EncoderFramingError<'a> {
+impl InternalEvent for EncoderFramingError<'_> {
     fn emit(self) {
         let reason = "Failed framing bytes.";
         error!(
@@ -84,7 +84,7 @@ pub struct EncoderSerializeError<'a> {
     pub error: &'a crate::Error,
 }
 
-impl<'a> InternalEvent for EncoderSerializeError<'a> {
+impl InternalEvent for EncoderSerializeError<'_> {
     fn emit(self) {
         let reason = "Failed serializing frame.";
         error!(

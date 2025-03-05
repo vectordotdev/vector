@@ -31,7 +31,7 @@ impl<'a> FileSourceMetricFile<'a> {
 }
 
 #[Object]
-impl<'a> FileSourceMetricFile<'a> {
+impl FileSourceMetricFile<'_> {
     /// File name
     async fn name(&self) -> &str {
         &*self.name
@@ -57,7 +57,7 @@ impl<'a> FileSourceMetricFile<'a> {
 pub struct FileSourceMetrics(Vec<Metric>);
 
 impl FileSourceMetrics {
-    pub fn new(metrics: Vec<Metric>) -> Self {
+    pub const fn new(metrics: Vec<Metric>) -> Self {
         Self(metrics)
     }
 

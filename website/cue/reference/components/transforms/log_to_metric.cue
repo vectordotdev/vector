@@ -79,7 +79,7 @@ components: transforms: log_to_metric: {
 		},
 		{
 			title: "Sum"
-			notes: "In this example we'll demonstrate computing a sum by computing the total of orders placed."
+			notes: "In this example we'll demonstrate computing a sum by computing the total of orders placed, and we are trying the tags expansion feature."
 
 			configuration: {
 				metrics: [
@@ -89,22 +89,26 @@ components: transforms: log_to_metric: {
 						name:               "order_total"
 						increment_by_value: true
 						tags: {
-							host: "{{host}}"
+							"*": "{{labels}}"
 						}
 					},
 				]
 			}
 
 			input: log: {
-				host:    "10.22.11.222"
 				message: "Order placed for $122.20"
-				total:   122.2
+				labels: {
+					host:     "10.22.11.222"
+					hostname: "vector-dev"
+				}
+				total: 122.2
 			}
 			output: [{metric: {
 				kind: "incremental"
 				name: "order_total"
 				tags: {
-					host: "10.22.11.222"
+					host:     "10.22.11.222"
+					hostname: "vector-dev"
 				}
 				counter: {
 					value: 122.2

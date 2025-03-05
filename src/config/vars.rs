@@ -1,6 +1,5 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::LazyLock};
 
-use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 
 // Environment variable names can have any characters from the Portable Character Set other
@@ -10,7 +9,7 @@ use regex::{Captures, Regex};
 // variable names when they come from a Java properties file.
 //
 // https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
-pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: Lazy<Regex> = Lazy::new(|| {
+pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?x)
         \$\$|

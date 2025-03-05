@@ -29,7 +29,7 @@ async fn test_greptimedb_sink() {
 
     // Drop the table and data inside
     let _ = query_client
-        .get(&format!(
+        .get(format!(
             "{}/v1/sql",
             std::env::var("GREPTIMEDB_HTTP").unwrap_or_else(|_| "http://localhost:4000".to_owned())
         ))
@@ -45,7 +45,7 @@ async fn test_greptimedb_sink() {
     run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
     let query_response = query_client
-        .get(&format!(
+        .get(format!(
             "{}/v1/sql",
             std::env::var("GREPTIMEDB_HTTP").unwrap_or_else(|_| "http://localhost:4000".to_owned())
         ))
@@ -85,7 +85,7 @@ new_naming = true
 
     // Drop the table and data inside
     let _ = query_client
-        .get(&format!(
+        .get(format!(
             "{}/v1/sql",
             std::env::var("GREPTIMEDB_HTTP").unwrap_or_else(|_| "http://localhost:4000".to_owned())
         ))
@@ -101,7 +101,7 @@ new_naming = true
     run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
     let query_response = query_client
-        .get(&format!(
+        .get(format!(
             "{}/v1/sql",
             std::env::var("GREPTIMEDB_HTTP").unwrap_or_else(|_| "http://localhost:4000".to_owned())
         ))

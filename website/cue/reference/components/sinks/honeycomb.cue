@@ -23,7 +23,12 @@ components: sinks: honeycomb: {
 				max_bytes:    100_000
 				timeout_secs: 1.0
 			}
-			compression: enabled: false
+			compression: {
+				enabled: true
+				default: "gzip"
+				algorithms: ["none", "gzip", "zstd"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+			}
 			encoding: {
 				enabled: true
 				codec: enabled: false

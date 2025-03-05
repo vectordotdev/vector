@@ -72,7 +72,7 @@ properly formatted. To run CUE's autoformatting, first [install cue](https://cue
 then run this command from the `vector` root:
 
 ```bash
-cue fmt ./website/**/*.cue
+./website/scripts/cue.sh fmt
 ```
 
 If that rewrites any files, make sure to commit your changes or else you'll see
@@ -85,8 +85,12 @@ the provided data needs to conform to various CUE schemas. To check the validity
 of the CUE sources:
 
 ```bash
-make check-docs
+cd .. # Change to the repo root directory
+CI=true make check-docs
 ```
+
+> When the CI flag is on, then the checker will also run a CUE format validation step.
+> Also, note that when this flag on, CUE files might be modified. See `scripts/check-docs.sh` for details.
 
 #### Tips & tricks
 

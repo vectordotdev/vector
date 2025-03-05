@@ -1,8 +1,7 @@
 use vrl::prelude::*;
 
 fn get_secret(ctx: &mut Context, key: Value) -> std::result::Result<Value, ExpressionError> {
-    let key_bytes = key.as_bytes().expect("argument must be a string");
-    let key_str = String::from_utf8_lossy(key_bytes);
+    let key_str = key.as_str().expect("argument must be a string");
     let value = match ctx.target().get_secret(key_str.as_ref()) {
         Some(secret) => secret.into(),
         None => Value::Null,

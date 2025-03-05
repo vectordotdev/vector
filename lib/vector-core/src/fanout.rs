@@ -905,15 +905,15 @@ mod tests {
         }
     }
 
-    fn _make_events(count: usize) -> impl Iterator<Item = LogEvent> {
+    fn make_events_inner(count: usize) -> impl Iterator<Item = LogEvent> {
         (0..count).map(|i| LogEvent::from(format!("line {i}")))
     }
 
     fn make_events(count: usize) -> Vec<Event> {
-        _make_events(count).map(Into::into).collect()
+        make_events_inner(count).map(Into::into).collect()
     }
 
     fn make_event_array(count: usize) -> EventArray {
-        _make_events(count).collect::<Vec<_>>().into()
+        make_events_inner(count).collect::<Vec<_>>().into()
     }
 }

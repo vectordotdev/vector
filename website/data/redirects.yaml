@@ -28,6 +28,7 @@ sinks:
 - influxdb_logs
 - influxdb_metrics
 - kafka
+- keep
 - mezmo
 - loki
 - nats

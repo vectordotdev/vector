@@ -9,6 +9,7 @@ use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
 use crate::{
+    common::http::{server_auth::HttpServerAuthConfig, ErrorMessage},
     config::{
         GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
@@ -18,7 +19,7 @@ use crate::{
     serde::bool_or_struct,
     sources::{
         self,
-        util::{decode, http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{decode, http::HttpMethod, HttpSource},
     },
     tls::TlsEnableableConfig,
 };
@@ -41,7 +42,7 @@ pub struct PrometheusRemoteWriteConfig {
 
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
-    auth: Option<HttpSourceAuthConfig>,
+    auth: Option<HttpServerAuthConfig>,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -89,8 +90,8 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             HttpMethod::Post,
             StatusCode::OK,
             true,
-            &self.tls,
-            &self.auth,
+            self.tls.as_ref(),
+            self.auth.as_ref(),
             cx,
             self.acknowledgements,
             self.keepalive.clone(),
@@ -183,7 +184,7 @@ mod test {
         let address = test_util::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
-        let proto = MaybeTlsSettings::from_config(&tls, true)
+        let proto = MaybeTlsSettings::from_config(tls.as_ref(), true)
             .unwrap()
             .http_protocol_name();
         let source = PrometheusRemoteWriteConfig {

@@ -401,9 +401,8 @@ where
         let http_client = self.inner.clone();
 
         Box::pin(async move {
-            let request = request_builder(body).await.map_err(|error| {
-                emit!(SinkRequestBuildError { error: &error });
-                error
+            let request = request_builder(body).await.inspect_err(|error| {
+                emit!(SinkRequestBuildError { error });
             })?;
             let byte_size = request.body().len();
             let request = request.map(Body::from);
@@ -471,6 +470,7 @@ impl RetryLogic for HttpRetryLogic {
 
         match status {
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
+            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
@@ -521,6 +521,7 @@ where
 
         match status {
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
+            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
@@ -618,7 +619,7 @@ pub struct HttpRequest<T: Send> {
 
 impl<T: Send> HttpRequest<T> {
     /// Creates a new `HttpRequest`.
-    pub fn new(
+    pub const fn new(
         payload: Bytes,
         finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
@@ -793,13 +794,14 @@ mod test {
     fn util_http_retry_logic() {
         let logic = HttpRetryLogic;
 
+        let response_408 = Response::builder().status(408).body(Bytes::new()).unwrap();
         let response_429 = Response::builder().status(429).body(Bytes::new()).unwrap();
         let response_500 = Response::builder().status(500).body(Bytes::new()).unwrap();
         let response_400 = Response::builder().status(400).body(Bytes::new()).unwrap();
         let response_501 = Response::builder().status(501).body(Bytes::new()).unwrap();
-
         assert!(logic.should_retry_response(&response_429).is_retryable());
         assert!(logic.should_retry_response(&response_500).is_retryable());
+        assert!(logic.should_retry_response(&response_408).is_retryable());
         assert!(logic
             .should_retry_response(&response_400)
             .is_not_retryable());

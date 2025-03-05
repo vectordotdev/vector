@@ -471,12 +471,12 @@ Here `event` is an encoded event to be produced by the transform, and `lane` is 
 
 > An emitting function is called from a transform component called `example_transform` with `lane` parameter set to `example_lane`. Then the downstream `console` sink have to be defined as the following to be able to read the emitted event:
 >
->    ```toml
->    [sinks.example_console]
->      type = "console"
->      inputs = ["example_transform.example_lane"] # would output the event from `example_lane`
->      encoding.codec = "text"
->    ```
+> ```toml
+> [sinks.example_console]
+> type = "console"
+> inputs = ["example_transform.example_lane"] # would output the event from `example_lane`
+> encoding.codec = "text"
+>  ```
 >
 > Other components connected to the same transform, but with different lanes names or without lane names at all would not receive any event.
 

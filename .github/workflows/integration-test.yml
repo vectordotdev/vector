@@ -30,24 +30,24 @@ env:
 
 jobs:
   test-integration:
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     if: inputs.if || github.event_name == 'workflow_dispatch'
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - run: sudo npm -g install @datadog/datadog-ci
 

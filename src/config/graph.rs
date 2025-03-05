@@ -1,10 +1,10 @@
-use indexmap::{set::IndexSet, IndexMap};
-use std::collections::{HashMap, HashSet, VecDeque};
-
 use super::{
     schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
     TransformOutput,
 };
+use indexmap::{set::IndexSet, IndexMap};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -18,6 +18,33 @@ pub enum Node {
     Sink {
         ty: DataType,
     },
+}
+
+impl fmt::Display for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Node::Source { outputs } => {
+                write!(f, "component_kind: source\n  outputs:")?;
+                for output in outputs {
+                    write!(f, "\n    {}", output)?;
+                }
+                Ok(())
+            }
+            Node::Transform { in_ty, outputs } => {
+                write!(
+                    f,
+                    "component_kind: source\n  input_types: {in_ty}\n  outputs:"
+                )?;
+                for output in outputs {
+                    write!(f, "\n    {}", output)?;
+                }
+                Ok(())
+            }
+            Node::Sink { ty } => {
+                write!(f, "component_kind: sink\n  types: {ty}")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -85,7 +112,7 @@ impl Graph {
             );
         }
 
-        for (id, config) in sinks.iter() {
+        for (id, config) in sinks {
             graph.nodes.insert(
                 id.clone(),
                 Node::Sink {
@@ -106,7 +133,7 @@ impl Graph {
             }
         }
 
-        for (id, config) in sinks.iter() {
+        for (id, config) in sinks {
             for input in config.inputs.iter() {
                 if let Err(e) = graph.add_input(input, id, &available_inputs) {
                     errors.push(e);
@@ -139,9 +166,16 @@ impl Graph {
                 Some(Node::Sink { .. }) => "sink",
                 _ => panic!("only transforms and sinks have inputs"),
             };
+            info!(
+                "Available components:\n{}",
+                self.nodes
+                    .iter()
+                    .map(|(key, node)| format!("\"{}\":\n  {}", key, node))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
             Err(format!(
-                "Input \"{}\" for {} \"{}\" doesn't match any components.",
-                from, output_type, to
+                "Input \"{from}\" for {output_type} \"{to}\" doesn't match any components.",
             ))
         }
     }
@@ -510,7 +544,7 @@ mod test {
 
         assert_eq!(
             Err(vec![
-                "Data type mismatch between in (Log) and out (Metric)".into()
+                "Data type mismatch between in ([\"Log\"]) and out ([\"Metric\"])".into()
             ]),
             graph.typecheck()
         );

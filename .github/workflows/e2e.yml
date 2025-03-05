@@ -16,6 +16,9 @@ on:
     # At midnight UTC Tue-Sat
     - cron: '0 0 * * 2-6'
 
+permissions:
+  statuses: write
+
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
   group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
@@ -49,7 +52,7 @@ jobs:
 
   e2e-tests:
     name: E2E Tests
-    runs-on: ubuntu-20.04-8core
+    runs-on: ubuntu-24.04-8core
     timeout-minutes: 45
     needs: changes
     if: always() && (
@@ -60,7 +63,7 @@ jobs:
         )
       )
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: "recursive"
 
@@ -100,7 +103,7 @@ jobs:
 
   e2e-test-suite:
     name: E2E Test Suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: always()
     needs: e2e-tests

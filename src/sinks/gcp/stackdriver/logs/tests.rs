@@ -8,6 +8,7 @@ use indoc::indoc;
 use serde::Deserialize;
 use std::collections::HashMap;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use vrl::{event_path, value};
 
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
@@ -15,7 +16,8 @@ use crate::{
     gcp::GcpAuthenticator,
     sinks::{
         gcp::stackdriver::logs::{
-            config::StackdriverLogName, encoder::remap_severity,
+            config::{StackdriverLabelConfig, StackdriverLogName},
+            encoder::remap_severity,
             service::StackdriverLogsServiceRequestBuilder,
         },
         prelude::*,
@@ -76,6 +78,13 @@ fn encode_valid() {
         transformer,
         Template::try_from("{{ log_id }}").unwrap(),
         StackdriverLogName::Project("project".to_owned()),
+        StackdriverLabelConfig {
+            labels_key: None,
+            labels: HashMap::from([(
+                "config_user_label_1".to_owned(),
+                Template::try_from("config_user_value_1").unwrap(),
+            )]),
+        },
         StackdriverResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([
@@ -92,7 +101,7 @@ fn encode_valid() {
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
 
-    let log = [
+    let mut log = [
         ("message", "hello world"),
         ("anumber", "100"),
         ("node_id", "10.10.10.1"),
@@ -101,6 +110,11 @@ fn encode_valid() {
     .iter()
     .copied()
     .collect::<LogEvent>();
+    log.insert(
+        event_path!("logging.googleapis.com/labels"),
+        value!({user_label_1: "user_value_1"}),
+    );
+
     let json = encoder.encode_event(Event::from(log)).unwrap();
     assert_eq!(
         json,
@@ -108,6 +122,10 @@ fn encode_valid() {
             "logName":"projects/project/logs/testlogs",
             "jsonPayload":{"message":"hello world"},
             "severity":100,
+            "labels":{
+                "config_user_label_1":"config_user_value_1",
+                "user_label_1":"user_value_1"
+            },
             "resource":{
                 "type":"generic_node",
                 "labels":{"namespace":"office","node_id":"10.10.10.1"}
@@ -124,6 +142,13 @@ fn encode_inserts_timestamp() {
         transformer,
         Template::try_from("testlogs").unwrap(),
         StackdriverLogName::Project("project".to_owned()),
+        StackdriverLabelConfig {
+            labels_key: None,
+            labels: HashMap::from([(
+                "config_user_label_1".to_owned(),
+                Template::try_from("value_1").unwrap(),
+            )]),
+        },
         StackdriverResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([(
@@ -153,6 +178,7 @@ fn encode_inserts_timestamp() {
             "logName":"projects/project/logs/testlogs",
             "jsonPayload":{"message":"hello world","timestamp":"2020-01-01T12:30:00Z"},
             "severity":100,
+            "labels":{"config_user_label_1":"value_1"},
             "resource":{
                 "type":"generic_node",
                 "labels":{"namespace":"office"}},
@@ -198,6 +224,13 @@ async fn correct_request() {
         transformer,
         Template::try_from("testlogs").unwrap(),
         StackdriverLogName::Project("project".to_owned()),
+        StackdriverLabelConfig {
+            labels_key: None,
+            labels: HashMap::from([(
+                "config_user_label_1".to_owned(),
+                Template::try_from("value_1").unwrap(),
+            )]),
+        },
         StackdriverResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([(
@@ -251,6 +284,9 @@ async fn correct_request() {
                     "jsonPayload": {
                         "message": "hello"
                     },
+                    "labels": {
+                        "config_user_label_1": "value_1"
+                    },
                     "resource": {
                         "type": "generic_node",
                         "labels": {
@@ -263,6 +299,9 @@ async fn correct_request() {
                     "severity": 0,
                     "jsonPayload": {
                         "message": "world"
+                    },
+                    "labels": {
+                        "config_user_label_1": "value_1"
                     },
                     "resource": {
                         "type": "generic_node",

@@ -11,6 +11,7 @@ env:
   ECS_ADDRESS: http://mock-ecs
   ELASTICSEARCH_ADDRESS: http://mock-localstack:4566
   KINESIS_ADDRESS: http://mock-localstack:4566
+  KMS_ADDRESS: http://mock-localstack:4566
   S3_ADDRESS: http://mock-localstack:4566
   SQS_ADDRESS: http://mock-localstack:4566
   SNS_ADDRESS: http://mock-localstack:4566

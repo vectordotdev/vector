@@ -12,6 +12,10 @@ fn default_dbname_template() -> Template {
     Template::try_from(default_dbname()).unwrap()
 }
 
+fn default_pipeline_template() -> Template {
+    Template::try_from("greptime_identity").unwrap()
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 struct GreptimeDBDefaultBatchSettings;
 

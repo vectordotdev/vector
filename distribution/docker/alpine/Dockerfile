@@ -1,4 +1,4 @@
-FROM docker.io/alpine:3.20 AS builder
+FROM docker.io/alpine:3.21 AS builder
 
 WORKDIR /vector
 
@@ -12,7 +12,7 @@ RUN ARCH=$(if [ "$TARGETPLATFORM" = "linux/arm/v6" ]; then echo "arm"; else cat 
 
 RUN mkdir -p /var/lib/vector
 
-FROM docker.io/alpine:3.20
+FROM docker.io/alpine:3.21
 # we want the latest versions of these
 # hadolint ignore=DL3018
 RUN apk --no-cache add ca-certificates tzdata

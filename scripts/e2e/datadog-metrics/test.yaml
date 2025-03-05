@@ -24,4 +24,5 @@ paths:
 - "src/sinks/datadog/metrics/**"
 - "src/sinks/util/**"
 - "scripts/integration/datadog-e2e/metrics/**"
+- "tests/e2e/datadog/metrics/**"
 - "tests/data/e2e/datadog/metrics/**"

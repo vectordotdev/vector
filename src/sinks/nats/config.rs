@@ -66,6 +66,9 @@ pub struct NatsSinkConfig {
     /// [nats_url]: https://docs.nats.io/using-nats/developer/connecting#nats-url
     #[configurable(metadata(docs::examples = "nats://demo.nats.io"))]
     #[configurable(metadata(docs::examples = "nats://127.0.0.1:4242"))]
+    #[configurable(metadata(
+        docs::examples = "nats://localhost:4222,nats://localhost:5222,nats://localhost:6222"
+    ))]
     pub(super) url: String,
 
     #[configurable(derived)]
@@ -138,7 +141,20 @@ impl NatsSinkConfig {
     pub(super) async fn connect(&self) -> Result<async_nats::Client, NatsError> {
         let options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
 
-        options.connect(&self.url).await.context(ConnectSnafu)
+        let urls = self.parse_server_addresses()?;
+        options.connect(urls).await.context(ConnectSnafu)
+    }
+
+    fn parse_server_addresses(&self) -> Result<Vec<async_nats::ServerAddr>, NatsError> {
+        self.url
+            .split(',')
+            .map(|url| {
+                url.parse::<async_nats::ServerAddr>()
+                    .map_err(|_| NatsError::Connect {
+                        source: async_nats::ConnectErrorKind::ServerParse.into(),
+                    })
+            })
+            .collect()
     }
 
     pub(super) async fn publisher(&self) -> Result<NatsPublisher, NatsError> {

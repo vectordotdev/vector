@@ -19,15 +19,16 @@ vector-core = { path = "../vector-core", default-features = false }
 vector-lookup = { path = "../vector-lookup", features = ["test"] }
 vector-stream = { path = "../vector-stream" }
 vector-tap = { path = "../vector-tap" }
+vrl = { workspace = true, optional = true }
 
 [features]
-api = ["vector-core/api", "vector-tap/api"]
+api = ["vector-tap/api"]
 api-client = ["dep:vector-api-client"]
 lua = ["vector-core/lua"]
 file-source = ["dep:file-source"]
 opentelemetry = ["dep:opentelemetry-proto"]
 prometheus = ["dep:prometheus-parser"]
-proptest = ["vector-lookup/proptest"]
+proptest = ["vector-lookup/proptest", "vrl/proptest"]
 syslog = ["codecs/syslog"]
 test = ["vector-core/test"]
-vrl = ["vector-core/vrl"]
+vrl = ["vector-core/vrl", "dep:vrl"]

@@ -8,7 +8,7 @@ pub struct WindowsServiceStart<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceStart<'a> {
+impl InternalEvent for WindowsServiceStart<'_> {
     fn emit(self) {
         info!(
             already_started = %self.already_started,
@@ -29,7 +29,7 @@ pub struct WindowsServiceStop<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceStop<'a> {
+impl InternalEvent for WindowsServiceStop<'_> {
     fn emit(self) {
         info!(
             already_stopped = %self.already_stopped,
@@ -49,7 +49,7 @@ pub struct WindowsServiceRestart<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceRestart<'a> {
+impl InternalEvent for WindowsServiceRestart<'_> {
     fn emit(self) {
         info!(
             name = ?self.name,
@@ -64,7 +64,7 @@ pub struct WindowsServiceInstall<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceInstall<'a> {
+impl InternalEvent for WindowsServiceInstall<'_> {
     fn emit(self) {
         info!(
             name = ?self.name,
@@ -79,7 +79,7 @@ pub struct WindowsServiceUninstall<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceUninstall<'a> {
+impl InternalEvent for WindowsServiceUninstall<'_> {
     fn emit(self) {
         info!(
             name = ?self.name,
@@ -94,7 +94,7 @@ pub struct WindowsServiceDoesNotExistError<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceDoesNotExistError<'a> {
+impl InternalEvent for WindowsServiceDoesNotExistError<'_> {
     fn emit(self) {
         error!(
             message = "Windows service does not exist. Maybe it needs to be installed.",

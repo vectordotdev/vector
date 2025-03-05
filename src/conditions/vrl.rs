@@ -21,7 +21,7 @@ pub struct VrlConfig {
     pub(crate) source: String,
 
     #[configurable(derived, metadata(docs::hidden))]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(crate) runtime: VrlRuntime,
 }
 
@@ -44,7 +44,11 @@ impl ConditionalConfig for VrlConfig {
 
         let functions = vrl::stdlib::all()
             .into_iter()
-            .chain(vector_lib::enrichment::vrl_functions())
+            .chain(vector_lib::enrichment::vrl_functions());
+        #[cfg(feature = "sources-dnstap")]
+        let functions = functions.chain(dnstap_parser::vrl_functions());
+
+        let functions = functions
             .chain(vector_vrl_functions::all())
             .collect::<Vec<_>>();
 

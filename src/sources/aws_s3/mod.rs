@@ -130,6 +130,13 @@ pub struct AwsS3Config {
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
+
+    /// Specifies which addressing style to use.
+    ///
+    /// This controls whether the bucket name is in the hostname, or part of the URL.
+    #[serde(default = "default_true")]
+    #[derivative(Default(value = "default_true()"))]
+    pub force_path_style: bool,
 }
 
 const fn default_framing() -> FramingConfig {
@@ -137,6 +144,10 @@ const fn default_framing() -> FramingConfig {
     FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
         newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
     })
+}
+
+const fn default_true() -> bool {
+    true
 }
 
 impl_generate_config_from_default!(AwsS3Config);
@@ -232,12 +243,15 @@ impl AwsS3Config {
         let endpoint = self.region.endpoint();
 
         let s3_client = create_client::<S3ClientBuilder>(
+            &S3ClientBuilder {
+                force_path_style: Some(self.force_path_style),
+            },
             &self.auth,
             region.clone(),
             endpoint.clone(),
             proxy,
-            &self.tls_options,
-            &None,
+            self.tls_options.as_ref(),
+            None,
         )
         .await?;
 
@@ -248,12 +262,13 @@ impl AwsS3Config {
         match self.sqs {
             Some(ref sqs) => {
                 let (sqs_client, region) = create_client_and_region::<SqsClientBuilder>(
+                    &SqsClientBuilder {},
                     &self.auth,
                     region.clone(),
                     endpoint,
                     proxy,
-                    &sqs.tls_options,
-                    &sqs.timeout,
+                    sqs.tls_options.as_ref(),
+                    sqs.timeout.as_ref(),
                 )
                 .await?;
 
@@ -1016,13 +1031,17 @@ mod integration_tests {
             endpoint: Some(s3_address()),
         };
         let proxy_config = ProxyConfig::default();
+        let force_path_style_value: bool = true;
         create_client::<S3ClientBuilder>(
+            &S3ClientBuilder {
+                force_path_style: Some(force_path_style_value),
+            },
             &auth,
             region_endpoint.region(),
             region_endpoint.endpoint(),
             &proxy_config,
-            &None,
-            &None,
+            None,
+            None,
         )
         .await
         .unwrap()
@@ -1036,12 +1055,13 @@ mod integration_tests {
         };
         let proxy_config = ProxyConfig::default();
         create_client::<SqsClientBuilder>(
+            &SqsClientBuilder {},
             &auth,
             region_endpoint.region(),
             region_endpoint.endpoint(),
             &proxy_config,
-            &None,
-            &None,
+            None,
+            None,
         )
         .await
         .unwrap()

@@ -101,7 +101,7 @@ impl TowerRequestConfigDefaults for GlobalTowerRequestConfigDefaults {}
 
 /// Middleware settings for outbound requests.
 ///
-/// Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+/// Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
 ///
 /// Note that the retry backoff policy follows the Fibonacci sequence.
 #[serde_as]
@@ -444,10 +444,10 @@ mod tests {
         toml::from_str::<TowerRequestConfig>(r#"concurrency = "broken""#)
             .expect_err("Invalid concurrency setting didn't fail");
 
-        toml::from_str::<TowerRequestConfig>(r#"concurrency = 0"#)
+        toml::from_str::<TowerRequestConfig>(r"concurrency = 0")
             .expect_err("Invalid concurrency setting didn't fail on zero");
 
-        toml::from_str::<TowerRequestConfig>(r#"concurrency = -9"#)
+        toml::from_str::<TowerRequestConfig>(r"concurrency = -9")
             .expect_err("Invalid concurrency setting didn't fail on negative number");
     }
 
@@ -496,14 +496,14 @@ mod tests {
     fn into_settings_with_populated_config() {
         // Populate with values not equal to the global defaults.
         let cfg = toml::from_str::<TowerRequestConfig>(
-            r#" concurrency = 16
+            r" concurrency = 16
             timeout_secs = 1
             rate_limit_duration_secs = 2
             rate_limit_num = 3
             retry_attempts = 4
             retry_max_duration_secs = 5
             retry_initial_backoff_secs = 6
-        "#,
+        ",
         )
         .expect("Config failed to parse");
 

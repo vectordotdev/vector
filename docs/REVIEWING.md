@@ -66,7 +66,7 @@ This checklist is specific for Vector's sinks.
 
 #### Documentation
 
-- [ ] Look at the doc preview on Netlify. Does it look good?
+- [ ] Generate a local website: `cd website & make serve`. Does it look good?
 - [ ] Is there a `cue` file linking to `base`?
 - [ ] Is there a markdown file under `/website/content/en/docs/reference/configuration/sinks/`?
 - [ ] Are module comments included in `mod.rs` linking to any relevant areas in the external services documentation?

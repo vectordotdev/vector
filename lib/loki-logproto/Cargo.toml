@@ -10,8 +10,6 @@ publish = false
 [dependencies]
 prost.workspace = true
 prost-types.workspace = true
-bytes = { version = "1.7.2", default-features = false }
-snap = { version = "1.1.1", default-features = false }
 
 [dev-dependencies]
 chrono.workspace = true

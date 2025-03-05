@@ -101,7 +101,7 @@ async fn firehose_put_records_without_partition_key() {
         .expect("Could not build HTTP client");
 
     let response = client
-        .get(&format!("{}/{}/_search", common.base_url, stream))
+        .get(format!("{}/{}/_search", common.base_url, stream))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))
@@ -213,7 +213,7 @@ async fn firehose_put_records_with_partition_key() {
         .expect("Could not build HTTP client");
 
     let response = client
-        .get(&format!("{}/{}/_search", common.base_url, stream))
+        .get(format!("{}/{}/_search", common.base_url, stream))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))
@@ -255,12 +255,13 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
     let proxy = ProxyConfig::default();
 
     create_client::<KinesisFirehoseClientBuilder>(
+        &KinesisFirehoseClientBuilder {},
         &auth,
         region_endpoint.region(),
         region_endpoint.endpoint(),
         &proxy,
-        &None,
-        &None,
+        None,
+        None,
     )
     .await
     .unwrap()
@@ -275,7 +276,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
                     .credentials_provider(
                         test_region_endpoint().region().unwrap(),
                         &Default::default(),
-                        &None,
+                        None,
                     )
                     .await
                     .unwrap(),

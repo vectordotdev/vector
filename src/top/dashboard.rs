@@ -322,7 +322,7 @@ impl<'a> Widgets<'a> {
 
     /// Draw a single frame. Creates a layout and renders widgets into it.
     fn draw(&self, f: &mut Frame, state: state::State) {
-        let size = f.size();
+        let size = f.area();
         let rects = Layout::default()
             .constraints(self.constraints.clone())
             .split(size);

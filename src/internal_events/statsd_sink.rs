@@ -10,7 +10,7 @@ pub struct StatsdInvalidMetricError<'a> {
     pub kind: MetricKind,
 }
 
-impl<'a> InternalEvent for StatsdInvalidMetricError<'a> {
+impl InternalEvent for StatsdInvalidMetricError<'_> {
     fn emit(self) {
         let reason = "Invalid metric type received.";
         error!(

@@ -72,10 +72,10 @@ fn node_attributes_to_string(attributes: &HashMap<String, String>, default_shape
     if !attrs.contains_key("shape") {
         attrs.insert("shape".to_string(), default_shape.to_string());
     }
-    return attrs
+    attrs
         .iter()
         .map(|(k, v)| format!("{}=\"{}\"", k, v))
-        .join(" ");
+        .join(" ")
 }
 
 pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {

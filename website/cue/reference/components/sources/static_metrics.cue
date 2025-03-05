@@ -62,7 +62,8 @@ components: sources: static_metrics: {
 						name: "heartbeat"
 						kind: "absolute"
 						value:
-							gauge: 1
+							gauge:
+								value: 1
 						tags:
 							env: "${ENV}"
 					},

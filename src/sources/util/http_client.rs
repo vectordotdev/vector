@@ -17,6 +17,7 @@ use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::json_size::JsonSize;
 
+use crate::http::QueryParameters;
 use crate::{
     http::{Auth, HttpClient},
     internal_events::{
@@ -82,7 +83,7 @@ pub(crate) trait HttpClientContext {
 }
 
 /// Builds a url for the HTTP requests.
-pub(crate) fn build_url(uri: &Uri, query: &HashMap<String, Vec<String>>) -> Uri {
+pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
     if let Some(query) = uri.query() {
         serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));

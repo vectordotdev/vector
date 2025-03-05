@@ -522,7 +522,7 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
     fn event_data_eq(&self, other: &Vec<Event>) -> bool {
         struct Comparator<'a>(EventRef<'a>);
 
-        impl<'a> PartialEq<&Event> for Comparator<'a> {
+        impl PartialEq<&Event> for Comparator<'_> {
             fn eq(&self, that: &&Event) -> bool {
                 self.0.event_data_eq(that)
             }

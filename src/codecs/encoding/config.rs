@@ -119,7 +119,8 @@ impl EncodingConfigWithFraming {
             }
             (
                 None,
-                Serializer::Csv(_)
+                Serializer::Cef(_)
+                | Serializer::Csv(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)

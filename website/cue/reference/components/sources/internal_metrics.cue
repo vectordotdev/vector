@@ -54,6 +54,12 @@ components: sources: internal_metrics: {
 		}
 
 		// Instance-level "process" metrics
+		active_clients: {
+			description:       "Number of clients attached to a component."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		aggregate_events_recorded_total: {
 			description:       "The number of events recorded by the aggregate transform."
 			type:              "counter"

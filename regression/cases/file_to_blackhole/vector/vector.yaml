@@ -11,7 +11,7 @@ sources:
   file:
     type: "file"
     include:
-      - "/tmp/file-gen-*.log"
+      - "/smp-shared/*.log"
 
 ##
 ## Sinks

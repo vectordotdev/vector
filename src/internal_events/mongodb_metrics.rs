@@ -13,7 +13,7 @@ pub struct MongoDbMetricsEventsReceived<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
+impl InternalEvent for MongoDbMetricsEventsReceived<'_> {
     // ## skip check-duplicate-events ##
     fn emit(self) {
         trace!(
@@ -40,7 +40,7 @@ pub struct MongoDbMetricsRequestError<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
+impl InternalEvent for MongoDbMetricsRequestError<'_> {
     fn emit(self) {
         error!(
             message = "MongoDb request error.",
@@ -64,7 +64,7 @@ pub struct MongoDbMetricsBsonParseError<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for MongoDbMetricsBsonParseError<'a> {
+impl InternalEvent for MongoDbMetricsBsonParseError<'_> {
     fn emit(self) {
         error!(
             message = "BSON document parse error.",

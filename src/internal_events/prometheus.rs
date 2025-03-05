@@ -16,7 +16,7 @@ pub struct PrometheusParseError<'a> {
 }
 
 #[cfg(feature = "sources-prometheus-scrape")]
-impl<'a> InternalEvent for PrometheusParseError<'a> {
+impl InternalEvent for PrometheusParseError<'_> {
     fn emit(self) {
         error!(
             message = "Parsing error.",

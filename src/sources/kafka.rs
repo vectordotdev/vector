@@ -16,8 +16,8 @@ use futures::{Stream, StreamExt};
 use futures_util::future::OptionFuture;
 use rdkafka::{
     consumer::{
-        stream_consumer::StreamPartitionQueue, CommitMode, Consumer, ConsumerContext, Rebalance,
-        StreamConsumer,
+        stream_consumer::StreamPartitionQueue, BaseConsumer, CommitMode, Consumer, ConsumerContext,
+        Rebalance, StreamConsumer,
     },
     error::KafkaError,
     message::{BorrowedMessage, Headers as _, Message},
@@ -1369,15 +1369,11 @@ impl ClientContext for KafkaSourceContext {
 }
 
 impl ConsumerContext for KafkaSourceContext {
-    fn pre_rebalance(&self, rebalance: &Rebalance) {
+    fn pre_rebalance(&self, _base_consumer: &BaseConsumer<Self>, rebalance: &Rebalance) {
         match rebalance {
             Rebalance::Assign(tpl) => self.consume_partitions(tpl),
 
             Rebalance::Revoke(tpl) => {
-                // TODO  workaround for https://github.com/fede1024/rust-rdkafka/issues/681
-                if tpl.capacity() == 0 {
-                    return;
-                }
                 self.revoke_partitions(tpl);
                 self.commit_consumer_state();
             }

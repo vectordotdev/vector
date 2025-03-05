@@ -146,7 +146,7 @@ where
 
 impl<C, I> TaskTransform<Event> for Throttle<C, I>
 where
-    C: clock::Clock<Instant = I> + Send + 'static,
+    C: clock::Clock<Instant = I> + Send + 'static + Clone,
     I: clock::Reference + Send + 'static,
 {
     fn transform(
@@ -158,7 +158,7 @@ where
     {
         let mut flush_keys = tokio::time::interval(self.flush_keys_interval * 2);
 
-        let limiter = RateLimiter::dashmap_with_clock(self.quota, &self.clock);
+        let limiter = RateLimiter::dashmap_with_clock(self.quota, self.clock.clone());
 
         Box::pin(stream! {
           loop {
@@ -251,10 +251,10 @@ mod tests {
     async fn throttle_events() {
         let clock = clock::FakeRelativeClock::default();
         let config = toml::from_str::<ThrottleConfig>(
-            r#"
+            r"
 threshold = 2
 window_secs = 5
-"#,
+",
         )
         .unwrap();
 

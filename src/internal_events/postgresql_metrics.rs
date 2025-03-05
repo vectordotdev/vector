@@ -8,7 +8,7 @@ pub struct PostgresqlMetricsCollectError<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for PostgresqlMetricsCollectError<'a> {
+impl InternalEvent for PostgresqlMetricsCollectError<'_> {
     fn emit(self) {
         error!(
             message = "PostgreSQL query error.",

@@ -3,6 +3,7 @@ modules:
   - path: lib/vector-core/proto
   - path: proto/third-party
   - path: proto/vector
+  - path: lib/dnstap-parser/proto
 lint:
   use:
     - DEFAULT
