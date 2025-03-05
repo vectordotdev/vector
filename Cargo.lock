@@ -1553,7 +1553,7 @@ version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4fa97bb310c33c811334143cf64c5bb2b7b3c06e453db6b095d7061eff8f113"
 dependencies = [
- "fastrand 2.1.1",
+ "fastrand 2.3.0",
  "gloo-timers",
  "tokio",
 ]
@@ -6642,13 +6642,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "backon",
-<<<<<<< HEAD
  "base64 0.22.1",
- "bytes 1.7.2",
-=======
- "base64 0.21.7",
  "bytes 1.10.0",
->>>>>>> origin/master
  "chrono",
  "flagset",
  "futures 0.3.31",
