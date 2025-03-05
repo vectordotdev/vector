@@ -90,15 +90,12 @@ impl ComponentConfig {
         }
     }
 
-    pub fn contains(&self, config_paths: &Vec<PathBuf>) -> Option<ComponentKey> {
-        for i in config_paths {
-            if self.config_paths.contains(&i) {
-                return Some(self.component_key.clone());
-            }
+    pub fn contains(&self, config_paths: &[PathBuf]) -> Option<ComponentKey> {
+        if config_paths.iter().any(|p| self.config_paths.contains(p)) {
+            return Some(self.component_key.clone());
         }
         None
     }
-}
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ConfigPath {
