@@ -1,3 +1,3 @@
-The TLS `crt_file` and `key_file` from `http` sinks are now part of the watcher list and therefore they are reloaded on Vector restart.
+The TLS `crt_file` and `key_file` from `http` sinks are now watched when `--watch_config` is enabled and therefore changes to those files will trigger a config reload without the need to restart Vector.
 
 authors: gllb
