@@ -21,6 +21,8 @@ _In this blog post we want to highlight some recently added features and guides.
   [release highlight]({{< ref "/highlights/2024-11-07-exclusive_route" >}}).
 * Apple Silicon builds are now available in our [downloads page]({{< ref "/download" >}}).
   Note that these are available since `v0.44.0` and won't show up for older versions.
+* A new type of `enrichment_table`, called `memory`, was introduced! This table can also function as a sink and addresses several new use cases. See this
+  [release highlight]({{< ref "/highlights/2025-02-24-memory_enrichment_table.md" >}}) for details.
 * The VRL function library keeps growing thanks to community contributions! You can read more:
   * [0.21.0 Features]({{< ref "/releases/0.44.0/#new-features" >}})
   * [0.20.0 Features]({{< ref "/releases/0.43.0/#new-features" >}})
