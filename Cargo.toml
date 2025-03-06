@@ -370,6 +370,7 @@ seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
 socket2 = { version = "0.5.8", default-features = false }
+sqlx = { version = "0.8.3", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional=true }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
@@ -740,6 +741,7 @@ sinks-logs = [
   "sinks-new_relic_logs",
   "sinks-opentelemetry",
   "sinks-papertrail",
+  "sinks-postgres",
   "sinks-pulsar",
   "sinks-redis",
   "sinks-sematext",
@@ -809,6 +811,7 @@ sinks-new_relic = []
 sinks-opentelemetry = ["sinks-http"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
+sinks-postgres = ["dep:sqlx"]
 sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "dep:lru"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
@@ -858,6 +861,7 @@ all-integration-tests = [
   "nginx-integration-tests",
   "opentelemetry-integration-tests",
   "postgresql_metrics-integration-tests",
+  "postgres_sink-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "redis-integration-tests",
@@ -922,6 +926,7 @@ nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 opentelemetry-integration-tests = ["sources-opentelemetry", "dep:prost"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
+postgres_sink-integration-tests = ["sinks-postgres"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "sinks-influxdb"]
 pulsar-integration-tests = ["sinks-pulsar", "sources-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
