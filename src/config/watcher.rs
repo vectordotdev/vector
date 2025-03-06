@@ -186,7 +186,6 @@ mod tests {
         config::ComponentKey,
         signal::SignalRx,
         test_util::{temp_dir, temp_file, trace_init},
-        config::ComponentKey,
     };
     use std::{fs::File, io::Write, time::Duration};
     use tokio::sync::broadcast;
@@ -285,7 +284,14 @@ mod tests {
         let mut file = File::create(&file_path).unwrap();
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
-        spawn_thread(watcher_conf, signal_tx, &[dir], vec![component_config], delay).unwrap();
+        spawn_thread(
+            watcher_conf,
+            signal_tx,
+            &[dir],
+            vec![component_config],
+            delay,
+        )
+        .unwrap();
 
         if !test(&mut file, delay * 5, signal_rx).await {
             panic!("Test timed out");
