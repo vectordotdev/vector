@@ -323,6 +323,10 @@ fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
                 Auth::Bearer { token } => {
                     HeaderValue::from_str(format!("Bearer {}", token.inner()).as_str())
                 }
+                Auth::Digest { .. } => {
+                    error!("Digest authentication is not supported.");
+                    return false;
+                }
             };
 
             if let Ok(encoded_credentials) = encoded_credentials {
