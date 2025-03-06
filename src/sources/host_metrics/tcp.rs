@@ -71,6 +71,8 @@ enum TcpError {
     InvalidTcpState { state: u8 },
     #[snafu(display("Received an error message from netlink; code: {code}"))]
     NetlinkMsgError { code: i32 },
+    #[snafu(display("Invalid message length: {length}"))]
+    InvalidLength { length: usize },
 }
 
 #[repr(u8)]
@@ -145,11 +147,15 @@ fn parse_netlink_messages(
     while offset < buffer.len() {
         let remaining_bytes = &buffer[offset..];
         if remaining_bytes.len() < 4 {
+            // Still treat this as an error since we can't even read the length
             return Err(TcpError::TruncatedMessage);
         }
 
         let length = NativeEndian::read_u32(&remaining_bytes[0..4]) as usize;
-        if length < 4 || length > remaining_bytes.len() {
+        if length == 0 {
+            break; // Restore original behavior: treat as end of buffer
+        }
+        if length > remaining_bytes.len() {
             return Err(TcpError::InvalidLength { length });
         }
 
