@@ -11,6 +11,7 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
+use super::buffering::MessageBufferingConfig;
 use super::sink::WebSocketListenerSink;
 
 /// Configuration for the `websocket_server` sink.
@@ -40,6 +41,9 @@ pub struct WebSocketListenerSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    pub message_buffering: Option<MessageBufferingConfig>,
 
     #[configurable(derived)]
     pub auth: Option<HttpServerAuthConfig>,
@@ -99,6 +103,7 @@ impl Default for WebSocketListenerSinkConfig {
             encoding: JsonSerializerConfig::default().into(),
             tls: None,
             acknowledgements: Default::default(),
+            message_buffering: None,
             auth: None,
             internal_metrics: InternalMetricsConfig::default(),
         }

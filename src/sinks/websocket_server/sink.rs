@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
@@ -21,6 +21,7 @@ use tokio_tungstenite::tungstenite::{
 use tokio_util::codec::Encoder as _;
 use tracing::Instrument;
 use url::Url;
+use uuid::Uuid;
 use vector_lib::{
     event::{Event, EventStatus},
     finalization::Finalizable,
@@ -40,10 +41,15 @@ use crate::{
         WsListenerConnectionFailedError, WsListenerConnectionShutdown, WsListenerMessageSent,
         WsListenerSendError,
     },
-    sinks::prelude::*,
+    sinks::{
+        prelude::*,
+        websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
+    },
 };
 
-use super::{config::ExtraMetricTagsConfig, WebSocketListenerSinkConfig};
+use super::{
+    buffering::MessageBufferingConfig, config::ExtraMetricTagsConfig, WebSocketListenerSinkConfig,
+};
 
 pub struct WebSocketListenerSink {
     peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
@@ -53,6 +59,7 @@ pub struct WebSocketListenerSink {
     address: SocketAddr,
     auth: Option<HttpServerAuthMatcher>,
     extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
+    message_buffering: Option<MessageBufferingConfig>,
 }
 
 impl WebSocketListenerSink {
@@ -73,6 +80,7 @@ impl WebSocketListenerSink {
             encoder,
             auth,
             extra_tags_config: config.internal_metrics.extra_tags,
+            message_buffering: config.message_buffering,
         })
     }
 
@@ -119,8 +127,10 @@ impl WebSocketListenerSink {
 
     async fn handle_connections(
         auth: Option<HttpServerAuthMatcher>,
+        message_buffering: Option<MessageBufferingConfig>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
+        buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
         mut listener: MaybeTlsListener,
     ) {
         let open_gauge = OpenGauge::new();
@@ -129,7 +139,9 @@ impl WebSocketListenerSink {
             tokio::spawn(
                 Self::handle_connection(
                     auth.clone(),
+                    message_buffering.clone(),
                     Arc::clone(&peers),
+                    Arc::clone(&buffer),
                     stream,
                     extra_tags_config.clone(),
                     open_gauge.clone(),
@@ -141,7 +153,9 @@ impl WebSocketListenerSink {
 
     async fn handle_connection(
         auth: Option<HttpServerAuthMatcher>,
+        message_buffering: Option<MessageBufferingConfig>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
+        buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
         stream: MaybeTlsIncomingStream<TcpStream>,
         extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
         open_gauge: OpenGauge,
@@ -166,8 +180,10 @@ impl WebSocketListenerSink {
                 _ => None,
             })
             .collect();
+        let mut buffer_replay = BufferReplayRequest::NO_REPLAY;
 
         let header_callback = |req: &Request, response: Response| {
+            buffer_replay = message_buffering.extract_message_replay_request(req);
             let Some(auth) = auth else {
                 extra_tags.append(&mut Self::extract_extra_tags(
                     &extra_tags_config,
@@ -212,6 +228,12 @@ impl WebSocketListenerSink {
 
         {
             let mut peers = peers.lock().unwrap();
+            buffer_replay.replay_messages(&buffer.lock().unwrap(), |(_, message)| {
+                if let Err(error) = tx.unbounded_send(message.clone()) {
+                    emit!(WsListenerSendError { error });
+                }
+            });
+
             debug!("WebSocket connection established: {}", addr);
 
             peers.insert(addr, tx);
@@ -262,11 +284,16 @@ impl StreamSink<Event> for WebSocketListenerSink {
 
         let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
 
+        let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
+            self.message_buffering.buffer_capacity(),
+        )));
         tokio::spawn(
             Self::handle_connections(
                 self.auth,
+                self.message_buffering.clone(),
                 Arc::clone(&self.peers),
                 self.extra_tags_config,
+                Arc::clone(&message_buffer),
                 listener,
             )
             .in_current_span(),
@@ -277,6 +304,10 @@ impl StreamSink<Event> for WebSocketListenerSink {
             let finalizers = event.take_finalizers();
 
             self.transformer.transform(&mut event);
+
+            let message_id = self
+                .message_buffering
+                .add_replay_message_id_to_event(&mut event);
 
             let event_byte_size = event.estimated_json_encoded_size_of();
 
@@ -291,6 +322,14 @@ impl StreamSink<Event> for WebSocketListenerSink {
                         Message::text(String::from_utf8_lossy(&bytes))
                     };
                     let message_len = message.len();
+
+                    if self.message_buffering.should_buffer() {
+                        let mut buffer = message_buffer.lock().unwrap();
+                        if buffer.len() + 1 >= buffer.capacity() {
+                            buffer.pop_front();
+                        }
+                        buffer.push_back((message_id, message.clone()));
+                    }
 
                     let peers = self.peers.lock().unwrap();
                     let broadcast_recipients = peers.iter().map(|(_, ws_sink)| ws_sink);
@@ -318,7 +357,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
 mod tests {
     use futures::{channel::mpsc::UnboundedReceiver, SinkExt, Stream, StreamExt};
     use futures_util::stream;
-    use std::future::ready;
+    use std::{future::ready, num::NonZeroUsize};
     use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
     use tokio::{task::JoinHandle, time};
@@ -504,7 +543,10 @@ mod tests {
         )
         .await;
 
-        let full_url = format!("ws://localhost:{port}/?last_received=x&some_other_param=ignored");
+        let full_url = format!(
+            "{}/?last_received=x&some_other_param=ignored",
+            localhost_with_port(port)
+        );
         let client_handle = attach_websocket_client(full_url.clone(), vec![event.clone()]).await;
         sender.send(event).await.expect("Failed to send.");
 
@@ -547,6 +589,91 @@ mod tests {
         .await;
     }
 
+    #[tokio::test]
+    async fn test_client_late_connect_with_buffering() {
+        let event1 = Event::Log(LogEvent::from("foo1"));
+        let event2 = Event::Log(LogEvent::from("foo2"));
+
+        let (mut sender, input_events) = build_test_event_channel();
+        let address = next_addr();
+        let port = address.port();
+
+        let websocket_sink = start_websocket_server_sink(
+            WebSocketListenerSinkConfig {
+                address,
+                message_buffering: Some(MessageBufferingConfig {
+                    max_events: NonZeroUsize::new(1).unwrap(),
+                    message_id_path: None,
+                }),
+                ..Default::default()
+            },
+            input_events,
+        )
+        .await;
+
+        // Sending event 1 before client joined, the client without buffering should not receive it
+        sender.send(event1.clone()).await.expect("Failed to send.");
+
+        // Now connect the clients
+        let client_handle =
+            attach_websocket_client(localhost_with_port(port), vec![event2.clone()]).await;
+        let client_with_buffer_handle = attach_websocket_client_with_query(
+            port,
+            "last_received=0",
+            vec![event1.clone(), event2.clone()],
+        )
+        .await;
+
+        // Sending event 2, this one should be received by both clients
+        sender.send(event2).await.expect("Failed to send.");
+
+        client_handle.await.unwrap();
+        client_with_buffer_handle.await.unwrap();
+        drop(sender);
+        websocket_sink.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_client_late_connect_with_buffering_over_max_events_limit() {
+        let event1 = Event::Log(LogEvent::from("foo1"));
+        let event2 = Event::Log(LogEvent::from("foo2"));
+
+        let (mut sender, input_events) = build_test_event_channel();
+        let address = next_addr();
+        let port = address.port();
+
+        let websocket_sink = start_websocket_server_sink(
+            WebSocketListenerSinkConfig {
+                address,
+                message_buffering: Some(MessageBufferingConfig {
+                    max_events: NonZeroUsize::new(1).unwrap(),
+                    message_id_path: None,
+                }),
+                ..Default::default()
+            },
+            input_events,
+        )
+        .await;
+
+        let client_handle = attach_websocket_client(
+            localhost_with_port(port),
+            vec![event1.clone(), event2.clone()],
+        )
+        .await;
+
+        // Sending 2 events before client joined, the client without buffering should receive just one
+        sender.send(event1.clone()).await.expect("Failed to send.");
+        sender.send(event2.clone()).await.expect("Failed to send.");
+
+        let client_with_buffer_handle =
+            attach_websocket_client_with_query(port, "last_received=0", vec![event2.clone()]).await;
+
+        client_handle.await.unwrap();
+        client_with_buffer_handle.await.unwrap();
+        drop(sender);
+        websocket_sink.await.unwrap();
+    }
+
     async fn start_websocket_server_sink<S>(
         config: WebSocketListenerSinkConfig,
         events: S,
@@ -569,6 +696,18 @@ mod tests {
 
     fn localhost_with_port(port: u16) -> String {
         format!("ws://localhost:{port}")
+    }
+
+    async fn attach_websocket_client_with_query(
+        port: u16,
+        query: &str,
+        expected_events: Vec<Event>,
+    ) -> JoinHandle<()> {
+        attach_websocket_client(
+            format!("{}/?{query}", localhost_with_port(port)),
+            expected_events,
+        )
+        .await
     }
 
     async fn attach_websocket_client<R: IntoClientRequest + Unpin>(

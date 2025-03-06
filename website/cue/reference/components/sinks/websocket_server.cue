@@ -97,6 +97,8 @@ components: sinks: websocket_server: {
 		}
 	}
 
+	configuration: base.components.sinks.websocket_server.configuration
+
 	how_it_works: {
 		simple_configuration: {
 			title: "Example configuration"
@@ -162,11 +164,39 @@ components: sinks: websocket_server: {
 					# ...
 				```
 
-				This configuration adds a fixed tag (`test_extra_tag`) to each metric with the value, 
+				This configuration adds a fixed tag (`test_extra_tag`) to each metric with the value,
 				`test_value`. It also puts the `Authorization` header found in connection requests
 				into the `user_auth` tag, IP address of the client under the `client_ip` tag, full
-				connection URL under the `full_url` tag, and the `last_received` query parameter under
+				connection URL under the `full_url` tag and the `last_received` query parameter under
 				the `last_received_query` tag.
+				"""
+		}
+		message_buffering: {
+			title: "Message buffering"
+			body: """
+				The `message_buffering` configuration option enables event buffering. It defines the number
+				of events to buffer, allowing clients to replay messages after a disconnection.
+				To provide clients with the message ID, define `message_buffering.message_id_path`.
+				This encodes the outgoing messages ID. The buffer is backed by a ring buffer, so
+				the oldest messages are discarded when the size limit is reached.
+
+				After clients have the ID, they can send it in the `last_received` query parameter on future connections.
+				All buffered messages since that ID are then sent to the client immediately upon connection.
+				If the message can't be found, the entire buffer is replayed.
+
+				Example config:
+				```yaml
+				sinks:
+					websocket_export:
+						type: websocket_server
+						inputs: ["demo_logs_test"]
+						address: "0.0.0.0:1234"
+							message_buffering:
+								max_events: 1000
+								message_id_path: "message_id"
+						encoding:
+							codec: "json"
+				```
 				"""
 		}
 	}

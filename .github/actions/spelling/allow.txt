@@ -440,8 +440,8 @@ rsyslogd
 scriptblock
 servlet
 Sinjo
-shannon
 sublocation
+shannon
 sundar
 svcb
 snyk
@@ -524,3 +524,6 @@ requestline
 jetbrains
 JetBrains
 gifs
+meme
+simdutf
+vhosts
