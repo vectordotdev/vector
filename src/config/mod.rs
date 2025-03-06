@@ -96,6 +96,7 @@ impl ComponentConfig {
         }
         None
     }
+}
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ConfigPath {
