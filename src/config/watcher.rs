@@ -76,8 +76,7 @@ pub fn spawn_thread<'a>(
     let mut component_config_paths: Vec<_> = component_configs
         .clone()
         .into_iter()
-        .map(|p| p.config_paths.clone())
-        .flatten()
+        .flat_map(|p| p.config_paths.clone())
         .collect();
 
     config_paths.append(&mut component_config_paths);
@@ -107,8 +106,7 @@ pub fn spawn_thread<'a>(
                     let component_keys: Vec<_> = component_configs
                         .clone()
                         .into_iter()
-                        .map(|p| p.contains(&event.paths))
-                        .flatten()
+                        .flat_map(|p| p.contains(&event.paths))
                         .collect();
 
                     // We need to read paths to resolve any inode changes that may have happened.
@@ -121,7 +119,7 @@ pub fn spawn_thread<'a>(
                     debug!(message = "Reloaded paths.");
 
                     info!("Configuration file changed.");
-                    if component_keys.len() > 0 {
+                    if !component_keys.is_empty() {
                         info!("Component {:?} configuration changed.", component_keys);
                         _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(component_keys)).map_err(|error| {
                             error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
@@ -187,6 +185,7 @@ mod tests {
     use crate::{
         signal::SignalRx,
         test_util::{temp_dir, temp_file, trace_init},
+        config::ComponentKey,
     };
     use std::{fs::File, io::Write, time::Duration};
     use tokio::sync::broadcast;
@@ -209,14 +208,14 @@ mod tests {
         let dir = temp_dir().to_path_buf();
         let file_path = dir.join("vector.toml");
         let watcher_conf = WatcherConfig::RecommendedWatcher;
-        let component_file_path = Vec::new(dir.join("tls.cert"), dir.join("tls.key"));
+        let component_file_path = vec![dir.join("tls.cert"), dir.join("tls.key")];
         let component_config =
             ComponentConfig::new(component_file_path, ComponentKey::from("http"));
         std::fs::create_dir(&dir).unwrap();
         let mut file = File::create(&file_path).unwrap();
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
-        spawn_thread(watcher_conf, signal_tx, &[dir], component_file_path, delay).unwrap();
+        spawn_thread(watcher_conf, signal_tx, &[dir], vec![component_config], delay).unwrap();
 
         if !test(&mut file, delay * 5, signal_rx).await {
             panic!("Test timed out");
@@ -233,7 +232,7 @@ mod tests {
         let watcher_conf = WatcherConfig::RecommendedWatcher;
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
-        spawn_thread(watcher_conf, signal_tx, &[file_path], delay).unwrap();
+        spawn_thread(watcher_conf, signal_tx, &[file_path], vec![], delay).unwrap();
 
         if !test(&mut file, delay * 5, signal_rx).await {
             panic!("Test timed out");
@@ -254,7 +253,7 @@ mod tests {
         let watcher_conf = WatcherConfig::RecommendedWatcher;
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
-        spawn_thread(watcher_conf, signal_tx, &[sym_file], delay).unwrap();
+        spawn_thread(watcher_conf, signal_tx, &[sym_file], vec![], delay).unwrap();
 
         if !test(&mut file, delay * 5, signal_rx).await {
             panic!("Test timed out");
@@ -275,7 +274,7 @@ mod tests {
         let mut file = File::create(&file_path).unwrap();
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
-        spawn_thread(watcher_conf, signal_tx, &[sub_dir], delay).unwrap();
+        spawn_thread(watcher_conf, signal_tx, &[sub_dir], vec![], delay).unwrap();
 
         if !test(&mut file, delay * 5, signal_rx).await {
             panic!("Test timed out");

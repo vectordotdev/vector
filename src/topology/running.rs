@@ -548,9 +548,8 @@ impl RunningTopology {
             }))
             .collect::<Vec<_>>();
 
-        match components_to_reload {
-            Some(mut components) => sinks_to_change.append(&mut components),
-            _ => (),
+        if let Some(mut components) = components_to_reload {
+            sinks_to_change.append(&mut components)
         }
 
         for key in &sinks_to_change {

@@ -83,7 +83,7 @@ pub struct ComponentConfig {
 }
 
 impl ComponentConfig {
-    pub fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
+    pub const fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
         Self {
             config_paths,
             component_key,

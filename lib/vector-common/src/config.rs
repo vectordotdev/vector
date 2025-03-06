@@ -41,7 +41,7 @@ impl ComponentKey {
 
 impl AsRef<ComponentKey> for ComponentKey {
     fn as_ref(&self) -> &ComponentKey {
-        &self
+        self
     }
 }
 
