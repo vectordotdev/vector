@@ -1,6 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use fasyslog::format::SyslogContext;
 use fasyslog::{Facility, Severity};
+use std::fmt::Write;
 use vector_lib::configurable::configurable_component;
 use vrl::value::Kind;
 
