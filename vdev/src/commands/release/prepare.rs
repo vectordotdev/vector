@@ -1,5 +1,3 @@
-#![allow(warnings)]
-
 use crate::git;
 use crate::util::run_command;
 use anyhow::{anyhow, Result};
@@ -14,6 +12,7 @@ const ALPINE_DOCKERFILE: &str = "distribution/docker/alpine/Dockerfile";
 const DEBIAN_PREFIX: &str = "FROM docker.io/debian:";
 const DEBIAN_DOCKERFILE: &str = "distribution/docker/debian/Dockerfile";
 const RELEASE_CUE_SCRIPT: &str = "scripts/generate-release-cue.rb";
+const KUBECLT_CUE_FILE: &str = "website/cue/reference/administration/interfaces/kubectl.cue";
 
 /// Release preparations CLI options.
 #[derive(clap::Args, Debug)]
@@ -26,34 +25,38 @@ pub struct Cli {
     #[arg(long)]
     vrl_version: Version,
     /// Optional: The Alpine version to use in `distribution/docker/alpine/Dockerfile`.
-    /// You can find the latest version here: https://alpinelinux.org/releases/.
+    /// You can find the latest version here: <https://alpinelinux.org/releases/>.
     #[arg(long)]
     alpine_version: Option<String>,
     /// Optional: The Debian version to use in `distribution/docker/debian/Dockerfile`.
-    /// You can find the latest version here: https://www.debian.org/releases/.
+    /// You can find the latest version here: <https://www.debian.org/releases/>.
     #[arg(long)]
     debian_version: Option<String>,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        // create_release_branches(&self.version)?;
-        // pin_vrl_version(&self.vrl_version)?;
+        create_release_branches(&self.version)?;
+        pin_vrl_version(&self.vrl_version)?;
 
-        // update_dockerfile_base_version(
-        //     &get_repo_root().join(ALPINE_DOCKERFILE),
-        //     self.alpine_version.as_deref(),
-        //     ALPINE_PREFIX,
-        // )?;
-        //
-        // update_dockerfile_base_version(
-        //     &get_repo_root().join(DEBIAN_DOCKERFILE),
-        //     self.debian_version.as_deref(),
-        //     DEBIAN_PREFIX,
-        // )?;
+        update_dockerfile_base_version(
+            &get_repo_root().join(ALPINE_DOCKERFILE),
+            self.alpine_version.as_deref(),
+            ALPINE_PREFIX,
+        )?;
+
+        update_dockerfile_base_version(
+            &get_repo_root().join(DEBIAN_DOCKERFILE),
+            self.debian_version.as_deref(),
+            DEBIAN_PREFIX,
+        )?;
 
         generate_release_cue(&self.version)?;
-        // TODO automate more steps such as 'cargo vdev build release-cue'
+
+        let latest_version = get_latest_version()?;
+        update_cue_vector_version(&latest_version, &self.version)?;
+
+        // TODO automate more steps
         println!("Continue the release preparation process manually.");
         Ok(())
     }
@@ -61,6 +64,17 @@ impl Cli {
 
 fn get_repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf()
+}
+
+fn get_latest_version() -> Result<Version> {
+    let tags = run_command("git tag --list --sort=-v:refname");
+    let latest_tag = tags
+        .lines().next()
+        .ok_or_else(|| anyhow::anyhow!("No tags found starting with 'v'"))?;
+
+    let version_str = latest_tag.trim_start_matches('v');
+    Version::parse(version_str)
+        .map_err(|e| anyhow::anyhow!("Failed to parse version from tag '{latest_tag}': {e}"))
 }
 
 /// Steps 1 & 2
@@ -163,5 +177,31 @@ fn generate_release_cue(new_version: &Version) -> Result<()> {
     }
     git::commit("chore(releasing): Generated release CUE file")?;
     println!("Generated release CUE file");
+    Ok(())
+}
+
+/// Step 7: Find the `_vector_version` line and update the version.
+fn update_cue_vector_version(latest_version: &Version, new_version: &Version) -> Result<()> {
+    let cue_file_path = get_repo_root().join(KUBECLT_CUE_FILE);
+    let contents = fs::read_to_string(&cue_file_path)
+        .map_err(|e| anyhow!("Failed to read {}: {}", cue_file_path.display(), e))?;
+
+    let old_version_str = format!("{}.{}", latest_version.major, latest_version.minor);
+    let new_version_str = format!("{}.{}", new_version.major, new_version.minor);
+
+    if !contents.contains(&old_version_str) {
+        return Err(anyhow!("Could not find version {} to update in {}",
+            latest_version, cue_file_path.display()));
+    }
+
+    let updated_contents = contents.replace(&old_version_str, &new_version_str) + "\n"; // Add newline at EOF
+
+    fs::write(&cue_file_path, updated_contents)
+        .map_err(|e| anyhow!("Failed to write {}: {}", cue_file_path.display(), e))?;
+    git::commit(&format!(
+        "chore(releasing): Updated {} vector version to {new_version}",
+        cue_file_path.strip_prefix(get_repo_root()).unwrap().display(),
+    ))?;
+
     Ok(())
 }
