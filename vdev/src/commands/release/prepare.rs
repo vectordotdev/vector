@@ -1,7 +1,8 @@
 #![allow(warnings)]
+
 use crate::git;
 use crate::util::run_command;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use semver::Version;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,6 +13,7 @@ const ALPINE_PREFIX: &str = "FROM docker.io/alpine:";
 const ALPINE_DOCKERFILE: &str = "distribution/docker/alpine/Dockerfile";
 const DEBIAN_PREFIX: &str = "FROM docker.io/debian:";
 const DEBIAN_DOCKERFILE: &str = "distribution/docker/debian/Dockerfile";
+const RELEASE_CUE_SCRIPT: &str = "scripts/generate-release-cue.rb";
 
 /// Release preparations CLI options.
 #[derive(clap::Args, Debug)]
@@ -38,18 +40,19 @@ impl Cli {
         // create_release_branches(&self.version)?;
         // pin_vrl_version(&self.vrl_version)?;
 
-        update_dockerfile_base_version(
-            &get_repo_root().join(ALPINE_DOCKERFILE),
-            self.alpine_version.as_deref(),
-            ALPINE_PREFIX,
-        )?;
+        // update_dockerfile_base_version(
+        //     &get_repo_root().join(ALPINE_DOCKERFILE),
+        //     self.alpine_version.as_deref(),
+        //     ALPINE_PREFIX,
+        // )?;
+        //
+        // update_dockerfile_base_version(
+        //     &get_repo_root().join(DEBIAN_DOCKERFILE),
+        //     self.debian_version.as_deref(),
+        //     DEBIAN_PREFIX,
+        // )?;
 
-        update_dockerfile_base_version(
-            &get_repo_root().join(DEBIAN_DOCKERFILE),
-            self.debian_version.as_deref(),
-            DEBIAN_PREFIX,
-        )?;
-
+        generate_release_cue(&self.version)?;
         // TODO automate more steps such as 'cargo vdev build release-cue'
         println!("Continue the release preparation process manually.");
         Ok(())
@@ -131,7 +134,7 @@ fn update_dockerfile_base_version(
         // E.g. "FROM docker.io/alpine:", "3.21", " AS builder"
         let after_prefix = first_line
             .strip_prefix(prefix)
-            .ok_or_else(|| anyhow::anyhow!("Failed to strip prefix in {}", dockerfile_path.display()))?;
+            .ok_or_else(|| anyhow!("Failed to strip prefix in {}", dockerfile_path.display()))?;
         let parts: Vec<&str> = after_prefix.splitn(2, ' ').collect();
         let suffix = parts.get(1).unwrap_or(&"");
 
@@ -147,5 +150,18 @@ fn update_dockerfile_base_version(
         println!(
             "No version specified for {dockerfile_path:?}; skipping update");
     }
+    Ok(())
+}
+
+// Step 6
+fn generate_release_cue(new_version: &Version) -> Result<()> {
+    let script = get_repo_root().join(RELEASE_CUE_SCRIPT);
+    if script.is_file() {
+        run_command(&format!("{} --new-version {new_version} --no-interactive", script.to_string_lossy().as_ref()));
+    } else {
+        return Err(anyhow!("Script not found: {}", script.display()));
+    }
+    git::commit("chore(releasing): Generated release CUE file")?;
+    println!("Generated release CUE file");
     Ok(())
 }
