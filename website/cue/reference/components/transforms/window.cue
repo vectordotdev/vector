@@ -36,71 +36,71 @@ components: transforms: window: {
 		{
 			title: "Flush recent events when an error happens"
 			input: [
-				{ log: { message: "A01", level: "info" } },
-				{ log: { message: "A02", level: "debug" } },
-				{ log: { message: "A03", level: "info" } },
-				{ log: { message: "A04", level: "debug" } },
-				{ log: { message: "A05", level: "error" } },
-				{ log: { message: "A06", level: "debug" } },
-				{ log: { message: "A07", level: "warning" } },
-				{ log: { message: "A08", level: "info" } },
-				{ log: { message: "A09", level: "debug" } },
-				{ log: { message: "A10", level: "info" } },
+				{log: {message: "A01", level: "info"}},
+				{log: {message: "A02", level: "debug"}},
+				{log: {message: "A03", level: "info"}},
+				{log: {message: "A04", level: "debug"}},
+				{log: {message: "A05", level: "error"}},
+				{log: {message: "A06", level: "debug"}},
+				{log: {message: "A07", level: "warning"}},
+				{log: {message: "A08", level: "info"}},
+				{log: {message: "A09", level: "debug"}},
+				{log: {message: "A10", level: "info"}},
 			]
 
 			configuration: {
-				flush_when: #".level == "error""#
+				flush_when:    #".level == "error""#
 				events_before: 2
-				events_after: 2
+				events_after:  2
 			}
 
 			output: [
-				{ log: { message: "A03", level: "info" } },
-				{ log: { message: "A04", level: "debug" } },
-				{ log: { message: "A05", level: "error" } },
-				{ log: { message: "A06", level: "debug" } },
-				{ log: { message: "A07", level: "warning" } },
+				{log: {message: "A03", level: "info"}},
+				{log: {message: "A04", level: "debug"}},
+				{log: {message: "A05", level: "error"}},
+				{log: {message: "A06", level: "debug"}},
+				{log: {message: "A07", level: "warning"}},
 			]
 		},
 
 		{
 			title: "Pass events through without preserving the order"
 			input: [
-				{ log: { message: "A01", level: "info" } },
-				{ log: { message: "A02", level: "debug" } },
-				{ log: { message: "A03", level: "info" } },
-				{ log: { message: "A04", level: "debug" } },
-				{ log: { message: "A05", level: "error" } },
-				{ log: { message: "A06", level: "debug" } },
-				{ log: { message: "A07", level: "warning" } },
-				{ log: { message: "A08", level: "info" } },
-				{ log: { message: "A09", level: "debug" } },
-				{ log: { message: "A10", level: "info" } },
+				{log: {message: "A01", level: "info"}},
+				{log: {message: "A02", level: "debug"}},
+				{log: {message: "A03", level: "info"}},
+				{log: {message: "A04", level: "debug"}},
+				{log: {message: "A05", level: "error"}},
+				{log: {message: "A06", level: "debug"}},
+				{log: {message: "A07", level: "warning"}},
+				{log: {message: "A08", level: "info"}},
+				{log: {message: "A09", level: "debug"}},
+				{log: {message: "A10", level: "info"}},
 			]
 
 			configuration: {
-				flush_when: #".level == "error""#
-				pass_when: #".level == "info""#
+				flush_when:    #".level == "error""#
+				pass_when:     #".level == "info""#
 				events_before: 2
-				events_after: 2
+				events_after:  2
 			}
 
 			output: [
-				{ log: { message: "A01", level: "info" } },
-				{ log: { message: "A03", level: "info" } },
-				{ log: { message: "A02", level: "debug" } },
-				{ log: { message: "A04", level: "debug" } },
-				{ log: { message: "A05", level: "error" } },
-				{ log: { message: "A06", level: "debug" } },
-				{ log: { message: "A07", level: "warning" } },
-				{ log: { message: "A08", level: "info" } },
-				{ log: { message: "A10", level: "info" } },
+				{log: {message: "A01", level: "info"}},
+				{log: {message: "A03", level: "info"}},
+				{log: {message: "A02", level: "debug"}},
+				{log: {message: "A04", level: "debug"}},
+				{log: {message: "A05", level: "error"}},
+				{log: {message: "A06", level: "debug"}},
+				{log: {message: "A07", level: "warning"}},
+				{log: {message: "A08", level: "info"}},
+				{log: {message: "A10", level: "info"}},
 			]
 		},
 	]
 
-how_it_works: {
-	advantages: {
+	how_it_works: {
+		advantages: {
 			title: "Advantages of Use"
 			body: """
 				A common way to reduce log volume from a verbose system is to filter out less important messages, and only
