@@ -136,7 +136,19 @@ struct TcpStats {
     tx_queued_bytes: f64,
 }
 
-// Helper function to parse Netlink messages from a buffer
+/// Parses Netlink messages from a buffer, extracting [`InetResponseHeader`]s.
+///
+/// # Arguments
+/// * `buffer` - Raw byte slice containing Netlink messages.
+/// * `headers` - Mutable vector to store parsed [`InetResponseHeader`]s.
+///
+/// # Returns
+/// * `Ok(true)` if parsing is complete (Done message received).
+/// * `Ok(false)` if more data is expected. In this case, this function can be called again.
+/// * `Err(TcpError)` on invalid length, deserialization failure, or Netlink error.
+///
+/// # Errors
+/// Returns [`TcpError`] variants for invalid message lengths or Netlink errors.
 fn parse_netlink_messages(
     buffer: &[u8],
     headers: &mut Vec<InetResponseHeader>,
@@ -148,12 +160,12 @@ fn parse_netlink_messages(
         let remaining_bytes = &buffer[offset..];
         if remaining_bytes.len() < 4 {
             // Still treat this as an error since we can't even read the length
-            return Err(TcpError::TruncatedMessage);
+            return Err(TcpError::InvalidLength { length: remaining_bytes.len() });
         }
-
+        // This function panics if the buffer length is less than 4.
         let length = NativeEndian::read_u32(&remaining_bytes[0..4]) as usize;
         if length == 0 {
-            break; // Restore original behavior: treat as end of buffer
+            break;
         }
         if length > remaining_bytes.len() {
             return Err(TcpError::InvalidLength { length });
@@ -169,7 +181,7 @@ fn parse_netlink_messages(
             }
             NetlinkPayload::Done(_) => {
                 done = true;
-                break; // Exit the loop, signal end of dump
+                break;
             }
             NetlinkPayload::Error(error) => {
                 if let Some(code) = error.code {
@@ -185,8 +197,21 @@ fn parse_netlink_messages(
     Ok(done)
 }
 
-// Main function to fetch InetResponseHeaders
-async fn fetch_nl_inet_hdrs(addr_family: u8) -> Result<Vec<InetResponseHeader>, TcpError> {
+/// Fetches [`InetResponseHeader`]s for TCP sockets using Netlink.
+///
+/// # Arguments
+/// * `addr_family` - Address family (`AF_INET` for IPv4, `AF_INET6` for IPv6).
+///
+/// # Returns
+/// * `Ok(Vec<InetResponseHeader>)` containing headers for active TCP sockets.
+/// * `Err(TcpError)` on socket creation, send, receive, or parsing errors.
+///
+/// # Errors
+/// Returns [`TcpError`] for socket-related or message parsing failures.
+///
+/// # Notes
+/// Asynchronously queries the kernel via a Netlink socket for TCP socket info.
+async fn fetch_netlink_inet_headers(addr_family: u8) -> Result<Vec<InetResponseHeader>, TcpError> {
     let unicast_socket: SocketAddr = SocketAddr::new(0, 0);
     let mut socket = TokioSocket::new(NETLINK_SOCK_DIAG).context(NetlinkSocketSnafu)?;
 
@@ -220,7 +245,7 @@ async fn fetch_nl_inet_hdrs(addr_family: u8) -> Result<Vec<InetResponseHeader>, 
     while let Ok(()) = socket.recv(&mut &mut receive_buffer[..]).await {
         let done = parse_netlink_messages(&receive_buffer, &mut inet_resp_hdrs)?;
         if done {
-            break; // Exit if we received a Done message
+            break;
         }
     }
 
@@ -244,11 +269,11 @@ fn parse_nl_inet_hdrs(
 
 async fn build_tcp_stats() -> Result<TcpStats, TcpError> {
     let mut tcp_stats = TcpStats::default();
-    let resp = fetch_nl_inet_hdrs(AF_INET).await?;
+    let resp = fetch_netlink_inet_headers(AF_INET).await?;
     parse_nl_inet_hdrs(resp, &mut tcp_stats)?;
 
     if is_ipv6_enabled() {
-        let resp = fetch_nl_inet_hdrs(AF_INET6).await?;
+        let resp = fetch_netlink_inet_headers(AF_INET6).await?;
         parse_nl_inet_hdrs(resp, &mut tcp_stats)?;
     }
 
@@ -269,7 +294,7 @@ mod tests {
     };
 
     use super::{
-        fetch_nl_inet_hdrs, parse_nl_inet_hdrs, TcpStats, STATE, TCP_CONNS_TOTAL,
+        fetch_netlink_inet_headers, parse_nl_inet_hdrs, TcpStats, STATE, TCP_CONNS_TOTAL,
         TCP_RX_QUEUED_BYTES_TOTAL, TCP_TX_QUEUED_BYTES_TOTAL,
     };
     use crate::sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer};
@@ -326,7 +351,7 @@ mod tests {
         // initiate a connection
         let _stream = TcpStream::connect(addr).await.unwrap();
 
-        let hdrs = fetch_nl_inet_hdrs(AF_INET).await.unwrap();
+        let hdrs = fetch_netlink_inet_headers(AF_INET).await.unwrap();
         // there should be at least two connections, one for the server and one for the client
         assert!(hdrs.len() >= 2);
 
