@@ -58,6 +58,7 @@ jobs:
 
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: |
+          rustup show active-toolchain || rustup toolchain install
           rustup target add x86_64-unknown-linux-gnu
           cargo install cross --version 0.2.4 --force --locked
       # Why is this build, not check? Because we need to make sure the linking phase works.
