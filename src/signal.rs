@@ -14,6 +14,8 @@ pub type SignalRx = broadcast::Receiver<SignalTo>;
 /// Control messages used by Vector to drive topology and shutdown events.
 #[allow(clippy::large_enum_variant)] // discovered during Rust upgrade to 1.57; just allowing for now since we did previously
 pub enum SignalTo {
+    /// Signal to reload given components.
+    ReloadComponents(Vec<ComponentKey>),
     /// Signal to reload config from a string.
     ReloadFromConfigBuilder(ConfigBuilder),
     /// Signal to reload config from the filesystem.
