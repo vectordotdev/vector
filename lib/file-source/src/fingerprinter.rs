@@ -382,6 +382,7 @@ mod test {
         time::Duration,
     };
 
+    use bytes::BytesMut;
     use flate2::write::GzEncoder;
     use tempfile::{tempdir, TempDir};
 
@@ -803,5 +804,7 @@ mod test {
         fn emit_files_open(&self, _: usize) {}
 
         fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
+
+        fn emit_file_line_too_long(&self, _: &BytesMut, _: usize, _: usize) {}
     }
 }

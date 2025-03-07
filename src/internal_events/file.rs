@@ -106,6 +106,7 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
+    use bytes::BytesMut;
     use metrics::counter;
     use vector_lib::file_source::FileSourceInternalEvents;
 
@@ -496,6 +497,30 @@ mod source {
         }
     }
 
+    #[derive(Debug)]
+    pub struct FileLineTooBig<'a> {
+        pub bytes: &'a BytesMut,
+        pub configured_limit: usize,
+        pub encountered_size_so_far: usize,
+    }
+
+    impl InternalEvent for FileLineTooBig<'_> {
+        fn emit(self) {
+            warn!(
+                message = "Found line that exceeds max_line_bytes; discarding.",
+                bytes = ?self.bytes,
+                configured_limit = self.configured_limit,
+                encountered_size_so_far = self.encountered_size_so_far,
+                internal_log_rate_limit = true,
+            );
+            counter!(
+                "component_discarded_events_total",
+                "intentional" => "true",
+            )
+            .increment(1);
+        }
+    }
+
     #[derive(Clone)]
     pub struct FileSourceInternalEventsEmitter {
         pub include_file_metric_tag: bool,
@@ -577,6 +602,19 @@ mod source {
 
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
             emit!(PathGlobbingError { path, error });
+        }
+
+        fn emit_file_line_too_long(
+            &self,
+            bytes: &bytes::BytesMut,
+            configured_limit: usize,
+            encountered_size_so_far: usize,
+        ) {
+            emit!(FileLineTooBig {
+                bytes,
+                configured_limit,
+                encountered_size_so_far
+            });
         }
     }
 }

@@ -11,6 +11,7 @@ use vrl::owned_value_path;
 
 use crate::event;
 use crate::event::{Event, LogEvent, Value};
+use crate::internal_events::KubernetesMergedLineTooBig;
 use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 
 /// The key we use for `file` field.
@@ -49,10 +50,11 @@ impl PartialEventMergeState {
                 // drop event if it's bigger than max allowed
                 if bytes_mut.len() > max_merged_line_bytes {
                     bucket.too_big = true;
-                    warn!(
-                        message = "Found line that exceeds max_merged_line_bytes; discarding.",
-                        internal_log_rate_limit = true
-                    );
+                    emit!(KubernetesMergedLineTooBig {
+                        event: &Event::Log(event),
+                        configured_limit: max_merged_line_bytes,
+                        encountered_size_so_far: bytes_mut.len()
+                    });
                 }
 
                 *prev_value = bytes_mut.freeze();
@@ -67,10 +69,12 @@ impl PartialEventMergeState {
             let too_big = bytes_mut.len() > max_merged_line_bytes;
 
             if too_big {
-                warn!(
-                    message = "Found line that exceeds max_merged_line_bytes; discarding.",
-                    internal_log_rate_limit = true
-                );
+                // perf impact of clone should be minimal since being here means no further processing of this event will occur
+                emit!(KubernetesMergedLineTooBig {
+                    event: &Event::Log(event.clone()),
+                    configured_limit: max_merged_line_bytes,
+                    encountered_size_so_far: bytes_mut.len()
+                });
             }
 
             self.buckets.insert(
