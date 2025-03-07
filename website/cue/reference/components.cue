@@ -204,6 +204,7 @@ components: {
 			exclusive_route?: #FeaturesExclusiveRoute
 			sanitize?:        #FeaturesSanitize
 			shape?:           #FeaturesShape
+			window?:          #FeaturesWindow
 		}
 
 		if Args.kind == "sink" {
@@ -334,6 +335,8 @@ components: {
 	#FeaturesSanitize: {}
 
 	#FeaturesShape: {}
+
+	#FeaturesWindow: {}
 
 	#FeaturesSend: {
 		_args: {
