@@ -130,7 +130,7 @@ how_it_works: {
 				non-matching events.
 
 				If the `flush_when` condition is matched before the buffer fills up, it will be flushed again. If the flush
-				condtion is triggered often enough, e.g. the system is constantly logging errors, the transform may always
+				condition is triggered often enough, e.g. the system is constantly logging errors, the transform may always
 				be in the flushing state, meaning that no events will be filtered. Therefore it works best for conditions
 				that are relatively uncommon.
 				"""

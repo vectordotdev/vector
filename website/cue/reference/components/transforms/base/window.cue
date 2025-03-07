@@ -15,7 +15,7 @@ base: components: transforms: window: configuration: {
 		description: """
 			A condition used to pass events through the transform without buffering.
 
-			If the condition resolves to `true` for an event, the event is immediatelly passed through
+			If the condition resolves to `true` for an event, the event is immediately passed through
 			without preserving the original order of events. Use with caution if the sink cannot handle
 			out of order events.
 			"""
