@@ -74,7 +74,15 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let mut objects: Vec<Entry> = op.list_with("/").recursive(true).await.unwrap();
+    let mut objects: Vec<Entry> = op
+        .list_with("/")
+        .recursive(true)
+        .await
+        .unwrap()
+        .into_iter()
+        // We need this because we are only interested in files.
+        .filter(|e| e.is_file())
+        .collect();
 
     // Sort file path in order, because we have the event id in path.
     objects.sort_by(|l, r| l.path().cmp(r.path()));
