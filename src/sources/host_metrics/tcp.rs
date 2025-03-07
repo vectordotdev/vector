@@ -160,7 +160,9 @@ fn parse_netlink_messages(
         let remaining_bytes = &buffer[offset..];
         if remaining_bytes.len() < 4 {
             // Still treat this as an error since we can't even read the length
-            return Err(TcpError::InvalidLength { length: remaining_bytes.len() });
+            return Err(TcpError::InvalidLength {
+                length: remaining_bytes.len(),
+            });
         }
         // This function panics if the buffer length is less than 4.
         let length = NativeEndian::read_u32(&remaining_bytes[0..4]) as usize;
