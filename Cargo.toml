@@ -737,8 +737,8 @@ sinks-logs = [
   "sinks-mezmo",
   "sinks-mqtt",
   "sinks-nats",
-  "sinks-new_relic",
   "sinks-new_relic_logs",
+  "sinks-new_relic",
   "sinks-opentelemetry",
   "sinks-papertrail",
   "sinks-postgres",
@@ -762,6 +762,7 @@ sinks-metrics = [
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
+  "sinks-opentelemetry_metrics",
   "sinks-prometheus",
   "sinks-sematext",
   "sinks-statsd",
@@ -809,6 +810,7 @@ sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
 sinks-opentelemetry = ["sinks-http"]
+sinks-opentelemetry_metrics = []
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-postgres = ["dep:sqlx"]
