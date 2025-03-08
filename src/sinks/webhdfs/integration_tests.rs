@@ -81,7 +81,7 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
         .unwrap()
         .into_iter()
         // We need this because we are only interested in files.
-        .filter(|e| e.is_file())
+        .filter(|e| e.metadata().is_file())
         .collect();
 
     // Sort file path in order, because we have the event id in path.
