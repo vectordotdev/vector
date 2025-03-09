@@ -966,7 +966,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 	input: {
 		logs:    true
 		metrics: true
-		traces:  true
+		traces:  false 
 	}
 
 	how_it_works: {

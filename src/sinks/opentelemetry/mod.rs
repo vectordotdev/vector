@@ -187,7 +187,7 @@ impl SinkConfig for OpenTelemetryConfig {
 
     fn input(&self) -> Input {
         if self.metrics_endpoint.is_some() {
-            Input::all()
+            Input::metric()
         } else {
             match &self.protocol {
                 Protocol::Http(config) => config.input(),
