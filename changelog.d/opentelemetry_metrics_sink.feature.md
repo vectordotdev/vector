@@ -1,3 +1,3 @@
-Added support for OpenTelemetry metrics sink to enable direct export of Vector metrics to OpenTelemetry collectors.
+Added support for sendings metrics via the OpenTelemetry sink to OpenTelemetry collectors
 
 authors: brittonhayes 
