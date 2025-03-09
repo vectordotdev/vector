@@ -26,7 +26,7 @@ use super::http::config::HttpMethod;
 ))]
 #[derive(Clone, Debug)]
 pub struct OpenTelemetryConfig {
-    /// Protocol configuration for logs and traces.
+    /// Protocol configuration.
     #[configurable(derived)]
     protocol: Protocol,
 
