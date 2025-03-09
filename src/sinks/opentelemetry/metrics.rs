@@ -1,25 +1,25 @@
 use std::time::Duration;
 
-use vector_config::configurable_component;
 use crate::event::metric::{Metric as VectorMetric, MetricValue};
 use std::task::{Context, Poll};
+use vector_config::configurable_component;
 
 use futures::future::{self, BoxFuture};
 use http::StatusCode;
 use hyper::Body;
 use tower::Service;
-use vector_lib::event::EventStatus;
 use tracing::{debug, trace};
+use vector_lib::event::EventStatus;
 
+use opentelemetry::metrics::{Meter, MeterProvider};
 use opentelemetry::KeyValue;
-use opentelemetry::metrics::{MeterProvider, Meter};
-use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider, Temporality};
 use opentelemetry_otlp::{MetricExporter, WithExportConfig};
+use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider, Temporality};
 
+use crate::event::Event;
 use crate::sinks::util::PartitionInnerBuffer;
 use futures_util::stream::BoxStream;
 use vector_lib::sink::StreamSink;
-use crate::event::Event;
 
 /// The aggregation temporality to use for metrics.
 #[configurable_component]
@@ -96,9 +96,11 @@ impl OpentelemetryMetricsSvc {
             let metric_name = event.name().to_string();
             let attributes = event
                 .tags()
-                .map(|tags| tags.iter_single()
-                    .map(|(k, v)| KeyValue::new(k.to_string(), v.to_string()))
-                    .collect::<Vec<_>>())
+                .map(|tags| {
+                    tags.iter_single()
+                        .map(|(k, v)| KeyValue::new(k.to_string(), v.to_string()))
+                        .collect::<Vec<_>>()
+                })
                 .unwrap_or_default();
 
             // Add the service.name attribute with the namespace
@@ -112,7 +114,10 @@ impl OpentelemetryMetricsSvc {
                 }
                 MetricValue::Gauge { value } => {
                     // For gauges, we use a counter since observable gauges require callbacks
-                    let counter = self.meter.f64_counter(format!("{}_gauge", metric_name)).build();
+                    let counter = self
+                        .meter
+                        .f64_counter(format!("{}_gauge", metric_name))
+                        .build();
                     counter.add(*value, &all_attributes);
                 }
                 MetricValue::Distribution { samples, .. } => {
@@ -126,7 +131,10 @@ impl OpentelemetryMetricsSvc {
                 }
                 MetricValue::Set { values } => {
                     // For sets, we record the count of unique values
-                    let counter = self.meter.f64_counter(format!("{}_set", metric_name)).build();
+                    let counter = self
+                        .meter
+                        .f64_counter(format!("{}_set", metric_name))
+                        .build();
                     counter.add(values.len() as f64, &all_attributes);
                 }
                 _ => {}
@@ -146,10 +154,10 @@ impl Service<PartitionInnerBuffer<Vec<VectorMetric>, String>> for OpentelemetryM
 
     fn call(&mut self, items: PartitionInnerBuffer<Vec<VectorMetric>, String>) -> Self::Future {
         let (metrics, _namespace) = items.into_parts();
-        
+
         // Convert and record metrics
         self.convert_and_record_metrics(metrics);
-        
+
         // The SDK handles the export asynchronously, so we just return a success response
         Box::pin(future::ok(
             http::Response::builder()
@@ -173,13 +181,13 @@ impl Drop for OpentelemetryMetricsSvc {
 impl StreamSink<Event> for OpentelemetryMetricsSvc {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         use futures::StreamExt;
-        
+
         debug!("OpenTelemetry metrics sink started");
-        
+
         while let Some(mut event) = input.next().await {
             // Extract finalizers before processing
             let finalizers = event.metadata_mut().take_finalizers();
-            
+
             // Extract metrics from the event
             if let Event::Metric(metric) = event {
                 trace!("Processing metric event: {}", metric.name());
@@ -188,11 +196,11 @@ impl StreamSink<Event> for OpentelemetryMetricsSvc {
             } else {
                 trace!("Ignoring non-metric event");
             }
-            
+
             // Finalize the event with success status
             finalizers.update_status(EventStatus::Delivered);
         }
-        
+
         debug!("OpenTelemetry metrics sink stopped");
         Ok(())
     }

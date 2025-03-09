@@ -1,14 +1,18 @@
 use tracing::debug;
 
-use crate::{codecs::{EncodingConfigWithFraming, Transformer}, config::{AcknowledgementsConfig, SinkConfig, SinkContext}, sinks::{
-        http::config::HttpSinkConfig,
-        Healthcheck, VectorSink,
-    }};
+use crate::{
+    codecs::{EncodingConfigWithFraming, Transformer},
+    config::{AcknowledgementsConfig, SinkConfig, SinkContext},
+    sinks::{http::config::HttpSinkConfig, Healthcheck, VectorSink},
+};
 use indoc::indoc;
 use vector_config::component::GenerateConfig;
-use vector_lib::{codecs::encoding::{FramingConfig, SerializerConfig}, config::Input};
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
+use vector_lib::{
+    codecs::encoding::{FramingConfig, SerializerConfig},
+    config::Input,
+};
 
 mod metrics;
 use metrics::AggregationTemporality;
@@ -16,7 +20,10 @@ use metrics::AggregationTemporality;
 use super::http::config::HttpMethod;
 
 /// Configuration for the `OpenTelemetry` sink.
-#[configurable_component(sink("opentelemetry", "Deliver OTLP data (logs, metrics, traces) over HTTP."))]
+#[configurable_component(sink(
+    "opentelemetry",
+    "Deliver OTLP data (logs, metrics, traces) over HTTP."
+))]
 #[derive(Clone, Debug)]
 pub struct OpenTelemetryConfig {
     /// Protocol configuration for logs and traces.
@@ -60,7 +67,6 @@ impl Default for OpenTelemetryConfig {
         }
     }
 }
-
 
 /// The protocol used to send data to OpenTelemetry.
 /// Currently only HTTP is supported, but we plan to support gRPC.
@@ -135,9 +141,14 @@ impl SinkConfig for OpenTelemetryConfig {
             // use crate::sinks::util::PartitionBuffer;
             // use crate::sinks::util::BatchSettings;
 
-            debug!("Creating OpenTelemetry metrics sink with endpoint: {}", metrics_endpoint);
+            debug!(
+                "Creating OpenTelemetry metrics sink with endpoint: {}",
+                metrics_endpoint
+            );
             let service = OpentelemetryMetricsSvc::new(
-                self.default_namespace.clone().unwrap_or_else(|| "vector".to_string()),
+                self.default_namespace
+                    .clone()
+                    .unwrap_or_else(|| "vector".to_string()),
                 metrics_endpoint.clone(),
                 self.aggregation_temporality,
             )?;
@@ -146,7 +157,6 @@ impl SinkConfig for OpenTelemetryConfig {
         } else {
             None
         };
-
 
         // Determine the healthcheck endpoint
         let healthcheck_endpoint = self.healthcheck_endpoint.clone().or_else(|| {
@@ -256,8 +266,14 @@ mod test {
         "#};
         let config: OpenTelemetryConfig = toml::from_str(config).unwrap();
 
-        assert_eq!(config.metrics_endpoint, Some("http://localhost:4317/v1/metrics".to_string()));
-        assert_eq!(config.healthcheck_endpoint, Some("http://localhost:13133".to_string()));
+        assert_eq!(
+            config.metrics_endpoint,
+            Some("http://localhost:4317/v1/metrics".to_string())
+        );
+        assert_eq!(
+            config.healthcheck_endpoint,
+            Some("http://localhost:13133".to_string())
+        );
         assert_eq!(config.default_namespace, Some("myservice".to_string()));
         assert!(matches!(
             config.aggregation_temporality,
