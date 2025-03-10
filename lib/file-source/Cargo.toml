@@ -23,7 +23,7 @@ default-features = false
 features = []
 
 [dependencies.bytes]
-version = "1.10.0"
+version = "1.10.1"
 default-features = false
 features = []
 
