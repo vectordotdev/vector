@@ -227,7 +227,7 @@ mod tests {
             "#,
             ),
         ] {
-            let config: AmqpSinkConfig = deserialize(&config, format).unwrap();
+            let config: AmqpSinkConfig = deserialize(config, format).unwrap();
             let event = LogEvent::from_str_legacy("message");
             assert_config_priority_eq(config, &event, 1);
         }
@@ -275,7 +275,7 @@ mod tests {
             "#,
             ),
         ] {
-            let config: AmqpSinkConfig = deserialize(&config, format).unwrap();
+            let config: AmqpSinkConfig = deserialize(config, format).unwrap();
             let event = {
                 let mut event = LogEvent::from_str_legacy("message");
                 event.insert("priority", 2);
