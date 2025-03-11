@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bytes::{Buf, Bytes};
 use http::{Response, StatusCode, Uri};
 use hyper::{body, Body};
@@ -13,14 +11,13 @@ use super::{
     InvalidHostSnafu, Request, VersionType,
 };
 use crate::{
-    http::{HttpClient, MaybeAuth},
+    http::{HttpClient, MaybeAuth, QueryParameterValue, QueryParameters},
     sinks::{
         elasticsearch::{
             ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig,
             OpenSearchServiceType, ParseError,
         },
-        util::auth::Auth,
-        util::{http::RequestConfig, UriSerde},
+        util::{auth::Auth, http::RequestConfig, UriSerde},
         HealthcheckError,
     },
     tls::TlsSettings,
@@ -37,7 +34,7 @@ pub struct ElasticsearchCommon {
     pub request_builder: ElasticsearchRequestBuilder,
     pub tls_settings: TlsSettings,
     pub request: RequestConfig,
-    pub query_params: HashMap<String, String>,
+    pub query_params: QueryParameters,
     pub metric_to_log: MetricToLog,
 }
 
@@ -81,7 +78,7 @@ impl ElasticsearchCommon {
                     .ok_or(ParseError::RegionRequired)?;
                 Some(Auth::Aws {
                     credentials_provider: aws
-                        .credentials_provider(region.clone(), proxy_config, &config.tls)
+                        .credentials_provider(region.clone(), proxy_config, config.tls.as_ref())
                         .await?,
                     region,
                 })
@@ -123,25 +120,40 @@ impl ElasticsearchCommon {
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert(
             "timeout".into(),
-            format!("{}s", tower_request.timeout.as_secs()),
+            QueryParameterValue::SingleParam(format!("{}s", tower_request.timeout.as_secs())),
         );
 
         if let Some(pipeline) = &config.pipeline {
             if !pipeline.is_empty() {
-                query_params.insert("pipeline".into(), pipeline.into());
+                query_params.insert(
+                    "pipeline".into(),
+                    QueryParameterValue::SingleParam(pipeline.into()),
+                );
             }
         }
 
         let bulk_url = {
             let mut query = url::form_urlencoded::Serializer::new(String::new());
-            for (p, v) in &query_params {
-                query.append_pair(&p[..], &v[..]);
+            // Iterate through the HashMap
+            for (param_name, param_value) in &query_params {
+                match param_value {
+                    QueryParameterValue::SingleParam(param) => {
+                        // For single parameter, just append one pair
+                        query.append_pair(param_name, param);
+                    }
+                    QueryParameterValue::MultiParams(params) => {
+                        // For multiple parameters, append the same key multiple times
+                        for value in params {
+                            query.append_pair(param_name, value);
+                        }
+                    }
+                }
             }
             format!("{}/_bulk?{}", base_url, query.finish())
         };
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 
-        let tls_settings = TlsSettings::from_options(&config.tls)?;
+        let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
         let config = config.clone();
         let request = config.request;
 
@@ -172,7 +184,7 @@ impl ElasticsearchCommon {
                 ElasticsearchApiVersion::Auto => {
                     match get_version(
                         &base_url,
-                        &auth,
+                        auth.as_ref(),
                         #[cfg(feature = "aws-core")]
                         &service_type,
                         &request,
@@ -285,7 +297,7 @@ impl ElasticsearchCommon {
         } else {
             match get(
                 &self.base_url,
-                &self.auth,
+                self.auth.as_ref(),
                 #[cfg(feature = "aws-core")]
                 &self.service_type,
                 &self.request,
@@ -307,7 +319,7 @@ pub async fn sign_request(
     service_type: &OpenSearchServiceType,
     request: &mut http::Request<Bytes>,
     credentials_provider: &aws_credential_types::provider::SharedCredentialsProvider,
-    region: &Option<aws_types::region::Region>,
+    region: Option<&aws_types::region::Region>,
 ) -> crate::Result<()> {
     // Amazon OpenSearch Serverless requires the x-amz-content-sha256 header when calculating
     // the AWS v4 signature:
@@ -324,7 +336,7 @@ pub async fn sign_request(
 
 async fn get_version(
     base_url: &str,
-    auth: &Option<Auth>,
+    auth: Option<&Auth>,
     #[cfg(feature = "aws-core")] service_type: &OpenSearchServiceType,
     request: &RequestConfig,
     tls_settings: &TlsSettings,
@@ -371,7 +383,7 @@ async fn get_version(
 
 async fn get(
     base_url: &str,
-    auth: &Option<Auth>,
+    auth: Option<&Auth>,
     #[cfg(feature = "aws-core")] service_type: &OpenSearchServiceType,
     request: &RequestConfig,
     client: HttpClient,
@@ -395,7 +407,7 @@ async fn get(
                 region,
             } => {
                 let region = region.clone();
-                sign_request(service_type, &mut request, provider, &Some(region)).await?;
+                sign_request(service_type, &mut request, provider, Some(&region)).await?;
             }
         }
     }

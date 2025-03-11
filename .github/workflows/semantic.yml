@@ -184,6 +184,7 @@ jobs:
             sample transform
             tag_cardinality_limit transform
             throttle transform
+            amqp sink
             apex sink
             aws_cloudwatch_logs sink
             aws_cloudwatch_metrics sink
@@ -224,6 +225,7 @@ jobs:
             new_relic_logs sink
             opentelemetry sink
             papertrail sink
+            postgres sink
             prometheus_exporter sink
             prometheus_remote_write sink
             pulsar sink
@@ -235,6 +237,7 @@ jobs:
             statsd sink
             vector sink
             websocket sink
+            websocket_server sink
             blog website
             css website
             guides website

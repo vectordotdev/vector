@@ -65,22 +65,11 @@ pub struct UnixSinkConfig {
     /// This should be an absolute path.
     #[configurable(metadata(docs::examples = "/path/to/socket"))]
     pub path: PathBuf,
-
-    /// The Unix socket mode to use.
-    ///
-    /// Unavailable on macOS, where the mode is always `Stream`.
-    #[cfg_attr(target_os = "macos", serde(skip))]
-    #[serde(default = "default_unix_mode")]
-    unix_mode: UnixMode,
-}
-
-const fn default_unix_mode() -> UnixMode {
-    UnixMode::Stream
 }
 
 impl UnixSinkConfig {
-    pub const fn new(path: PathBuf, unix_mode: UnixMode) -> Self {
-        Self { path, unix_mode }
+    pub const fn new(path: PathBuf) -> Self {
+        Self { path }
     }
 
     pub fn build(
@@ -91,8 +80,9 @@ impl UnixSinkConfig {
             + Send
             + Sync
             + 'static,
+        unix_mode: UnixMode,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let connector = UnixConnector::new(self.path.clone(), self.unix_mode);
+        let connector = UnixConnector::new(self.path.clone(), unix_mode);
         let sink = UnixSink::new(connector.clone(), transformer, encoder);
         Ok((
             VectorSink::from_event_streamsink(sink),
@@ -332,20 +322,22 @@ mod tests {
     async fn unix_sink_healthcheck() {
         let good_path = temp_uds_path("valid_stream_uds");
         let _listener = UnixListener::bind(&good_path).unwrap();
-        assert!(UnixSinkConfig::new(good_path.clone(), UnixMode::Stream)
+        assert!(UnixSinkConfig::new(good_path.clone())
             .build(
                 Default::default(),
-                Encoder::<()>::new(TextSerializerConfig::default().build().into())
+                Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+                UnixMode::Stream
             )
             .unwrap()
             .1
             .await
             .is_ok());
         assert!(
-            UnixSinkConfig::new(good_path.clone(), UnixMode::Datagram)
+            UnixSinkConfig::new(good_path.clone())
                 .build(
                     Default::default(),
-                    Encoder::<()>::new(TextSerializerConfig::default().build().into())
+                    Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+                    UnixMode::Datagram
                 )
                 .unwrap()
                 .1
@@ -355,19 +347,21 @@ mod tests {
         );
 
         let bad_path = temp_uds_path("no_one_listening");
-        assert!(UnixSinkConfig::new(bad_path.clone(), UnixMode::Stream)
+        assert!(UnixSinkConfig::new(bad_path.clone())
             .build(
                 Default::default(),
-                Encoder::<()>::new(TextSerializerConfig::default().build().into())
+                Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+                UnixMode::Stream
             )
             .unwrap()
             .1
             .await
             .is_err());
-        assert!(UnixSinkConfig::new(bad_path.clone(), UnixMode::Datagram)
+        assert!(UnixSinkConfig::new(bad_path.clone())
             .build(
                 Default::default(),
-                Encoder::<()>::new(TextSerializerConfig::default().build().into())
+                Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+                UnixMode::Datagram
             )
             .unwrap()
             .1
@@ -384,7 +378,7 @@ mod tests {
         let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
 
         // Set up Sink
-        let config = UnixSinkConfig::new(out_path, UnixMode::Stream);
+        let config = UnixSinkConfig::new(out_path);
         let (sink, _healthcheck) = config
             .build(
                 Default::default(),
@@ -392,6 +386,7 @@ mod tests {
                     NewlineDelimitedEncoder::default().into(),
                     TextSerializerConfig::default().build().into(),
                 ),
+                UnixMode::Stream,
             )
             .unwrap();
 
@@ -438,7 +433,7 @@ mod tests {
         ready_rx.await.expect("failed to receive ready signal");
 
         // Set up Sink
-        let config = UnixSinkConfig::new(out_path.clone(), UnixMode::Datagram);
+        let config = UnixSinkConfig::new(out_path.clone());
         let (sink, _healthcheck) = config
             .build(
                 Default::default(),
@@ -446,6 +441,7 @@ mod tests {
                     BytesEncoder.into(),
                     TextSerializerConfig::default().build().into(),
                 ),
+                UnixMode::Datagram,
             )
             .unwrap();
 

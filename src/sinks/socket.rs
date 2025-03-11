@@ -4,7 +4,7 @@ use vector_lib::codecs::{
 };
 use vector_lib::configurable::configurable_component;
 
-#[cfg(unix)]
+#[cfg(not(windows))]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::{Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType},
@@ -40,9 +40,14 @@ pub enum Mode {
     /// Send over UDP.
     Udp(UdpMode),
 
-    /// Send over a Unix domain socket (UDS).
-    #[cfg(unix)]
-    Unix(UnixMode),
+    /// Send over a Unix domain socket (UDS), in stream mode.
+    #[serde(alias = "unix")]
+    UnixStream(UnixMode),
+
+    /// Send over a Unix domain socket (UDS), in datagram mode.
+    /// Unavailable on macOS, due to send(2)'s apparent non-blocking behavior,
+    /// resulting in ENOBUFS errors which we currently don't handle.
+    UnixDatagram(UnixMode),
 }
 
 /// TCP configuration.
@@ -68,7 +73,6 @@ pub struct UdpMode {
 }
 
 /// Unix Domain Socket configuration.
-#[cfg(unix)]
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct UnixMode {
@@ -77,6 +81,19 @@ pub struct UnixMode {
 
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
+}
+
+// Workaround for https://github.com/vectordotdev/vector/issues/22198.
+#[cfg(windows)]
+/// A Unix Domain Socket sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixSinkConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    pub path: std::path::PathBuf,
 }
 
 impl GenerateConfig for SocketSinkConfig {
@@ -133,11 +150,38 @@ impl SinkConfig for SocketSinkConfig {
                 config.build(transformer, encoder)
             }
             #[cfg(unix)]
-            Mode::Unix(UnixMode { config, encoding }) => {
+            Mode::UnixStream(UnixMode { config, encoding }) => {
                 let transformer = encoding.transformer();
                 let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
                 let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(transformer, encoder)
+                config.build(
+                    transformer,
+                    encoder,
+                    super::util::service::net::UnixMode::Stream,
+                )
+            }
+            #[allow(unused)]
+            #[cfg(unix)]
+            Mode::UnixDatagram(UnixMode { config, encoding }) => {
+                cfg_if! {
+                    if #[cfg(not(target_os = "macos"))] {
+                        let transformer = encoding.transformer();
+                        let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
+                        let encoder = Encoder::<Framer>::new(framer, serializer);
+                        config.build(
+                            transformer,
+                            encoder,
+                            super::util::service::net::UnixMode::Datagram,
+                        )
+                    }
+                    else {
+                        Err("UnixDatagram is not available on macOS platforms.".into())
+                    }
+                }
+            }
+            #[cfg(not(unix))]
+            Mode::UnixStream(_) | Mode::UnixDatagram(_) => {
+                Err("Unix modes are supported only on Unix platforms.".into())
             }
         }
     }
@@ -146,8 +190,8 @@ impl SinkConfig for SocketSinkConfig {
         let encoder_input_type = match &self.mode {
             Mode::Tcp(TcpMode { encoding, .. }) => encoding.config().1.input_type(),
             Mode::Udp(UdpMode { encoding, .. }) => encoding.config().input_type(),
-            #[cfg(unix)]
-            Mode::Unix(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
+            Mode::UnixStream(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
+            Mode::UnixDatagram(UnixMode { encoding, .. }) => encoding.config().1.input_type(),
         };
         Input::new(encoder_input_type)
     }
@@ -163,8 +207,6 @@ mod test {
         future::ready,
         net::{SocketAddr, UdpSocket},
     };
-    #[cfg(unix)]
-    use std::{os::unix::net::UnixDatagram, path::PathBuf};
 
     use futures::stream::StreamExt;
     use futures_util::stream;
@@ -176,12 +218,19 @@ mod test {
     use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
     use vector_lib::codecs::JsonSerializerConfig;
-    #[cfg(unix)]
-    use vector_lib::codecs::NativeJsonSerializerConfig;
 
     use super::*;
-    #[cfg(unix)]
-    use crate::test_util::random_metrics_with_stream;
+
+    #[cfg(target_os = "windows")]
+    use cfg_if::cfg_if;
+    cfg_if! { if #[cfg(unix)] {
+        use vector_lib::codecs::NativeJsonSerializerConfig;
+        use crate::test_util::random_metrics_with_stream;
+        use std::path::PathBuf;
+    } }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    use std::os::unix::net::UnixDatagram;
+
     use crate::{
         config::SinkContext,
         event::{Event, LogEvent},
@@ -198,20 +247,20 @@ mod test {
 
     enum DatagramSocket {
         Udp(UdpSocket),
-        #[cfg(unix)]
+        #[cfg(all(unix, not(target_os = "macos")))]
         Unix(UnixDatagram),
     }
 
     enum DatagramSocketAddr {
         Udp(SocketAddr),
-        #[cfg(unix)]
+        #[cfg(all(unix, not(target_os = "macos")))]
         Unix(PathBuf),
     }
 
     async fn test_datagram(datagram_addr: DatagramSocketAddr) {
         let receiver = match &datagram_addr {
             DatagramSocketAddr::Udp(addr) => DatagramSocket::Udp(UdpSocket::bind(addr).unwrap()),
-            #[cfg(unix)]
+            #[cfg(all(unix, not(target_os = "macos")))]
             DatagramSocketAddr::Unix(path) => {
                 DatagramSocket::Unix(UnixDatagram::bind(path).unwrap())
             }
@@ -223,12 +272,9 @@ mod test {
                     config: UdpSinkConfig::from_address(addr.to_string()),
                     encoding: JsonSerializerConfig::default().into(),
                 }),
-                #[cfg(unix)]
-                DatagramSocketAddr::Unix(path) => Mode::Unix(UnixMode {
-                    config: UnixSinkConfig::new(
-                        path.to_path_buf(),
-                        crate::sinks::util::service::net::UnixMode::Datagram,
-                    ),
+                #[cfg(all(unix, not(target_os = "macos")))]
+                DatagramSocketAddr::Unix(path) => Mode::UnixDatagram(UnixMode {
+                    config: UnixSinkConfig::new(path.to_path_buf()),
                     encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
                 }),
             },
@@ -250,7 +296,7 @@ mod test {
             DatagramSocket::Udp(sock) => {
                 sock.recv_from(&mut buf).expect("Did not receive message").0
             }
-            #[cfg(unix)]
+            #[cfg(all(unix, not(target_os = "macos")))]
             DatagramSocket::Unix(sock) => sock.recv(&mut buf).expect("Did not receive message"),
         };
 
@@ -276,7 +322,7 @@ mod test {
         test_datagram(DatagramSocketAddr::Udp(next_addr_v6())).await;
     }
 
-    #[cfg(unix)]
+    #[cfg(all(unix, not(target_os = "macos")))]
     #[tokio::test]
     async fn unix_datagram() {
         trace_init();
@@ -334,11 +380,8 @@ mod test {
         let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
 
         let config = SocketSinkConfig {
-            mode: Mode::Unix(UnixMode {
-                config: UnixSinkConfig::new(
-                    out_path,
-                    crate::sinks::util::service::net::UnixMode::Stream,
-                ),
+            mode: Mode::UnixStream(UnixMode {
+                config: UnixSinkConfig::new(out_path),
                 encoding: (None::<FramingConfig>, NativeJsonSerializerConfig).into(),
             }),
             acknowledgements: Default::default(),
@@ -448,7 +491,7 @@ mod test {
 
         // Only accept two connections.
         let jh2 = tokio::spawn(async move {
-            let tls = MaybeTlsSettings::from_config(&config, true).unwrap();
+            let tls = MaybeTlsSettings::from_config(config.as_ref(), true).unwrap();
             let listener = tls.bind(&addr).await.unwrap();
             listener
                 .accept_stream()

@@ -14,9 +14,9 @@ base: components: sinks: mezmo: configuration: {
 			description: """
 				Whether or not end-to-end acknowledgements are enabled.
 
-				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
-				connected** sinks before acknowledging them at the source.
+				When enabled for a sink, any source that supports end-to-end
+				acknowledgements that is connected to that sink waits for events
+				to be acknowledged by **all connected sinks** before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -144,7 +144,7 @@ base: components: sinks: mezmo: configuration: {
 		description: """
 			Middleware settings for outbound requests.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
 
 			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
@@ -166,7 +166,7 @@ base: components: sinks: mezmo: configuration: {
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
 																when latency increases.
 
-																Note that the new limit is rounded down after applying this ratio.
+																**Note**: The new limit is rounded down after applying this ratio.
 																"""
 						required: false
 						type: float: default: 0.9
@@ -186,9 +186,9 @@ base: components: sinks: mezmo: configuration: {
 					}
 					initial_concurrency: {
 						description: """
-																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
-																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
 																`adaptive_concurrency_limit` metric.
 																"""
@@ -199,7 +199,7 @@ base: components: sinks: mezmo: configuration: {
 						description: """
 																The maximum concurrency limit.
 
-																The adaptive request concurrency limit will not go above this bound. This is put in place as a safeguard.
+																The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
 																"""
 						required: false
 						type: uint: default: 200
@@ -233,7 +233,7 @@ base: components: sinks: mezmo: configuration: {
 						default: "adaptive"
 						enum: {
 							adaptive: """
-															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
 															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
 															"""

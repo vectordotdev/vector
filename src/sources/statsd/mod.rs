@@ -180,7 +180,7 @@ impl SourceConfig for StatsdConfig {
                     .as_ref()
                     .and_then(|tls| tls.client_metadata_key.clone())
                     .and_then(|k| k.path);
-                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
+                let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true)?;
                 let statsd_tcp_source = StatsdTcpSource {
                     sanitize: config.sanitize,
                 };

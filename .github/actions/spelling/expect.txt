@@ -78,7 +78,6 @@ bytesize
 califrag
 califragilistic
 CAROOT
-CBOR
 cddl
 cdylib
 cef
@@ -191,6 +190,7 @@ eventstreamsink
 evictingpages
 evmap
 ewma
+Exabytes
 examplegroup
 exitcodes
 extendedstatus
@@ -255,7 +255,6 @@ hostpath
 hoverable
 hoverbear
 httpdeliveryrequestresponse
-httpdump
 httpevent
 hugepages
 hugops
@@ -423,7 +422,6 @@ oplog
 optimisation
 optimizable
 OSSL
-OTel
 otherhost
 otlm
 otlp
@@ -442,7 +440,6 @@ PIDs
 PII
 plainify
 ple
-plork
 podspec
 Ponge
 POSINT
@@ -468,6 +465,7 @@ rcode
 rdkafka
 rdparty
 readnone
+recordset
 rediss
 redoctober
 regexes
@@ -527,7 +525,6 @@ SIEM
 SIGHUPs
 sinkbuilder
 sinknetworkbytessent
-SIV
 slideover
 smartphone
 Smol
@@ -543,6 +540,7 @@ spencergilbert
 spinlock
 SPOF
 spog
+sqlx
 srcaddr
 srcport
 SREs
@@ -594,6 +592,7 @@ threatmanager
 Throughputs
 Tiltfile
 timberio
+TIMESTAMPTZ
 TKEY
 tlh
 tmpfs

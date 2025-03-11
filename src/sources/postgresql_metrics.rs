@@ -995,35 +995,15 @@ mod tests {
 
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
-    use std::path::PathBuf;
-
     use super::*;
     use crate::{
         event::Event,
-        test_util::components::{assert_source_compliance, PULL_SOURCE_TAGS},
+        test_util::{
+            components::{assert_source_compliance, PULL_SOURCE_TAGS},
+            integration::postgres::{pg_socket, pg_url},
+        },
         tls, SourceSender,
     };
-
-    fn pg_host() -> String {
-        std::env::var("PG_HOST").unwrap_or_else(|_| "localhost".into())
-    }
-
-    fn pg_socket() -> PathBuf {
-        std::env::var("PG_SOCKET")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| {
-                let current_dir = std::env::current_dir().unwrap();
-                current_dir
-                    .join("tests")
-                    .join("data")
-                    .join("postgresql-local-socket")
-            })
-    }
-
-    fn pg_url() -> String {
-        std::env::var("PG_URL")
-            .unwrap_or_else(|_| format!("postgres://vector:vector@{}/postgres", pg_host()))
-    }
 
     async fn test_postgresql_metrics(
         endpoint: String,
