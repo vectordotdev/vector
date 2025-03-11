@@ -1445,7 +1445,7 @@ mod tests {
         b.body(message.to_owned())
     }
 
-    async fn send_with<'a>(
+    async fn send_with(
         address: SocketAddr,
         api: &str,
         message: &str,
@@ -1456,7 +1456,7 @@ mod tests {
         b.send().await.unwrap().status().as_u16()
     }
 
-    async fn send_with_response<'a>(
+    async fn send_with_response(
         address: SocketAddr,
         api: &str,
         message: &str,

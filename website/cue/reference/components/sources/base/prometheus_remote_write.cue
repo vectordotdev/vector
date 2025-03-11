@@ -32,18 +32,49 @@ base: components: sources: prometheus_remote_write: configuration: {
 		type: string: examples: ["0.0.0.0:9090"]
 	}
 	auth: {
-		description: "HTTP Basic authentication configuration."
-		required:    false
+		description: """
+			Configuration of the authentication strategy for server mode sinks and sources.
+
+			Use the HTTP authentication with HTTPS only. The authentication credentials are passed as an
+			HTTP header without any additional encryption beyond what is provided by the transport itself.
+			"""
+		required: false
 		type: object: options: {
 			password: {
-				description: "The password for basic authentication."
+				description:   "The basic authentication password."
+				relevant_when: "strategy = \"basic\""
+				required:      true
+				type: string: examples: ["${PASSWORD}", "password"]
+			}
+			source: {
+				description:   "The VRL boolean expression."
+				relevant_when: "strategy = \"custom\""
+				required:      true
+				type: string: {}
+			}
+			strategy: {
+				description: "The authentication strategy to use."
 				required:    true
-				type: string: examples: ["hunter2", "${PASSWORD}"]
+				type: string: enum: {
+					basic: """
+						Basic authentication.
+
+						The username and password are concatenated and encoded using [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
+						"""
+					custom: """
+						Custom authentication using VRL code.
+
+						Takes in request and validates it using VRL code.
+						"""
+				}
 			}
 			username: {
-				description: "The username for basic authentication."
-				required:    true
-				type: string: examples: ["AzureDiamond", "admin"]
+				description:   "The basic authentication username."
+				relevant_when: "strategy = \"basic\""
+				required:      true
+				type: string: examples: ["${USERNAME}", "username"]
 			}
 		}
 	}
@@ -89,7 +120,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -111,7 +142,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -162,7 +193,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

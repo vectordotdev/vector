@@ -518,13 +518,13 @@ base: components: sources: http_client: configuration: {
 		required: false
 		type: object: {
 			examples: [{
-				field: ["value"]
+				field: "value"
 				fruit: ["mango", "papaya", "kiwi"]
 			}]
 			options: "*": {
 				description: "A query string parameter and it's value(s)."
 				required:    true
-				type: array: items: type: string: {}
+				type: string: {}
 			}
 		}
 	}
@@ -556,7 +556,7 @@ base: components: sources: http_client: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -578,7 +578,7 @@ base: components: sources: http_client: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -619,7 +619,7 @@ base: components: sources: http_client: configuration: {
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

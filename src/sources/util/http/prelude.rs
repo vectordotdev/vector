@@ -1,10 +1,5 @@
-use std::{
-    collections::HashMap,
-    convert::{Infallible, TryFrom},
-    fmt,
-    net::SocketAddr,
-    time::Duration,
-};
+use crate::common::http::{server_auth::HttpServerAuthConfig, ErrorMessage};
+use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
@@ -38,11 +33,7 @@ use crate::{
     SourceSender,
 };
 
-use super::{
-    auth::{HttpSourceAuth, HttpSourceAuthConfig},
-    encoding::decode,
-    error::ErrorMessage,
-};
+use super::encoding::decode;
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
     // This function can be defined to enrich events with additional HTTP
@@ -79,14 +70,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         response_code: StatusCode,
         strict_path: bool,
         tls: Option<&TlsEnableableConfig>,
-        auth: Option<&HttpSourceAuthConfig>,
+        auth: Option<&HttpServerAuthConfig>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         keepalive_settings: KeepaliveConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
-        let auth = HttpSourceAuth::try_from(auth)?;
+        let auth_matcher = auth.map(|a| a.build(&cx.enrichment_tables)).transpose()?;
         let path = path.to_owned();
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
         let enable_source_ip = self.enable_source_ip();
@@ -124,7 +115,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 })
                 .untuple_one()
                 .and(warp::path::full())
-                .and(warp::header::optional::<String>("authorization"))
                 .and(warp::header::optional::<String>("content-encoding"))
                 .and(warp::header::headers_cloned())
                 .and(warp::body::bytes())
@@ -132,7 +122,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .and(warp::filters::ext::optional())
                 .and_then(
                     move |path: FullPath,
-                          auth_header,
                           encoding_header: Option<String>,
                           headers: HeaderMap,
                           body: Bytes,
@@ -141,8 +130,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
 
-                        let events = auth
-                            .is_valid(&auth_header)
+                        let events = auth_matcher
+                            .as_ref()
+                            .map_or(Ok(()), |a| a.handle_auth(&headers))
                             .and_then(|()| self.decode(encoding_header.as_deref(), body))
                             .and_then(|body| {
                                 emit!(HttpBytesReceived {

@@ -441,6 +441,7 @@ scriptblock
 servlet
 Sinjo
 sublocation
+shannon
 sundar
 svcb
 snyk
@@ -520,3 +521,9 @@ WCDMA
 XMODEM
 cbor
 requestline
+jetbrains
+JetBrains
+gifs
+meme
+simdutf
+vhosts

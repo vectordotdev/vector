@@ -410,6 +410,15 @@ base: components: sources: aws_s3: configuration: {
 		required:    false
 		type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
 	}
+	force_path_style: {
+		description: """
+			Specifies which addressing style to use.
+
+			This controls whether the bucket name is in the hostname, or part of the URL.
+			"""
+		required: false
+		type: bool: default: true
+	}
 	framing: {
 		description: """
 			Framing configuration.
@@ -787,7 +796,7 @@ base: components: sources: aws_s3: configuration: {
 						description: """
 																Sets the list of supported ALPN protocols.
 
-																Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+																Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 																that they are defined.
 																"""
 						required: false
@@ -809,7 +818,7 @@ base: components: sources: aws_s3: configuration: {
 																The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 																an inline string in PEM format.
 
-																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+																If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 																"""
 						required: false
 						type: string: examples: ["/path/to/host_certificate.crt"]
@@ -850,7 +859,7 @@ base: components: sources: aws_s3: configuration: {
 																If enabled, certificates must not be expired and must be issued by a trusted
 																issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 																certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-																so on until the verification process reaches a root certificate.
+																so on, until the verification process reaches a root certificate.
 
 																Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 																"""
@@ -898,7 +907,7 @@ base: components: sources: aws_s3: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -920,7 +929,7 @@ base: components: sources: aws_s3: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -961,7 +970,7 @@ base: components: sources: aws_s3: configuration: {
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
