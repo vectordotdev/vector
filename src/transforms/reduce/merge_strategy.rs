@@ -1,9 +1,8 @@
-use std::collections::HashSet;
-
 use crate::event::{LogEvent, Value};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
+use std::collections::HashSet;
 use vector_lib::configurable::configurable_component;
 use vrl::path::OwnedTargetPath;
 
@@ -414,7 +413,7 @@ impl ReduceValueMerger for AddNumbersMerger {
                 }
             },
             Value::Float(f) => match self.v {
-                NumberMergerValue::Int(j) => self.v = NumberMergerValue::Float(f + j as f64),
+                NumberMergerValue::Int(j) => self.v = NumberMergerValue::Float(f + NotNan::new(j as f64).map_err(|_| "Cannot add NaN")?),
                 NumberMergerValue::Float(j) => self.v = NumberMergerValue::Float(f + j),
             },
             _ => {
