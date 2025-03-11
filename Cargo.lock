@@ -593,22 +593,21 @@ dependencies = [
 
 [[package]]
 name = "async-io"
-version = "2.1.0"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10da8f3146014722c89e7859e1d7bb97873125d7346d10ca642ffab794355828"
+checksum = "43a2b323ccce0a1d90b449fd71f2a06ca7faa7c54c2751f06c9bd851fc061059"
 dependencies = [
- "async-lock 2.8.0",
+ "async-lock 3.4.0",
  "cfg-if",
  "concurrent-queue",
  "futures-io",
- "futures-lite 1.13.0",
+ "futures-lite 2.6.0",
  "parking",
  "polling 3.3.0",
  "rustix 0.38.40",
  "slab",
  "tracing 0.1.41",
- "waker-fn",
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -700,7 +699,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63255f1dc2381611000436537bbedfe83183faa303a5a0edaf191edef06526bb"
 dependencies = [
  "async-channel 2.3.1",
- "async-io 2.1.0",
+ "async-io 2.4.0",
  "async-lock 3.4.0",
  "async-signal",
  "async-task",
@@ -741,7 +740,7 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e47d90f65a225c4527103a8d747001fc56e375203592b25ad103e1ca13124c5"
 dependencies = [
- "async-io 2.1.0",
+ "async-io 2.4.0",
  "async-lock 2.8.0",
  "atomic-waker",
  "cfg-if",
