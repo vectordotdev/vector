@@ -94,7 +94,7 @@ releases: "0.41.0": {
 			description: """
 				A new `static_metrics` source was added. This source periodically emits preconfigured values.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "fix"
