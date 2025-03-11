@@ -2,6 +2,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use lookup::{event_path, owned_value_path};
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, TimestampSecondsWithFrac};
 use smallvec::{smallvec, SmallVec};
@@ -150,7 +151,7 @@ impl GelfDeserializer {
         if let Some(line) = parsed.line {
             log.insert(
                 &GELF_TARGET_PATHS.line,
-                Value::Float(ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs")),
+                Value::Float(NotNan::new(line).expect("JSON doesn't allow NaNs")),
             );
         }
         if let Some(file) = &parsed.file {
@@ -308,7 +309,7 @@ mod tests {
         );
         assert_eq!(
             log.get(LINE),
-            Some(&Value::Float(ordered_float::NotNan::new(42.0).unwrap()))
+            Some(&Value::Float(NotNan::new(42.0).unwrap()))
         );
         assert_eq!(
             log.get(FILE),
@@ -317,7 +318,7 @@ mod tests {
         assert_eq!(
             log.get(event_path!(add_on_int_in)),
             Some(&Value::Float(
-                ordered_float::NotNan::new(2001.1002).unwrap()
+                NotNan::new(2001.1002).unwrap()
             ))
         );
         assert_eq!(

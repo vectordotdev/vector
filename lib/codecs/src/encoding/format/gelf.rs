@@ -295,7 +295,7 @@ mod tests {
             FULL_MESSAGE => "Even more message",
             FACILITY => "",
             FILE => "/tmp/foobar",
-            LINE => Value::Float(ordered_float::NotNan::new(1.5).unwrap()),
+            LINE => Value::Float(NotNan::new(1.5).unwrap()),
             LEVEL => 5,
         };
 
