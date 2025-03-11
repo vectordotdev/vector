@@ -231,9 +231,6 @@ jobs:
           max_attempts: 3
           command: make test-e2e-kubernetes
 
-      - run: make test-e2e-kubernetes
-
-
       - name: (PR review) Set latest commit status as failure
         uses: myrotvorets/set-commit-status-action@v2.0.1
         if: failure() && github.event_name == 'pull_request_review'
