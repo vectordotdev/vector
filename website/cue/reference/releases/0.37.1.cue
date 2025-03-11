@@ -20,7 +20,7 @@ releases: "0.37.1": {
 			description: """
 				Fixed an issue where `GeoLite2-City` MMDB database type was not supported.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 	]
 
