@@ -219,11 +219,20 @@ jobs:
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
 
-      - run: make test-e2e-kubernetes
+      # TODO: This job has been quite flakey. Need to investigate further and then remove the retries.
+      - name: Run tests
+        uses: nick-fields/retry@v3
         env:
           USE_MINIKUBE_CACHE: "true"
           SKIP_PACKAGE_DEB: "true"
           CARGO_INCREMENTAL: 0
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          command: make test-e2e-kubernetes
+
+      - run: make test-e2e-kubernetes
+
 
       - name: (PR review) Set latest commit status as failure
         uses: myrotvorets/set-commit-status-action@v2.0.1
