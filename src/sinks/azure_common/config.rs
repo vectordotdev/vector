@@ -167,7 +167,10 @@ pub fn build_client(
                 // If a blob_endpoint is provided in the configuration, use it with a Custom
                 // CloudLocation, to allow overriding the blob storage API endpoint
                 Some(endpoint) => ClientBuilder::with_location(
-                    CloudLocation::Custom { account: storage_account_p, uri: endpoint },
+                    CloudLocation::Custom {
+                        account: storage_account_p,
+                        uri: endpoint,
+                    },
                     storage_credentials,
                 ),
                 // Use the storage_account configuration parameter and assume we are in Azure
