@@ -97,7 +97,7 @@ releases: "0.44.0": {
 			description: """
 				Add VRL function `parse_dnstap` that can parse dnstap data and produce output in the same format as `dnstap` source.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "enhancement"
