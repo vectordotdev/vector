@@ -6,7 +6,7 @@ base: components: transforms: window: configuration: {
 			A condition used to flush the events.
 
 			If the condition resolves to `true` for an event, the whole window is immediately flushed,
-			including the event itself, and any following events it `events_after` is more than zero.
+			including the event itself, and any following events if `events_after` is more than zero.
 			"""
 		required: true
 		type: condition: {}

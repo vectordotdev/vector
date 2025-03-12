@@ -104,10 +104,10 @@ components: transforms: window: {
 			title: "Advantages of Use"
 			body: """
 				A common way to reduce log volume from a verbose system is to filter out less important messages, and only
-				ingest e.g. errors and warnings. However an error message by itself may not be sufficient to determine the
+				ingest errors and warnings. However, an error message by itself may not be sufficient to determine the
 				cause, as surrounding events often contain important context information leading to the failure.
 
-				The `window` transform offers an approach that allows for reduction of log volume by filtering out logs
+				The `window` transform allows for reduction of log volume by filtering out logs
 				when the system is healthy, but preserving detailed logs when they are most relevant.
 				"""
 		}
@@ -130,7 +130,7 @@ components: transforms: window: {
 				non-matching events.
 
 				If the `flush_when` condition is matched before the buffer fills up, it will be flushed again. If the flush
-				condition is triggered often enough, e.g. the system is constantly logging errors, the transform may always
+				condition is triggered often enough (for example, the system is constantly logging errors), the transform may always
 				be in the flushing state, meaning that no events will be filtered. Therefore it works best for conditions
 				that are relatively uncommon.
 				"""
