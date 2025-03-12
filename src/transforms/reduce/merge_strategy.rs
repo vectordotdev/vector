@@ -414,7 +414,12 @@ impl ReduceValueMerger for AddNumbersMerger {
                 }
             },
             Value::Float(f) => match self.v {
-                NumberMergerValue::Int(j) => self.v = NumberMergerValue::Float(f + j as f64),
+                NumberMergerValue::Int(j) => {
+                    self.v = NumberMergerValue::Float(
+                        NotNan::new(f + j as f64)
+                            .map_err(|_| format!("asked to convert a NaN to a float"))?,
+                    )
+                }
                 NumberMergerValue::Float(j) => self.v = NumberMergerValue::Float(f + j),
             },
             _ => {
