@@ -9,4 +9,5 @@ website/content  @vectordotdev/documentation
 website/js @vectordotdev/vector-website
 website/layouts @vectordotdev/vector-website
 website/scripts @vectordotdev/vector-website
+website/data @vectordotdev/vector-website
 website/* @vectordotdev/vector-website
