@@ -21,20 +21,40 @@ use super::transform::Window;
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct WindowConfig {
-    /// A condition used to pass events through the transform without buffering
+    /// A condition used to pass events through the transform without buffering.
+    ///
+    /// If the condition resolves to `true` for an event, the event is immediately passed through
+    /// without preserving the original order of events. Use with caution if the sink cannot handle
+    /// out of order events.
     pub pass_when: Option<AnyCondition>,
-    /// A condition used to flush the events
+
+    /// A condition used to flush the events.
+    ///
+    /// If the condition resolves to `true` for an event, the whole window is immediately flushed,
+    /// including the event itself, and any following events if `events_after` is more than zero.
     pub flush_when: AnyCondition,
-    /// The maximum number of events to keep before the event matched by the flush_when condition
-    pub events_before: Option<usize>,
-    /// The maximum number of events to keep after the event matched by the flush_when condition
-    pub events_after: Option<usize>,
+
+    /// The maximum number of events to keep before the event matched by the `flush_when` condition.
+    #[serde(default = "default_events_before")]
+    pub events_before: usize,
+
+    /// The maximum number of events to keep after the event matched by the `flush_when` condition.
+    #[serde(default = "default_events_after")]
+    pub events_after: usize,
 }
 
 impl GenerateConfig for WindowConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(r#"flush_when = ".message == \"value\"""#).unwrap()
     }
+}
+
+const fn default_events_before() -> usize {
+    100
+}
+
+const fn default_events_after() -> usize {
+    0
 }
 
 #[async_trait::async_trait]
@@ -48,8 +68,8 @@ impl TransformConfig for WindowConfig {
                     .map(|condition| condition.build(&context.enrichment_tables))
                     .transpose()?,
                 self.flush_when.build(&context.enrichment_tables)?,
-                self.events_before.unwrap_or(100),
-                self.events_after.unwrap_or(0),
+                self.events_before,
+                self.events_after,
             )
             .unwrap(),
         ))

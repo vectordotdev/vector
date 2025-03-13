@@ -361,8 +361,8 @@ mod test {
         WindowConfig {
             flush_when,
             pass_when,
-            events_before: Some(events_before),
-            events_after: Some(events_after),
+            events_before,
+            events_after,
         }
     }
 

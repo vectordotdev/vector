@@ -1,6 +1,16 @@
 package metadata
 
 base: components: transforms: window: configuration: {
+	events_after: {
+		description: "The maximum number of events to keep after the event matched by the `flush_when` condition."
+		required:    false
+		type: uint: default: 0
+	}
+	events_before: {
+		description: "The maximum number of events to keep before the event matched by the `flush_when` condition."
+		required:    false
+		type: uint: default: 100
+	}
 	flush_when: {
 		description: """
 			A condition used to flush the events.
@@ -21,23 +31,5 @@ base: components: transforms: window: configuration: {
 			"""
 		required: false
 		type: condition: {}
-	}
-	events_before: {
-		description: """
-			The maximum number of events to keep before the event matched by the `flush_when` condition.
-			"""
-		required: false
-		type: uint: {
-			default: 100
-		}
-	}
-	events_after: {
-		description: """
-			The maximum number of events to keep after the event matched by the `flush_when` condition.
-			"""
-		required: false
-		type: uint: {
-			default: 0
-		}
 	}
 }
