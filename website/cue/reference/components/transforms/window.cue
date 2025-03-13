@@ -4,7 +4,8 @@ components: transforms: window: {
 	title: "Window"
 
 	description: """
-		When a condition is met, flush recent events to the output. Otherwise silently drop non-matching events.
+		A variant of ring buffer or backtrace logging implemented as a sliding window. Keeps events in a buffer until
+		the `flush_when` condition is matched. When the buffer is full, the oldest events are dropped.
 		"""
 
 	classes: {
@@ -122,16 +123,16 @@ components: transforms: window: {
 
 				{{< svg "img/sliding-window.svg" >}}
 
-				Past events are stored in a memory buffer with the capacity of `events_before`. The buffer is not persistent,
-				so in case of a hard system crash, all the buffered events will be lost.
+				Past events are stored in a memory buffer with the capacity of `events_before`. When the buffer is full,
+				the oldest events are dropped to make space for new ones. The buffer is not persistent, so in case of a hard
+				system crash, all the buffered events will be lost.
 
 				Future events are counted from the event matched by the `flush_when` condition until `events_after` number
-				of events is reached. Otherwise the transform functions as a `filter` transform, silently dropping
-				non-matching events.
+				of events is reached.
 
 				If the `flush_when` condition is matched before the buffer fills up, it will be flushed again. If the flush
-				condition is triggered often enough (for example, the system is constantly logging errors), the transform may always
-				be in the flushing state, meaning that no events will be filtered. Therefore it works best for conditions
+				condition is triggered often enough (for example, the system is constantly logging errors), the transform may
+				always be in the flushing state, meaning that no events will be filtered. Therefore it works best for conditions
 				that are relatively uncommon.
 				"""
 		}

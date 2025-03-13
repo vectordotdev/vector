@@ -1,6 +1,6 @@
 ---
 title: Window
-description: When a condition is met, flush recent events to the output
+description: A variant of ring buffer or backtrace logging implemented as a sliding window
 component_kind: transform
 layout: component
 tags: ["filter", "component", "transform", "logs"]
