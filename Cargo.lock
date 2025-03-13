@@ -4686,7 +4686,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.4.10",
+ "socket2 0.5.8",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -7745,7 +7745,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "proc-macro2 1.0.94",
  "quote 1.0.39",
  "syn 2.0.100",
@@ -11757,7 +11757,7 @@ version = "0.1.0"
 dependencies = [
  "cargo-lock",
  "enrichment",
- "getrandom 0.2.15",
+ "getrandom 0.3.1",
  "gloo-utils",
  "serde",
  "vector-vrl-functions",
