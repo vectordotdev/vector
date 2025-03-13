@@ -413,7 +413,11 @@ impl ReduceValueMerger for AddNumbersMerger {
                 }
             },
             Value::Float(f) => match self.v {
-                NumberMergerValue::Int(j) => self.v = NumberMergerValue::Float(f + NotNan::new(j as f64).map_err(|_| "Cannot add NaN")?),
+                NumberMergerValue::Int(j) => {
+                    self.v = NumberMergerValue::Float(
+                        f + NotNan::new(j as f64).map_err(|_| "Cannot add NaN")?,
+                    )
+                }
                 NumberMergerValue::Float(j) => self.v = NumberMergerValue::Float(f + j),
             },
             _ => {

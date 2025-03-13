@@ -317,9 +317,7 @@ mod tests {
         );
         assert_eq!(
             log.get(event_path!(add_on_int_in)),
-            Some(&Value::Float(
-                NotNan::new(2001.1002).unwrap()
-            ))
+            Some(&Value::Float(NotNan::new(2001.1002).unwrap()))
         );
         assert_eq!(
             log.get(event_path!(add_on_str_in)),
