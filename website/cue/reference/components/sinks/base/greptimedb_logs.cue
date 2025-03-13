@@ -160,6 +160,19 @@ base: components: sinks: greptimedb_logs: configuration: {
 			}
 		}
 	}
+	extra_headers: {
+		description: "Custom headers to add to each HTTP request sent to GreptimeDB."
+		required:    false
+		type: object: {
+			examples: [{
+				marker: "vector"
+			}]
+			options: "*": {
+				description: "A header."
+				required:    true
+				type: string: {}
+			}
+	}
 	password: {
 		description: """
 			The password for your GreptimeDB instance.
