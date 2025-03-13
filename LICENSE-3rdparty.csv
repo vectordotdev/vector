@@ -381,6 +381,7 @@ mime,https://github.com/hyperium/mime,MIT OR Apache-2.0,Sean McArthur <sean@sean
 mime_guess,https://github.com/abonander/mime_guess,MIT,Austin Bonander <austin.bonander@gmail.com>
 minimal-lexical,https://github.com/Alexhuszagh/minimal-lexical,MIT OR Apache-2.0,Alex Huszagh <ahuszagh@gmail.com>
 miniz_oxide,https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide,MIT OR Zlib OR Apache-2.0,"Frommi <daniil.liferenko@gmail.com>, oyvindln <oyvindln@users.noreply.github.com>"
+miniz_oxide,https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide,MIT OR Zlib OR Apache-2.0,"Frommi <daniil.liferenko@gmail.com>, oyvindln <oyvindln@users.noreply.github.com>, Rich Geldreich richgel99@gmail.com"
 mio,https://github.com/tokio-rs/mio,MIT,"Carl Lerche <me@carllerche.com>, Thomas de Zeeuw <thomasdezeeuw@gmail.com>, Tokio Contributors <team@tokio.rs>"
 mlua,https://github.com/khvzak/mlua,MIT,"Aleksandr Orlenko <zxteam@pm.me>, kyren <catherine@kyju.org>"
 mlua-sys,https://github.com/khvzak/mlua,MIT,Aleksandr Orlenko <zxteam@pm.me>
