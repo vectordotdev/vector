@@ -200,10 +200,12 @@ mod tests {
         )
     }
 
-    async fn test_component_reload(file: &mut File,
-                                   expected_component: &ComponentKey,
-                                   timeout: Duration,
-                                   mut receiver: SignalRx) -> bool {
+    async fn test_component_reload(
+        file: &mut File,
+        expected_component: &ComponentKey,
+        timeout: Duration,
+        mut receiver: SignalRx,
+    ) -> bool {
         file.write_all(&[0]).unwrap();
         file.sync_all().unwrap();
 
@@ -228,9 +230,10 @@ mod tests {
             ComponentConfig::new(component_file_path.clone(), http_component.clone());
         std::fs::create_dir(&dir).unwrap();
         let mut file = File::create(&file_path).unwrap();
-        let mut component_files: Vec<std::fs::File> = component_file_path.iter().map(|file| {
-            File::create(&file).unwrap()
-        }).collect();
+        let mut component_files: Vec<std::fs::File> = component_file_path
+            .iter()
+            .map(|file| File::create(file).unwrap())
+            .collect();
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
         spawn_thread(
@@ -245,11 +248,25 @@ mod tests {
         let signal_rx2 = signal_rx.resubscribe();
         let signal_rx3 = signal_rx.resubscribe();
 
-        if !test_component_reload(&mut component_files[0], &http_component, delay * 5, signal_rx).await {
+        if !test_component_reload(
+            &mut component_files[0],
+            &http_component,
+            delay * 5,
+            signal_rx,
+        )
+        .await
+        {
             panic!("Test timed out");
         }
 
-        if !test_component_reload(&mut component_files[1], &http_component, delay * 5, signal_rx2).await {
+        if !test_component_reload(
+            &mut component_files[1],
+            &http_component,
+            delay * 5,
+            signal_rx2,
+        )
+        .await
+        {
             panic!("Test timed out");
         }
 
