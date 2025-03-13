@@ -11,6 +11,7 @@ use vrl::owned_value_path;
 
 use crate::event;
 use crate::event::{Event, LogEvent, Value};
+use crate::internal_events::KubernetesMergedLineTooBig;
 use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 
 /// The key we use for `file` field.
@@ -29,25 +30,59 @@ impl PartialEventMergeState {
         file: &str,
         message_path: &OwnedTargetPath,
         expiration_time: Duration,
+        max_merged_line_bytes: usize,
     ) {
+        let mut bytes_mut = BytesMut::new();
         if let Some(bucket) = self.buckets.get_mut(file) {
+            // don't bother continuing to process new partial events that match existing ones that are already too big
+            if bucket.too_big {
+                return;
+            }
+
             // merging with existing event
 
             if let (Some(Value::Bytes(prev_value)), Some(Value::Bytes(new_value))) =
                 (bucket.event.get_mut(message_path), event.get(message_path))
             {
-                let mut bytes_mut = BytesMut::new();
                 bytes_mut.extend_from_slice(prev_value);
                 bytes_mut.extend_from_slice(new_value);
+
+                // drop event if it's bigger than max allowed
+                if bytes_mut.len() > max_merged_line_bytes {
+                    bucket.too_big = true;
+                    emit!(KubernetesMergedLineTooBig {
+                        event: &Event::Log(event),
+                        configured_limit: max_merged_line_bytes,
+                        encountered_size_so_far: bytes_mut.len()
+                    });
+                }
+
                 *prev_value = bytes_mut.freeze();
             }
         } else {
             // new event
+
+            if let Some(Value::Bytes(event_bytes)) = event.get(message_path) {
+                bytes_mut.extend_from_slice(event_bytes);
+            }
+
+            let too_big = bytes_mut.len() > max_merged_line_bytes;
+
+            if too_big {
+                // perf impact of clone should be minimal since being here means no further processing of this event will occur
+                emit!(KubernetesMergedLineTooBig {
+                    event: &Event::Log(event.clone()),
+                    configured_limit: max_merged_line_bytes,
+                    encountered_size_so_far: bytes_mut.len()
+                });
+            }
+
             self.buckets.insert(
                 file.to_owned(),
                 Bucket {
                     event,
                     expiration: Instant::now() + expiration_time,
+                    too_big,
                 },
             );
         }
@@ -70,7 +105,9 @@ impl PartialEventMergeState {
 
     fn flush_events(&mut self, emitter: &mut Emitter<LogEvent>) {
         for (_, bucket) in self.buckets.drain() {
-            emitter.emit(bucket.event);
+            if !bucket.too_big {
+                emitter.emit(bucket.event);
+            }
         }
     }
 }
@@ -78,13 +115,20 @@ impl PartialEventMergeState {
 struct Bucket {
     event: LogEvent,
     expiration: Instant,
+    too_big: bool,
 }
 
 pub fn merge_partial_events(
     stream: impl Stream<Item = Event> + 'static,
     log_namespace: LogNamespace,
+    max_merged_line_bytes: usize,
 ) -> impl Stream<Item = Event> {
-    merge_partial_events_with_custom_expiration(stream, log_namespace, EXPIRATION_TIME)
+    merge_partial_events_with_custom_expiration(
+        stream,
+        log_namespace,
+        EXPIRATION_TIME,
+        max_merged_line_bytes,
+    )
 }
 
 // internal function that allows customizing the expiration time (for testing)
@@ -92,6 +136,7 @@ fn merge_partial_events_with_custom_expiration(
     stream: impl Stream<Item = Event> + 'static,
     log_namespace: LogNamespace,
     expiration_time: Duration,
+    max_merged_line_bytes: usize,
 ) -> impl Stream<Item = Event> {
     let partial_flag_path = match log_namespace {
         LogNamespace::Vector => {
@@ -132,7 +177,13 @@ fn merge_partial_events_with_custom_expiration(
                 .map(|x| x.to_string())
                 .unwrap_or_default();
 
-            state.add_event(event, &file, &message_path, expiration_time);
+            state.add_event(
+                event,
+                &file,
+                &message_path,
+                expiration_time,
+                max_merged_line_bytes,
+            );
             if !is_partial {
                 if let Some(log_event) = state.remove_event(&file) {
                     emitter.emit(log_event);
@@ -164,7 +215,8 @@ mod test {
         e_1.insert("foo", 1);
 
         let input_stream = futures::stream::iter([e_1.into()]);
-        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy);
+        let output_stream =
+            merge_partial_events(input_stream, LogNamespace::Legacy, 50 * 1024 * 1024);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
@@ -172,6 +224,18 @@ mod test {
             output[0].as_log().get(".message"),
             Some(&value!("test message 1"))
         );
+    }
+
+    #[tokio::test]
+    async fn merge_single_event_legacy_too_big() {
+        let mut e_1 = LogEvent::from("test message 1");
+        e_1.insert("foo", 1);
+
+        let input_stream = futures::stream::iter([e_1.into()]);
+        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, 1);
+
+        let output: Vec<Event> = output_stream.collect().await;
+        assert_eq!(output.len(), 0);
     }
 
     #[tokio::test]
@@ -184,7 +248,8 @@ mod test {
         e_2.insert("foo2", 1);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
-        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy);
+        let output_stream =
+            merge_partial_events(input_stream, LogNamespace::Legacy, 50 * 1024 * 1024);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
@@ -192,6 +257,23 @@ mod test {
             output[0].as_log().get(".message"),
             Some(&value!("test message 1test message 2"))
         );
+    }
+
+    #[tokio::test]
+    async fn merge_multiple_events_legacy_too_big() {
+        let mut e_1 = LogEvent::from("test message 1");
+        e_1.insert("foo", 1);
+        e_1.insert("_partial", true);
+
+        let mut e_2 = LogEvent::from("test message 2");
+        e_2.insert("foo2", 1);
+
+        let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
+        // 32 > length of first message but less than the two combined
+        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, 32);
+
+        let output: Vec<Event> = output_stream.collect().await;
+        assert_eq!(output.len(), 0);
     }
 
     #[tokio::test]
@@ -205,7 +287,8 @@ mod test {
         e_1.insert("_partial", true);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
-        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy);
+        let output_stream =
+            merge_partial_events(input_stream, LogNamespace::Legacy, 50 * 1024 * 1024);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
@@ -213,6 +296,24 @@ mod test {
             output[0].as_log().get(".message"),
             Some(&value!("test message 1test message 2"))
         );
+    }
+
+    #[tokio::test]
+    async fn multiple_events_flush_legacy_too_big() {
+        let mut e_1 = LogEvent::from("test message 1");
+        e_1.insert("foo", 1);
+        e_1.insert("_partial", true);
+
+        let mut e_2 = LogEvent::from("test message 2");
+        e_2.insert("foo2", 1);
+        e_1.insert("_partial", true);
+
+        let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
+        // 32 > length of first message but less than the two combined
+        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, 32);
+
+        let output: Vec<Event> = output_stream.collect().await;
+        assert_eq!(output.len(), 0);
     }
 
     #[tokio::test]
@@ -233,6 +334,7 @@ mod test {
             input_stream,
             LogNamespace::Legacy,
             Duration::from_secs(1),
+            50 * 1024 * 1024,
         );
 
         let output: Vec<Event> = output_stream.take(2).collect().await;
@@ -256,7 +358,8 @@ mod test {
         );
 
         let input_stream = futures::stream::iter([e_1.into()]);
-        let output_stream = merge_partial_events(input_stream, LogNamespace::Vector);
+        let output_stream =
+            merge_partial_events(input_stream, LogNamespace::Vector, 50 * 1024 * 1024);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
@@ -286,7 +389,8 @@ mod test {
         );
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
-        let output_stream = merge_partial_events(input_stream, LogNamespace::Vector);
+        let output_stream =
+            merge_partial_events(input_stream, LogNamespace::Vector, 50 * 1024 * 1024);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
