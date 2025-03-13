@@ -2,7 +2,6 @@ use crate::gelf::GELF_TARGET_PATHS;
 use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
-use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
@@ -169,7 +168,7 @@ fn coerce_field_names_and_values(
                     if let Value::Timestamp(ts) = value {
                         let ts_millis = ts.timestamp_millis();
                         if ts_millis % 1000 != 0 {
-                            *value = Value::Float(NotNan::new(ts_millis as f64 / 1000.0).unwrap());
+                            *value = Value::try_from(ts_millis as f64 / 1000.0).unwrap();
                         } else {
                             // keep full range of representable time if no milliseconds are set
                             // but still convert to numeric according to GELF protocol

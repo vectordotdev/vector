@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::TimeZone;
-use ordered_float::NotNan;
 use uuid::Uuid;
 
 use super::{MetricTags, WithMetadata};
@@ -702,7 +701,7 @@ fn decode_value(input: Value) -> Option<super::Value> {
                 .expect("invalid timestamp"),
         )),
         Some(value::Kind::Integer(value)) => Some(super::Value::Integer(value)),
-        Some(value::Kind::Float(value)) => Some(super::Value::Float(NotNan::new(value).unwrap())),
+        Some(value::Kind::Float(value)) => Some(super::Value::from(value)),
         Some(value::Kind::Boolean(value)) => Some(super::Value::Boolean(value)),
         Some(value::Kind::Map(map)) => decode_map(map.fields),
         Some(value::Kind::Array(array)) => decode_array(array.items),

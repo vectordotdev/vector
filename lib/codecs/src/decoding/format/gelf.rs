@@ -150,7 +150,7 @@ impl GelfDeserializer {
         if let Some(line) = parsed.line {
             log.insert(
                 &GELF_TARGET_PATHS.line,
-                Value::Float(ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs")),
+                Value::try_from(line).expect("JSON doesn't allow NaNs"),
             );
         }
         if let Some(file) = &parsed.file {

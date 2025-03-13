@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use lookup::path;
-use ordered_float::NotNan;
 use std::collections::BTreeMap;
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
@@ -81,7 +80,7 @@ impl From<PBValue> for Value {
             PBValue::StringValue(v) => Value::Bytes(Bytes::from(v)),
             PBValue::BoolValue(v) => Value::Boolean(v),
             PBValue::IntValue(v) => Value::Integer(v),
-            PBValue::DoubleValue(v) => Value::Float(NotNan::new(v).unwrap()),
+            PBValue::DoubleValue(v) => Value::try_from(v).unwrap(),
             PBValue::BytesValue(v) => Value::Bytes(Bytes::from(v)),
             PBValue::ArrayValue(arr) => Value::Array(
                 arr.values
