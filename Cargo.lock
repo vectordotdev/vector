@@ -2175,26 +2175,9 @@ dependencies = [
 
 [[package]]
 name = "cidr"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d18b093eba54c9aaa1e3784d4361eb2ba944cf7d0a932a830132238f483e8d8"
-
-[[package]]
-name = "cidr"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd1b64030216239a2e7c364b13cd96a2097ebf0dfe5025f2dedee14a23f2ab60"
-
-[[package]]
-name = "cidr-utils"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25c0a9fb70c2c2cc2a520aa259b1d1345650046a07df1b6da1d3cefcd327f43e"
-dependencies = [
- "cidr 0.2.2",
- "num-bigint",
- "num-traits",
-]
 
 [[package]]
 name = "cipher"
@@ -2311,7 +2294,7 @@ dependencies = [
  "indoc",
  "influxdb-line-protocol",
  "memchr",
- "ordered-float 4.6.0",
+ "ordered-float 5.0.0",
  "prost 0.12.6",
  "prost-reflect",
  "rand 0.9.0",
@@ -3189,6 +3172,7 @@ dependencies = [
  "chrono-tz",
  "dnsmsg-parser",
  "hickory-proto",
+ "paste",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "snafu 0.7.5",
@@ -4017,8 +4001,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43a49c392881ce6d5c3b8cb70f98717b7c07aabbdff06687b9030dbfbe2725f8"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi 0.13.3+wasi-0.2.2",
+ "wasm-bindgen",
  "windows-targets 0.52.6",
 ]
 
@@ -5366,10 +5352,11 @@ dependencies = [
 
 [[package]]
 name = "js-sys"
-version = "0.3.65"
+version = "0.3.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54c0c35952f67de54bb584e9fd912b3023117cbafc0a77d8f3dee1fb5f572fe8"
+checksum = "1cfaf33c695fc6e08064efbc1f72ec937429614f25eef83af942d0e227c3a28f"
 dependencies = [
+ "once_cell",
  "wasm-bindgen",
 ]
 
@@ -6433,7 +6420,7 @@ version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f79c902b31ceac6856e262af5dbaffef75390cf4647c9fef7b55da69a4b912e"
 dependencies = [
- "cidr 0.3.1",
+ "cidr",
  "serde",
 ]
 
@@ -6911,7 +6898,7 @@ dependencies = [
  "bytes 1.10.1",
  "chrono",
  "hex",
- "ordered-float 4.6.0",
+ "ordered-float 5.0.0",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "tonic 0.11.0",
@@ -6941,6 +6928,15 @@ name = "ordered-float"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "ordered-float"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2c1f9f56e534ac6a9b8a4600bdf0f530fb393b5f393e7b4d03489c3cf0c3f01"
 dependencies = [
  "num-traits",
 ]
@@ -11344,7 +11340,7 @@ dependencies = [
  "openssl",
  "openssl-probe",
  "openssl-src",
- "ordered-float 4.6.0",
+ "ordered-float 5.0.0",
  "paste",
  "percent-encoding",
  "pin-project",
@@ -11601,7 +11597,7 @@ dependencies = [
  "no-proxy",
  "noisy_float",
  "openssl",
- "ordered-float 4.6.0",
+ "ordered-float 5.0.0",
  "parking_lot",
  "pin-project",
  "proptest",
@@ -11761,7 +11757,7 @@ version = "0.1.0"
 dependencies = [
  "cargo-lock",
  "enrichment",
- "getrandom 0.2.15",
+ "getrandom 0.3.1",
  "gloo-utils",
  "serde",
  "vector-vrl-functions",
@@ -11784,7 +11780,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.22.0"
-source = "git+https://github.com/vectordotdev/vrl?branch=main#2d5e2dfb28ad22c2f659099f3d7869954f4a6be3"
+source = "git+https://github.com/vectordotdev/vrl?branch=main#53aa78a0c22617c915a7d84d1825896d10f0c826"
 dependencies = [
  "aes",
  "aes-siv",
@@ -11802,7 +11798,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "ciborium",
- "cidr-utils",
+ "cidr",
  "clap",
  "codespan-reporting",
  "community-id",
@@ -11820,6 +11816,7 @@ dependencies = [
  "exitcode",
  "fancy-regex",
  "flate2",
+ "getrandom 0.3.1",
  "grok",
  "hex",
  "hmac",
@@ -11837,9 +11834,8 @@ dependencies = [
  "nom",
  "ofb",
  "onig",
- "ordered-float 4.6.0",
+ "ordered-float 5.0.0",
  "parse-size",
- "paste",
  "peeking_take_while",
  "percent-encoding",
  "pest",
@@ -11855,7 +11851,7 @@ dependencies = [
  "publicsuffix",
  "quickcheck",
  "quoted_printable",
- "rand 0.8.5",
+ "rand 0.9.0",
  "regex",
  "roxmltree",
  "rust_decimal",

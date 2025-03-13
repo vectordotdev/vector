@@ -9,14 +9,15 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
 vrl.workspace = true
+wasm-bindgen = "0.2"
 serde.workspace = true
 gloo-utils = { version = "0.2", features = ["serde"] }
 vector-vrl-functions = { path = "../functions" }
 enrichment = { path = "../../enrichment" }
+
 # Required per https://docs.rs/getrandom/latest/getrandom/#webassembly-support
-getrandom = { version = "0.2.15", features = ["js"] }
+getrandom = { version = "0.3.1", features = ["wasm_js"] }
 
 [build-dependencies]
 cargo-lock = "10.1.0"
