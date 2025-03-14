@@ -669,6 +669,7 @@ transforms-logs = [
   "transforms-exclusive-route",
   "transforms-sample",
   "transforms-throttle",
+  "transforms-trace_to_log"
 ]
 transforms-metrics = [
   "transforms-aggregate",
@@ -679,6 +680,7 @@ transforms-metrics = [
   "transforms-remap",
   "transforms-tag_cardinality_limit",
   "transforms-throttle",
+  "transforms-trace_to_log"
 ]
 
 transforms-aggregate = []
@@ -695,6 +697,7 @@ transforms-exclusive-route = []
 transforms-sample = ["transforms-impl-sample"]
 transforms-tag_cardinality_limit = ["dep:bloomy", "dep:hashbrown"]
 transforms-throttle = ["dep:governor"]
+transforms-trace_to_log = []
 
 # Implementations of transforms
 transforms-impl-sample = []
