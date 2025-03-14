@@ -39,6 +39,12 @@ impl ComponentKey {
     }
 }
 
+impl AsRef<ComponentKey> for ComponentKey {
+    fn as_ref(&self) -> &ComponentKey {
+        self
+    }
+}
+
 impl From<String> for ComponentKey {
     fn from(id: String) -> Self {
         Self { id }
