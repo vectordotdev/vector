@@ -801,6 +801,38 @@ base: components: sinks: websocket_server: configuration: {
 			}
 		}
 	}
+	subprotocol: {
+		description: "Configuration of websocket subprotocol handling."
+		required:    false
+		type: object: options: {
+			supported_subprotocols: {
+				description: """
+					List of supported `Sec-WebSocket-Protocol` values. First match out of requested
+					subprotocols will be accepted.
+					"""
+				relevant_when: "type = \"specific\""
+				required:      false
+				type: array: {
+					default: []
+					items: type: string: {}
+				}
+			}
+			type: {
+				description: "Enum for websocket subprotocol handling."
+				required:    false
+				type: string: {
+					default: "specific"
+					enum: {
+						any: "Supports any subprotocol that the client sends. First of the requested subprotocols will be accepted."
+						specific: """
+															Supports only listed subprotocols. If client doesn't send any of these, server will skip
+															`Sec-WebSocket-Protocol` header and the client can choose to close the connection then.
+															"""
+					}
+				}
+			}
+		}
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false

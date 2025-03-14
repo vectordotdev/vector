@@ -48,7 +48,9 @@ use crate::{
 };
 
 use super::{
-    buffering::MessageBufferingConfig, config::ExtraMetricTagsConfig, WebSocketListenerSinkConfig,
+    buffering::MessageBufferingConfig,
+    config::{ExtraMetricTagsConfig, SubProtocolConfig},
+    WebSocketListenerSinkConfig,
 };
 
 pub struct WebSocketListenerSink {
@@ -59,6 +61,7 @@ pub struct WebSocketListenerSink {
     auth: Option<HttpServerAuthMatcher>,
     extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
     message_buffering: Option<MessageBufferingConfig>,
+    subprotocol: SubProtocolConfig,
 }
 
 impl WebSocketListenerSink {
@@ -80,6 +83,7 @@ impl WebSocketListenerSink {
             auth,
             extra_tags_config: config.internal_metrics.extra_tags,
             message_buffering: config.message_buffering,
+            subprotocol: config.subprotocol,
         })
     }
 
@@ -124,9 +128,11 @@ impl WebSocketListenerSink {
             .collect()
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn handle_connections(
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
+        subprotocol: SubProtocolConfig,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
         client_checkpoints: Arc<Mutex<HashMap<String, Uuid>>>,
@@ -140,6 +146,7 @@ impl WebSocketListenerSink {
                 Self::handle_connection(
                     auth.clone(),
                     message_buffering.clone(),
+                    subprotocol.clone(),
                     Arc::clone(&peers),
                     Arc::clone(&client_checkpoints),
                     Arc::clone(&buffer),
@@ -156,6 +163,7 @@ impl WebSocketListenerSink {
     async fn handle_connection(
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
+        subprotocol: SubProtocolConfig,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         client_checkpoints: Arc<Mutex<HashMap<String, Uuid>>>,
         buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
@@ -186,7 +194,7 @@ impl WebSocketListenerSink {
         let mut buffer_replay = BufferReplayRequest::NO_REPLAY;
         let mut client_checkpoint_key = None;
 
-        let header_callback = |req: &Request, response: Response| {
+        let header_callback = |req: &Request, mut response: Response| {
             client_checkpoint_key = message_buffering.client_key(req, &addr);
             buffer_replay = message_buffering.extract_message_replay_request(
                 req,
@@ -213,6 +221,35 @@ impl WebSocketListenerSink {
                         base_url.as_ref(),
                         req,
                     ));
+                    match subprotocol {
+                        SubProtocolConfig::Any => {
+                            if let Some(websocket_protocol) =
+                                req.headers().get("Sec-WebSocket-Protocol")
+                            {
+                                response
+                                    .headers_mut()
+                                    .insert("Sec-WebSocket-Protocol", websocket_protocol.clone());
+                            }
+                        }
+                        SubProtocolConfig::Specific {
+                            supported_subprotocols,
+                        } => {
+                            let requested_protocols =
+                                req.headers().get_all("Sec-WebSocket-Protocol");
+                            if let Some(matched_protocol) =
+                                requested_protocols.iter().find(|requested_protocol| {
+                                    supported_subprotocols.iter().any(|supported_protocol| {
+                                        requested_protocol.as_bytes()
+                                            == supported_protocol.as_bytes()
+                                    })
+                                })
+                            {
+                                response
+                                    .headers_mut()
+                                    .insert("Sec-WebSocket-Protocol", matched_protocol.clone());
+                            }
+                        }
+                    }
                     Ok(response)
                 }
                 Err(message) => {
@@ -340,6 +377,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
             Self::handle_connections(
                 self.auth,
                 self.message_buffering.clone(),
+                self.subprotocol.clone(),
                 Arc::clone(&peers),
                 self.extra_tags_config,
                 Arc::clone(&client_checkpoints),
