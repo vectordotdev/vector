@@ -216,24 +216,23 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_directory_update() {
+    async fn component_update() {
         trace_init();
 
         let delay = Duration::from_secs(3);
         let dir = temp_dir().to_path_buf();
-        let file_path = dir.join("vector.toml");
         let watcher_conf = WatcherConfig::RecommendedWatcher;
         let component_file_path = vec![dir.join("tls.cert"), dir.join("tls.key")];
         let http_component = ComponentKey::from("http");
 
-        let component_config =
-            ComponentConfig::new(component_file_path.clone(), http_component.clone());
         std::fs::create_dir(&dir).unwrap();
-        let mut file = File::create(&file_path).unwrap();
+
         let mut component_files: Vec<std::fs::File> = component_file_path
             .iter()
             .map(|file| File::create(file).unwrap())
             .collect();
+        let component_config =
+            ComponentConfig::new(component_file_path.clone(), http_component.clone());
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
         spawn_thread(
@@ -245,8 +244,8 @@ mod tests {
         )
         .unwrap();
 
+        let signal_rx = signal_rx.resubscribe();
         let signal_rx2 = signal_rx.resubscribe();
-        let signal_rx3 = signal_rx.resubscribe();
 
         if !test_component_reload(
             &mut component_files[0],
@@ -269,8 +268,23 @@ mod tests {
         {
             panic!("Test timed out");
         }
+    }
+    #[tokio::test]
+    async fn file_directory_update() {
+        trace_init();
 
-        if !test(&mut file, delay * 5, signal_rx3).await {
+        let delay = Duration::from_secs(3);
+        let dir = temp_dir().to_path_buf();
+        let file_path = dir.join("vector.toml");
+        let watcher_conf = WatcherConfig::RecommendedWatcher;
+
+        std::fs::create_dir(&dir).unwrap();
+        let mut file = File::create(&file_path).unwrap();
+
+        let (signal_tx, signal_rx) = broadcast::channel(128);
+        spawn_thread(watcher_conf, signal_tx, &[dir], vec![], delay).unwrap();
+
+        if !test(&mut file, delay * 5, signal_rx).await {
             panic!("Test timed out");
         }
     }
