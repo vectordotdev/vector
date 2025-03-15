@@ -6,19 +6,20 @@ use crate::codecs::EncodingConfig;
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
-    internal_events::TemplateRenderingError,
     sinks::util::{
         metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
         EncodedLength, RequestBuilder,
     },
     template::Template,
 };
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub(super) struct SSMetadata {
     pub(super) finalizers: EventFinalizers,
     pub(super) message_group_id: Option<String>,
     pub(super) message_deduplication_id: Option<String>,
+    pub(super) message_attributes: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone)]
@@ -26,6 +27,7 @@ pub(super) struct SSRequestBuilder {
     encoder: (Transformer, Encoder<()>),
     message_group_id: Option<Template>,
     message_deduplication_id: Option<Template>,
+    message_attributes: Option<HashMap<String, String>>,
 }
 
 impl SSRequestBuilder {
@@ -42,6 +44,7 @@ impl SSRequestBuilder {
             encoder: (transformer, encoder),
             message_group_id,
             message_deduplication_id,
+            message_attributes: None, // Default to None, can be populated later
         })
     }
 }
@@ -66,34 +69,15 @@ impl RequestBuilder<Event> for SSRequestBuilder {
         &self,
         mut event: Event,
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let message_group_id = match self.message_group_id {
-            Some(ref tpl) => match tpl.render_string(&event) {
-                Ok(value) => Some(value),
-                Err(error) => {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("message_group_id"),
-                        drop_event: true,
-                    });
-                    None
-                }
-            },
-            None => None,
-        };
-        let message_deduplication_id = match self.message_deduplication_id {
-            Some(ref tpl) => match tpl.render_string(&event) {
-                Ok(value) => Some(value),
-                Err(error) => {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("message_deduplication_id"),
-                        drop_event: true,
-                    });
-                    None
-                }
-            },
-            None => None,
-        };
+        let message_group_id = self.message_group_id.as_ref().and_then(|tpl| {
+            tpl.render_string(&event).ok()
+        });
+
+        let message_deduplication_id = self.message_deduplication_id.as_ref().and_then(|tpl| {
+            tpl.render_string(&event).ok()
+        });
+
+        let message_attributes = self.message_attributes.clone();
 
         let builder = RequestMetadataBuilder::from_event(&event);
 
@@ -101,6 +85,7 @@ impl RequestBuilder<Event> for SSRequestBuilder {
             finalizers: event.take_finalizers(),
             message_group_id,
             message_deduplication_id,
+            message_attributes,
         };
         (metadata, builder, event)
     }
@@ -112,12 +97,13 @@ impl RequestBuilder<Event> for SSRequestBuilder {
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let payload_bytes = payload.into_payload();
-        let message_body = String::from(std::str::from_utf8(&payload_bytes).unwrap());
+        let message_body = String::from_utf8_lossy(&payload_bytes).to_string();
 
         SendMessageEntry {
             message_body,
             message_group_id: client_metadata.message_group_id,
             message_deduplication_id: client_metadata.message_deduplication_id,
+            message_attributes: client_metadata.message_attributes,
             finalizers: client_metadata.finalizers,
             metadata,
         }
@@ -129,6 +115,7 @@ pub(super) struct SendMessageEntry {
     pub(super) message_body: String,
     pub(super) message_group_id: Option<String>,
     pub(super) message_deduplication_id: Option<String>,
+    pub(super) message_attributes: Option<HashMap<String, String>>,
     pub(super) finalizers: EventFinalizers,
     pub(super) metadata: RequestMetadata,
 }
@@ -138,6 +125,9 @@ impl ByteSizeOf for SendMessageEntry {
         self.message_body.size_of()
             + self.message_group_id.size_of()
             + self.message_deduplication_id.size_of()
+            + self.message_attributes.as_ref().map_or(0, |attrs| {
+                attrs.iter().map(|(k, v)| k.size_of() + v.size_of()).sum()
+            })
     }
 }
 

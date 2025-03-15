@@ -1,7 +1,7 @@
 use aws_sdk_sqs::Client as SqsClient;
+use std::collections::HashMap;
 
 use crate::aws::RegionOrEndpoint;
-
 use crate::config::{
     AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
 };
@@ -33,6 +33,10 @@ pub(super) struct SqsSinkConfig {
 
     #[serde(flatten)]
     pub(super) base_config: BaseSSSinkConfig,
+
+    /// Optional message attributes to be sent with each message.
+    #[serde(default)]
+    pub(super) message_attributes: Option<HashMap<String, String>>,
 }
 
 impl GenerateConfig for SqsSinkConfig {
@@ -40,7 +44,8 @@ impl GenerateConfig for SqsSinkConfig {
         toml::from_str(
             r#"queue_url = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
             region = "us-east-2"
-            encoding.codec = "json""#,
+            encoding.codec = "json"
+            message_attributes = { "AttributeKey" = "AttributeValue" }"#,
         )
         .unwrap()
     }
