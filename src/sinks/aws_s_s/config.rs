@@ -1,6 +1,4 @@
 use std::convert::TryFrom;
-use std::collections::HashMap;
-
 use snafu::{ResultExt, Snafu};
 
 use vector_lib::configurable::configurable_component;
@@ -74,9 +72,6 @@ pub(super) struct BaseSSSinkConfig {
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
 
-    /// Optional message attributes to be sent with each message.
-    #[serde(default)]
-    pub(super) message_attributes: Option<HashMap<String, String>>,
 }
 
 pub(super) fn message_group_id(

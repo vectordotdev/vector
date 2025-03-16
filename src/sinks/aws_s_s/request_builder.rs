@@ -44,7 +44,7 @@ impl SSRequestBuilder {
             encoder: (transformer, encoder),
             message_group_id,
             message_deduplication_id,
-            message_attributes: None, // Default to None, can be populated later
+            message_attributes: None,
         })
     }
 }
