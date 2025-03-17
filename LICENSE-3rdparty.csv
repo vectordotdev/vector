@@ -69,6 +69,7 @@ aws-smithy-async,https://github.com/smithy-lang/smithy-rs,Apache-2.0,"AWS Rust S
 aws-smithy-checksums,https://github.com/smithy-lang/smithy-rs,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Zelda Hessler <zhessler@amazon.com>"
 aws-smithy-eventstream,https://github.com/smithy-lang/smithy-rs,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, John DiSanti <jdisanti@amazon.com>"
 aws-smithy-http,https://github.com/smithy-lang/smithy-rs,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Russell Cohen <rcoh@amazon.com>"
+aws-smithy-http-client,https://github.com/smithy-lang/smithy-rs,Apache-2.0,AWS Rust SDK Team <aws-sdk-rust@amazon.com>
 aws-smithy-json,https://github.com/smithy-lang/smithy-rs,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, John DiSanti <jdisanti@amazon.com>"
 aws-smithy-query,https://github.com/smithy-lang/smithy-rs,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, John DiSanti <jdisanti@amazon.com>"
 aws-smithy-runtime,https://github.com/smithy-lang/smithy-rs,Apache-2.0,"AWS Rust SDK Team <aws-sdk-rust@amazon.com>, Zelda Hessler <zhessler@amazon.com>"
