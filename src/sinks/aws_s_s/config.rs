@@ -72,7 +72,6 @@ pub(super) struct BaseSSSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
-
 }
 
 pub(super) fn message_group_id(

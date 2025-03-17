@@ -26,7 +26,6 @@ impl Client<SendMessageError> for SqsMessagePublisher {
     ) -> Result<SendMessageResponse, SdkError<SendMessageError, HttpResponse>> {
         let mut message_attributes = HashMap::new();
 
-
         if let Some(attributes) = entry.message_attributes {
             for (key, value) in attributes.iter() {
                 match MessageAttributeValue::builder()
@@ -43,7 +42,6 @@ impl Client<SendMessageError> for SqsMessagePublisher {
                 }
             }
         }
-
 
         self.client
             .send_message()
