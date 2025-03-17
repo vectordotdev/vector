@@ -105,7 +105,7 @@ updates:
       - "javascript"
       - "no-changelog"
     commit-message:
-      prefix: "chore(deps)"
+      prefix: "chore(website deps)"
     open-pull-requests-limit: 50
     groups:
       npm_and_yarn:
