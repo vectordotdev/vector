@@ -55,8 +55,9 @@ static RETRIABLE_CODES: OnceLock<RegexSet> = OnceLock::new();
 /// Checks if the request can be retried after the given error was returned.
 pub fn is_retriable_error<T>(error: &SdkError<T, HttpResponse>) -> bool {
     match error {
-        SdkError::TimeoutError(_) | SdkError::DispatchFailure(_) => {
-            info!(message = "Got timeout or dispatch error", error = format!("{error:?}"));
+        SdkError::TimeoutError(_) => true,
+        SdkError::DispatchFailure(err) => {
+            info!(message = "Got timeout or dispatch error", error = format!("{err:?}"));
             true
         },
         SdkError::ConstructionFailure(_) => false,
