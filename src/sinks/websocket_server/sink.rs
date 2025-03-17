@@ -316,12 +316,20 @@ mod tests {
     use std::{future::ready, num::NonZeroUsize};
 
     use tokio::{task::JoinHandle, time};
-    use vector_lib::sink::VectorSink;
+    use vector_lib::{
+        codecs::{
+            decoding::{DeserializerConfig, JsonDeserializerOptions},
+            JsonDeserializerConfig,
+        },
+        lookup::lookup_v2::ConfigValuePath,
+        sink::VectorSink,
+    };
 
     use super::*;
 
     use crate::{
         event::{Event, LogEvent},
+        sinks::websocket_server::buffering::{BufferingAckConfig, ClientKeyConfig},
         test_util::{
             components::{run_and_assert_sink_compliance, SINK_TAGS},
             next_addr,
@@ -516,6 +524,55 @@ mod tests {
         websocket_sink.await.unwrap();
     }
 
+    #[tokio::test]
+    async fn test_client_late_connect_with_acks() {
+        let event1 = Event::Log(LogEvent::from("foo1"));
+        let event2 = Event::Log(LogEvent::from("foo2"));
+        let event3 = Event::Log(LogEvent::from("foo3"));
+
+        let (mut sender, input_events) = build_test_event_channel();
+        let address = next_addr();
+        let port = address.port();
+
+        let websocket_sink = start_websocket_server_sink(
+            WebSocketListenerSinkConfig {
+                address,
+                message_buffering: Some(MessageBufferingConfig {
+                    max_events: NonZeroUsize::new(1).unwrap(),
+                    message_id_path: Some(ConfigValuePath::from("message_id")),
+                    client_ack_support: Some(BufferingAckConfig {
+                        ack_decoding: DeserializerConfig::Json(JsonDeserializerConfig::new(
+                            JsonDeserializerOptions::default(),
+                        )),
+                        message_id_path: ConfigValuePath::from("message_id"),
+                        client_key: ClientKeyConfig::IpAddress { with_port: false },
+                    }),
+                }),
+                ..Default::default()
+            },
+            input_events,
+        )
+        .await;
+
+        // First connection, to ACK and save last event
+        let first_connection = attach_websocket_client_with_ack(port, vec![event1.clone()]).await;
+        sender.send(event1.clone()).await.expect("Failed to send.");
+        first_connection.await.unwrap();
+
+        // Second event sent while not connected
+        sender.send(event2.clone()).await.expect("Failed to send.");
+
+        // Second connection, should receive missed event
+        let second_connection =
+            attach_websocket_client_with_ack(port, vec![event2.clone(), event3.clone()]).await;
+
+        sender.send(event3.clone()).await.expect("Failed to send.");
+
+        second_connection.await.unwrap();
+        drop(sender);
+        websocket_sink.await.unwrap();
+    }
+
     async fn start_websocket_server_sink<S>(
         config: WebSocketListenerSinkConfig,
         events: S,
@@ -541,32 +598,60 @@ mod tests {
         query: &str,
         expected_events: Vec<Event>,
     ) -> JoinHandle<()> {
-        attach_websocket_client_url(format!("ws://localhost:{port}/?{query}"), expected_events)
-            .await
+        attach_websocket_client_url(
+            format!("ws://localhost:{port}/?{query}"),
+            expected_events,
+            false,
+        )
+        .await
     }
 
     async fn attach_websocket_client(port: u16, expected_events: Vec<Event>) -> JoinHandle<()> {
-        attach_websocket_client_url(format!("ws://localhost:{port}"), expected_events).await
+        attach_websocket_client_url(format!("ws://localhost:{port}"), expected_events, false).await
+    }
+
+    async fn attach_websocket_client_with_ack(
+        port: u16,
+        expected_events: Vec<Event>,
+    ) -> JoinHandle<()> {
+        attach_websocket_client_url(format!("ws://localhost:{port}"), expected_events, true).await
     }
 
     async fn attach_websocket_client_url(
         url: String,
         expected_events: Vec<Event>,
+        ack: bool,
     ) -> JoinHandle<()> {
         let (ws_stream, _) = tokio_tungstenite::connect_async(url)
             .await
             .expect("Client failed to connect.");
-        let (_, rx) = ws_stream.split();
+        let (mut tx, rx) = ws_stream.split();
         tokio::spawn(async move {
             let events = expected_events.clone();
-            rx.take(events.len())
+
+            let pairs: Vec<(Result<Message, _>, Event)> = rx
+                .take(events.len())
                 .zip(stream::iter(events))
-                .for_each(|(msg, expected)| async {
-                    let msg_text = msg.unwrap().into_text().unwrap();
-                    let expected = serde_json::to_string(expected.into_log().value()).unwrap();
-                    assert_eq!(expected, msg_text);
-                })
+                .collect()
                 .await;
+
+            pairs.iter().for_each(|(msg, expected)| {
+                let mut base_msg = serde_json::from_str::<Value>(
+                    &msg.as_ref().unwrap().clone().into_text().unwrap(),
+                )
+                .unwrap();
+                // Removing message_id from message, since it is not part of the event
+                base_msg.remove("message_id", true);
+                let msg_text = serde_json::to_string(&base_msg).unwrap();
+                let expected = serde_json::to_string(expected.clone().into_log().value()).unwrap();
+                assert_eq!(expected, msg_text);
+            });
+
+            if ack {
+                for (msg, _) in pairs {
+                    tx.send(msg.unwrap()).await.unwrap();
+                }
+            }
         })
     }
 
