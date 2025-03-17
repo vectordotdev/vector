@@ -228,8 +228,7 @@ where
     {
         info!(message = "Got endpoint from config", endpoint_from_config);
         config_builder = config_builder
-            .endpoint_url(endpoint_from_config)
-            .region(None);
+            .endpoint_url(endpoint_from_config);
     } else {
         info!(
             message = "Did not get endpoint from config",
