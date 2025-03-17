@@ -15,7 +15,10 @@ use super::{
     BuiltBuffer, TaskHandle,
 };
 use crate::{
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
+    config::{
+        ComponentKey, Config, ConfigDiff, EnrichmentTableOuter, HealthcheckOptions, Inputs,
+        OutputId, Resource,
+    },
     event::EventArray,
     extra_context::ExtraContext,
     shutdown::SourceShutdownCoordinator,
@@ -419,7 +422,25 @@ impl RunningTopology {
         let remove_sink = diff
             .sinks
             .removed_and_changed()
-            .map(|key| (key, self.config.sink(key).unwrap().resources(key)));
+            .map(|key| {
+                (
+                    key,
+                    self.config
+                        .sink(key)
+                        .map(|s| s.resources(key))
+                        .unwrap_or_default(),
+                )
+            })
+            .chain(
+                diff.enrichment_tables
+                    .removed_and_changed()
+                    .filter_map(|key| {
+                        self.config
+                            .enrichment_table(key)
+                            .and_then(|t| t.as_sink())
+                            .map(|s| (key, s.resources(key)))
+                    }),
+            );
         let add_source = diff
             .sources
             .changed_and_added()
@@ -427,7 +448,25 @@ impl RunningTopology {
         let add_sink = diff
             .sinks
             .changed_and_added()
-            .map(|key| (key, new_config.sink(key).unwrap().resources(key)));
+            .map(|key| {
+                (
+                    key,
+                    new_config
+                        .sink(key)
+                        .map(|s| s.resources(key))
+                        .unwrap_or_default(),
+                )
+            })
+            .chain(
+                diff.enrichment_tables
+                    .changed_and_added()
+                    .filter_map(|key| {
+                        self.config
+                            .enrichment_table(key)
+                            .and_then(|t| t.as_sink())
+                            .map(|s| (key, s.resources(key)))
+                    }),
+            );
         let conflicts = Resource::conflicts(
             remove_sink.map(|(key, value)| ((true, key), value)).chain(
                 add_sink
@@ -450,7 +489,17 @@ impl RunningTopology {
             .to_change
             .iter()
             .filter(|&key| {
-                self.config.sink(key).unwrap().buffer == new_config.sink(key).unwrap().buffer
+                self.config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(EnrichmentTableOuter::as_sink)
+                        .map(|s| s.buffer)
+                }) == new_config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(EnrichmentTableOuter::as_sink)
+                        .map(|s| s.buffer)
+                })
             })
             .cloned()
             .collect::<HashSet<_>>();
@@ -463,7 +512,18 @@ impl RunningTopology {
             .collect::<HashSet<_>>();
 
         // First, we remove any inputs to removed sinks so they can naturally shut down.
-        for key in &diff.sinks.to_remove {
+        let removed_sinks = diff
+            .sinks
+            .to_remove
+            .iter()
+            .chain(diff.enrichment_tables.to_remove.iter().filter(|key| {
+                self.config
+                    .enrichment_table(key)
+                    .and_then(EnrichmentTableOuter::as_sink)
+                    .is_some()
+            }))
+            .collect::<Vec<_>>();
+        for key in &removed_sinks {
             debug!(component = %key, "Removing sink.");
             self.remove_inputs(key, diff, new_config).await;
         }
@@ -472,7 +532,18 @@ impl RunningTopology {
         // they can naturally shutdown and allow us to recover their buffers if possible.
         let mut buffer_tx = HashMap::new();
 
-        for key in &diff.sinks.to_change {
+        let sinks_to_change = diff
+            .sinks
+            .to_change
+            .iter()
+            .chain(diff.enrichment_tables.to_change.iter().filter(|key| {
+                self.config
+                    .enrichment_table(key)
+                    .and_then(EnrichmentTableOuter::as_sink)
+                    .is_some()
+            }))
+            .collect::<Vec<_>>();
+        for key in &sinks_to_change {
             debug!(component = %key, "Changing sink.");
             if reuse_buffers.contains(key) {
                 self.detach_triggers
@@ -491,7 +562,7 @@ impl RunningTopology {
                 // basically a no-op since we're reusing the same buffer) than it is to pass around
                 // info about which sinks are having their buffers reused and treat them differently
                 // at other stages.
-                buffer_tx.insert(key.clone(), self.inputs.get(key).unwrap().clone());
+                buffer_tx.insert((*key).clone(), self.inputs.get(key).unwrap().clone());
             }
             self.remove_inputs(key, diff, new_config).await;
         }
@@ -502,7 +573,7 @@ impl RunningTopology {
         //
         // If a sink we're removing isn't tying up any resource that a changed/added sink depends
         // on, we don't bother waiting for it to shutdown.
-        for key in &diff.sinks.to_remove {
+        for key in &removed_sinks {
             let previous = self.tasks.remove(key).unwrap();
             if wait_for_sinks.contains(key) {
                 debug!(message = "Waiting for sink to shutdown.", %key);
@@ -513,7 +584,7 @@ impl RunningTopology {
         }
 
         let mut buffers = HashMap::<ComponentKey, BuiltBuffer>::new();
-        for key in &diff.sinks.to_change {
+        for key in &sinks_to_change {
             if wait_for_sinks.contains(key) {
                 let previous = self.tasks.remove(key).unwrap();
                 debug!(message = "Waiting for sink to shutdown.", %key);
@@ -533,7 +604,7 @@ impl RunningTopology {
                         _ => unreachable!(),
                     };
 
-                    buffers.insert(key.clone(), (tx, Arc::new(Mutex::new(Some(rx)))));
+                    buffers.insert((*key).clone(), (tx, Arc::new(Mutex::new(Some(rx)))));
                 }
             }
         }
@@ -563,6 +634,17 @@ impl RunningTopology {
             }
 
             for key in &diff.sinks.to_remove {
+                // Sinks only have inputs
+                self.inputs_tap_metadata.remove(key);
+            }
+
+            let removed_sinks = diff.enrichment_tables.to_remove.iter().filter(|key| {
+                self.config
+                    .enrichment_table(key)
+                    .and_then(EnrichmentTableOuter::as_sink)
+                    .is_some()
+            });
+            for key in removed_sinks {
                 // Sinks only have inputs
                 self.inputs_tap_metadata.remove(key);
             }
@@ -611,6 +693,15 @@ impl RunningTopology {
         // Now that all sources and transforms are fully configured, we can wire up sinks.
         for key in diff.sinks.changed_and_added() {
             debug!(component = %key, "Connecting inputs for sink.");
+            self.setup_inputs(key, diff, new_pieces).await;
+        }
+        let added_changed_tables: Vec<&ComponentKey> = diff
+            .enrichment_tables
+            .changed_and_added()
+            .filter(|k| new_pieces.inputs.contains_key(k))
+            .collect();
+        for key in added_changed_tables {
+            debug!(component = %key, "Connecting inputs for enrichment table sink.");
             self.setup_inputs(key, diff, new_pieces).await;
         }
 
@@ -845,6 +936,30 @@ impl RunningTopology {
 
         for key in &diff.sinks.to_add {
             trace!(message = "Spawning new sink.", key = %key);
+            self.spawn_sink(key, &mut new_pieces);
+        }
+
+        let changed_tables: Vec<&ComponentKey> = diff
+            .enrichment_tables
+            .to_change
+            .iter()
+            .filter(|k| new_pieces.tasks.contains_key(k))
+            .collect();
+
+        let added_tables: Vec<&ComponentKey> = diff
+            .enrichment_tables
+            .to_add
+            .iter()
+            .filter(|k| new_pieces.tasks.contains_key(k))
+            .collect();
+
+        for key in changed_tables {
+            debug!(message = "Spawning changed enrichment table sink.", key = %key);
+            self.spawn_sink(key, &mut new_pieces);
+        }
+
+        for key in added_tables {
+            debug!(message = "Spawning enrichment table new sink.", key = %key);
             self.spawn_sink(key, &mut new_pieces);
         }
     }

@@ -627,7 +627,7 @@ where
 {
     struct UpperLimitVisitor;
 
-    impl<'de> de::Visitor<'de> for UpperLimitVisitor {
+    impl de::Visitor<'_> for UpperLimitVisitor {
         type Value = f64;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

@@ -30,8 +30,8 @@ async fn redis_sink_list_lpush() {
     let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {}.", key);
-    let mut rng = rand::thread_rng();
-    let num_events = rng.gen_range(10000..20000);
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(10000..20000);
     debug!("Test events num: {}.", num_events);
 
     let cnf = RedisSinkConfig {
@@ -94,8 +94,8 @@ async fn redis_sink_list_rpush() {
     let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {}.", key);
-    let mut rng = rand::thread_rng();
-    let num_events = rng.gen_range(10000..20000);
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(10000..20000);
     debug!("Test events num: {}.", num_events);
 
     let cnf = RedisSinkConfig {
@@ -158,8 +158,8 @@ async fn redis_sink_channel() {
     let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {}.", key);
-    let mut rng = rand::thread_rng();
-    let num_events = rng.gen_range(10000..20000);
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(10000..20000);
     debug!("Test events num: {}.", num_events);
 
     let client = redis::Client::open(redis_server()).unwrap();
@@ -234,8 +234,8 @@ async fn redis_sink_channel_data_volume_tags() {
     let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {}.", key);
-    let mut rng = rand::thread_rng();
-    let num_events = rng.gen_range(10000..20000);
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(10000..20000);
     debug!("Test events num: {}.", num_events);
 
     let client = redis::Client::open(redis_server()).unwrap();

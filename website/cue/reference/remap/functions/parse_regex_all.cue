@@ -33,7 +33,10 @@ remap: functions: parse_regex_all: {
 			type: ["regex"]
 		},
 	]
-	internal_failure_reasons: []
+	internal_failure_reasons: [
+		"`value` is not a string.",
+		"`pattern` is not a regex.",
+	]
 	return: {
 		types: ["array"]
 		rules: [

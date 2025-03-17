@@ -18,7 +18,6 @@ use std::{
 
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
-use ordered_float::NotNan;
 use tokio::sync::{
     oneshot::{self, Receiver},
     Mutex,
@@ -39,9 +38,9 @@ use crate::{
     conditions::Condition,
     config::{
         self, loading, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
-        TestDefinition, TestInput, TestInputValue, TestOutput,
+        TestDefinition, TestInput, TestOutput,
     },
-    event::{Event, EventMetadata, LogEvent, Value},
+    event::{Event, EventMetadata, LogEvent},
     signal,
     topology::{builder::TopologyPieces, RunningTopology},
 };
@@ -622,16 +621,8 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
             if let Some(log_fields) = &input.log_fields {
                 let mut event = LogEvent::from_str_legacy("");
                 for (path, value) in log_fields {
-                    let value: Value = match value {
-                        TestInputValue::String(s) => Value::from(s.to_owned()),
-                        TestInputValue::Boolean(b) => Value::from(*b),
-                        TestInputValue::Integer(i) => Value::from(*i),
-                        TestInputValue::Float(f) => Value::from(
-                            NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
-                        ),
-                    };
                     event
-                        .parse_path_and_insert(path, value)
+                        .parse_path_and_insert(path, value.clone())
                         .map_err(|e| e.to_string())?;
                 }
                 Ok(event.into())

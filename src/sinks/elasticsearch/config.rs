@@ -10,7 +10,7 @@ use crate::{
     codecs::Transformer,
     config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
-    http::HttpClient,
+    http::{HttpClient, QueryParameters},
     internal_events::TemplateRenderingError,
     sinks::{
         elasticsearch::{
@@ -175,7 +175,7 @@ pub struct ElasticsearchConfig {
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
-    pub query: Option<HashMap<String, String>>,
+    pub query: Option<QueryParameters>,
 
     #[serde(default)]
     #[configurable(derived)]
@@ -264,6 +264,7 @@ impl ElasticsearchConfig {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
                 index: self.bulk.index.clone(),
+                template_fallback_index: self.bulk.template_fallback_index.clone(),
                 action: self.bulk.action.clone(),
                 version: self.bulk.version.clone(),
                 version_type: self.bulk.version_type,
@@ -295,6 +296,10 @@ pub struct BulkConfig {
     #[configurable(metadata(docs::examples = "application-{{ application_id }}-%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "{{ index }}"))]
     pub index: Template,
+
+    /// The default index to write events to if the template in `bulk.index` cannot be resolved
+    #[configurable(metadata(docs::examples = "test-index"))]
+    pub template_fallback_index: Option<String>,
 
     /// Version field value.
     #[configurable(metadata(docs::examples = "{{ obj_version }}-%Y-%m-%d"))]
@@ -329,6 +334,7 @@ impl Default for BulkConfig {
         Self {
             action: default_bulk_action(),
             index: default_index(),
+            template_fallback_index: Default::default(),
             version: Default::default(),
             version_type: default_version_type(),
         }

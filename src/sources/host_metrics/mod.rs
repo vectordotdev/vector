@@ -10,6 +10,7 @@ use glob::{Pattern, PatternError};
 use heim::units::ratio::ratio;
 use heim::units::time::second;
 use serde_with::serde_as;
+use sysinfo::System;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::config::LogNamespace;
@@ -35,6 +36,8 @@ mod filesystem;
 mod memory;
 mod network;
 mod process;
+#[cfg(target_os = "linux")]
+mod tcp;
 
 /// Collector types.
 #[serde_as]
@@ -70,6 +73,9 @@ pub enum Collector {
 
     /// Metrics related to network utilization.
     Network,
+
+    /// Metrics related to TCP connections.
+    TCP,
 }
 
 /// Filtering configuration.
@@ -178,7 +184,7 @@ pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
-const fn example_collectors() -> [&'static str; 8] {
+const fn example_collectors() -> [&'static str; 9] {
     [
         "cgroups",
         "cpu",
@@ -188,6 +194,7 @@ const fn example_collectors() -> [&'static str; 8] {
         "host",
         "memory",
         "network",
+        "tcp",
     ]
 }
 
@@ -206,10 +213,12 @@ fn default_collectors() -> Option<Vec<Collector>> {
     #[cfg(target_os = "linux")]
     {
         collectors.push(Collector::CGroups);
+        collectors.push(Collector::TCP);
     }
     #[cfg(not(target_os = "linux"))]
     if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
         collectors.push(Collector::CGroups);
+        collectors.push(Collector::TCP);
     }
 
     Some(collectors)
@@ -284,6 +293,9 @@ impl SourceConfig for HostMetricsConfig {
             if self.cgroups.is_some() || self.has_collector(Collector::CGroups) {
                 return Err("CGroups collector is only available on Linux systems".into());
             }
+            if self.has_collector(Collector::TCP) {
+                return Err("TCP collector is only available on Linux systems".into());
+            }
         }
 
         let mut config = self.clone();
@@ -311,7 +323,7 @@ impl HostMetricsConfig {
         let duration = self.scrape_interval_secs;
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
-        let generator = HostMetrics::new(self);
+        let mut generator = HostMetrics::new(self);
 
         let bytes_received = register!(BytesReceived::from(Protocol::NONE));
 
@@ -338,6 +350,7 @@ impl HostMetricsConfig {
 
 pub struct HostMetrics {
     config: HostMetricsConfig,
+    system: System,
     #[cfg(target_os = "linux")]
     root_cgroup: Option<cgroups::CGroupRoot>,
     events_received: Registered<EventsReceived>,
@@ -348,6 +361,7 @@ impl HostMetrics {
     pub fn new(config: HostMetricsConfig) -> Self {
         Self {
             config,
+            system: System::new(),
             events_received: register!(EventsReceived),
         }
     }
@@ -358,6 +372,7 @@ impl HostMetrics {
         let root_cgroup = cgroups::CGroupRoot::new(&cgroups);
         Self {
             config,
+            system: System::new(),
             root_cgroup,
             events_received: register!(EventsReceived),
         }
@@ -367,7 +382,7 @@ impl HostMetrics {
         MetricsBuffer::new(self.config.namespace.clone())
     }
 
-    async fn capture_metrics(&self) -> Vec<Metric> {
+    async fn capture_metrics(&mut self) -> Vec<Metric> {
         let mut buffer = self.buffer();
 
         #[cfg(target_os = "linux")]
@@ -398,6 +413,10 @@ impl HostMetrics {
         }
         if self.config.has_collector(Collector::Network) {
             self.network_metrics(&mut buffer).await;
+        }
+        #[cfg(target_os = "linux")]
+        if self.config.has_collector(Collector::TCP) {
+            self.tcp_metrics(&mut buffer).await;
         }
 
         let metrics = buffer.metrics;
