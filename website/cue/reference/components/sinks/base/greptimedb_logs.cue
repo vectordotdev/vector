@@ -146,6 +146,18 @@ base: components: sinks: greptimedb_logs: configuration: {
 		required:    true
 		type: string: examples: ["http://localhost:4000"]
 	}
+	extra_headers: {
+		description: "Custom headers to add to the HTTP request sent to GreptimeDB."
+		required:    false
+		type: object: {
+			examples: [{}]
+			options: "*": {
+				description: "Extra header key-value pairs."
+				required:    true
+				type: string: {}
+			}
+		}
+	}
 	extra_params: {
 		description: "Custom parameters to add to the query string for each HTTP request sent to GreptimeDB."
 		required:    false
@@ -159,19 +171,6 @@ base: components: sinks: greptimedb_logs: configuration: {
 				type: string: {}
 			}
 		}
-	}
-	extra_headers: {
-		description: "Custom headers to add to each HTTP request sent to GreptimeDB."
-		required:    false
-		type: object: {
-			examples: [{
-				marker: "vector"
-			}]
-			options: "*": {
-				description: "A header."
-				required:    true
-				type: string: {}
-			}
 	}
 	password: {
 		description: """
