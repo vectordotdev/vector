@@ -34,7 +34,6 @@ pub(super) struct SqsSinkConfig {
     #[serde(flatten)]
     pub(super) base_config: BaseSSSinkConfig,
 
-    /// Optional message attributes to be sent with each message.
     #[serde(default)]
     pub(super) message_attributes: Option<HashMap<String, String>>,
 }

@@ -31,7 +31,7 @@ impl Client<SendMessageError> for SqsMessagePublisher {
             for (key, value) in attributes.iter() {
                 match MessageAttributeValue::builder()
                     .data_type("String")
-                    .string_value(value.clone()) // Ensure value is cloned properly
+                    .string_value(value.clone())
                     .build()
                 {
                     Ok(attr) => {
@@ -43,7 +43,7 @@ impl Client<SendMessageError> for SqsMessagePublisher {
                 }
             }
         }
-        
+
 
         self.client
             .send_message()
