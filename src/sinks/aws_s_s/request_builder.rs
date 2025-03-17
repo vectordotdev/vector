@@ -6,6 +6,7 @@ use crate::codecs::EncodingConfig;
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
+    internal_events::TemplateRenderingError,
     sinks::util::{
         metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
         EncodedLength, RequestBuilder,
@@ -69,13 +70,34 @@ impl RequestBuilder<Event> for SSRequestBuilder {
         &self,
         mut event: Event,
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
-        let message_group_id = self.message_group_id.as_ref().and_then(|tpl| {
-            tpl.render_string(&event).ok()
-        });
-
-        let message_deduplication_id = self.message_deduplication_id.as_ref().and_then(|tpl| {
-            tpl.render_string(&event).ok()
-        });
+        let message_group_id = match self.message_group_id {
+            Some(ref tpl) => match tpl.render_string(&event) {
+                Ok(value) => Some(value),
+                Err(error) => {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("message_group_id"),
+                        drop_event: true,
+                    });
+                    None
+                }
+            },
+            None => None,
+        };
+        let message_deduplication_id = match self.message_deduplication_id {
+            Some(ref tpl) => match tpl.render_string(&event) {
+                Ok(value) => Some(value),
+                Err(error) => {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("message_deduplication_id"),
+                        drop_event: true,
+                    });
+                    None
+                }
+            },
+            None => None,
+        };
 
         let message_attributes = self.message_attributes.clone();
 
@@ -97,7 +119,7 @@ impl RequestBuilder<Event> for SSRequestBuilder {
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let payload_bytes = payload.into_payload();
-        let message_body = String::from_utf8_lossy(&payload_bytes).to_string();
+        let message_body = String::from(std::str::from_utf8(&payload_bytes).unwrap());
 
         SendMessageEntry {
             message_body,
