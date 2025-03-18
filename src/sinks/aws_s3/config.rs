@@ -258,14 +258,6 @@ impl S3SinkConfig {
     }
 
     pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
-        info!(
-            message = "Creating service for S3 sink",
-            region = format!(
-                "region: {0:?}, endpoint: {1:?}",
-                self.region.region(),
-                self.region.endpoint()
-            )
-        );
         s3_common::config::create_service(
             &self.region,
             &self.auth,

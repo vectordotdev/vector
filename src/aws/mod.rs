@@ -55,11 +55,7 @@ static RETRIABLE_CODES: OnceLock<RegexSet> = OnceLock::new();
 /// Checks if the request can be retried after the given error was returned.
 pub fn is_retriable_error<T>(error: &SdkError<T, HttpResponse>) -> bool {
     match error {
-        SdkError::TimeoutError(_) => true,
-        SdkError::DispatchFailure(err) => {
-            info!(message = "Got timeout or dispatch error", error = format!("{err:?}"));
-            true
-        },
+        SdkError::TimeoutError(_) | SdkError::DispatchFailure(_) => true,
         SdkError::ConstructionFailure(_) => false,
         SdkError::ResponseError(err) => check_response(err.raw()),
         SdkError::ServiceError(err) => check_response(err.raw()),
@@ -200,7 +196,6 @@ where
     // The default credentials chains will look for a region if not given but we'd like to
     // error up front if later SDK calls will fail due to lack of region configuration
     let region = resolve_region(proxy, tls_options, region).await?;
-    info!(message = "Got region", region = format!("{region:?}"));
 
     let provider_config =
         aws_config::provider_config::ProviderConfig::empty().with_region(Some(region.clone()));
@@ -230,14 +225,7 @@ where
     } else if let Some(endpoint_from_config) =
         aws_config::default_provider::endpoint_url::endpoint_url_provider(&provider_config).await
     {
-        info!(message = "Got endpoint from config", endpoint_from_config);
-        config_builder = config_builder
-            .endpoint_url(endpoint_from_config);
-    } else {
-        info!(
-            message = "Did not get endpoint from config",
-            provider_config = format!("{provider_config:?}")
-        );
+        config_builder = config_builder.endpoint_url(endpoint_from_config);
     }
 
     if let Some(use_fips) =
