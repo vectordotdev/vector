@@ -6950,15 +6950,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ordered-float"
-version = "5.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2c1f9f56e534ac6a9b8a4600bdf0f530fb393b5f393e7b4d03489c3cf0c3f01"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "os_pipe"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7762,7 +7753,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.11.0",
  "proc-macro2 1.0.94",
  "quote 1.0.40",
  "syn 2.0.100",
@@ -11796,7 +11787,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.22.0"
-source = "git+https://github.com/vectordotdev/vrl?branch=main#53aa78a0c22617c915a7d84d1825896d10f0c826"
+source = "git+https://github.com/vectordotdev/vrl?branch=main#728f614bef400bcfa58c8c619be7f01503c1c5b9"
 dependencies = [
  "aes",
  "aes-siv",
@@ -11850,7 +11841,7 @@ dependencies = [
  "nom",
  "ofb",
  "onig",
- "ordered-float 5.0.0",
+ "ordered-float 4.6.0",
  "parse-size",
  "peeking_take_while",
  "percent-encoding",
