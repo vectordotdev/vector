@@ -30,7 +30,7 @@ async fn closed_source() {
     topology.sources_finished().await;
 
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
         .await
         .unwrap());
 }
@@ -52,7 +52,7 @@ async fn remove_sink() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
         .await
         .unwrap());
 }
@@ -75,7 +75,7 @@ async fn remove_transform() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
         .await
         .unwrap());
 }
@@ -99,7 +99,7 @@ async fn replace_transform() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
         .await
         .unwrap());
 }

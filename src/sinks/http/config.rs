@@ -3,6 +3,7 @@
 use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
 use hyper::Body;
 use indexmap::IndexMap;
+use std::path::PathBuf;
 use vector_lib::codecs::{
     encoding::{Framer, Serializer},
     CharacterDelimitedEncoder,
@@ -299,6 +300,19 @@ impl SinkConfig for HttpSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type())
+    }
+
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        let mut files = Vec::new();
+        if let Some(tls) = &self.tls {
+            if let Some(crt_file) = &tls.crt_file {
+                files.push(crt_file)
+            }
+            if let Some(key_file) = &tls.key_file {
+                files.push(key_file)
+            }
+        };
+        files
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
