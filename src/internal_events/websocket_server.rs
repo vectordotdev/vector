@@ -49,6 +49,7 @@ impl InternalEvent for WsListenerConnectionFailedError {
             error_type::CONNECTION_FAILED.to_string(),
         ));
         all_tags.push(("stage".to_string(), error_stage::SENDING.to_string()));
+        // ## skip check-validity-events ##
         counter!("component_errors_total", &all_tags).increment(1);
     }
 
