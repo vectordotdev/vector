@@ -3190,6 +3190,7 @@ dependencies = [
  "chrono-tz",
  "dnsmsg-parser",
  "hickory-proto",
+ "paste",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "snafu 0.7.5",
