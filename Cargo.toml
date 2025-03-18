@@ -145,6 +145,7 @@ glob = { version = "0.3.2", default-features = false }
 hickory-proto = { version = "0.24.4", default-features = false, features = ["dnssec"] }
 indexmap = { version = "2.8.0", default-features = false, features = ["serde", "std"] }
 inventory = { version = "0.3" }
+indoc = { version = "2.0.6" }
 metrics = "0.24.1"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
@@ -183,6 +184,7 @@ proptest-derive = { workspace = true, optional = true }
 snafu.workspace = true
 cfg-if.workspace = true
 semver.workspace = true
+indoc.workspace = true
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
@@ -337,7 +339,6 @@ hyper = { version = "0.14.28", default-features = false, features = ["client", "
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap.workspace = true
-indoc = { version = "2.0.6", default-features = false }
 inventory = { version = "0.3.20", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
 itertools = { version = "0.14.0", default-features = false, optional = false, features = ["use_alloc"] }

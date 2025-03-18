@@ -11225,6 +11225,7 @@ dependencies = [
  "hex",
  "indexmap 2.8.0",
  "indicatif",
+ "indoc",
  "itertools 0.14.0",
  "log",
  "owo-colors",
