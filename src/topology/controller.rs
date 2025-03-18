@@ -62,7 +62,7 @@ impl TopologyController {
     pub async fn reload(
         &mut self,
         mut new_config: config::Config,
-        components_to_reload: Option<Vec<&config::ComponentKey>>,
+        components_to_reload: Option<Vec<config::ComponentKey>>,
     ) -> ReloadOutcome {
         new_config
             .healthchecks

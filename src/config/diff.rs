@@ -13,22 +13,25 @@ pub struct ConfigDiff {
     /// This difference does not only contain the actual enrichment_tables keys, but also keys that
     /// may be used for their source and sink components (if available).
     pub enrichment_tables: Difference,
+    pub components_to_reload: Option<Vec<ComponentKey>>,
 }
 
 impl ConfigDiff {
     pub fn initial(initial: &Config) -> Self {
-        Self::new(&Config::default(), initial)
+        Self::new(&Config::default(), initial, None)
     }
 
-    pub fn new(old: &Config, new: &Config) -> Self {
+    pub fn new(
+        old: &Config,
+        new: &Config,
+        components_to_reload: Option<Vec<ComponentKey>>,
+    ) -> Self {
         ConfigDiff {
             sources: Difference::new(&old.sources, &new.sources),
             transforms: Difference::new(&old.transforms, &new.transforms),
             sinks: Difference::new(&old.sinks, &new.sinks),
-            enrichment_tables: Difference::new_tables(
-                &old.enrichment_tables,
-                &new.enrichment_tables,
-            ),
+            enrichment_tables: Difference::new(&old.enrichment_tables, &new.enrichment_tables),
+            components_to_reload,
         }
     }
 
@@ -51,10 +54,17 @@ impl ConfigDiff {
 
     /// Checks whether or not the given component is changed.
     pub fn is_changed(&self, key: &ComponentKey) -> bool {
+        let to_change = if let Some(components) = &self.components_to_reload {
+            components.contains(key)
+        } else {
+            false
+        };
+
         self.sources.is_changed(key)
             || self.transforms.is_changed(key)
             || self.sinks.is_changed(key)
             || self.enrichment_tables.contains(key)
+            || to_change
     }
 
     /// Checks whether or not the given component is removed.

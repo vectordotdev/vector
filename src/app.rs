@@ -352,12 +352,7 @@ async fn handle_signal(
             )
             .await;
 
-            reload_config_from_result(
-                topology_controller,
-                new_config,
-                Some(component_keys.iter().map(AsRef::as_ref).collect()),
-            )
-            .await
+            reload_config_from_result(topology_controller, new_config, Some(component_keys)).await
         }
         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
             let topology_controller = topology_controller.lock().await;
@@ -393,7 +388,7 @@ async fn handle_signal(
 async fn reload_config_from_result(
     mut topology_controller: MutexGuard<'_, TopologyController>,
     config: Result<Config, Vec<String>>,
-    components_to_reload: Option<Vec<&ComponentKey>>,
+    components_to_reload: Option<Vec<ComponentKey>>,
 ) -> Option<SignalTo> {
     match config {
         Ok(new_config) => match topology_controller
