@@ -12,6 +12,7 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use toml::map::Map;
 use toml::Value;
 
@@ -68,7 +69,10 @@ impl Cli {
 
         // add_new_version_to_versions_cue(&self.version)?;
 
-        create_new_release_md(&latest_version, &self.version);
+        create_new_release_md(&latest_version, &self.version)?;
+
+        open_release_pr(&self.version)?;
+
         // TODO automate more steps
         println!("Continue the release preparation process manually.");
         Ok(())
@@ -291,6 +295,37 @@ fn create_new_release_md(old_version: &Version, new_version: &Version) -> Result
     let updated_content = updated_lines.join("\n");
     fs::write(&new_file_path, updated_content)?;
     git::commit(&format!("chore(releasing): Created release md file: {new_file_path:?}"))?;
+    Ok(())
+}
+
+/// Final step. Create a release prep PR against the release branch.
+fn open_release_pr(new_version: &Version) -> Result<()> {
+    let release_branch = format!("v{}", new_version.rsplit_once('.').unwrap().0);
+    let repo_root = get_repo_root();
+
+    git::push()?;
+
+    let pr_title = format!("chore(releasing): prepare v{new_version} release");
+    let pr_body = format!("This PR prepares the release for Vector v{}", new_version);
+    let current_branch = format!("website-prepare-v{new_version}");
+    let gh_status = Command::new("gh")
+        .arg("pr")
+        .arg("create")
+        .arg("--base")
+        .arg(&release_branch)
+        .arg("--head")
+        .arg(&current_branch)
+        .arg("--title")
+        .arg(&pr_title)
+        .arg("--body")
+        .arg(&pr_body)
+        .current_dir(&repo_root)
+        .status()?;
+    if !gh_status.success() {
+        return Err(anyhow!("Failed to create PR with gh CLI"));
+    }
+
+    println!("Successfully created PR against {} using gh CLI", release_branch);
     Ok(())
 }
 
