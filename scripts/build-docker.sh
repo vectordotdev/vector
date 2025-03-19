@@ -89,7 +89,7 @@ build() {
 # Build
 #
 
-echo "Building $REPO:* Docker images"
+echo "Building Docker images for $REPOS"
 
 if [[ "$CHANNEL" == "release" ]]; then
   VERSION_EXACT="$VERSION"
