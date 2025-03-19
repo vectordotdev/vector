@@ -621,9 +621,9 @@ impl IngestorProcess {
             });
         }
 
-        if self.state.max_file_age_secs.is_some() {
+        if let Some(max_age_secs) = self.state.max_file_age_secs {
             let delta = Utc::now() - s3_event.event_time;
-            if delta.num_seconds() > self.state.max_file_age_secs.unwrap() as i64 {
+            if delta.num_seconds() > max_age_secs as i64 {
                 return Err(ProcessingError::FileTooOld {
                     bucket: s3_event.s3.bucket.name.clone(),
                     key: s3_event.s3.object.key.clone(),
