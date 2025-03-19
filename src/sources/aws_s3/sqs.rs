@@ -152,18 +152,20 @@ pub(super) struct Config {
     #[serde(flatten)]
     pub(super) timeout: Option<AwsTimeout>,
 
-    /// The URL of the SQS queue to send notifications if file is too old
-    /// If not set and delete_message = true then the message is deleted without pulling the file
+    /// Used in conjunction with `max_file_age` to forward events to a different queue for later processing.
+    /// If the event is older than `max_file_age` seconds, it is forwarded to this queue.
+    /// If this is not set, the event is deleted.
     #[configurable(metadata(
         docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
     ))]
     #[configurable(validation(format = "uri"))]
     pub(super) deferred_queue_url: Option<String>,
 
-    /// The maximum age of a file before it is forwarded to the retry queue
-    /// If not set, files are never forwarded to the retry queue
+    /// Event must have been emitted within the last `max_file_age` seconds to be processed.
+    /// If the event is older, it can be forwarded to the `deferred_queue_url` for later processing
+    /// otherwise it is deleted.
     ///
-    /// This is useful for processing fresher data and allowing a secondary process to handle older data
+    /// This is useful for preferring to process more recent files.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 3600))]
     pub(super) max_file_age: Option<u64>,
