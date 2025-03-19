@@ -7,9 +7,9 @@ use aws_sdk_sqs::operation::delete_message_batch::{
     DeleteMessageBatchError, DeleteMessageBatchOutput,
 };
 use aws_sdk_sqs::operation::receive_message::ReceiveMessageError;
+use aws_sdk_sqs::operation::send_message_batch::{SendMessageBatchError, SendMessageBatchOutput};
 use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message, SendMessageBatchRequestEntry};
 use aws_sdk_sqs::Client as SqsClient;
-use aws_sdk_sqs::operation::send_message_batch::{SendMessageBatchError, SendMessageBatchOutput};
 use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
 use aws_smithy_runtime_api::client::result::SdkError;
 use aws_types::region::Region;
@@ -31,6 +31,9 @@ use vector_lib::internal_event::{
 
 use crate::codecs::Decoder;
 use crate::event::{Event, LogEvent};
+use crate::internal_events::{
+    SqsMessageSendBatchError, SqsMessageSentPartialError, SqsMessageSentSucceeded,
+};
 use crate::{
     aws::AwsTimeout,
     config::{SourceAcknowledgementsConfig, SourceContext},
@@ -50,7 +53,6 @@ use crate::{
 use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
 use vector_lib::event::MaybeAsLogMut;
 use vector_lib::lookup::{metadata_path, path, PathPrefix};
-use crate::internal_events::{SqsMessageSendBatchError, SqsMessageSentPartialError, SqsMessageSentSucceeded};
 
 static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
     LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -243,7 +245,12 @@ pub enum ProcessingError {
         bucket: String,
         key: String,
     },
-    #[snafu(display("File s3://{}/{} too old.  Forwarded to retry queue {}", bucket, key, retry_queue))]
+    #[snafu(display(
+        "File s3://{}/{} too old.  Forwarded to retry queue {}",
+        bucket,
+        key,
+        retry_queue
+    ))]
     FileTooOld {
         bucket: String,
         key: String,
@@ -461,11 +468,12 @@ impl IngestorProcess {
                                     deferred_queue = deferred_queue,
                                 );
 
-                                retry_entries.push(SendMessageBatchRequestEntry::builder()
-                                    .id(message_id.clone())
-                                    .message_body(message.body.unwrap_or_default())
-                                    .build()
-                                    .expect("all required builder params specified")
+                                retry_entries.push(
+                                    SendMessageBatchRequestEntry::builder()
+                                        .id(message_id.clone())
+                                        .message_body(message.body.unwrap_or_default())
+                                        .build()
+                                        .expect("all required builder params specified"),
                                 );
                             }
                             //  maybe delete the message from current queue since we have processed it
@@ -1170,8 +1178,12 @@ fn test_s3_sns_testevent() {
      }"#,
     ).unwrap();
 
-
-    assert_eq!(sns_value.timestamp, DateTime::parse_from_rfc3339("2012-03-29T05:12:16.901Z").unwrap().to_utc());
+    assert_eq!(
+        sns_value.timestamp,
+        DateTime::parse_from_rfc3339("2012-03-29T05:12:16.901Z")
+            .unwrap()
+            .to_utc()
+    );
 
     let value: S3TestEvent = serde_json::from_str(sns_value.message.as_ref()).unwrap();
 
