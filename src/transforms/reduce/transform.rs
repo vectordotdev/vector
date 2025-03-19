@@ -526,7 +526,7 @@ merge_strategies.baz = "max"
             assert_eq!(output_1["foo"], "first foo second foo".into());
             assert_eq!(
                 output_1["bar"],
-                Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
+                Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()].into()),
             );
             assert_eq!(output_1["baz"], 3.into());
             assert_eq!(output_1.metadata(), &metadata);

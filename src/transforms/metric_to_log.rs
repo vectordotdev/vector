@@ -1,6 +1,6 @@
 use chrono::Utc;
 use serde_json::Value;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use vector_lib::codecs::MetricTagValues;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
@@ -8,7 +8,7 @@ use vector_lib::lookup::{event_path, owned_value_path, path, PathPrefix};
 use vector_lib::TimeZone;
 use vrl::path::OwnedValuePath;
 use vrl::value::kind::Collection;
-use vrl::value::Kind;
+use vrl::value::{Kind, ObjectMap};
 
 use crate::config::OutputId;
 use crate::{
@@ -324,7 +324,7 @@ impl MetricToLog {
                         // This can be removed once metrics support namespacing.
                         log.insert(
                             (PathPrefix::Metadata, path!("vector")),
-                            vrl::value::Value::Object(BTreeMap::new()),
+                            vrl::value::Value::Object(ObjectMap::new()),
                         );
                     }
                     Some(log)

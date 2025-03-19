@@ -146,7 +146,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use std::env;
     use std::path::PathBuf;
 
@@ -158,7 +157,7 @@ mod tests {
     };
     use vector_lib::event::LogEvent;
     use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
-    use vrl::value::{KeyString, Value};
+    use vrl::value::{KeyString, ObjectMap, Value};
 
     use super::*;
 
@@ -194,7 +193,7 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([(
+        let input = vec![Event::Log(LogEvent::from(ObjectMap::from([(
             KeyString::from("key"),
             Value::from("value"),
         )])))];
@@ -222,15 +221,15 @@ mod tests {
         );
 
         let input = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value1"),
             )]))),
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value2"),
             )]))),
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value3"),
             )]))),
@@ -285,7 +284,7 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([(
+        let input = vec![Event::Log(LogEvent::from(ObjectMap::from([(
             KeyString::from("key"),
             Value::from("value"),
         )])))];
@@ -313,15 +312,15 @@ mod tests {
 
         let mut writer = Vec::new();
         let input = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value1"),
             )]))),
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value2"),
             )]))),
-            Event::Log(LogEvent::from(BTreeMap::from([(
+            Event::Log(LogEvent::from(ObjectMap::from([(
                 KeyString::from("key"),
                 Value::from("value3"),
             )]))),
@@ -349,7 +348,7 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let input = Event::Log(LogEvent::from(BTreeMap::from([(
+        let input = Event::Log(LogEvent::from(ObjectMap::from([(
             KeyString::from("key"),
             Value::from("value"),
         )])));
@@ -370,7 +369,7 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let input = Event::Log(LogEvent::from(BTreeMap::from([(
+        let input = Event::Log(LogEvent::from(ObjectMap::from([(
             KeyString::from("message"),
             Value::from("value"),
         )])));
@@ -415,7 +414,7 @@ mod tests {
         );
 
         let mut writer = Vec::new();
-        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([
+        let input = vec![Event::Log(LogEvent::from(ObjectMap::from([
             (KeyString::from("id"), Value::from("123")),
             (KeyString::from("name"), Value::from("Alice")),
             (KeyString::from("age"), Value::from(30)),
@@ -470,7 +469,7 @@ mod tests {
 
         let mut writer = Vec::new();
         let input = vec![
-            Event::Log(LogEvent::from(BTreeMap::from([
+            Event::Log(LogEvent::from(ObjectMap::from([
                 (KeyString::from("id"), Value::from("123")),
                 (KeyString::from("name"), Value::from("Alice")),
                 (KeyString::from("age"), Value::from(30)),
@@ -479,7 +478,7 @@ mod tests {
                     Value::from(vec!["alice@example.com", "alice@work.com"]),
                 ),
             ]))),
-            Event::Log(LogEvent::from(BTreeMap::from([
+            Event::Log(LogEvent::from(ObjectMap::from([
                 (KeyString::from("id"), Value::from("123")),
                 (KeyString::from("name"), Value::from("Alice")),
                 (KeyString::from("age"), Value::from(30)),

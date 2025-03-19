@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -391,7 +391,7 @@ where
     Runner: VrlRunner,
 {
     component_key: Option<ComponentKey>,
-    program: Program,
+    program: Arc<Program>,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -464,7 +464,7 @@ where
     ) -> crate::Result<Self> {
         Ok(Remap {
             component_key: context.key.clone(),
-            program,
+            program: Arc::new(program),
             timezone: config
                 .timezone
                 .unwrap_or_else(|| context.globals.timezone()),
