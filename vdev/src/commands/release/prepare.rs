@@ -62,12 +62,13 @@ impl Cli {
         //
         // generate_release_cue(&self.version)?;
 
-        // let latest_version = get_latest_version_from_vector_tags()?;
+        let latest_version = get_latest_version_from_vector_tags()?;
         // update_vector_version(&get_repo_root().join(KUBECLT_CUE_FILE), &latest_version, &self.version)?;
         // update_vector_version(&get_repo_root().join(INSTALL_SCRIPT), &latest_version, &self.version)?;
 
-        add_new_version_to_versions_cue(&self.version)?;
+        // add_new_version_to_versions_cue(&self.version)?;
 
+        create_new_release_md(&latest_version, &self.version);
         // TODO automate more steps
         println!("Continue the release preparation process manually.");
         Ok(())
@@ -248,6 +249,50 @@ fn add_new_version_to_versions_cue(vector_version: &Version) -> Result<()> {
     Ok(())
 }
 
+/// Step 10: Create a new release md file
+fn create_new_release_md(old_version: &Version, new_version: &Version) -> Result<()> {
+    let releases_dir = get_repo_root()
+        .join("website")
+        .join("content")
+        .join("en")
+        .join("releases");
+
+    let old_file_path = releases_dir.join(format!("{}.md", old_version));
+    if !old_file_path.exists() {
+        return Err(anyhow!("Source file not found: {}", old_file_path.display()));
+    }
+
+    let content = fs::read_to_string(&old_file_path)?;
+    let updated_content = content.replace(&old_version.to_string(), &new_version.to_string());
+    let lines: Vec<&str> = updated_content.lines().collect();
+    let mut updated_lines = Vec::new();
+    let mut weight_updated = false;
+
+    for line in lines {
+        if line.trim().starts_with("weight: ") && !weight_updated {
+            // Extract the current weight value
+            let weight_str = line.trim().strip_prefix("weight: ").ok_or_else(|| anyhow!("Invalid weight format"))?;
+            let weight: i32 = weight_str.parse().map_err(|e| anyhow!("Failed to parse weight: {}", e))?;
+            // Increase by 1
+            let new_weight = weight + 1;
+            updated_lines.push(format!("weight: {}", new_weight));
+            weight_updated = true;
+        } else {
+            updated_lines.push(line.to_string());
+        }
+    }
+
+    if !weight_updated {
+        eprintln!("Couldn't update 'weight' line from {}", old_file_path.display());
+    }
+
+
+    let new_file_path = releases_dir.join(format!("{}.md", new_version));
+    let updated_content = updated_lines.join("\n");
+    fs::write(&new_file_path, updated_content)?;
+    git::commit(&format!("chore(releasing): Created release md file: {new_file_path:?}"))?;
+    Ok(())
+}
 
 fn append_vrl_changelog_to_release_cue(vector_version: &Version, vrl_changelog: String) -> Result<()> {
     let releases_path = get_repo_root().join("website").join("cue").join("reference").join("releases");
