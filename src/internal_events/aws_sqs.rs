@@ -7,7 +7,10 @@ use vector_lib::internal_event::{error_stage, error_type};
 
 #[cfg(feature = "sources-aws_s3")]
 mod s3 {
-    use aws_sdk_sqs::types::{BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry, SendMessageBatchRequestEntry, SendMessageBatchResultEntry};
+    use aws_sdk_sqs::types::{
+        BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry,
+        SendMessageBatchRequestEntry, SendMessageBatchResultEntry,
+    };
 
     use super::*;
     use crate::sources::aws_s3::sqs::ProcessingError;
@@ -153,7 +156,7 @@ mod s3 {
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
             )
-                .increment(1);
+            .increment(1);
         }
     }
 
@@ -183,10 +186,9 @@ mod s3 {
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
             )
-                .increment(1);
+            .increment(1);
         }
     }
-
 }
 
 #[derive(Debug)]
