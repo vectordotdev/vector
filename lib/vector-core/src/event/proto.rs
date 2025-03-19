@@ -112,7 +112,7 @@ impl From<Log> for super::LogEvent {
                 .fields
                 .into_iter()
                 .filter_map(|(k, v)| decode_value(v).map(|value| (k.into(), value)))
-                .collect::<ObjectMap>();
+                .collect();
 
             Self::from_map(fields, metadata)
         }
@@ -137,7 +137,7 @@ impl From<Trace> for super::TraceEvent {
             .fields
             .into_iter()
             .filter_map(|(k, v)| decode_value(v).map(|value| (k.into(), value)))
-            .collect::<ObjectMap>();
+            .collect();
 
         Self::from(super::LogEvent::from_map(fields, metadata))
     }

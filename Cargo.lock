@@ -4703,7 +4703,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.8",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -7753,7 +7753,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.94",
  "quote 1.0.40",
  "syn 2.0.100",
@@ -11787,7 +11787,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.22.0"
-source = "git+https://github.com/Zettroke/vrl?branch=CoW-value-optimization#270fba2491873eccff65b7166e59e2aa89d26ebf"
+source = "git+https://github.com/Zettroke/vrl?branch=CoW-value-optimization#16be412724a4ebbc96d39599c68a1d116e3e6f2a"
 dependencies = [
  "aes",
  "aes-siv",
