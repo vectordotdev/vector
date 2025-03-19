@@ -131,7 +131,7 @@ format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
 A list of allowed sub-categories is defined
-[here](https://github.com/vectordotdev/vector/blob/master/.github/semantic.yml#L21).
+[here](https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L21).
 
 The following are all good examples of pull request titles:
 

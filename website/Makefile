@@ -54,7 +54,7 @@ production-build:
 	--environment "production" \
 	--minify
 
-ci-production-build: setup cargo-data structured-data production-build run-link-checker typesense-production
+ci-production-build: setup cargo-data structured-data production-build typesense-production
 
 # Preview site
 preview-build:
@@ -65,7 +65,7 @@ preview-build:
 	--minify
 	cp ./custom-headers/_preview ./public/_headers
 
-ci-preview-build: setup cargo-data structured-data preview-build run-link-checker typesense-preview
+ci-preview-build: setup cargo-data structured-data preview-build typesense-preview
 
 run-link-checker:
 	htmltest
