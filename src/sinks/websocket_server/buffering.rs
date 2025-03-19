@@ -60,6 +60,7 @@ pub struct BufferingAckConfig {
 /// Configuration for client key used for tracking ACKed message for message buffering.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientKeyConfig {
     /// Use client IP address as the unique key for that client
     IpAddress {
