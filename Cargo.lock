@@ -7752,7 +7752,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9552f850d5f0964a4e4d0bf306459ac29323ddfbae05e35a7c0d35cb0803cc5"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.94",
  "quote 1.0.40",
  "syn 2.0.100",
@@ -11786,7 +11786,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.22.0"
-source = "git+https://github.com/vectordotdev/vrl?branch=revert-1300-pront%2Fupdate-rand-uuid-new-rand-backend#4f4b77b2263f3149f8c996c872375dba6d7352fe"
+source = "git+https://github.com/vectordotdev/vrl?branch=main#7020ba22191554fbc8acd5875350a6b9b3c2ce42"
 dependencies = [
  "aes",
  "aes-siv",

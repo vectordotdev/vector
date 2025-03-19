@@ -172,8 +172,7 @@ vector-lib = { path = "lib/vector-lib", default-features = false, features = ["v
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
-#vrl = { git = "https://github.com/vectordotdev/vrl", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
-vrl = { git = "https://github.com/vectordotdev/vrl", branch = "revert-1300-pront/update-rand-uuid-new-rand-backend", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { git = "https://github.com/vectordotdev/vrl", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
 cfg-if.workspace = true
