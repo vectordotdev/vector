@@ -710,8 +710,8 @@ base: components: sources: aws_s3: configuration: {
 			}
 			deferred_queue_url: {
 				description: """
-					Used in conjunction with `max_file_age` to forward events to a different queue for later processing.
-					If the event is older than `max_file_age` seconds, it is forwarded to this queue.
+					Used in conjunction with `max_file_age_secs` to forward events to a different queue for later processing.
+					If the event is older than `max_file_age_secs` seconds, it is forwarded to this queue.
 					If this is not set, the event is deleted.
 					"""
 				required: false
@@ -735,9 +735,9 @@ base: components: sources: aws_s3: configuration: {
 				required: false
 				type: bool: default: true
 			}
-			max_file_age: {
+			max_file_age_secs: {
 				description: """
-					Event must have been emitted within the last `max_file_age` seconds to be processed.
+					Event must have been emitted within the last `max_file_age_secs` seconds to be processed.
 					If the event is older, it can be forwarded to the `deferred_queue_url` for later processing
 					otherwise it is deleted.
 

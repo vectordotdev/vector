@@ -152,8 +152,8 @@ pub(super) struct Config {
     #[serde(flatten)]
     pub(super) timeout: Option<AwsTimeout>,
 
-    /// Used in conjunction with `max_file_age` to forward events to a different queue for later processing.
-    /// If the event is older than `max_file_age` seconds, it is forwarded to this queue.
+    /// Used in conjunction with `max_file_age_secs` to forward events to a different queue for later processing.
+    /// If the event is older than `max_file_age_secs` seconds, it is forwarded to this queue.
     /// If this is not set, the event is deleted.
     #[configurable(metadata(
         docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
@@ -161,14 +161,14 @@ pub(super) struct Config {
     #[configurable(validation(format = "uri"))]
     pub(super) deferred_queue_url: Option<String>,
 
-    /// Event must have been emitted within the last `max_file_age` seconds to be processed.
+    /// Event must have been emitted within the last `max_file_age_secs` seconds to be processed.
     /// If the event is older, it can be forwarded to the `deferred_queue_url` for later processing
     /// otherwise it is deleted.
     ///
     /// This is useful for preferring to process more recent files.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 3600))]
-    pub(super) max_file_age: Option<u64>,
+    pub(super) max_file_age_secs: Option<u64>,
 }
 
 const fn default_poll_secs() -> u32 {
@@ -248,15 +248,15 @@ pub enum ProcessingError {
         key: String,
     },
     #[snafu(display(
-        "File s3://{}/{} too old.  Forwarded to retry queue {}",
+        "File s3://{}/{} too old.  Forwarded to deferred queue {}",
         bucket,
         key,
-        retry_queue
+        deferred_queue
     ))]
     FileTooOld {
         bucket: String,
         key: String,
-        retry_queue: String,
+        deferred_queue: String,
     },
 }
 
@@ -278,7 +278,7 @@ pub struct State {
     delete_failed_message: bool,
     decoder: Decoder,
 
-    max_file_age: Option<u64>,
+    max_file_age_secs: Option<u64>,
     deferred_queue_url: Option<String>,
 }
 
@@ -323,7 +323,7 @@ impl Ingestor {
             decoder,
 
             deferred_queue_url: config.deferred_queue_url,
-            max_file_age: config.max_file_age,
+            max_file_age_secs: config.max_file_age_secs,
         });
 
         Ok(Ingestor { state })
@@ -621,13 +621,13 @@ impl IngestorProcess {
             });
         }
 
-        if self.state.max_file_age.is_some() {
+        if self.state.max_file_age_secs.is_some() {
             let delta = Utc::now() - s3_event.event_time;
-            if delta.num_seconds() > self.state.max_file_age.unwrap() as i64 {
+            if delta.num_seconds() > self.state.max_file_age_secs.unwrap() as i64 {
                 return Err(ProcessingError::FileTooOld {
                     bucket: s3_event.s3.bucket.name.clone(),
                     key: s3_event.s3.object.key.clone(),
-                    retry_queue: self.state.deferred_queue_url.clone().unwrap(),
+                    deferred_queue: self.state.deferred_queue_url.clone().unwrap(),
                 });
             }
         }
