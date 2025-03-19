@@ -1,8 +1,9 @@
+use hickory_proto::dnssec::{PublicKey, Verifier};
+use std::fmt::Write as _;
 use std::str::Utf8Error;
-use std::{fmt::Write as _, ops::Deref};
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
-use hickory_proto::dnssec::rdata::{DNSSECRData, DNSKEY, DS};
+use hickory_proto::dnssec::rdata::{DNSSECRData, CDNSKEY, CDS, DNSKEY, DS};
 use hickory_proto::dnssec::SupportedAlgorithms;
 use hickory_proto::{
     op::{message::Message as TrustDnsMessage, Query},
@@ -737,11 +738,9 @@ impl DnsMessageParser {
             RData::DNSSEC(dnssec) => match dnssec {
                 // See https://tools.ietf.org/html/rfc4034 for details
                 // on dnssec related rdata formats
-                DNSSECRData::CDS(cds) => Ok((Some(format_ds_record(cds.deref())), None)),
+                DNSSECRData::CDS(cds) => Ok((Some(format_cds_record(cds)), None)),
                 DNSSECRData::DS(ds) => Ok((Some(format_ds_record(ds)), None)),
-                DNSSECRData::CDNSKEY(cdnskey) => {
-                    Ok((Some(format_dnskey_record(cdnskey.deref())), None))
-                }
+                DNSSECRData::CDNSKEY(cdnskey) => Ok((Some(format_cdnskey_record(cdnskey)), None)),
                 DNSSECRData::DNSKEY(dnskey) => Ok((Some(format_dnskey_record(dnskey)), None)),
                 DNSSECRData::NSEC(nsec) => {
                     let nsec_rdata = format!(
@@ -749,8 +748,7 @@ impl DnsMessageParser {
                         nsec.next_domain_name()
                             .to_string_with_options(&self.options),
                         nsec.type_bit_maps()
-                            .iter()
-                            .flat_map(|e| format_record_type(*e))
+                            .flat_map(format_record_type)
                             .collect::<Vec<String>>()
                             .join(" ")
                     );
@@ -766,8 +764,7 @@ impl DnsMessageParser {
                         BASE32HEX_NOPAD.encode(nsec3.next_hashed_owner_name()),
                         nsec3
                             .type_bit_maps()
-                            .iter()
-                            .flat_map(|e| format_record_type(*e))
+                            .flat_map(format_record_type)
                             .collect::<Vec<String>>()
                             .join(" ")
                     );
@@ -873,6 +870,25 @@ fn format_svcb_record(svcb: &SVCB, options: &DnsParserOptions) -> String {
     )
 }
 
+fn format_cdnskey_record(cdnskey: &CDNSKEY) -> String {
+    format!(
+        "{} 3 {} {}",
+        {
+            if cdnskey.revoke() {
+                0b0000_0000_0000_0000
+            } else if cdnskey.zone_key() && cdnskey.secure_entry_point() {
+                0b0000_0001_0000_0001
+            } else {
+                0b0000_0001_0000_0000
+            }
+        },
+        cdnskey.algorithm().map_or(0, u8::from),
+        cdnskey
+            .public_key()
+            .map_or("".to_string(), |k| BASE64.encode(k.public_bytes()))
+    )
+}
+
 fn format_dnskey_record(dnskey: &DNSKEY) -> String {
     format!(
         "{} 3 {} {}",
@@ -886,7 +902,17 @@ fn format_dnskey_record(dnskey: &DNSKEY) -> String {
             }
         },
         u8::from(dnskey.algorithm()),
-        BASE64.encode(dnskey.public_key())
+        BASE64.encode(dnskey.public_key().public_bytes())
+    )
+}
+
+fn format_cds_record(cds: &CDS) -> String {
+    format!(
+        "{} {} {} {}",
+        cds.key_tag(),
+        cds.algorithm().map_or(0, u8::from),
+        u8::from(cds.digest_type()),
+        HEXUPPER.encode(cds.digest())
     )
 }
 
@@ -993,11 +1019,7 @@ fn parse_edns_options(edns: &OPT) -> DnsParserResult<(Vec<EDE>, Vec<EdnsOptionEn
         .iter()
         .filter(|(code, _)| u16::from(*code) != EDE_OPTION_CODE)
         .map(|(code, option)| match option {
-            EdnsOption::DAU(algorithms)
-            | EdnsOption::DHU(algorithms)
-            | EdnsOption::N3U(algorithms) => {
-                Ok(parse_edns_opt_dnssec_algorithms(*code, *algorithms))
-            }
+            EdnsOption::DAU(algorithms) => Ok(parse_edns_opt_dnssec_algorithms(*code, *algorithms)),
             EdnsOption::Unknown(_, opt_data) => Ok(parse_edns_opt(*code, opt_data)),
             option => Vec::<u8>::try_from(option)
                 .map(|bytes| parse_edns_opt(*code, &bytes))
@@ -1272,14 +1294,17 @@ mod tests {
 
     #[allow(deprecated)]
     use hickory_proto::dnssec::rdata::key::UpdateScope;
-    use hickory_proto::rr::{
-        domain::Name,
-        rdata::{
-            caa::KeyValue,
-            sshfp::{Algorithm, FingerprintType},
-            svcb,
-            tlsa::{CertUsage, Matching, Selector},
-            CAA, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
+    use hickory_proto::{
+        dnssec::PublicKeyBuf,
+        rr::{
+            domain::Name,
+            rdata::{
+                caa::KeyValue,
+                sshfp::{Algorithm, FingerprintType},
+                svcb,
+                tlsa::{CertUsage, Matching, Selector},
+                CAA, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
+            },
         },
     };
     use hickory_proto::{
@@ -1654,7 +1679,7 @@ mod tests {
     #[test]
     fn test_format_rdata_for_tlsa_type() {
         let rdata = RData::TLSA(TLSA::new(
-            CertUsage::Service,
+            CertUsage::PkixEe,
             Selector::Spki,
             Matching::Sha256,
             vec![1, 2, 3, 4, 5, 6, 7, 8],
@@ -1730,8 +1755,7 @@ mod tests {
             true,
             true,
             false,
-            DNSSEC_Algorithm::RSASHA256,
-            vec![0, 1, 2, 3, 4, 5, 6, 7],
+            PublicKeyBuf::new(vec![0, 1, 2, 3, 4, 5, 6, 7], DNSSEC_Algorithm::RSASHA256),
         )));
         let rdata_text1 = format_rdata(&rdata1);
 
@@ -1739,8 +1763,7 @@ mod tests {
             true,
             false,
             false,
-            DNSSEC_Algorithm::RSASHA256,
-            vec![0, 1, 2, 3, 4, 5, 6, 7],
+            PublicKeyBuf::new(vec![0, 1, 2, 3, 4, 5, 6, 7], DNSSEC_Algorithm::RSASHA256),
         )));
         let rdata_text2 = format_rdata(&rdata2);
 
@@ -1748,8 +1771,7 @@ mod tests {
             true,
             true,
             true,
-            DNSSEC_Algorithm::RSASHA256,
-            vec![0, 1, 2, 3, 4, 5, 6, 7],
+            PublicKeyBuf::new(vec![0, 1, 2, 3, 4, 5, 6, 7], DNSSEC_Algorithm::RSASHA256),
         )));
         let rdata_text3 = format_rdata(&rdata3);
 
