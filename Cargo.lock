@@ -4019,10 +4019,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43a49c392881ce6d5c3b8cb70f98717b7c07aabbdff06687b9030dbfbe2725f8"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "wasi 0.13.3+wasi-0.2.2",
- "wasm-bindgen",
  "windows-targets 0.52.6",
 ]
 
@@ -11788,7 +11786,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.22.0"
-source = "git+https://github.com/vectordotdev/vrl?branch=main#728f614bef400bcfa58c8c619be7f01503c1c5b9"
+source = "git+https://github.com/vectordotdev/vrl?branch=revert-1300-pront%2Fupdate-rand-uuid-new-rand-backend#4f4b77b2263f3149f8c996c872375dba6d7352fe"
 dependencies = [
  "aes",
  "aes-siv",
@@ -11824,7 +11822,6 @@ dependencies = [
  "exitcode",
  "fancy-regex",
  "flate2",
- "getrandom 0.3.1",
  "grok",
  "hex",
  "hmac",
@@ -11859,7 +11856,7 @@ dependencies = [
  "publicsuffix",
  "quickcheck",
  "quoted_printable",
- "rand 0.9.0",
+ "rand 0.8.5",
  "regex",
  "roxmltree",
  "rust_decimal",
