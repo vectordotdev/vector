@@ -42,7 +42,7 @@ derivative = { version = "2.2.0", default-features = false }
 futures.workspace = true
 indexmap.workspace = true
 metrics.workspace = true
-paste = "1.0.15"
+paste.workspace = true
 pin-project.workspace = true
 serde.workspace = true
 serde_json.workspace = true
