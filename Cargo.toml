@@ -134,21 +134,21 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = "1.0.96"
+anyhow = "1.0.97"
 cfg-if = { version = "1.0.0", default-features = false }
 chrono = { version = "0.4.40", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.1", default-features = false, features = ["serde"] }
-clap = { version = "4.5.31", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.32", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.2", default-features = false }
 hickory-proto = { version = "0.24.4", default-features = false, features = ["dnssec"] }
-indexmap = { version = "2.7.1", default-features = false, features = ["serde", "std"] }
+indexmap = { version = "2.8.0", default-features = false, features = ["serde", "std"] }
 inventory = { version = "0.3" }
 metrics = "0.24.1"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
-pin-project = { version = "1.1.9", default-features = false }
+pin-project = { version = "1.1.10", default-features = false }
 proptest = { version = "1.6" }
 proptest-derive = { version = "0.5.1" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
@@ -157,16 +157,16 @@ prost-reflect = { version = "0.14", features = ["serde"], default-features = fal
 prost-types = { version = "0.12", default-features = false }
 rand = { version = "0.9.0", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
-semver = { version = "1.0.25", default-features = false, features = ["serde", "std"] }
-serde_json = { version = "1.0.139", default-features = false, features = ["raw_value", "std"] }
-serde = { version = "1.0.218", default-features = false, features = ["alloc", "derive", "rc"] }
+semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
+serde_json = { version = "1.0.140", default-features = false, features = ["raw_value", "std"] }
+serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
-tempfile = "3.17.1"
-tokio = { version = "1.43.0", default-features = false, features = ["full"] }
+tempfile = "3.19.0"
+tokio = { version = "1.44.1", default-features = false, features = ["full"] }
 toml = { version = "0.8.20", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
-uuid = { version = "1.12.0", features = ["v4", "v7", "serde"] }
+uuid = { version = "1.16.0", features = ["v4", "v7", "serde"] }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
@@ -200,9 +200,9 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.6", default-features = false }
-async-trait = { version = "0.1.86", default-features = false }
+async-trait = { version = "0.1.88", default-features = false }
 futures.workspace = true
-tokio = { version = "1.43.0", default-features = false, features = ["full"] }
+tokio = { version = "1.44.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { version = "0.1.17", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -237,18 +237,18 @@ aws-sdk-sts = { version = "1.3.1", default-features = false, features = ["behavi
 aws-types = { version = "1.3.5", default-features = false, optional = true }
 aws-sigv4 = { version = "1.2.9", default-features = false, features = ["sign-http"], optional = true }
 aws-config = { version = "~1.0.1", default-features = false, features = ["behavior-version-latest", "credentials-process", "sso", "rt-tokio"], optional = true }
-aws-credential-types = { version = "1.2.1", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-smithy-http = { version = "0.60", default-features = false, features = ["event-stream", "rt-tokio"], optional = true }
+aws-credential-types = { version = "1.2.2", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-smithy-http = { version = "0.62", default-features = false, features = ["event-stream", "rt-tokio"], optional = true }
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional = true }
-aws-smithy-runtime = { version = "1.7.8", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
-aws-smithy-async = { version = "1.2.4", default-features = false, features = ["rt-tokio"], optional = true }
+aws-smithy-runtime = { version = "1.8.0", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
+aws-smithy-async = { version = "1.2.5", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { version = "0.17", default-features = false, optional = true }
-azure_storage_blobs = { version = "0.17", default-features = false, optional = true }
+azure_core = { version = "0.21", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_identity = { version = "0.21", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { version = "0.21", default-features = false, optional = true }
+azure_storage_blobs = { version = "0.21", default-features = false, optional = true }
 
 # OpenDAL
 opendal = { version = "0.45", default-features = false, features = ["native-tls", "services-webhdfs"], optional = true }
@@ -259,7 +259,7 @@ tower-http = { version = "0.4.4", default-features = false, features = ["compres
 # Serde
 serde.workspace = true
 serde-toml-merge = { version = "0.3.8", default-features = false }
-serde_bytes = { version = "0.11.15", default-features = false, features = ["std"], optional = true }
+serde_bytes = { version = "0.11.17", default-features = false, features = ["std"], optional = true }
 serde_json.workspace = true
 serde_with = { version = "3.12.0", default-features = false, features = ["macros", "std"] }
 serde_yaml = { version = "0.9.34", default-features = false }
@@ -278,7 +278,7 @@ goauth = { version = "0.14.0", optional = true }
 smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 
 # AMQP
-lapin = { version = "2.5.0", default-features = false, features = ["native-tls"], optional = true }
+lapin = { version = "2.5.1", default-features = false, features = ["native-tls"], optional = true }
 
 # API
 async-graphql = { version = "7.0.15", default-features = false, optional = true, features = ["chrono", "playground"] }
@@ -299,13 +299,13 @@ greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingest
 
 # External libs
 arc-swap = { version = "1.7", default-features = false, optional = true }
-async-compression = { version = "0.4.20", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.4.21", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.22.1", default-features = false, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
 bollard = { version = "0.16.1", default-features = false, features = ["ssl", "chrono"], optional = true }
-bytes = { version = "1.10.0", default-features = false, features = ["serde"] }
+bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 bytesize = { version = "2.0.1", default-features = false }
 chrono.workspace = true
 chrono-tz.workspace = true
@@ -314,7 +314,7 @@ csv = { version = "1.3", default-features = false }
 databend-client = { version = "0.22.2", default-features = false, features = ["rustls"], optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
-dyn-clone = { version = "1.0.18", default-features = false }
+dyn-clone = { version = "1.0.19", default-features = false }
 encoding_rs = { version = "0.8.35", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.13", default-features = false }
 evmap = { version = "10.0.2", default-features = false, optional = true }
@@ -337,8 +337,8 @@ hyper = { version = "0.14.28", default-features = false, features = ["client", "
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap.workspace = true
-indoc = { version = "2.0.5", default-features = false }
-inventory = { version = "0.3.19", default-features = false }
+indoc = { version = "2.0.6", default-features = false }
+inventory = { version = "0.3.20", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
 itertools = { version = "0.14.0", default-features = false, optional = false, features = ["use_alloc"] }
 k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26"], optional = true }
@@ -370,6 +370,7 @@ seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
 socket2 = { version = "0.5.8", default-features = false }
+sqlx = { version = "0.8.3", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional=true }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
@@ -416,23 +417,23 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.16", default-features = false }
-aws-smithy-runtime = { version = "1.7.8", default-features = false, features = ["tls-rustls"] }
-azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
-azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
-azure_storage = { version = "0.17", default-features = false }
+aws-smithy-runtime = { version = "1.8.0", default-features = false, features = ["tls-rustls"] }
+azure_core = { version = "0.21", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
+azure_identity = { version = "0.21", default-features = false, features = ["enable_reqwest"] }
+azure_storage_blobs = { version = "0.21", default-features = false, features = ["azurite_workaround"] }
+azure_storage = { version = "0.21", default-features = false }
 base64 = "0.22.1"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
-libc = "0.2.170"
+libc = "0.2.171"
 similar-asserts = "1.7.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
-rstest = { version = "0.24.0" }
+rstest = { version = "0.25.0" }
 tempfile.workspace = true
 test-generator = "0.3.1"
-tokio = { version = "1.43.0", features = ["test-util"] }
+tokio = { version = "1.44.1", features = ["test-util"] }
 tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { workspace = true, features = ["test"] }
@@ -740,6 +741,7 @@ sinks-logs = [
   "sinks-new_relic_logs",
   "sinks-opentelemetry",
   "sinks-papertrail",
+  "sinks-postgres",
   "sinks-pulsar",
   "sinks-redis",
   "sinks-sematext",
@@ -809,6 +811,7 @@ sinks-new_relic = []
 sinks-opentelemetry = ["sinks-http"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
+sinks-postgres = ["dep:sqlx"]
 sinks-pulsar = ["dep:apache-avro", "dep:pulsar", "dep:lru"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
@@ -858,6 +861,7 @@ all-integration-tests = [
   "nginx-integration-tests",
   "opentelemetry-integration-tests",
   "postgresql_metrics-integration-tests",
+  "postgres_sink-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "redis-integration-tests",
@@ -922,6 +926,7 @@ nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 opentelemetry-integration-tests = ["sources-opentelemetry", "dep:prost"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
+postgres_sink-integration-tests = ["sinks-postgres"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "sinks-influxdb"]
 pulsar-integration-tests = ["sinks-pulsar", "sources-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
