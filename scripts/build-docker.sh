@@ -60,7 +60,7 @@ build() {
 
   # Build and tag for each registry
   for REPO in "${REPO_LIST[@]}"; do
-    local TAG="$REPO/$VERSION-$BASE"
+    local TAG="$REPO:$VERSION-$BASE"
     if [ -n "$PLATFORM" ]; then
       ARGS=()
       if [[ "$PUSH" == "true" ]]; then
