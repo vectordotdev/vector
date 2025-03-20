@@ -241,7 +241,11 @@ impl RunningTopology {
         // spawning the new version of the component.
         //
         // We also shutdown any component that is simply being removed entirely.
-        let diff = ConfigDiff::new(&self.config, &new_config, components_to_reload);
+        let diff = if let Some(components) = components_to_reload {
+            ConfigDiff::new(&self.config, &new_config, HashSet::from_iter(components))
+        } else {
+            ConfigDiff::new(&self.config, &new_config, HashSet::new())
+        };
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
         // Gives windows some time to make available any port
@@ -489,17 +493,18 @@ impl RunningTopology {
             .to_change
             .iter()
             .filter(|&key| {
-                self.config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
-                    self.config
-                        .enrichment_table(key)
-                        .and_then(|t| t.as_sink(key))
-                        .map(|(_, s)| s.buffer)
-                }) == new_config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
-                    self.config
-                        .enrichment_table(key)
-                        .and_then(|t| t.as_sink(key))
-                        .map(|(_, s)| s.buffer)
-                })
+                !diff.components_to_reload.contains(key)
+                    && self.config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
+                        self.config
+                            .enrichment_table(key)
+                            .and_then(EnrichmentTableOuter::as_sink)
+                            .map(|s| s.buffer)
+                    }) == new_config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
+                        self.config
+                            .enrichment_table(key)
+                            .and_then(EnrichmentTableOuter::as_sink)
+                            .map(|s| s.buffer)
+                    })
             })
             .cloned()
             .collect::<HashSet<_>>();

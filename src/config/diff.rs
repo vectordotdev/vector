@@ -13,24 +13,24 @@ pub struct ConfigDiff {
     /// This difference does not only contain the actual enrichment_tables keys, but also keys that
     /// may be used for their source and sink components (if available).
     pub enrichment_tables: Difference,
-    pub components_to_reload: Option<Vec<ComponentKey>>,
+    pub components_to_reload: HashSet<ComponentKey>,
 }
 
 impl ConfigDiff {
     pub fn initial(initial: &Config) -> Self {
-        Self::new(&Config::default(), initial, None)
+        Self::new(&Config::default(), initial, HashSet::new())
     }
 
-    pub fn new(
-        old: &Config,
-        new: &Config,
-        components_to_reload: Option<Vec<ComponentKey>>,
-    ) -> Self {
+    pub fn new(old: &Config, new: &Config, components_to_reload: HashSet<ComponentKey>) -> Self {
         ConfigDiff {
-            sources: Difference::new(&old.sources, &new.sources),
-            transforms: Difference::new(&old.transforms, &new.transforms),
-            sinks: Difference::new(&old.sinks, &new.sinks),
-            enrichment_tables: Difference::new(&old.enrichment_tables, &new.enrichment_tables),
+            sources: Difference::new(&old.sources, &new.sources, &components_to_reload),
+            transforms: Difference::new(&old.transforms, &new.transforms, &components_to_reload),
+            sinks: Difference::new(&old.sinks, &new.sinks, &components_to_reload),
+            enrichment_tables: Difference::new(
+                &old.enrichment_tables,
+                &new.enrichment_tables,
+                &components_to_reload,
+            ),
             components_to_reload,
         }
     }
@@ -54,17 +54,10 @@ impl ConfigDiff {
 
     /// Checks whether or not the given component is changed.
     pub fn is_changed(&self, key: &ComponentKey) -> bool {
-        let to_change = if let Some(components) = &self.components_to_reload {
-            components.contains(key)
-        } else {
-            false
-        };
-
         self.sources.is_changed(key)
             || self.transforms.is_changed(key)
             || self.sinks.is_changed(key)
             || self.enrichment_tables.contains(key)
-            || to_change
     }
 
     /// Checks whether or not the given component is removed.
@@ -84,7 +77,11 @@ pub struct Difference {
 }
 
 impl Difference {
-    fn new<C>(old: &IndexMap<ComponentKey, C>, new: &IndexMap<ComponentKey, C>) -> Self
+    fn new<C>(
+        old: &IndexMap<ComponentKey, C>,
+        new: &IndexMap<ComponentKey, C>,
+        need_change: &HashSet<ComponentKey>,
+    ) -> Self
     where
         C: serde::Serialize + serde::Deserialize<'static>,
     {
@@ -102,7 +99,7 @@ impl Difference {
                 // which can iterate in varied orders.
                 let old_value = serde_json::to_value(&old[n]).unwrap();
                 let new_value = serde_json::to_value(&new[n]).unwrap();
-                old_value != new_value
+                old_value != new_value || need_change.contains(n)
             })
             .cloned()
             .collect::<HashSet<_>>();
