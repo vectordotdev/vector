@@ -158,6 +158,16 @@ A few things to notice about this script:
   `.foo[0]`, `.foo.bar`, `.foo.bar[0]`, and so on to reference subfields, array
   indices, and more.
 
+{{< info >}}
+Note that VRL functions can behave differently depending on the execution context.
+For example, the `contains` function seemed infallible above,
+but it will fail if `.message` is not a string.
+The same code might behave differently when run in the [VRL Playground][urls.playground],
+VRL CLI, or when `schema.log_namespace` is set to `true`.
+
+[urls.playground]: https://playground.vrl.dev/?state=eyJwcm9ncmFtIjoiLmlzX2NyaXRpY2FsID0gY29udGFpbnMoLm1lc3NhZ2UsIFwiR3JlYXQgU2NvdHQhXCIpIiwiZXZlbnQiOnsibWVzc2FnZSI6IkdyZWF0IFNjb3R0ISJ9LCJpc19qc29ubCI6ZmFsc2UsImVycm9yIjpudWxsfQ%3D%3D
+{{< /info >}}
+
 If you stop and restart Vector, you should see log lines like this (again
 reformatted for readability):
 
