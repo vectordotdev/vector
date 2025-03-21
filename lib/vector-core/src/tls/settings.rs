@@ -460,8 +460,7 @@ impl TlsConfig {
 
 /// === System Specific Root Cert ===
 ///
-/// Most of this code is borrowed from https://github.com/ctz/rustls-native-certs
-
+/// Most of this code is borrowed from <https://github.com/ctz/rustls-native-certs>
 /// Load the system default certs from `schannel` this should be in place
 /// of openssl-probe on linux.
 #[cfg(windows)]

@@ -101,7 +101,7 @@ pub fn simple_trace_event(resource: String) -> TraceEvent {
     t.insert(event_path!("error_tps"), Value::Integer(5));
     t.insert(
         event_path!("spans"),
-        Value::Array(vec![Value::from(simple_span(resource))]),
+        Value::Array(vec![Value::from(simple_span(resource))].into()),
     );
     t
 }

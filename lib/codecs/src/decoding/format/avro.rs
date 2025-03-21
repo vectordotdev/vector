@@ -187,7 +187,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
             for item in array {
                 vector.push(try_from(item)?);
             }
-            Ok(VrlValue::Array(vector))
+            Ok(VrlValue::Array(vector.into()))
         }
         AvroValue::Boolean(boolean) => Ok(VrlValue::from(boolean)),
         AvroValue::Bytes(bytes) => Ok(VrlValue::from(bytes)),

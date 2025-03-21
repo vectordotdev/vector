@@ -236,15 +236,16 @@ fn to_gelf_event(log: LogEvent) -> vector_common::Result<LogEvent> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use crate::encoding::SerializerConfig;
 
     use super::*;
     use chrono::NaiveDateTime;
     use vector_core::event::{Event, EventMetadata};
     use vrl::btreemap;
-    use vrl::value::{ObjectMap, Value};
+    use vrl::value::Value;
 
-    fn do_serialize(expect_success: bool, event_fields: ObjectMap) -> Option<serde_json::Value> {
+    fn do_serialize(expect_success: bool, event_fields: BTreeMap<KeyString, Value>) -> Option<serde_json::Value> {
         let config = GelfSerializerConfig::new();
         let mut serializer = config.build();
         let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();

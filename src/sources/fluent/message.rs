@@ -225,7 +225,6 @@ impl From<FluentTimestamp> for Value {
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
 
     use approx::assert_relative_eq;
     use quickcheck::quickcheck;
@@ -331,7 +330,7 @@ mod test {
             let actual_inner: Vec<(rmpv::Value, rmpv::Value)> = input.into_iter().map(|(k,v)| (key_fn(k), val_fn(v))).collect();
             let actual = rmpv::Value::Map(actual_inner);
 
-            let expected = Value::Object(BTreeMap::new());
+            let expected = Value::Object(ObjectMap::new());
 
             assert_eq!(Value::from(FluentValue(actual)), expected);
       }

@@ -1,6 +1,5 @@
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use vrl::compiler::runtime::{Runtime, Terminate};
 use vrl::compiler::TimeZone;
 use vrl::compiler::{compile_with_state, CompileConfig, TargetValue, TypeState};
@@ -89,7 +88,7 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, VrlDiagnosticResult> {
 
     let mut target_value = TargetValue {
         value: event.clone(),
-        metadata: Value::Object(BTreeMap::new()),
+        metadata: Value::object(),
         secrets: Secrets::new(),
     };
 

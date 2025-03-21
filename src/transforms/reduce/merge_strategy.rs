@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
 use vrl::path::OwnedTargetPath;
+use vrl::value::ObjectArray;
 
 /// Strategies for merging events.
 #[configurable_component]
@@ -178,7 +179,7 @@ impl ReduceValueMerger for ConcatArrayMerger {
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v));
+        v.insert(path, Value::Array(self.v.into()));
         Ok(())
     }
 }
@@ -205,18 +206,18 @@ impl ReduceValueMerger for ArrayMerger {
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v));
+        v.insert(path, Value::Array(self.v.into()));
         Ok(())
     }
 }
 
 #[derive(Debug, Clone)]
 struct LongestArrayMerger {
-    v: Vec<Value>,
+    v: ObjectArray,
 }
 
 impl LongestArrayMerger {
-    const fn new(v: Vec<Value>) -> Self {
+    const fn new(v: ObjectArray) -> Self {
         Self { v }
     }
 }
@@ -248,11 +249,11 @@ impl ReduceValueMerger for LongestArrayMerger {
 
 #[derive(Debug, Clone)]
 struct ShortestArrayMerger {
-    v: Vec<Value>,
+    v: ObjectArray,
 }
 
 impl ShortestArrayMerger {
-    const fn new(v: Vec<Value>) -> Self {
+    const fn new(v: ObjectArray) -> Self {
         Self { v }
     }
 }
@@ -619,7 +620,7 @@ pub(crate) fn get_value_merger(
         },
         MergeStrategy::Concat => match v {
             Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, Some(' ')))),
-            Value::Array(a) => Ok(Box::new(ConcatArrayMerger::new(a))),
+            Value::Array(a) => Ok(Box::new(ConcatArrayMerger::new(a.into_vec()))),
             _ => Err(format!(
                 "expected string or array value, found: '{}'",
                 v.to_string_lossy()

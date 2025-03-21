@@ -7,7 +7,7 @@ use std::{
     num::NonZeroUsize,
     sync::{Arc, LazyLock},
 };
-
+use std::collections::BTreeMap;
 use crate::event::util::log::all_fields_skip_array_elements;
 use bytes::Bytes;
 use chrono::Utc;
@@ -264,8 +264,8 @@ impl LogEvent {
     }
 
     ///  Create a `LogEvent` from an `ObjectMap` and `EventMetadata`
-    pub fn from_map(map: ObjectMap, metadata: EventMetadata) -> Self {
-        let inner = Arc::new(Inner::from(Value::Object(map)));
+    pub fn from_map(map: BTreeMap<KeyString, Value>, metadata: EventMetadata) -> Self {
+        let inner = Arc::new(Inner::from(Value::Object(map.into())));
         Self { inner, metadata }
     }
 
@@ -666,6 +666,11 @@ impl From<Value> for LogEvent {
 impl From<ObjectMap> for LogEvent {
     fn from(map: ObjectMap) -> Self {
         Self::from_parts(Value::Object(map), EventMetadata::default())
+    }
+}
+impl From<BTreeMap<KeyString, Value>> for LogEvent {
+    fn from(map: BTreeMap<KeyString, Value>) -> Self {
+        Self::from_parts(Value::Object(map.into()), EventMetadata::default())
     }
 }
 

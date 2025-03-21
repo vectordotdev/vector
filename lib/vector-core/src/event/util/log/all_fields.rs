@@ -334,7 +334,7 @@ mod test {
             ("a.b.c", Value::Integer(5)),
             ("\"a.b.c\"", Value::Integer(6)),
             ("d", Value::Object(ObjectMap::new())),
-            ("e", Value::Array(Vec::new())),
+            ("e", Value::array()),
         ]
         .into_iter()
         .map(|(k, v)| (k.into(), v))
@@ -356,7 +356,7 @@ mod test {
             ("a.b.c", Value::Integer(5)),
             ("a.b.c", Value::Integer(6)),
             ("d", Value::Object(ObjectMap::new())),
-            ("e", Value::Array(Vec::new())),
+            ("e", Value::array()),
         ]
         .into_iter()
         .map(|(k, v)| (k.into(), v))
