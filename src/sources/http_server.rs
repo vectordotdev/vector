@@ -338,7 +338,7 @@ fn socket_addr_to_ip_string(addr: &SocketAddr) -> String {
     addr.ip().to_string()
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum HttpConfigParamKind {
     Glob(glob::Pattern),
     Exact(String),
