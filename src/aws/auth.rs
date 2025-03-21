@@ -2,11 +2,8 @@
 use std::time::Duration;
 
 use aws_config::{
-    default_provider::credentials::DefaultCredentialsChain,
-    identity::IdentityCache,
-    imds,
-    profile::ProfileFileCredentialsProvider,
-    provider_config::ProviderConfig,
+    default_provider::credentials::DefaultCredentialsChain, identity::IdentityCache, imds,
+    profile::ProfileFileCredentialsProvider, provider_config::ProviderConfig,
     sts::AssumeRoleProviderBuilder,
 };
 use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
