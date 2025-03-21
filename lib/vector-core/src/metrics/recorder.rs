@@ -6,6 +6,7 @@ use metrics::{Counter, Gauge, Histogram, Key, KeyName, Metadata, Recorder, Share
 use metrics_util::{registry::Registry as MetricsRegistry, MetricKindMask};
 use quanta::Clock;
 
+use super::metric_matcher::MetricKeyMatcher;
 use super::recency::{GenerationalStorage, Recency};
 use super::storage::VectorStorage;
 use crate::event::{Metric, MetricValue};
@@ -15,7 +16,7 @@ thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = const { OnceCell::new(
 #[allow(dead_code)]
 pub(super) struct Registry {
     registry: MetricsRegistry<Key, GenerationalStorage<VectorStorage>>,
-    recency: RwLock<Option<Recency<Key>>>,
+    recency: RwLock<Option<Recency<Key, MetricKeyMatcher>>>,
 }
 
 impl Registry {
@@ -30,8 +31,21 @@ impl Registry {
         self.registry.clear();
     }
 
-    pub(super) fn set_expiry(&self, timeout: Option<Duration>) {
-        let recency = timeout.map(|_| Recency::new(Clock::new(), MetricKindMask::ALL, timeout));
+    pub(super) fn set_expiry(
+        &self,
+        global_timeout: Option<Duration>,
+        expire_metrics_per_metric_set: Vec<(MetricKeyMatcher, Duration)>,
+    ) {
+        let recency = if global_timeout.is_none() && expire_metrics_per_metric_set.is_empty() {
+            None
+        } else {
+            Some(Recency::new(
+                Clock::new(),
+                MetricKindMask::ALL,
+                global_timeout,
+                expire_metrics_per_metric_set,
+            ))
+        };
         *(self.recency.write()).expect("Failed to acquire write lock on recency map") = recency;
     }
 
