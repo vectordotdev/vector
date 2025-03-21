@@ -51,40 +51,45 @@ evaluate_supported_platforms_for_base() {
 build() {
   local BASE="$1"
   local VERSION="$2"
-
   local DOCKERFILE="distribution/docker/$BASE/Dockerfile"
   local BUILDABLE_PLATFORMS=""
   if [ -n "$PLATFORM" ]; then
     BUILDABLE_PLATFORMS=$(evaluate_supported_platforms_for_base "$BASE")
   fi
 
-  # Build and tag for each registry
+  # Collect all tags
+  TAGS=()
   for REPO in "${REPO_LIST[@]}"; do
-    local TAG="$REPO:$VERSION-$BASE"
-    if [ -n "$PLATFORM" ]; then
-      ARGS=()
-      if [[ "$PUSH" == "true" ]]; then
-        ARGS+=(--push)
-      fi
-
-      docker buildx build \
-        --platform="$BUILDABLE_PLATFORMS" \
-        --tag "$TAG" \
-        target/artifacts \
-        -f "$DOCKERFILE" \
-        "${ARGS[@]}"
-    else
-      docker build \
-        --tag "$TAG" \
-        target/artifacts \
-        -f "$DOCKERFILE"
-
-      if [[ "$PUSH" == "true" ]]; then
-        docker push "$TAG"
-      fi
-    fi
+    TAGS+=(--tag "$REPO:$VERSION-$BASE")
   done
+
+  # Build once with all tags
+  if [ -n "$PLATFORM" ]; then
+    ARGS=()
+    if [[ "$PUSH" == "true" ]]; then
+      ARGS+=(--push)
+    fi
+
+    docker buildx build \
+      --platform="$BUILDABLE_PLATFORMS" \
+      "${TAGS[@]}" \
+      target/artifacts \
+      -f "$DOCKERFILE" \
+      "${ARGS[@]}"
+  else
+    docker build \
+      "${TAGS[@]}" \
+      target/artifacts \
+      -f "$DOCKERFILE"
+
+    if [[ "$PUSH" == "true" ]]; then
+      for TAG in "${TAGS[@]}"; do
+        docker push "$TAG"
+      done
+    fi
+  fi
 }
+
 #
 # Build
 #
