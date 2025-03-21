@@ -12,7 +12,7 @@ remap: functions: encode_lz4: {
 			description: "The string to encode."
 			required:    true
 			type: ["string"]
-		}
+		},
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]
