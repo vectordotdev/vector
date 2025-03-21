@@ -1,3 +1,5 @@
+use crate::config::ComponentConfig;
+use std::collections::HashSet;
 use std::{
     path::{Path, PathBuf},
     time::Duration,
@@ -6,8 +8,6 @@ use std::{
     sync::mpsc::{channel, Receiver},
     thread,
 };
-
-use crate::config::ComponentConfig;
 
 use notify::{recommended_watcher, EventKind, RecursiveMode};
 
@@ -103,7 +103,7 @@ pub fn spawn_thread<'a>(
 
                     debug!(message = "Consumed file change events for delay.", delay = ?delay);
 
-                    let component_keys: Vec<_> = component_configs
+                    let component_keys: HashSet<_> = component_configs
                         .clone()
                         .into_iter()
                         .flat_map(|p| p.contains(&event.paths))
