@@ -43,12 +43,12 @@ impl InternalEvent for WsListenerConnectionFailedError {
             internal_log_rate_limit = true,
         );
         let mut all_tags = self.extra_tags.clone();
-        all_tags.push(("error_code".to_string(), "ws_connection_failed".to_string()));
-        all_tags.push((
-            "error_type".to_string(),
-            error_type::CONNECTION_FAILED.to_string(),
-        ));
-        all_tags.push(("stage".to_string(), error_stage::SENDING.to_string()));
+        all_tags.extend([
+            ("error_code".to_string(), "ws_connection_failed".to_string()),
+            ("error_type".to_string(), error_type::CONNECTION_FAILED.to_string()),
+            ("stage".to_string(), error_stage::SENDING.to_string()),
+        ]);
+        // Tags required by `component_errors_total` are dynamically added above. 
         // ## skip check-validity-events ##
         counter!("component_errors_total", &all_tags).increment(1);
     }
