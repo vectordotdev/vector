@@ -160,8 +160,7 @@ A few things to notice about this script:
 
 {{< info >}}
 Note that VRL functions can behave differently depending on the execution context.
-For example, the `contains` function seemed infallible above,
-but it will fail if `.message` is not a string.
+For example, the `contains` function above is infallible when ran inside a Vector/Remap process if the compiler can detect that the type of `.message` is a string. 
 The same code might behave differently when run in the [VRL Playground][urls.playground],
 VRL CLI, or when `schema.log_namespace` is set to `true`.
 
