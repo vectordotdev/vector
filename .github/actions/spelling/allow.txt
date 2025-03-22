@@ -223,6 +223,7 @@ Xperia
 Yarvik
 Yifang
 ZTE
+Zipkin
 Zopo
 Zync
 acmecorp
@@ -457,6 +458,7 @@ timeframe
 timeseries
 timespan
 timestamped
+tracestate
 typesense
 tzdata
 ubuntu
