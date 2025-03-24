@@ -237,19 +237,15 @@ impl GlobalOptions {
         let mut telemetry = self.telemetry.clone();
         telemetry.merge(&with.telemetry);
 
-        // TODO: maybe do some better merging here
-        let mut merged_expire_metrics_per_metric_set = None;
-        if self.expire_metrics_per_metric_set.is_some()
-            || with.expire_metrics_per_metric_set.is_some()
-        {
-            merged_expire_metrics_per_metric_set = Some(
-                self.expire_metrics_per_metric_set
-                    .iter()
-                    .flatten()
-                    .cloned()
-                    .chain(with.expire_metrics_per_metric_set.iter().flatten().cloned())
-                    .collect(),
-            );
+        let merged_expire_metrics_per_metric_set = match (
+            &self.expire_metrics_per_metric_set,
+            &with.expire_metrics_per_metric_set,
+        ) {
+            (Some(a), Some(b)) => Some(a.iter().chain(b).cloned().collect()),
+            (Some(a), None) => Some(a.clone()),
+            (None, Some(b)) => Some(b.clone()),
+            (None, None) => None,
+        };
         }
 
         if errors.is_empty() {
