@@ -4,7 +4,7 @@ use chrono::{
     SecondsFormat,
 };
 use fakedata_generator::{gen_domain, gen_ipv4, gen_username};
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 
 static APPLICATION_NAMES: [&str; 10] = [
     "auth", "data", "deploy", "etl", "scraper", "cron", "ingress", "egress", "alerter", "fwd",
@@ -217,13 +217,13 @@ fn syslog_version() -> usize {
 
 // Helper functions
 fn random_in_range(min: usize, max: usize) -> usize {
-    thread_rng().gen_range(min..max)
+    rng().random_range(min..max)
 }
 
 fn random_from_array<T: ?Sized>(v: &'static [&'static T]) -> &'static T {
-    v[thread_rng().gen_range(0..v.len())]
+    v[rng().random_range(0..v.len())]
 }
 
 fn random_from_array_copied<T: Copy>(v: &[T]) -> T {
-    v[thread_rng().gen_range(0..v.len())]
+    v[rng().random_range(0..v.len())]
 }

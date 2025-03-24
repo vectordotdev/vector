@@ -441,6 +441,7 @@ scriptblock
 servlet
 Sinjo
 sublocation
+shannon
 sundar
 svcb
 snyk
@@ -523,3 +524,6 @@ requestline
 jetbrains
 JetBrains
 gifs
+meme
+simdutf
+vhosts

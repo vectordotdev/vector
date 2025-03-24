@@ -225,6 +225,7 @@ jobs:
             new_relic_logs sink
             opentelemetry sink
             papertrail sink
+            postgres sink
             prometheus_exporter sink
             prometheus_remote_write sink
             pulsar sink
@@ -236,6 +237,7 @@ jobs:
             statsd sink
             vector sink
             websocket sink
+            websocket_server sink
             blog website
             css website
             guides website
@@ -244,3 +246,4 @@ jobs:
             search website
             template website
             website
+            website deps
