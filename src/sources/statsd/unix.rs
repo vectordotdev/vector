@@ -33,7 +33,7 @@ pub struct UnixConfig {
     pub convert_timers_to_seconds: bool,
 }
 
-fn default_convert_timers_to_seconds() -> bool {
+const fn default_convert_timers_to_seconds() -> bool {
     true
 }
 
