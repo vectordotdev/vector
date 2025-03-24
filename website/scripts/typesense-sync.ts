@@ -1,6 +1,6 @@
-import { typesenseSync } from 'typesense-sync';
-import { saveSettings } from 'typesense-sync';
-import tsConfig from "../typesense.config.json";
+const { typesenseSync } = require('typesense-sync');
+const { saveSettings } = require('typesense-sync/settings');
+const tsConfig = require('../typesense.config.json');
 
 const syncCollection = async () => {
   const promises: Promise<any>[] = []
@@ -14,6 +14,6 @@ const syncCollection = async () => {
 }
 
 saveSettings()
-  .then(() => syncCollection())
+  // .then(() => syncCollection())
   .then(() => console.log('Typesense sync completed'))
   .catch(error => console.log('An error occurred', error))
