@@ -69,6 +69,16 @@ base: components: sources: statsd: configuration: {
 		required: false
 		type: bool: default: true
 	}
+	convert_timers_to_seconds: {
+		description: """
+			Controls whether StatsD timing values in milliseconds (`ms`) are converted to seconds (`s`).
+			When set to `true` (the default), timing values are converted;
+			when set to `false`, the original millisecond values are preserved.
+			"""
+		relevant_when: "mode = \"tcp\" or mode = \"udp\" or mode = \"unix\""
+		required: false
+		type: bool: default: true
+	}
 	shutdown_timeout_secs: {
 		description:   "The timeout before a connection is forcefully closed during shutdown."
 		relevant_when: "mode = \"tcp\""
