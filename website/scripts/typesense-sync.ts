@@ -14,6 +14,6 @@ const syncCollection = async () => {
 }
 
 saveSettings()
-  // .then(() => syncCollection())
+  .then(() => syncCollection())
   .then(() => console.log('Typesense sync completed'))
   .catch(error => console.log('An error occurred', error))
