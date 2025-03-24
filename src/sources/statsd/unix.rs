@@ -27,6 +27,14 @@ pub struct UnixConfig {
     #[serde(default = "default_sanitize")]
     #[configurable(derived)]
     pub sanitize: bool,
+
+    #[serde(default = "default_convert_timers_to_seconds")]
+    #[configurable(derived)]
+    pub convert_timers_to_seconds: bool,
+}
+
+fn default_convert_timers_to_seconds() -> bool {
+    true
 }
 
 pub fn statsd_unix(
@@ -36,7 +44,7 @@ pub fn statsd_unix(
 ) -> crate::Result<Source> {
     let decoder = Decoder::new(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-        Deserializer::Boxed(Box::new(StatsdDeserializer::unix(config.sanitize))),
+        Deserializer::Boxed(Box::new(StatsdDeserializer::unix(config.sanitize, config.convert_timers_to_seconds))),
     );
 
     build_unix_stream_source(

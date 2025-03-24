@@ -178,7 +178,7 @@ mod tests {
     #[cfg(feature = "sources-statsd")]
     fn parse_encoded_metrics(metric: &[u8]) -> Vec<Metric> {
         use crate::sources::statsd::parser::Parser;
-        let statsd_parser = Parser::new(true);
+        let statsd_parser = Parser::new(true, true);
 
         let s = std::str::from_utf8(metric).unwrap().trim();
         s.split('\n')
