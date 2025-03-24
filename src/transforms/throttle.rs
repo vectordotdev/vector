@@ -45,26 +45,26 @@ pub struct ThrottleConfig {
     /// The number of events allowed for a given bucket per configured `window_secs`.
     ///
     /// Each unique key has its own `threshold`.
-    threshold: u32,
+    pub threshold: u32,
 
     /// The time window in which the configured `threshold` is applied, in seconds.
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     #[configurable(metadata(docs::human_name = "Time Window"))]
-    window_secs: Duration,
+    pub window_secs: Duration,
 
     /// The value to group events into separate buckets to be rate limited independently.
     ///
     /// If left unspecified, or if the event doesn't have `key_field`, then the event is not rate
     /// limited separately.
     #[configurable(metadata(docs::examples = "{{ message }}", docs::examples = "{{ hostname }}",))]
-    key_field: Option<Template>,
+    pub key_field: Option<Template>,
 
     /// A logical condition used to exclude events from sampling.
-    exclude: Option<AnyCondition>,
+    pub exclude: Option<AnyCondition>,
 
     #[configurable(derived)]
     #[serde(default)]
-    internal_metrics: ThrottleInternalMetricsConfig,
+    pub internal_metrics: ThrottleInternalMetricsConfig,
 }
 
 impl_generate_config_from_default!(ThrottleConfig);
