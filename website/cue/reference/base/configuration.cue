@@ -198,7 +198,7 @@ base: configuration: configuration: {
 						required: true
 					}
 				}
-				description:   "Configuration for source functonality."
+				description:   "Configuration for source functionality."
 				required:      false
 				relevant_when: "type = \"memory\""
 			}

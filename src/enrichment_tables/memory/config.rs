@@ -57,7 +57,7 @@ pub struct MemoryConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
-    /// Configuration for source functonality.
+    /// Configuration for source functionality.
     #[configurable(derived)]
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub source_config: Option<MemorySourceConfig>,
