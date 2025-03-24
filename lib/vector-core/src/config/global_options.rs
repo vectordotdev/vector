@@ -246,7 +246,6 @@ impl GlobalOptions {
             (None, Some(b)) => Some(b.clone()),
             (None, None) => None,
         };
-        }
 
         if errors.is_empty() {
             Ok(Self {

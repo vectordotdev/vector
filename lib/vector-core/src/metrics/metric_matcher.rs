@@ -4,7 +4,7 @@ use metrics::Key;
 use regex::Regex;
 
 use crate::config::metrics_expiration::{
-    MetricLabelMatcherConfig, MetricNameMatcherConfig, PerMetricSetExpiration,
+    MetricLabelMatcher, MetricLabelMatcherConfig, MetricNameMatcherConfig, PerMetricSetExpiration,
 };
 
 use super::recency::KeyMatcher;
@@ -16,8 +16,8 @@ pub(super) struct MetricKeyMatcher {
 
 impl KeyMatcher<Key> for MetricKeyMatcher {
     fn matches(&self, key: &Key) -> bool {
-        let name_match = self.name.as_ref().map_or(true, |m| m.matches(key));
-        let labels_match = self.labels.as_ref().map_or(true, |l| l.matches(key));
+        let name_match = self.name.as_ref().is_none_or(|m| m.matches(key));
+        let labels_match = self.labels.as_ref().is_none_or(|l| l.matches(key));
         name_match && labels_match
     }
 }
@@ -96,6 +96,22 @@ impl KeyMatcher<Key> for LabelsMatcher {
     }
 }
 
+impl TryFrom<MetricLabelMatcher> for LabelsMatcher {
+    type Error = super::Error;
+
+    fn try_from(value: MetricLabelMatcher) -> Result<Self, Self::Error> {
+        Ok(match value {
+            MetricLabelMatcher::Exact { key, value } => Self::Exact(key, value),
+            MetricLabelMatcher::Regex { key, value_pattern } => Self::Regex(
+                key,
+                Regex::new(&value_pattern).map_err(|_| super::Error::InvalidRegexPattern {
+                    pattern: value_pattern,
+                })?,
+            ),
+        })
+    }
+}
+
 impl TryFrom<MetricLabelMatcherConfig> for LabelsMatcher {
     type Error = super::Error;
 
@@ -113,13 +129,7 @@ impl TryFrom<MetricLabelMatcherConfig> for LabelsMatcher {
                     .map(TryInto::<LabelsMatcher>::try_into)
                     .collect::<Result<Vec<_>, _>>()?,
             ),
-            MetricLabelMatcherConfig::Exact { key, value } => Self::Exact(key, value),
-            MetricLabelMatcherConfig::Regex { key, value_pattern } => Self::Regex(
-                key,
-                Regex::new(&value_pattern).map_err(|_| super::Error::InvalidRegexPattern {
-                    pattern: value_pattern,
-                })?,
-            ),
+            MetricLabelMatcherConfig::Single { matcher } => matcher.try_into()?,
         })
     }
 }
@@ -420,14 +430,6 @@ mod tests {
                     - type: "regex"
                       key: "component_type"
                       value_pattern: "aws_.*"
-                    - type: "any"
-                      matchers:
-                          - type: "exact"
-                            key: "region"
-                            value: "some_aws_region_name"
-                          - type: "regex"
-                            key: "endpoint"
-                            value_pattern: "test.com.*"
             expire_secs: 1.0
             "#})
         .unwrap();
@@ -444,7 +446,7 @@ mod tests {
             panic!("Expected main label matcher to be an all matcher");
         };
 
-        assert_eq!(3, all_matchers.len());
+        assert_eq!(2, all_matchers.len());
         if let LabelsMatcher::Exact(key, value) = &all_matchers[0] {
             assert_eq!("component_kind", key);
             assert_eq!("sink", value);
@@ -457,22 +459,37 @@ mod tests {
         } else {
             panic!("Expected second label matcher to be a regex matcher");
         }
-        let LabelsMatcher::Any(any_matchers) = &all_matchers[2] else {
-            panic!("Expected third label matcher to be an any matcher");
-        };
+    }
 
-        assert_eq!(2, any_matchers.len());
-        if let LabelsMatcher::Exact(key, value) = &any_matchers[0] {
-            assert_eq!("region", key);
-            assert_eq!("some_aws_region_name", value);
+    #[test]
+    fn parse_simple_single_config_into_matcher() {
+        let config = serde_yaml::from_str::<PerMetricSetExpiration>(indoc! {r#"
+            name:
+                type: "exact"
+                value: "test_metric"
+            labels:
+                type: "single"
+                matcher:
+                  type: "exact"
+                  key: "component_kind"
+                  value: "sink"
+            expire_secs: 1.0
+            "#})
+        .unwrap();
+
+        let matcher: MetricKeyMatcher = config.try_into().unwrap();
+
+        if let Some(MetricNameMatcher::Exact(value)) = matcher.name {
+            assert_eq!("test_metric", value);
         } else {
-            panic!("Expected first label matcher to be an exact matcher");
+            panic!("Expected exact name matcher");
         }
-        if let LabelsMatcher::Regex(key, regex) = &any_matchers[1] {
-            assert_eq!("endpoint", key);
-            assert_eq!("test.com.*", regex.as_str());
+
+        if let Some(LabelsMatcher::Exact(key, value)) = matcher.labels {
+            assert_eq!("component_kind", key);
+            assert_eq!("sink", value);
         } else {
-            panic!("Expected second label matcher to be a regex matcher");
+            panic!("Expected main label matcher to be an exact matcher");
         }
     }
 }

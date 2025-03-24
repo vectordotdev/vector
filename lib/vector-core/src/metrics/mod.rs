@@ -246,7 +246,9 @@ mod tests {
     use super::*;
 
     use crate::{
-        config::metrics_expiration::{MetricLabelMatcherConfig, MetricNameMatcherConfig},
+        config::metrics_expiration::{
+            MetricLabelMatcher, MetricLabelMatcherConfig, MetricNameMatcherConfig,
+        },
         event::MetricKind,
     };
 
@@ -405,9 +407,11 @@ mod tests {
                     },
                     PerMetricSetExpiration {
                         name: None,
-                        labels: Some(MetricLabelMatcherConfig::Exact {
-                            key: "tag".to_string(),
-                            value: "value1".to_string(),
+                        labels: Some(MetricLabelMatcherConfig::Single {
+                            matcher: MetricLabelMatcher::Exact {
+                                key: "tag".to_string(),
+                                value: "value1".to_string(),
+                            },
                         }),
                         expire_secs: IDLE_TIMEOUT * 2.0,
                     },
