@@ -3,12 +3,10 @@ use crate::enrichment_tables::memory::internal_events::{
     MemoryEnrichmentTableRead, MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
 };
 use crate::enrichment_tables::memory::MemoryConfig;
-use crate::internal_events::StreamClosedError;
 use crate::SourceSender;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use chrono::Utc;
 use evmap::shallow_copy::CopyValue;
 use evmap::{self};
 use evmap_derive::ShallowCopy;
@@ -24,13 +22,14 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::BoxStream;
 use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
-use vector_lib::event::{Event, EventMetadata, EventStatus, Finalizable, LogEvent};
+use vector_lib::event::{Event, EventStatus, Finalizable};
 use vector_lib::internal_event::{
-    ByteSize, BytesReceived, BytesSent, CountByteSize, EventsReceived, EventsSent,
-    InternalEventHandle, Output, Protocol,
+    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
 };
 use vector_lib::sink::StreamSink;
 use vrl::value::{KeyString, ObjectMap, Value};
+
+use super::source::MemorySource;
 
 /// Single memory entry containing the value and TTL
 #[derive(Clone, Eq, PartialEq, Hash, ShallowCopy)]
@@ -223,7 +222,6 @@ impl Memory {
             shutdown,
             out,
             log_namespace,
-            dump_batch_size: self.config.dump_batch_size.map(|d| d as usize),
         }
     }
 }
@@ -373,7 +371,7 @@ impl StreamSink<Event> for Memory {
 mod tests {
     use futures::{future::ready, StreamExt};
     use futures_util::stream;
-    use std::time::Duration;
+    use std::{num::NonZeroU64, time::Duration};
     use tokio::time;
 
     use vector_lib::{
@@ -384,7 +382,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        enrichment_tables::memory::internal_events::InternalMetricsConfig,
+        enrichment_tables::memory::{
+            internal_events::InternalMetricsConfig, source::MemorySourceConfig,
+        },
         event::{Event, LogEvent},
         test_util::components::{
             run_and_assert_sink_compliance, run_and_assert_source_compliance, SINK_TAGS,
@@ -860,7 +860,12 @@ mod tests {
     #[tokio::test]
     async fn source_spec_compliance() {
         let mut memory_config = MemoryConfig::default();
-        memory_config.dump_interval = Some(1);
+        memory_config.source_config = Some(MemorySourceConfig {
+            dump_interval: NonZeroU64::try_from(1).unwrap(),
+            dump_batch_size: None,
+            remove_after_dump: false,
+            source_key: "test".to_string(),
+        });
         let memory = memory_config.get_or_build_memory().await;
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 

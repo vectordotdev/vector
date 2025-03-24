@@ -18,6 +18,7 @@ use vrl::value::Kind;
 use crate::config::{EnrichmentTableConfig, SinkConfig, SourceConfig, SourceContext, SourceOutput};
 
 use super::internal_events::InternalMetricsConfig;
+use super::source::MemorySourceConfig;
 
 /// Configuration for the `memory` enrichment table.
 #[configurable_component(enrichment_table("memory"))]
@@ -52,34 +53,14 @@ pub struct MemoryConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
-    /// Interval for dumping all data from the table when used as a source.
-    ///
-    /// By default, no dumps happen and this table can't be used as a source,
-    /// unless a non-zero dump interval is provided
-    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
-    pub dump_interval: Option<u64>,
-    /// Batch size for data dumping. Used to prevent dumping entire table at
-    /// once and blocking the system.
-    ///
-    /// By default, batches are not used and entire table is dumped.
-    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
-    pub dump_batch_size: Option<u64>,
-    /// If set to true, all data will be removed from cache after dumping.
-    /// Only valid if used as a source and dump_interval > 0
-    ///
-    /// By default, dump will not remove data from cache
-    #[serde(default = "crate::serde::default_false")]
-    pub remove_after_dump: bool,
-    /// Key to use for this component when used as a source.
-    ///
-    /// If this table is used as a source, this has to be defined and must be different from the
-    /// component key.
-    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
-    pub source_key: Option<String>,
     /// Configuration of internal metrics
     #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
+    /// Configuration for source functonality.
+    #[configurable(derived)]
+    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
+    pub source_config: Option<MemorySourceConfig>,
 
     #[serde(skip)]
     memory: Arc<Mutex<Option<Box<Memory>>>>,
@@ -103,10 +84,7 @@ impl Default for MemoryConfig {
             memory: Arc::new(Mutex::new(None)),
             max_byte_size: None,
             log_namespace: None,
-            dump_interval: None,
-            dump_batch_size: None,
-            remove_after_dump: false,
-            source_key: None,
+            source_config: None,
             internal_metrics: InternalMetricsConfig::default(),
         }
     }
@@ -146,14 +124,11 @@ impl EnrichmentTableConfig for MemoryConfig {
 
     fn source_config(
         &self,
-        default_key: &ComponentKey,
+        _default_key: &ComponentKey,
     ) -> Option<(ComponentKey, Box<dyn SourceConfig>)> {
-        if self.dump_interval.is_some() {
+        if let Some(source_config) = &self.source_config {
             Some((
-                self.source_key
-                    .clone()
-                    .map(ComponentKey::from)
-                    .unwrap_or(default_key.clone()),
+                source_config.source_key.clone().into(),
                 Box::new(self.clone()),
             ))
         } else {
