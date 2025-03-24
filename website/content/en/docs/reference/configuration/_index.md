@@ -511,8 +511,7 @@ sinks:
 
 #### Using memory enrichment table as a source
 
-Memory enrichment table can also be used as a source, dumping all the data stored in it periodically
-and providing it to downstream components.
+The memory enrichment table can serve as a source by periodically exporting its stored data and making it available to downstream components.
 
 ```yaml
 enrichment_tables:
