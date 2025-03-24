@@ -85,11 +85,14 @@ impl Parser {
                     _ => val,
                 };
                 Metric::new(
-                name, MetricKind::Incremental, MetricValue::Distribution {
-                    samples: vector_lib::samples![final_val => sample_rate as u32],
-                    statistic: convert_to_statistic(unit),
-                },
-            ).with_tags(tags)
+                    name,
+                    MetricKind::Incremental,
+                    MetricValue::Distribution {
+                        samples: vector_lib::samples![final_val => sample_rate as u32],
+                        statistic: convert_to_statistic(unit),
+                    },
+                )
+                .with_tags(tags)
             }
             "g" => {
                 let value = if parts[0]

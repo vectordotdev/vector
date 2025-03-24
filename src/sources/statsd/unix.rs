@@ -44,7 +44,10 @@ pub fn statsd_unix(
 ) -> crate::Result<Source> {
     let decoder = Decoder::new(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-        Deserializer::Boxed(Box::new(StatsdDeserializer::unix(config.sanitize, config.convert_timers_to_seconds))),
+        Deserializer::Boxed(Box::new(StatsdDeserializer::unix(
+            config.sanitize,
+            config.convert_timers_to_seconds,
+        ))),
     );
 
     build_unix_stream_source(
