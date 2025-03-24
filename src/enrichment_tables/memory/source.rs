@@ -27,9 +27,6 @@ use super::{Memory, MemoryConfig};
 #[serde(deny_unknown_fields)]
 pub struct MemorySourceConfig {
     /// Interval for dumping all data from the table when used as a source.
-    ///
-    /// By default, no dumps happen and this table can't be used as a source,
-    /// unless a non-zero dump interval is provided
     pub dump_interval: NonZeroU64,
     /// Batch size for data dumping. Used to prevent dumping entire table at
     /// once and blocking the system.

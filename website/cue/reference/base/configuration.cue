@@ -171,13 +171,8 @@ base: configuration: configuration: {
 					}
 					dump_interval: {
 						type: uint: {}
-						description: """
-														Interval for dumping all data from the table when used as a source.
-
-														By default, no dumps happen and this table can't be used as a source,
-														unless a non-zero dump interval is provided
-														"""
-						required: true
+						description: "Interval for dumping all data from the table when used as a source."
+						required:    true
 					}
 					remove_after_dump: {
 						type: bool: default: false
