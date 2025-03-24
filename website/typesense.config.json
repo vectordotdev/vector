@@ -11,17 +11,6 @@
             "index": true,
             "infix": false,
             "locale": "",
-            "name": ".*",
-            "optional": true,
-            "sort": false,
-            "stem": false,
-            "type": "auto"
-          },
-          {
-            "facet": false,
-            "index": true,
-            "infix": false,
-            "locale": "",
             "name": "content",
             "optional": true,
             "sort": false,

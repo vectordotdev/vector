@@ -1,9 +1,9 @@
 import { typesenseSync } from 'typesense-sync';
-import { saveSettings } from 'typesense-sync/settings';
-import tsConfig from "../typesense.config.json" assert { type: "json" };
+import { saveSettings } from 'typesense-sync';
+import tsConfig from "../typesense.config.json";
 
 const syncCollection = async () => {
-  const promises = []
+  const promises: Promise<any>[] = []
 
   for (const collection of tsConfig.collections) {
     console.log(`Updating collection ${collection.name}`)
