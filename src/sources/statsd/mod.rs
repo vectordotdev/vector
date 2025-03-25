@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     time::Duration,
 };
@@ -7,9 +8,12 @@ use vector_lib::ipallowlist::IpAllowlistConfig;
 use bytes::Bytes;
 use futures::{StreamExt, TryFutureExt};
 use listenfd::ListenFd;
+use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
+use vector_config::schema::{InstanceType, SchemaGenerator, SchemaObject};
+use vector_config::{Configurable, GenerateError, ToValue};
 use vector_lib::codecs::{
     decoding::{self, Deserializer, Framer},
     NewlineDelimitedDecoder,
@@ -63,6 +67,34 @@ pub enum StatsdConfig {
     Unix(UnixConfig),
 }
 
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ConversionUnit {
+    #[default]
+    Seconds,
+    Milliseconds,
+}
+
+impl ToValue for ConversionUnit {
+    fn to_value(&self) -> serde_json::Value {
+        serde_json::Value::String(match self {
+            ConversionUnit::Seconds => "seconds".into(),
+            ConversionUnit::Milliseconds => "milliseconds".into(),
+        })
+    }
+}
+
+impl Configurable for ConversionUnit {
+    fn generate_schema(_gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        let schema = SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            enum_values: Some(vec!["seconds".into(), "milliseconds".into()]),
+            ..Default::default()
+        };
+        Ok(schema)
+    }
+}
+
 /// UDP configuration for the `statsd` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -77,9 +109,9 @@ pub struct UdpConfig {
     #[configurable(derived)]
     sanitize: bool,
 
-    #[serde(default = "default_convert_timers_to_seconds")]
+    #[serde(default = "default_convert_to")]
     #[configurable(derived)]
-    convert_timers_to_seconds: bool,
+    convert_to: ConversionUnit,
 }
 
 impl UdpConfig {
@@ -88,7 +120,7 @@ impl UdpConfig {
             address,
             receive_buffer_bytes: None,
             sanitize: default_sanitize(),
-            convert_timers_to_seconds: default_convert_timers_to_seconds(),
+            convert_to: default_convert_to(),
         }
     }
 }
@@ -133,10 +165,9 @@ pub struct TcpConfig {
     #[configurable(derived)]
     sanitize: bool,
 
-    /// Whether to convert timers to seconds. When "true", timers are converted to seconds.
-    #[serde(default = "default_convert_timers_to_seconds")]
+    #[serde(default = "default_convert_to")]
     #[configurable(derived)]
-    convert_timers_to_seconds: bool,
+    convert_to: ConversionUnit,
 }
 
 impl TcpConfig {
@@ -151,7 +182,7 @@ impl TcpConfig {
             receive_buffer_bytes: None,
             connection_limit: None,
             sanitize: default_sanitize(),
-            convert_timers_to_seconds: default_convert_timers_to_seconds(),
+            convert_to: default_convert_to(),
         }
     }
 }
@@ -164,8 +195,8 @@ const fn default_sanitize() -> bool {
     true
 }
 
-const fn default_convert_timers_to_seconds() -> bool {
-    true
+const fn default_convert_to() -> ConversionUnit {
+    ConversionUnit::Seconds
 }
 
 impl GenerateConfig for StatsdConfig {
@@ -198,7 +229,7 @@ impl SourceConfig for StatsdConfig {
                 let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true)?;
                 let statsd_tcp_source = StatsdTcpSource {
                     sanitize: config.sanitize,
-                    convert_timers_to_seconds: config.convert_timers_to_seconds,
+                    convert_to: config.convert_to,
                 };
 
                 statsd_tcp_source.run(
@@ -248,29 +279,29 @@ pub(crate) struct StatsdDeserializer {
 }
 
 impl StatsdDeserializer {
-    pub fn udp(sanitize: bool, convert_timers_to_seconds: bool) -> Self {
+    pub fn udp(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: Some(SocketMode::Udp),
             // The other modes emit a different `EventsReceived`.
             events_received: Some(register!(EventsReceived)),
-            parser: Parser::new(sanitize, convert_timers_to_seconds),
+            parser: Parser::new(sanitize, convert_to),
         }
     }
 
-    pub const fn tcp(sanitize: bool, convert_timers_to_seconds: bool) -> Self {
+    pub const fn tcp(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: None,
             events_received: None,
-            parser: Parser::new(sanitize, convert_timers_to_seconds),
+            parser: Parser::new(sanitize, convert_to),
         }
     }
 
     #[cfg(unix)]
-    pub const fn unix(sanitize: bool, convert_timers_to_seconds: bool) -> Self {
+    pub const fn unix(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: Some(SocketMode::Unix),
             events_received: None,
-            parser: Parser::new(sanitize, convert_timers_to_seconds),
+            parser: Parser::new(sanitize, convert_to),
         }
     }
 }
@@ -339,7 +370,7 @@ async fn statsd_udp(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
         Deserializer::Boxed(Box::new(StatsdDeserializer::udp(
             config.sanitize,
-            config.convert_timers_to_seconds,
+            config.convert_to,
         ))),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
@@ -366,7 +397,7 @@ async fn statsd_udp(
 #[derive(Clone)]
 struct StatsdTcpSource {
     sanitize: bool,
-    convert_timers_to_seconds: bool,
+    convert_to: ConversionUnit,
 }
 
 impl TcpSource for StatsdTcpSource {
@@ -380,7 +411,7 @@ impl TcpSource for StatsdTcpSource {
             Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
             Deserializer::Boxed(Box::new(StatsdDeserializer::tcp(
                 self.sanitize,
-                self.convert_timers_to_seconds,
+                self.convert_to,
             ))),
         )
     }
@@ -490,7 +521,7 @@ mod test {
             let config = StatsdConfig::Unix(UnixConfig {
                 path: in_path.clone(),
                 sanitize: true,
-                convert_timers_to_seconds: true,
+                convert_to: ConversionUnit::Seconds,
             });
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
@@ -512,7 +543,7 @@ mod test {
     async fn test_statsd_udp_conversion_disabled() {
         let in_addr = next_addr();
         let mut config = UdpConfig::from_address(in_addr.into());
-        config.convert_timers_to_seconds = false;
+        config.convert_to = ConversionUnit::Milliseconds;
         let statsd_config = StatsdConfig::Udp(config);
         let (mut sender, mut receiver) = mpsc::channel(200);
 

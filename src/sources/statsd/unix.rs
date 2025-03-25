@@ -6,7 +6,7 @@ use vector_lib::codecs::{
 };
 use vector_lib::configurable::configurable_component;
 
-use super::{default_sanitize, StatsdDeserializer};
+use super::{default_convert_to, default_sanitize, ConversionUnit, StatsdDeserializer};
 use crate::{
     codecs::Decoder,
     shutdown::ShutdownSignal,
@@ -28,13 +28,9 @@ pub struct UnixConfig {
     #[configurable(derived)]
     pub sanitize: bool,
 
-    #[serde(default = "default_convert_timers_to_seconds")]
+    #[serde(default = "default_convert_to")]
     #[configurable(derived)]
-    pub convert_timers_to_seconds: bool,
-}
-
-const fn default_convert_timers_to_seconds() -> bool {
-    true
+    pub convert_to: ConversionUnit,
 }
 
 pub fn statsd_unix(
@@ -46,7 +42,7 @@ pub fn statsd_unix(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
         Deserializer::Boxed(Box::new(StatsdDeserializer::unix(
             config.sanitize,
-            config.convert_timers_to_seconds,
+            config.convert_to,
         ))),
     );
 

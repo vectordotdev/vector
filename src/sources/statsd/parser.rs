@@ -9,6 +9,7 @@ use regex::Regex;
 
 use crate::{
     event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+    sources::statsd::ConversionUnit,
     sources::util::extract_tag_key_and_value,
 };
 
@@ -18,14 +19,14 @@ static NONALPHANUM: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^a-zA-Z_\-0
 #[derive(Clone)]
 pub struct Parser {
     sanitize: bool,
-    convert_timers: bool,
+    convert_to: ConversionUnit,
 }
 
 impl Parser {
-    pub const fn new(sanitize_keys: bool, convert_timers: bool) -> Self {
+    pub const fn new(sanitize_keys: bool, convert_to: ConversionUnit) -> Self {
         Self {
             sanitize: sanitize_keys,
-            convert_timers,
+            convert_to,
         }
     }
 
@@ -80,15 +81,18 @@ impl Parser {
             }
             unit @ "h" | unit @ "ms" | unit @ "d" => {
                 let val: f64 = parts[0].parse()?;
-                let final_val = match unit {
-                    "ms" if self.convert_timers => val / 1000.0,
+                let converted_val = match unit {
+                    "ms" => match self.convert_to {
+                        ConversionUnit::Seconds => val / 1000.0,
+                        ConversionUnit::Milliseconds => val,
+                    },
                     _ => val,
                 };
                 Metric::new(
                     name,
                     MetricKind::Incremental,
                     MetricValue::Distribution {
-                        samples: vector_lib::samples![final_val => sample_rate as u32],
+                        samples: vector_lib::samples![converted_val => sample_rate as u32],
                         statistic: convert_to_statistic(unit),
                     },
                 )
@@ -239,18 +243,19 @@ mod test {
 
     use super::{sanitize_key, sanitize_sampling, ParseError, Parser};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use crate::sources::statsd::ConversionUnit;
 
-    const SANITIZING_PARSER: Parser = Parser::new(true, true);
+    const SANITIZING_PARSER: Parser = Parser::new(true, ConversionUnit::Seconds);
     fn parse(packet: &str) -> Result<Metric, ParseError> {
         SANITIZING_PARSER.parse(packet)
     }
 
-    const NON_CONVERTING_PARSER: Parser = Parser::new(true, false);
+    const NON_CONVERTING_PARSER: Parser = Parser::new(true, ConversionUnit::Milliseconds);
     fn parse_non_converting(packet: &str) -> Result<Metric, ParseError> {
         NON_CONVERTING_PARSER.parse(packet)
     }
 
-    const NON_SANITIZING_PARSER: Parser = Parser::new(false, true);
+    const NON_SANITIZING_PARSER: Parser = Parser::new(false, ConversionUnit::Seconds);
     fn unsanitized_parse(packet: &str) -> Result<Metric, ParseError> {
         NON_SANITIZING_PARSER.parse(packet)
     }
