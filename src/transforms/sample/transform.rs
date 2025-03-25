@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{fmt, collections::HashMap};
 use vector_lib::config::LegacyKey;
 
 use crate::{
@@ -12,15 +12,44 @@ use crate::{
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::lookup::OwnedTargetPath;
 
+/// Exists only for backwards compatability purposes so that the value of sample_rate_key is
+/// consistent after the internal implementation of the Sample class was modified to work in terms
+/// of percentages
+#[derive(Clone, Copy, Debug)]
+pub enum SampleRate {
+    OneOverN(u64),
+    Percentage(f32),
+}
+
+impl SampleRate {
+    pub fn pct(&self) -> f32 {
+        match self {
+            // Potential precision loss if user had a very large number in old rate implementation
+            Self::OneOverN(integer_rate) => 1.0 / (*integer_rate as f32),
+            Self::Percentage(percent_rate) => *percent_rate,
+        }
+    }
+}
+impl fmt::Display for SampleRate {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Avoids the print of an additional '.0' which was not performed in the previous
+        // implementation
+        match self {
+            Self::OneOverN(integer_rate) => write!(f, "{}", integer_rate),
+            Self::Percentage(percent_rate) => write!(f, "{}", percent_rate),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Sample {
     name: String,
-    rate: u64,
+    rate: SampleRate,
     key_field: Option<String>,
     group_by: Option<Template>,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
-    counter: HashMap<Option<String>, u64>,
+    counter: HashMap<Option<String>, f32>,
 }
 
 impl Sample {
@@ -29,7 +58,7 @@ impl Sample {
     #![allow(dead_code)]
     pub fn new(
         name: String,
-        rate: u64,
+        rate: SampleRate,
         key_field: Option<String>,
         group_by: Option<Template>,
         exclude: Option<Condition>,
@@ -104,19 +133,29 @@ impl FunctionTransform for Sample {
             Event::Metric(_) => panic!("component can never receive metric events"),
         });
 
-        let counter_value: u64 = *self.counter.entry(group_by_key.clone()).or_default();
-
-        let num = if let Some(value) = value {
-            seahash::hash(value.as_bytes())
-        } else {
-            counter_value
-        };
+        let counter_value: f32 = *self
+            .counter
+            .entry(group_by_key.clone())
+            .or_insert(self.rate.pct());
 
         // reset counter for particular key, or default key if group_by option isn't provided
-        let increment: u64 = (counter_value + 1) % self.rate;
-        self.counter.insert(group_by_key.clone(), increment);
+        let increment: f32 = counter_value + self.rate.pct();
+        self.counter.insert(
+            group_by_key.clone(),
+            if increment >= 1.0 {
+                increment - 1.0
+            } else {
+                increment
+            },
+        );
 
-        if num % self.rate == 0 {
+        let should_process = if let Some(value) = value {
+            (seahash::hash(value.as_bytes()) % 100) as f32 <= (self.rate.pct() * 100.0)
+        } else {
+            increment >= 1.0
+        };
+
+        if should_process {
             if let Some(path) = &self.sample_rate_key.path {
                 match event {
                     Event::Log(ref mut event) => {

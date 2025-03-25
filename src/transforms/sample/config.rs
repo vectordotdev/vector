@@ -14,7 +14,7 @@ use crate::{
     transforms::Transform,
 };
 
-use super::transform::Sample;
+use super::transform::{Sample, SampleRate};
 
 /// Configuration for the `sample` transform.
 #[configurable_component(transform(
@@ -29,7 +29,16 @@ pub struct SampleConfig {
     /// For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
     /// dropped.
     #[configurable(metadata(docs::examples = 1500))]
-    pub rate: u64,
+    #[configurable(deprecated = "This option will be deprecated, prefer percent_rate instead")]
+    pub rate: Option<u64>,
+
+    /// The rate at which events are forwarded, expressed as a percentage
+    ///
+    /// For example, `ratio = .13` means that 13% out of all events on the stream are forwarded and
+    /// the rest are dropped.
+    #[configurable(metadata(docs::examples = "0.13"))]
+    #[configurable(validation(range(min = 0.0, max = 1.0)))]
+    pub percent_rate: f32,
 
     /// The name of the field whose value is hashed to determine if the event should be
     /// sampled.
@@ -67,7 +76,8 @@ pub struct SampleConfig {
 impl GenerateConfig for SampleConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            rate: 10,
+            rate: None,
+            percent_rate: 0.1,
             key_field: None,
             group_by: None,
             exclude: None::<AnyCondition>,
@@ -81,9 +91,14 @@ impl GenerateConfig for SampleConfig {
 #[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        let sample_rate = if let Some(old_rate) = self.rate {
+            SampleRate::OneOverN(old_rate)
+        } else {
+            SampleRate::Percentage(self.percent_rate)
+        };
         Ok(Transform::function(Sample::new(
             Self::NAME.to_string(),
-            self.rate,
+            sample_rate,
             self.key_field.clone(),
             self.group_by.clone(),
             self.exclude
