@@ -21,6 +21,9 @@ pub struct SourceComponent;
 // A transform component.
 pub struct TransformComponent;
 
+// A schema component.
+pub struct SchemaComponent;
+
 // Marker trait representing a component.
 pub trait ComponentMarker: sealed::Sealed {}
 
@@ -32,6 +35,7 @@ impl ComponentMarker for SecretsComponent {}
 impl ComponentMarker for SinkComponent {}
 impl ComponentMarker for SourceComponent {}
 impl ComponentMarker for TransformComponent {}
+impl ComponentMarker for SchemaComponent {}
 
 mod sealed {
     pub trait Sealed {}
@@ -44,4 +48,5 @@ mod sealed {
     impl Sealed for super::SinkComponent {}
     impl Sealed for super::SourceComponent {}
     impl Sealed for super::TransformComponent {}
+    impl Sealed for super::SchemaComponent {}
 }

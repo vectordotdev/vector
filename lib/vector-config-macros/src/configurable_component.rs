@@ -103,6 +103,9 @@ impl TypedComponent {
                 ComponentType::Transform => {
                     parse_quote! { ::vector_config::component::TransformDescription }
                 }
+                ComponentType::Schema => {
+                    parse_quote! { ::vector_config::component::SchemaDescription }
+                }
             };
 
             // Derive the human-friendly name from the component name.
@@ -233,7 +236,7 @@ impl FromMeta for Options {
                 }
 
                 NestedMeta::Meta(m) => {
-                    let error = "expected one of: `enrichment_table(\"...\")`, `provider(\"...\")`, `source(\"...\")`, `transform(\"...\")`, `secrets(\"...\")`, `sink(\"...\")`, `no_ser`, or `no_deser`";
+                    let error = "expected one of: `enrichment_table(\"...\")`, `provider(\"...\")`, `source(\"...\")`, `transform(\"...\")`, `secrets(\"...\")`, `sink(\"...\")`, `schema(\"...\")`, `no_ser`, or `no_deser`";
                     errors.push(Error::custom(error).with_span(m));
                 }
 
@@ -361,6 +364,7 @@ fn get_named_component_helper_ident(component_type: ComponentType) -> Ident {
         ComponentType::Sink => attrs::SINK_COMPONENT,
         ComponentType::Source => attrs::SOURCE_COMPONENT,
         ComponentType::Transform => attrs::TRANSFORM_COMPONENT,
+        ComponentType::Schema => attrs::SCHEMA_COMPONENT
     };
 
     attr.as_ident(Span::call_site())

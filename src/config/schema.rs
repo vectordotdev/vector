@@ -4,21 +4,25 @@ use vector_lib::configurable::configurable_component;
 pub(crate) use crate::schema::Definition;
 
 /// Schema options.
-#[configurable_component]
+#[configurable_component(schema("schema"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
-    /// Whether or not schema is enabled.
+    /// Whether schema is enabled.
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
-    /// Whether or not schema validation is enabled.
+    /// Whether schema validation is enabled.
     #[serde(default = "default_validation")]
     pub validation: bool,
 
-    /// Whether or not to enable log namespacing.
+    /// Whether to enable log namespacing.
+    /// Known issues:
+    ///  - Enabling log namespacing doesn't work when disk buffers are used (see [#18574](https://github.com/vectordotdev/vector/issues/18574))
     pub log_namespace: Option<bool>,
 }
+
+impl_generate_config_from_default!(Options);
 
 impl Options {
     /// Gets the value of the globally configured log namespace, or the default if it wasn't set.

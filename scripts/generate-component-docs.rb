@@ -1755,6 +1755,22 @@ def render_and_import_base_global_option_schema(root_schema, global_options)
   )
 end
 
+def render_and_import_schema_options_schema(root_schema, apis)
+  api_schema = {}
+  apis.each do |component_name, schema_name|
+    friendly_name = "'#{component_name}' #{schema_name} configuration"
+    resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
+    api_schema[component_name] = resolved_schema
+  end
+
+  render_and_import_schema(
+    api_schema,
+    "configuration",
+    ["base", "schema"],
+    "base/schema.cue"
+  )
+end
+
 if ARGV.empty?
   puts 'usage: extract-component-schema.rb <configuration schema path>'
   exit 1

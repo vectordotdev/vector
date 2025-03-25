@@ -20,6 +20,7 @@ pub const SECRETS_COMPONENT: AttributeIdent = AttributeIdent("secrets_component"
 pub const SINK_COMPONENT: AttributeIdent = AttributeIdent("sink_component");
 pub const SOURCE_COMPONENT: AttributeIdent = AttributeIdent("source_component");
 pub const TRANSFORM_COMPONENT: AttributeIdent = AttributeIdent("transform_component");
+pub const SCHEMA_COMPONENT: AttributeIdent = AttributeIdent("schema_component");
 
 impl PartialEq<AttributeIdent> for Ident {
     fn eq(&self, word: &AttributeIdent) -> bool {
