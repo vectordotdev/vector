@@ -419,7 +419,7 @@ impl IngestorProcess {
             .unwrap_or_default();
 
         let mut delete_entries = Vec::new();
-        let mut retry_entries = Vec::new();
+        let mut deferred_entries = Vec::new();
         for message in messages {
             let receipt_handle = match message.receipt_handle {
                 None => {
@@ -470,7 +470,7 @@ impl IngestorProcess {
                                     deferred_queue = deferred_queue,
                                 );
 
-                                retry_entries.push(
+                                deferred_entries.push(
                                     SendMessageBatchRequestEntry::builder()
                                         .id(message_id.clone())
                                         .message_body(message.body.unwrap_or_default())
@@ -505,6 +505,31 @@ impl IngestorProcess {
             }
         }
 
+        // Should consider removing failed deferrals from the delete_entries
+        if !deferred_entries.is_empty() {
+            let cloned_entries = deferred_entries.clone();
+            match self.send_messages(deferred_entries).await {
+                Ok(result) => {
+                    if !result.successful.is_empty() {
+                        emit!(SqsMessageSentSucceeded {
+                            message_ids: result.successful,
+                        })
+                    }
+
+                    if !result.failed.is_empty() {
+                        emit!(SqsMessageSentPartialError {
+                            entries: result.failed
+                        })
+                    }
+                }
+                Err(err) => {
+                    emit!(SqsMessageSendBatchError {
+                        entries: cloned_entries,
+                        error: err,
+                    });
+                }
+            }
+        }
         if !delete_entries.is_empty() {
             // We need these for a correct error message if the batch fails overall.
             let cloned_entries = delete_entries.clone();
@@ -527,31 +552,6 @@ impl IngestorProcess {
                 Err(err) => {
                     emit!(SqsMessageDeleteBatchError {
                         entries: cloned_entries,
-                        error: err,
-                    });
-                }
-            }
-        }
-
-        if !retry_entries.is_empty() {
-            let cloned_entries = retry_entries.clone();
-            match self.send_messages(cloned_entries).await {
-                Ok(result) => {
-                    if !result.successful.is_empty() {
-                        emit!(SqsMessageSentSucceeded {
-                            message_ids: result.successful,
-                        })
-                    }
-
-                    if !result.failed.is_empty() {
-                        emit!(SqsMessageSentPartialError {
-                            entries: result.failed
-                        })
-                    }
-                }
-                Err(err) => {
-                    emit!(SqsMessageSendBatchError {
-                        entries: retry_entries,
                         error: err,
                     });
                 }
