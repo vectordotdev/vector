@@ -1,5 +1,4 @@
 use std::fmt;
-use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 
 use super::{LogEvent, ObjectMap, Value};
@@ -160,13 +159,17 @@ fn hash_null<H: Hasher>(hasher: &mut H) {
     hasher.write_u8(0);
 }
 
-impl Display for Discriminant {
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+impl fmt::Display for Discriminant {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         for (i, value) in self.values.iter().enumerate() {
             if i != 0 {
                 write!(fmt, "-")?;
             }
-            write!(fmt, "{}", value.as_ref().map_or("none".to_string(), ToString::to_string))?
+            if let Some(value) = value {
+                value.fmt(fmt)?;
+            } else {
+                fmt.write_str("none")?;
+            }
         }
         Ok(())
     }
