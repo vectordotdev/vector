@@ -1,4 +1,4 @@
-use std::{fmt, collections::HashMap};
+use std::{collections::HashMap, fmt};
 use vector_lib::config::LegacyKey;
 
 use crate::{
@@ -15,28 +15,62 @@ use vector_lib::lookup::OwnedTargetPath;
 /// Exists only for backwards compatability purposes so that the value of sample_rate_key is
 /// consistent after the internal implementation of the Sample class was modified to work in terms
 /// of percentages
-#[derive(Clone, Copy, Debug)]
-pub enum SampleRate {
-    OneOverN(u64),
-    Percentage(f32),
+#[derive(Clone, Debug)]
+pub enum SampleMode {
+    Rate(u64, HashMap<Option<String>, u64>),
+    Ratio(f64, HashMap<Option<String>, f64>),
 }
 
-impl SampleRate {
-    pub fn pct(&self) -> f32 {
+impl SampleMode {
+    pub fn new_rate(rate: u64) -> Self {
+        Self::Rate(rate, HashMap::default())
+    }
+
+    pub fn new_ratio(ratio: f64) -> Self {
+        Self::Ratio(ratio, HashMap::default())
+    }
+
+    fn increment(&mut self, key: &Option<String>) -> bool {
         match self {
-            // Potential precision loss if user had a very large number in old rate implementation
-            Self::OneOverN(integer_rate) => 1.0 / (*integer_rate as f32),
-            Self::Percentage(percent_rate) => *percent_rate,
+            Self::Rate(rate, counter) => {
+                let counter_value = counter.entry(key.clone()).or_default();
+                let increment: u64 = *counter_value + 1;
+                *counter_value = increment;
+                increment % *rate == 0
+            }
+            Self::Ratio(ratio, counter) => {
+                let counter_value = counter.entry(key.clone()).or_insert(*ratio);
+                let increment: f64 = *counter_value + *ratio;
+                *counter_value = if increment >= 1.0 {
+                    increment - 1.0
+                } else {
+                    increment
+                };
+                increment >= 1.0
+            }
+        }
+    }
+
+    fn hash_within_ratio(&self, value: &[u8]) -> bool {
+        let hash = seahash::hash(value);
+        match self {
+            Self::Rate(rate, _) => hash % rate == 0,
+            Self::Ratio(ratio, _) => {
+                // Assuming an even distribution of values, process the event if the value of its hash %
+                // 100, is within the allowable configured ratio
+                (hash % 100) as f64 <= (ratio * 100.0)
+            }
         }
     }
 }
-impl fmt::Display for SampleRate {
+
+impl fmt::Display for SampleMode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Avoids the print of an additional '.0' which was not performed in the previous
         // implementation
         match self {
-            Self::OneOverN(integer_rate) => write!(f, "{}", integer_rate),
-            Self::Percentage(percent_rate) => write!(f, "{}", percent_rate),
+            Self::Rate(integer_rate, _) => write!(f, "{integer_rate}"),
+            Self::Ratio(percent_rate, _) => write!(f, "{percent_rate}"),
         }
     }
 }
@@ -44,12 +78,11 @@ impl fmt::Display for SampleRate {
 #[derive(Clone)]
 pub struct Sample {
     name: String,
-    rate: SampleRate,
+    rate: SampleMode,
     key_field: Option<String>,
     group_by: Option<Template>,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
-    counter: HashMap<Option<String>, f32>,
 }
 
 impl Sample {
@@ -58,7 +91,7 @@ impl Sample {
     #![allow(dead_code)]
     pub fn new(
         name: String,
-        rate: SampleRate,
+        rate: SampleMode,
         key_field: Option<String>,
         group_by: Option<Template>,
         exclude: Option<Condition>,
@@ -71,7 +104,13 @@ impl Sample {
             group_by,
             exclude,
             sample_rate_key,
-            counter: HashMap::new(),
+        }
+    }
+
+    pub fn ratio(&self) -> f64 {
+        match self.rate {
+            SampleMode::Rate(rate, _) => 1.0f64 / rate as f64,
+            SampleMode::Ratio(ratio, _) => ratio,
         }
     }
 }
@@ -133,26 +172,11 @@ impl FunctionTransform for Sample {
             Event::Metric(_) => panic!("component can never receive metric events"),
         });
 
-        let counter_value: f32 = *self
-            .counter
-            .entry(group_by_key.clone())
-            .or_insert(self.rate.pct());
-
-        // reset counter for particular key, or default key if group_by option isn't provided
-        let increment: f32 = counter_value + self.rate.pct();
-        self.counter.insert(
-            group_by_key.clone(),
-            if increment >= 1.0 {
-                increment - 1.0
-            } else {
-                increment
-            },
-        );
-
+        let threshold_exceeded = self.rate.increment(&group_by_key);
         let should_process = if let Some(value) = value {
-            (seahash::hash(value.as_bytes()) % 100) as f32 <= (self.rate.pct() * 100.0)
+            self.rate.hash_within_ratio(value.as_bytes())
         } else {
-            increment >= 1.0
+            threshold_exceeded
         };
 
         if should_process {
