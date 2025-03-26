@@ -1,5 +1,6 @@
 //! Service implementation for the `Clickhouse` sink.
 
+use super::config::ClickHouseQuerySettingsConfig;
 use super::sink::PartitionKey;
 use crate::{
     http::{Auth, HttpError},
@@ -67,6 +68,7 @@ pub(super) struct ClickhouseServiceRequestBuilder {
     pub(super) date_time_best_effort: bool,
     pub(super) insert_random_shard: bool,
     pub(super) compression: Compression,
+    pub(super) query_settings: ClickHouseQuerySettingsConfig,
 }
 
 impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
@@ -84,6 +86,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             self.skip_unknown_fields,
             self.date_time_best_effort,
             self.insert_random_shard,
+            self.query_settings,
         )?;
 
         let auth: Option<Auth> = self.auth.clone();
@@ -115,6 +118,7 @@ fn set_uri_query(
     skip_unknown: Option<bool>,
     date_time_best_effort: bool,
     insert_random_shard: bool,
+    query_settings: ClickHouseQuerySettingsConfig,
 ) -> crate::Result<Uri> {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
@@ -148,6 +152,50 @@ fn set_uri_query(
     if insert_random_shard {
         uri.push_str("insert_distributed_one_random_shard=1&")
     }
+    if let Some(async_insert) = query_settings.async_insert {
+        if async_insert {
+            uri.push_str("async_insert=1&");
+        } else {
+            uri.push_str("async_insert=0&")
+        }
+    }
+    if let Some(wait_for_async_insert) = query_settings.wait_for_async_insert {
+        if wait_for_async_insert {
+            uri.push_str("wait_for_async_insert=1&");
+        } else {
+            uri.push_str("wait_for_async_insert=0&")
+        }
+    }
+    if let Some(wait_for_async_insert_timeout) = query_settings.wait_for_async_insert_timeout {
+        uri.push_str(
+            format!(
+                "wait_for_async_insert_timeout={}&",
+                wait_for_async_insert_timeout,
+            )
+            .as_str(),
+        );
+    }
+    if let Some(async_insert_deduplicate) = query_settings.async_insert_deduplicate {
+        if async_insert_deduplicate {
+            uri.push_str("async_insert_deduplicate=1&");
+        } else {
+            uri.push_str("async_insert_deduplicate=0&")
+        }
+    }
+    if let Some(async_insert_max_data_size) = query_settings.async_insert_max_data_size {
+        uri.push_str(
+            format!("async_insert_max_data_size={}&", async_insert_max_data_size,).as_str(),
+        );
+    }
+    if let Some(async_insert_max_query_number) = query_settings.async_insert_max_query_number {
+        uri.push_str(
+            format!(
+                "async_insert_max_query_number={}&",
+                async_insert_max_query_number,
+            )
+            .as_str(),
+        );
+    }
     uri.push_str(query.as_str());
 
     uri.parse::<Uri>()
@@ -169,6 +217,7 @@ mod tests {
             Some(false),
             true,
             false,
+            ClickHouseQuerySettingsConfig::default(),
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
@@ -185,6 +234,7 @@ mod tests {
             Some(false),
             false,
             false,
+            ClickHouseQuerySettingsConfig::default(),
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
@@ -200,6 +250,7 @@ mod tests {
             Some(true),
             true,
             false,
+            ClickHouseQuerySettingsConfig::default(),
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
@@ -216,11 +267,36 @@ mod tests {
             None,
             true,
             false,
+            ClickHouseQuerySettingsConfig::default(),
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      date_time_input_format=best_effort&\
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject");
+
+        let uri = set_uri_query(
+            &"http://localhost:80".parse().unwrap(),
+            "my_database",
+            "my_\"table\"",
+            Format::JsonAsObject,
+            None,
+            true,
+            false,
+            ClickHouseQuerySettingsConfig {
+                async_insert: Some(true),
+                wait_for_async_insert: Some(true),
+                wait_for_async_insert_timeout: Some(500),
+                ..ClickHouseQuerySettingsConfig::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(uri.to_string(), "http://localhost:80/?\
+                                     input_format_import_nested_json=1&\
+                                     date_time_input_format=best_effort&\
+                                     async_insert=1&\
+                                     wait_for_async_insert=1&\
+                                     wait_for_async_insert_timeout=500&\
                                      query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject");
     }
 
@@ -234,6 +310,7 @@ mod tests {
             Some(false),
             false,
             false,
+            ClickHouseQuerySettingsConfig::default(),
         )
         .unwrap_err();
     }
