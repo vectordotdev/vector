@@ -30,7 +30,7 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
 
 impl<C, I> Throttle<C, I>
 where
-    C: clock::Clock<Instant = I> + Send + Sync + 'static + Clone,
+    C: clock::Clock<Instant = I> + Clone + Send + Sync + 'static,
     I: clock::Reference,
 {
     pub fn new(
@@ -85,7 +85,7 @@ where
 
 impl<C, I> TaskTransform<Event> for Throttle<C, I>
 where
-    C: clock::Clock<Instant = I> + Send + Sync + 'static + Clone,
+    C: clock::Clock<Instant = I> + Clone + Send + Sync + 'static,
     I: clock::Reference + Send + 'static,
 {
     fn transform(
