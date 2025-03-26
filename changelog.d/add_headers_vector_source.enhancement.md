@@ -1,3 +1,3 @@
-Add option to add https headers to vector source's event logs
+Add `headers` option to the `vector` source config. Use this setting to provide custom headers.
 
 authors: anil-db
