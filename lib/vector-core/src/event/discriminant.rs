@@ -162,17 +162,13 @@ fn hash_null<H: Hasher>(hasher: &mut H) {
 
 impl Display for Discriminant {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        fmt.write_str(
-            &self
-                .values
-                .iter()
-                .map(|x| {
-                    x.as_ref()
-                        .map_or("none".to_string(), std::string::ToString::to_string)
-                })
-                .collect::<Vec<String>>()
-                .join("-"),
-        )
+        for (i, value) in self.values.iter().enumerate() {
+            if i != 0 {
+                write!(fmt, "-")?;
+            }
+            write!(fmt, "{}", value.as_ref().map_or("none".to_string(), std::string::ToString::to_string))?
+        }
+        Ok(())
     }
 }
 
