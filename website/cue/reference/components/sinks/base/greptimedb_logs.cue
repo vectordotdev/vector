@@ -147,8 +147,11 @@ base: components: sinks: greptimedb_logs: configuration: {
 		type: string: examples: ["http://localhost:4000"]
 	}
 	extra_headers: {
-		description: "Custom headers to add to the HTTP request sent to GreptimeDB."
-		required:    false
+		description: """
+			Custom headers to add to the HTTP request sent to GreptimeDB.
+			Note that those headers will override the existing headers.
+			"""
+		required: false
 		type: object: {
 			examples: [{}]
 			options: "*": {

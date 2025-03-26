@@ -101,6 +101,7 @@ pub struct GreptimeDBLogsConfig {
     pub extra_params: Option<HashMap<String, String>>,
 
     /// Custom headers to add to the HTTP request sent to GreptimeDB.
+    /// Note that those headers will override the existing headers.
     #[serde(default)]
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
