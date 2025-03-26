@@ -778,3 +778,91 @@ sinks:
 
 Now that we have a final configuration, we can also write
 [Vector configuration unit tests]({{< ref "/docs/reference/configuration/unit-tests/" >}}).
+
+### Visualizing and querying internal metrics
+
+#### Datadog Metrics
+
+It is surprisingly simple to integrate Vector with the [Datadog Metrics Explorer](https://docs.datadoghq.com/metrics/explorer/).
+
+Step 1: Append the following to your config.
+
+```yaml
+sinks:
+  sink_2:
+    datadog_metrics:
+      type: datadog_metrics
+      inputs: ["internal_metrics"]
+      api_key: "${DATADOG_API_KEY}"
+```
+
+Step 2: Navigate to the Datadog metrics explorer.
+
+* https://app.datadoghq.com/metric/explorer
+* Use the UI to search for Vector metrics.
+  * Sample query: `sum:vector.component_sent_event_bytes_total{host:foo}.as_count()`
+* Tip: If you are investigating an issue, you can create a [notebook](https://app.datadoghq.com/notebook/list)
+with and add multiple queries for a bird's-eye view of the system.
+
+#### Prometheus and Grafana
+
+Step 1: Append the following to your config.
+
+```yaml
+sinks:
+  sink_2:
+    type: prometheus_exporter
+    inputs:
+      - internal_metrics
+    address: 0.0.0.0:9598
+```
+
+Step 2: Run Vector however you prefer locally, or in Docker.
+
+```shell
+docker run -d \
+  --name vector \
+  -v /path/to/vector.yaml:/etc/vector/vector.yaml \
+  -p 9598:9598 \
+  timberio/vector:0.45.0-debian
+```
+
+
+Step 3: Create a Prometheus configuration.
+
+```yaml
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "vector"
+    static_configs:
+      - targets: ["vector:9598"]
+```
+
+Step 4: Run a Prometheus instance.
+
+```shell
+docker run -d \
+  --name prometheus \
+  -v /path/to/prometheus.yml:/etc/prometheus/prometheus.yml \
+  -p 9090:9090 \
+  prom/prometheus:latest
+```
+
+Step 5: Setup [Grafana](https://grafana.com/) for visualization.
+
+```shell
+docker run -d \
+  --name grafana \
+  -p 3000:3000 \
+  grafana/grafana:latest
+```
+
+Now login to Grafana with username `admin` and password `admin` and add Prometheus as a datasource:
+http://localhost:3000/connections/datasources/.
+
+Using `host.docker.internal` is recommended for local Docker setups. So you can specify
+http://host.docker.internal:9090 for the connection URL.
+
+If you are having trouble with this step, please [read this guide](https://grafana.com/docs/grafana/latest/getting-started/get-started-grafana-prometheus/).
