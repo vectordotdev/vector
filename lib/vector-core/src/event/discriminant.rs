@@ -166,7 +166,7 @@ impl Display for Discriminant {
             if i != 0 {
                 write!(fmt, "-")?;
             }
-            write!(fmt, "{}", value.as_ref().map_or("none".to_string(), std::string::ToString::to_string))?
+            write!(fmt, "{}", value.as_ref().map_or("none".to_string(), ToString::to_string))?
         }
         Ok(())
     }
