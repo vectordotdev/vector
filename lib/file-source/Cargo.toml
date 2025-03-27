@@ -38,7 +38,7 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "2.7.1"
+version = "2.8.0"
 default-features = false
 features = ["serde"]
 
@@ -68,7 +68,7 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.44.0"
+version = "1.44.1"
 default-features = false
 features = ["full"]
 
