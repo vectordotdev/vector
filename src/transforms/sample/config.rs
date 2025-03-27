@@ -56,7 +56,7 @@ pub struct SampleConfig {
     /// the rest are dropped. This differs from `rate` allowing the configuration of a higher
     /// precion value and also the ability to retain values of greater then 50% of all events. It is
     /// an error to provide a value for both `rate` and `ratio`.
-    #[configurable(metadata(docs::examples = "0.13"))]
+    #[configurable(metadata(docs::examples = 0.13))]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub ratio: Option<f64>,
 

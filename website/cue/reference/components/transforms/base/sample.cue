@@ -60,7 +60,7 @@ base: components: transforms: sample: configuration: {
 			"""
 		required: false
 		type: float: examples: [
-			"0.13",
+			0.13,
 		]
 	}
 	sample_rate_key: {
