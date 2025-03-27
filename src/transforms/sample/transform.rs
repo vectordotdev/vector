@@ -89,7 +89,7 @@ impl Sample {
     // This function is dead code when the feature flag `transforms-impl-sample` is specified but not
     // `transforms-sample`.
     #![allow(dead_code)]
-    pub fn new(
+    pub const fn new(
         name: String,
         rate: SampleMode,
         key_field: Option<String>,
