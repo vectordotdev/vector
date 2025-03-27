@@ -46,7 +46,7 @@ pub struct SampleConfig {
     ///
     /// For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
     /// dropped. This differs from `ratio` which allows more precise control over the number of events
-    /// retained and values greater then 1/2. It is an error to provide a value for both `rate` and `ratio`.
+    /// retained and values greater than 1/2. It is an error to provide a value for both `rate` and `ratio`.
     #[configurable(metadata(docs::examples = 1500))]
     pub rate: Option<u64>,
 
@@ -54,7 +54,7 @@ pub struct SampleConfig {
     ///
     /// For example, `ratio = .13` means that 13% out of all events on the stream are forwarded and
     /// the rest are dropped. This differs from `rate` allowing the configuration of a higher
-    /// precion value and also the ability to retain values of greater then 50% of all events. It is
+    /// precision value and also the ability to retain values of greater than 50% of all events. It is
     /// an error to provide a value for both `rate` and `ratio`.
     #[configurable(metadata(docs::examples = 0.13))]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
