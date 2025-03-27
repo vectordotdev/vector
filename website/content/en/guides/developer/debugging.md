@@ -685,7 +685,7 @@ Our downstream server has a strict limit on the maximum payload size. Payloads l
 Also, assume Vector sets the maximum batch size to 10MB.
 
 {{< info >}}
-Always refer to the docs for as the source of truth for this value.
+Always refer to the docs as the source of truth for this value.
 {{< /info >}}
 
 ```text
