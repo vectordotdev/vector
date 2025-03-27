@@ -17,6 +17,23 @@ use crate::{
 
 use super::transform::{Sample, SampleMode};
 
+#[derive(Debug, Snafu)]
+pub enum SampleError {
+    // Errors from `determine_sample_mode`
+    #[snafu(display(
+        "Only positive, non-zero numbers are allowed values for `ratio`, value: {ratio}"
+    ))]
+    InvalidRatio { ratio: f64 },
+
+    #[snafu(display("Only non-zero numbers are allowed values for `rate`"))]
+    InvalidRate,
+
+    #[snafu(display(
+        "Exactly one value must be provided for either 'rate' or 'ratio', but not both"
+    ))]
+    InvalidConfiguration,
+}
+
 /// Configuration for the `sample` transform.
 #[configurable_component(transform(
     "sample",
@@ -76,22 +93,26 @@ pub struct SampleConfig {
     pub exclude: Option<AnyCondition>,
 }
 
-#[derive(Debug, Snafu)]
-pub enum SampleError {
-    // Errors from `determine_sample_mode`
-    #[snafu(display(
-        "Only positive, non-zero numbers are allowed values for `ratio`, value: {}",
-        ratio
-    ))]
-    InvalidRatio { ratio: f64 },
-
-    #[snafu(display("Only non-zero numbers are allowed values for `rate`"))]
-    InvalidRate,
-
-    #[snafu(display(
-        "Exactly one value must be provided for either 'rate' or 'ratio', but not both"
-    ))]
-    InvalidConfiguration,
+impl SampleConfig {
+    fn sample_rate(&self) -> Result<SampleMode, SampleError> {
+        match (self.rate, self.ratio) {
+            (None, Some(ratio)) => {
+                if ratio <= 0.0 {
+                    Err(SampleError::InvalidRatio { ratio })
+                } else {
+                    Ok(SampleMode::new_ratio(ratio))
+                }
+            }
+            (Some(rate), None) => {
+                if rate == 0 {
+                    Err(SampleError::InvalidRate)
+                } else {
+                    Ok(SampleMode::new_rate(rate))
+                }
+            }
+            _ => Err(SampleError::InvalidConfiguration),
+        }
+    }
 }
 
 impl GenerateConfig for SampleConfig {
@@ -112,26 +133,9 @@ impl GenerateConfig for SampleConfig {
 #[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        let sample_rate = match (self.rate, self.ratio) {
-            (None, Some(ratio)) => {
-                if ratio <= 0.0 {
-                    Err(SampleError::InvalidRatio { ratio })
-                } else {
-                    Ok(SampleMode::new_ratio(ratio))
-                }
-            }
-            (Some(rate), None) => {
-                if rate == 0 {
-                    Err(SampleError::InvalidRate)
-                } else {
-                    Ok(SampleMode::new_rate(rate))
-                }
-            }
-            _ => Err(SampleError::InvalidConfiguration),
-        }?;
         Ok(Transform::function(Sample::new(
             Self::NAME.to_string(),
-            sample_rate,
+            self.sample_rate()?,
             self.key_field.clone(),
             self.group_by.clone(),
             self.exclude
@@ -144,6 +148,12 @@ impl TransformConfig for SampleConfig {
 
     fn input(&self) -> Input {
         Input::new(DataType::Log | DataType::Trace)
+    }
+
+    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+        self.sample_rate()
+            .map(|_| ())
+            .map_err(|e| vec![e.to_string()])
     }
 
     fn outputs(
