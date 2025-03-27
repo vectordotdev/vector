@@ -618,8 +618,7 @@ Shortly after, observe this new Vector log:
 ```
 
 {{< warning >}}
-The `component_sent_events_total` metrics for `sinks_0` is not increasing anymore.
-And also, we can now see a `429` code in the response status.
+The `component_sent_events_total` metric for `sinks_0` has stopped increasing, and we are observing a 429 response status code.
 {{< /warning >}}
 
 A sample metric demonstrating this:
@@ -679,13 +678,13 @@ Notice how the `component_sent_events_total` metrics for `sinks_0` is now increa
 For this scenario, we will introduce a new limitation imposed by the server.
 
 {{< warning >}}
-Our downstream server has a strict limit on the maximum payload size. Payloads larger than 8192 bytes will be rejected.
+Our downstream server enforces a strict limit on the maximum payload size. Payloads larger than 8192 bytes will be rejected.
 {{< /warning >}}
 
 Also, assume Vector sets the maximum batch size to 10MB.
 
 {{< info >}}
-Always refer to the docs as the source of truth for this value.
+Always refer to the documentation as the source of truth for this value.
 {{< /info >}}
 
 ```text
