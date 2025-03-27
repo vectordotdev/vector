@@ -622,6 +622,7 @@ The `component_sent_events_total` metric for `sinks_0` has stopped increasing, a
 {{< /warning >}}
 
 A sample metric demonstrating this:
+
 ```json
 {
   "name": "http_client_responses_total",
@@ -914,6 +915,7 @@ sinks:
       - internal_metrics
     address: 0.0.0.0:9598
 ```
+
 </details>
 
 ##### Step 2: Prometheus configuration
