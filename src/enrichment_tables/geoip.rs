@@ -156,7 +156,7 @@ impl Geoip {
         };
 
         macro_rules! add_field {
-            ($k:expr, $v:expr) => {
+            ($k:expr_2021, $v:expr_2021) => {
                 add_field($k, $v.map(Into::into))
             };
         }

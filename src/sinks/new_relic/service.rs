@@ -84,11 +84,11 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
             .header(CONTENT_TYPE, "application/json")
             .header("Api-Key", request.credentials.license_key.clone());
 
-        let http_request = if let Some(ce) = request.compression.content_encoding() {
+        let http_request = match request.compression.content_encoding() { Some(ce) => {
             http_request.header(CONTENT_ENCODING, ce)
-        } else {
+        } _ => {
             http_request
-        };
+        }};
 
         let payload_len = request.payload.len();
         let metadata = request.get_metadata().clone();

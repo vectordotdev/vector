@@ -396,7 +396,7 @@ impl DockerLogsSourceCore {
     /// Returns event stream coming from docker.
     fn docker_logs_event_stream(
         &self,
-    ) -> impl Stream<Item = Result<EventMessage, DockerError>> + Send {
+    ) -> impl Stream<Item = Result<EventMessage, DockerError>> + Send + use<> {
         let mut filters = HashMap::new();
 
         // event  | emitted on commands
@@ -623,10 +623,10 @@ impl DockerLogsSource {
                                     }
                                 }
                                 "start" | "unpause" => {
-                                    if let Some(state) = self.containers.get_mut(&id) {
+                                    match self.containers.get_mut(&id) { Some(state) => {
                                         state.running();
                                         self.esb.restart(state);
-                                    } else {
+                                    } _ => {
                                         let include_name =
                                             self.esb.core.config.container_name_or_id_included(
                                                 id.as_str(),
@@ -638,7 +638,7 @@ impl DockerLogsSource {
                                         if include_name && !exclude_self {
                                             self.containers.insert(id.clone(), self.esb.start(id, None));
                                         }
-                                    }
+                                    }}
                                 }
                                 _ => {},
                             };
@@ -800,15 +800,15 @@ impl EventStreamBuilder {
             .take_until(self.shutdown.clone());
 
         let events_stream: Box<dyn Stream<Item = LogEvent> + Unpin + Send> =
-            if let Some(ref line_agg_config) = core.line_agg_config {
+            match core.line_agg_config { Some(ref line_agg_config) => {
                 Box::new(line_agg_adapter(
                     events_stream,
                     line_agg::Logic::new(line_agg_config.clone()),
                     self.log_namespace,
                 ))
-            } else {
+            } _ => {
                 Box::new(events_stream)
-            };
+            }};
 
         let host_key = self.host_key.clone().path;
         let hostname = self.hostname.clone();
@@ -1001,8 +1001,8 @@ impl ContainerLogInfo {
                 // occur when a container changes generations, and to avoid processing logs with timestamps before
                 // the created timestamp.
                 match self.last_log.as_ref() {
-                    Some(&(last, gen)) => {
-                        if last < timestamp || (last == timestamp && gen == self.generation) {
+                    Some(&(last, r#gen)) => {
+                        if last < timestamp || (last == timestamp && r#gen == self.generation) {
                             // Noop - log received in order.
                         } else {
                             // Docker returns logs in order.

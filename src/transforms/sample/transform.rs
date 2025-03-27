@@ -50,7 +50,7 @@ impl Sample {
 impl FunctionTransform for Sample {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut event = {
-            if let Some(condition) = self.exclude.as_ref() {
+            match self.exclude.as_ref() { Some(condition) => {
                 let (result, event) = condition.check(event);
                 if result {
                     output.push(event);
@@ -58,9 +58,9 @@ impl FunctionTransform for Sample {
                 } else {
                     event
                 }
-            } else {
+            } _ => {
                 event
-            }
+            }}
         };
 
         let value = self

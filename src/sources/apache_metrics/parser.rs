@@ -112,7 +112,7 @@ pub fn parse(
     namespace: Option<&str>,
     now: DateTime<Utc>,
     tags: Option<&MetricTags>,
-) -> impl Iterator<Item = Result<Metric, ParseError>> {
+) -> impl Iterator<Item = Result<Metric, ParseError>> + use<> {
     // We use a HashMap rather than a Vector as mod_status has
     // BusyWorkers/IdleWorkers repeated
     // https://bz.apache.org/bugzilla/show_bug.cgi?id=63300

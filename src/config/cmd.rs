@@ -78,7 +78,7 @@ impl Opts {
 /// Helper to merge JSON. Handles objects and array concatenation.
 fn merge_json(a: &mut Value, b: Value) {
     match (a, b) {
-        (Value::Object(ref mut a), Value::Object(b)) => {
+        (Value::Object(a), Value::Object(b)) => {
             for (k, v) in b {
                 merge_json(a.entry(k).or_insert(Value::Null), v);
             }
@@ -92,7 +92,7 @@ fn merge_json(a: &mut Value, b: Value) {
 /// Helper to sort array values.
 fn sort_json_array_values(json: &mut Value) {
     match json {
-        Value::Array(ref mut arr) => {
+        Value::Array(arr) => {
             for v in arr.iter_mut() {
                 sort_json_array_values(v);
             }
@@ -113,7 +113,7 @@ fn sort_json_array_values(json: &mut Value) {
                 .map(|v| serde_json::from_str(v.as_str()).unwrap())
                 .collect::<Vec<_>>();
         }
-        Value::Object(ref mut json) => {
+        Value::Object(json) => {
             for (_, v) in json {
                 sort_json_array_values(v);
             }

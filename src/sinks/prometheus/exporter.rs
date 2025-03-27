@@ -561,7 +561,7 @@ impl StreamSink<Event> for PrometheusExporter {
             let mut metric = event.into_metric();
             let finalizers = metric.take_finalizers();
 
-            if let Some(normalized) = self.normalize(metric) {
+            match self.normalize(metric) { Some(normalized) => {
                 let normalized = if self.config.suppress_timestamp {
                     normalized.with_timestamp(None)
                 } else {
@@ -583,10 +583,10 @@ impl StreamSink<Event> for PrometheusExporter {
                     }
                 }
                 finalizers.update_status(EventStatus::Delivered);
-            } else {
+            } _ => {
                 emit!(PrometheusNormalizationError {});
                 finalizers.update_status(EventStatus::Errored);
-            }
+            }}
         }
 
         Ok(())

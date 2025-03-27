@@ -159,11 +159,11 @@ fn handle_dd_trace_payload_v1(
                 event_path!("error_tps"),
                 Value::Float(NotNan::new(error_tps).expect("error_tps cannot be Nan")),
             );
-            if let Some(Value::Object(span_tags)) = trace_event.get_mut(event_path!("tags")) {
+            match trace_event.get_mut(event_path!("tags")) { Some(Value::Object(span_tags)) => {
                 span_tags.extend(tags.clone());
-            } else {
+            } _ => {
                 trace_event.insert(event_path!("tags"), Value::from(tags.clone()));
-            }
+            }}
             Event::Trace(trace_event)
         })
         .collect();

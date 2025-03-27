@@ -200,13 +200,13 @@ impl SourceConfig for DatadogAgentConfig {
 
         Ok(Box::pin(async move {
             let routes = filters.recover(|r: Rejection| async move {
-                if let Some(e_msg) = r.find::<ErrorMessage>() {
+                match r.find::<ErrorMessage>() { Some(e_msg) => {
                     let json = warp::reply::json(e_msg);
                     Ok(warp::reply::with_status(json, e_msg.status_code()))
-                } else {
+                } _ => {
                     // other internal error - will return 500 internal server error
                     Err(r)
-                }
+                }}
             });
 
             let span = Span::current();

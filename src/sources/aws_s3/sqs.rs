@@ -643,13 +643,13 @@ impl IngestorProcess {
         // reference must be dropped before the status of the batch is sent to the channel.
         drop(batch);
 
-        if let Some(error) = read_error {
+        match read_error { Some(error) => {
             Err(ProcessingError::ReadObject {
                 source: error,
                 bucket: s3_event.s3.bucket.name.clone(),
                 key: s3_event.s3.object.key.clone(),
             })
-        } else if let Some(error) = send_error {
+        } _ => if let Some(error) = send_error {
             Err(ProcessingError::PipelineSend {
                 source: error,
                 bucket: s3_event.s3.bucket.name.clone(),
@@ -694,7 +694,7 @@ impl IngestorProcess {
                     }
                 }
             }
-        }
+        }}
     }
 
     async fn receive_messages(

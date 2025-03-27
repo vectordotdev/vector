@@ -139,11 +139,11 @@ impl Service<LogApiRequest> for LogApiService {
             .header(CONTENT_TYPE, "application/json")
             .header("DD-API-KEY", request.api_key.to_string());
 
-        let http_request = if let Some(ce) = request.compression.content_encoding() {
+        let http_request = match request.compression.content_encoding() { Some(ce) => {
             http_request.header(CONTENT_ENCODING, ce)
-        } else {
+        } _ => {
             http_request
-        };
+        }};
 
         let metadata = std::mem::take(request.metadata_mut());
         let events_byte_size = metadata.into_events_estimated_json_encoded_byte_size();

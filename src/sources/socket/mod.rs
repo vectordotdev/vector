@@ -1376,7 +1376,7 @@ mod test {
         message: &str,
         stream: bool,
         use_vector_namespace: bool,
-    ) -> (PathBuf, impl Stream<Item = Event>) {
+    ) -> (PathBuf, impl Stream<Item = Event> + use<>) {
         let (tx, rx) = SourceSender::new_test();
         let path = init_unix(tx, stream, use_vector_namespace).await;
         let path_clone = path.clone();

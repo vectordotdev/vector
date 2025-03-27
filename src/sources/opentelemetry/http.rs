@@ -288,7 +288,7 @@ async fn handle_request(
 }
 
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::Infallible> {
-    if let Some(err_msg) = err.find::<ErrorMessage>() {
+    match err.find::<ErrorMessage>() { Some(err_msg) => {
         let reply = protobuf(Status {
             code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
             message: err_msg.message().into(),
@@ -296,7 +296,7 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::In
         });
 
         Ok(warp::reply::with_status(reply, err_msg.status_code()))
-    } else {
+    } _ => {
         let reply = protobuf(Status {
             code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
             message: format!("{:?}", err),
@@ -307,5 +307,5 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::In
             reply,
             StatusCode::INTERNAL_SERVER_ERROR,
         ))
-    }
+    }}
 }

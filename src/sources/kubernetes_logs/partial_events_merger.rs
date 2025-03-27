@@ -30,7 +30,7 @@ impl PartialEventMergeState {
         message_path: &OwnedTargetPath,
         expiration_time: Duration,
     ) {
-        if let Some(bucket) = self.buckets.get_mut(file) {
+        match self.buckets.get_mut(file) { Some(bucket) => {
             // merging with existing event
 
             if let (Some(Value::Bytes(prev_value)), Some(Value::Bytes(new_value))) =
@@ -41,7 +41,7 @@ impl PartialEventMergeState {
                 bytes_mut.extend_from_slice(new_value);
                 *prev_value = bytes_mut.freeze();
             }
-        } else {
+        } _ => {
             // new event
             self.buckets.insert(
                 file.to_owned(),
@@ -50,7 +50,7 @@ impl PartialEventMergeState {
                     expiration: Instant::now() + expiration_time,
                 },
             );
-        }
+        }}
     }
 
     fn remove_event(&mut self, file: &str) -> Option<LogEvent> {

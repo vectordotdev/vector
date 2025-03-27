@@ -31,11 +31,11 @@ impl SinkEncoder<Vec<Event>> for HoneycombEncoder {
 
             let log = event.as_mut_log();
 
-            let timestamp = if let Some(Value::Timestamp(ts)) = log.remove_timestamp() {
+            let timestamp = match log.remove_timestamp() { Some(Value::Timestamp(ts)) => {
                 ts
-            } else {
+            } _ => {
                 Utc::now()
-            };
+            }};
 
             let data = json!({
                 "time": timestamp.to_rfc3339_opts(SecondsFormat::Nanos, true),

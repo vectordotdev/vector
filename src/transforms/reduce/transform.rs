@@ -272,12 +272,12 @@ impl Reduce {
         if let Some(max_events) = self.max_events {
             if max_events == 1 {
                 ends_here = true;
-            } else if let Some(entry) = self.reduce_merge_states.get(&discriminant) {
+            } else { match self.reduce_merge_states.get(&discriminant) { Some(entry) => {
                 // The current event will finish this set
                 if entry.events + 1 == max_events {
                     ends_here = true;
                 }
-            }
+            } _ => {}}}
         }
 
         if starts_here {

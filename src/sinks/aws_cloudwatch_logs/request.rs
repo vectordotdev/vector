@@ -130,12 +130,12 @@ impl Future for CloudwatchFuture {
 
                     let stream_name = &self.client.stream_name;
 
-                    if let Some(stream) = response
+                    match response
                         .log_streams
                         .ok_or(CloudwatchError::NoStreamsFound)?
                         .into_iter()
                         .find(|log_stream| log_stream.log_stream_name == Some(stream_name.clone()))
-                    {
+                    { Some(stream) => {
                         debug!(message = "Stream found.", stream = ?stream.log_stream_name);
 
                         let events = self
@@ -147,12 +147,12 @@ impl Future for CloudwatchFuture {
 
                         info!(message = "Putting logs.", token = ?token);
                         self.state = State::Put(self.client.put_logs(token, events));
-                    } else if self.create_missing_stream {
+                    } _ => if self.create_missing_stream {
                         info!("Provided stream does not exist; creating a new one.");
                         self.state = State::CreateStream(self.client.create_log_stream());
                     } else {
                         return Poll::Ready(Err(CloudwatchError::NoStreamsFound));
-                    }
+                    }}
                 }
 
                 State::CreateGroup(fut) => {

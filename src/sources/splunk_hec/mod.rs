@@ -430,11 +430,11 @@ impl SplunkSource {
                             }
                         }
 
-                        if let Some(error) = error {
+                        match error { Some(error) => {
                             Err(error)
-                        } else {
+                        } _ => {
                             Ok(maybe_ack_id)
-                        }
+                        }}
                     }
                 },
             )
@@ -539,7 +539,7 @@ impl SplunkSource {
             .and_then(move |_, channel_id: String, body: HecAckStatusRequest| {
                 let idx_ack = idx_ack.clone();
                 async move {
-                    if let Some(idx_ack) = idx_ack {
+                    match idx_ack { Some(idx_ack) => {
                         let ack_statuses = idx_ack
                             .get_acks_status_from_channel(channel_id, &body.acks)
                             .await?;
@@ -547,9 +547,9 @@ impl SplunkSource {
                             warp::reply::json(&HecAckStatusResponse { acks: ack_statuses })
                                 .into_response(),
                         )
-                    } else {
+                    } _ => {
                         Err(Rejection::from(ApiError::AckIsDisabled))
-                    }
+                    }}
                 }
             })
             .boxed()
@@ -717,7 +717,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 
         // Process channel field
         let channel_path = owned_value_path!(CHANNEL);
-        if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
+        match json.get_mut("channel").map(JsonValue::take) { Some(JsonValue::String(guid)) => {
             self.log_namespace.insert_source_metadata(
                 SplunkConfig::NAME,
                 &mut log,
@@ -725,7 +725,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 lookup::path!(CHANNEL),
                 guid,
             );
-        } else if let Some(guid) = self.channel.as_ref() {
+        } _ => { match self.channel.as_ref() { Some(guid) => {
             self.log_namespace.insert_source_metadata(
                 SplunkConfig::NAME,
                 &mut log,
@@ -733,7 +733,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 lookup::path!(CHANNEL),
                 guid.clone(),
             );
-        }
+        } _ => {}}}}
 
         // Process fields field
         if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
@@ -1189,7 +1189,7 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
 }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
-    if let Some(&error) = rejection.find::<ApiError>() {
+    match rejection.find::<ApiError>() { Some(&error) => {
         emit!(SplunkHecRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => {
@@ -1229,9 +1229,9 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
                 response_json(StatusCode::BAD_REQUEST, splunk_response::ACK_IS_DISABLED)
             }
         },))
-    } else {
+    } _ => {
         Err(rejection)
-    }
+    }}
 }
 
 /// Response without body
@@ -1307,7 +1307,7 @@ mod tests {
         valid_tokens: Option<&[&str]>,
         acknowledgements: Option<HecAcknowledgementsConfig>,
         store_hec_token: bool,
-    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin + use<>, SocketAddr) {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =

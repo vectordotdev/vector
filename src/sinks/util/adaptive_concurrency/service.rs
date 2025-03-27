@@ -115,7 +115,7 @@ impl fmt::Debug for State {
                 .debug_tuple("State::Waiting")
                 .field(&format_args!("..."))
                 .finish(),
-            State::Ready(ref r) => f.debug_tuple("State::Ready").field(&r).finish(),
+            State::Ready(r) => f.debug_tuple("State::Ready").field(&r).finish(),
             State::Empty => f.debug_tuple("State::Empty").finish(),
         }
     }

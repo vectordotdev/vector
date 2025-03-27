@@ -618,7 +618,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
             }
         }
         "log" => {
-            if let Some(log_fields) = &input.log_fields {
+            match &input.log_fields { Some(log_fields) => {
                 let mut event = LogEvent::from_str_legacy("");
                 for (path, value) in log_fields {
                     event
@@ -626,16 +626,16 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                         .map_err(|e| e.to_string())?;
                 }
                 Ok(event.into())
-            } else {
+            } _ => {
                 Err("input type 'log' requires the field 'log_fields'".to_string())
-            }
+            }}
         }
         "metric" => {
-            if let Some(metric) = &input.metric {
+            match &input.metric { Some(metric) => {
                 Ok(Event::Metric(metric.clone()))
-            } else {
+            } _ => {
                 Err("input type 'metric' requires the field 'metric'".to_string())
-            }
+            }}
         }
         _ => Err(format!(
             "unrecognized input type '{}', expected one of: 'raw', 'log' or 'metric'",

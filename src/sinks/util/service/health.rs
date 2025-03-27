@@ -200,11 +200,11 @@ where
     }
 
     fn call(&mut self, req: Req) -> Self::Future {
-        let permit = if let CircuitState::HalfOpen { permit, .. } = &mut self.state {
+        let permit = match &mut self.state { CircuitState::HalfOpen { permit, .. } => {
             permit.take()
-        } else {
+        } _ => {
             None
-        };
+        }};
 
         HealthFuture {
             inner: self.inner.call(req),

@@ -566,7 +566,7 @@ impl PubsubSource {
     fn request_stream(
         &self,
         ack_ids: mpsc::Receiver<Vec<String>>,
-    ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
+    ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static + use<> {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
         let stream_ack_deadline_seconds = self.ack_deadline_secs.as_secs() as i32;

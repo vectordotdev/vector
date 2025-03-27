@@ -258,16 +258,16 @@ where
         where
             E: de::Error,
         {
-            if let Some(caps) = PERCENT_REGEX.captures(value) {
+            match PERCENT_REGEX.captures(value) { Some(caps) => {
                 caps[1].parse::<usize>().map_err(|err| {
                     Error::custom(format!("could not parse percent value into usize: {}", err))
                 })
-            } else {
+            } _ => {
                 Err(de::Error::invalid_value(
                     Unexpected::Str(value),
                     &"string did not contain a percent value like 30%",
                 ))
-            }
+            }}
         }
 
         fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>

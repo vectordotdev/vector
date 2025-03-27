@@ -73,7 +73,7 @@ pub mod integration;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
-    ($e:expr, $t:ty, $v:pat) => {{
+    ($e:expr_2021, $t:ty, $v:pat) => {{
         match $e.downcast_ref::<$t>() {
             Some($v) => (),
             got => panic!("Assertion failed: got wrong error variant {:?}", got),
@@ -83,7 +83,7 @@ macro_rules! assert_downcast_matches {
 
 #[macro_export]
 macro_rules! log_event {
-    ($($key:expr => $value:expr),*  $(,)?) => {
+    ($($key:expr_2021 => $value:expr_2021),*  $(,)?) => {
         #[allow(unused_variables)]
         {
             let mut event = $crate::event::Event::Log($crate::event::LogEvent::default());
@@ -187,11 +187,11 @@ pub async fn send_lines_tls(
     let local_addr = stream.local_addr().unwrap();
 
     let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
-    if let Some(ca) = ca.into() {
+    match ca.into() { Some(ca) => {
         connector.set_ca_file(ca).unwrap();
-    } else {
+    } _ => {
         connector.set_verify(SslVerifyMode::NONE);
-    }
+    }}
 
     if let Some(cert_file) = client_cert.into() {
         connector.set_certificate_chain_file(cert_file).unwrap();

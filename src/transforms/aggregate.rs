@@ -1117,16 +1117,16 @@ interval_ms = 999999
             // available.
             let mut count = 0_u8;
             while count < 2 {
-                if let Some(event) = out.next().await {
+                match out.next().await { Some(event) => {
                     match event.as_metric().series().name.name.as_str() {
                         "counter_a" => assert_eq!(counter_a_summed, event),
                         "gauge_a" => assert_eq!(gauge_a_2, event),
                         _ => panic!("Unexpected metric name in aggregate output"),
                     };
                     count += 1;
-                } else {
+                } _ => {
                     panic!("Unexpectedly received None in output stream");
-                }
+                }}
             }
             // We should be back to pending, having nothing waiting for us
             assert_eq!(Poll::Pending, futures::poll!(out.next()));

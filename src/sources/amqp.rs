@@ -445,7 +445,7 @@ async fn run_amqp_source(
                 }
             },
             opt_m = consumer.next() => {
-                if let Some(try_m) = opt_m {
+                match opt_m { Some(try_m) => {
                     match try_m {
                         Err(error) => {
                             emit!(AmqpEventError { error });
@@ -455,9 +455,9 @@ async fn run_amqp_source(
                             receive_event(&config, &mut out, log_namespace, finalizer.as_ref(), msg).await?
                         }
                     }
-                } else {
+                } _ => {
                     break
-                }
+                }}
             }
         };
     }

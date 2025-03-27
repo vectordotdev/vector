@@ -672,7 +672,7 @@ pub fn file_source(
                 include_file_metric_tag,
             );
 
-            if let Some(finalizer) = &finalizer {
+            match &finalizer { Some(finalizer) => {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 event = event.with_batch_notifier(&batch);
                 let entry = FinalizerEntry {
@@ -680,9 +680,9 @@ pub fn file_source(
                     offset: line.end_offset,
                 };
                 finalizer.add(entry, receiver);
-            } else {
+            } _ => {
                 checkpoints.update(line.file_id, line.end_offset);
-            }
+            }}
             event
         });
         tokio::spawn(async move {

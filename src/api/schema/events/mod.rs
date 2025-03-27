@@ -99,14 +99,14 @@ pub(crate) fn create_events_stream(
                 // the next `interval`.
                 Some(payload) = tap_rx.next() => {
                     // Emit notifications immediately; these don't count as a 'batch'.
-                    if let OutputEventsPayload::Notification(_) = payload {
+                    match payload { OutputEventsPayload::Notification(_) => {
                         // If an error occurs when sending, the subscription has likely gone
                         // away. Break the loop to terminate the thread.
                         if let Err(err) = event_tx.send(vec![payload]).await {
                             debug!(message = "Couldn't send notification.", error = ?err);
                             break;
                         }
-                    } else {
+                    } _ => {
                         // Wrap tap in a 'sortable' wrapper, using the batch as a key, to
                         // re-sort after random eviction.
                         let payload = SortableOutputEventsPayload { batch, payload };
@@ -125,7 +125,7 @@ pub(crate) fn create_events_stream(
                         }
                         // Increment the batch count, to be used for the next Algo R loop.
                         batch += 1;
-                    }
+                    }}
                 }
                 _ = interval.tick() => {
                     // If there are any existing results after the interval tick, emit.

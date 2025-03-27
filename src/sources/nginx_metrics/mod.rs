@@ -31,7 +31,7 @@ use parser::NginxStubStatus;
 use vector_lib::config::LogNamespace;
 
 macro_rules! counter {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Counter {
             value: $value as f64,
         }
@@ -39,7 +39,7 @@ macro_rules! counter {
 }
 
 macro_rules! gauge {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Gauge {
             value: $value as f64,
         }

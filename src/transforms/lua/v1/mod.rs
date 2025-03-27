@@ -266,18 +266,18 @@ impl mlua::UserData for LuaEvent {
         );
 
         methods.add_meta_method(mlua::MetaMethod::Index, |lua, this, key: String| {
-            if let Some(value) = this
+            match this
                 .inner
                 .as_log()
                 .parse_path_and_get_value(key.as_str())
                 .ok()
                 .flatten()
-            {
+            { Some(value) => {
                 let string = lua.create_string(value.coerce_to_bytes())?;
                 Ok(Some(string))
-            } else {
+            } _ => {
                 Ok(None)
-            }
+            }}
         });
 
         methods.add_meta_function(mlua::MetaMethod::Pairs, |lua, event: LuaEvent| {
