@@ -89,14 +89,14 @@ impl PartialEventMergeState {
     }
 
     fn remove_event(&mut self, file: &str) -> Option<LogEvent> {
-        self.buckets.remove(file).map(|bucket| bucket.event)
+        self.buckets.remove(file).filter(|bucket| !bucket.too_big).map(|bucket| bucket.event)
     }
 
     fn emit_expired_events(&mut self, emitter: &mut Emitter<LogEvent>) {
         let now = Instant::now();
         self.buckets.retain(|_key, bucket| {
             let expired = now >= bucket.expiration;
-            if expired {
+            if expired && !bucket.too_big {
                 emitter.emit(bucket.event.clone());
             }
             !expired
@@ -309,8 +309,8 @@ mod test {
         e_1.insert("_partial", true);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
-        // 32 > length of first message but less than the two combined
-        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, 32);
+        // 24 > length of first message but less than the two combined
+        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, 24);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 0);
