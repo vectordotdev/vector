@@ -14,14 +14,15 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::DecodingConfig,
-    common::mqtt::{MqttCommonConfig, ConfigurationError, MqttError, TlsSnafu, ConfigurationSnafu},
+    common::mqtt::{
+        ConfigurationError, ConfigurationSnafu, MqttCommonConfig, MqttConnector, MqttError,
+        TlsSnafu,
+    },
     config::{SourceConfig, SourceContext, SourceOutput},
     serde::{default_decoding, default_framing_message_based},
 };
 
-use super::source::{MqttConnector, MqttSource};
-
-
+use super::source::MqttSource;
 
 /// Configuration for the `mqtt` source.
 #[configurable_component(source("mqtt", "Collect logs from MQTT."))]
@@ -70,7 +71,12 @@ impl SourceConfig for MqttSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let sink = MqttSource::new(connector.clone(), decoder, log_namespace)?;
+        let sink = MqttSource::new(
+            connector.clone(),
+            decoder,
+            log_namespace,
+            self.topic.clone(),
+        )?;
         Ok(Box::pin(sink.run(cx.out, cx.shutdown)))
     }
 
@@ -113,7 +119,8 @@ impl MqttSourceConfig {
             return Err(ConfigurationError::InvalidClientId).context(ConfigurationSnafu);
         }
 
-        let tls = MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
+        let tls =
+            MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
         let mut options = MqttOptions::new(client_id, &self.common.host, self.common.port);
         options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
         options.set_clean_session(false);
@@ -141,7 +148,7 @@ impl MqttSourceConfig {
             }));
         }
 
-        MqttConnector::new(options, self.topic.clone())
+        Ok(MqttConnector::new(options))
     }
 }
 

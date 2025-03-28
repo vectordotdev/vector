@@ -8,13 +8,12 @@ use vector_lib::codecs::JsonSerializerConfig;
 use crate::template::Template;
 use crate::{
     codecs::EncodingConfig,
-    common::mqtt::{MqttCommonConfig, MqttError, ConfigurationError, TlsSnafu, ConfigurationSnafu},
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
-    sinks::{
-        mqtt::sink::{MqttConnector, MqttSink},
-        prelude::*,
-        Healthcheck, VectorSink,
+    common::mqtt::{
+        ConfigurationError, ConfigurationSnafu, MqttCommonConfig, MqttConnector, MqttError,
+        TlsSnafu,
     },
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    sinks::{mqtt::sink::MqttSink, prelude::*, Healthcheck, VectorSink},
     tls::MaybeTlsSettings,
 };
 
@@ -145,7 +144,8 @@ impl MqttSinkConfig {
         if client_id.is_empty() {
             return Err(ConfigurationError::EmptyClientId).context(ConfigurationSnafu);
         }
-        let tls = MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
+        let tls =
+            MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
         let mut options = MqttOptions::new(&client_id, &self.common.host, self.common.port);
         options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
         options.set_clean_session(self.clean_session);
@@ -170,7 +170,7 @@ impl MqttSinkConfig {
                 alpn,
             }));
         }
-        MqttConnector::new(options, self.topic.to_string())
+        Ok(MqttConnector::new(options))
     }
 }
 

@@ -1,3 +1,4 @@
+use rumqttc::{AsyncClient, EventLoop, MqttOptions};
 use snafu::Snafu;
 use vector_config_macros::configurable_component;
 use vector_lib::tls::{TlsEnableableConfig, TlsError};
@@ -91,7 +92,32 @@ pub enum ConfigurationError {
         "Client ID must be 1-23 characters long and must consist of only alphanumeric characters."
     ))]
     InvalidClientId,
-    /// Credentials provided were imcomplete
+    /// Credentials provided were incomplete
     #[snafu(display("Username and password must be either both or neither provided."))]
     IncompleteCredentials,
+}
+
+#[derive(Clone)]
+/// Mqtt connector wrapper
+pub struct MqttConnector {
+    /// Mqtt connection options
+    pub options: MqttOptions,
+}
+
+impl MqttConnector {
+    /// Creates a new MqttConnector
+    pub const fn new(options: MqttOptions) -> Self {
+        Self { options }
+    }
+
+    /// Connects the connector and generates a client and eventloop
+    pub fn connect(&self) -> (AsyncClient, EventLoop) {
+        let (client, eventloop) = AsyncClient::new(self.options.clone(), 1024);
+        (client, eventloop)
+    }
+
+    /// TODO: Right now there is no way to implement the healthcheck properly: https://github.com/bytebeamio/rumqtt/issues/562
+    pub async fn healthcheck(&self) -> crate::Result<()> {
+        Ok(())
+    }
 }

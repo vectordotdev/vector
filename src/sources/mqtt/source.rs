@@ -2,11 +2,11 @@ use itertools::Itertools;
 use vector_lib::config::LogNamespace;
 use vector_lib::internal_event::EventsReceived;
 
-use rumqttc::{Event as MqttEvent, Publish};
+use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS};
 
 use crate::{
     codecs::Decoder,
-    common::mqtt::MqttError,
+    common::mqtt::MqttConnector,
     event::BatchNotifier,
     internal_events::{EndpointBytesReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -14,30 +14,11 @@ use crate::{
     SourceSender,
 };
 
-use rumqttc::{AsyncClient, ClientError, EventLoop, Incoming, MqttOptions, QoS};
-
-#[derive(Clone)]
-pub struct MqttConnector {
-    options: MqttOptions,
-    topic: String,
-}
-
-impl MqttConnector {
-    pub const fn new(options: MqttOptions, topic: String) -> Result<Self, MqttError> {
-        Ok(Self { options, topic })
-    }
-
-    async fn connect(&self) -> Result<(AsyncClient, EventLoop), ClientError> {
-        let (client, eventloop) = AsyncClient::new(self.options.clone(), 1024);
-        client.subscribe(&self.topic, QoS::AtLeastOnce).await?;
-        Ok((client, eventloop))
-    }
-}
-
 pub struct MqttSource {
     connector: MqttConnector,
     decoder: Decoder,
     log_namespace: LogNamespace,
+    topic: String,
 }
 
 impl MqttSource {
@@ -45,16 +26,23 @@ impl MqttSource {
         connector: MqttConnector,
         decoder: Decoder,
         log_namespace: LogNamespace,
+        topic: String,
     ) -> crate::Result<Self> {
         Ok(Self {
             connector,
             decoder,
             log_namespace,
+            topic,
         })
     }
 
     pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
-        let (_client, mut connection) = self.connector.connect().await.map_err(|_| ())?;
+        let (client, mut connection) = self.connector.connect();
+
+        client
+            .subscribe(&self.topic, QoS::AtLeastOnce)
+            .await
+            .map_err(|_| ())?;
 
         loop {
             tokio::select! {
