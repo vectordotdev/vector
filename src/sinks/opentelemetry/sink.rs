@@ -1,30 +1,30 @@
-//! Implementation of the `gcp_stackdriver_logs` sink.
+//! Implementation of the `opentelemetry` sink.
 
 use crate::sinks::{
     prelude::*,
     util::http::{HttpJsonBatchSizer, HttpRequest},
 };
 
-use super::request_builder::StackdriverLogsRequestBuilder;
+use super::request_builder::OpentelemetryRequestBuilder;
 
-pub(super) struct StackdriverLogsSink<S> {
+pub(super) struct OpentelemetrySink<S> {
     service: S,
     batch_settings: BatcherSettings,
-    request_builder: StackdriverLogsRequestBuilder,
+    request_builder: OpentelemetryRequestBuilder,
 }
 
-impl<S> StackdriverLogsSink<S>
+impl<S> OpentelemetrySink<S>
 where
     S: Service<HttpRequest<()>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    /// Creates a new `StackdriverLogsSink`.
+    /// Creates a new `OpentelemetrySink`.
     pub(super) const fn new(
         service: S,
         batch_settings: BatcherSettings,
-        request_builder: StackdriverLogsRequestBuilder,
+        request_builder: OpentelemetryRequestBuilder,
     ) -> Self {
         Self {
             service,
@@ -61,7 +61,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<S> StreamSink<Event> for StackdriverLogsSink<S>
+impl<S> StreamSink<Event> for OpentelemetrySink<S>
 where
     S: Service<HttpRequest<()>> + Send + 'static,
     S::Future: Send + 'static,

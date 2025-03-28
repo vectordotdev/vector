@@ -1,10 +1,10 @@
-//! Service implementation for the `gcp_stackdriver_logs` sink.
+//! Service implementation for the `opentelemetry` sink.
 
 use bytes::Bytes;
 use http::{header::CONTENT_TYPE, Request, Uri};
 
 use crate::{
-    gcp::GcpAuthenticator,
+    http::Auth,
     sinks::{
         util::http::{HttpRequest, HttpServiceRequestBuilder},
         HTTPRequestBuilderSnafu,
@@ -13,12 +13,12 @@ use crate::{
 use snafu::ResultExt;
 
 #[derive(Debug, Clone)]
-pub(super) struct StackdriverLogsServiceRequestBuilder {
+pub(super) struct OpentelemetryServiceRequestBuilder {
     pub(super) uri: Uri,
-    pub(super) auth: GcpAuthenticator,
+    pub(super) auth: Option<Auth>,
 }
 
-impl HttpServiceRequestBuilder<()> for StackdriverLogsServiceRequestBuilder {
+impl HttpServiceRequestBuilder<()> for OpentelemetryServiceRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
         let builder = Request::post(self.uri.clone()).header(CONTENT_TYPE, "application/json");
 
@@ -27,7 +27,9 @@ impl HttpServiceRequestBuilder<()> for StackdriverLogsServiceRequestBuilder {
             .context(HTTPRequestBuilderSnafu)
             .map_err(Into::<crate::Error>::into)?;
 
-        self.auth.apply(&mut request);
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
+        }
 
         Ok(request)
     }

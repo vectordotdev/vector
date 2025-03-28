@@ -1,20 +1,20 @@
-//! `RequestBuilder` implementation for the `gcp_stackdriver_logs` sink.
+//! `RequestBuilder` implementation for the `opentelemetry` sink.
 
 use bytes::Bytes;
 use std::io;
 
 use crate::sinks::{prelude::*, util::http::HttpRequest};
 
-use super::encoder::StackdriverLogsEncoder;
+use super::encoder::OpentelemetryEncoder;
 
-pub(super) struct StackdriverLogsRequestBuilder {
-    pub(super) encoder: StackdriverLogsEncoder,
+pub(super) struct OpentelemetryRequestBuilder {
+    pub(super) encoder: OpentelemetryEncoder,
 }
 
-impl RequestBuilder<Vec<Event>> for StackdriverLogsRequestBuilder {
+impl RequestBuilder<Vec<Event>> for OpentelemetryRequestBuilder {
     type Metadata = EventFinalizers;
     type Events = Vec<Event>;
-    type Encoder = StackdriverLogsEncoder;
+    type Encoder = OpentelemetryEncoder;
     type Payload = Bytes;
     type Request = HttpRequest<()>;
     type Error = io::Error;
