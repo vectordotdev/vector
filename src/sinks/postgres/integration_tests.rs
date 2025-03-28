@@ -98,7 +98,7 @@ pub fn create_trace(resource: &str) -> TraceEvent {
     t.insert(event_path!("trace_id"), Value::Integer(123));
     t.insert(
         event_path!("spans"),
-        Value::Array(vec![Value::from(create_span(resource))]),
+        Value::Array(vec![Value::from(create_span(resource))].into()),
     );
     t
 }
