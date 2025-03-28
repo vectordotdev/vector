@@ -2,9 +2,13 @@ use std::io::{self, BufRead};
 
 use bstr::Finder;
 use bytes::BytesMut;
-use tracing::warn;
 
 use crate::FilePosition;
+
+pub struct ReadResult {
+    pub successfully_read: Option<usize>,
+    pub discarded_for_size: Vec<BytesMut>,
+}
 
 /// Read up to `max_size` bytes from `reader`, splitting by `delim`
 ///
@@ -29,17 +33,18 @@ use crate::FilePosition;
 /// Benchmarks indicate that this function processes in the high single-digit
 /// GiB/s range for buffers of length 1KiB. For buffers any smaller than this
 /// the overhead of setup dominates our benchmarks.
-pub fn read_until_with_max_size<R: BufRead + ?Sized>(
-    reader: &mut R,
-    position: &mut FilePosition,
-    delim: &[u8],
-    buf: &mut BytesMut,
+pub fn read_until_with_max_size<'a, R: BufRead + ?Sized>(
+    reader: &'a mut R,
+    position: &'a mut FilePosition,
+    delim: &'a [u8],
+    buf: &'a mut BytesMut,
     max_size: usize,
-) -> io::Result<Option<usize>> {
+) -> io::Result<ReadResult> {
     let mut total_read = 0;
     let mut discarding = false;
     let delim_finder = Finder::new(delim);
     let delim_len = delim.len();
+    let mut discarded_for_size = Vec::new();
     loop {
         let available: &[u8] = match reader.fill_buf() {
             Ok(n) => n,
@@ -68,16 +73,16 @@ pub fn read_until_with_max_size<R: BufRead + ?Sized>(
         total_read += used;
 
         if !discarding && buf.len() > max_size {
-            warn!(
-                message = "Found line that exceeds max_line_bytes; discarding.",
-                internal_log_rate_limit = true
-            );
+            discarded_for_size.push(buf.clone());
             discarding = true;
         }
 
         if done {
             if !discarding {
-                return Ok(Some(total_read));
+                return Ok(ReadResult {
+                    successfully_read: Some(total_read),
+                    discarded_for_size,
+                });
             } else {
                 discarding = false;
                 buf.clear();
@@ -87,7 +92,10 @@ pub fn read_until_with_max_size<R: BufRead + ?Sized>(
             // us to observe an incomplete write. We return None here and let the loop continue
             // next time the method is called. This is safe because the buffer is specific to this
             // FileWatcher.
-            return Ok(None);
+            return Ok(ReadResult {
+                successfully_read: None,
+                discarded_for_size,
+            });
         }
     }
 }
@@ -98,6 +106,8 @@ mod test {
 
     use bytes::{BufMut, BytesMut};
     use quickcheck::{QuickCheck, TestResult};
+
+    use crate::buffer::ReadResult;
 
     use super::read_until_with_max_size;
 
@@ -181,7 +191,10 @@ mod test {
             )
             .unwrap()
             {
-                None => {
+                ReadResult {
+                    successfully_read: None,
+                    discarded_for_size: _,
+                } => {
                     // Subject only returns None if this is the last chunk _and_
                     // the chunk did not contain a delimiter _or_ the delimiter
                     // was outside the max_size range _or_ the current chunk is empty.
@@ -190,7 +203,10 @@ mod test {
                         .any(|details| ((details.chunk_index == idx) && details.within_max_size));
                     assert!(chunk.is_empty() || !has_valid_delimiter)
                 }
-                Some(total_read) => {
+                ReadResult {
+                    successfully_read: Some(total_read),
+                    discarded_for_size: _,
+                } => {
                     // Now that the function has returned we confirm that the
                     // returned details match our `first_delim` and also that
                     // the `buffer` is populated correctly.

@@ -205,3 +205,27 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
         });
     }
 }
+
+#[derive(Debug)]
+pub struct KubernetesMergedLineTooBig<'a> {
+    pub event: &'a Event,
+    pub configured_limit: usize,
+    pub encountered_size_so_far: usize,
+}
+
+impl InternalEvent for KubernetesMergedLineTooBig<'_> {
+    fn emit(self) {
+        warn!(
+            message = "Found line that exceeds max_merged_line_bytes; discarding.",
+            event = ?self.event,
+            configured_limit = self.configured_limit,
+            encountered_size_so_far = self.encountered_size_so_far,
+            internal_log_rate_limit = true,
+        );
+        counter!(
+            "component_discarded_events_total",
+            "intentional" => "true",
+        )
+        .increment(1);
+    }
+}
