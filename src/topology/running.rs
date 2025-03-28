@@ -52,6 +52,7 @@ pub struct RunningTopology {
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
+    pending_reload: Option<HashSet<ComponentKey>>,
 }
 
 impl RunningTopology {
@@ -70,12 +71,22 @@ impl RunningTopology {
             running: Arc::new(AtomicBool::new(true)),
             graceful_shutdown_duration: config.graceful_shutdown_duration,
             config,
+            pending_reload: None,
         }
     }
 
     /// Gets the configuration that represents this running topology.
     pub const fn config(&self) -> &Config {
         &self.config
+    }
+
+    /// Adds a set of component keys to the pending reload set if one exists. Otherwise, it
+    /// initializes the pending reload set.
+    pub fn extend_reload_set(&mut self, new_set: HashSet<ComponentKey>) {
+        match &mut self.pending_reload {
+            None => self.pending_reload = Some(new_set.clone()),
+            Some(existing) => existing.extend(new_set),
+        }
     }
 
     /// Creates a subscription to topology changes.
@@ -227,7 +238,6 @@ impl RunningTopology {
         &mut self,
         new_config: Config,
         extra_context: ExtraContext,
-        components_to_reload: Option<Vec<&ComponentKey>>,
     ) -> Result<bool, ()> {
         info!("Reloading running topology with new configuration.");
 
@@ -244,10 +254,12 @@ impl RunningTopology {
         // spawning the new version of the component.
         //
         // We also shutdown any component that is simply being removed entirely.
-        let diff = ConfigDiff::new(&self.config, &new_config);
-        let buffers = self
-            .shutdown_diff(&diff, &new_config, components_to_reload)
-            .await;
+        let diff = if let Some(components) = &self.pending_reload {
+            ConfigDiff::new(&self.config, &new_config, components.clone())
+        } else {
+            ConfigDiff::new(&self.config, &new_config, HashSet::new())
+        };
+        let buffers = self.shutdown_diff(&diff, &new_config).await;
 
         // Gives windows some time to make available any port
         // released by shutdown components.
@@ -352,7 +364,6 @@ impl RunningTopology {
         &mut self,
         diff: &ConfigDiff,
         new_config: &Config,
-        components_to_reload: Option<Vec<&ComponentKey>>,
     ) -> HashMap<ComponentKey, BuiltBuffer> {
         // First, we shutdown any changed/removed sources. This ensures that we can allow downstream
         // components to terminate naturally by virtue of the flow of events stopping.
@@ -493,6 +504,9 @@ impl RunningTopology {
             .to_change
             .iter()
             .filter(|&key| {
+                if diff.components_to_reload.contains(key) {
+                    return false;
+                }
                 self.config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
                     self.config
                         .enrichment_table(key)
@@ -536,7 +550,7 @@ impl RunningTopology {
         // they can naturally shutdown and allow us to recover their buffers if possible.
         let mut buffer_tx = HashMap::new();
 
-        let mut sinks_to_change = diff
+        let sinks_to_change = diff
             .sinks
             .to_change
             .iter()
@@ -547,10 +561,6 @@ impl RunningTopology {
                     .is_some()
             }))
             .collect::<Vec<_>>();
-
-        if let Some(mut components) = components_to_reload {
-            sinks_to_change.append(&mut components)
-        }
 
         for key in &sinks_to_change {
             debug!(component = %key, "Changing sink.");
