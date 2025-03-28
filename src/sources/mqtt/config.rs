@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use rand::Rng;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
-use snafu::{ResultExt, Snafu};
+use snafu::ResultExt;
 use vector_lib::{
     codecs::decoding::{DeserializerConfig, FramingConfig},
     config::{LegacyKey, LogNamespace},
@@ -14,23 +14,14 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::DecodingConfig,
-    common::mqtt::MqttCommonConfig,
+    common::mqtt::{MqttCommonConfig, ConfigurationError},
     config::{SourceConfig, SourceContext, SourceOutput},
     serde::{default_decoding, default_framing_message_based},
 };
 
 use super::source::{ConfigurationSnafu, MqttConnector, MqttError, MqttSource, TlsSnafu};
 
-#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
-pub enum ConfigurationError {
-    #[snafu(display(
-        "Client ID must be 1-23 characters long and must consist of only alphanumeric characters."
-    ))]
-    InvalidClientId,
 
-    #[snafu(display("Username and password must be either both or neither provided."))]
-    IncompleteCredentials,
-}
 
 /// Configuration for the `mqtt` source.
 #[configurable_component(source("mqtt", "Collect logs from MQTT."))]
@@ -110,7 +101,7 @@ impl SourceConfig for MqttSourceConfig {
 impl MqttSourceConfig {
     fn build_connector(&self) -> Result<MqttConnector, MqttError> {
         let client_id = self.common.client_id.clone().unwrap_or_else(|| {
-            let hash = rand::thread_rng()
+            let hash = rand::rng()
                 .sample_iter(&rand_distr::Alphanumeric)
                 .take(6)
                 .map(char::from)
@@ -122,7 +113,7 @@ impl MqttSourceConfig {
             return Err(ConfigurationError::InvalidClientId).context(ConfigurationSnafu);
         }
 
-        let tls = MaybeTlsSettings::from_config(&self.common.tls, false).context(TlsSnafu)?;
+        let tls = MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
         let mut options = MqttOptions::new(client_id, &self.common.host, self.common.port);
         options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
         options.set_clean_session(false);

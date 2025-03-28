@@ -1,5 +1,8 @@
+use snafu::Snafu;
 use vector_config_macros::configurable_component;
-use vector_lib::tls::TlsEnableableConfig;
+use vector_lib::tls::{TlsEnableableConfig, TlsError};
+
+use crate::template::TemplateParseError;
 
 /// Shared MQTT configuration for sources and sinks.
 #[configurable_component]
@@ -48,4 +51,47 @@ const fn default_port() -> u16 {
 
 const fn default_keep_alive() -> u16 {
     60
+}
+
+/// MQTT Error Types
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub))]
+pub enum MqttError {
+    /// Topic template parsing failed
+    #[snafu(display("invalid topic template: {}", source))]
+    TopicTemplate {
+        /// Source of error
+        source: TemplateParseError,
+    },
+    /// TLS error
+    #[snafu(display("TLS error: {}", source))]
+    Tls {
+        /// Source of error
+        source: TlsError,
+    },
+    /// Configuration error
+    #[snafu(display("MQTT configuration error: {}", source))]
+    Configuration {
+        /// Source of error
+        source: ConfigurationError,
+    },
+}
+
+/// MQTT Configuration error types
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
+pub enum ConfigurationError {
+    /// Empty client ID error
+    #[snafu(display("Client ID is not allowed to be empty."))]
+    EmptyClientId,
+    /// Invalid credentials provided error
+    #[snafu(display("Username and password must be either both provided or both missing."))]
+    InvalidCredentials,
+    /// Invalid client ID provied error
+    #[snafu(display(
+        "Client ID must be 1-23 characters long and must consist of only alphanumeric characters."
+    ))]
+    InvalidClientId,
+    /// Credentials provided were imcomplete
+    #[snafu(display("Username and password must be either both or neither provided."))]
+    IncompleteCredentials,
 }

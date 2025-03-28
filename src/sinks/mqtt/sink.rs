@@ -1,29 +1,19 @@
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use rumqttc::{AsyncClient, EventLoop, MqttOptions};
-use snafu::{ResultExt, Snafu};
-use vector_lib::tls::TlsError;
+use snafu::ResultExt;
 
+use crate::common::mqtt::{MqttError, TopicTemplateSnafu};
 use crate::internal_events::MqttConnectionError;
 use crate::sinks::prelude::*;
 
 use super::{
-    config::{ConfigurationError, MqttQoS},
+    config::MqttQoS,
     request_builder::{MqttEncoder, MqttRequestBuilder},
     service::MqttService,
     MqttSinkConfig,
 };
 
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
-pub enum MqttError {
-    #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateParseError },
-    #[snafu(display("TLS error: {}", source))]
-    Tls { source: TlsError },
-    #[snafu(display("MQTT configuration error: {}", source))]
-    Configuration { source: ConfigurationError },
-}
 
 #[derive(Clone)]
 pub struct MqttConnector {

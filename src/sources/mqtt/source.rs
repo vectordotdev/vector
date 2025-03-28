@@ -6,6 +6,7 @@ use rumqttc::{Event as MqttEvent, Publish};
 
 use crate::{
     codecs::Decoder,
+    common::mqtt::ConfigurationError,
     event::BatchNotifier,
     internal_events::{EndpointBytesReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -16,8 +17,6 @@ use crate::{
 use rumqttc::{AsyncClient, ClientError, EventLoop, Incoming, MqttOptions, QoS};
 use snafu::Snafu;
 use vector_lib::tls::TlsError;
-
-use super::config::ConfigurationError;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
