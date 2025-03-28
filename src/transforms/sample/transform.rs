@@ -44,10 +44,10 @@ impl SampleMode {
             // field, hashing its contents this component should output events according to the
             // configured ratio.
             //
-            // To do this convert the hash to a number between 0 and 1 and compare to the ratio, to
-            // address issues with precision here the ratio is expanded to meet the width of the type of
-            // the hash.
-            hash_ratio_threshold: (ratio * ((u64::MAX as u128) + 1) as f64) as u64,
+            // To do one option would be to convert the hash to a number between 0 and 1 and compare
+            // to the ratio. However to address issues with precision, here the ratio is scaled to
+            // meet the width of the type of the hash.
+            hash_ratio_threshold: (ratio * (u64::MAX as u128) as f64) as u64,
         }
     }
 
@@ -56,8 +56,7 @@ impl SampleMode {
             Self::Rate { rate, counters } => {
                 let counter_value = counters.entry(group_by_key.clone()).or_default();
                 let old_counter_value = *counter_value;
-                let increment: u64 = *counter_value + 1;
-                *counter_value = increment;
+                *counter_value += 1;
                 old_counter_value % *rate == 0
             }
             Self::Ratio { ratio, values, .. } => {
