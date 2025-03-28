@@ -15,7 +15,7 @@ mod proto_event {
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
 pub use proto_event::*;
-use vrl::value::{ObjectMap, Value as VrlValue};
+use vrl::value::{ObjectArray, ObjectMap, Value as VrlValue};
 
 use super::{array, metric::MetricSketch, EventMetadata};
 
@@ -112,7 +112,7 @@ impl From<Log> for super::LogEvent {
                 .fields
                 .into_iter()
                 .filter_map(|(k, v)| decode_value(v).map(|value| (k.into(), value)))
-                .collect::<ObjectMap>();
+                .collect();
 
             Self::from_map(fields, metadata)
         }
@@ -137,7 +137,7 @@ impl From<Trace> for super::TraceEvent {
             .fields
             .into_iter()
             .filter_map(|(k, v)| decode_value(v).map(|value| (k.into(), value)))
-            .collect::<ObjectMap>();
+            .collect();
 
         Self::from(super::LogEvent::from_map(fields, metadata))
     }
@@ -726,7 +726,7 @@ fn decode_array(items: Vec<Value>) -> Option<super::Value> {
     items
         .into_iter()
         .map(decode_value)
-        .collect::<Option<Vec<_>>>()
+        .collect::<Option<ObjectArray>>()
         .map(super::Value::Array)
 }
 
@@ -758,7 +758,7 @@ fn encode_map(fields: ObjectMap) -> ValueMap {
     }
 }
 
-fn encode_array(items: Vec<super::Value>) -> ValueArray {
+fn encode_array(items: ObjectArray) -> ValueArray {
     ValueArray {
         items: items.into_iter().map(encode_value).collect(),
     }

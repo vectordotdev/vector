@@ -30,7 +30,7 @@ impl TraceEvent {
     }
 
     pub fn from_parts(fields: ObjectMap, metadata: EventMetadata) -> Self {
-        Self(LogEvent::from_map(fields, metadata))
+        Self(LogEvent::from_parts(Value::Object(fields), metadata))
     }
 
     pub fn value(&self) -> &Value {

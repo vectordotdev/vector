@@ -7,7 +7,7 @@ use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     event::{Event, LogEvent, TraceEvent},
 };
-use vrl::value::KeyString;
+use vrl::value::{KeyString, ObjectArray};
 use vrl::{
     event_path,
     value::{ObjectMap, Value},
@@ -87,7 +87,7 @@ impl From<PBValue> for Value {
                 arr.values
                     .into_iter()
                     .map(|av| av.value.map(Into::into).unwrap_or(Value::Null))
-                    .collect::<Vec<Value>>(),
+                    .collect::<ObjectArray>(),
             ),
             PBValue::KvlistValue(arr) => kv_list_into_value(arr.values),
         }
@@ -395,7 +395,7 @@ impl From<SpanEvent> for Value {
             "dropped_attributes_count".into(),
             Value::Integer(ev.dropped_attributes_count as i64),
         );
-        Value::Object(obj)
+        Value::Object(obj.into())
     }
 }
 
@@ -410,7 +410,7 @@ impl From<Link> for Value {
             "dropped_attributes_count".into(),
             Value::Integer(link.dropped_attributes_count as i64),
         );
-        Value::Object(obj)
+        Value::Object(obj.into())
     }
 }
 
@@ -419,6 +419,6 @@ impl From<SpanStatus> for Value {
         let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
         obj.insert("message".into(), status.message.into());
         obj.insert("code".into(), status.code.into());
-        Value::Object(obj)
+        Value::Object(obj.into())
     }
 }

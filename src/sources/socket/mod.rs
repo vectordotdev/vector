@@ -646,7 +646,7 @@ mod test {
 
             let tls_meta: ObjectMap = btreemap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
-            );
+            ).into();
 
             assert_eq!(event.as_log()["tls_peer"], tls_meta.clone().into(),);
 
@@ -711,7 +711,7 @@ mod test {
 
             let tls_meta: ObjectMap = btreemap!(
                 "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
-            );
+            ).into();
 
             assert_eq!(
                 event_meta

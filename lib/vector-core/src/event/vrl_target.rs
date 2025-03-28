@@ -791,7 +791,7 @@ mod test {
         ];
 
         for (value, path, expect) in cases {
-            let value: ObjectMap = value;
+            let value: ObjectMap = value.into();
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -865,37 +865,37 @@ mod test {
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![]) },
+                btreemap! { "foo" => Value::array() },
                 owned_value_path!("foo", 0),
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into()]) },
+                btreemap! { "foo" => Value::Array(vec![0.into()].into()) },
                 owned_value_path!("foo", 0),
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()].into()) },
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
+                btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()].into()) },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()].into()) },
                 owned_value_path!("foo", 1),
                 "baz".into(),
-                btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
+                btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()].into()) },
                 Ok(()),
             ),
         ];
 
         for (object, path, value, expect, result) in cases {
-            let object: ObjectMap = object;
+            let object: ObjectMap = object.into();
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -903,7 +903,7 @@ mod test {
                 target_assignments: vec![],
             };
             let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
-            let expect = LogEvent::from(expect);
+            let expect = LogEvent::from(ObjectMap::from(expect));
             let value: Value = value;
             let path = OwnedTargetPath::event(path);
 
@@ -960,7 +960,7 @@ mod test {
                 btreemap! { "foo" => vec![0] },
                 owned_value_path!("foo", 0),
                 false,
-                Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
+                Some(btreemap! { "foo" => Value::array() }.into()),
             ),
             (
                 btreemap! { "foo" => vec![0] },
@@ -977,7 +977,7 @@ mod test {
                 false,
                 Some(
                     btreemap! {
-                        "foo" => btreemap! { "bar baz" => Value::Array(vec![]) },
+                        "foo" => btreemap! { "bar baz" => Value::array() },
                         "bar" => "baz",
                     }
                     .into(),
@@ -1001,7 +1001,7 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
+            let mut target = VrlTarget::new(Event::Log(LogEvent::from(ObjectMap::from(object))), &info, false);
             let path = OwnedTargetPath::event(path);
             let removed = Target::target_get(&target, &path).unwrap().cloned();
 
@@ -1222,7 +1222,7 @@ mod test {
         let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
         let _result = target.target_insert(
             &OwnedTargetPath::event(owned_value_path!("tags")),
-            Value::Object(BTreeMap::from([("a".into(), "b".into())])),
+            Value::Object(ObjectMap::from([("a".into(), "b".into())])),
         );
 
         match target {
@@ -1319,7 +1319,7 @@ mod test {
 
         let mut target = VrlTarget::new(Event::Metric(metric), &info, true);
 
-        let value = Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()]);
+        let value = Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()].into());
         target
             .target_insert(
                 &OwnedTargetPath::event(owned_value_path!("tags", "foo")),
@@ -1334,9 +1334,9 @@ mod test {
 
         assert_eq!(
             vrl_tags_value,
-            &Value::Object(BTreeMap::from([(
+            &Value::Object(ObjectMap::from([(
                 "foo".into(),
-                Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()])
+                Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()].into())
             )]))
         );
 

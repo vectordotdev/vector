@@ -1,8 +1,8 @@
 use std::{collections::BTreeSet, iter};
-
+use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use quickcheck::{empty_shrinker, Arbitrary, Gen};
-use vrl::value::{ObjectMap, Value};
+use vrl::value::Value;
 
 use super::super::{
     metric::{
@@ -77,7 +77,7 @@ impl Arbitrary for Event {
 impl Arbitrary for LogEvent {
     fn arbitrary(g: &mut Gen) -> Self {
         let mut gen = Gen::new(MAX_MAP_SIZE);
-        let map: ObjectMap = ObjectMap::arbitrary(&mut gen);
+        let map = BTreeMap::arbitrary(&mut gen);
         let metadata: EventMetadata = EventMetadata::arbitrary(g);
         LogEvent::from_map(map, metadata)
     }

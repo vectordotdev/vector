@@ -12,7 +12,7 @@ mod tests;
 mod unit_test_components;
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     sync::Arc,
 };
 
@@ -28,7 +28,6 @@ use vrl::{
     diagnostic::Formatter,
     value,
 };
-
 pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
     UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
@@ -595,7 +594,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
 
                 let mut target = TargetValue {
                     value: value!({}),
-                    metadata: value::Value::Object(BTreeMap::new()),
+                    metadata: value::Value::object(),
                     secrets: value::Secrets::default(),
                 };
 
