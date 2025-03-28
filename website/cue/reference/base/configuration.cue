@@ -157,6 +157,46 @@ base: configuration: configuration: {
 				required:      false
 				relevant_when: "type = \"memory\""
 			}
+			source_config: {
+				type: object: options: {
+					dump_batch_size: {
+						type: uint: {}
+						description: """
+														Batch size for data dumping. Used to prevent dumping entire table at
+														once and blocking the system.
+
+														By default, batches are not used and entire table is dumped.
+														"""
+						required: false
+					}
+					dump_interval: {
+						type: uint: {}
+						description: "Interval for dumping all data from the table when used as a source."
+						required:    true
+					}
+					remove_after_dump: {
+						type: bool: default: false
+						description: """
+														If set to true, all data will be removed from cache after dumping.
+														Only valid if used as a source and dump_interval > 0
+
+														By default, dump will not remove data from cache
+														"""
+						required: false
+					}
+					source_key: {
+						type: string: {}
+						description: """
+														Key to use for this component when used as a source. This must be different from the
+														component key.
+														"""
+						required: true
+					}
+				}
+				description:   "Configuration for source functionality."
+				required:      false
+				relevant_when: "type = \"memory\""
+			}
 			ttl: {
 				type: uint: default: 600
 				description: """
