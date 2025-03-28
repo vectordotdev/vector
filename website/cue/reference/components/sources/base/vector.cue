@@ -31,22 +31,6 @@ base: components: sources: vector: configuration: {
 		required: true
 		type: string: {}
 	}
-	headers: {
-		description: """
-			A list of HTTP headers to include in the log event.
-
-			Accepts the wildcard (`*`) character for headers matching a specified pattern.
-
-			Specifying "*" results in all headers included in the log event.
-
-			These headers are not included in the JSON payload if a field with a conflicting name exists.
-			"""
-		required: false
-		type: array: {
-			default: []
-			items: type: string: examples: ["User-Agent", "X-My-Custom-Header", "X-*", "*"]
-		}
-	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
