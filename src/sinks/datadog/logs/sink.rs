@@ -16,15 +16,67 @@ use crate::{
         util::{http::HttpJsonBatchSizer, Compressor},
     },
 };
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PartitionKey {
+    conforms: bool,
+    api_key: Option<Arc<str>>,
+}
+
 #[derive(Default)]
 pub struct EventPartitioner;
 
+impl EventPartitioner {
+    fn attr_is(log: &LogEvent, attr: &str, f: fn(&Value) -> bool) -> bool {
+        log.get(attr).map(f).is_some()
+    }
+
+    fn attr_is_bytes(log: &LogEvent, attr: &str) -> bool {
+        Self::attr_is(log, attr, Value::is_bytes)
+    }
+
+    fn attr_is_int(log: &LogEvent, attr: &str) -> bool {
+        Self::attr_is(log, attr, Value::is_integer)
+    }
+
+    fn event_originates_from_agent(item: &Event) -> bool {
+        let log = item.as_log();
+        log.source_type_path()
+            .and_then(|source_type_path| log.get(source_type_path))
+            .and_then(Value::as_str)
+            .map(|source_type_str| source_type_str == "datadog_agent")
+            .unwrap_or(false)
+    }
+
+    /// Evaluates the payload as conforming to the agent standard if the following 7 attributes
+    /// exist and also adhere to the expected types. All types are expected to be strings with the
+    /// exception of timestamp which should be an integer.
+    fn event_conforms_to_agent_payload(item: &Event) -> bool {
+        let log = item.as_log();
+        Self::attr_is_bytes(log, "message")
+            && Self::attr_is_bytes(log, "status")
+            && Self::attr_is_bytes(log, "hostname")
+            && Self::attr_is_bytes(log, "service")
+            && Self::attr_is_bytes(log, "ddsource")
+            && Self::attr_is_bytes(log, "ddtags")
+            && Self::attr_is_int(log, "timestamp")
+    }
+}
+
 impl Partitioner for EventPartitioner {
     type Item = Event;
-    type Key = Option<Arc<str>>;
+    type Key = PartitionKey;
 
+    /// Partition on api_key and if the payload conforms to the agent standard. If it does conform
+    /// the payload will be partitioned so that the sink can apply the appropriate HTTP header on
+    /// the HTTP request.
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.metadata().datadog_api_key()
+        let from_agent = Self::event_originates_from_agent(item);
+        let event_conforms = Self::event_conforms_to_agent_payload(item);
+        Self::Key {
+            conforms: (from_agent && event_conforms),
+            api_key: item.metadata().datadog_api_key(),
+        }
     }
 }
 
@@ -211,6 +263,7 @@ impl LogRequestBuilder {
         &self,
         events: Vec<Event>,
         api_key: Arc<str>,
+        conforms: bool,
     ) -> Result<Vec<LogApiRequest>, RequestBuildError> {
         // Transform events and pre-compute their estimated size.
         let mut events_with_estimated_size: VecDeque<(Event, JsonSize)> = events
@@ -236,8 +289,13 @@ impl LogRequestBuilder {
                     reason: "Event too large to encode."
                 });
             } else {
-                let request =
-                    self.finish_request(body, events_serialized, byte_size, Arc::clone(&api_key))?;
+                let request = self.finish_request(
+                    body,
+                    events_serialized,
+                    byte_size,
+                    Arc::clone(&api_key),
+                    conforms,
+                )?;
                 requests.push(request);
             }
         }
@@ -251,6 +309,7 @@ impl LogRequestBuilder {
         mut events: Vec<Event>,
         byte_size: GroupedCountByteSize,
         api_key: Arc<str>,
+        conforms: bool,
     ) -> Result<LogApiRequest, RequestBuildError> {
         let n_events = events.len();
         let uncompressed_size = buf.len();
@@ -276,6 +335,7 @@ impl LogRequestBuilder {
             metadata: request_metadata_builder.build(&payload),
             uncompressed_size: payload.uncompressed_byte_size,
             body: payload.into_payload(),
+            conforms,
         })
     }
 }
@@ -350,10 +410,10 @@ where
                 let builder = Arc::clone(&builder);
 
                 Box::pin(async move {
-                    let (api_key, events) = input;
+                    let (PartitionKey { conforms, api_key }, events) = input;
                     let api_key = api_key.unwrap_or_else(|| Arc::clone(&builder.default_api_key));
 
-                    builder.build_request(events, api_key)
+                    builder.build_request(events, api_key, conforms)
                 })
             })
             .filter_map(|request| async move {
