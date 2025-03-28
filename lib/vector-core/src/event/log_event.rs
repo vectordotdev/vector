@@ -1,3 +1,7 @@
+use crate::event::util::log::all_fields_skip_array_elements;
+use bytes::Bytes;
+use chrono::Utc;
+use std::collections::BTreeMap;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
@@ -7,10 +11,6 @@ use std::{
     num::NonZeroUsize,
     sync::{Arc, LazyLock},
 };
-use std::collections::BTreeMap;
-use crate::event::util::log::all_fields_skip_array_elements;
-use bytes::Bytes;
-use chrono::Utc;
 
 use crossbeam_utils::atomic::AtomicCell;
 use lookup::{lookup_v2::TargetPath, metadata_path, path, PathPrefix};
@@ -107,14 +107,9 @@ impl Clone for Inner {
     fn clone(&self) -> Self {
         Self {
             fields: self.fields.clone(),
-            // This clone is only ever used in combination with
-            // `Arc::make_mut`, so don't bother fetching the size
-            // cache to copy it since it will be invalidated anyways.
+            // The caches cannot be directly cloned, so just reset them since it's likely they will
+            // need to be updated after the clone anyways.
             size_cache: None.into(),
-
-            // This clone is only ever used in combination with
-            // `Arc::make_mut`, so don't bother fetching the size
-            // cache to copy it since it will be invalidated anyways.
             json_encoded_size_cache: None.into(),
         }
     }
@@ -150,7 +145,7 @@ impl PartialEq for Inner {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct LogEvent {
     #[serde(flatten)]
-    inner: Arc<Inner>,
+    inner: Inner,
 
     #[serde(skip)]
     metadata: EventMetadata,
@@ -177,15 +172,14 @@ impl LogEvent {
     }
 
     pub fn value(&self) -> &Value {
-        self.inner.as_ref().as_value()
+        self.inner.as_value()
     }
 
     pub fn value_mut(&mut self) -> &mut Value {
-        let result = Arc::make_mut(&mut self.inner);
         // We MUST invalidate the inner size cache when making a
         // mutable copy, since the _next_ action will modify the data.
-        result.invalidate();
-        &mut result.fields
+        self.inner.invalidate();
+        &mut self.inner.fields
     }
 
     pub fn metadata(&self) -> &EventMetadata {
@@ -258,26 +252,20 @@ impl LogEvent {
     ///  Create a `LogEvent` from a `Value` and `EventMetadata`
     pub fn from_parts(value: Value, metadata: EventMetadata) -> Self {
         Self {
-            inner: Arc::new(value.into()),
+            inner: value.into(),
             metadata,
         }
     }
 
     ///  Create a `LogEvent` from an `ObjectMap` and `EventMetadata`
     pub fn from_map(map: BTreeMap<KeyString, Value>, metadata: EventMetadata) -> Self {
-        let inner = Arc::new(Inner::from(Value::Object(map.into())));
+        let inner = Inner::from(Value::Object(map.into()));
         Self { inner, metadata }
     }
 
     /// Convert a `LogEvent` into a tuple of its components
-    pub fn into_parts(mut self) -> (Value, EventMetadata) {
-        self.value_mut();
-
-        let value = Arc::try_unwrap(self.inner)
-            .unwrap_or_else(|_| unreachable!("inner fields already cloned after owning"))
-            .fields;
-        let metadata = self.metadata;
-        (value, metadata)
+    pub fn into_parts(self) -> (Value, EventMetadata) {
+        (self.inner.fields, self.metadata)
     }
 
     #[must_use]
