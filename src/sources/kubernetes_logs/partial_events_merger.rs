@@ -269,8 +269,8 @@ mod test {
         e_2.insert("foo2", 1);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
-        // 32 > length of first message but less than the two combined
-        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, 32);
+        // 24 > length of first message but less than the two combined
+        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, 24);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 0);
