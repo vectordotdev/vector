@@ -14,12 +14,12 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::DecodingConfig,
-    common::mqtt::{MqttCommonConfig, ConfigurationError},
+    common::mqtt::{MqttCommonConfig, ConfigurationError, MqttError, TlsSnafu, ConfigurationSnafu},
     config::{SourceConfig, SourceContext, SourceOutput},
     serde::{default_decoding, default_framing_message_based},
 };
 
-use super::source::{ConfigurationSnafu, MqttConnector, MqttError, MqttSource, TlsSnafu};
+use super::source::{MqttConnector, MqttSource};
 
 
 

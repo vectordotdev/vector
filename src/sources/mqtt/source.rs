@@ -6,7 +6,7 @@ use rumqttc::{Event as MqttEvent, Publish};
 
 use crate::{
     codecs::Decoder,
-    common::mqtt::ConfigurationError,
+    common::mqtt::MqttError,
     event::BatchNotifier,
     internal_events::{EndpointBytesReceived, StreamClosedError},
     shutdown::ShutdownSignal,
@@ -15,17 +15,6 @@ use crate::{
 };
 
 use rumqttc::{AsyncClient, ClientError, EventLoop, Incoming, MqttOptions, QoS};
-use snafu::Snafu;
-use vector_lib::tls::TlsError;
-
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
-pub enum MqttError {
-    #[snafu(display("TLS error: {}", source))]
-    Tls { source: TlsError },
-    #[snafu(display("MQTT configuration error: {}", source))]
-    Configuration { source: ConfigurationError },
-}
 
 #[derive(Clone)]
 pub struct MqttConnector {
