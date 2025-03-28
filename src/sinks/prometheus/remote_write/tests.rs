@@ -23,7 +23,7 @@ fn generate_config() {
 }
 
 macro_rules! labels {
-        ( $( $name:expr => $value:expr ),* ) => {
+        ( $( $name:expr_2021 => $value:expr_2021 ),* ) => {
             vec![ $( proto::Label {
                 name: $name.to_string(),
                 value: $value.to_string()

@@ -49,13 +49,13 @@ impl PathsProvider for K8sPathsProvider {
             // they will be picked up on a later run
             .filter(|pod| {
                 trace!(message = "Verifying Namespace metadata for pod.", pod = ?pod.metadata.name);
-                if let Some(namespace) = pod.metadata.namespace.as_ref() {
+                match pod.metadata.namespace.as_ref() { Some(namespace) => {
                     self.namespace_state
                         .get(&ObjectRef::<Namespace>::new(namespace))
                         .is_some()
-                } else {
+                } _ => {
                     false
-                }
+                }}
             })
             .flat_map(|pod| {
                 trace!(message = "Providing log paths for pod.", pod = ?pod.metadata.name);
@@ -171,7 +171,7 @@ where
         })
 }
 
-fn real_glob(pattern: &str) -> impl Iterator<Item = PathBuf> {
+fn real_glob(pattern: &str) -> impl Iterator<Item = PathBuf> + use<> {
     glob::glob_with(
         pattern,
         glob::MatchOptions {

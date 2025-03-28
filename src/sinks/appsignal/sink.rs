@@ -28,11 +28,11 @@ where
 
         input
             .filter_map(move |event| {
-                ready(if let Event::Metric(metric) = event {
+                ready(match event { Event::Metric(metric) => {
                     normalizer.normalize(metric).map(Event::Metric)
-                } else {
+                } _ => {
                     Some(event)
-                })
+                }})
             })
             .batched(self.batch_settings.as_byte_size_config())
             .request_builder(

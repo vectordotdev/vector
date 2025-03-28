@@ -100,11 +100,11 @@ fn compute_api_endpoint(endpoint: &str) -> String {
             .expect("Could not build Datadog domain regex")
     });
 
-    if let Some(caps) = DOMAIN_REGEX.captures(endpoint) {
+    match DOMAIN_REGEX.captures(endpoint) { Some(caps) => {
         format!("https://api.{}", &caps[1])
-    } else {
+    } _ => {
         endpoint.into()
-    }
+    }}
 }
 
 /// Default settings to use for Datadog components.

@@ -307,11 +307,11 @@ impl StreamSink<Event> for Memory {
         loop {
             tokio::select! {
                 event = input.next() => {
-                    let mut event = if let Some(event) = event {
+                    let mut event = match event { Some(event) => {
                         event
-                    } else {
+                    } _ => {
                         break;
-                    };
+                    }};
                     let event_byte_size = event.estimated_json_encoded_size_of();
 
                     let finalizers = event.take_finalizers();

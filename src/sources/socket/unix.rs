@@ -99,7 +99,7 @@ fn handle_events(
     let now = Utc::now();
 
     for event in events {
-        if let Event::Log(ref mut log) = event {
+        if let Event::Log(log) = event {
             log_namespace.insert_standard_vector_source_metadata(log, SocketConfig::NAME, now);
 
             if let Some(ref host) = received_from {

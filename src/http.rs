@@ -200,11 +200,11 @@ pub fn build_tls_connector(
 
     let settings = tls_settings.tls().cloned();
     https.set_callback(move |c, _uri| {
-        if let Some(settings) = &settings {
+        match &settings { Some(settings) => {
             settings.apply_connect_configuration(c)
-        } else {
+        } _ => {
             Ok(())
-        }
+        }}
     });
     Ok(https)
 }

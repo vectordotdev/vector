@@ -273,7 +273,7 @@ impl FileSink {
                             // Close all the open files.
                             debug!(message = "Closing all the open files.");
                             for (path, file) in self.files.iter_mut() {
-                                if let Err(error) = file.close().await {
+                                match file.close().await { Err(error) => {
                                     emit!(FileIoError {
                                         error,
                                         code: "failed_closing_file",
@@ -281,9 +281,9 @@ impl FileSink {
                                         path,
                                         dropped_events: 0,
                                     });
-                                } else{
+                                } _ => {
                                     trace!(message = "Successfully closed file.", path = ?path);
-                                }
+                                }}
                             }
 
                             emit!(FileOpen {
@@ -340,10 +340,10 @@ impl FileSink {
         let next_deadline = self.deadline_at();
         trace!(message = "Computed next deadline.", next_deadline = ?next_deadline, path = ?path);
 
-        let file = if let Some(file) = self.files.reset_at(&path, next_deadline) {
+        let file = match self.files.reset_at(&path, next_deadline) { Some(file) => {
             trace!(message = "Working with an already opened file.", path = ?path);
             file
-        } else {
+        } _ => {
             trace!(message = "Opening new file.", ?path);
             let file = match open_file(BytesPath::new(path.clone())).await {
                 Ok(file) => file,
@@ -370,7 +370,7 @@ impl FileSink {
                 count: self.files.len()
             });
             self.files.get_mut(&path).unwrap()
-        };
+        }};
 
         trace!(message = "Writing an event to file.", path = ?path);
         let event_size = event.estimated_json_encoded_size_of();
