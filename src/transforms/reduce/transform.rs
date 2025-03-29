@@ -308,14 +308,12 @@ impl Reduce {
         } else if self.condition_on_merged && !ends_here {
             self.push_or_new_reduce_state(event, discriminant.clone());
             if let Some(check_state) = self.reduce_merge_states.get_mut(&discriminant) {
-                warn!(message = "Running check on ", %discriminant);
                 (ends_here, _) = match &self.ends_when {
                     Some(condition) => condition.check(check_state.merged_log.clone()),
                     None => (false, check_state.merged_log.clone()),
                 };
 
                 if ends_here {
-                    warn!(message = "Reached end of ", %discriminant );
                     if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
                         emitter.emit(state.flush().into());
                     }
