@@ -26,6 +26,7 @@ struct ReduceState {
     stale_since: Instant,
     creation: Instant,
     metadata: EventMetadata,
+    merged_log: Event,
 }
 
 fn is_covered_by_strategy(
@@ -50,6 +51,7 @@ impl ReduceState {
             creation: Instant::now(),
             fields: HashMap::new(),
             metadata: EventMetadata::default(),
+            merged_log: Event::Log(LogEvent::default()),
         }
     }
 
@@ -73,6 +75,10 @@ impl ReduceState {
                         }
                     }
                 }
+
+                if let Some(new_entry) = self.fields.get(&path.clone()) {
+                    let _ = new_entry.insert_into(&path.clone(), self.merged_log.as_mut_log());
+                }
             }
         }
 
@@ -91,12 +97,13 @@ impl ReduceState {
                 }
 
                 let maybe_strategy = strategies.get(&parsed_path);
-                match self.fields.entry(parsed_path) {
+                match self.fields.entry(parsed_path.clone()) {
                     Entry::Vacant(entry) => {
                         if let Some(strategy) = maybe_strategy {
                             match get_value_merger(value.clone(), strategy) {
                                 Ok(m) => {
                                     entry.insert(m);
+                                    
                                 }
                                 Err(error) => {
                                     warn!(message = "Failed to merge value.", %error);
@@ -111,6 +118,10 @@ impl ReduceState {
                             warn!(message = "Failed to merge value.", %error);
                         }
                     }
+                }
+
+                if let Some(new_entry) = self.fields.get(&parsed_path.clone()) {
+                    let _ = new_entry.insert_into(&parsed_path.clone(), self.merged_log.as_mut_log());
                 }
             }
         }
@@ -143,6 +154,7 @@ pub struct Reduce {
     ends_when: Option<Condition>,
     starts_when: Option<Condition>,
     max_events: Option<usize>,
+    condition_on_merged: bool,
 }
 
 fn validate_merge_strategies(strategies: IndexMap<KeyString, MergeStrategy>) -> crate::Result<()> {
@@ -211,6 +223,7 @@ impl Reduce {
             ends_when,
             starts_when,
             max_events,
+            condition_on_merged: config.condition_on_merged,
         })
     }
 
@@ -256,15 +269,21 @@ impl Reduce {
     }
 
     pub(crate) fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
-        let (starts_here, event) = match &self.starts_when {
-            Some(condition) => condition.check(event),
-            None => (false, event),
-        };
+        let mut starts_here = false;
+        let mut ends_here = false;
+        let mut event = event;
 
-        let (mut ends_here, event) = match &self.ends_when {
-            Some(condition) => condition.check(event),
-            None => (false, event),
-        };
+        if !self.condition_on_merged {
+            (starts_here, event) = match &self.starts_when {
+                Some(condition) => condition.check(event),
+                None => (false, event),
+            };
+
+            (ends_here, event) = match &self.ends_when {
+                Some(condition) => condition.check(event),
+                None => (false, event),
+            };
+        }
 
         let event = event.into_log();
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);
@@ -286,20 +305,41 @@ impl Reduce {
             }
 
             self.push_or_new_reduce_state(event, discriminant)
-        } else if ends_here {
-            emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
-                Some(mut state) => {
-                    state.add_event(event, &self.merge_strategies);
-                    state.flush().into()
+        }
+        else {
+            if self.condition_on_merged && !ends_here {
+                self.push_or_new_reduce_state(event, discriminant.clone());
+                if let Some(check_state) = self.reduce_merge_states.get_mut(&discriminant) {
+                    warn!(message = "Running check on ", %discriminant);
+                    (ends_here, _) = match &self.ends_when {
+                        Some(condition) => condition.check(check_state.merged_log.clone()),
+                        None => (false, check_state.merged_log.clone()),
+                    };
+
+                    if ends_here {
+                        warn!(message = "Reached end of ", %discriminant );
+                        if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
+                            emitter.emit(state.flush().into());
+                        }
+                    }
                 }
-                None => {
-                    let mut state = ReduceState::new();
-                    state.add_event(event, &self.merge_strategies);
-                    state.flush().into()
-                }
-            });
-        } else {
-            self.push_or_new_reduce_state(event, discriminant)
+            }
+            else if ends_here {
+                emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
+                    Some(mut state) => {
+                        state.add_event(event, &self.merge_strategies);
+                        state.flush().into()
+                    }
+                    None => {
+                        let mut state = ReduceState::new();
+                        state.add_event(event, &self.merge_strategies);
+                        state.flush().into()
+                    }
+                });
+            }
+            else {
+                self.push_or_new_reduce_state(event, discriminant)
+            }
         }
     }
 }
@@ -455,6 +495,132 @@ group_by = [ "request_id" ]
             schema_definitions
                 .values()
                 .for_each(|definition| definition.assert_valid_for_event(&output_2.clone().into()));
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn reduce_from_merged_condition() {
+        let reduce_config = toml::from_str::<ReduceConfig>(
+            r#"
+group_by = [ "request_id" ]
+condition_on_merged = true
+merge_strategies.message = "array"
+merge_strategies.size = "retain"
+
+[ends_when]
+  type = "vrl"
+  source = "(is_array(.message) && (to_int!(.size)) == length!(.message)) || (is_string(.message) && to_int!(.size) == 1)"
+"#,
+        )
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+
+            let input_definition = schema::Definition::default_legacy_namespace()
+                .with_event_field(&owned_value_path!("size"), Kind::integer(), None)
+                .with_event_field(&owned_value_path!("request_id"), Kind::bytes(), None);
+            let schema_definitions = reduce_config
+                .outputs(
+                    vector_lib::enrichment::TableRegistry::default(),
+                    &[("test".into(), input_definition)],
+                    LogNamespace::Legacy,
+                )
+                .first()
+                .unwrap()
+                .schema_definitions(true)
+                .clone();
+
+            let new_schema_definition = reduce_config.outputs(
+                TableRegistry::default(),
+                &[(OutputId::from("in"), Definition::default_legacy_namespace())],
+                LogNamespace::Legacy,
+            )[0]
+            .clone()
+            .log_schema_definitions
+            .get(&OutputId::from("in"))
+            .unwrap()
+            .clone();
+
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
+
+            let mut e_1 = LogEvent::from("test message 1 request 1");
+            e_1.insert("request_id", "1");
+            e_1.insert("size", 1);
+            let mut metadata = e_1.metadata().clone();
+            metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+            metadata.set_schema_definition(&Arc::new(new_schema_definition.clone()));
+            tx.send(e_1.into()).await.unwrap();
+
+            let mut e_2 = LogEvent::from("test message 1 request 2");
+            e_2.insert("request_id", "2");
+            e_2.insert("size", 2);
+            tx.send(e_2.into()).await.unwrap();
+
+            let mut e_3 = LogEvent::from("test message 2 request 2");
+            e_3.insert("request_id", "2");
+            e_3.insert("size", 2);
+            tx.send(e_3.into()).await.unwrap();
+
+            let mut e_4 = LogEvent::from("test message 1 request 3");
+            e_4.insert("request_id", "3");
+            e_4.insert("size", 3);
+            tx.send(e_4.into()).await.unwrap();
+
+            let mut e_5 = LogEvent::from("test message 2 request 3");
+            e_5.insert("request_id", "3");
+            e_5.insert("size", 3);
+            tx.send(e_5.into()).await.unwrap();
+
+            let mut e_6 = LogEvent::from("test message 3 request 3");
+            e_6.insert("request_id", "3");
+            e_6.insert("size", 3);
+            tx.send(e_6.into()).await.unwrap();
+
+            let mut e_7 = LogEvent::from("test message 4 request 3 - beyond count");
+            e_7.insert("request_id", "3");
+            e_7.insert("size", 1);
+            tx.send(e_7.into()).await.unwrap();
+
+            let output_1 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_1["message"], 
+                Value::Array(vec![
+                    "test message 1 request 1".into()
+                ])
+            );
+            assert_eq!(output_1.metadata(), &metadata);
+            schema_definitions
+                .values()
+                .for_each(|definition| definition.assert_valid_for_event(&output_1.clone().into()));
+
+            let output_2 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_2["message"],
+                Value::Array(vec![
+                    "test message 1 request 2".into(),
+                    "test message 2 request 2".into()
+                ])
+            );
+
+            let output_3 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_3["message"],
+                Value::Array(vec![
+                    "test message 1 request 3".into(),
+                    "test message 2 request 3".into(),
+                    "test message 3 request 3".into()
+                ])
+            );
+
+            let output_4 = out.recv().await.unwrap().into_log();
+            assert_eq!(output_4["message"],
+                Value::Array(vec![
+                    "test message 4 request 3 - beyond count".into(),
+                ])
+            );
 
             drop(tx);
             topology.stop().await;

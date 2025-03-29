@@ -69,11 +69,11 @@ impl ReduceValueMerger for DiscardMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(path, self.v);
+        v.insert(path, self.v.clone());
         Ok(())
     }
 }
@@ -99,11 +99,11 @@ impl ReduceValueMerger for RetainMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(path, self.v);
+        v.insert(path, self.v.clone());
         Ok(())
     }
 }
@@ -143,11 +143,11 @@ impl ReduceValueMerger for ConcatMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(path, Value::Bytes(self.v.into()));
+        v.insert(path, Value::Bytes(self.v.clone().into()));
         Ok(())
     }
 }
@@ -174,11 +174,11 @@ impl ReduceValueMerger for ConcatArrayMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v));
+        v.insert(path, Value::Array(self.v.clone()));
         Ok(())
     }
 }
@@ -201,11 +201,11 @@ impl ReduceValueMerger for ArrayMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v));
+        v.insert(path, Value::Array(self.v.clone()));
         Ok(())
     }
 }
@@ -237,11 +237,11 @@ impl ReduceValueMerger for LongestArrayMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v));
+        v.insert(path, Value::Array(self.v.clone()));
         Ok(())
     }
 }
@@ -273,11 +273,11 @@ impl ReduceValueMerger for ShortestArrayMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v));
+        v.insert(path, Value::Array(self.v.clone()));
         Ok(())
     }
 }
@@ -322,11 +322,11 @@ impl ReduceValueMerger for FlatUniqueMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v.into_iter().collect()));
+        v.insert(path, Value::Array(self.v.clone().into_iter().collect()));
         Ok(())
     }
 }
@@ -360,7 +360,7 @@ impl ReduceValueMerger for TimestampWindowMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
@@ -428,7 +428,7 @@ impl ReduceValueMerger for AddNumbersMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
@@ -491,7 +491,7 @@ impl ReduceValueMerger for MaxNumberMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
@@ -554,7 +554,7 @@ impl ReduceValueMerger for MinNumberMerger {
     }
 
     fn insert_into(
-        self: Box<Self>,
+        &self,
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
@@ -568,7 +568,7 @@ impl ReduceValueMerger for MinNumberMerger {
 
 pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync {
     fn add(&mut self, v: Value) -> Result<(), String>;
-    fn insert_into(self: Box<Self>, path: &OwnedTargetPath, v: &mut LogEvent)
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent)
         -> Result<(), String>;
 }
 

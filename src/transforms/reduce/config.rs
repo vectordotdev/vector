@@ -98,6 +98,17 @@ pub struct ReduceConfig {
     /// If this condition resolves to `true` for an event, the previous transaction is flushed
     /// (without this event) and a new transaction is started.
     pub starts_when: Option<AnyCondition>,
+
+    /// Runs `ends_with` condition on the merged event instead of the original incoming event.
+    ///
+    /// Normally, the `ends_when` condition happens on the original incoming event. In some cases,
+    /// you may wish to run the conditional on the merged result.
+    ///
+    /// In these cases, `condition_on_merged` can be set to `true` to run the conditions
+    /// against the merged result.
+    #[serde(default = "crate::serde::default_false")]
+    #[configurable(metadata(docs::human_name = "Run Conditions on Merged Event"))]
+    pub condition_on_merged: bool,
 }
 
 const fn default_expire_after_ms() -> Duration {
