@@ -136,6 +136,8 @@ impl SinkConfig for PubsubConfig {
             request_settings,
             batch_settings.timeout,
             client,
+            #[cfg(feature = "aws-core")]
+            None,
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error));
 

@@ -130,6 +130,8 @@ impl SinkConfig for DatabendConfig {
             Some(Auth::Bearer { .. }) => {
                 return Err("Bearer authentication is not supported currently".into());
             }
+            #[cfg(feature = "aws-core")]
+            Some(Auth::Aws { .. }) => {}
             None => {}
         }
         if let Some(database) = &self.database {

@@ -108,7 +108,12 @@ impl SinkConfig for KeepConfig {
 
         let client = HttpClient::new(None, cx.proxy())?;
 
-        let service = HttpService::new(client.clone(), keep_service_request_builder);
+        let service = HttpService::new(
+            client.clone(),
+            keep_service_request_builder,
+            #[cfg(feature = "aws-core")]
+            None,
+        );
 
         let request_limits = self.request.into_settings();
 

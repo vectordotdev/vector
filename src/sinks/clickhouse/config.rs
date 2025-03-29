@@ -139,8 +139,12 @@ impl SinkConfig for ClickhouseConfig {
             compression: self.compression,
         };
 
-        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
-            HttpService::new(client.clone(), clickhouse_service_request_builder);
+        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> = HttpService::new(
+            client.clone(),
+            clickhouse_service_request_builder,
+            #[cfg(feature = "aws-core")]
+            None,
+        );
 
         let request_limits = self.request.into_settings();
 
