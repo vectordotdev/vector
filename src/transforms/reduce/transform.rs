@@ -103,7 +103,6 @@ impl ReduceState {
                             match get_value_merger(value.clone(), strategy) {
                                 Ok(m) => {
                                     entry.insert(m);
-                                    
                                 }
                                 Err(error) => {
                                     warn!(message = "Failed to merge value.", %error);
@@ -121,7 +120,8 @@ impl ReduceState {
                 }
 
                 if let Some(new_entry) = self.fields.get(&parsed_path.clone()) {
-                    let _ = new_entry.insert_into(&parsed_path.clone(), self.merged_log.as_mut_log());
+                    let _ =
+                        new_entry.insert_into(&parsed_path.clone(), self.merged_log.as_mut_log());
                 }
             }
         }
@@ -305,41 +305,36 @@ impl Reduce {
             }
 
             self.push_or_new_reduce_state(event, discriminant)
-        }
-        else {
-            if self.condition_on_merged && !ends_here {
-                self.push_or_new_reduce_state(event, discriminant.clone());
-                if let Some(check_state) = self.reduce_merge_states.get_mut(&discriminant) {
-                    warn!(message = "Running check on ", %discriminant);
-                    (ends_here, _) = match &self.ends_when {
-                        Some(condition) => condition.check(check_state.merged_log.clone()),
-                        None => (false, check_state.merged_log.clone()),
-                    };
+        } else if self.condition_on_merged && !ends_here {
+            self.push_or_new_reduce_state(event, discriminant.clone());
+            if let Some(check_state) = self.reduce_merge_states.get_mut(&discriminant) {
+                warn!(message = "Running check on ", %discriminant);
+                (ends_here, _) = match &self.ends_when {
+                    Some(condition) => condition.check(check_state.merged_log.clone()),
+                    None => (false, check_state.merged_log.clone()),
+                };
 
-                    if ends_here {
-                        warn!(message = "Reached end of ", %discriminant );
-                        if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
-                            emitter.emit(state.flush().into());
-                        }
+                if ends_here {
+                    warn!(message = "Reached end of ", %discriminant );
+                    if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
+                        emitter.emit(state.flush().into());
                     }
                 }
             }
-            else if ends_here {
-                emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
-                    Some(mut state) => {
-                        state.add_event(event, &self.merge_strategies);
-                        state.flush().into()
-                    }
-                    None => {
-                        let mut state = ReduceState::new();
-                        state.add_event(event, &self.merge_strategies);
-                        state.flush().into()
-                    }
-                });
-            }
-            else {
-                self.push_or_new_reduce_state(event, discriminant)
-            }
+        } else if ends_here {
+            emitter.emit(match self.reduce_merge_states.remove(&discriminant) {
+                Some(mut state) => {
+                    state.add_event(event, &self.merge_strategies);
+                    state.flush().into()
+                }
+                None => {
+                    let mut state = ReduceState::new();
+                    state.add_event(event, &self.merge_strategies);
+                    state.flush().into()
+                }
+            });
+        } else {
+            self.push_or_new_reduce_state(event, discriminant)
         }
     }
 }
@@ -588,10 +583,9 @@ merge_strategies.size = "retain"
             tx.send(e_7.into()).await.unwrap();
 
             let output_1 = out.recv().await.unwrap().into_log();
-            assert_eq!(output_1["message"], 
-                Value::Array(vec![
-                    "test message 1 request 1".into()
-                ])
+            assert_eq!(
+                output_1["message"],
+                Value::Array(vec!["test message 1 request 1".into()])
             );
             assert_eq!(output_1.metadata(), &metadata);
             schema_definitions
@@ -599,7 +593,8 @@ merge_strategies.size = "retain"
                 .for_each(|definition| definition.assert_valid_for_event(&output_1.clone().into()));
 
             let output_2 = out.recv().await.unwrap().into_log();
-            assert_eq!(output_2["message"],
+            assert_eq!(
+                output_2["message"],
                 Value::Array(vec![
                     "test message 1 request 2".into(),
                     "test message 2 request 2".into()
@@ -607,7 +602,8 @@ merge_strategies.size = "retain"
             );
 
             let output_3 = out.recv().await.unwrap().into_log();
-            assert_eq!(output_3["message"],
+            assert_eq!(
+                output_3["message"],
                 Value::Array(vec![
                     "test message 1 request 3".into(),
                     "test message 2 request 3".into(),
@@ -616,10 +612,9 @@ merge_strategies.size = "retain"
             );
 
             let output_4 = out.recv().await.unwrap().into_log();
-            assert_eq!(output_4["message"],
-                Value::Array(vec![
-                    "test message 4 request 3 - beyond count".into(),
-                ])
+            assert_eq!(
+                output_4["message"],
+                Value::Array(vec!["test message 4 request 3 - beyond count".into(),])
             );
 
             drop(tx);
