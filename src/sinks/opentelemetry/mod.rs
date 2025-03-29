@@ -30,12 +30,12 @@ pub struct OpenTelemetryConfig {
     #[configurable(derived)]
     protocol: Protocol,
 
-    /// The endpoint to send OpenTelemetry metrics to.
+    /// The endpoint to send OpenTelemetry logs, metrics, and traces to.
     ///
     /// This should be a full URL, including the protocol (e.g. `https://`).
-    /// If not specified, metrics will not be sent.
+    /// If not specified, telemetry will not be sent.
     #[configurable(metadata(docs::examples = "http://localhost:4317/v1/metrics"))]
-    pub metrics_endpoint: Option<String>,
+    pub endpoint: Option<String>,
 
     /// The endpoint to send healthcheck requests to.
     ///
@@ -60,7 +60,7 @@ impl Default for OpenTelemetryConfig {
     fn default() -> Self {
         Self {
             protocol: Protocol::default(),
-            metrics_endpoint: None,
+            endpoint: None,
             healthcheck_endpoint: None,
             default_namespace: Some("vector".to_string()),
             aggregation_temporality: AggregationTemporality::Cumulative,
@@ -135,25 +135,24 @@ impl SinkConfig for OpenTelemetryConfig {
         };
 
         // Build the metrics sink if an endpoint is provided
-        let metrics_sink = if let Some(metrics_endpoint) = &self.metrics_endpoint {
+        let metrics_sink = if let Some(endpoint) = &self.endpoint {
             use crate::sinks::opentelemetry::metrics::OpentelemetryMetricsSvc;
-            // use crate::sinks::util::BatchSink;
-            // use crate::sinks::util::PartitionBuffer;
-            // use crate::sinks::util::BatchSettings;
-
             debug!(
                 "Creating OpenTelemetry metrics sink with endpoint: {}",
-                metrics_endpoint
+                endpoint
             );
-            let service = OpentelemetryMetricsSvc::new(
-                self.default_namespace
-                    .clone()
-                    .unwrap_or_else(|| "vector".to_string()),
-                metrics_endpoint.clone(),
+            let namespace = self
+                .default_namespace
+                .clone()
+                .unwrap_or_else(|| "vector".to_string());
+
+            let metrics_service = OpentelemetryMetricsSvc::new(
+                namespace,
+                endpoint.clone(),
                 self.aggregation_temporality,
             )?;
-            let sink = VectorSink::from_event_streamsink(service);
-            Some(sink)
+            let metrics_sink = VectorSink::from_event_streamsink(metrics_service);
+            Some(metrics_sink)
         } else {
             None
         };
@@ -186,12 +185,8 @@ impl SinkConfig for OpenTelemetryConfig {
     }
 
     fn input(&self) -> Input {
-        if self.metrics_endpoint.is_some() {
-            Input::metric()
-        } else {
-            match &self.protocol {
-                Protocol::Http(config) => config.input(),
-            }
+        match &self.protocol {
+            Protocol::Http(config) => config.input(),
         }
     }
 
@@ -242,7 +237,7 @@ mod test {
         "#};
         let config: OpenTelemetryConfig = toml::from_str(config).unwrap();
 
-        assert!(config.metrics_endpoint.is_none());
+        assert!(config.endpoint.is_none());
         assert!(config.healthcheck_endpoint.is_none());
         assert_eq!(config.default_namespace, Some("vector".to_string()));
         assert!(matches!(
@@ -259,7 +254,7 @@ mod test {
             uri = "http://localhost:5318/v1/logs"
             encoding.codec = "json"
             
-            metrics_endpoint = "http://localhost:4317/v1/metrics"
+            endpoint = "http://localhost:4317/v1/metrics"
             healthcheck_endpoint = "http://localhost:13133"
             default_namespace = "myservice"
             aggregation_temporality = "delta"
@@ -267,7 +262,7 @@ mod test {
         let config: OpenTelemetryConfig = toml::from_str(config).unwrap();
 
         assert_eq!(
-            config.metrics_endpoint,
+            config.endpoint,
             Some("http://localhost:4317/v1/metrics".to_string())
         );
         assert_eq!(

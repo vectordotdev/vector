@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::event::metric::{Metric as VectorMetric, MetricValue};
 use std::task::{Context, Poll};
 use vector_config::configurable_component;
@@ -14,7 +12,7 @@ use vector_lib::event::EventStatus;
 use opentelemetry::metrics::{Meter, MeterProvider};
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::{MetricExporter, WithExportConfig};
-use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider, Temporality};
+use opentelemetry_sdk::metrics::{SdkMeterProvider, Temporality};
 
 use crate::event::Event;
 use crate::sinks::util::PartitionInnerBuffer;
@@ -74,11 +72,7 @@ impl OpentelemetryMetricsSvc {
 
         // Create the meter provider with the exporter
         let provider = SdkMeterProvider::builder()
-            .with_reader(
-                PeriodicReader::builder(exporter)
-                    .with_interval(Duration::from_secs(10))
-                    .build(),
-            )
+            .with_periodic_exporter(exporter)
             .build();
 
         let meter = provider.meter("vector");
@@ -172,7 +166,7 @@ impl Drop for OpentelemetryMetricsSvc {
     fn drop(&mut self) {
         // Ensure metrics are exported before shutting down
         if let Err(err) = self.meter_provider.shutdown() {
-            eprintln!("Error shutting down meter provider: {:?}", err);
+            error!("Error shutting down meter provider: {:?}", err);
         }
     }
 }

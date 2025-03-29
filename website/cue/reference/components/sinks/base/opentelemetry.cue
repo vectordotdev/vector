@@ -909,16 +909,16 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 		}
 	}
 
-	metrics_endpoint: {
+	endpoint: {
 		description: """
-			The endpoint to send OpenTelemetry metrics to.
+			The endpoint to send OpenTelemetry events to.
 			
 			This should be a full URL, including the protocol (e.g. `https://`).
-			If not specified, metrics will not be sent.
+			If not specified, events will not be sent.
 			"""
 		required: false
 		type: string: {
-			examples: ["http://localhost:4317/v1/metrics"]
+			examples: ["http://localhost:4317/v1/metrics", "http://localhost:4318/v1/logs"]
 		}
 	}
 
@@ -936,7 +936,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 
 	default_namespace: {
 		description: """
-			The default namespace to use for metrics that do not have one.
+			The default namespace to use for events that do not have one.
 			
 			Metrics with the same name can only be differentiated by their namespace.
 			"""
@@ -957,7 +957,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 		type: string: {
 			default: "cumulative"
 			enum: {
-				delta: "Delta temporality means that metrics are reported as changes since the last report."
+				delta:      "Delta temporality means that metrics are reported as changes since the last report."
 				cumulative: "Cumulative temporality means that metrics are reported as cumulative changes since a fixed start time."
 			}
 		}
@@ -966,7 +966,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 	input: {
 		logs:    true
 		metrics: true
-		traces:  false 
+		traces:  false
 	}
 
 	how_it_works: {
