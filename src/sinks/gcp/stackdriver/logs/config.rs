@@ -266,7 +266,12 @@ impl SinkConfig for StackdriverConfig {
             auth: auth.clone(),
         };
 
-        let service = HttpService::new(client.clone(), stackdriver_logs_service_request_builder);
+        let service = HttpService::new(
+            client.clone(),
+            stackdriver_logs_service_request_builder,
+            #[cfg(feature = "aws-core")]
+            None,
+        );
 
         let service = ServiceBuilder::new()
             .settings(request_limits, http_response_retry_logic())

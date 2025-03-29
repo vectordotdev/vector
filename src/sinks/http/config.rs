@@ -1,29 +1,36 @@
 //! Configuration for the `http` sink.
 
+#[cfg(feature = "aws-core")]
+use aws_config::meta::region::ProvideRegion;
+#[cfg(feature = "aws-core")]
+use aws_types::region::Region;
 use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
 use hyper::Body;
 use indexmap::IndexMap;
 use std::path::PathBuf;
-use vector_lib::codecs::{
-    encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder,
+use vector_lib::{
+    codecs::{
+        encoding::{Framer, Serializer},
+        CharacterDelimitedEncoder,
+    },
+    config::proxy::ProxyConfig,
 };
 
+use super::{
+    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
+    sink::HttpSink,
+};
+use crate::aws::AwsAuthentication;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService, RequestConfig},
+            http::{http_response_retry_logic, HttpService, RequestConfig, SigV4Config},
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
         },
     },
-};
-
-use super::{
-    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
-    sink::HttpSink,
 };
 
 const CONTENT_TYPE_TEXT: &str = "text/plain";
@@ -285,7 +292,34 @@ impl SinkConfig for HttpSinkConfig {
             content_encoding,
         );
 
-        let service = HttpService::new(client, http_sink_request_builder);
+        let sig_v4_config = match &self.auth {
+            None => None,
+            #[cfg(feature = "aws-core")]
+            Some(Auth::Aws { auth, service }) => {
+                let default_region = crate::aws::region_provider(&ProxyConfig::default(), None)?
+                    .region()
+                    .await;
+                let region = (match &auth {
+                    AwsAuthentication::AccessKey { region, .. } => region.clone(),
+                    AwsAuthentication::File { .. } => None,
+                    AwsAuthentication::Role { region, .. } => region.clone(),
+                    AwsAuthentication::Default { region, .. } => region.clone(),
+                })
+                .map_or(default_region, |r| Some(Region::new(r.to_string())))
+                .expect("Region must be specified");
+
+                Some(SigV4Config {
+                    shared_credentials_provider: auth
+                        .credentials_provider(region.clone(), &ProxyConfig::default(), None)
+                        .await?,
+                    region: region.clone(),
+                    service: service.clone(),
+                })
+            }
+            _ => None,
+        };
+
+        let service = HttpService::new(client, http_sink_request_builder, sig_v4_config);
 
         let request_limits = self.request.tower.into_settings();
 
