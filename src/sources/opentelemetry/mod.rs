@@ -23,6 +23,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_lib::opentelemetry::proto::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
+    metrics::v1::metrics_service_server::MetricsServiceServer,
     trace::v1::trace_service_server::TraceServiceServer,
 };
 use vector_lib::{
@@ -49,6 +50,7 @@ use crate::{
 use super::http_server::{build_param_matcher, remove_duplicates};
 
 pub const LOGS: &str = "logs";
+pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
 /// Configuration for the `opentelemetry` source.
@@ -180,8 +182,20 @@ impl SourceConfig for OpentelemetryConfig {
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
+        let metrics_service = MetricsServiceServer::new(Service {
+            pipeline: cx.out.clone(),
+            acknowledgements,
+            log_namespace,
+            events_received: events_received.clone(),
+        })
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(usize::MAX);
+
         let mut builder = RoutesBuilder::default();
-        builder.add_service(log_service).add_service(trace_service);
+        builder
+            .add_service(log_service)
+            .add_service(metrics_service)
+            .add_service(trace_service);
         let grpc_source = run_grpc_server_with_routes(
             self.grpc.address,
             grpc_tls_settings,
@@ -308,6 +322,7 @@ impl SourceConfig for OpentelemetryConfig {
 
         vec![
             SourceOutput::new_maybe_logs(DataType::Log, schema_definition).with_port(LOGS),
+            SourceOutput::new_metrics().with_port(METRICS),
             SourceOutput::new_traces().with_port(TRACES),
         ]
     }

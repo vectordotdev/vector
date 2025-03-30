@@ -1,3 +1,17 @@
+use super::proto::{
+    common::v1::{any_value::Value as PBValue, InstrumentationScope, KeyValue},
+    logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
+    metrics::v1::{
+        metric::Data, number_data_point::Value as NumberDataPointValue, ExponentialHistogram,
+        ExponentialHistogramDataPoint, Gauge, Histogram, HistogramDataPoint, NumberDataPoint,
+        ResourceMetrics, Sum, Summary, SummaryDataPoint,
+    },
+    resource::v1::Resource,
+    trace::v1::{
+        span::{Event as SpanEvent, Link},
+        ResourceSpans, Span, Status as SpanStatus,
+    },
+};
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use lookup::path;
@@ -5,22 +19,15 @@ use ordered_float::NotNan;
 use std::collections::BTreeMap;
 use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
-    event::{Event, LogEvent, TraceEvent},
+    event::{
+        metric::{Bucket, Quantile, TagValue},
+        Event, LogEvent, Metric as MetricEvent, MetricKind, MetricTags, MetricValue, TraceEvent,
+    },
 };
 use vrl::value::KeyString;
 use vrl::{
     event_path,
     value::{ObjectMap, Value},
-};
-
-use super::proto::{
-    common::v1::{any_value::Value as PBValue, InstrumentationScope, KeyValue},
-    logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
-    resource::v1::Resource,
-    trace::v1::{
-        span::{Event as SpanEvent, Link},
-        ResourceSpans, Span, Status as SpanStatus,
-    },
 };
 
 const SOURCE_NAME: &str = "opentelemetry";
@@ -54,6 +61,159 @@ impl ResourceLogs {
                 .into_event(log_namespace, now)
             })
         })
+    }
+}
+
+impl ResourceMetrics {
+    pub fn into_event_iter(self) -> impl Iterator<Item = Event> {
+        let resource = self.resource.clone();
+
+        self.scope_metrics
+            .into_iter()
+            .flat_map(move |scope_metrics| {
+                let scope = scope_metrics.scope;
+                let resource = resource.clone();
+
+                scope_metrics.metrics.into_iter().flat_map(move |metric| {
+                    let metric_name = metric.name.clone();
+                    match metric.data {
+                        Some(Data::Gauge(g)) => {
+                            Self::convert_gauge(g, &resource, &scope, &metric_name)
+                        }
+                        Some(Data::Sum(s)) => Self::convert_sum(s, &resource, &scope, &metric_name),
+                        Some(Data::Histogram(h)) => {
+                            Self::convert_histogram(h, &resource, &scope, &metric_name)
+                        }
+                        Some(Data::ExponentialHistogram(e)) => {
+                            Self::convert_exp_histogram(e, &resource, &scope, &metric_name)
+                        }
+                        Some(Data::Summary(su)) => {
+                            Self::convert_summary(su, &resource, &scope, &metric_name)
+                        }
+                        _ => Vec::new(),
+                    }
+                })
+            })
+    }
+
+    fn convert_gauge(
+        gauge: Gauge,
+        resource: &Option<Resource>,
+        scope: &Option<InstrumentationScope>,
+        metric_name: &str,
+    ) -> Vec<Event> {
+        let resource = resource.clone();
+        let scope = scope.clone();
+        let metric_name = metric_name.to_string();
+
+        gauge
+            .data_points
+            .into_iter()
+            .map(move |point| {
+                GaugeMetric {
+                    resource: resource.clone(),
+                    scope: scope.clone(),
+                    point,
+                }
+                .into_metric(metric_name.clone())
+            })
+            .collect()
+    }
+
+    fn convert_sum(
+        sum: Sum,
+        resource: &Option<Resource>,
+        scope: &Option<InstrumentationScope>,
+        metric_name: &str,
+    ) -> Vec<Event> {
+        let resource = resource.clone();
+        let scope = scope.clone();
+        let metric_name = metric_name.to_string();
+
+        sum.data_points
+            .into_iter()
+            .map(move |point| {
+                SumMetric {
+                    resource: resource.clone(),
+                    scope: scope.clone(),
+                    is_monotonic: sum.is_monotonic,
+                    point,
+                }
+                .into_metric(metric_name.clone())
+            })
+            .collect()
+    }
+
+    fn convert_histogram(
+        histogram: Histogram,
+        resource: &Option<Resource>,
+        scope: &Option<InstrumentationScope>,
+        metric_name: &str,
+    ) -> Vec<Event> {
+        let resource = resource.clone();
+        let scope = scope.clone();
+        let metric_name = metric_name.to_string();
+
+        histogram
+            .data_points
+            .into_iter()
+            .map(move |point| {
+                HistogramMetric {
+                    resource: resource.clone(),
+                    scope: scope.clone(),
+                    point,
+                }
+                .into_metric(metric_name.clone())
+            })
+            .collect()
+    }
+
+    fn convert_exp_histogram(
+        histogram: ExponentialHistogram,
+        resource: &Option<Resource>,
+        scope: &Option<InstrumentationScope>,
+        metric_name: &str,
+    ) -> Vec<Event> {
+        let resource = resource.clone();
+        let scope = scope.clone();
+        let metric_name = metric_name.to_string();
+
+        histogram
+            .data_points
+            .into_iter()
+            .map(move |point| {
+                ExpHistogramMetric {
+                    resource: resource.clone(),
+                    scope: scope.clone(),
+                    point,
+                }
+                .into_metric(metric_name.clone())
+            })
+            .collect()
+    }
+
+    fn convert_summary(
+        summary: Summary,
+        resource: &Option<Resource>,
+        scope: &Option<InstrumentationScope>,
+        metric_name: &str,
+    ) -> Vec<Event> {
+        let resource = resource.clone();
+        let scope = scope.clone();
+        let metric_name = metric_name.to_string();
+
+        summary
+            .data_points
+            .into_iter()
+            .map(move |point| {
+                SummaryMetric {
+                    resource: resource.clone(),
+                    scope: scope.clone(),
+                    point,
+                }
+                .into_metric(metric_name.clone())
+            })
+            .collect()
     }
 }
 
@@ -94,10 +254,54 @@ impl From<PBValue> for Value {
     }
 }
 
+impl From<PBValue> for TagValue {
+    fn from(pb: PBValue) -> Self {
+        match pb {
+            PBValue::StringValue(s) => TagValue::from(s),
+            PBValue::BoolValue(b) => TagValue::from(b.to_string()),
+            PBValue::IntValue(i) => TagValue::from(i.to_string()),
+            PBValue::DoubleValue(f) => TagValue::from(f.to_string()),
+            PBValue::BytesValue(b) => TagValue::from(String::from_utf8_lossy(&b).to_string()),
+            _ => TagValue::from("null"),
+        }
+    }
+}
+
 struct ResourceLog {
     resource: Option<Resource>,
     scope: Option<InstrumentationScope>,
     log_record: LogRecord,
+}
+
+struct GaugeMetric {
+    resource: Option<Resource>,
+    scope: Option<InstrumentationScope>,
+    point: NumberDataPoint,
+}
+
+struct SumMetric {
+    resource: Option<Resource>,
+    scope: Option<InstrumentationScope>,
+    point: NumberDataPoint,
+    is_monotonic: bool,
+}
+
+struct SummaryMetric {
+    resource: Option<Resource>,
+    scope: Option<InstrumentationScope>,
+    point: SummaryDataPoint,
+}
+
+struct HistogramMetric {
+    resource: Option<Resource>,
+    scope: Option<InstrumentationScope>,
+    point: HistogramDataPoint,
+}
+
+struct ExpHistogramMetric {
+    resource: Option<Resource>,
+    scope: Option<InstrumentationScope>,
+    point: ExponentialHistogramDataPoint,
 }
 
 struct ResourceSpan {
@@ -125,6 +329,215 @@ fn to_hex(d: &[u8]) -> String {
         return "".to_string();
     }
     hex::encode(d)
+}
+
+pub fn build_metric_tags(
+    resource: Option<Resource>,
+    scope: Option<InstrumentationScope>,
+    attributes: &[KeyValue],
+) -> MetricTags {
+    let mut tags = MetricTags::default();
+
+    if let Some(res) = resource {
+        for attr in res.attributes {
+            if let Some(value) = &attr.value {
+                if let Some(pb_value) = &value.value {
+                    tags.insert(
+                        format!("resource.{}", attr.key.clone()),
+                        TagValue::from(pb_value.clone()),
+                    );
+                }
+            }
+        }
+    }
+
+    if let Some(scope) = scope {
+        if !scope.name.is_empty() {
+            tags.insert("scope.name".to_string(), scope.name);
+        }
+        if !scope.version.is_empty() {
+            tags.insert("scope.version".to_string(), scope.version);
+        }
+        for attr in scope.attributes {
+            if let Some(value) = &attr.value {
+                if let Some(pb_value) = &value.value {
+                    tags.insert(
+                        format!("scope.{}", attr.key.clone()),
+                        TagValue::from(pb_value.clone()),
+                    );
+                }
+            }
+        }
+    }
+
+    for attr in attributes {
+        if let Some(value) = &attr.value {
+            if let Some(pb_value) = &value.value {
+                tags.insert(attr.key.clone(), TagValue::from(pb_value.clone()));
+            }
+        }
+    }
+
+    tags
+}
+
+impl SumMetric {
+    fn into_metric(self, metric_name: String) -> Event {
+        let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
+        let value = Value::from(self.point.value)
+            .as_float()
+            .unwrap()
+            .into_inner();
+        let attributes = build_metric_tags(self.resource, self.scope, &self.point.attributes);
+        let kind = if self.is_monotonic {
+            MetricKind::Incremental
+        } else {
+            MetricKind::Absolute
+        };
+
+        MetricEvent::new(metric_name, kind, MetricValue::Counter { value })
+            .with_tags(Some(attributes))
+            .with_timestamp(timestamp)
+            .into()
+    }
+}
+
+impl GaugeMetric {
+    fn into_metric(self, metric_name: String) -> Event {
+        let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
+        let value = Value::from(self.point.value);
+        let attributes = build_metric_tags(self.resource, self.scope, &self.point.attributes);
+
+        MetricEvent::new(
+            metric_name,
+            MetricKind::Absolute,
+            MetricValue::Gauge {
+                value: value.as_float().unwrap().into_inner(),
+            },
+        )
+        .with_timestamp(timestamp)
+        .with_tags(Some(attributes))
+        .into()
+    }
+}
+
+impl HistogramMetric {
+    fn into_metric(self, metric_name: String) -> Event {
+        let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
+        let attributes = build_metric_tags(self.resource, self.scope, &self.point.attributes);
+        let buckets = match self.point.bucket_counts.len() {
+            0 => Vec::new(),
+            n => {
+                let mut buckets = Vec::with_capacity(n);
+
+                for (i, &count) in self.point.bucket_counts.iter().enumerate() {
+                    // there are n+1 buckets, since we have -Inf, +Inf on the sides
+                    let upper_limit = self
+                        .point
+                        .explicit_bounds
+                        .get(i)
+                        .copied()
+                        .unwrap_or(f64::INFINITY);
+                    buckets.push(Bucket { count, upper_limit });
+                }
+
+                buckets
+            }
+        };
+
+        MetricEvent::new(
+            metric_name,
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count: self.point.count,
+                sum: self.point.sum.unwrap_or(0.0),
+            },
+        )
+        .with_timestamp(timestamp)
+        .with_tags(Some(attributes))
+        .into()
+    }
+}
+
+impl ExpHistogramMetric {
+    fn into_metric(self, metric_name: String) -> Event {
+        // we have to convert Exponential Histogram to agg histogram using scale and base
+        let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
+        let attributes = build_metric_tags(self.resource, self.scope, &self.point.attributes);
+
+        let scale = self.point.scale;
+        // from Opentelemetry docs: base = 2**(2**(-scale))
+        let base = 2f64.powf(2f64.powi(-scale));
+
+        let mut buckets = Vec::new();
+
+        if let Some(negative_buckets) = self.point.negative {
+            for (i, &count) in negative_buckets.bucket_counts.iter().enumerate() {
+                let index = negative_buckets.offset + i as i32;
+                let upper_limit = -base.powi(index);
+                buckets.push(Bucket { count, upper_limit });
+            }
+        }
+
+        if self.point.zero_count > 0 {
+            buckets.push(Bucket {
+                count: self.point.zero_count,
+                upper_limit: 0.0,
+            });
+        }
+
+        if let Some(positive_buckets) = self.point.positive {
+            for (i, &count) in positive_buckets.bucket_counts.iter().enumerate() {
+                let index = positive_buckets.offset + i as i32;
+                let upper_limit = base.powi(index + 1);
+                buckets.push(Bucket { count, upper_limit });
+            }
+        }
+
+        MetricEvent::new(
+            metric_name,
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count: self.point.count,
+                sum: self.point.sum.unwrap_or(0.0),
+            },
+        )
+        .with_timestamp(timestamp)
+        .with_tags(Some(attributes))
+        .into()
+    }
+}
+
+impl SummaryMetric {
+    fn into_metric(self, metric_name: String) -> Event {
+        let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
+        let attributes = build_metric_tags(self.resource, self.scope, &self.point.attributes);
+
+        let quantiles: Vec<Quantile> = self
+            .point
+            .quantile_values
+            .iter()
+            .map(|q| Quantile {
+                quantile: q.quantile,
+                value: q.value,
+            })
+            .collect();
+
+        MetricEvent::new(
+            metric_name,
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
+                quantiles,
+                count: self.point.count,
+                sum: self.point.sum,
+            },
+        )
+        .with_timestamp(timestamp)
+        .with_tags(Some(attributes))
+        .into()
+    }
 }
 
 // Unlike log events(log body + metadata), trace spans are just metadata, so we don't handle log_namespace here,
@@ -420,5 +833,14 @@ impl From<SpanStatus> for Value {
         obj.insert("message".into(), status.message.into());
         obj.insert("code".into(), status.code.into());
         Value::Object(obj)
+    }
+}
+
+impl From<NumberDataPointValue> for Value {
+    fn from(v: NumberDataPointValue) -> Self {
+        match v {
+            NumberDataPointValue::AsDouble(v) => Value::Float(NotNan::new(v).unwrap()),
+            NumberDataPointValue::AsInt(v) => Value::Integer(v),
+        }
     }
 }
