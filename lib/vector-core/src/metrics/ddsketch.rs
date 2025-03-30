@@ -456,8 +456,7 @@ impl AgentDDSketch {
         // something horribly broken.
         assert!(
             keys.len()
-                <= u32::MAX
-                    .try_into()
+                <= TryInto::<usize>::try_into(u32::MAX)
                     .expect("we don't support 16-bit systems")
         );
 
