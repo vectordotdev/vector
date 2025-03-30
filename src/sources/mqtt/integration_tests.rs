@@ -1,6 +1,7 @@
 #![cfg(feature = "mqtt-integration-tests")]
 #![cfg(test)]
 
+use crate::common::mqtt::MqttCommonConfig;
 use crate::test_util::trace_init;
 use crate::test_util::{components::SOURCE_TAGS, random_lines_with_stream, random_string};
 use rumqttc::{AsyncClient, MqttOptions, QoS};
@@ -66,10 +67,15 @@ async fn mqtt_happy() {
     let (input, _events) = random_lines_with_stream(100, num_events, None);
 
     assert_source_compliance(&SOURCE_TAGS, async {
-        let config = MqttSourceConfig {
+        let common = MqttCommonConfig {
             host: mqtt_broker_address(),
             port: mqtt_broker_port(),
             client_id: Some(client_id),
+            ..Default::default()
+        };
+
+        let config = MqttSourceConfig {
+            common,
             topic: topic.to_owned(),
             ..MqttSourceConfig::default()
         };
