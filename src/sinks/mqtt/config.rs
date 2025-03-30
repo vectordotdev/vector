@@ -141,8 +141,9 @@ pub enum ConfigurationError {
 
 impl MqttSinkConfig {
     fn build_connector(&self) -> Result<MqttConnector, MqttError> {
-        let client_id = self.common.client_id.clone().unwrap_or_else(|| {
-            let hash = rand::thread_rng()
+
+        let client_id = self.client_id.clone().unwrap_or_else(|| {
+            let hash = rand::rng()
                 .sample_iter(&rand_distr::Alphanumeric)
                 .take(6)
                 .map(char::from)
@@ -153,9 +154,10 @@ impl MqttSinkConfig {
         if client_id.is_empty() {
             return Err(ConfigurationError::EmptyClientId).context(ConfigurationSnafu);
         }
-        let tls = MaybeTlsSettings::from_config(&self.common.tls, false).context(TlsSnafu)?;
-        let mut options = MqttOptions::new(&client_id, &self.common.host, self.common.port);
-        options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
+
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false).context(TlsSnafu)?;
+        let mut options = MqttOptions::new(&client_id, &self.host, self.port);
+        options.set_keep_alive(Duration::from_secs(self.keep_alive.into()));
         options.set_clean_session(self.clean_session);
         match (&self.common.user, &self.common.password) {
             (Some(user), Some(password)) => {

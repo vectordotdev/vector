@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
+use dnstap_parser::parser::DnstapParser;
+use dnstap_parser::schema::DnstapEventSchema;
 use vector_lib::event::{Event, LogEvent};
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered,
@@ -11,25 +13,19 @@ use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
 use vrl::path::{OwnedValuePath, PathPrefix};
 use vrl::value::{kind::Collection, Kind};
 
-use self::parser::DnstapParser;
-
 use super::util::framestream::{
     build_framestream_tcp_source, build_framestream_unix_source, FrameHandler,
 };
 use crate::internal_events::DnstapParseError;
-use crate::sources::dnstap::schema::DNSTAP_VALUE_PATHS;
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
     Result,
 };
+use dnstap_parser::schema::DNSTAP_VALUE_PATHS;
 
-pub mod parser;
-pub mod schema;
 pub mod tcp;
 #[cfg(unix)]
 pub mod unix;
-use dnsmsg_parser::{dns_message, dns_message_parser};
-pub use schema::DnstapEventSchema;
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
 
@@ -185,7 +181,7 @@ impl SourceConfig for DnstapConfig {
             Mode::Tcp(config) => {
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
 
-                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
+                let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true)?;
                 let frame_handler = tcp::DnstapFrameHandler::new(
                     config.clone(),
                     tls,
@@ -625,7 +621,7 @@ mod integration_tests {
         }
     }
 
-    fn get_bind_ports(raw_data: bool, query_type: &'static str) -> (&str, &str) {
+    fn get_bind_ports(raw_data: bool, query_type: &'static str) -> (&'static str, &'static str) {
         // Returns the query port and control port, respectively, for the given BIND instance.
         match query_type {
             "query" if raw_data => ("8001", "9001"),

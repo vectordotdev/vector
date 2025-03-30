@@ -4,7 +4,7 @@ use crate::testing::{config::ComposeTestConfig, integration::ComposeTestT, state
 
 pub fn exec<T: ComposeTestT>(
     integration: &str,
-    environment: &Option<String>,
+    environment: Option<&String>,
     build_all: bool,
     retries: u8,
     args: &[String],
@@ -14,7 +14,7 @@ pub fn exec<T: ComposeTestT>(
 
     let active = EnvsDir::new(integration).active()?;
 
-    match (&environment, &active) {
+    match (environment, &active) {
         (Some(environment), Some(active)) if environment != active => {
             bail!("Requested environment {environment:?} does not match active one {active:?}")
         }

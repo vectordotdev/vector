@@ -57,7 +57,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         return exitcode::SOFTWARE;
     }
 
-    return if opts.input_path.is_file() && opts.output_path.extension().is_some() {
+    if opts.input_path.is_file() && opts.output_path.extension().is_some() {
         if let Some(base_dir) = opts.output_path.parent() {
             if !base_dir.exists() {
                 fs::create_dir_all(base_dir).unwrap_or_else(|_| {
@@ -96,7 +96,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 exitcode::SOFTWARE
             }
         }
-    };
+    }
 }
 
 fn convert_config(
