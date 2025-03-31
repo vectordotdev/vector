@@ -346,7 +346,7 @@ that will be invoked to send the actual data.
 ```rust
     fn call(&mut self, request: BasicRequest) -> Self::Future {
         let byte_size = request.payload.len();
-        let body = hyper::Body::from(request.payload);
+        let body = hyper::body::Body::from(request.payload);
         let req = http::Request::post(&self.endpoint)
             .header("Content-Type", "application/json")
             .body(body)

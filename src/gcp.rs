@@ -277,7 +277,7 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
     debug!("Fetching implicit GCP authentication token.");
     let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
         .header("Metadata-Flavor", "Google")
-        .body(hyper::Body::empty())
+        .body(hyper::body::Body::empty())
         .unwrap();
 
     let proxy = ProxyConfig::from_env();
@@ -288,7 +288,7 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
         .context(GetImplicitTokenSnafu)?;
 
     let body = res.into_body();
-    let bytes = hyper::body::to_bytes(body)
+    let bytes = hyper::body::Body::to_bytes(body)
         .await
         .context(GetTokenBytesSnafu)?;
 

@@ -523,7 +523,7 @@ impl SplunkSource {
             .map(move |_| {
                 http::Response::builder()
                     .header(http::header::CONTENT_TYPE, "application/json")
-                    .body(hyper::Body::from(r#"{"text":"HEC is healthy","code":17}"#))
+                    .body(hyper::body::Body::from(r#"{"text":"HEC is healthy","code":17}"#))
                     .expect("static response")
             })
             .boxed()

@@ -113,7 +113,7 @@ fn eventstoredb(
                     }
 
                     Ok(resp) => {
-                        let bytes = match hyper::body::to_bytes(resp.into_body()).await {
+                        let bytes = match hyper::body::Body::to_bytes(resp.into_body()).await {
                             Ok(b) => b,
                             Err(error) => {
                                 emit!(EventStoreDbMetricsHttpError {

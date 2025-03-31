@@ -1,7 +1,7 @@
 //! Configuration for the `http` sink.
 
 use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
-use hyper::Body;
+use hyper::body::Body;
 use indexmap::IndexMap;
 use std::path::PathBuf;
 use vector_lib::codecs::{

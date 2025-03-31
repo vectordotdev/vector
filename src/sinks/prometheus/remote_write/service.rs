@@ -70,7 +70,7 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
 
             let response = client.send(http_request).await?;
             let (parts, body) = response.into_parts();
-            let body = hyper::body::to_bytes(body).await?;
+            let body = hyper::body::Body::to_bytes(body).await?;
             let http_response = hyper::Response::from_parts(parts, body);
 
             if http_response.status().is_success() {
@@ -107,7 +107,7 @@ pub(super) async fn build_request(
     body: Bytes,
     tenant_id: Option<&String>,
     auth: Option<Auth>,
-) -> crate::Result<http::Request<hyper::Body>> {
+) -> crate::Result<http::Request<hyper::body::Body>> {
     let mut builder = http::Request::builder()
         .method(method)
         .uri(endpoint)
@@ -135,5 +135,5 @@ pub(super) async fn build_request(
         }
     }
 
-    Ok(request.map(hyper::Body::from))
+    Ok(request.map(hyper::body::Body::from))
 }

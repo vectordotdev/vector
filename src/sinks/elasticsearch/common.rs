@@ -413,7 +413,7 @@ async fn get(
     }
 
     client
-        .send(request.map(hyper::Body::from))
+        .send(request.map(hyper::body::Body::from))
         .await
         .map_err(Into::into)
 }

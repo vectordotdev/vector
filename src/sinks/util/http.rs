@@ -836,7 +836,7 @@ mod test {
                 let mut tx = tx.clone();
 
                 async move {
-                    let mut body = hyper::body::aggregate(req.into_body())
+                    let mut body = hyper::body::Body::aggregate(req.into_body())
                         .await
                         .map_err(|error| format!("error: {}", error))?;
                     let string = String::from_utf8(body.copy_to_bytes(body.remaining()).to_vec())

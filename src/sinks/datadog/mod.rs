@@ -1,6 +1,6 @@
 use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
-use hyper::body::Body;
+use hyper::body::Body::Body;
 use snafu::Snafu;
 use vector_lib::{
     config::AcknowledgementsConfig, configurable::configurable_component,
@@ -162,7 +162,7 @@ async fn build_healthcheck_future(
 ) -> crate::Result<()> {
     let request = Request::get(validate_endpoint)
         .header("DD-API-KEY", api_key)
-        .body(hyper::Body::empty())
+        .body(hyper::body::Body::empty())
         .unwrap();
 
     let response = client.send(request).await?;

@@ -7,7 +7,7 @@ use http::{
     header::{HeaderValue, CONTENT_ENCODING, CONTENT_TYPE},
     Request, StatusCode, Uri,
 };
-use hyper::Body;
+use hyper::body::Body;
 use snafu::ResultExt;
 use tower::Service;
 use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};

@@ -7,7 +7,7 @@ use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
 use http::header::{self, HeaderName, HeaderValue};
 use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use indoc::indoc;
 use serde::Serialize;
 use serde_json::json;

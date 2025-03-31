@@ -164,12 +164,12 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
         .unwrap()
         .freeze();
     let req: Request<Bytes> = request.body(body)?;
-    let req = req.map(hyper::Body::from);
+    let req = req.map(hyper::body::Body::from);
 
     let res = client.send(req).await?;
 
     let status = res.status();
-    let body = hyper::body::to_bytes(res.into_body()).await?;
+    let body = hyper::body::Body::to_bytes(res.into_body()).await?;
 
     if status == StatusCode::BAD_REQUEST {
         Ok(())

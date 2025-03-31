@@ -10,7 +10,7 @@ use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
     HeaderValue, Request, Uri,
 };
-use hyper::Body;
+use hyper::body::Body;
 use indexmap::IndexMap;
 use tower::Service;
 use tracing::Instrument;

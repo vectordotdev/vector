@@ -377,7 +377,7 @@ impl MezmoConfig {
 async fn healthcheck(config: MezmoConfig, client: HttpClient) -> crate::Result<()> {
     let uri = config.build_uri("");
 
-    let req = Request::post(uri).body(hyper::Body::empty()).unwrap();
+    let req = Request::post(uri).body(hyper::body::Body::empty()).unwrap();
 
     let res = client.send(req).await?;
 

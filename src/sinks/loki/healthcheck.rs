@@ -9,7 +9,7 @@ async fn fetch_status(
     let endpoint = config.endpoint.append_path(endpoint)?;
 
     let mut req = http::Request::get(endpoint.uri)
-        .body(hyper::Body::empty())
+        .body(hyper::body::Body::empty())
         .expect("Building request never fails.");
 
     if let Some(auth) = &config.auth {

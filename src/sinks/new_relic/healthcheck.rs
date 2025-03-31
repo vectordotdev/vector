@@ -32,7 +32,7 @@ pub(crate) async fn healthcheck(
 ) -> crate::Result<()> {
     let request = Request::post(credentials.get_uri())
         .header("Api-Key", credentials.license_key.clone())
-        .body(hyper::Body::empty())
+        .body(hyper::body::Body::empty())
         .unwrap();
 
     let response = client.send(request).await?;

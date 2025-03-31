@@ -6,7 +6,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use snafu::ResultExt;
 use tower::Service;
 use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
@@ -153,7 +153,7 @@ impl Service<TraceApiRequest> for TraceApiService {
 
             let response = client.send(http_request).await?;
             let (parts, body) = response.into_parts();
-            let mut body = hyper::body::aggregate(body)
+            let mut body = hyper::body::Body::aggregate(body)
                 .await
                 .context(CallRequestSnafu)?;
             let body = body.copy_to_bytes(body.remaining());

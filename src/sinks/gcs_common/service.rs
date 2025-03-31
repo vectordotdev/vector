@@ -6,7 +6,7 @@ use http::{
     header::{HeaderName, HeaderValue},
     Request, Uri,
 };
-use hyper::Body;
+use hyper::body::Body;
 use tower::Service;
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::stream::DriverResponse;

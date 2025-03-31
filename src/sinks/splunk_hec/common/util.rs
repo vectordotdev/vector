@@ -3,7 +3,7 @@ use std::{borrow::Cow, sync::Arc};
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use snafu::{ResultExt, Snafu};
 use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
 use vector_lib::{config::proxy::ProxyConfig, event::EventRef};

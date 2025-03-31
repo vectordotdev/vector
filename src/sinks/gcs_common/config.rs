@@ -1,6 +1,6 @@
 use futures::FutureExt;
 use http::{StatusCode, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
@@ -127,7 +127,7 @@ pub fn build_healthcheck(
 }
 
 pub fn healthcheck_response(
-    response: http::Response<hyper::Body>,
+    response: http::Response<hyper::body::Body>,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
     match response.status() {

@@ -2,7 +2,7 @@ use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use indoc::indoc;
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};

@@ -127,7 +127,7 @@ impl Service<LokiRequest> for LokiService {
             req = req.header("Content-Encoding", ce);
         }
 
-        let body = hyper::Body::from(request.payload);
+        let body = hyper::body::Body::from(request.payload);
         let mut req = req.body(body).unwrap();
 
         if let Some(auth) = &self.endpoint.auth {

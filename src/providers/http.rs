@@ -1,7 +1,7 @@
 use async_stream::stream;
 use bytes::Buf;
 use futures::Stream;
-use hyper::Body;
+use hyper::body::Body;
 use indexmap::IndexMap;
 use tokio::time;
 use url::Url;
@@ -107,7 +107,7 @@ async fn http_request(
 
     info!(message = "Response received.", url = ?url.as_str());
 
-    hyper::body::to_bytes(response.into_body())
+    hyper::body::Body::to_bytes(response.into_body())
         .await
         .map_err(|err| {
             let message = "Error interpreting response.";

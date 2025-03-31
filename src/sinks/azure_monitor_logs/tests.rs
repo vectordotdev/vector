@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use futures::{future::ready, stream};
 use http::Response;
-use hyper::body;
+use hyper::body::Body;
 use openssl::{base64, hash, pkey, sign};
 use tokio::time::timeout;
 use vector_lib::config::log_schema;
@@ -184,7 +184,7 @@ async fn correct_request() {
         let tx = tx.clone();
         async move {
             tx.send(request).await.unwrap();
-            Ok(Response::new(hyper::Body::empty()))
+            Ok(Response::new(hyper::body::Body::empty()))
         }
     })
     .await;

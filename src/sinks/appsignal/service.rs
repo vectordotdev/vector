@@ -6,7 +6,7 @@ use futures::{
     future::{BoxFuture, Ready},
 };
 use http::{header::AUTHORIZATION, Request, StatusCode, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use tower::{Service, ServiceExt};
 
 use vector_lib::stream::DriverResponse;

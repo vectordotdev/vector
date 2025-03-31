@@ -6,7 +6,7 @@ use http::{
     header::{self, HeaderMap},
     HeaderName, HeaderValue, Request, StatusCode, Uri,
 };
-use hyper::Body;
+use hyper::body::Body;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use tracing::Instrument;

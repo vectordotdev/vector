@@ -94,7 +94,7 @@ mod tests {
             hyper::Response::builder()
                 .header("grpc-status", "0") // OK
                 .header("content-type", "application/grpc")
-                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .body(hyper::body::Body::from(encode_body(proto::PushEventsResponse {})))
                 .unwrap()
         });
 

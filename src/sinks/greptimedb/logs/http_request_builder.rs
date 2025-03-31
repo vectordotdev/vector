@@ -14,7 +14,7 @@ use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
     Request, StatusCode,
 };
-use hyper::Body;
+use hyper::body::Body;
 use snafu::ResultExt;
 use std::collections::HashMap;
 use vector_lib::codecs::encoding::Framer;

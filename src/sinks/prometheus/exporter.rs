@@ -890,7 +890,7 @@ mod tests {
         mut events: Vec<Event>,
         suppress_timestamp: bool,
         encoding: Option<String>,
-    ) -> hyper::body::Bytes {
+    ) -> hyper::body::Body::Bytes {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(tls_config.as_ref(), false).unwrap();
@@ -952,7 +952,7 @@ mod tests {
         }
 
         let body = result.into_body();
-        let bytes = hyper::body::to_bytes(body)
+        let bytes = hyper::body::Body::to_bytes(body)
             .await
             .expect("Reading body failed");
 
@@ -1031,7 +1031,7 @@ mod tests {
         }
 
         let body = result.into_body();
-        let bytes = hyper::body::to_bytes(body)
+        let bytes = hyper::body::Body::to_bytes(body)
             .await
             .expect("Reading body failed");
         let result = String::from_utf8(bytes.to_vec()).unwrap();
@@ -1481,7 +1481,7 @@ mod integration_tests {
             .send(request)
             .await
             .expect("Could not send request");
-        let result = hyper::body::to_bytes(result.into_body())
+        let result = hyper::body::Body::to_bytes(result.into_body())
             .await
             .expect("Error fetching body");
         String::from_utf8_lossy(&result).to_string()
@@ -1502,7 +1502,7 @@ mod integration_tests {
             .send(request)
             .await
             .expect("Could not fetch query");
-        let result = hyper::body::to_bytes(result.into_body())
+        let result = hyper::body::Body::to_bytes(result.into_body())
             .await
             .expect("Error fetching body");
         let result = String::from_utf8_lossy(&result);

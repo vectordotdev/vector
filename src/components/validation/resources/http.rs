@@ -322,7 +322,7 @@ impl HttpResourceOutputContext<'_> {
                 let mut decoder = decoder.clone();
 
                 async move {
-                    match hyper::body::to_bytes(request.into_body()).await {
+                    match hyper::body::Body::to_bytes(request.into_body()).await {
                         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
                         Ok(body) => {
                             let mut body = BytesMut::from(&body[..]);

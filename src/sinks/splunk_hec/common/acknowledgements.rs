@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use hyper::Body;
+use hyper::body::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 use vector_lib::configurable::configurable_component;
@@ -236,7 +236,7 @@ impl HecAckClient {
 
         let status = response.status();
         if status.is_success() {
-            let response_body = hyper::body::to_bytes(response.into_body())
+            let response_body = hyper::body::Body::to_bytes(response.into_body())
                 .await
                 .map_err(|_| HecAckApiError::ClientParseResponse)?;
             serde_json::from_slice::<HecAckStatusResponse>(&response_body)

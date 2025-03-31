@@ -118,7 +118,7 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
             debug!("`{}` server got stats payload.", state.name);
 
             let body = request.body_mut();
-            let compressed_body_bytes = hyper::body::to_bytes(body)
+            let compressed_body_bytes = hyper::body::Body::to_bytes(body)
                 .await
                 .expect("could not decode body into bytes");
 

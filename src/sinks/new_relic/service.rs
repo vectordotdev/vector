@@ -9,7 +9,7 @@ use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
     Request,
 };
-use hyper::Body;
+use hyper::body::Body;
 use tracing::Instrument;
 
 use super::{NewRelicCredentials, NewRelicSinkError};

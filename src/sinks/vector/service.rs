@@ -137,7 +137,7 @@ pub struct HyperSvc {
 }
 
 impl Service<hyper::Request<BoxBody>> for HyperSvc {
-    type Response = hyper::Response<hyper::Body>;
+    type Response = hyper::Response<hyper::body::Body>;
     type Error = hyper::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 

@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use std::fmt;
 use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 
