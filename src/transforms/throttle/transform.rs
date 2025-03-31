@@ -1,112 +1,36 @@
-use std::{num::NonZeroU32, pin::Pin, time::Duration};
-
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use governor::{clock, Quota, RateLimiter};
-use serde_with::serde_as;
+use governor::{clock, Quota};
 use snafu::Snafu;
-use vector_lib::config::{clone_input_definitions, LogNamespace};
-use vector_lib::configurable::configurable_component;
+use std::hash::Hash;
+use std::{num::NonZeroU32, pin::Pin, time::Duration};
 
+use super::{
+    config::{ThrottleConfig, ThrottleInternalMetricsConfig},
+    rate_limiter::RateLimiterRunner,
+};
 use crate::{
-    conditions::{AnyCondition, Condition},
-    config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
+    conditions::Condition,
+    config::TransformContext,
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
-    schema,
     template::Template,
-    transforms::{TaskTransform, Transform},
+    transforms::TaskTransform,
 };
-
-/// Configuration of internal metrics for the Throttle transform.
-#[configurable_component]
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-#[serde(deny_unknown_fields)]
-pub struct ThrottleInternalMetricsConfig {
-    /// Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.
-    ///
-    /// If true, the counter will be incremented for each discarded event, including the key value
-    /// associated with the discarded event. If false, the counter will not be emitted. Instead, the
-    /// number of discarded events can be seen through the `component_discarded_events_total` internal
-    /// metric.
-    ///
-    /// Note that this defaults to false because the `key` tag has potentially unbounded cardinality.
-    /// Only set this to true if you know that the number of unique keys is bounded.
-    #[serde(default)]
-    pub emit_events_discarded_per_key: bool,
-}
-
-/// Configuration for the `throttle` transform.
-#[serde_as]
-#[configurable_component(transform("throttle", "Rate limit logs passing through a topology."))]
-#[derive(Clone, Debug, Default)]
-#[serde(deny_unknown_fields)]
-pub struct ThrottleConfig {
-    /// The number of events allowed for a given bucket per configured `window_secs`.
-    ///
-    /// Each unique key has its own `threshold`.
-    threshold: u32,
-
-    /// The time window in which the configured `threshold` is applied, in seconds.
-    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
-    #[configurable(metadata(docs::human_name = "Time Window"))]
-    window_secs: Duration,
-
-    /// The value to group events into separate buckets to be rate limited independently.
-    ///
-    /// If left unspecified, or if the event doesn't have `key_field`, then the event is not rate
-    /// limited separately.
-    #[configurable(metadata(docs::examples = "{{ message }}", docs::examples = "{{ hostname }}",))]
-    key_field: Option<Template>,
-
-    /// A logical condition used to exclude events from sampling.
-    exclude: Option<AnyCondition>,
-
-    #[configurable(derived)]
-    #[serde(default)]
-    internal_metrics: ThrottleInternalMetricsConfig,
-}
-
-impl_generate_config_from_default!(ThrottleConfig);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "throttle")]
-impl TransformConfig for ThrottleConfig {
-    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Throttle::new(self, context, clock::MonotonicClock).map(Transform::event_task)
-    }
-
-    fn input(&self) -> Input {
-        Input::log()
-    }
-
-    fn outputs(
-        &self,
-        _: vector_lib::enrichment::TableRegistry,
-        input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
-    ) -> Vec<TransformOutput> {
-        // The event is not modified, so the definition is passed through as-is
-        vec![TransformOutput::new(
-            DataType::Log,
-            clone_input_definitions(input_definitions),
-        )]
-    }
-}
 
 #[derive(Clone)]
 pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
-    quota: Quota,
-    flush_keys_interval: Duration,
+    pub quota: Quota,
+    pub flush_keys_interval: Duration,
     key_field: Option<Template>,
     exclude: Option<Condition>,
-    clock: C,
+    pub clock: C,
     internal_metrics: ThrottleInternalMetricsConfig,
 }
 
 impl<C, I> Throttle<C, I>
 where
-    C: clock::Clock<Instant = I>,
+    C: clock::Clock<Instant = I> + Clone + Send + Sync + 'static,
     I: clock::Reference,
 {
     pub fn new(
@@ -142,11 +66,26 @@ where
             internal_metrics: config.internal_metrics.clone(),
         })
     }
+
+    #[must_use]
+    pub fn start_rate_limiter<K>(&self) -> RateLimiterRunner<K, C>
+    where
+        K: Hash + Eq + Clone + Send + Sync + 'static,
+    {
+        RateLimiterRunner::start(self.quota, self.clock.clone(), self.flush_keys_interval)
+    }
+
+    pub fn emit_event_discarded(&self, key: String) {
+        emit!(ThrottleEventDiscarded {
+            key,
+            emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key
+        });
+    }
 }
 
 impl<C, I> TaskTransform<Event> for Throttle<C, I>
 where
-    C: clock::Clock<Instant = I> + Send + 'static + Clone,
+    C: clock::Clock<Instant = I> + Clone + Send + Sync + 'static,
     I: clock::Reference + Send + 'static,
 {
     fn transform(
@@ -156,68 +95,43 @@ where
     where
         Self: 'static,
     {
-        let mut flush_keys = tokio::time::interval(self.flush_keys_interval * 2);
-
-        let limiter = RateLimiter::dashmap_with_clock(self.quota, self.clock.clone());
+        let limiter = self.start_rate_limiter();
 
         Box::pin(stream! {
-          loop {
-            let done = tokio::select! {
-                biased;
+            while let Some(event) = input_rx.next().await {
+                let (throttle, event) = match self.exclude.as_ref() {
+                    Some(condition) => {
+                        let (result, event) = condition.check(event);
+                        (!result, event)
+                    },
+                    _ => (true, event)
+                };
+                let output = if throttle {
+                    let key = self.key_field.as_ref().and_then(|t| {
+                        t.render_string(&event)
+                            .map_err(|error| {
+                                emit!(TemplateRenderingError {
+                                    error,
+                                    field: Some("key_field"),
+                                    drop_event: false,
+                                })
+                            })
+                            .ok()
+                    });
 
-                maybe_event = input_rx.next() => {
-                    match maybe_event {
-                        None => true,
-                        Some(event) => {
-                            let (throttle, event) = match self.exclude.as_ref() {
-                                Some(condition) => {
-                                    let (result, event) = condition.check(event);
-                                    (!result, event)
-                                },
-                                _ => (true, event)
-                            };
-                            let output = if throttle {
-                                let key = self.key_field.as_ref().and_then(|t| {
-                                    t.render_string(&event)
-                                        .map_err(|error| {
-                                            emit!(TemplateRenderingError {
-                                                error,
-                                                field: Some("key_field"),
-                                                drop_event: false,
-                                            })
-                                        })
-                                        .ok()
-                                });
-
-                                match limiter.check_key(&key) {
-                                    Ok(()) => {
-                                        Some(event)
-                                    }
-                                    _ => {
-                                        emit!(ThrottleEventDiscarded{
-                                            key: key.unwrap_or_else(|| "None".to_string()),
-                                            emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key
-                                        });
-                                        None
-                                    }
-                                }
-                            } else {
-                                Some(event)
-                            };
-                            if let Some(event) = output {
-                                yield event;
-                            }
-                            false
-                        }
+                    if limiter.check_key(&key) {
+                        Some(event)
+                    } else {
+                        self.emit_event_discarded(key.unwrap_or_else(|| "None".to_string()));
+                        None
                     }
+                } else {
+                    Some(event)
+                };
+                if let Some(event) = output {
+                    yield event;
                 }
-                _ = flush_keys.tick() => {
-                    limiter.retain_recent();
-                    false
-                }
-            };
-            if done { break }
-          }
+            }
         })
     }
 }
@@ -235,17 +149,13 @@ mod tests {
     use futures::SinkExt;
 
     use super::*;
+    use crate::transforms::Transform;
     use crate::{
         event::LogEvent, test_util::components::assert_transform_compliance,
         transforms::test::create_topology,
     };
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-
-    #[test]
-    fn generate_config() {
-        crate::test_util::test_generate_config::<ThrottleConfig>();
-    }
 
     #[tokio::test]
     async fn throttle_events() {
