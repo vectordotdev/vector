@@ -35,7 +35,7 @@ impl PartialEventMergeState {
         let mut bytes_mut = BytesMut::new();
         if let Some(bucket) = self.buckets.get_mut(file) {
             // don't bother continuing to process new partial events that match existing ones that are already too big
-            if bucket.too_big {
+            if bucket.exceeds_max_merged_line_limit {
                 return;
             }
 
@@ -49,7 +49,7 @@ impl PartialEventMergeState {
 
                 // drop event if it's bigger than max allowed
                 if bytes_mut.len() > max_merged_line_bytes {
-                    bucket.too_big = true;
+                    bucket.exceeds_max_merged_line_limit = true;
                     // perf impact of clone should be minimal since being here means no further processing of this event will occur
                     emit!(KubernetesMergedLineTooBig {
                         event: &Value::Bytes(new_value.clone()),
@@ -63,13 +63,13 @@ impl PartialEventMergeState {
         } else {
             // new event
 
-            let mut too_big = false;
+            let mut exceeds_max_merged_line_limit = false;
 
             if let Some(Value::Bytes(event_bytes)) = event.get(message_path) {
                 bytes_mut.extend_from_slice(event_bytes);
-                too_big = bytes_mut.len() > max_merged_line_bytes;
+                exceeds_max_merged_line_limit = bytes_mut.len() > max_merged_line_bytes;
 
-                if too_big {
+                if exceeds_max_merged_line_limit {
                     // perf impact of clone should be minimal since being here means no further processing of this event will occur
                     emit!(KubernetesMergedLineTooBig {
                         event: &Value::Bytes(event_bytes.clone()),
@@ -84,21 +84,21 @@ impl PartialEventMergeState {
                 Bucket {
                     event,
                     expiration: Instant::now() + expiration_time,
-                    too_big,
+                    exceeds_max_merged_line_limit,
                 },
             );
         }
     }
 
     fn remove_event(&mut self, file: &str) -> Option<LogEvent> {
-        self.buckets.remove(file).filter(|bucket| !bucket.too_big).map(|bucket| bucket.event)
+        self.buckets.remove(file).filter(|bucket| !bucket.exceeds_max_merged_line_limit).map(|bucket| bucket.event)
     }
 
     fn emit_expired_events(&mut self, emitter: &mut Emitter<LogEvent>) {
         let now = Instant::now();
         self.buckets.retain(|_key, bucket| {
             let expired = now >= bucket.expiration;
-            if expired && !bucket.too_big {
+            if expired && !bucket.exceeds_max_merged_line_limit {
                 emitter.emit(bucket.event.clone());
             }
             !expired
@@ -107,7 +107,7 @@ impl PartialEventMergeState {
 
     fn flush_events(&mut self, emitter: &mut Emitter<LogEvent>) {
         for (_, bucket) in self.buckets.drain() {
-            if !bucket.too_big {
+            if !bucket.exceeds_max_merged_line_limit {
                 emitter.emit(bucket.event);
             }
         }
@@ -117,7 +117,7 @@ impl PartialEventMergeState {
 struct Bucket {
     event: LogEvent,
     expiration: Instant,
-    too_big: bool,
+    exceeds_max_merged_line_limit: bool,
 }
 
 pub fn merge_partial_events(
@@ -229,7 +229,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn merge_single_event_legacy_too_big() {
+    async fn merge_single_event_legacy_exceeds_max_merged_line_limit() {
         let mut e_1 = LogEvent::from("test message 1");
         e_1.insert("foo", 1);
 
@@ -262,7 +262,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn merge_multiple_events_legacy_too_big() {
+    async fn merge_multiple_events_legacy_exceeds_max_merged_line_limit() {
         let mut e_1 = LogEvent::from("test message 1");
         e_1.insert("foo", 1);
         e_1.insert("_partial", true);
@@ -301,7 +301,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn multiple_events_flush_legacy_too_big() {
+    async fn multiple_events_flush_legacy_exceeds_max_merged_line_limit() {
         let mut e_1 = LogEvent::from("test message 1");
         e_1.insert("foo", 1);
         e_1.insert("_partial", true);
