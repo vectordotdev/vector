@@ -178,6 +178,7 @@ vrl = { git = "https://github.com/vectordotdev/vrl", branch = "main", features =
 [dependencies]
 cfg-if.workspace = true
 clap.workspace = true
+indoc.workspace = true
 paste.workspace = true
 pin-project.workspace = true
 proptest = { workspace = true, optional = true }
@@ -186,7 +187,6 @@ semver.workspace = true
 snafu.workspace = true
 uuid.workspace = true
 vrl.workspace = true
-indoc.workspace = true
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
