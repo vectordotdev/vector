@@ -21,6 +21,7 @@ const EXPIRATION_TIME: Duration = Duration::from_secs(30);
 
 struct PartialEventMergeState {
     buckets: HashMap<String, Bucket>,
+    max_merged_line_bytes: usize,
 }
 
 impl PartialEventMergeState {
@@ -30,7 +31,6 @@ impl PartialEventMergeState {
         file: &str,
         message_path: &OwnedTargetPath,
         expiration_time: Duration,
-        max_merged_line_bytes: usize,
     ) {
         let mut bytes_mut = BytesMut::new();
         if let Some(bucket) = self.buckets.get_mut(file) {
@@ -48,12 +48,12 @@ impl PartialEventMergeState {
                 bytes_mut.extend_from_slice(new_value);
 
                 // drop event if it's bigger than max allowed
-                if bytes_mut.len() > max_merged_line_bytes {
+                if bytes_mut.len() > self.max_merged_line_bytes {
                     bucket.exceeds_max_merged_line_limit = true;
                     // perf impact of clone should be minimal since being here means no further processing of this event will occur
                     emit!(KubernetesMergedLineTooBig {
                         event: &Value::Bytes(new_value.clone()),
-                        configured_limit: max_merged_line_bytes,
+                        configured_limit: self.max_merged_line_bytes,
                         encountered_size_so_far: bytes_mut.len()
                     });
                 }
@@ -67,13 +67,13 @@ impl PartialEventMergeState {
 
             if let Some(Value::Bytes(event_bytes)) = event.get(message_path) {
                 bytes_mut.extend_from_slice(event_bytes);
-                exceeds_max_merged_line_limit = bytes_mut.len() > max_merged_line_bytes;
+                exceeds_max_merged_line_limit = bytes_mut.len() > self.max_merged_line_bytes;
 
                 if exceeds_max_merged_line_limit {
                     // perf impact of clone should be minimal since being here means no further processing of this event will occur
                     emit!(KubernetesMergedLineTooBig {
                         event: &Value::Bytes(event_bytes.clone()),
-                        configured_limit: max_merged_line_bytes,
+                        configured_limit: self.max_merged_line_bytes,
                         encountered_size_so_far: bytes_mut.len()
                     });
                 }
@@ -156,6 +156,7 @@ fn merge_partial_events_with_custom_expiration(
 
     let state = PartialEventMergeState {
         buckets: HashMap::new(),
+        max_merged_line_bytes,
     };
 
     let message_path = get_message_path(log_namespace);
@@ -184,7 +185,6 @@ fn merge_partial_events_with_custom_expiration(
                 &file,
                 &message_path,
                 expiration_time,
-                max_merged_line_bytes,
             );
             if !is_partial {
                 if let Some(log_event) = state.remove_event(&file) {
