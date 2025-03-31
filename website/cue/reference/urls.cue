@@ -126,7 +126,7 @@ urls: {
 	databend_cloud:                             "https://www.databend.com"
 	datadog:                                    "https://www.datadoghq.com"
 	datadog_agent:                              "https://docs.datadoghq.com/agent/"
-	datadog_agent_doc:                          "\(datadog_docs)/agent/vector_aggregation/"
+	datadog_agent_vector_config_template:       "https://github.com/DataDog/datadog-agent/blob/7.64.1/pkg/config/config_template.yaml#L594-L650"
 	datadog_agent_exec_api:                     "\(datadog_agent)/guide/secrets-management/#the-executable-api"
 	datadog_distribution:                       "\(datadog_docs)/developers/metrics/types/?tab=distribution#definition"
 	datadog_docs:                               "https://docs.datadoghq.com"

@@ -1,9 +1,19 @@
+#![allow(clippy::print_stdout)]
+#![allow(clippy::print_stderr)]
+
 use crate::git;
 use crate::util::run_command;
 use anyhow::{anyhow, Result};
+use indoc::indoc;
+use reqwest::blocking::Client;
 use semver::Version;
 use std::fs;
+use std::fs::File;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use toml::map::Map;
 use toml::Value;
 
@@ -13,6 +23,7 @@ const DEBIAN_PREFIX: &str = "FROM docker.io/debian:";
 const DEBIAN_DOCKERFILE: &str = "distribution/docker/debian/Dockerfile";
 const RELEASE_CUE_SCRIPT: &str = "scripts/generate-release-cue.rb";
 const KUBECLT_CUE_FILE: &str = "website/cue/reference/administration/interfaces/kubectl.cue";
+const INSTALL_SCRIPT: &str = "distribution/install.sh";
 
 /// Release preparations CLI options.
 #[derive(clap::Args, Debug)]
@@ -53,12 +64,15 @@ impl Cli {
 
         generate_release_cue(&self.version)?;
 
-        let latest_version = get_latest_version()?;
-        update_cue_vector_version(&latest_version, &self.version)?;
+        let latest_version = get_latest_version_from_vector_tags()?;
+        update_vector_version(&get_repo_root().join(KUBECLT_CUE_FILE), &latest_version, &self.version)?;
+        update_vector_version(&get_repo_root().join(INSTALL_SCRIPT), &latest_version, &self.version)?;
 
-        // TODO automate more steps
-        println!("Continue the release preparation process manually.");
-        Ok(())
+        add_new_version_to_versions_cue(&self.version)?;
+
+        create_new_release_md(&latest_version, &self.version)?;
+
+        open_release_pr(&self.version)
     }
 }
 
@@ -66,7 +80,7 @@ fn get_repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf()
 }
 
-fn get_latest_version() -> Result<Version> {
+fn get_latest_version_from_vector_tags() -> Result<Version> {
     let tags = run_command("git tag --list --sort=-v:refname");
     let latest_tag = tags
         .lines().next()
@@ -124,7 +138,8 @@ fn pin_vrl_version(new_version: &Version) -> Result<()> {
     Ok(())
 }
 
-/// Step 4 & 5
+/// Step 4 & 5: Update dockerfile versions.
+/// TODO: investigate if this can be automated.
 fn update_dockerfile_base_version(
     dockerfile_path: &Path,
     new_version: Option<&str>,
@@ -175,33 +190,250 @@ fn generate_release_cue(new_version: &Version) -> Result<()> {
     } else {
         return Err(anyhow!("Script not found: {}", script.display()));
     }
+
+    let vrl_changelog = get_latest_vrl_tag_and_changelog()?;
+    append_vrl_changelog_to_release_cue(new_version, vrl_changelog.as_str())?;
     git::commit("chore(releasing): Generated release CUE file")?;
     println!("Generated release CUE file");
     Ok(())
 }
 
-/// Step 7: Find the `_vector_version` line and update the version.
-fn update_cue_vector_version(latest_version: &Version, new_version: &Version) -> Result<()> {
-    let cue_file_path = get_repo_root().join(KUBECLT_CUE_FILE);
-    let contents = fs::read_to_string(&cue_file_path)
-        .map_err(|e| anyhow!("Failed to read {}: {}", cue_file_path.display(), e))?;
+/// Step 7 & 8: Replace old version with the new version.
+fn update_vector_version(file_path: &Path, latest_version: &Version, new_version: &Version) -> Result<()> {
+    let contents = fs::read_to_string(file_path)
+        .map_err(|e| anyhow!("Failed to read {}: {}", file_path.display(), e))?;
 
     let old_version_str = format!("{}.{}", latest_version.major, latest_version.minor);
     let new_version_str = format!("{}.{}", new_version.major, new_version.minor);
 
     if !contents.contains(&old_version_str) {
         return Err(anyhow!("Could not find version {} to update in {}",
-            latest_version, cue_file_path.display()));
+            latest_version, file_path.display()));
     }
 
-    let updated_contents = contents.replace(&old_version_str, &new_version_str) + "\n"; // Add newline at EOF
+    let updated_contents = contents.replace(&latest_version.to_string(), &new_version.to_string());
+    let updated_contents = updated_contents.replace(&old_version_str, &new_version_str);
 
-    fs::write(&cue_file_path, updated_contents)
-        .map_err(|e| anyhow!("Failed to write {}: {}", cue_file_path.display(), e))?;
+    fs::write(file_path, updated_contents)
+        .map_err(|e| anyhow!("Failed to write {}: {}", file_path.display(), e))?;
     git::commit(&format!(
         "chore(releasing): Updated {} vector version to {new_version}",
-        cue_file_path.strip_prefix(get_repo_root()).unwrap().display(),
+        file_path.strip_prefix(get_repo_root()).unwrap().display(),
     ))?;
 
     Ok(())
+}
+
+/// Step 9: Add new version to `versions.cue`
+fn add_new_version_to_versions_cue(vector_version: &Version) -> Result<()> {
+    let cure_reference_path = get_repo_root().join("website").join("cue").join("reference");
+    let versions_cue_path = cure_reference_path.join("versions.cue");
+    if !versions_cue_path.is_file() {
+        return Err(anyhow!("{versions_cue_path:?} not found"));
+    }
+
+    let temp_file_path = cure_reference_path.join(format!("{vector_version}.cue.tmp"));
+    let input_file = File::open(&versions_cue_path)?;
+    let reader = BufReader::new(input_file);
+    let mut output_file = File::create(&temp_file_path)?;
+
+    for line in reader.lines() {
+        let line = line?;
+        writeln!(output_file, "{line}")?;
+        if line.contains("versions:") {
+            writeln!(output_file, "\t\"{vector_version}\",")?;
+        }
+    }
+
+    fs::rename(&temp_file_path, &versions_cue_path)?;
+
+    git::commit(&format!("chore(releasing): Add {vector_version} to versions.cue"))?;
+    Ok(())
+}
+
+/// Step 10: Create a new release md file
+fn create_new_release_md(old_version: &Version, new_version: &Version) -> Result<()> {
+    let releases_dir = get_repo_root()
+        .join("website")
+        .join("content")
+        .join("en")
+        .join("releases");
+
+    let old_file_path = releases_dir.join(format!("{old_version}.md"));
+    if !old_file_path.exists() {
+        return Err(anyhow!("Source file not found: {}", old_file_path.display()));
+    }
+
+    let content = fs::read_to_string(&old_file_path)?;
+    let updated_content = content.replace(&old_version.to_string(), &new_version.to_string());
+    let lines: Vec<&str> = updated_content.lines().collect();
+    let mut updated_lines = Vec::new();
+    let mut weight_updated = false;
+
+    for line in lines {
+        if line.trim().starts_with("weight: ") && !weight_updated {
+            // Extract the current weight value
+            let weight_str = line.trim().strip_prefix("weight: ").ok_or_else(|| anyhow!("Invalid weight format"))?;
+            let weight: i32 = weight_str.parse().map_err(|e| anyhow!("Failed to parse weight: {}", e))?;
+            // Increase by 1
+            let new_weight = weight + 1;
+            updated_lines.push(format!("weight: {new_weight}"));
+            weight_updated = true;
+        } else {
+            updated_lines.push(line.to_string());
+        }
+    }
+
+    if !weight_updated {
+        eprintln!("Couldn't update 'weight' line from {old_file_path:?}");
+    }
+
+
+    let new_file_path = releases_dir.join(format!("{new_version}.md"));
+    let updated_content = updated_lines.join("\n");
+    fs::write(&new_file_path, updated_content)?;
+    git::commit(&format!("chore(releasing): Created release md file: {new_file_path:?}"))?;
+    Ok(())
+}
+
+/// Final step. Create a release prep PR against the release branch.
+fn open_release_pr(new_version: &Version) -> Result<()> {
+    git::push()?;
+
+    let release_branch = format!("v{}.{}", new_version.major, new_version.minor);
+    let pr_title = format!("chore(releasing): prepare v{new_version} release");
+    let pr_body = format!("This PR prepares the release for Vector v{new_version}");
+    let current_branch = format!("website-prepare-v{new_version}");
+    let gh_status = Command::new("gh")
+        .arg("pr")
+        .arg("create")
+        .arg("--base")
+        .arg(&release_branch)
+        .arg("--head")
+        .arg(&current_branch)
+        .arg("--title")
+        .arg(&pr_title)
+        .arg("--body")
+        .arg(&pr_body)
+        .current_dir(get_repo_root())
+        .status()?;
+    if !gh_status.success() {
+        return Err(anyhow!("Failed to create PR with gh CLI"));
+    }
+
+    println!("Successfully created PR against {release_branch}");
+    Ok(())
+}
+
+fn append_vrl_changelog_to_release_cue(vector_version: &Version, vrl_changelog: &str) -> Result<()> {
+    let releases_path = get_repo_root().join("website").join("cue").join("reference").join("releases");
+    let release_cue_path = releases_path.join(format!("{vector_version}.cue"));
+    if !release_cue_path.is_file() {
+        return Err(anyhow!("{release_cue_path:?} not found"));
+    }
+
+    let temp_file_path = releases_path.join(format!("{vector_version}.cue.tmp"));
+    let input_file = File::open(&release_cue_path)?;
+    let reader = BufReader::new(input_file);
+    let mut output_file = File::create(&temp_file_path)?;
+
+    let indent = "\t".repeat(5);
+    let processed_changelog: String = vrl_changelog
+        .lines()
+        .map(|line| {
+            let line = line.trim();
+            if line.starts_with('#') {
+                format!("{indent}#{line}")
+            } else {
+                format!("{indent}{line}")
+            }
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    // Format the new changelog entry
+    let vrl_cue_block = format!(
+        indoc! {r#"
+            {{
+                type: "feat"
+                description: """
+            {}
+                    """
+            }},
+        "#},
+        processed_changelog
+    );
+
+    let mut found_changelog = false;
+    let changelog_marker = "changelog: [";
+
+    // Read and write line by line
+    for line in reader.lines() {
+        let line = line?;
+        writeln!(output_file, "{line}")?;
+
+        // Check if this is the changelog line
+        if !found_changelog && line.trim().starts_with(changelog_marker) {
+            // Insert the new entry after the changelog opening
+            writeln!(output_file, "{vrl_cue_block}")?;
+            found_changelog = true;
+        }
+    }
+
+    fs::rename(&temp_file_path, &release_cue_path)?;
+
+    Ok(())
+}
+
+fn get_latest_vrl_tag_and_changelog() -> Result<String> {
+    let client = Client::new();
+
+    // Step 1: Get latest tag from GitHub API
+    let tags_url = "https://api.github.com/repos/vectordotdev/vrl/tags";
+    let tags_response = client
+        .get(tags_url)
+        .header("User-Agent", "rust-reqwest")  // GitHub API requires User-Agent
+        .send()?
+        .text()?;
+
+    let tags: Vec<Value> = serde_json::from_str(&tags_response)?;
+    let latest_tag = tags.first()
+        .and_then(|tag| tag.get("name"))
+        .and_then(|name| name.as_str())
+        .ok_or_else(|| anyhow!("Failed to extract latest tag"))?
+        .to_string();
+
+    // Step 2: Download CHANGELOG.md for the specific tag
+    let changelog_url = format!(
+        "https://raw.githubusercontent.com/vectordotdev/vrl/{latest_tag}/CHANGELOG.md",
+    );
+    let changelog = client
+        .get(&changelog_url)
+        .header("User-Agent", "rust-reqwest")
+        .send()?
+        .text()?;
+
+    // Step 3: Extract text from first ## to next ##
+    let lines: Vec<&str> = changelog.lines().collect();
+    let mut section = Vec::new();
+    let mut found_first = false;
+
+    for line in lines {
+        if line.starts_with("## ") {
+            if found_first {
+                section.push(line.to_string());
+                break;
+            }
+            found_first = true;
+            section.push(line.to_string());
+        } else if found_first {
+            section.push(line.to_string());
+        }
+    }
+
+    if !found_first {
+        return Err(anyhow!("No ## headers found in CHANGELOG.md"));
+    }
+
+    Ok(section.join("\n"))
 }

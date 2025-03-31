@@ -2,7 +2,122 @@
   "collections": [
     {
       "name": "vector_docs_v1",
+      "file_path": "./public/search.json",
       "synonyms": [],
+      "schema": {
+        "fields": [
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "content",
+            "optional": true,
+            "sort": false,
+            "stem": false,
+            "type": "string"
+          },
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "itemUrl",
+            "optional": true,
+            "sort": false,
+            "stem": false,
+            "type": "string"
+          },
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "level",
+            "optional": true,
+            "sort": true,
+            "stem": false,
+            "type": "int64"
+          },
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "pageTitle",
+            "optional": true,
+            "sort": false,
+            "stem": false,
+            "type": "string"
+          },
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "pageUrl",
+            "optional": true,
+            "sort": false,
+            "stem": false,
+            "type": "string"
+          },
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "ranking",
+            "optional": true,
+            "sort": true,
+            "stem": false,
+            "type": "int64"
+          },
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "section",
+            "optional": true,
+            "sort": false,
+            "stem": false,
+            "type": "string"
+          },
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "tags",
+            "optional": true,
+            "sort": false,
+            "stem": false,
+            "type": "string[]"
+          },
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "title",
+            "optional": true,
+            "sort": false,
+            "stem": false,
+            "type": "string"
+          },
+          {
+            "facet": false,
+            "index": true,
+            "infix": false,
+            "locale": "",
+            "name": "hierarchy",
+            "optional": true,
+            "sort": false,
+            "stem": false,
+            "type": "string[]"
+          }
+        ]
+      },
       "presets": [
         {
           "name": "vector_docs_search",

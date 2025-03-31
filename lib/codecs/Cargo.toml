@@ -42,7 +42,7 @@ vector-core = { path = "../vector-core", default-features = false, features = ["
 
 [dev-dependencies]
 futures.workspace = true
-indoc = { version = "2", default-features = false }
+indoc.workspace = true
 tokio = { version = "1", features = ["test-util"] }
 similar-asserts = "1.7.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
