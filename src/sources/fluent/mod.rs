@@ -74,6 +74,7 @@ pub enum FluentMode {
 mod deser {
     use super::*;
 
+    #[allow(clippy::large_enum_variant)]
     #[derive(Deserialize)]
     #[serde(tag = "mode")]
     enum FluentModeTagged {
