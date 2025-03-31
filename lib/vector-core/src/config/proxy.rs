@@ -1,9 +1,9 @@
 use headers::Authorization;
 use http::uri::InvalidUri;
-use hyper_proxy::{Custom, Intercept, Proxy, ProxyConnector};
+use hyper_http_proxy::{Custom, Intercept, Proxy, ProxyConnector};
 use no_proxy::NoProxy;
 use url::Url;
-use vector_config::configurable_component;
+use vector_config::configurable_componenp
 
 use crate::serde::is_default;
 

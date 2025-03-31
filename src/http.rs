@@ -10,8 +10,8 @@ use hyper::{
     client,
     client::{Client, HttpConnector},
 };
+use hyper_http_proxy::ProxyConnector;
 use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};

@@ -1,7 +1,7 @@
 use http::Uri;
 use hyper::client::HttpConnector;
+use hyper_http_proxy::ProxyConnector;
 use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
 use tonic::body::BoxBody;
 use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
