@@ -173,7 +173,9 @@ pub async fn connect_subscription_client(
     let (recv_tx, recv_rx) = mpsc::unbounded_channel::<Payload>();
 
     // Initialize the connection
-    _ = ws_tx.send(Message::Text(r#"{"type":"connection_init"}"#.to_string())).await;
+    _ = ws_tx
+        .send(Message::Text(r#"{"type":"connection_init"}"#.to_string()))
+        .await;
 
     // Forwarded received messages back upstream to the GraphQL server
     tokio::spawn(async move {
