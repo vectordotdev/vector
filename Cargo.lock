@@ -1010,14 +1010,14 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-kms"
-version = "1.62.0"
+version = "1.63.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db4ecacd2e7947b670b7f9e5146c860d1b638cef1392351df47ddf6bb4c68839"
+checksum = "a971bfe62ca4a228627a1b74a87a7a142979b20b168d2e2884f4893212ebb715"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
  "aws-smithy-async",
- "aws-smithy-http 0.61.1",
+ "aws-smithy-http 0.62.0",
  "aws-smithy-json 0.61.3",
  "aws-smithy-runtime",
  "aws-smithy-runtime-api",
@@ -1066,14 +1066,14 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-secretsmanager"
-version = "1.65.0"
+version = "1.66.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c5bce3fceed1d290dfc1d4a670c726afd2193164d093a2014d2a66e09107fb8"
+checksum = "3a18853bf19ba8f8b500f6e111ae4a1910f02c617b628b38c1ef73867d5fc56e"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
  "aws-smithy-async",
- "aws-smithy-http 0.61.1",
+ "aws-smithy-http 0.62.0",
  "aws-smithy-json 0.61.3",
  "aws-smithy-runtime",
  "aws-smithy-runtime-api",
@@ -1089,14 +1089,14 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-sns"
-version = "1.62.0"
+version = "1.63.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55e276801af0763b50da15e96e3aaf9dc47680edb7c10c882963f3180fd932e9"
+checksum = "18f19087f7ce277f68f4fe7147acc50618190e12b80f2f3b5b5a915bea71465d"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
  "aws-smithy-async",
- "aws-smithy-http 0.61.1",
+ "aws-smithy-http 0.62.0",
  "aws-smithy-json 0.61.3",
  "aws-smithy-query",
  "aws-smithy-runtime",
@@ -4764,7 +4764,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.4.10",
+ "socket2 0.5.8",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
