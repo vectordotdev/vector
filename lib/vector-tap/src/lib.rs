@@ -294,13 +294,25 @@ mod tests {
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
             let mut ws_stream = accept_async(stream).await.unwrap();
+            // The first message should be connection_init
             if let Some(Ok(Message::Text(msg))) = ws_stream.next().await {
                 let client_init_msg: Value =
                     serde_json::from_str(&msg).expect("Init message should be in JSON format");
-                let subscription_id = &client_init_msg["id"];
+                assert_eq!(client_init_msg["type"].as_str(), Some("connection_init"));
+            }
+            // The next message should be start with id, run in loop to make test more reliable
+            loop {
+                if let Ok(Some(Ok(Message::Text(msg)))) =
+                    timeout(Duration::from_millis(100), ws_stream.next()).await
+                {
+                    let client_start_msg: Value =
+                        serde_json::from_str(&msg).expect("Start message should be in JSON format");
+                    assert_eq!(client_start_msg["type"].as_str(), Some("start"));
+                    let subscription_id = &client_start_msg["id"];
+                    assert!(subscription_id.is_string());
 
-                let message_to_send = format!(
-                    "{{\
+                    let message_to_send = format!(
+                        "{{\
                         \"type\":\"data\",\
                         \"id\":{subscription_id},\
                         \"payload\":{{\
@@ -317,15 +329,16 @@ mod tests {
                             }}\
                         }}\
                     }}",
-                );
+                    );
 
-                // Send 2 messages to client, mimicking 3 second interval
-                loop {
-                    ws_stream
-                        .send(Message::Text(message_to_send.clone()))
-                        .await
-                        .unwrap();
-                    sleep(Duration::from_secs(3)).await;
+                    // Send 2 messages to client, mimicking 3 second interval
+                    loop {
+                        ws_stream
+                            .send(Message::Text(message_to_send.clone()))
+                            .await
+                            .unwrap();
+                        sleep(Duration::from_secs(3)).await;
+                    }
                 }
             }
         });
