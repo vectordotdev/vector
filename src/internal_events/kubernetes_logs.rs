@@ -4,6 +4,7 @@ use vector_lib::{
     internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
     json_size::JsonSize,
 };
+use vrl::core::Value;
 
 use crate::event::Event;
 
@@ -208,7 +209,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
 
 #[derive(Debug)]
 pub struct KubernetesMergedLineTooBig<'a> {
-    pub event: &'a Event,
+    pub event: &'a Value,
     pub configured_limit: usize,
     pub encountered_size_so_far: usize,
 }

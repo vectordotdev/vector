@@ -50,8 +50,9 @@ impl PartialEventMergeState {
                 // drop event if it's bigger than max allowed
                 if bytes_mut.len() > max_merged_line_bytes {
                     bucket.too_big = true;
+                    // perf impact of clone should be minimal since being here means no further processing of this event will occur
                     emit!(KubernetesMergedLineTooBig {
-                        event: &Event::Log(event),
+                        event: &Value::Bytes(new_value.clone()),
                         configured_limit: max_merged_line_bytes,
                         encountered_size_so_far: bytes_mut.len()
                     });
@@ -62,19 +63,20 @@ impl PartialEventMergeState {
         } else {
             // new event
 
+            let mut too_big = false;
+
             if let Some(Value::Bytes(event_bytes)) = event.get(message_path) {
                 bytes_mut.extend_from_slice(event_bytes);
-            }
+                too_big = bytes_mut.len() > max_merged_line_bytes;
 
-            let too_big = bytes_mut.len() > max_merged_line_bytes;
-
-            if too_big {
-                // perf impact of clone should be minimal since being here means no further processing of this event will occur
-                emit!(KubernetesMergedLineTooBig {
-                    event: &Event::Log(event.clone()),
-                    configured_limit: max_merged_line_bytes,
-                    encountered_size_so_far: bytes_mut.len()
-                });
+                if too_big {
+                    // perf impact of clone should be minimal since being here means no further processing of this event will occur
+                    emit!(KubernetesMergedLineTooBig {
+                        event: &Value::Bytes(event_bytes.clone()),
+                        configured_limit: max_merged_line_bytes,
+                        encountered_size_so_far: bytes_mut.len()
+                    });
+                }
             }
 
             self.buckets.insert(
