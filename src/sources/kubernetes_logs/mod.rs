@@ -199,7 +199,7 @@ pub struct Config {
     ///
     /// Note that, if auto_partial_merge is false, this config will be ignored. Also, if max_line_bytes is too small to reach the continuation character, then this
     /// config will have no practical impact (the same is true of `auto_partial_merge`). Finally, the smaller of `max_merged_line_bytes` and `max_line_bytes` will apply
-    /// if auto_partial_merge is true, so if this is set to eg 1 MiB but max_line_bytes is set to ~2.5 MiB, then every line greater than 1 MiB will be dropped.
+    /// if auto_partial_merge is true, so if this is set to eg 1 MiB but `max_line_bytes` is set to ~2.5 MiB, then every line greater than 1 MiB will be dropped.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     max_merged_line_bytes: usize,
 
