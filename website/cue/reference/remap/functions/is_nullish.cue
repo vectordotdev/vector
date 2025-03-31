@@ -10,7 +10,7 @@ remap: functions: is_nullish: {
 	notices: [
 		"""
 			This function behaves inconsistently: it returns `false` for empty arrays (`[]`) and objects (`{}`),
-			but `true` for empty strings (`""`) and `null`. Consider using `is_empty` as a better alternative.
+			but `true` for empty strings (`""`) and `null`.
 			""",
 	]
 
