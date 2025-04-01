@@ -632,7 +632,7 @@ mod integration_tests {
     }
 
     async fn dnstap_exec(cmd: Vec<&str>) {
-        let docker = Docker::connect_with_unix_defaults().expect("failed binding to docker socket");
+        let docker = Docker::connect_with_defaults().expect("failed binding to docker socket");
         let config = CreateExecOptions {
             cmd: Some(cmd),
             attach_stdout: Some(true),
