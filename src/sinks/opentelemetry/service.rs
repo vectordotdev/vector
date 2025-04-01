@@ -20,7 +20,8 @@ pub(super) struct OpentelemetryServiceRequestBuilder {
 
 impl HttpServiceRequestBuilder<()> for OpentelemetryServiceRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
-        let builder = Request::post(self.uri.clone()).header(CONTENT_TYPE, "application/json");
+        let builder =
+            Request::post(self.uri.clone()).header(CONTENT_TYPE, "application/x-protobuf");
 
         let mut request = builder
             .body(request.take_payload())

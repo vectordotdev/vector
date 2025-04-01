@@ -8,10 +8,22 @@ use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::event_path;
 use vrl::path::PathPrefix;
 
+use base64::prelude::*;
+
+use std::time::SystemTime;
+
 use crate::{
+    config::Resource,
+    event::LogEvent,
     sinks::{prelude::*, util::encoding::Encoder as SinkEncoder},
     template::TemplateRenderingError,
 };
+
+use vector_lib::opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
+use vector_lib::opentelemetry::proto::common::v1::KeyValueList;
+use vector_lib::opentelemetry::proto::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
+
+use prost::Message;
 
 #[derive(Clone, Debug)]
 pub(super) struct OpentelemetryEncoder {
@@ -24,40 +36,106 @@ impl OpentelemetryEncoder {
         Self { transformer }
     }
 
-    pub(super) fn encode_event(&self, event: Event) -> Option<serde_json::Value> {
-        Some(json!({"a": "b"}))
+    fn encode_trace(&self, mut trace: TraceEvent) -> ResourceSpans {
+        ResourceSpans::default()
+    }
+
+    /// Encode a log event into an OpenTelemetry `ResourceLogs` message.
+    ///
+    /// Log Events must match the OpenTelemetry log record format:
+    ///
+    /// body
+    /// attributes
+    /// resource
+    /// trace_id
+    /// ...
+    fn encode_log(&self, mut log: LogEvent) -> ResourceLogs {
+        let mut log_record = LogRecord::default();
+
+        if let Some(msg) = log.get_message() {
+            log_record.body = Some(msg.clone().into());
+        }
+
+        if let Some(Value::Timestamp(timestamp)) = log.get_timestamp() {
+            log_record.time_unix_nano = timestamp.timestamp_nanos_opt().unwrap_or(0) as u64;
+        }
+
+        if let Some(Value::Timestamp(timestamp)) = log.remove(event_path!("observed_timestamp")) {
+            log_record.observed_time_unix_nano =
+                timestamp.timestamp_nanos_opt().unwrap_or(0) as u64;
+        }
+
+        if let Some(attrs) = log.remove(event_path!("attributes")) {
+            match attrs {
+                Value::Object(map) => {
+                    log_record.attributes = Into::<KeyValueList>::into(map).into();
+                }
+                _ => {} /* TODO: how to handle? */
+            }
+        }
+
+        if let Some(trace_id) = log.remove(event_path!("trace_id")) {
+            match trace_id {
+                Value::Bytes(id) => {
+                    log_record.trace_id = id.into();
+                }
+                _ => {} /* TODO: how to handle? */
+            }
+        }
+
+        let mut scope_logs = ScopeLogs::default();
+        scope_logs.log_records = vec![log_record];
+        let mut resource_logs = ResourceLogs::default();
+        resource_logs.scope_logs = vec![scope_logs];
+
+        if let Some(attrs) = log.remove(event_path!("resource")) {
+            match attrs {
+                Value::Object(map) => {
+                    let mut resource =
+                        ::vector_lib::opentelemetry::proto::resource::v1::Resource::default();
+                    resource.attributes = Into::<KeyValueList>::into(map).into();
+
+                    resource_logs.resource = Some(resource);
+                }
+                _ => {} /* TODO: how to handle? */
+            }
+        }
+
+        resource_logs
+    }
+
+    fn encode(&self, event: Event) -> ResourceLogs {
+        match event {
+            Event::Log(log) => self.encode_log(log),
+            _ => unreachable!(),
+        }
     }
 }
 
 impl SinkEncoder<Vec<Event>> for OpentelemetryEncoder {
     fn encode_input(
         &self,
-        events: Vec<Event>,
+        mut events: Vec<Event>,
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
         let mut byte_size = telemetry().create_request_count_byte_size();
         let mut n_events = events.len();
-        let mut body = BytesMut::new();
 
-        let mut entries = Vec::with_capacity(n_events);
-        for event in &events {
-            let size = event.estimated_json_encoded_size_of();
-            if let Some(data) = self.encode_event(event.clone()) {
-                byte_size.add_event(event, size);
-                entries.push(data)
-            } else {
-                // encode_event() emits the `TemplateRenderingError` internal event,
-                // which emits an `EventsDropped`, so no need to here.
-                n_events -= 1;
-            }
+        for event in events.iter_mut() {
+            self.transformer.transform(event);
+            byte_size.add_event(event, event.estimated_json_encoded_size_of());
         }
 
-        let events = json!({ "entries": entries });
+        let payload: Vec<ResourceLogs> = events
+            .into_iter()
+            .map(|mut event| self.encode(event))
+            .collect();
 
-        body.extend(&to_vec(&events)?);
+        let payload = ExportLogsServiceRequest {
+            resource_logs: payload,
+        }
+        .encode_to_vec();
 
-        let body = body.freeze();
-
-        write_all(writer, n_events, body.as_ref()).map(|()| (body.len(), byte_size))
+        write_all(writer, n_events, &payload).map(|()| (payload.len(), byte_size))
     }
 }
