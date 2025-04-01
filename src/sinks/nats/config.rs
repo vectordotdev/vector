@@ -17,7 +17,7 @@ pub struct NatsTowerRequestConfigDefaults;
 impl TowerRequestConfigDefaults for NatsTowerRequestConfigDefaults {
     const CONCURRENCY: Concurrency = Concurrency::None;
 }
-
+// test
 /// Configuration for the `nats` sink.
 #[configurable_component(sink(
     "nats",
