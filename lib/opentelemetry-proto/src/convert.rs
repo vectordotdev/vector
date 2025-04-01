@@ -7,7 +7,7 @@ use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     event::{Event, LogEvent, TraceEvent},
 };
-use vrl::value::{KeyString, ObjectArray};
+use vrl::value::{KeyString, Array};
 use vrl::{
     event_path,
     value::{ObjectMap, Value},
@@ -87,7 +87,7 @@ impl From<PBValue> for Value {
                 arr.values
                     .into_iter()
                     .map(|av| av.value.map(Into::into).unwrap_or(Value::Null))
-                    .collect::<ObjectArray>(),
+                    .collect::<Array>(),
             ),
             PBValue::KvlistValue(arr) => kv_list_into_value(arr.values),
         }

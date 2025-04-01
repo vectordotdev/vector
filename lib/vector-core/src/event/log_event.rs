@@ -150,7 +150,7 @@ impl PartialEq for Inner {
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct LogEvent {
     #[serde(flatten)]
-    inner: Arc<Inner>,
+    inner: Inner,
 
     #[serde(skip)]
     metadata: EventMetadata,
@@ -177,11 +177,11 @@ impl LogEvent {
     }
 
     pub fn value(&self) -> &Value {
-        self.inner.as_ref().as_value()
+        self.inner.as_value()
     }
 
     pub fn value_mut(&mut self) -> &mut Value {
-        let result = Arc::make_mut(&mut self.inner);
+        let result = &mut self.inner;
         // We MUST invalidate the inner size cache when making a
         // mutable copy, since the _next_ action will modify the data.
         result.invalidate();
@@ -258,14 +258,14 @@ impl LogEvent {
     ///  Create a `LogEvent` from a `Value` and `EventMetadata`
     pub fn from_parts(value: Value, metadata: EventMetadata) -> Self {
         Self {
-            inner: Arc::new(value.into()),
+            inner: value.into(),
             metadata,
         }
     }
 
     ///  Create a `LogEvent` from an `ObjectMap` and `EventMetadata`
     pub fn from_map(map: BTreeMap<KeyString, Value>, metadata: EventMetadata) -> Self {
-        let inner = Arc::new(Inner::from(Value::Object(map.into())));
+        let inner = Inner::from(Value::Object(map.into()));
         Self { inner, metadata }
     }
 
@@ -273,9 +273,7 @@ impl LogEvent {
     pub fn into_parts(mut self) -> (Value, EventMetadata) {
         self.value_mut();
 
-        let value = Arc::try_unwrap(self.inner)
-            .unwrap_or_else(|_| unreachable!("inner fields already cloned after owning"))
-            .fields;
+        let value = self.inner.fields;
         let metadata = self.metadata;
         (value, metadata)
     }

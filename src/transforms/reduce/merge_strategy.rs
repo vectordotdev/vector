@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
 use vrl::path::OwnedTargetPath;
-use vrl::value::ObjectArray;
+use vrl::value::Array;
 
 /// Strategies for merging events.
 #[configurable_component]
@@ -213,11 +213,11 @@ impl ReduceValueMerger for ArrayMerger {
 
 #[derive(Debug, Clone)]
 struct LongestArrayMerger {
-    v: ObjectArray,
+    v: Array,
 }
 
 impl LongestArrayMerger {
-    const fn new(v: ObjectArray) -> Self {
+    const fn new(v: Array) -> Self {
         Self { v }
     }
 }
@@ -249,11 +249,11 @@ impl ReduceValueMerger for LongestArrayMerger {
 
 #[derive(Debug, Clone)]
 struct ShortestArrayMerger {
-    v: ObjectArray,
+    v: Array,
 }
 
 impl ShortestArrayMerger {
-    const fn new(v: ObjectArray) -> Self {
+    const fn new(v: Array) -> Self {
         Self { v }
     }
 }
