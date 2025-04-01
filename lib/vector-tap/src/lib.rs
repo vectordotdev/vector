@@ -173,7 +173,6 @@ impl<'a> TapRunner<'a> {
             }
 
             let message = timeout(stream_duration - time_elapsed, stream.next()).await;
-            println!("{:#?}", message);
             match message {
                 Ok(Some(Some(res))) => {
                     if let Some(d) = res.data {
