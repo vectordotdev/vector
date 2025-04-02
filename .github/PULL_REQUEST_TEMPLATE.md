@@ -50,7 +50,9 @@ Providing this information upfront will facilitate a smoother review process. --
     - `cargo fmt --all`
     - `cargo clippy --workspace --all-targets -- -D warnings`
     - `cargo nextest run --workspace` (alternatively, you can run `cargo test --all`)
-- When push new commits, please avoid force pushes to help us review incrementally. For example, you can run `git merge origin master` and `git push`.
+- After a review is requested, please avoid force pushes to help us review incrementally.
+  - Feel free to push as many commits as you want. They will be squashed into one before merging.
+  - For example, you can run `git merge origin master` and `git push`.
 - If this PR introduces changes Vector dependencies (modifies `Cargo.lock`), please
   run `dd-rust-license-tool write` to regenerate the [license inventory](https://github.com/vectordotdev/vrl/blob/main/LICENSE-3rdparty.csv) and commit the changes (if any). More details [here](https://crates.io/crates/dd-rust-license-tool).
 
