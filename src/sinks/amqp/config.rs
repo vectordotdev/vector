@@ -59,7 +59,7 @@ impl AmqpPropertiesConfig {
                 }
                 Err(error) => {
                     warn!(
-                        message = "Failed to convert to numeric value for \"properties.priority\"",
+                        message = "Failed to convert to numeric value for \"properties.priority\".",
                         error = %error,
                         error_type = error_type::CONVERSION_FAILED,
                         stage = error_stage::PROCESSING,

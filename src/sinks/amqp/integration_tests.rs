@@ -321,7 +321,7 @@ async fn amqp_priority_with_template(
         assert_eq!(msg_priority, expected_priority);
         assert_eq!(output, input);
     } else {
-        panic!("Did not consume message in time");
+        panic!("Did not consume message in time.");
     }
 }
 
