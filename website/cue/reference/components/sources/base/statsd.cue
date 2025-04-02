@@ -76,7 +76,7 @@ base: components: sources: statsd: configuration: {
 			When set to "milliseconds", the original timing values are preserved.
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"udp\" or mode = \"unix\""
-		required: false
+		required: 	   false
 		type: string: default: "seconds"
 	}
 	shutdown_timeout_secs: {
