@@ -6,7 +6,7 @@ license = "MPL-2.0"
 
 [dependencies]
 convert_case = { version = "0.7", default-features = false }
-darling = { version = "0.20", default-features = false, features = ["suggestions"] }
+darling = { version = "0.20.10", default-features = false, features = ["suggestions"] }
 proc-macro2 = { version = "1.0", default-features = false }
 serde.workspace = true
 serde_json.workspace = true

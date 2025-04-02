@@ -176,9 +176,11 @@ components: sources: datadog_agent: {
 		decompression: {
 			title: "Configuring the Datadog Agent"
 			body:  """
-				Sending logs or metrics to Vector requires the [Datadog Agent](\(urls.datadog_agent_doc)) v7.35/6.35 or greater.
+				Sending logs or metrics to Vector requires the [Datadog Agent](\(urls.datadog_agent)) v7.35/6.35 or greater.
+				Note that if you are using a Datadog Agent where `zstd` is the default compression mode, then you will also
+				need a Vector version `0.40.2` or later.
 
-				To send logs from a Datadog Agent to this source, the [Datadog Agent](\(urls.datadog_agent_doc)) configuration
+				To send logs from a Datadog Agent to this source, the [Datadog Agent](\(urls.datadog_agent)) configuration
 				must be updated to use:
 
 				```yaml
@@ -187,7 +189,7 @@ components: sources: datadog_agent: {
 					logs.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
 				```
 
-				In order to send metrics the [Datadog Agent](\(urls.datadog_agent_doc)) configuration must be updated with the
+				In order to send metrics the [Datadog Agent](\(urls.datadog_agent)) configuration must be updated with the
 				following options:
 
 				```yaml
@@ -196,7 +198,7 @@ components: sources: datadog_agent: {
 					metrics.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
 				```
 
-				In order to send traces the [Datadog Agent](\(urls.datadog_agent_doc)) configuration must be updated with the
+				In order to send traces the [Datadog Agent](\(urls.datadog_agent)) configuration must be updated with the
 				following options:
 
 				```yaml
@@ -204,6 +206,8 @@ components: sources: datadog_agent: {
 					traces.enabled: true
 					traces.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
 				```
+
+				You can find the agent configuration template [here](\(urls.datadog_agent_vector_config_template)).
 				"""
 		}
 		trace_support: {
