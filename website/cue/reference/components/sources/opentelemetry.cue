@@ -39,11 +39,7 @@ components: sources: opentelemetry: {
 
 	support: {
 		requirements: []
-		warnings: [
-			"""
-				The `opentelemetry` source only supports log, trace and metric events at this time.
-				""",
-		]
+		warnings: []
 		notices: []
 	}
 

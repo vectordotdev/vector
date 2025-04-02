@@ -66,7 +66,7 @@ impl ResourceLogs {
 
 impl ResourceMetrics {
     pub fn into_event_iter(self) -> impl Iterator<Item = Event> {
-        let resource = self.resource.as_ref();
+        let resource = self.resource.clone();
 
         self.scope_metrics
             .into_iter()
