@@ -80,11 +80,6 @@ pub enum MetricLabelMatcherConfig {
         /// List of matchers to check.
         matchers: Vec<MetricLabelMatcher>,
     },
-    /// A single matcher (direct leaf).
-    Single {
-        /// The matcher to check.
-        matcher: MetricLabelMatcher,
-    },
 }
 
 /// Tests to confirm complex examples configuration
@@ -131,7 +126,7 @@ mod tests {
     fn simple_labels_config() {
         let config = serde_yaml::from_str::<PerMetricSetExpiration>(indoc! {r#"
             labels:
-                type: "single"
+                type: "all"
                 matcher:
                     type: "exact"
                     key: "test_metric_label"
@@ -140,14 +135,15 @@ mod tests {
             "#})
         .unwrap();
 
-        if let Some(MetricLabelMatcherConfig::Single {
-            matcher: MetricLabelMatcher::Exact { key, value },
-        }) = config.labels
-        {
-            assert_eq!("test_metric_label", key);
-            assert_eq!("test_value", value);
+        if let Some(MetricLabelMatcherConfig::All { matchers }) = config.labels {
+            if let MetricLabelMatcher::Exact { key, value } = &matchers[0] {
+                assert_eq!("test_metric_label", key);
+                assert_eq!("test_value", value);
+            } else {
+                panic!("Expected exact metric matcher");
+            }
         } else {
-            panic!("Expected exact label matcher");
+            panic!("Expected all matcher");
         }
         assert!(config.name.is_none());
         assert_eq!(1.0, config.expire_secs);

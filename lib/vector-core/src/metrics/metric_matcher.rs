@@ -129,7 +129,6 @@ impl TryFrom<MetricLabelMatcherConfig> for LabelsMatcher {
                     .map(TryInto::<LabelsMatcher>::try_into)
                     .collect::<Result<Vec<_>, _>>()?,
             ),
-            MetricLabelMatcherConfig::Single { matcher } => matcher.try_into()?,
         })
     }
 }

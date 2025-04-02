@@ -44,57 +44,5 @@ configuration: {
 				}
 			}
 		}
-
-		expire_metrics_per_metric_set: {
-			type: array: {
-				items: type: object: options: {
-					labels: {
-						description: """
-						Labels to apply this expiration to. Ignores labels if not defined.
-						"""
-						required: false
-						type: object: options: {
-							type: {
-								required: true
-								type: string: enum: {
-									exact: "Looks for an exact match of one label key value pair."
-									regex: "Compares label value with given key to the provided pattern."
-									all:   "Checks that all of the provided matchers can be applied to given metric."
-									any:   "Checks that any of the provided matchers can be applied to given metric."
-								}
-								description: "Metric label matcher type."
-							}
-							key: {
-								required: true
-								type: string: {}
-								description:   "Metric key to look for."
-								relevant_when: "type = \"exact\" or type = \"regex\""
-							}
-							value: {
-								required: true
-								type: string: {}
-								description:   "The exact metric label value."
-								relevant_when: "type = \"exact\""
-							}
-							pattern: {
-								required: true
-								type: string: {}
-								description:   "Pattern to compare metric label value to."
-								relevant_when: "type = \"regex\""
-							}
-							matchers: {
-								required: true
-								type: array: items: type: object: {}
-								description: """
-								List of matchers to check. Each matcher has the same
-								options as the `labels` object.
-								"""
-								relevant_when: "type = \"all\" or type = \"any\""
-							}
-						}
-					}
-				}
-			}
-		}
 	}
 }

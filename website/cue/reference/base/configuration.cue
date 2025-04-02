@@ -616,42 +616,9 @@ base: configuration: configuration: {
 				description: "Labels to apply this expiration to. Ignores labels if not defined."
 				required:    false
 				type: object: options: {
-					matcher: {
-						description:   "The matcher to check."
-						relevant_when: "type = \"single\""
-						required:      true
-						type: object: options: {
-							key: {
-								description: "Metric key to look for."
-								required:    true
-								type: string: {}
-							}
-							type: {
-								description: "Metric label matcher type."
-								required:    true
-								type: string: enum: {
-									exact: "Looks for an exact match of one label key value pair."
-									regex: "Compares label value with given key to the provided pattern."
-								}
-							}
-							value: {
-								description:   "The exact metric label value."
-								relevant_when: "type = \"exact\""
-								required:      true
-								type: string: {}
-							}
-							value_pattern: {
-								description:   "Pattern to compare metric label value to."
-								relevant_when: "type = \"regex\""
-								required:      true
-								type: string: {}
-							}
-						}
-					}
 					matchers: {
-						description:   "List of matchers to check."
-						relevant_when: "type = \"any\" or type = \"all\""
-						required:      true
+						description: "List of matchers to check."
+						required:    true
 						type: array: items: type: object: options: {
 							key: {
 								description: "Metric key to look for."
@@ -684,9 +651,8 @@ base: configuration: configuration: {
 						description: "Metric label group matcher type."
 						required:    true
 						type: string: enum: {
-							all:    "Checks that all of the provided matchers can be applied to given metric."
-							any:    "Checks that any of the provided matchers can be applied to given metric."
-							single: "A single matcher (direct leaf)."
+							all: "Checks that all of the provided matchers can be applied to given metric."
+							any: "Checks that any of the provided matchers can be applied to given metric."
 						}
 					}
 				}
