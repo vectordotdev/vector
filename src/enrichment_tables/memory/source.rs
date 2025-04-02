@@ -26,20 +26,20 @@ use super::{Memory, MemoryConfig};
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct MemorySourceConfig {
-    /// Interval for dumping all data from the table when used as a source.
-    pub dump_interval: NonZeroU64,
-    /// Batch size for data dumping. Used to prevent dumping entire table at
+    /// Interval for exporting all data from the table when used as a source.
+    pub export_interval: NonZeroU64,
+    /// Batch size for data exporting. Used to prevent exporting entire table at
     /// once and blocking the system.
     ///
-    /// By default, batches are not used and entire table is dumped.
+    /// By default, batches are not used and entire table is exported.
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
-    pub dump_batch_size: Option<u64>,
-    /// If set to true, all data will be removed from cache after dumping.
-    /// Only valid if used as a source and dump_interval > 0
+    pub export_batch_size: Option<u64>,
+    /// If set to true, all data will be removed from cache after exporting.
+    /// Only valid if used as a source and export_interval > 0
     ///
-    /// By default, dump will not remove data from cache
+    /// By default, export will not remove data from cache
     #[serde(default = "crate::serde::default_false")]
-    pub remove_after_dump: bool,
+    pub remove_after_export: bool,
     /// Key to use for this component when used as a source. This must be different from the
     /// component key.
     pub source_key: String,
@@ -64,7 +64,7 @@ impl MemorySource {
             .as_ref()
             .expect("Unexpected missing source config in memory table used as a source.");
         let mut interval = IntervalStream::new(interval(Duration::from_secs(
-            source_config.dump_interval.into(),
+            source_config.export_interval.into(),
         )))
         .take_until(self.shutdown);
 
@@ -79,18 +79,18 @@ impl MemorySource {
                         let utc_now = Utc::now();
                         events = reader
                             .iter()
-                            .skip(if source_config.remove_after_dump {
+                            .skip(if source_config.remove_after_export {
                                 0
                             } else {
                                 sent
                             })
-                            .take(if let Some(batch_size) = source_config.dump_batch_size {
+                            .take(if let Some(batch_size) = source_config.export_batch_size {
                                 batch_size as usize
                             } else {
                                 usize::MAX
                             })
                             .filter_map(|(k, v)| {
-                                if source_config.remove_after_dump {
+                                if source_config.remove_after_export {
                                     writer.write_handle.empty(k.clone());
                                 }
                                 v.get_one().map(|v| (k, v))
@@ -110,7 +110,7 @@ impl MemorySource {
                                 Some(event)
                             })
                             .collect::<Vec<_>>();
-                        if source_config.remove_after_dump {
+                        if source_config.remove_after_export {
                             writer.write_handle.refresh();
                         }
                     }
@@ -125,9 +125,9 @@ impl MemorySource {
                 }
 
                 sent += count;
-                match source_config.dump_batch_size {
+                match source_config.export_batch_size {
                     None => break,
-                    Some(dump_batch_size) if count < dump_batch_size as usize => break,
+                    Some(export_batch_size) if count < export_batch_size as usize => break,
                     _ => {}
                 }
             }

@@ -521,17 +521,17 @@ enrichment_tables:
     flush_interval: 5
     inputs: ["cache_generator"]
     source_config:
-       # Dump the cache every 3 minutes (100 seconds).
-       dump_interval: 180
-       # If set to false (which is the default) it will not remove data from cache after dumping.
-       remove_after_dump: false
+       # Export the cache every 3 minutes (100 seconds).
+       export_interval: 180
+       # If set to false (which is the default) it will not remove data from cache after exporting.
+       remove_after_export: false
        # Source key has to be defined and be different from the main key ("memory_table").
        # This key is then used to define this component as an input to other components
        source_key: "memory_table_source"
-       # dump_batch_size can be used to reduce memory usage when handling larger tables.
-       # When set, data will be dumped from the table in batches, waiting for downstream components
+       # export_batch_size can be used to reduce memory usage when handling larger tables.
+       # When set, data will be exported from the table in batches, waiting for downstream components
        # to process the data
-       # dump_batch_size: 10000
+       # export_batch_size: 10000
 
 
 sources:
@@ -580,7 +580,7 @@ transforms:
         . = {}
       }
 
-# We can observe that after some time data will be dumped to console from the cache
+# We can observe that after some time data will be exported to console from the cache
 sinks:
   console:
     inputs: ["memory_table_source"]

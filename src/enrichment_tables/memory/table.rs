@@ -861,9 +861,9 @@ mod tests {
     async fn source_spec_compliance() {
         let mut memory_config = MemoryConfig::default();
         memory_config.source_config = Some(MemorySourceConfig {
-            dump_interval: NonZeroU64::try_from(1).unwrap(),
-            dump_batch_size: None,
-            remove_after_dump: false,
+            export_interval: NonZeroU64::try_from(1).unwrap(),
+            export_batch_size: None,
+            remove_after_export: false,
             source_key: "test".to_string(),
         });
         let memory = memory_config.get_or_build_memory().await;

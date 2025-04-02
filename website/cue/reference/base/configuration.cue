@@ -159,28 +159,28 @@ base: configuration: configuration: {
 			}
 			source_config: {
 				type: object: options: {
-					dump_batch_size: {
+					export_batch_size: {
 						type: uint: {}
 						description: """
-														Batch size for data dumping. Used to prevent dumping entire table at
+														Batch size for data exporting. Used to prevent exporting entire table at
 														once and blocking the system.
 
-														By default, batches are not used and entire table is dumped.
+														By default, batches are not used and entire table is exported.
 														"""
 						required: false
 					}
-					dump_interval: {
+					export_interval: {
 						type: uint: {}
-						description: "Interval for dumping all data from the table when used as a source."
+						description: "Interval for exporting all data from the table when used as a source."
 						required:    true
 					}
-					remove_after_dump: {
+					remove_after_export: {
 						type: bool: default: false
 						description: """
-														If set to true, all data will be removed from cache after dumping.
-														Only valid if used as a source and dump_interval > 0
+														If set to true, all data will be removed from cache after exporting.
+														Only valid if used as a source and export_interval > 0
 
-														By default, dump will not remove data from cache
+														By default, export will not remove data from cache
 														"""
 						required: false
 					}

@@ -126,14 +126,13 @@ impl EnrichmentTableConfig for MemoryConfig {
         &self,
         _default_key: &ComponentKey,
     ) -> Option<(ComponentKey, Box<dyn SourceConfig>)> {
-        if let Some(source_config) = &self.source_config {
-            Some((
-                source_config.source_key.clone().into(),
-                Box::new(self.clone()),
-            ))
-        } else {
-            None
-        }
+        let Some(source_config) = &self.source_config else {
+            return None;
+        };
+        Some((
+            source_config.source_key.clone().into(),
+            Box::new(self.clone()),
+        ))
     }
 }
 
