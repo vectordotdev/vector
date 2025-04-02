@@ -43,6 +43,7 @@ Providing this information upfront will facilitate a smoother review process. --
 
 ## Notes
 - Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
+- Do not hesitate to use `@vectordotdev/vector` to reach out to us regarding this PR.
 - The CI checks run only after we manually approve them. To minimize round-trips see the following local checks:
   - `make check-all` is a good command to run locally. This check is
     defined [here](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454). Some of these
