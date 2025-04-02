@@ -1,3 +1,3 @@
-Support ingesting metrics through opentelemetry source(experimental)
+The `opentelemetry` source now supports metrics ingestion.
 
 authors: cmcmacs
