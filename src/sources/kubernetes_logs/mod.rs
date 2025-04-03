@@ -791,7 +791,14 @@ impl Source {
 
         let mut resolved_max_line_bytes = max_line_bytes;
         if auto_partial_merge {
-            resolved_max_line_bytes = min(max_line_bytes, if let Some(configured_max_merged_line_bytes) = max_merged_line_bytes { configured_max_merged_line_bytes } else { max_line_bytes });
+            resolved_max_line_bytes = min(
+                max_line_bytes,
+                if let Some(configured_max_merged_line_bytes) = max_merged_line_bytes {
+                    configured_max_merged_line_bytes
+                } else {
+                    max_line_bytes
+                },
+            );
         }
 
         // TODO: maybe more of the parameters have to be configurable.

@@ -70,7 +70,7 @@ impl PartialEventMergeState {
             if let Some(Value::Bytes(event_bytes)) = event.get(message_path) {
                 bytes_mut.extend_from_slice(event_bytes);
                 if let Some(max_merged_line_bytes) = self.maybe_max_merged_line_bytes {
-                    exceeds_max_merged_line_limit =  bytes_mut.len() > max_merged_line_bytes;
+                    exceeds_max_merged_line_limit = bytes_mut.len() > max_merged_line_bytes;
 
                     if exceeds_max_merged_line_limit {
                         // perf impact of clone should be minimal since being here means no further processing of this event will occur
@@ -95,7 +95,10 @@ impl PartialEventMergeState {
     }
 
     fn remove_event(&mut self, file: &str) -> Option<LogEvent> {
-        self.buckets.remove(file).filter(|bucket| !bucket.exceeds_max_merged_line_limit).map(|bucket| bucket.event)
+        self.buckets
+            .remove(file)
+            .filter(|bucket| !bucket.exceeds_max_merged_line_limit)
+            .map(|bucket| bucket.event)
     }
 
     fn emit_expired_events(&mut self, emitter: &mut Emitter<LogEvent>) {
@@ -184,12 +187,7 @@ fn merge_partial_events_with_custom_expiration(
                 .map(|x| x.to_string())
                 .unwrap_or_default();
 
-            state.add_event(
-                event,
-                &file,
-                &message_path,
-                expiration_time,
-            );
+            state.add_event(event, &file, &message_path, expiration_time);
             if !is_partial {
                 if let Some(log_event) = state.remove_event(&file) {
                     emitter.emit(log_event);
@@ -221,8 +219,7 @@ mod test {
         e_1.insert("foo", 1);
 
         let input_stream = futures::stream::iter([e_1.into()]);
-        let output_stream =
-            merge_partial_events(input_stream, LogNamespace::Legacy, None);
+        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, None);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
@@ -254,8 +251,7 @@ mod test {
         e_2.insert("foo2", 1);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
-        let output_stream =
-            merge_partial_events(input_stream, LogNamespace::Legacy, None);
+        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, None);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
@@ -293,8 +289,7 @@ mod test {
         e_1.insert("_partial", true);
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
-        let output_stream =
-            merge_partial_events(input_stream, LogNamespace::Legacy, None);
+        let output_stream = merge_partial_events(input_stream, LogNamespace::Legacy, None);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
@@ -364,8 +359,7 @@ mod test {
         );
 
         let input_stream = futures::stream::iter([e_1.into()]);
-        let output_stream =
-            merge_partial_events(input_stream, LogNamespace::Vector, None);
+        let output_stream = merge_partial_events(input_stream, LogNamespace::Vector, None);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
@@ -395,8 +389,7 @@ mod test {
         );
 
         let input_stream = futures::stream::iter([e_1.into(), e_2.into()]);
-        let output_stream =
-            merge_partial_events(input_stream, LogNamespace::Vector, None);
+        let output_stream = merge_partial_events(input_stream, LogNamespace::Vector, None);
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 1);
