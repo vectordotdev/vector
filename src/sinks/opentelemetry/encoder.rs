@@ -14,14 +14,16 @@ use std::time::SystemTime;
 
 use crate::{
     config::Resource,
-    event::LogEvent,
+    event::{LogEvent, TraceEvent},
     sinks::{prelude::*, util::encoding::Encoder as SinkEncoder},
     template::TemplateRenderingError,
 };
 
 use vector_lib::opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
+use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 use vector_lib::opentelemetry::proto::common::v1::KeyValueList;
 use vector_lib::opentelemetry::proto::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
+use vector_lib::opentelemetry::proto::trace::v1::ResourceSpans;
 
 use prost::Message;
 
@@ -103,13 +105,6 @@ impl OpentelemetryEncoder {
 
         resource_logs
     }
-
-    fn encode(&self, event: Event) -> ResourceLogs {
-        match event {
-            Event::Log(log) => self.encode_log(log),
-            _ => unreachable!(),
-        }
-    }
 }
 
 impl SinkEncoder<Vec<Event>> for OpentelemetryEncoder {
@@ -126,15 +121,35 @@ impl SinkEncoder<Vec<Event>> for OpentelemetryEncoder {
             byte_size.add_event(event, event.estimated_json_encoded_size_of());
         }
 
-        let payload: Vec<ResourceLogs> = events
-            .into_iter()
-            .map(|mut event| self.encode(event))
-            .collect();
+        // TODO: will there always be at least one event?
+        let ty = events.get(0).unwrap();
 
-        let payload = ExportLogsServiceRequest {
-            resource_logs: payload,
-        }
-        .encode_to_vec();
+        let payload = match ty {
+            Event::Log(_) => {
+                let logs = events
+                    .into_iter()
+                    .map(|e| self.encode_log(e.into_log()))
+                    .collect();
+                let payload = ExportLogsServiceRequest {
+                    resource_logs: logs,
+                };
+                payload.encode_to_vec()
+            }
+            Event::Trace(_) => {
+                // TODO: can we get all spans for a trace into one event?
+                let spans = events
+                    .into_iter()
+                    .map(|e| self.encode_trace(e.into_trace()))
+                    .collect();
+                let payload = ExportTraceServiceRequest {
+                    resource_spans: spans,
+                };
+                payload.encode_to_vec()
+            }
+            Event::Metric(_) => {
+                unreachable!()
+            }
+        };
 
         write_all(writer, n_events, &payload).map(|()| (payload.len(), byte_size))
     }
