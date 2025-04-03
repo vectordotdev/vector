@@ -114,7 +114,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
 }
 
 fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
-    let mut mermaid = String::from("graph TD;\n");
+    let mut mermaid = String::from("flowchart TD;\n");
 
     writeln!(mermaid, "\n  %% Sources").expect("write to String never fails");
     for (id, _) in config.sources() {
