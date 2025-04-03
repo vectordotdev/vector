@@ -149,7 +149,7 @@ base: components: sinks: greptimedb_logs: configuration: {
 	extra_headers: {
 		description: """
 			Custom headers to add to the HTTP request sent to GreptimeDB.
-			Note that those headers will override the existing headers.
+			Note that these headers will override the existing headers.
 			"""
 		required: false
 		type: object: {
