@@ -261,7 +261,13 @@ components: sources: opentelemetry: {
 		metrics: {
 			title: "Ingest metrics"
 			body: """
-				Metrics support is experimental and subject to change due to the differences in metrics structure between internal Vector metric DataModel and OpenTelemetry, difference to note: Exponential Histogram is transformed into regular Aggregated Histogram, buckets are being calculated based on the base and scale.
+				Metrics support is experimental and subject to change due to the differences in metrics structure between internal Vector metric DataModel and OpenTelemetry.
+				The current mapping behavior is as follows:
+				Gauge is mapped to a Vector Gauge with `MetricKind::Absolute`;
+				Sum is mapped to a Vector Counter(if `is_monotonic` is true, it uses `MetricKind::Incremental`, otherwise, it uses `MetricKind::Absolute`);
+				Histogram is mapped to a Vector AggregatedHistogram;
+				Exponential Histogram is also mapped to a Vector AggregatedHistogram, bucket boundaries are reconstructed from the exponential scale;
+				Summary is mapped to a Vector Aggregated Summary.
 				"""
 		}
 	}
