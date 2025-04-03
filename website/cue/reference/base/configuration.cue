@@ -633,6 +633,98 @@ base: configuration: configuration: {
 		required: false
 		type: string: default: "/var/lib/vector/"
 	}
+	expire_metrics_per_metric_set: {
+		description: """
+			This allows configuring different expiration intervals for different metric sets.
+			By default this is empty and any metric not matched by one of these sets will use
+			the global default value, defined using `expire_metrics_secs`.
+			"""
+		required: false
+		type: array: items: type: object: options: {
+			expire_secs: {
+				description: """
+					The amount of time, in seconds, that internal metrics will persist after having not been
+					updated before they expire and are removed.
+
+					Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
+					so that metrics live long enough to be emitted and captured.
+					"""
+				required: true
+				type: float: examples: [60.0]
+			}
+			labels: {
+				description: "Labels to apply this expiration to. Ignores labels if not defined."
+				required:    false
+				type: object: options: {
+					matchers: {
+						description: "List of matchers to check."
+						required:    true
+						type: array: items: type: object: options: {
+							key: {
+								description: "Metric key to look for."
+								required:    true
+								type: string: {}
+							}
+							type: {
+								description: "Metric label matcher type."
+								required:    true
+								type: string: enum: {
+									exact: "Looks for an exact match of one label key value pair."
+									regex: "Compares label value with given key to the provided pattern."
+								}
+							}
+							value: {
+								description:   "The exact metric label value."
+								relevant_when: "type = \"exact\""
+								required:      true
+								type: string: {}
+							}
+							value_pattern: {
+								description:   "Pattern to compare metric label value to."
+								relevant_when: "type = \"regex\""
+								required:      true
+								type: string: {}
+							}
+						}
+					}
+					type: {
+						description: "Metric label group matcher type."
+						required:    true
+						type: string: enum: {
+							all: "Checks that all of the provided matchers can be applied to given metric."
+							any: "Checks that any of the provided matchers can be applied to given metric."
+						}
+					}
+				}
+			}
+			name: {
+				description: "Metric name to apply this expiration to. Ignores metric name if not defined."
+				required:    false
+				type: object: options: {
+					pattern: {
+						description:   "Pattern to compare to."
+						relevant_when: "type = \"regex\""
+						required:      true
+						type: string: {}
+					}
+					type: {
+						description: "Metric name matcher type."
+						required:    true
+						type: string: enum: {
+							exact: "Only considers exact name matches."
+							regex: "Compares metric name to the provided pattern."
+						}
+					}
+					value: {
+						description:   "The exact metric name."
+						relevant_when: "type = \"exact\""
+						required:      true
+						type: string: {}
+					}
+				}
+			}
+		}
+	}
 	expire_metrics_secs: {
 		common: false
 		description: """
