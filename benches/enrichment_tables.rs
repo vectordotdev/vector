@@ -27,8 +27,8 @@ fn column(col: usize, row: usize) -> Value {
         // And a final column with a date, each of the above duplicated row should have
         // a unique date.
         Value::Timestamp(
-            Utc.ymd(2013, row as u32 % 10 + 1, 15)
-                .and_hms_opt(0, 0, 0)
+            Utc.with_ymd_and_hms(2013, row as u32 % 10 + 1, 15, 0, 0, 0)
+                .single()
                 .expect("invalid timestamp"),
         )
     } else {
@@ -36,10 +36,16 @@ fn column(col: usize, row: usize) -> Value {
     }
 }
 
+enum ConditionType {
+    Equals,
+    BetweenDates,
+    Multiple,
+}
+
 fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     let mut group = c.benchmark_group("enrichment_tables_file");
 
-    let setup = |size, date_range, case| {
+    let setup = |size, condition_type, case| {
         let data = (0..size)
             .map(|row| {
                 // Add 8 columns.
@@ -57,32 +63,33 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                 .collect::<Vec<_>>(),
         );
 
-        let (condition, index, result_offset) = if date_range {
-            // Search on the first and last field.
-            (
-                vec![
-                    Condition::Equals {
-                        field: "field-0",
-                        value: Value::from(format!("data-0-{}", (size - 1) / 10 * 10)),
-                    },
-                    Condition::BetweenDates {
-                        field: "field-1",
-                        from: Utc
-                            .ymd(2013, 6, 1)
-                            .and_hms_opt(0, 0, 0)
-                            .expect("invalid timestamp"),
-                        to: Utc
-                            .ymd(2013, 7, 1)
-                            .and_hms_opt(0, 0, 0)
-                            .expect("invalid timestamp"),
-                    },
-                ],
-                file.add_index(case, &["field-0"]).unwrap(),
-                5,
-            )
-        } else {
-            (
-                vec![
+        let (condition, index, result_offset) = match condition_type {
+            ConditionType::BetweenDates => {
+                // Search on the first and last field.
+                (
+                    vec![vec![
+                        Condition::Equals {
+                            field: "field-0",
+                            value: Value::from(format!("data-0-{}", (size - 1) / 10 * 10)),
+                        },
+                        Condition::BetweenDates {
+                            field: "field-1",
+                            from: Utc
+                                .with_ymd_and_hms(2013, 6, 1, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                            to: Utc
+                                .with_ymd_and_hms(2013, 7, 1, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        },
+                    ]],
+                    vec![file.add_index(case, &["field-0"]).unwrap()],
+                    5,
+                )
+            }
+            ConditionType::Equals => (
+                vec![vec![
                     Condition::Equals {
                         field: "field-2",
                         value: Value::from(format!("data-2-{}", size - 1)),
@@ -91,10 +98,33 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
                         field: "field-9",
                         value: Value::from(format!("data-9-{}", size - 1)),
                     },
-                ],
-                file.add_index(case, &["field-2", "field-9"]).unwrap(),
+                ]],
+                vec![file.add_index(case, &["field-2", "field-9"]).unwrap()],
                 1,
-            )
+            ),
+            ConditionType::Multiple => (
+                vec![
+                    vec![
+                        Condition::Equals {
+                            field: "field-2",
+                            value: Value::from(format!("data-2-{}", size - 1)),
+                        },
+                        Condition::Equals {
+                            field: "field-9",
+                            value: Value::from(format!("data-9-{}", size - 1)),
+                        },
+                    ],
+                    vec![Condition::Equals {
+                        field: "field-3",
+                        value: Value::from(format!("data-3-{}", size - 1)),
+                    }],
+                ],
+                vec![
+                    file.add_index(case, &["field-2", "field-9"]).unwrap(),
+                    file.add_index(case, &["field-3"]).unwrap(),
+                ],
+                1,
+            ),
         };
 
         let result = (0..10)
@@ -110,13 +140,14 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     };
 
     group.bench_function("enrichment_tables/file_date_10", |b| {
-        let (file, index, condition, expected) = setup(10, true, Case::Sensitive);
+        let (file, index, condition, expected) =
+            setup(10, ConditionType::BetweenDates, Case::Sensitive);
         b.iter_batched(
-            || (&file, &condition, expected.clone()),
-            |(file, condition, expected)| {
+            || (&file, &condition, &index, expected.clone()),
+            |(file, condition, index, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, index)
                 )
             },
             BatchSize::SmallInput,
@@ -124,13 +155,13 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_hashindex_sensitive_10", |b| {
-        let (file, index, condition, expected) = setup(10, false, Case::Sensitive);
+        let (file, index, condition, expected) = setup(10, ConditionType::Equals, Case::Sensitive);
         b.iter_batched(
-            || (&file, index, &condition, expected.clone()),
+            || (&file, &index, &condition, expected.clone()),
             |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, index)
                 )
             },
             BatchSize::SmallInput,
@@ -138,13 +169,14 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_hashindex_insensitive_10", |b| {
-        let (file, index, condition, expected) = setup(10, false, Case::Insensitive);
+        let (file, index, condition, expected) =
+            setup(10, ConditionType::Equals, Case::Insensitive);
         b.iter_batched(
-            || (&file, index, &condition, expected.clone()),
+            || (&file, &index, &condition, expected.clone()),
             |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Insensitive, condition, None, Some(index))
+                    file.find_table_row(Case::Insensitive, condition, None, index)
                 )
             },
             BatchSize::SmallInput,
@@ -152,13 +184,14 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_date_1_000", |b| {
-        let (file, index, condition, expected) = setup(1_000, true, Case::Sensitive);
+        let (file, index, condition, expected) =
+            setup(1_000, ConditionType::BetweenDates, Case::Sensitive);
         b.iter_batched(
-            || (&file, &condition, expected.clone()),
-            |(file, condition, expected)| {
+            || (&file, &index, &condition, expected.clone()),
+            |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, index)
                 )
             },
             BatchSize::SmallInput,
@@ -166,13 +199,14 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_hashindex_sensitive_1_000", |b| {
-        let (file, index, condition, expected) = setup(1_000, false, Case::Sensitive);
+        let (file, index, condition, expected) =
+            setup(1_000, ConditionType::Equals, Case::Sensitive);
         b.iter_batched(
-            || (&file, index, &condition, expected.clone()),
+            || (&file, &index, &condition, expected.clone()),
             |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, index)
                 )
             },
             BatchSize::SmallInput,
@@ -180,13 +214,14 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_hashindex_insensitive_1_000", |b| {
-        let (file, index, condition, expected) = setup(1_000, false, Case::Insensitive);
+        let (file, index, condition, expected) =
+            setup(1_000, ConditionType::Equals, Case::Insensitive);
         b.iter_batched(
-            || (&file, index, &condition, expected.clone()),
+            || (&file, &index, &condition, expected.clone()),
             |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Insensitive, condition, None, Some(index))
+                    file.find_table_row(Case::Insensitive, condition, None, index)
                 )
             },
             BatchSize::SmallInput,
@@ -194,13 +229,14 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     });
 
     group.bench_function("enrichment_tables/file_date_1_000_000", |b| {
-        let (file, index, condition, expected) = setup(1_000_000, true, Case::Sensitive);
+        let (file, index, condition, expected) =
+            setup(1_000_000, ConditionType::BetweenDates, Case::Sensitive);
         b.iter_batched(
-            || (&file, &condition, expected.clone()),
-            |(file, condition, expected)| {
+            || (&file, &index, &condition, expected.clone()),
+            |(file, index, condition, expected)| {
                 assert_eq!(
                     Ok(expected),
-                    file.find_table_row(Case::Sensitive, condition, None, Some(index))
+                    file.find_table_row(Case::Sensitive, condition, None, index)
                 )
             },
             BatchSize::SmallInput,
@@ -210,13 +246,14 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     group.bench_function(
         "enrichment_tables/file_hashindex_sensitive_1_000_000",
         |b| {
-            let (file, index, condition, expected) = setup(1_000_000, false, Case::Sensitive);
+            let (file, index, condition, expected) =
+                setup(1_000_000, ConditionType::Equals, Case::Sensitive);
             b.iter_batched(
-                || (&file, index, &condition, expected.clone()),
+                || (&file, &index, &condition, expected.clone()),
                 |(file, index, condition, expected)| {
                     assert_eq!(
                         Ok(expected),
-                        file.find_table_row(Case::Sensitive, condition, None, Some(index))
+                        file.find_table_row(Case::Sensitive, condition, None, index)
                     )
                 },
                 BatchSize::SmallInput,
@@ -227,19 +264,35 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
     group.bench_function(
         "enrichment_tables/file_hashindex_insensitive_1_000_000",
         |b| {
-            let (file, index, condition, expected) = setup(1_000_000, false, Case::Insensitive);
+            let (file, index, condition, expected) =
+                setup(1_000_000, ConditionType::Equals, Case::Insensitive);
             b.iter_batched(
-                || (&file, index, &condition, expected.clone()),
+                || (&file, &index, &condition, expected.clone()),
                 |(file, index, condition, expected)| {
                     assert_eq!(
                         Ok(expected),
-                        file.find_table_row(Case::Insensitive, condition, None, Some(index))
+                        file.find_table_row(Case::Insensitive, condition, None, index)
                     )
                 },
                 BatchSize::SmallInput,
             );
         },
     );
+
+    group.bench_function("enrichment_tables/file_hashindex_union_1_000_000", |b| {
+        let (file, index, condition, expected) =
+            setup(1_000_000, ConditionType::Multiple, Case::Sensitive);
+        b.iter_batched(
+            || (&file, &index, &condition, expected.clone()),
+            |(file, index, condition, expected)| {
+                assert_eq!(
+                    Ok(vec![expected]),
+                    file.find_table_rows(Case::Insensitive, condition, None, index)
+                )
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
@@ -272,12 +325,12 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
                     table
                         .find_table_row(
                             Case::Insensitive,
-                            &[Condition::Equals {
+                            &[vec![Condition::Equals {
                                 field: "ip",
                                 value: ip.into(),
-                            }],
+                            }]],
                             None,
-                            None,
+                            &[],
                         )
                         .as_ref()
                 )
@@ -310,12 +363,12 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
                     table
                         .find_table_row(
                             Case::Insensitive,
-                            &[Condition::Equals {
+                            &[vec![Condition::Equals {
                                 field: "ip",
                                 value: ip.into(),
-                            }],
+                            }]],
                             None,
-                            None,
+                            &[],
                         )
                         .as_ref()
                 )
@@ -354,12 +407,12 @@ fn benchmark_enrichment_tables_mmdb(c: &mut Criterion) {
                     table
                         .find_table_row(
                             Case::Insensitive,
-                            &[Condition::Equals {
+                            &[vec![Condition::Equals {
                                 field: "ip",
                                 value: ip.into(),
-                            }],
+                            }]],
                             None,
-                            None,
+                            &[],
                         )
                         .as_ref()
                 )
@@ -389,15 +442,15 @@ fn benchmark_enrichment_tables_mmdb(c: &mut Criterion) {
                     table
                         .find_table_row(
                             Case::Insensitive,
-                            &[Condition::Equals {
+                            &[vec![Condition::Equals {
                                 field: "ip",
                                 value: ip.into(),
-                            }],
+                            }]],
                             Some(&[
                                 "location.latitude".to_string(),
                                 "location.longitude".to_string(),
                             ]),
-                            None,
+                            &[],
                         )
                         .as_ref()
                 )
