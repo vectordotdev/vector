@@ -177,7 +177,7 @@ components: sinks: websocket_server: {
 
 				This configuration will expect clients to send messages in format `{"id": "{message_id}"}`,
 				and received message IDs will be stored in the component as the last received
-				message for that client. By default, clients are identified by their IP address, but
+				message for that client. By default, clients are identified by their IP address, but the
 				`client_key` configuration option can be used to use different identification for
 				clients.
 				"""

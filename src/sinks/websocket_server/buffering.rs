@@ -67,7 +67,7 @@ pub struct BufferingAckConfig {
 pub enum ClientKeyConfig {
     /// Use client IP address as the unique key for that client
     IpAddress {
-        /// Set to true if port should be included with the ip address.
+        /// Set to true if port should be included with the IP address
         ///
         /// By default port is not included
         #[serde(default = "crate::serde::default_false")]
