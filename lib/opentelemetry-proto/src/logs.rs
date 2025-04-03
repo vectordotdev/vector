@@ -1,6 +1,6 @@
 use super::common::{kv_list_into_value, to_hex};
 use crate::proto::{
-    common::v1::InstrumentationScope,
+    common::v1::{any_value::Value as PBValue, InstrumentationScope},
     logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
     resource::v1::Resource,
 };
@@ -58,9 +58,7 @@ impl ResourceLog {
         let mut log = match log_namespace {
             LogNamespace::Vector => {
                 if let Some(v) = self.log_record.body.and_then(|av| av.value) {
-                    LogEvent::from(<crate::proto::common::v1::any_value::Value as Into<
-                        Value,
-                    >>::into(v))
+                    LogEvent::from(<PBValue as Into<Value>>::into(v))
                 } else {
                     LogEvent::from(Value::Null)
                 }
