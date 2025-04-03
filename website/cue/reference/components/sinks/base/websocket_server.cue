@@ -431,7 +431,7 @@ base: components: sinks: websocket_server: configuration: {
 		description: "Configuration for message buffering which enables message replay for clients that connect later."
 		required:    false
 		type: object: options: {
-			client_ack_support: {
+			client_ack_config: {
 				description: """
 					Configuration for ACK support for message buffering.
 					Enabling ACK support makes it possible to replay messages for clients without requiring query

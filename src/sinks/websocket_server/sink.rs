@@ -456,7 +456,7 @@ mod tests {
                 message_buffering: Some(MessageBufferingConfig {
                     max_events: NonZeroUsize::new(1).unwrap(),
                     message_id_path: None,
-                    client_ack_support: None,
+                    client_ack_config: None,
                 }),
                 ..Default::default()
             },
@@ -500,7 +500,7 @@ mod tests {
                 message_buffering: Some(MessageBufferingConfig {
                     max_events: NonZeroUsize::new(1).unwrap(),
                     message_id_path: None,
-                    client_ack_support: None,
+                    client_ack_config: None,
                 }),
                 ..Default::default()
             },
@@ -540,7 +540,7 @@ mod tests {
                 message_buffering: Some(MessageBufferingConfig {
                     max_events: NonZeroUsize::new(1).unwrap(),
                     message_id_path: Some(ConfigValuePath::from("message_id")),
-                    client_ack_support: Some(BufferingAckConfig {
+                    client_ack_config: Some(BufferingAckConfig {
                         ack_decoding: DeserializerConfig::Json(JsonDeserializerConfig::new(
                             JsonDeserializerOptions::default(),
                         )),

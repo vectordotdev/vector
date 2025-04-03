@@ -33,7 +33,7 @@ pub struct MessageBufferingConfig {
     pub message_id_path: Option<ConfigValuePath>,
 
     #[configurable(derived)]
-    pub client_ack_support: Option<BufferingAckConfig>,
+    pub client_ack_config: Option<BufferingAckConfig>,
 }
 
 /// Configuration for ACK support for message buffering.
@@ -154,7 +154,7 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
 
     fn client_key(&self, request: &Request, client_address: &SocketAddr) -> Option<String> {
         self.as_ref()
-            .and_then(|mb| mb.client_ack_support.as_ref())
+            .and_then(|mb| mb.client_ack_config.as_ref())
             .and_then(|ack| match &ack.client_key {
                 ClientKeyConfig::IpAddress { with_port } => Some(if *with_port {
                     client_address.to_string()
@@ -250,7 +250,7 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
     fn handle_ack_request(&self, request: Message) -> Option<Uuid> {
         let ack_config = self
             .as_ref()
-            .and_then(|mb| mb.client_ack_support.as_ref())?;
+            .and_then(|mb| mb.client_ack_config.as_ref())?;
 
         let parsed_message = ack_config
             .ack_decoding

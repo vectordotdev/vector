@@ -154,7 +154,7 @@ components: sinks: websocket_server: {
 				changes the responsibility of tracking last received message from the clients to
 				this component.
 
-				To enable this, use `client_ack_support` configuration option for
+				To enable this, use `client_ack_config` configuration option for
 				`message_buffering`.
 
 				Example config:
@@ -167,7 +167,7 @@ components: sinks: websocket_server: {
 					message_buffering:
 						max_events: 1000
 					  message_id_path: "message_id"
-					  client_ack_support:
+					  client_ack_config:
 						ack_decoding:
 						  codec: "json"
 					    message_id_path: "id"
