@@ -113,66 +113,6 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
-    let mut mermaid = String::from("flowchart TD;\n");
-
-    // Note: The `.graph.node_attributes` config is ignored for Mermaid rendering
-    // since it's explicitly set to be in DOT format. It should be possible to
-    // adapt but it's likely to lead to conflicts between the two formats.
-    //
-    // It could look like:
-    // node_id@{shape: shapename}
-    // style node_id key:value,key2:value2
-    //
-    // (shapename would replace the shorthand in the current version)
-    //
-    // https://mermaid.js.org/syntax/flowchart.html#styling-and-classes
-    writeln!(mermaid, "\n  %% Sources").expect("write to String never fails");
-    for (id, _) in config.sources() {
-        writeln!(mermaid, "  {}[/{}/]", id, id)
-            .expect("write to String never fails");
-    }
-
-    writeln!(mermaid, "\n  %% Transforms").expect("write to String never fails");
-    for (id, transform) in config.transforms() {
-        writeln!(mermaid, "  {}{{{}}}", id, id)
-            .expect("write to String never fails");
-
-        for input in transform.inputs.iter() {
-            if let Some(port) = &input.port {
-                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id)
-                    .expect("write to String never fails");
-            } else {
-                writeln!(mermaid, "  {} --> {}", input.component, id)
-                    .expect("write to String never fails");
-            }
-        }
-    }
-
-    writeln!(mermaid, "\n  %% Sinks").expect("write to String never fails");
-    for (id, sink) in config.sinks() {
-        writeln!(mermaid, "  {}[\\{}\\]", id, id)
-            .expect("write to String never fails");
-
-        for input in &sink.inputs {
-            if let Some(port) = &input.port {
-                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id)
-                    .expect("write to String never fails");
-            } else {
-                writeln!(mermaid, "  {} --> {}", input.component, id)
-                    .expect("write to String never fails");
-            }
-        }
-    }
-
-    #[allow(clippy::print_stdout)]
-    {
-        println!("{}", mermaid);
-    }
-
-    exitcode::OK
-}
-
 fn render_dot(config: config::Config) -> exitcode::ExitCode {
     let mut dot = String::from("digraph {\n");
 
@@ -239,6 +179,66 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
     #[allow(clippy::print_stdout)]
     {
         println!("{}", dot);
+    }
+
+    exitcode::OK
+}
+
+fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
+    let mut mermaid = String::from("flowchart TD;\n");
+
+    // Note: The `.graph.node_attributes` config is ignored for Mermaid rendering
+    // since it's explicitly set to be in DOT format. It should be possible to
+    // adapt but it's likely to lead to conflicts between the two formats.
+    //
+    // It could look like:
+    // node_id@{shape: shapename}
+    // style node_id key:value,key2:value2
+    //
+    // (shapename would replace the shorthand in the current version)
+    //
+    // https://mermaid.js.org/syntax/flowchart.html#styling-and-classes
+    writeln!(mermaid, "\n  %% Sources").expect("write to String never fails");
+    for (id, _) in config.sources() {
+        writeln!(mermaid, "  {}[/{}/]", id, id)
+            .expect("write to String never fails");
+    }
+
+    writeln!(mermaid, "\n  %% Transforms").expect("write to String never fails");
+    for (id, transform) in config.transforms() {
+        writeln!(mermaid, "  {}{{{}}}", id, id)
+            .expect("write to String never fails");
+
+        for input in transform.inputs.iter() {
+            if let Some(port) = &input.port {
+                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id)
+                    .expect("write to String never fails");
+            } else {
+                writeln!(mermaid, "  {} --> {}", input.component, id)
+                    .expect("write to String never fails");
+            }
+        }
+    }
+
+    writeln!(mermaid, "\n  %% Sinks").expect("write to String never fails");
+    for (id, sink) in config.sinks() {
+        writeln!(mermaid, "  {}[\\{}\\]", id, id)
+            .expect("write to String never fails");
+
+        for input in &sink.inputs {
+            if let Some(port) = &input.port {
+                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id)
+                    .expect("write to String never fails");
+            } else {
+                writeln!(mermaid, "  {} --> {}", input.component, id)
+                    .expect("write to String never fails");
+            }
+        }
+    }
+
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{}", mermaid);
     }
 
     exitcode::OK
