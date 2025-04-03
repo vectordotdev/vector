@@ -145,11 +145,12 @@ make check-version
 make check-examples
 make check-scripts
 
-# The following check is very slow. You can run
+# The following check is very slow.
 # make check-component-features
 ```
-Note that `make check-all` will cover everything but it is slow and it might run these checks not
-relevant to your PR. This check is defined [here](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454).
+Please note that make check-all covers all checks, but it is slow and may include checks not
+relevant to your PR. This command is defined
+[here](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454).
 
 ### GitHub Pull Requests
 
