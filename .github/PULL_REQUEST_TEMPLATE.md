@@ -44,13 +44,13 @@ Providing this information upfront will facilitate a smoother review process. --
 ## Notes
 - Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
 - Do not hesitate to use `@vectordotdev/vector` to reach out to us regarding this PR.
-- The CI checks run only after we manually approve them. To minimize round-trips see the following local checks:
-  - `make check-all` is a good command to run locally. This check is
-    defined [here](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454). Some of these
-    checks might not be relevant to your PR. For Rust changes, at the very least you should run:
+- The CI checks run only after we manually approve them.
+  - We recommend adding `pre-push` hook, you can find one [here](https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md#Pre-push).
+  - Alternatively, we recommend running the following locally before pushing to the remote branch:
     - `cargo fmt --all`
     - `cargo clippy --workspace --all-targets -- -D warnings`
     - `cargo nextest run --workspace` (alternatively, you can run `cargo test --all`)
+
 - After a review is requested, please avoid force pushes to help us review incrementally.
   - Feel free to push as many commits as you want. They will be squashed into one before merging.
   - For example, you can run `git merge origin master` and `git push`.
