@@ -201,7 +201,7 @@ pub struct Config {
     /// config will have no practical impact (the same is true of `auto_partial_merge`). Finally, the smaller of `max_merged_line_bytes` and `max_line_bytes` will apply
     /// if auto_partial_merge is true, so if this is set to eg 1 MiB but `max_line_bytes` is set to ~2.5 MiB, then every line greater than 1 MiB will be dropped.
     #[configurable(metadata(docs::type_unit = "bytes"))]
-    max_merged_line_bytes: usize,
+    max_merged_line_bytes: Option<usize>,
 
     /// The number of lines to read for generating the checksum.
     ///
@@ -304,7 +304,7 @@ impl Default for Config {
             max_read_bytes: default_max_read_bytes(),
             oldest_first: default_oldest_first(),
             max_line_bytes: default_max_line_bytes(),
-            max_merged_line_bytes: default_max_merged_line_bytes(),
+            max_merged_line_bytes: None,
             fingerprint_lines: default_fingerprint_lines(),
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
             ingestion_timestamp_field: None,
@@ -564,7 +564,7 @@ struct Source {
     max_read_bytes: usize,
     oldest_first: bool,
     max_line_bytes: usize,
-    max_merged_line_bytes: usize,
+    max_merged_line_bytes: Option<usize>,
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
     use_apiserver_cache: bool,
@@ -791,7 +791,7 @@ impl Source {
 
         let mut resolved_max_line_bytes = max_line_bytes;
         if auto_partial_merge {
-            resolved_max_line_bytes = min(max_line_bytes, max_merged_line_bytes);
+            resolved_max_line_bytes = min(max_line_bytes, if let Some(configured_max_merged_line_bytes) = max_merged_line_bytes { configured_max_merged_line_bytes } else { max_line_bytes });
         }
 
         // TODO: maybe more of the parameters have to be configurable.
@@ -1042,10 +1042,6 @@ const fn default_max_line_bytes() -> usize {
     // parsers, see the `partial_events_merger` logic.
 
     32 * 1024 // 32 KiB
-}
-
-const fn default_max_merged_line_bytes() -> usize {
-    50 * 1024 * 1024 // 50 MiB
 }
 
 const fn default_glob_minimum_cooldown_ms() -> Duration {
