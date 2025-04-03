@@ -113,9 +113,53 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-fn render_mermaid(_: config::Config) -> exitcode::ExitCode {
-    eprintln!("mermaid path");
-    exitcode::CONFIG
+fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
+    let mut mermaid = String::from("graph TD;\n");
+
+    writeln!(mermaid, "\n  %% Sources").expect("write to String never fails");
+    for (id, _) in config.sources() {
+        writeln!(mermaid, "  {}[/{}/]", id, id)
+            .expect("write to String never fails");
+    }
+
+    writeln!(mermaid, "\n  %% Transforms").expect("write to String never fails");
+    for (id, transform) in config.transforms() {
+        writeln!(mermaid, "  {}{{{}}}", id, id)
+            .expect("write to String never fails");
+
+        for input in transform.inputs.iter() {
+            if let Some(port) = &input.port {
+                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id)
+                    .expect("write to String never fails");
+            } else {
+                writeln!(mermaid, "  {} --> {}", input.component, id)
+                    .expect("write to String never fails");
+            }
+        }
+    }
+
+    writeln!(mermaid, "\n  %% Sinks").expect("write to String never fails");
+    for (id, sink) in config.sinks() {
+        writeln!(mermaid, "  {}[\\{}\\]", id, id)
+            .expect("write to String never fails");
+
+        for input in &sink.inputs {
+            if let Some(port) = &input.port {
+                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id)
+                    .expect("write to String never fails");
+            } else {
+                writeln!(mermaid, "  {} --> {}", input.component, id)
+                    .expect("write to String never fails");
+            }
+        }
+    }
+
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{}", mermaid);
+    }
+
+    exitcode::OK
 }
 
 fn render_dot(config: config::Config) -> exitcode::ExitCode {
