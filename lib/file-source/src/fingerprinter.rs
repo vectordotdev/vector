@@ -1,8 +1,9 @@
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     fs::{self, metadata, File},
     io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
+    time,
 };
 
 use crc::Crc;
@@ -200,7 +201,7 @@ impl Fingerprinter {
         &self,
         path: &Path,
         buffer: &mut Vec<u8>,
-        known_small_files: &mut HashSet<PathBuf>,
+        known_small_files: &mut HashMap<PathBuf, time::Instant>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
         metadata(path)
@@ -213,9 +214,9 @@ impl Fingerprinter {
             })
             .map_err(|error| match error.kind() {
                 io::ErrorKind::UnexpectedEof => {
-                    if !known_small_files.contains(path) {
+                    if !known_small_files.contains_key(path) {
                         emitter.emit_file_checksum_failed(path);
-                        known_small_files.insert(path.to_path_buf());
+                        known_small_files.insert(path.to_path_buf(), time::Instant::now());
                     }
                 }
                 io::ErrorKind::NotFound => {
@@ -375,7 +376,7 @@ fn fingerprinter_read_until(
 #[cfg(test)]
 mod test {
     use std::{
-        collections::HashSet,
+        collections::HashMap,
         fs,
         io::{Error, Read, Write},
         path::Path,
@@ -744,7 +745,7 @@ mod test {
         };
 
         let mut buf = Vec::new();
-        let mut small_files = HashSet::new();
+        let mut small_files = HashMap::new();
         assert!(fingerprinter
             .get_fingerprint_or_log_error(target_dir.path(), &mut buf, &mut small_files, &NoErrors)
             .is_none());
