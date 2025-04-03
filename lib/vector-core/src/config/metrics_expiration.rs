@@ -127,10 +127,10 @@ mod tests {
         let config = serde_yaml::from_str::<PerMetricSetExpiration>(indoc! {r#"
             labels:
                 type: "all"
-                matcher:
-                    type: "exact"
-                    key: "test_metric_label"
-                    value: "test_value"
+                matchers :
+                    - type: "exact"
+                      key: "test_metric_label"
+                      value: "test_value"
             expire_secs: 1.0
             "#})
         .unwrap();

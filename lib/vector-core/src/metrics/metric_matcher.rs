@@ -459,36 +459,4 @@ mod tests {
             panic!("Expected second label matcher to be a regex matcher");
         }
     }
-
-    #[test]
-    fn parse_simple_single_config_into_matcher() {
-        let config = serde_yaml::from_str::<PerMetricSetExpiration>(indoc! {r#"
-            name:
-                type: "exact"
-                value: "test_metric"
-            labels:
-                type: "single"
-                matcher:
-                  type: "exact"
-                  key: "component_kind"
-                  value: "sink"
-            expire_secs: 1.0
-            "#})
-        .unwrap();
-
-        let matcher: MetricKeyMatcher = config.try_into().unwrap();
-
-        if let Some(MetricNameMatcher::Exact(value)) = matcher.name {
-            assert_eq!("test_metric", value);
-        } else {
-            panic!("Expected exact name matcher");
-        }
-
-        if let Some(LabelsMatcher::Exact(key, value)) = matcher.labels {
-            assert_eq!("component_kind", key);
-            assert_eq!("sink", value);
-        } else {
-            panic!("Expected main label matcher to be an exact matcher");
-        }
-    }
 }
