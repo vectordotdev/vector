@@ -1,7 +1,9 @@
 //! Service implementation for the `opentelemetry` sink.
 
 use bytes::Bytes;
-use http::{header::CONTENT_TYPE, Request, Uri};
+use http::{header::CONTENT_TYPE, Request};
+
+use super::sink::PartitionKey;
 
 use crate::{
     http::Auth,
@@ -14,14 +16,18 @@ use snafu::ResultExt;
 
 #[derive(Debug, Clone)]
 pub(super) struct OpentelemetryServiceRequestBuilder {
-    pub(super) uri: Uri,
     pub(super) auth: Option<Auth>,
 }
 
-impl HttpServiceRequestBuilder<()> for OpentelemetryServiceRequestBuilder {
-    fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+impl HttpServiceRequestBuilder<PartitionKey> for OpentelemetryServiceRequestBuilder {
+    fn build(
+        &self,
+        mut request: HttpRequest<PartitionKey>,
+    ) -> Result<Request<Bytes>, crate::Error> {
+        let metadata = request.get_additional_metadata();
+
         let builder =
-            Request::post(self.uri.clone()).header(CONTENT_TYPE, "application/x-protobuf");
+            Request::post(metadata.endpoint.clone()).header(CONTENT_TYPE, "application/x-protobuf");
 
         let mut request = builder
             .body(request.take_payload())

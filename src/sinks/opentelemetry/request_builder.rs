@@ -11,12 +11,14 @@ pub(super) struct OpentelemetryRequestBuilder {
     pub(super) encoder: OpentelemetryEncoder,
 }
 
-impl RequestBuilder<Vec<Event>> for OpentelemetryRequestBuilder {
-    type Metadata = EventFinalizers;
+use super::sink::PartitionKey;
+
+impl RequestBuilder<(PartitionKey, Vec<Event>)> for OpentelemetryRequestBuilder {
+    type Metadata = (PartitionKey, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = OpentelemetryEncoder;
     type Payload = Bytes;
-    type Request = HttpRequest<()>;
+    type Request = HttpRequest<PartitionKey>;
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
@@ -29,11 +31,12 @@ impl RequestBuilder<Vec<Event>> for OpentelemetryRequestBuilder {
 
     fn split_input(
         &self,
-        mut events: Vec<Event>,
+        input: (PartitionKey, Vec<Event>),
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let (key, mut events) = input;
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
-        (finalizers, builder, events)
+        ((key, finalizers), builder, events)
     }
 
     fn build_request(
@@ -42,6 +45,14 @@ impl RequestBuilder<Vec<Event>> for OpentelemetryRequestBuilder {
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        HttpRequest::new(payload.into_payload(), metadata, request_metadata, ())
+        let (key, finalizers) = metadata;
+        HttpRequest::new(
+            payload.into_payload(),
+            finalizers,
+            request_metadata,
+            PartitionKey {
+                endpoint: key.endpoint,
+            },
+        )
     }
 }

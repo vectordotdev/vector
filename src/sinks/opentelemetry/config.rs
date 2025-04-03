@@ -73,8 +73,12 @@ impl SinkConfig for OpenTelemetryConfig {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
+        // TODO: needs something better
+        let log_endpoint = format!("{}v1/logs", self.uri);
+        let trace_endpoint = format!("{}v1/traces", self.uri);
+        let metric_endpoint = format!("{}v1/metrics", self.uri);
+
         let service_request_builder = OpentelemetryServiceRequestBuilder {
-            uri: self.uri.uri.clone(),
             auth: self.auth.choose_one(&self.uri.auth)?,
         };
 
@@ -86,7 +90,14 @@ impl SinkConfig for OpenTelemetryConfig {
             .settings(request_limits, http_response_retry_logic())
             .service(service);
 
-        let sink = OpentelemetrySink::new(service, batch_settings, request_builder);
+        let sink = OpentelemetrySink::new(
+            service,
+            batch_settings,
+            request_builder,
+            log_endpoint,
+            trace_endpoint,
+            metric_endpoint,
+        );
 
         let healthcheck = match cx.healthcheck.uri {
             Some(healthcheck_uri) => {

@@ -17,7 +17,7 @@ use super::proto::{
         any_value::Value as PBValue, AnyValue, ArrayValue, InstrumentationScope, KeyValue,
         KeyValueList,
     },
-    logs::v1::{LogRecord, ResourceLogs, ScopeLogs, SeverityNumber},
+    logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
     resource::v1::Resource,
     trace::v1::{
         span::{Event as SpanEvent, Link},
