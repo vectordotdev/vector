@@ -712,7 +712,7 @@ base: components: sinks: websocket_server: configuration: {
 							}
 							with_port: {
 								description: """
-																				Set to true if port should be included with the ip address.
+																				Set to true if port should be included with the IP address
 
 																				By default port is not included
 																				"""
