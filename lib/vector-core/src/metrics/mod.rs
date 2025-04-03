@@ -407,11 +407,11 @@ mod tests {
                     },
                     PerMetricSetExpiration {
                         name: None,
-                        labels: Some(MetricLabelMatcherConfig::Single {
-                            matcher: MetricLabelMatcher::Exact {
+                        labels: Some(MetricLabelMatcherConfig::All {
+                            matchers: vec![MetricLabelMatcher::Exact {
                                 key: "tag".to_string(),
                                 value: "value1".to_string(),
-                            },
+                            }],
                         }),
                         expire_secs: IDLE_TIMEOUT * 2.0,
                     },
