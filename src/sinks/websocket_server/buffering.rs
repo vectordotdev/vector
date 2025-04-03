@@ -248,14 +248,12 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
     }
 
     fn handle_ack_request(&self, request: Message) -> Option<Uuid> {
-        let ack_config = self
-            .as_ref()
-            .and_then(|mb| mb.client_ack_config.as_ref())?;
+        let ack_config = self.as_ref().and_then(|mb| mb.client_ack_config.as_ref())?;
 
         let parsed_message = ack_config
             .ack_decoding
             .build()
-            .unwrap()
+            .expect("Invalid `ack_decoding` config.")
             .parse(request.into_data().into(), Default::default())
             .inspect_err(|err| {
                 debug!(message = "Parsing ACK request failed.", %err);

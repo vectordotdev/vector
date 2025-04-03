@@ -172,12 +172,15 @@ impl WebSocketListenerSink {
         let (tx, rx) = unbounded();
 
         {
-            let mut peers = peers.lock().unwrap();
-            buffer_replay.replay_messages(&buffer.lock().unwrap(), |(_, message)| {
-                if let Err(error) = tx.unbounded_send(message.clone()) {
-                    emit!(WsListenerSendError { error });
-                }
-            });
+            let mut peers = peers.lock().expect("mutex poisoned");
+            buffer_replay.replay_messages(
+                &buffer.lock().expect("mutex poisoned"),
+                |(_, message)| {
+                    if let Err(error) = tx.unbounded_send(message.clone()) {
+                        emit!(WsListenerSendError { error });
+                    }
+                },
+            );
 
             debug!("WebSocket connection established: {}", addr);
 
@@ -191,7 +194,11 @@ impl WebSocketListenerSink {
 
         let incoming_data_handler = incoming.try_for_each(|msg| {
             let ip = addr.ip();
-            debug!("Received a message from {}: {}", ip, msg.to_text().unwrap());
+            debug!(
+                "Received a message from {}: {}",
+                ip,
+                msg.to_text().unwrap_or("invalid data")
+            );
             if let Some(client_key) = &client_checkpoint_key {
                 if let Some(checkpoint) = message_buffering.handle_ack_request(msg) {
                     debug!(
@@ -200,7 +207,7 @@ impl WebSocketListenerSink {
                     );
                     client_checkpoints
                         .lock()
-                        .unwrap()
+                        .expect("mutex poisoned")
                         .insert(client_key.clone(), checkpoint);
                 }
             }
@@ -213,7 +220,7 @@ impl WebSocketListenerSink {
         future::select(forward_data_to_client, incoming_data_handler).await;
 
         {
-            let mut peers = peers.lock().unwrap();
+            let mut peers = peers.lock().expect("mutex poisoned");
             debug!("{} disconnected.", &addr);
             peers.remove(&addr);
             emit!(WsListenerConnectionShutdown {
@@ -280,14 +287,14 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     let message_len = message.len();
 
                     if self.message_buffering.should_buffer() {
-                        let mut buffer = message_buffer.lock().unwrap();
+                        let mut buffer = message_buffer.lock().expect("mutex poisoned");
                         if buffer.len() + 1 >= buffer.capacity() {
                             buffer.pop_front();
                         }
                         buffer.push_back((message_id, message.clone()));
                     }
 
-                    let peers = peers.lock().unwrap();
+                    let peers = peers.lock().expect("mutex poisoned");
                     let broadcast_recipients = peers.iter().map(|(_, ws_sink)| ws_sink);
                     for recp in broadcast_recipients {
                         if let Err(error) = recp.unbounded_send(message.clone()) {
