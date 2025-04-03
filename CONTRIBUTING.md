@@ -145,6 +145,8 @@ make check-version
 make check-examples
 make check-scripts
 
+./scripts/check_changelog_fragments.sh
+
 # The following check is very slow.
 # make check-component-features
 ```
