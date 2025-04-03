@@ -47,6 +47,16 @@ pub struct Opts {
         value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
+
+    /// Set the output format
+    #[arg(id = "format", long, default_value = "dot")]
+    pub format: OutputFormat,
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputFormat {
+    Dot,
+    Mermaid,
 }
 
 impl Opts {
@@ -96,6 +106,19 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         }
     };
 
+    let format = opts.format;
+    match format {
+        OutputFormat::Dot => render_dot(config),
+        OutputFormat::Mermaid => render_mermaid(config),
+    }
+}
+
+fn render_mermaid(_: config::Config) -> exitcode::ExitCode {
+    eprintln!("mermaid path");
+    exitcode::CONFIG
+}
+
+fn render_dot(config: config::Config) -> exitcode::ExitCode {
     let mut dot = String::from("digraph {\n");
 
     for (id, source) in config.sources() {
