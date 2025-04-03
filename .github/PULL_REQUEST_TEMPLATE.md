@@ -50,7 +50,6 @@ Providing this information upfront will facilitate a smoother review process. --
     - `cargo fmt --all`
     - `cargo clippy --workspace --all-targets -- -D warnings`
     - `cargo nextest run --workspace` (alternatively, you can run `cargo test --all`)
-
 - After a review is requested, please avoid force pushes to help us review incrementally.
   - Feel free to push as many commits as you want. They will be squashed into one before merging.
   - For example, you can run `git merge origin master` and `git push`.
