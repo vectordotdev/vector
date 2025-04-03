@@ -157,6 +157,46 @@ base: configuration: configuration: {
 				required:      false
 				relevant_when: "type = \"memory\""
 			}
+			source_config: {
+				type: object: options: {
+					export_batch_size: {
+						type: uint: {}
+						description: """
+														Batch size for data exporting. Used to prevent exporting entire table at
+														once and blocking the system.
+
+														By default, batches are not used and entire table is exported.
+														"""
+						required: false
+					}
+					export_interval: {
+						type: uint: {}
+						description: "Interval for exporting all data from the table when used as a source."
+						required:    true
+					}
+					remove_after_export: {
+						type: bool: default: false
+						description: """
+														If set to true, all data will be removed from cache after exporting.
+														Only valid if used as a source and export_interval > 0
+
+														By default, export will not remove data from cache
+														"""
+						required: false
+					}
+					source_key: {
+						type: string: {}
+						description: """
+														Key to use for this component when used as a source. This must be different from the
+														component key.
+														"""
+						required: true
+					}
+				}
+				description:   "Configuration for source functionality."
+				required:      false
+				relevant_when: "type = \"memory\""
+			}
 			ttl: {
 				type: uint: default: 600
 				description: """
