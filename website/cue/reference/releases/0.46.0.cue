@@ -19,73 +19,70 @@ releases: "0.46.0": {
 		  - Thanks to [esensar](https://github.com/esensar) and [Quad9DNS](https://github.com/Quad9DNS).
 		"""
 
+	vrl_changelog: """
+		VRL was updated to v0.23.0. This includes the following changes:
+
+		#### Breaking Changes
+
+		- The `ip_cidr_contains` function now validates the cidr argument during the compilation phase if it is a constant string or array. Previously, invalid constant CIDR values would only trigger an error during execution.
+
+		Previously, if an invalid CIDR was passed as a constant, an error was thrown at runtime:
+
+		```text
+		error[E000]: function call error for "ip_cidr_contains" at (0:45): unable to parse CIDR: couldn't parse address in network: invalid IP address syntax
+		┌─ :1:1
+		│
+		1 │ ip_cidr_contains!("INVALID", "192.168.10.32")
+		│ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unable to parse CIDR: couldn't parse address in network: invalid IP address syntax
+		│
+		= see language documentation at https://vrl.dev
+		= try your code in the VRL REPL, learn more at https://vrl.dev/examples
+		```
+
+		Now, we see a compilation error:
+
+		```text
+		error[E610]: function compilation error: error[E403] invalid argument
+		┌─ :1:1
+		│
+		1 │ ip_cidr_contains!("INVALID", "192.168.10.32")
+		│ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+		│ │
+		│ invalid argument "ip_cidr_contains"
+		│ error: "cidr" must be valid cidr
+		│ received: "INVALID"
+		│
+		= learn more about error code 403 at https://errors.vrl.dev/403
+		= see language documentation at https://vrl.dev
+		= try your code in the VRL REPL, learn more at https://vrl.dev/examples
+		```
+
+		This change improves error detection by identifying invalid CIDR values earlier, reducing unexpected failures at runtime and provides better performance.
+
+		#### New Features
+
+		- Support for encoding and decoding lz4 block compression.
+
+		#### Enhancements
+
+		- The `encode_proto` function was enhanced to automatically convert integer, float, and boolean values when passed to string proto fields. (https://github.com/vectordotdev/vrl/pull/1304)
+		- The `parse_user_agent` method now uses the [ua-parser](https://crates.io/crates/ua-parser) library
+		which is much faster than the previous library. The method's output remains unchanged.
+		- Added support for excluded_boundaries in the `snakecase()` function. This allows users to leverage the same function `snakecase()` that they're already leveraging but tune it to handle specific scenarios where default boundaries are not desired.
+
+		For example,
+
+		```rust
+		snakecase("s3BucketDetails", excluded_boundaries: ["digit_lower", "lower_digit", "upper_digit"])
+		// Output: s3_bucket_details
+		```
+
+		#### Fixes
+
+		- The `parse_nginx_log` function can now parse `delaying requests` error messages.
+		""",
+
 	changelog: [
-		{
-			type: "feat"
-			description: """
-				VRL was updated to v0.23.0. This includes the following changes:
-
-				#### Breaking Changes
-
-				- The `ip_cidr_contains` function now validates the cidr argument during the compilation phase if it is a constant string or array. Previously, invalid constant CIDR values would only trigger an error during execution.
-
-				Previously, if an invalid CIDR was passed as a constant, an error was thrown at runtime:
-
-				```text
-				error[E000]: function call error for "ip_cidr_contains" at (0:45): unable to parse CIDR: couldn't parse address in network: invalid IP address syntax
-				┌─ :1:1
-				│
-				1 │ ip_cidr_contains!("INVALID", "192.168.10.32")
-				│ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unable to parse CIDR: couldn't parse address in network: invalid IP address syntax
-				│
-				= see language documentation at https://vrl.dev
-				= try your code in the VRL REPL, learn more at https://vrl.dev/examples
-				```
-
-				Now, we see a compilation error:
-
-				```text
-				error[E610]: function compilation error: error[E403] invalid argument
-				┌─ :1:1
-				│
-				1 │ ip_cidr_contains!("INVALID", "192.168.10.32")
-				│ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-				│ │
-				│ invalid argument "ip_cidr_contains"
-				│ error: "cidr" must be valid cidr
-				│ received: "INVALID"
-				│
-				= learn more about error code 403 at https://errors.vrl.dev/403
-				= see language documentation at https://vrl.dev
-				= try your code in the VRL REPL, learn more at https://vrl.dev/examples
-				```
-
-				This change improves error detection by identifying invalid CIDR values earlier, reducing unexpected failures at runtime and provides better performance.
-
-				#### New Features
-
-				- Support for encoding and decoding lz4 block compression.
-
-				#### Enhancements
-
-				- The `encode_proto` function was enhanced to automatically convert integer, float, and boolean values when passed to string proto fields. (https://github.com/vectordotdev/vrl/pull/1304)
-				- The `parse_user_agent` method now uses the [ua-parser](https://crates.io/crates/ua-parser) library
-				which is much faster than the previous library. The method's output remains unchanged.
-				- Added support for excluded_boundaries in the `snakecase()` function. This allows users to leverage the same function `snakecase()` that they're already leveraging but tune it to handle specific scenarios where default boundaries are not desired.
-
-				For example,
-
-				```rust
-				snakecase("s3BucketDetails", excluded_boundaries: ["digit_lower", "lower_digit", "upper_digit"])
-				// Output: s3_bucket_details
-				```
-
-				#### Fixes
-
-				- The `parse_nginx_log` function can now parse `delaying requests` error messages.
-				"""
-		},
-
 		{
 			type: "feat"
 			description: """

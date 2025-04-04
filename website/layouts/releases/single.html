@@ -98,10 +98,24 @@
       </div>
       {{ end }}
 
+      {{ with $release.vrl_changelog }}
+      {{ if ne . "" }}
+      <div class="mt-8">
+        <div class="prose dark:prose-dark max-w-none">
+          {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
+        </div>
+
+        <div class="mt-6 prose dark:prose-dark max-w-none">
+          {{ . | markdownify }}
+        </div>
+      </div>
+      {{ end }}
+      {{ end }}
+
       {{ if gt (len $release.changelog) 0 }}
       <div class="mt-8">
         <div class="prose dark:prose-dark max-w-none">
-          {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
         </div>
 
         <div class="mt-6 flex flex-col space-y-8">
