@@ -7,13 +7,16 @@ releases: "0.46.0": {
 	whats_next: []
 
 	description: """
-		The Vector team is pleased to announce version 0.46.0!
+		The Vector team is pleased to announce version `0.46.0`!
 
-		Some highlights for this release:
+		Release highlights:
 
-		- A new `postgres` sink is now available (thanks to [jorgehermo9](https://github.com/jorgehermo9) and it supports logs, metrics and traces!
-		- `vector top` now supports filtering out components by their component ID
+		- A new `postgres` sink is now available and it supports logs, metrics and traces!
+		  - Thanks to [jorgehermo9](https://github.com/jorgehermo9) for this sizable contribution.
+		- `vector top` now supports filtering out components by their component ID.
+		  - Again thanks to [jorgehermo9](https://github.com/jorgehermo9).
 		- A new global option `expire_metrics_per_metric_set` is now available and it enables more fine grained control over individual metric sets.
+		  - Thanks to [esensar](https://github.com/esensar) and [Quad9DNS](https://github.com/Quad9DNS).
 		"""
 
 	changelog: [

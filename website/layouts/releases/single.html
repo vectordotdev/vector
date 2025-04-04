@@ -124,7 +124,8 @@
                     {{ .description | markdownify }}
                   </span>
                 {{ if gt (len .contributors) 0 }}
-                <span class="prose dark:prose-dark">
+                <br>
+                <span class="prose dark:prose-dark italic">
                     Thanks to
                     {{ range .contributors}}
                     <a href="https://github.com/{{ replace . "@" "" }}" rel="noopener" target="_blank">{{ . }}</a>
@@ -143,6 +144,10 @@
       {{ else }}
       {{ if gt (len $release.commits) 0 }}
       <div class="mt-8">
+        <div class="prose dark:prose-dark max-w-none">
+          {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
+        </div>
+
         <div class="prose dark:prose-dark max-w-none">
           {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
         </div>
