@@ -74,4 +74,8 @@ components: sinks: file: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		open_files: components.sources.internal_metrics.output.metrics.open_files
+	}
 }

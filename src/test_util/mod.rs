@@ -68,6 +68,9 @@ pub mod mock;
 pub mod compression;
 pub mod stats;
 
+#[cfg(test)]
+pub mod integration;
+
 #[macro_export]
 macro_rules! assert_downcast_matches {
     ($e:expr, $t:ty, $v:pat) => {{
@@ -230,6 +233,10 @@ pub fn temp_dir() -> PathBuf {
     let path = std::env::temp_dir();
     let dir_name = random_string(16);
     path.join(dir_name)
+}
+
+pub fn random_table_name() -> String {
+    format!("test_{}", random_string(10).to_lowercase())
 }
 
 pub fn map_event_batch_stream(
