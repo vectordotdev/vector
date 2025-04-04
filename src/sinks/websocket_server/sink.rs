@@ -265,16 +265,12 @@ impl WebSocketListenerSink {
         let incoming_data_handler = incoming.try_for_each(|msg| {
             let ip = addr.ip();
             debug!(
-                "Received a message from {}: {}",
-                ip,
+                "Received a message from {ip}: {}",
                 msg.to_text().unwrap_or("invalid data")
             );
             if let Some(client_key) = &client_checkpoint_key {
                 if let Some(checkpoint) = message_buffering.handle_ack_request(msg) {
-                    debug!(
-                        "Inserting checkpoint for {}({}): {}",
-                        client_key, ip, checkpoint
-                    );
+                    debug!("Inserting checkpoint for {client_key}({ip}): {checkpoint}");
                     client_checkpoints
                         .lock()
                         .expect("mutex poisoned")
