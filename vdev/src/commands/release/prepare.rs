@@ -339,6 +339,7 @@ impl Prepare {
         let gh_status = Command::new("gh")
             .arg("pr")
             .arg("create")
+            .arg("--draft")
             .arg("--base")
             .arg(&release_branch)
             .arg("--head")
