@@ -255,12 +255,16 @@ impl FileWatcher {
         if self.state == WatcherState::Passive {
             if let Some(ref mut notify_watcher) = self.notify_watcher {
                 let events = notify_watcher.check_events();
-                for (path, kind) in events {
-                    if path == self.path {
-                        trace!(message = "Detected file event, activating watcher", ?path, ?kind);
-                        self.activate()?;
-                        // Note: The FileServer will handle emitting the event when it processes the file
-                        break;
+                if !events.is_empty() {
+                    trace!(message = "Checking {} events for file", events.len(), ?self.path);
+
+                    for (path, kind) in events {
+                        if path == self.path {
+                            debug!(message = "Detected relevant file event, activating watcher", ?path, ?kind);
+                            self.activate()?;
+                            // Note: The FileServer will handle emitting the event when it processes the file
+                            break;
+                        }
                     }
                 }
             }

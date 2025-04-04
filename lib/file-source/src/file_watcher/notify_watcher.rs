@@ -46,13 +46,22 @@ impl NotifyWatcher {
     /// Initialize the watcher with a specific path
     pub fn initialize(&mut self, path: &Path) -> Result<(), notify::Error> {
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut watcher = notify::recommended_watcher(tx)?;
+
+        // Create a custom config that's optimized for our use case
+        let config = notify::Config::default()
+            // Use a reasonable polling interval as fallback
+            .with_poll_interval(std::time::Duration::from_secs(2))
+            // We only care about file modifications, creations, and renames
+            .with_compare_contents(false);
+
+        // Create the watcher with our custom config
+        let mut watcher = notify::RecommendedWatcher::new(tx, config)?;
 
         // Watch the parent directory of the file to catch renames, deletions, etc.
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
         watcher.watch(parent, RecursiveMode::NonRecursive)?;
 
-        trace!(message = "Initialized notify watcher", ?path);
+        trace!(message = "Initialized notify watcher for directory", directory = ?parent, target_file = ?path);
 
         self.watcher = Some(Box::new(watcher));
         self.event_rx = Some(rx);
@@ -80,6 +89,9 @@ impl NotifyWatcher {
     }
 
     /// Check for any events on the watched files
+    ///
+    /// Only returns events that indicate actual file changes (writes, moves, or renames)
+    /// to avoid reacting to our own file accesses.
     pub fn check_events(&mut self) -> Vec<(PathBuf, EventKind)> {
         let mut events = Vec::new();
 
@@ -90,8 +102,26 @@ impl NotifyWatcher {
                         match event {
                             Ok(event) => {
                                 trace!(message = "Received file event", ?event);
-                                for path in event.paths {
-                                    events.push((path, event.kind));
+
+                                // Filter for relevant events only
+                                let is_relevant = match event.kind {
+                                    // File content was modified
+                                    EventKind::Modify(notify::event::ModifyKind::Data(_)) => true,
+                                    // File was created or moved
+                                    EventKind::Create(_) => true,
+                                    // File was renamed
+                                    EventKind::Modify(notify::event::ModifyKind::Name(_)) => true,
+                                    // Other events are not relevant for our purposes
+                                    _ => false,
+                                };
+
+                                if is_relevant {
+                                    for path in event.paths {
+                                        trace!(message = "Relevant file event detected", ?path, kind = ?event.kind);
+                                        events.push((path, event.kind));
+                                    }
+                                } else {
+                                    trace!(message = "Ignoring non-relevant file event", kind = ?event.kind);
                                 }
                             }
                             Err(e) => {
