@@ -126,7 +126,7 @@ impl Prepare {
     fn pin_vrl_version(&self) -> Result<()> {
         debug!("pin_vrl_version");
         let cargo_toml_path = &self.repo_root.join("Cargo.toml");
-        let contents = fs::read_to_string(&cargo_toml_path).expect("Failed to read Cargo.toml");
+        let contents = fs::read_to_string(cargo_toml_path).expect("Failed to read Cargo.toml");
 
         // Needs this hybrid approach to preserve ordering.
         let mut lines: Vec<String> = contents.lines().map(String::from).collect();
