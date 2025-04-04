@@ -256,7 +256,7 @@ impl FileWatcher {
             if let Some(ref mut notify_watcher) = self.notify_watcher {
                 let events = notify_watcher.check_events();
                 if !events.is_empty() {
-                    trace!(message = "Checking {} events for file", events.len(), ?self.path);
+                    trace!(message = "Checking events for file", count = events.len(), path = ?self.path);
 
                     for (path, kind) in events {
                         if path == self.path {
