@@ -6,87 +6,81 @@ releases: "0.46.0": {
 
 	whats_next: []
 
+	description: """
+		The Vector team is pleased to announce version 0.46.0!
+
+		Some highlights for this release:
+
+		- A new `postgres` sink is now available (thanks to [jorgehermo9](https://github.com/jorgehermo9) and it supports logs, metrics and traces!
+		- `vector top` now supports filtering out components by their component ID
+		- A new global option `expire_metrics_per_metric_set` is now available and it enables more fine grained control over individual metric sets.
+		"""
+
 	changelog: [
 		{
 			type: "feat"
 			description: """
-					### [0.23.0 (2025-04-03)]
-					
-					
-					#### Breaking Changes & Upgrade Guide
-					
-					- The `ip_cidr_contains` function now validates the cidr argument during the compilation phase if it is a constant string or array. Previously, invalid constant CIDR values would only trigger an error during execution.
-					
-					Previous Behavior: Runtime Error
-					
-					Previously, if an invalid CIDR was passed as a constant, an error was thrown at runtime:
-					
-					```
-					error[E000]: function call error for "ip_cidr_contains" at (0:45): unable to parse CIDR: couldn't parse address in network: invalid IP address syntax
-					┌─ :1:1
-					│
-					1 │ ip_cidr_contains!("INVALID", "192.168.10.32")
-					│ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unable to parse CIDR: couldn't parse address in network: invalid IP address syntax
-					│
-					= see language documentation at https://vrl.dev
-					= try your code in the VRL REPL, learn more at https://vrl.dev/examples
-					```
-					
-					New Behavior: Compilation Error
-					
-					```
-					error[E610]: function compilation error: error[E403] invalid argument
-					┌─ :1:1
-					│
-					1 │ ip_cidr_contains!("INVALID", "192.168.10.32")
-					│ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-					│ │
-					│ invalid argument "ip_cidr_contains"
-					│ error: "cidr" must be valid cidr
-					│ received: "INVALID"
-					│
-					= learn more about error code 403 at https://errors.vrl.dev/403
-					= see language documentation at https://vrl.dev
-					= try your code in the VRL REPL, learn more at https://vrl.dev/examples
-					```
-					
-					This change improves error detection by identifying invalid CIDR values earlier, reducing unexpected failures at runtime and provides better performance.
-					
-					authors: JakubOnderka (https://github.com/vectordotdev/vrl/pull/1286)
-					
-					#### New Features
-					
-					- Support for encoding and decoding lz4 block compression.
-					
-					authors: jimmystewpot (https://github.com/vectordotdev/vrl/pull/1339)
-					
-					#### Enhancements
-					
-					- The `encode_proto` function was enhanced to automatically convert integer, float, and boolean values when passed to string proto fields. (https://github.com/vectordotdev/vrl/pull/1304)
-					- The `parse_user_agent` method now uses the [ua-parser](https://crates.io/crates/ua-parser) library
-					which is much faster than the previous library. The method's output remains unchanged.
-					
-					authors: JakubOnderka (https://github.com/vectordotdev/vrl/pull/1317)
-					- Added support for excluded_boundaries in the `snakecase()` function. This allows users to leverage the same function `snakecase()` that they're already leveraging but tune it to handle specific scenarios where default boundaries are not desired.
-					
-					For example,
-					
-					```rust
-					snakecase("s3BucketDetails", excluded_boundaries: ["digit_lower", "lower_digit", "upper_digit"])
-					/// Output: s3_bucket_details
-					```
-					
-					authors: brittonhayes (https://github.com/vectordotdev/vrl/pull/1324)
-					
-					#### Fixes
-					
-					- The `parse_nginx_log` function can now parse `delaying requests` error messages.
-					
-					authors: JakubOnderka (https://github.com/vectordotdev/vrl/pull/1285)
-					
-					
-					### [0.22.0 (2025-02-19)]
-        """
+				VRL was updated to v0.23.0. This includes the following changes:
+
+				#### Breaking Changes
+
+				- The `ip_cidr_contains` function now validates the cidr argument during the compilation phase if it is a constant string or array. Previously, invalid constant CIDR values would only trigger an error during execution.
+
+				Previously, if an invalid CIDR was passed as a constant, an error was thrown at runtime:
+
+				```text
+				error[E000]: function call error for "ip_cidr_contains" at (0:45): unable to parse CIDR: couldn't parse address in network: invalid IP address syntax
+				┌─ :1:1
+				│
+				1 │ ip_cidr_contains!("INVALID", "192.168.10.32")
+				│ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unable to parse CIDR: couldn't parse address in network: invalid IP address syntax
+				│
+				= see language documentation at https://vrl.dev
+				= try your code in the VRL REPL, learn more at https://vrl.dev/examples
+				```
+
+				Now, we see a compilation error:
+
+				```text
+				error[E610]: function compilation error: error[E403] invalid argument
+				┌─ :1:1
+				│
+				1 │ ip_cidr_contains!("INVALID", "192.168.10.32")
+				│ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+				│ │
+				│ invalid argument "ip_cidr_contains"
+				│ error: "cidr" must be valid cidr
+				│ received: "INVALID"
+				│
+				= learn more about error code 403 at https://errors.vrl.dev/403
+				= see language documentation at https://vrl.dev
+				= try your code in the VRL REPL, learn more at https://vrl.dev/examples
+				```
+
+				This change improves error detection by identifying invalid CIDR values earlier, reducing unexpected failures at runtime and provides better performance.
+
+				#### New Features
+
+				- Support for encoding and decoding lz4 block compression.
+
+				#### Enhancements
+
+				- The `encode_proto` function was enhanced to automatically convert integer, float, and boolean values when passed to string proto fields. (https://github.com/vectordotdev/vrl/pull/1304)
+				- The `parse_user_agent` method now uses the [ua-parser](https://crates.io/crates/ua-parser) library
+				which is much faster than the previous library. The method's output remains unchanged.
+				- Added support for excluded_boundaries in the `snakecase()` function. This allows users to leverage the same function `snakecase()` that they're already leveraging but tune it to handle specific scenarios where default boundaries are not desired.
+
+				For example,
+
+				```rust
+				snakecase("s3BucketDetails", excluded_boundaries: ["digit_lower", "lower_digit", "upper_digit"])
+				// Output: s3_bucket_details
+				```
+
+				#### Fixes
+
+				- The `parse_nginx_log` function can now parse `delaying requests` error messages.
+				"""
 		},
 
 		{
@@ -96,9 +90,9 @@ releases: "0.46.0": {
 				This is very similar to `vector tap` `--outputs-of` and `--inputs-of` options. This can be useful
 				in cases where you have a lot of components and they don't fit in the terminal (as scrolling is not supported yet in `vector top`).
 				By default, all components are shown with a glob pattern of `*`.
-				
+
 				The glob pattern semantics can be found in the [`glob` crate documentation](https://docs.rs/glob/latest/glob/).
-				
+
 				Example usage: `vector top --components "demo*"` will only show the components that match the glob pattern `demo*`.
 				"""
 			contributors: ["jorgehermo9"]
@@ -106,14 +100,14 @@ releases: "0.46.0": {
 		{
 			type: "feat"
 			description: """
-				Add a new postgres sink which allows to send log, metric and trace events to a postgres database.
+				Add a new `postgres` sink which allows to send log, metric and trace events to a postgres database.
 				"""
 			contributors: ["jorgehermo9"]
 		},
 		{
 			type: "fix"
 			description: """
-				Fix for overflow when calculating next refresh interval for gcs tokens.
+				Prevent overflow when calculating the next refresh interval for Google Cloud Storage tokens.
 				"""
 			contributors: ["graphcareful"]
 		},
@@ -193,21 +187,24 @@ releases: "0.46.0": {
 		{
 			type: "enhancement"
 			description: """
-				Add support for static labels in gcp_stackdriver_logs sink.
-				
-				    This enhancement enables users to define static labels directly in the
-				    gcp_stackdriver_logs sink configuration. Static labels are key-value pairs
-				    that are consistently applied to all log entries sent to Google Cloud Logging,
-				    improving log organization and filtering capabilities.
-				
-				
-				Add support for dynamic labels in gcp_stackdriver_logs sink via `labels_key`.
-				
-				    This enhancement allows Vector to automatically map fields from structured
-				    log entries to Google Cloud LogEntry labels. When a structured log contains
-				    fields matching the configured `labels_key`, Vector will populate the
-				    corresponding labels in the Google Cloud LogEntry, enabling better log
-				    organization and filtering in Google Cloud Logging.
+				Add support for static labels in `gcp_stackdriver_logs` sink.
+
+				```text
+				This enhancement enables users to define static labels directly in the
+				gcp_stackdriver_logs sink configuration. Static labels are key-value pairs
+				that are consistently applied to all log entries sent to Google Cloud Logging,
+				improving log organization and filtering capabilities.
+				```
+
+				Add support for dynamic labels in `gcp_stackdriver_logs` sink via `labels_key`.
+
+				```text
+				This enhancement allows Vector to automatically map fields from structured
+				log entries to Google Cloud LogEntry labels. When a structured log contains
+				fields matching the configured `labels_key`, Vector will populate the
+				corresponding labels in the Google Cloud LogEntry, enabling better log
+				organization and filtering in Google Cloud Logging.
+				```
 				"""
 			contributors: ["stackempty"]
 		},
@@ -235,14 +232,14 @@ releases: "0.46.0": {
 		{
 			type: "feat"
 			description: """
-				The sample transform now accepts a percentage via a new configuration parameter named "percent_rate"
+				The sample transform now accepts a percentage via a new `percent_rate`. configuration parameter.
 				"""
 			contributors: ["graphcareful"]
 		},
 		{
 			type: "feat"
 			description: """
-				The sample transform now accepts a ratio via a new configuration parameter named "ratio"
+				The sample transform now accepts a ratio via a new `ratio` configuration parameter.
 				"""
 			contributors: ["graphcareful"]
 		},
