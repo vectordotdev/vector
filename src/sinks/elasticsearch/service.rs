@@ -80,17 +80,12 @@ impl ElasticsearchService {
         http_request_builder: HttpRequestBuilder,
     ) -> ElasticsearchService {
         let http_request_builder = Arc::new(http_request_builder);
-        let batch_service = HttpBatchService::new(
-            http_client,
-            move |req| {
-                let request_builder = Arc::clone(&http_request_builder);
-                let future: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
-                    Box::pin(async move { request_builder.build_request(req).await });
-                future
-            },
-            #[cfg(feature = "aws-core")]
-            None,
-        );
+        let batch_service = HttpBatchService::new(http_client, move |req| {
+            let request_builder = Arc::clone(&http_request_builder);
+            let future: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
+                Box::pin(async move { request_builder.build_request(req).await });
+            future
+        });
         ElasticsearchService { batch_service }
     }
 }

@@ -167,12 +167,7 @@ impl SematextMetricsService {
     ) -> Result<VectorSink> {
         let batch = config.batch.into_batch_settings()?;
         let request = config.request.into_settings();
-        let http_service = HttpBatchService::new(
-            client,
-            create_build_request(endpoint),
-            #[cfg(feature = "aws-core")]
-            None,
-        );
+        let http_service = HttpBatchService::new(client, create_build_request(endpoint));
         let sematext_service = SematextMetricsService {
             config,
             inner: http_service,

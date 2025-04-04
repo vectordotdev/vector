@@ -110,7 +110,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        #[cfg(feature = "aws-core")] sig_v4_config: Option<SigV4Config>,
     ) -> Self {
         Self::with_logic(
             sink,
@@ -119,8 +118,6 @@ where
             request_settings,
             batch_timeout,
             client,
-            #[cfg(feature = "aws-core")]
-            sig_v4_config,
         )
     }
 }
@@ -139,7 +136,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        #[cfg(feature = "aws-core")] sig_v4_config: Option<SigV4Config>,
     ) -> Self {
         let sink = Arc::new(sink);
 
@@ -149,12 +145,7 @@ where
             Box::pin(async move { sink.build_request(b).await })
         };
 
-        let svc = HttpBatchService::new(
-            client,
-            request_builder,
-            #[cfg(feature = "aws-core")]
-            sig_v4_config,
-        );
+        let svc = HttpBatchService::new(client, request_builder);
         let inner = request_settings.batch_sink(retry_logic, svc, batch, batch_timeout);
         let encoder = sink.build_encoder();
 
@@ -261,7 +252,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        #[cfg(feature = "aws-core")] sig_v4_config: Option<SigV4Config>,
     ) -> Self {
         Self::with_retry_logic(
             sink,
@@ -270,8 +260,6 @@ where
             request_settings,
             batch_timeout,
             client,
-            #[cfg(feature = "aws-core")]
-            sig_v4_config,
         )
     }
 }
@@ -292,7 +280,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        #[cfg(feature = "aws-core")] sig_v4_config: Option<SigV4Config>,
     ) -> Self {
         let sink = Arc::new(sink);
 
@@ -302,12 +289,7 @@ where
             Box::pin(async move { sink.build_request(b).await })
         };
 
-        let svc = HttpBatchService::new(
-            client,
-            request_builder,
-            #[cfg(feature = "aws-core")]
-            sig_v4_config,
-        );
+        let svc = HttpBatchService::new(client, request_builder);
         let inner = request_settings.partition_sink(retry_logic, svc, batch, batch_timeout);
         let encoder = sink.build_encoder();
 
@@ -411,12 +393,24 @@ impl<F, B> HttpBatchService<F, B> {
     pub fn new(
         inner: HttpClient,
         request_builder: impl Fn(B) -> F + Send + Sync + 'static,
-        #[cfg(feature = "aws-core")] sig_v4_config: Option<SigV4Config>,
     ) -> Self {
         HttpBatchService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
             #[cfg(feature = "aws-core")]
+            sig_v4_config: None,
+        }
+    }
+
+    #[cfg(feature = "aws-core")]
+    pub fn new_with_sig_v4(
+        inner: HttpClient,
+        request_builder: impl Fn(B) -> F + Send + Sync + 'static,
+        sig_v4_config: Option<SigV4Config>,
+    ) -> Self {
+        HttpBatchService {
+            inner,
+            request_builder: Arc::new(Box::new(request_builder)),
             sig_v4_config,
         }
     }
@@ -787,14 +781,32 @@ impl<B, T: Send + 'static> HttpService<B, T>
 where
     B: HttpServiceRequestBuilder<T> + std::marker::Sync + std::marker::Send + 'static,
 {
-    pub fn new(
+    pub fn new(http_client: HttpClient<Body>, http_request_builder: B) -> Self {
+        let http_request_builder = Arc::new(http_request_builder);
+
+        let batch_service = HttpBatchService::new(http_client, move |req: HttpRequest<T>| {
+            let request_builder = Arc::clone(&http_request_builder);
+
+            let fut: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
+                Box::pin(async move { request_builder.build(req) });
+
+            fut
+        });
+        Self {
+            batch_service,
+            _phantom: PhantomData,
+        }
+    }
+
+    #[cfg(feature = "aws-core")]
+    pub fn new_with_sig_v4(
         http_client: HttpClient<Body>,
         http_request_builder: B,
-        #[cfg(feature = "aws-core")] sig_v4_config: Option<SigV4Config>,
+        sig_v4_config: Option<SigV4Config>,
     ) -> Self {
         let http_request_builder = Arc::new(http_request_builder);
 
-        let batch_service = HttpBatchService::new(
+        let batch_service = HttpBatchService::new_with_sig_v4(
             http_client,
             move |req: HttpRequest<T>| {
                 let request_builder = Arc::clone(&http_request_builder);
@@ -804,7 +816,6 @@ where
 
                 fut
             },
-            #[cfg(feature = "aws-core")]
             sig_v4_config,
         );
         Self {
@@ -891,16 +902,11 @@ mod test {
         let request = Bytes::from("hello");
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
-        let mut service = HttpBatchService::new(
-            client,
-            move |body: Bytes| {
-                Box::pin(ready(
-                    http::Request::post(&uri).body(body).map_err(Into::into),
-                ))
-            },
-            #[cfg(feature = "aws-core")]
-            None,
-        );
+        let mut service = HttpBatchService::new(client, move |body: Bytes| {
+            Box::pin(ready(
+                http::Request::post(&uri).body(body).map_err(Into::into),
+            ))
+        });
 
         let (tx, rx) = futures::channel::mpsc::channel(10);
 

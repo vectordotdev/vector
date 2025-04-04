@@ -221,8 +221,6 @@ impl SinkConfig for InfluxDbLogsConfig {
             request,
             batch.timeout,
             client,
-            #[cfg(feature = "aws-core")]
-            None,
         )
         .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 

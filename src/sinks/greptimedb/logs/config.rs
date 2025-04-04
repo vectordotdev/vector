@@ -146,12 +146,8 @@ impl SinkConfig for GreptimeDBLogsConfig {
             extra_params: self.extra_params.clone(),
         };
 
-        let service: HttpService<GreptimeDBLogsHttpRequestBuilder, PartitionKey> = HttpService::new(
-            client.clone(),
-            request_builder.clone(),
-            #[cfg(feature = "aws-core")]
-            None,
-        );
+        let service: HttpService<GreptimeDBLogsHttpRequestBuilder, PartitionKey> =
+            HttpService::new(client.clone(), request_builder.clone());
 
         let request_limits = self.request.into_settings();
 

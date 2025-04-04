@@ -170,8 +170,6 @@ impl SinkConfig for MezmoConfig {
             request_settings,
             batch_settings.timeout,
             client.clone(),
-            #[cfg(feature = "aws-core")]
-            None,
         )
         .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error));
 

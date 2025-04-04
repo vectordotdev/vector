@@ -293,7 +293,6 @@ impl SinkConfig for HttpSinkConfig {
         );
 
         let sig_v4_config = match &self.auth {
-            None => None,
             #[cfg(feature = "aws-core")]
             Some(Auth::Aws { auth, service }) => {
                 let default_region = crate::aws::region_provider(&ProxyConfig::default(), None)?
@@ -319,7 +318,8 @@ impl SinkConfig for HttpSinkConfig {
             _ => None,
         };
 
-        let service = HttpService::new(client, http_sink_request_builder, sig_v4_config);
+        let service =
+            HttpService::new_with_sig_v4(client, http_sink_request_builder, sig_v4_config);
 
         let request_limits = self.request.tower.into_settings();
 

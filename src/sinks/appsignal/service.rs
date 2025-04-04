@@ -38,24 +38,19 @@ impl AppsignalService {
         push_api_key: SensitiveString,
         compression: Compression,
     ) -> Self {
-        let batch_service = HttpBatchService::new(
-            http_client,
-            move |req| {
-                let req: AppsignalRequest = req;
+        let batch_service = HttpBatchService::new(http_client, move |req| {
+            let req: AppsignalRequest = req;
 
-                let mut request = Request::post(&endpoint)
-                    .header("Content-Type", "application/json")
-                    .header(AUTHORIZATION, format!("Bearer {}", push_api_key.inner()))
-                    .header("Content-Length", req.payload.len());
-                if let Some(ce) = compression.content_encoding() {
-                    request = request.header("Content-Encoding", ce)
-                }
-                let result = request.body(req.payload).map_err(|x| x.into());
-                future::ready(result)
-            },
-            #[cfg(feature = "aws-core")]
-            None,
-        );
+            let mut request = Request::post(&endpoint)
+                .header("Content-Type", "application/json")
+                .header(AUTHORIZATION, format!("Bearer {}", push_api_key.inner()))
+                .header("Content-Length", req.payload.len());
+            if let Some(ce) = compression.content_encoding() {
+                request = request.header("Content-Encoding", ce)
+            }
+            let result = request.body(req.payload).map_err(|x| x.into());
+            future::ready(result)
+        });
         Self { batch_service }
     }
 }

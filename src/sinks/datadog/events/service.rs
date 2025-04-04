@@ -59,27 +59,22 @@ impl DatadogEventsService {
         default_api_key: SensitiveString,
         http_client: HttpClient<Body>,
     ) -> Self {
-        let batch_http_service = HttpBatchService::new(
-            http_client,
-            move |req| {
-                let req: DatadogEventsRequest = req;
+        let batch_http_service = HttpBatchService::new(http_client, move |req| {
+            let req: DatadogEventsRequest = req;
 
-                let api_key = match req.metadata.api_key.as_ref() {
-                    Some(x) => x.as_ref(),
-                    None => default_api_key.inner(),
-                };
+            let api_key = match req.metadata.api_key.as_ref() {
+                Some(x) => x.as_ref(),
+                None => default_api_key.inner(),
+            };
 
-                let request = Request::post(&endpoint)
-                    .header("Content-Type", "application/json")
-                    .header("DD-API-KEY", api_key)
-                    .header("Content-Length", req.body.len())
-                    .body(req.body)
-                    .map_err(|x| x.into());
-                future::ready(request)
-            },
-            #[cfg(feature = "aws-core")]
-            None,
-        );
+            let request = Request::post(&endpoint)
+                .header("Content-Type", "application/json")
+                .header("DD-API-KEY", api_key)
+                .header("Content-Length", req.body.len())
+                .body(req.body)
+                .map_err(|x| x.into());
+            future::ready(request)
+        });
 
         Self { batch_http_service }
     }

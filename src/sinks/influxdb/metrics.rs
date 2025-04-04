@@ -156,12 +156,7 @@ impl InfluxDbSvc {
 
         let uri = settings.write_uri(endpoint)?;
 
-        let http_service = HttpBatchService::new(
-            client,
-            create_build_request(uri, token.inner()),
-            #[cfg(feature = "aws-core")]
-            None,
-        );
+        let http_service = HttpBatchService::new(client, create_build_request(uri, token.inner()));
 
         let influxdb_http_service = InfluxDbSvc {
             config,
