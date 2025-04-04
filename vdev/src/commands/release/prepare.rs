@@ -149,7 +149,7 @@ impl Prepare {
         }
 
         lines.push(String::new()); // File should end with a newline.
-        fs::write(&cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
+        fs::write(cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
         run_command("cargo update -p vrl");
         git::commit(&format!("chore(releasing): Pinned VRL version to {vrl_version}"))?;
         Ok(())
