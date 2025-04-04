@@ -348,6 +348,8 @@ impl Prepare {
             .arg(&pr_title)
             .arg("--body")
             .arg(&pr_body)
+            .arg("--label")
+            .arg("no-changelog")
             .current_dir(&self.repo_root)
             .status()?;
         if !gh_status.success() {
