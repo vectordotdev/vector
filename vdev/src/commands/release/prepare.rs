@@ -126,7 +126,7 @@ impl Prepare {
     fn pin_vrl_version(&self) -> Result<()> {
         debug!("pin_vrl_version");
         let cargo_toml_path = &self.repo_root.join("Cargo.toml");
-        let contents = fs::read_to_string(&cargo_toml_path).expect("Failed to read Cargo.toml");
+        let contents = fs::read_to_string(cargo_toml_path).expect("Failed to read Cargo.toml");
 
         // Needs this hybrid approach to preserve ordering.
         let mut lines: Vec<String> = contents.lines().map(String::from).collect();
@@ -148,7 +148,7 @@ impl Prepare {
             }
         }
 
-        fs::write(&cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
+        fs::write(cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
         run_command("cargo update -p vrl");
         git::commit(&format!("chore(releasing): Pinned VRL version to {vrl_version}"))?;
         Ok(())
