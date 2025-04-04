@@ -112,9 +112,7 @@ pub fn check_git_repository_clean() -> Result<bool> {
 }
 
 pub fn add_files_in_current_dir() -> Result<String> {
-    Command::new("git")
-        .args(["add", "."])
-        .check_output()
+    Command::new("git").args(["add", "."]).check_output()
 }
 
 /// Commits changes from the current repo
