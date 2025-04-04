@@ -241,7 +241,7 @@ impl Prepare {
             .map_err(|e| anyhow!("Failed to write {}: {}", file_path.display(), e))?;
         git::commit(&format!(
             "chore(releasing): Updated {} vector version to {new_version}",
-            file_path.strip_prefix(get_repo_root()).unwrap().display(),
+            file_path.strip_prefix(&self.repo_root).unwrap().display(),
         ))?;
 
         Ok(())
@@ -279,7 +279,7 @@ impl Prepare {
     /// Step 10: Create a new release md file
     fn create_new_release_md(&self) -> Result<()> {
         debug!("create_new_release_md");
-        let releases_dir = get_repo_root()
+        let releases_dir = self.repo_root
             .join("website")
             .join("content")
             .join("en")
@@ -345,7 +345,7 @@ impl Prepare {
             .arg(&pr_title)
             .arg("--body")
             .arg(&pr_body)
-            .current_dir(get_repo_root())
+            .current_dir(&self.repo_root)
             .status()?;
         if !gh_status.success() {
             return Err(anyhow!("Failed to create PR with gh CLI"));
