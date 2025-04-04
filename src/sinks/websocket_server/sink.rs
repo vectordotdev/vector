@@ -266,7 +266,7 @@ impl WebSocketListenerSink {
             let ip = addr.ip();
             debug!(
                 "Received a message from {ip}: {}",
-                msg.to_text().unwrap_or("invalid data")
+                msg.to_text().unwrap_or(&format!("Couldn't convert: {msg}"))
             );
             if let (Some(client_key), Some(checkpoint)) = (
                 &client_checkpoint_key,
