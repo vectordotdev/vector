@@ -26,10 +26,9 @@ impl ConfigDiff {
             sources: Difference::new(&old.sources, &new.sources, &components_to_reload),
             transforms: Difference::new(&old.transforms, &new.transforms, &components_to_reload),
             sinks: Difference::new(&old.sinks, &new.sinks, &components_to_reload),
-            enrichment_tables: Difference::new(
+            enrichment_tables: Difference::new_tables(
                 &old.enrichment_tables,
                 &new.enrichment_tables,
-                &components_to_reload,
             ),
             components_to_reload,
         }
