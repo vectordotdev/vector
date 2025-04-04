@@ -213,6 +213,7 @@ impl Prepare {
         }
 
         self.append_vrl_changelog_to_release_cue()?;
+        git::add_files_in_current_dir()?;
         git::commit("chore(releasing): Generated release CUE file")?;
         debug!("Generated release CUE file");
         Ok(())
@@ -320,6 +321,7 @@ impl Prepare {
         let new_file_path = releases_dir.join(format!("{new_version}.md"));
         let updated_content = updated_lines.join("\n");
         fs::write(&new_file_path, updated_content)?;
+        git::add_files_in_current_dir()?;
         git::commit("chore(releasing): Created release md file")?;
         Ok(())
     }
