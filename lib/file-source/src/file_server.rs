@@ -25,11 +25,16 @@ use crate::{
     FileSourceInternalEvents, ReadFrom,
 };
 
-/// `FileServer` is a Source which cooperatively schedules reads over files,
-/// converting the lines of said files into `LogLine` structures. As
-/// `FileServer` is intended to be useful across multiple operating systems with
-/// POSIX filesystem semantics `FileServer` must poll for changes. That is, no
-/// event notification is used by `FileServer`.
+/// `FileServer` is a Source which schedules reads over files,
+/// converting the lines of said files into `LogLine` structures.
+///
+/// `FileServer` uses a hybrid approach for file monitoring:
+/// 1. Active polling: For files that are actively being read
+/// 2. Passive watching: For idle files, using filesystem notifications via notify-rs/notify
+///
+/// This approach allows `FileServer` to efficiently monitor many files without
+/// holding open file handles for all of them, while still maintaining checkpoints
+/// in case files receive future writes.
 ///
 /// `FileServer` is configured on a path to watch. The files do _not_ need to
 /// exist at startup. `FileServer` will discover new files which match
@@ -53,6 +58,8 @@ where
     pub emitter: E,
     pub handle: tokio::runtime::Handle,
     pub rotate_wait: Duration,
+    /// Duration after which to switch a file from active to passive watching
+    pub idle_timeout: Option<Duration>,
 }
 
 /// `FileServer` as Source
@@ -293,9 +300,46 @@ where
                 }
             }
 
+            // Handle file watcher state transitions
             for (_, watcher) in &mut fp_map {
+                // Mark files as dead if they're not findable and have been missing for too long
                 if !watcher.file_findable() && watcher.last_seen().elapsed() > self.rotate_wait {
                     watcher.set_dead();
+                    continue;
+                }
+
+                // Handle transitions between active and passive states
+                if let Some(idle_timeout) = self.idle_timeout {
+                    use crate::file_watcher::WatcherState;
+
+                    match watcher.state() {
+                        // If the file is active but hasn't been read from in a while, switch to passive mode
+                        WatcherState::Active if watcher.last_read_success().elapsed() > idle_timeout => {
+                            if watcher.reached_eof() {
+                                trace!(
+                                    message = "Switching file to passive mode",
+                                    ?watcher.path,
+                                    position = %watcher.get_file_position(),
+                                    idle_time = ?watcher.last_read_success().elapsed(),
+                                );
+
+                                if let Err(e) = watcher.deactivate() {
+                                    debug!(
+                                        message = "Failed to switch file to passive mode",
+                                        ?watcher.path,
+                                        error = ?e
+                                    );
+                                } else {
+                                    self.emitter.emit_file_switched_to_passive(&watcher.path, watcher.get_file_position());
+                                }
+                            }
+                        },
+                        // Passive files are handled by the notify watcher and will be activated when needed
+                        WatcherState::Passive => {
+                            // The file watcher will automatically activate when events are detected
+                        },
+                        _ => {}
+                    }
                 }
             }
 

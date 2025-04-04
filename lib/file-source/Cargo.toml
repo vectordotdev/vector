@@ -13,6 +13,7 @@ winapi = { version = "0.3", features = ["winioctl"] }
 [dependencies]
 crc = "3.2.1"
 glob.workspace = true
+notify = "8.0.0"
 scan_fmt = "0.2.6"
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }

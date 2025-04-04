@@ -569,6 +569,7 @@ pub fn file_source(
         emitter,
         handle: tokio::runtime::Handle::current(),
         rotate_wait: config.rotate_wait,
+        idle_timeout: Some(Duration::from_secs(60)), // Default to 60 seconds idle timeout
     };
 
     let event_metadata = EventMetadata {
