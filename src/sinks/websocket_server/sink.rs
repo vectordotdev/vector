@@ -246,7 +246,9 @@ impl WebSocketListenerSink {
                 &buffer.lock().expect("mutex poisoned"),
                 |(_, message)| {
                     if let Err(error) = tx.unbounded_send(message.clone()) {
-                        emit!(WsListenerSendError { error });
+                        emit!(WsListenerSendError {
+                            error: Box::new(error)
+                        });
                     }
                 },
             );
@@ -292,7 +294,15 @@ impl WebSocketListenerSink {
             .forward(outgoing);
 
         pin_mut!(forward_data_to_client, incoming_data_handler);
-        future::select(forward_data_to_client, incoming_data_handler).await;
+        if let Err(error) = future::select(forward_data_to_client, incoming_data_handler)
+            .await
+            .factor_first()
+            .0
+        {
+            emit!(WsListenerSendError {
+                error: Box::new(error)
+            })
+        }
 
         {
             let mut peers = peers.lock().expect("mutex poisoned");
@@ -375,7 +385,9 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     let broadcast_recipients = peers.iter().map(|(_, ws_sink)| ws_sink);
                     for recp in broadcast_recipients {
                         if let Err(error) = recp.unbounded_send(message.clone()) {
-                            emit!(WsListenerSendError { error });
+                            emit!(WsListenerSendError {
+                                error: Box::new(error)
+                            });
                         } else {
                             events_sent.emit(CountByteSize(1, event_byte_size));
                             bytes_sent.emit(ByteSize(message_len));

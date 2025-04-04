@@ -1,9 +1,7 @@
 use std::error::Error;
 use std::fmt::Debug;
 
-use futures::channel::mpsc::TrySendError;
 use metrics::{counter, gauge};
-use tokio_tungstenite::tungstenite::Message;
 use vector_lib::internal_event::InternalEvent;
 
 use vector_lib::internal_event::{error_stage, error_type};
@@ -81,7 +79,7 @@ impl InternalEvent for WsListenerConnectionShutdown {
 
 #[derive(Debug)]
 pub struct WsListenerSendError {
-    pub error: TrySendError<Message>,
+    pub error: Box<dyn Error>,
 }
 
 impl InternalEvent for WsListenerSendError {
