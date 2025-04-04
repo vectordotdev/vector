@@ -145,7 +145,7 @@ pub fn checkout_branch(branch_name: &str) -> Result<()> {
 }
 
 pub fn checkout_main_branch() -> Result<()> {
-    let _output = run_and_check_output(&["checkout", "origin/master"])?;
+    let _output = run_and_check_output(&["switch", "master"])?;
     Ok(())
 }
 

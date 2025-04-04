@@ -103,7 +103,7 @@ fn create_release_branches(new_version: &Version) -> Result<()> {
     // Step 2: Create a new release preparation branch
     //         The branch website contains 'website' to generate vector.dev preview.
     let release_preparation_branch = format!("website-prepare-v{new_version}");
-    git::checkout_branch(release_preparation_branch.as_str())?;
+    git::create_branch(release_preparation_branch.as_str())?;
     git::push_and_set_upstream(release_preparation_branch.as_str())?;
     Ok(())
 }
