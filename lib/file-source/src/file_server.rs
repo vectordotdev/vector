@@ -19,7 +19,7 @@ use tracing::{debug, error, info, trace};
 
 use crate::{
     checkpointer::{Checkpointer, CheckpointsView},
-    file_watcher::FileWatcher,
+    file_watcher::{FileWatcher, WatcherState},
     fingerprinter::{FileFingerprint, Fingerprinter},
     paths_provider::PathsProvider,
     FileSourceInternalEvents, ReadFrom,
@@ -310,8 +310,6 @@ where
 
                 // Handle transitions between active and passive states
                 if let Some(idle_timeout) = self.idle_timeout {
-                    use crate::file_watcher::WatcherState;
-
                     match watcher.state() {
                         // If the file is active but hasn't been read from in a while, switch to passive mode
                         WatcherState::Active if watcher.last_read_success().elapsed() > idle_timeout => {
