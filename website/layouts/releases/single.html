@@ -14,7 +14,7 @@
     <div class="mb-4 md:mb-6">
       {{ partial "breadcrumb.html" . }}
     </div>
-    <div class="pb-8 md:pb-10 lg:pb-12">
+    <div class="pb-1 md:pb-2 lg:pb-3">
       {{ partial "hero.html" . }}
     </div>
 
@@ -144,10 +144,6 @@
       {{ else }}
       {{ if gt (len $release.commits) 0 }}
       <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
-          {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
-        </div>
-
         <div class="prose dark:prose-dark max-w-none">
           {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
         </div>
