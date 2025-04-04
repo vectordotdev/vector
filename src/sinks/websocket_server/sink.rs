@@ -268,14 +268,15 @@ impl WebSocketListenerSink {
                 "Received a message from {ip}: {}",
                 msg.to_text().unwrap_or("invalid data")
             );
-            if let Some(client_key) = &client_checkpoint_key {
-                if let Some(checkpoint) = message_buffering.handle_ack_request(msg) {
-                    debug!("Inserting checkpoint for {client_key}({ip}): {checkpoint}");
-                    client_checkpoints
-                        .lock()
-                        .expect("mutex poisoned")
-                        .insert(client_key.clone(), checkpoint);
-                }
+            if let (Some(client_key), Some(checkpoint)) = (
+                &client_checkpoint_key,
+                message_buffering.handle_ack_request(msg),
+            ) {
+                debug!("Inserting checkpoint for {client_key}({ip}): {checkpoint}");
+                client_checkpoints
+                    .lock()
+                    .expect("mutex poisoned")
+                    .insert(client_key.clone(), checkpoint);
             }
 
             future::ok(())
