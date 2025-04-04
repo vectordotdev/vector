@@ -74,6 +74,7 @@ impl Cli {
 
 impl Prepare {
     pub fn run(&self) -> Result<()> {
+        debug!("run");
         self.create_release_branches()?;
         self.pin_vrl_version()?;
 
@@ -103,6 +104,7 @@ impl Prepare {
 
     /// Steps 1 & 2
     fn create_release_branches(&self) -> Result<()> {
+        debug!("create_release_branches");
         // Step 1: Create a new release branch
         git::run_and_check_output(&["fetch"])?;
         git::checkout_main_branch()?;
@@ -122,6 +124,7 @@ impl Prepare {
 
     /// Step 3
     fn pin_vrl_version(&self) -> Result<()> {
+        debug!("pin_vrl_version");
         let cargo_toml_path = &self.repo_root.join("Cargo.toml");
         let contents = fs::read_to_string(&cargo_toml_path).expect("Failed to read Cargo.toml");
 
@@ -159,6 +162,7 @@ impl Prepare {
         new_version: Option<&str>,
         prefix: &str,
     ) -> Result<()> {
+        debug!("update_dockerfile_base_version for {}", dockerfile_path.display());
         if let Some(version) = new_version {
             let contents = fs::read_to_string(dockerfile_path)?;
 
@@ -191,7 +195,7 @@ impl Prepare {
                 dockerfile_path.strip_prefix(&self.repo_root).unwrap().display(),
             ))?;
         } else {
-            println!(
+            debug!(
                 "No version specified for {dockerfile_path:?}; skipping update");
         }
         Ok(())
@@ -199,6 +203,7 @@ impl Prepare {
 
     // Step 6
     fn generate_release_cue(&self) -> Result<()> {
+        debug!("generate_release_cue");
         let script = self.repo_root.join(RELEASE_CUE_SCRIPT);
         let new_vector_version = &self.new_vector_version;
         if script.is_file() {
@@ -209,12 +214,13 @@ impl Prepare {
 
         self.append_vrl_changelog_to_release_cue()?;
         git::commit("chore(releasing): Generated release CUE file")?;
-        println!("Generated release CUE file");
+        debug!("Generated release CUE file");
         Ok(())
     }
 
     /// Step 7 & 8: Replace old version with the new version.
     fn update_vector_version(&self, file_path: &Path) -> Result<()> {
+        debug!("update_vector_version for {file_path:?}");
         let contents = fs::read_to_string(file_path)
             .map_err(|e| anyhow!("Failed to read {}: {}", file_path.display(), e))?;
 
@@ -243,6 +249,7 @@ impl Prepare {
 
     /// Step 9: Add new version to `versions.cue`
     fn add_new_version_to_versions_cue(&self) -> Result<()> {
+        debug!("add_new_version_to_versions_cue");
         let cure_reference_path = &self.repo_root.join("website").join("cue").join("reference");
         let versions_cue_path = cure_reference_path.join("versions.cue");
         if !versions_cue_path.is_file() {
@@ -271,6 +278,7 @@ impl Prepare {
 
     /// Step 10: Create a new release md file
     fn create_new_release_md(&self) -> Result<()> {
+        debug!("create_new_release_md");
         let releases_dir = get_repo_root()
             .join("website")
             .join("content")
@@ -305,7 +313,7 @@ impl Prepare {
         }
 
         if !weight_updated {
-            eprintln!("Couldn't update 'weight' line from {old_file_path:?}");
+            error!("Couldn't update 'weight' line from {old_file_path:?}");
         }
 
 
@@ -318,6 +326,7 @@ impl Prepare {
 
     /// Final step. Create a release prep PR against the release branch.
     fn open_release_pr(&self) -> Result<()> {
+        debug!("open_release_pr");
         git::push()?;
 
         let new_vector_version = &self.new_vector_version;
@@ -341,12 +350,12 @@ impl Prepare {
         if !gh_status.success() {
             return Err(anyhow!("Failed to create PR with gh CLI"));
         }
-
-        println!("Successfully created PR against {release_branch}");
+        info!("Successfully created PR against {release_branch}");
         Ok(())
     }
 
     fn append_vrl_changelog_to_release_cue(&self) -> Result<()> {
+        debug!("append_vrl_changelog_to_release_cue");
         let releases_path = &self.repo_root.join("website").join("cue").join("reference").join("releases");
         let vector_version = &self.new_vector_version;
         let release_cue_path = releases_path.join(format!("{vector_version}.cue"));
@@ -406,7 +415,7 @@ impl Prepare {
 
         fs::rename(&temp_file_path, &release_cue_path)?;
         run_command(&format!("cue fmt {release_cue_path:?}"));
-        println!("Successfully added VRL changelog to the release cue file.");
+        debug!("Successfully added VRL changelog to the release cue file.");
         Ok(())
     }
 }
