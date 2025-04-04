@@ -312,7 +312,7 @@ impl Prepare {
         let new_file_path = releases_dir.join(format!("{new_version}.md"));
         let updated_content = updated_lines.join("\n");
         fs::write(&new_file_path, updated_content)?;
-        git::commit(&format!("chore(releasing): Created release md file: {new_file_path:?}"))?;
+        git::commit("chore(releasing): Created release md file")?;
         Ok(())
     }
 
@@ -405,7 +405,8 @@ impl Prepare {
         }
 
         fs::rename(&temp_file_path, &release_cue_path)?;
-
+        run_command(&format!("cue fmt {release_cue_path:?}"));
+        println!("Successfully added VRL changelog to the release cue file.");
         Ok(())
     }
 }
