@@ -15,7 +15,7 @@ releases: "0.46.0": {
 		  - Thanks to [jorgehermo9](https://github.com/jorgehermo9) for this sizable contribution.
 		- `vector top` now supports filtering out components by their component ID.
 		  - Again thanks to [jorgehermo9](https://github.com/jorgehermo9).
-		- A new global option `expire_metrics_per_metric_set` is now available and it enables more fine grained control over individual metric sets.
+		- A new global option `expire_metrics_per_metric_set` is now available and it enables more fine-grained control over individual metric sets.
 		  - Thanks to [esensar](https://github.com/esensar) and [Quad9DNS](https://github.com/Quad9DNS).
 		"""
 
