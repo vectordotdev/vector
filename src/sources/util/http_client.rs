@@ -76,6 +76,13 @@ pub(crate) trait HttpClientContext {
     /// (Optional) Called if the HTTP response is not 200 ('OK').
     fn on_http_response_error(&self, _uri: &Uri, _header: &Parts) {}
 
+    /// (Optional) Process the base URL before each request.
+    /// Allows for dynamic query parameters that update at runtime.
+    /// Returns a new URL if parameters need to be updated, or None to use the original URL.
+    fn process_url(&self, _url: &Uri) -> Option<Uri> {
+        None
+    }
+
     // This function can be defined to enrich events with additional HTTP
     // metadata. This function should be used rather than internal enrichment so
     // that accurate byte count metrics can be emitted.
@@ -141,12 +148,15 @@ pub(crate) async fn call<
         .take_until(inputs.shutdown)
         .map(move |_| stream::iter(inputs.urls.clone()))
         .flatten()
-        .map(move |url| {
+        .map(move |base_url| {
             let client = client.clone();
-            let endpoint = url.to_string();
+            let endpoint = base_url.to_string();
 
             let context_builder = context_builder.clone();
-            let mut context = context_builder.build(&url);
+            let mut context = context_builder.build(&base_url);
+
+            // Check if we need to process the URL dynamically (for updating VRL expressions)
+            let url = context.process_url(&base_url).unwrap_or(base_url);
 
             let mut builder = match http_method {
                 HttpMethod::Head => Request::head(&url),
