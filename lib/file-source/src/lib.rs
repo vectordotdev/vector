@@ -16,8 +16,13 @@ pub mod paths_provider;
 pub use self::{
     checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
     file_server::{calculate_ignore_before, FileServer, Line, Shutdown as FileServerShutdown},
+    file_watcher::WatcherState,
     fingerprinter::{FileFingerprint, FingerprintStrategy, Fingerprinter},
     internal_events::FileSourceInternalEvents,
+    paths_provider::{
+        boxed::BoxedPathsProvider,
+        notify::NotifyPathsProvider,
+    },
 };
 use vector_config::configurable_component;
 

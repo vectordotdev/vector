@@ -19,17 +19,22 @@ use tracing::{debug, error, info, trace};
 
 use crate::{
     checkpointer::{Checkpointer, CheckpointsView},
-    file_watcher::FileWatcher,
+    file_watcher::{FileWatcher, WatcherState},
     fingerprinter::{FileFingerprint, Fingerprinter},
     paths_provider::PathsProvider,
     FileSourceInternalEvents, ReadFrom,
 };
 
-/// `FileServer` is a Source which cooperatively schedules reads over files,
-/// converting the lines of said files into `LogLine` structures. As
-/// `FileServer` is intended to be useful across multiple operating systems with
-/// POSIX filesystem semantics `FileServer` must poll for changes. That is, no
-/// event notification is used by `FileServer`.
+/// `FileServer` is a Source which schedules reads over files,
+/// converting the lines of said files into `LogLine` structures.
+///
+/// `FileServer` uses a hybrid approach for file monitoring:
+/// 1. Active polling: For files that are actively being read
+/// 2. Passive watching: For idle files, using filesystem notifications via notify-rs/notify
+///
+/// This approach allows `FileServer` to efficiently monitor many files without
+/// holding open file handles for all of them, while still maintaining checkpoints
+/// in case files receive future writes.
 ///
 /// `FileServer` is configured on a path to watch. The files do _not_ need to
 /// exist at startup. `FileServer` will discover new files which match
@@ -53,6 +58,12 @@ where
     pub emitter: E,
     pub handle: tokio::runtime::Handle,
     pub rotate_wait: Duration,
+    /// Duration after which to switch a file from active to passive watching
+    pub idle_timeout: Option<Duration>,
+    /// Whether we're using notify-based file discovery
+    pub using_notify_discovery: bool,
+    /// Duration after which to checkpoint files when using notify-based discovery
+    pub checkpoint_interval: Duration,
 }
 
 /// `FileServer` as Source
@@ -137,10 +148,19 @@ where
 
         let mut stats = TimingStats::default();
 
-        // Spawn the checkpoint writer task
+        // Spawn the checkpoint writer task with appropriate interval
+        let checkpoint_interval = if self.using_notify_discovery {
+            // When using notify-based discovery, we can use a longer checkpoint interval
+            // since we're not relying on frequent polling
+            self.checkpoint_interval
+        } else {
+            // Standard behavior for polling-based discovery
+            self.glob_minimum_cooldown
+        };
+
         let checkpoint_task_handle = self.handle.spawn(checkpoint_writer(
             checkpointer,
-            self.glob_minimum_cooldown,
+            checkpoint_interval,
             shutdown_checkpointer,
             self.emitter.clone(),
         ));
@@ -156,9 +176,18 @@ where
         // or write new checkpoints, on every iteration.
         let mut next_glob_time = time::Instant::now();
         loop {
-            // Glob find files to follow, but not too often.
+            // Determine if we need to perform file discovery
             let now_time = time::Instant::now();
-            if next_glob_time <= now_time {
+            let should_discover = if self.using_notify_discovery {
+                // When using notify-based discovery, we only need to glob occasionally as a fallback
+                // This is much less frequent than with polling-based discovery
+                next_glob_time <= now_time && now_time.duration_since(next_glob_time) > Duration::from_secs(10)
+            } else {
+                // Standard behavior for polling-based discovery
+                next_glob_time <= now_time
+            };
+
+            if should_discover {
                 // Schedule the next glob time.
                 next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
 
@@ -293,9 +322,44 @@ where
                 }
             }
 
+            // Handle file watcher state transitions
             for (_, watcher) in &mut fp_map {
+                // Mark files as dead if they're not findable and have been missing for too long
                 if !watcher.file_findable() && watcher.last_seen().elapsed() > self.rotate_wait {
                     watcher.set_dead();
+                    continue;
+                }
+
+                // Handle transitions between active and passive states
+                if let Some(idle_timeout) = self.idle_timeout {
+                    match watcher.state() {
+                        // If the file is active but hasn't been read from in a while, switch to passive mode
+                        WatcherState::Active if watcher.last_read_success().elapsed() > idle_timeout => {
+                            if watcher.reached_eof() {
+                                trace!(
+                                    message = "Switching file to passive mode",
+                                    ?watcher.path,
+                                    position = %watcher.get_file_position(),
+                                    idle_time = ?watcher.last_read_success().elapsed(),
+                                );
+
+                                if let Err(e) = watcher.deactivate() {
+                                    debug!(
+                                        message = "Failed to switch file to passive mode",
+                                        ?watcher.path,
+                                        error = ?e
+                                    );
+                                } else {
+                                    self.emitter.emit_file_switched_to_passive(&watcher.path, watcher.get_file_position());
+                                }
+                            }
+                        },
+                        // Passive files are handled by the notify watcher and will be activated when needed
+                        WatcherState::Passive => {
+                            // The file watcher will automatically activate when events are detected
+                        },
+                        _ => {}
+                    }
                 }
             }
 
@@ -326,16 +390,31 @@ where
             stats.record("sending", start.elapsed());
 
             let start = time::Instant::now();
-            // When no lines have been read we kick the backup_cap up by twice,
-            // limited by the hard-coded cap. Else, we set the backup_cap to its
-            // minimum on the assumption that next time through there will be
-            // more lines to read promptly.
-            backoff_cap = if global_bytes_read == 0 {
-                cmp::min(2_048, backoff_cap.saturating_mul(2))
+            // Determine the appropriate backoff based on file activity and discovery mode
+            let backoff = if self.using_notify_discovery {
+                // When using notify-based discovery, we can use a more adaptive approach
+                let all_files_passive = fp_map.values().all(|w| w.state() == WatcherState::Passive);
+
+                if global_bytes_read > 0 {
+                    // If we read data, use minimal backoff for responsiveness
+                    1
+                } else if all_files_passive {
+                    // If all files are in passive mode, use a longer backoff
+                    // This significantly reduces CPU usage when files are idle
+                    cmp::min(5_000, backoff_cap)
+                } else {
+                    // Otherwise, use standard exponential backoff
+                    cmp::min(2_048, backoff_cap.saturating_mul(2))
+                }
             } else {
-                1
+                // Standard behavior for polling-based discovery
+                backoff_cap = if global_bytes_read == 0 {
+                    cmp::min(2_048, backoff_cap.saturating_mul(2))
+                } else {
+                    1
+                };
+                backoff_cap.saturating_sub(global_bytes_read)
             };
-            let backoff = backoff_cap.saturating_sub(global_bytes_read);
 
             // This works only if run inside tokio context since we are using
             // tokio's Timer. Outside of such context, this will panic on the first

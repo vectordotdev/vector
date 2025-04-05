@@ -830,6 +830,10 @@ impl Source {
             // A handle to the current tokio runtime
             handle: tokio::runtime::Handle::current(),
             rotate_wait,
+            // Default idle timeout for switching to passive mode
+            idle_timeout: Some(Duration::from_secs(60)),
+            using_notify_discovery: false, // Kubernetes logs don't use notify-based discovery
+            checkpoint_interval: Duration::from_secs(30),
         };
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);

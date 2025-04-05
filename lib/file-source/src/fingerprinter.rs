@@ -802,6 +802,10 @@ mod test {
 
         fn emit_files_open(&self, _: usize) {}
 
+        fn emit_file_switched_to_passive(&self, _: &Path, _: u64) {}
+
+        fn emit_file_switched_to_active(&self, _: &Path, _: u64) {}
+
         fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
     }
 }
