@@ -31,9 +31,10 @@ _values: {
 //
 // * `at_least_once` - The event will be delivered at least once and
 // could be delivered more than once.
+// * `exactly_once` - The event will be delivered exactly once.
 // * `best_effort` - We will make a best effort to deliver the event,
 // but the event is not guaranteed to be delivered.
-#DeliveryStatus: "at_least_once" | "best_effort"
+#DeliveryStatus: "at_least_once" | "exactly_once" | "best_effort"
 
 // `#DeploymentRoles` clarify when a component should be used under
 // certain deployment contexts.

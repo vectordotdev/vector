@@ -65,7 +65,7 @@ async fn topology_reuse_old_port() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
         .await
         .unwrap());
 }
@@ -90,7 +90,7 @@ async fn topology_rebuild_old() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     assert!(!topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
         .await
         .unwrap());
 }
@@ -107,7 +107,7 @@ async fn topology_old() {
 
     let (mut topology, _) = start_topology(old_config.clone().build().unwrap(), false).await;
     assert!(topology
-        .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(old_config.build().unwrap(), Default::default(), None)
         .await
         .unwrap());
 }
@@ -258,7 +258,7 @@ async fn topology_readd_input() {
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1"], prom_exporter_sink(address_0, 1));
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
         .await
         .unwrap());
 
@@ -268,7 +268,7 @@ async fn topology_readd_input() {
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1", "in2"], prom_exporter_sink(address_0, 1));
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
         .await
         .unwrap());
 
@@ -299,7 +299,7 @@ async fn reload_sink_test(
 
     // Now reload the topology with the "new" configuration, and make sure that a component is now listening on `new_address`.
     assert!(topology
-        .reload_config_and_respawn(new_config, Default::default())
+        .reload_config_and_respawn(new_config, Default::default(), None)
         .await
         .unwrap());
 

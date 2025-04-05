@@ -41,16 +41,21 @@ Providing this information upfront will facilitate a smoother review process. --
 - [ ] Yes. Please add a changelog fragment based on our [guidelines](https://github.com/vectordotdev/vector/blob/master/changelog.d/README.md).
 - [ ] No. A maintainer will apply the "no-changelog" label to this PR.
 
-## Checklist
-- [ ] Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
+## Notes
+- Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
+- Do not hesitate to use `@vectordotdev/vector` to reach out to us regarding this PR.
+- The CI checks run only after we manually approve them. To minimize round-trips see the following local checks:
   - `make check-all` is a good command to run locally. This check is
     defined [here](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454). Some of these
     checks might not be relevant to your PR. For Rust changes, at the very least you should run:
     - `cargo fmt --all`
     - `cargo clippy --workspace --all-targets -- -D warnings`
     - `cargo nextest run --workspace` (alternatively, you can run `cargo test --all`)
-- [ ] If this PR introduces changes Vector dependencies (modifies `Cargo.lock`), please
-  run `dd-rust-license-tool write` to regenerate the [license inventory](https://github.com/vectordotdev/vrl/blob/main/LICENSE-3rdparty.csv) and commit the changes (if any). More details [here](https://crates.io/crates/dd-rust-license-tool).
+- After a review is requested, please avoid force pushes to help us review incrementally.
+  - Feel free to push as many commits as you want. They will be squashed into one before merging.
+  - For example, you can run `git merge origin master` and `git push`.
+- If this PR introduces changes Vector dependencies (modifies `Cargo.lock`), please
+  run `cargo vdev build licenses` to regenerate the [license inventory](https://github.com/vectordotdev/vrl/blob/main/LICENSE-3rdparty.csv) and commit the changes (if any). More details [here](https://crates.io/crates/dd-rust-license-tool).
 
 ## References
 

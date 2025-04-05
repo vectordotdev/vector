@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap, fmt};
 use vector_lib::config::LegacyKey;
 
 use crate::{
@@ -12,24 +12,111 @@ use crate::{
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::lookup::OwnedTargetPath;
 
+/// Exists only for backwards compatability purposes so that the value of sample_rate_key is
+/// consistent after the internal implementation of the Sample class was modified to work in terms
+/// of percentages
+#[derive(Clone, Debug)]
+pub enum SampleMode {
+    Rate {
+        rate: u64,
+        counters: HashMap<Option<String>, u64>,
+    },
+    Ratio {
+        ratio: f64,
+        values: HashMap<Option<String>, f64>,
+        hash_ratio_threshold: u64,
+    },
+}
+
+impl SampleMode {
+    pub fn new_rate(rate: u64) -> Self {
+        Self::Rate {
+            rate,
+            counters: HashMap::default(),
+        }
+    }
+
+    pub fn new_ratio(ratio: f64) -> Self {
+        Self::Ratio {
+            ratio,
+            values: HashMap::default(),
+            // Supports the 'key_field' option, assuming an equal distribution of values for a given
+            // field, hashing its contents this component should output events according to the
+            // configured ratio.
+            //
+            // To do one option would be to convert the hash to a number between 0 and 1 and compare
+            // to the ratio. However to address issues with precision, here the ratio is scaled to
+            // meet the width of the type of the hash.
+            hash_ratio_threshold: (ratio * (u64::MAX as u128) as f64) as u64,
+        }
+    }
+
+    fn increment(&mut self, group_by_key: &Option<String>, value: &Option<Cow<'_, str>>) -> bool {
+        let threshold_exceeded = match self {
+            Self::Rate { rate, counters } => {
+                let counter_value = counters.entry(group_by_key.clone()).or_default();
+                let old_counter_value = *counter_value;
+                *counter_value += 1;
+                old_counter_value % *rate == 0
+            }
+            Self::Ratio { ratio, values, .. } => {
+                let value = values.entry(group_by_key.clone()).or_insert(1.0 - *ratio);
+                let increment: f64 = *value + *ratio;
+                *value = if increment >= 1.0 {
+                    increment - 1.0
+                } else {
+                    increment
+                };
+                increment >= 1.0
+            }
+        };
+        if let Some(value) = value {
+            self.hash_within_ratio(value.as_bytes())
+        } else {
+            threshold_exceeded
+        }
+    }
+
+    fn hash_within_ratio(&self, value: &[u8]) -> bool {
+        let hash = seahash::hash(value);
+        match self {
+            Self::Rate { rate, .. } => hash % rate == 0,
+            Self::Ratio {
+                hash_ratio_threshold,
+                ..
+            } => hash <= *hash_ratio_threshold,
+        }
+    }
+}
+
+impl fmt::Display for SampleMode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Avoids the print of an additional '.0' which was not performed in the previous
+        // implementation
+        match self {
+            Self::Rate { rate, .. } => write!(f, "{rate}"),
+            Self::Ratio { ratio, .. } => write!(f, "{ratio}"),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Sample {
     name: String,
-    rate: u64,
+    rate: SampleMode,
     key_field: Option<String>,
     group_by: Option<Template>,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
-    counter: HashMap<Option<String>, u64>,
 }
 
 impl Sample {
     // This function is dead code when the feature flag `transforms-impl-sample` is specified but not
     // `transforms-sample`.
     #![allow(dead_code)]
-    pub fn new(
+    pub const fn new(
         name: String,
-        rate: u64,
+        rate: SampleMode,
         key_field: Option<String>,
         group_by: Option<Template>,
         exclude: Option<Condition>,
@@ -42,7 +129,14 @@ impl Sample {
             group_by,
             exclude,
             sample_rate_key,
-            counter: HashMap::new(),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn ratio(&self) -> f64 {
+        match self.rate {
+            SampleMode::Rate { rate, .. } => 1.0f64 / rate as f64,
+            SampleMode::Ratio { ratio, .. } => ratio,
         }
     }
 }
@@ -104,19 +198,8 @@ impl FunctionTransform for Sample {
             Event::Metric(_) => panic!("component can never receive metric events"),
         });
 
-        let counter_value: u64 = *self.counter.entry(group_by_key.clone()).or_default();
-
-        let num = if let Some(value) = value {
-            seahash::hash(value.as_bytes())
-        } else {
-            counter_value
-        };
-
-        // reset counter for particular key, or default key if group_by option isn't provided
-        let increment: u64 = (counter_value + 1) % self.rate;
-        self.counter.insert(group_by_key.clone(), increment);
-
-        if num % self.rate == 0 {
+        let should_sample = self.rate.increment(&group_by_key, &value);
+        if should_sample {
             if let Some(path) = &self.sample_rate_key.path {
                 match event {
                     Event::Log(ref mut event) => {

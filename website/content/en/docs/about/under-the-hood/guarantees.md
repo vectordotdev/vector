@@ -103,6 +103,11 @@ if it meets the following criteria:
 The `beta` status means that a feature has not met the criteria outlined in the [stable](#stable)
 section and therefore should be used with caution in production environments.
 
+### Alpha
+
+The `alpha` status means that a feature is experimental—often incomplete and potentially unstable—
+and is provided for early testing and feedback rather than production use.
+
 ### Deprecated
 
 The `deprecated` status means that a feature will be removed in the next major version of Vector. We

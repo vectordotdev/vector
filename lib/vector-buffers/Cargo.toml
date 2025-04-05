@@ -13,7 +13,7 @@ async-recursion = "1.1.1"
 async-stream = "0.3.6"
 async-trait = { version = "0.1", default-features = false }
 bytecheck = { version = "0.6.9", default-features = false, features = ["std"] }
-bytes = { version = "1.10.0", default-features = false }
+bytes = { version = "1.10.1", default-features = false }
 crc32fast = { version = "1.4.2", default-features = false }
 crossbeam-queue = { version = "0.3.12", default-features = false, features = ["std"] }
 crossbeam-utils = { version = "0.8.21", default-features = false }
@@ -23,12 +23,12 @@ futures.workspace = true
 memmap2 = { version = "0.9.5", default-features = false }
 metrics.workspace = true
 num-traits = { version = "0.2.19", default-features = false }
-paste = "1.0.15"
+paste.workspace = true
 rkyv = { version = "0.7.45", default-features = false, features = ["size_32", "std", "strict", "validation"] }
 serde.workspace = true
 snafu.workspace = true
 tokio-util = { version = "0.7.0", default-features = false }
-tokio = { version = "1.43.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
+tokio = { version = "1.44.1", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tracing = { version = "0.1.34", default-features = false, features = ["attributes"] }
 vector-config = { path = "../vector-config", default-features = false }
 vector-common = { path = "../vector-common", default-features = false, features = ["byte_size_of"] }

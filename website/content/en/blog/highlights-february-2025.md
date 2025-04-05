@@ -33,7 +33,7 @@ We recently added a new guide category: [Development]({{< ref "guides/developer/
 
 ### Debugging Guide
 
-You can find the new [debugging guide here]({{< ref "guides/developer/debugging/debugging/" >}}). The goal of this guide is to serve as a
+You can find the new [debugging guide here]({{< ref "guides/developer/debugging/" >}}). The goal of this guide is to serve as a
 starting point for Vector users who are experiencing issues with their Vector configurations and deployments. In addition, it highlights
 debugging tools that Vector offers.
 

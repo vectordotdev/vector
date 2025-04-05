@@ -9,7 +9,7 @@ use crate::{
     event::{Event, LogEvent, TraceEvent},
     test_util::random_lines,
     transforms::sample::config::default_sample_rate_key,
-    transforms::sample::transform::Sample,
+    transforms::sample::transform::{Sample, SampleMode},
     transforms::test::transform_one,
 };
 use approx::assert_relative_eq;
@@ -22,7 +22,8 @@ use vrl::owned_value_path;
 async fn emits_internal_events() {
     assert_transform_compliance(async move {
         let config = SampleConfig {
-            rate: 1,
+            rate: None,
+            ratio: Some(1.0),
             key_field: None,
             group_by: None,
             exclude: None,
@@ -50,7 +51,7 @@ fn hash_samples_at_roughly_the_configured_rate() {
     let events = random_events(num_events);
     let mut sampler = Sample::new(
         "sample".to_string(),
-        2,
+        SampleMode::new_rate(2),
         log_schema().message_key().map(ToString::to_string),
         None,
         Some(condition_contains(
@@ -67,14 +68,13 @@ fn hash_samples_at_roughly_the_configured_rate() {
             buf.into_events().next()
         })
         .count();
-    let ideal = 1.0f64 / 2.0f64;
     let actual = total_passed as f64 / num_events as f64;
-    assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
+    assert_relative_eq!(sampler.ratio(), actual, epsilon = 0.03);
 
     let events = random_events(num_events);
     let mut sampler = Sample::new(
         "sample".to_string(),
-        25,
+        SampleMode::new_ratio(0.04),
         log_schema().message_key().map(ToString::to_string),
         None,
         Some(condition_contains(
@@ -91,9 +91,8 @@ fn hash_samples_at_roughly_the_configured_rate() {
             buf.into_events().next()
         })
         .count();
-    let ideal = 1.0f64 / 25.0f64;
     let actual = total_passed as f64 / num_events as f64;
-    assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
+    assert_relative_eq!(sampler.ratio(), actual, epsilon = 0.03);
 }
 
 #[test]
@@ -101,7 +100,7 @@ fn hash_consistently_samples_the_same_events() {
     let events = random_events(1000);
     let mut sampler = Sample::new(
         "sample".to_string(),
-        2,
+        SampleMode::new_rate(2),
         log_schema().message_key().map(ToString::to_string),
         None,
         Some(condition_contains(
@@ -138,7 +137,7 @@ fn always_passes_events_matching_pass_list() {
         let event = Event::Log(LogEvent::from("i am important"));
         let mut sampler = Sample::new(
             "sample".to_string(),
-            0,
+            SampleMode::new_rate(0),
             key_field.clone(),
             None,
             Some(condition_contains(
@@ -165,7 +164,7 @@ fn handles_group_by() {
         log.insert("other_field", "foo");
         let mut sampler = Sample::new(
             "sample".to_string(),
-            0,
+            SampleMode::new_rate(0),
             log_schema().message_key().map(ToString::to_string),
             group_by.clone(),
             Some(condition_contains(
@@ -192,7 +191,7 @@ fn handles_key_field() {
         log.insert("other_field", "foo");
         let mut sampler = Sample::new(
             "sample".to_string(),
-            0,
+            SampleMode::new_ratio(0.0),
             key_field.clone(),
             None,
             Some(condition_contains("other_field", "foo")),
@@ -215,7 +214,7 @@ fn sampler_adds_sampling_rate_to_event() {
         let message_key = log_schema().message_key().unwrap().to_string();
         let mut sampler = Sample::new(
             "sample".to_string(),
-            10,
+            SampleMode::new_ratio(0.1),
             key_field.clone(),
             None,
             Some(condition_contains(&message_key, "na")),
@@ -226,12 +225,12 @@ fn sampler_adds_sampling_rate_to_event() {
             .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
             .find_map(|event| transform_one(&mut sampler, event))
             .unwrap();
-        assert_eq!(passing.as_log()["sample_rate"], "10".into());
+        assert_eq!(passing.as_log()["sample_rate"], "0.1".into());
 
         let events = random_events(10000);
         let mut sampler = Sample::new(
             "sample".to_string(),
-            25,
+            SampleMode::new_rate(25),
             key_field.clone(),
             None,
             Some(condition_contains(&message_key, "na")),
@@ -248,7 +247,7 @@ fn sampler_adds_sampling_rate_to_event() {
         let events = random_events(10000);
         let mut sampler = Sample::new(
             "sample".to_string(),
-            50,
+            SampleMode::new_rate(2),
             key_field.clone(),
             None,
             Some(condition_contains(&message_key, "na")),
@@ -264,7 +263,7 @@ fn sampler_adds_sampling_rate_to_event() {
         // If the event passed the regex check, don't include the sampling rate
         let mut sampler = Sample::new(
             "sample".to_string(),
-            25,
+            SampleMode::new_ratio(0.04),
             key_field.clone(),
             None,
             Some(condition_contains(&message_key, "na")),
@@ -283,7 +282,7 @@ fn handles_trace_event() {
 
     let mut sampler = Sample::new(
         "sample".to_string(),
-        2,
+        SampleMode::new_rate(2),
         None,
         None,
         None,
@@ -295,6 +294,32 @@ fn handles_trace_event() {
         .filter_map(|_| transform_one(&mut sampler, trace.clone()))
         .count();
     assert_eq!(total_passed, 1);
+}
+
+#[test]
+fn sample_at_rates_higher_then_half() {
+    // Retain 80% of the events of the stream
+    let events = random_events(10000);
+    let ratios = vec![0.8, 0.7, 0.9, 0.672];
+    for ratio in ratios {
+        let mut sampler = Sample::new(
+            "sample".to_string(),
+            SampleMode::new_ratio(ratio),
+            None,
+            None,
+            None,
+            default_sample_rate_key(),
+        );
+        let total_observed = events
+            .iter()
+            .filter_map(|event| {
+                let mut buf = OutputBuffer::with_capacity(1);
+                sampler.transform(&mut buf, event.clone());
+                buf.into_events().next()
+            })
+            .count();
+        assert_eq!(total_observed as f64, 10000.0 * sampler.ratio());
+    }
 }
 
 fn condition_contains(key: &str, needle: &str) -> Condition {

@@ -78,7 +78,6 @@ bytesize
 califrag
 califragilistic
 CAROOT
-cbor
 cddl
 cdylib
 cef
@@ -256,7 +255,6 @@ hostpath
 hoverable
 hoverbear
 httpdeliveryrequestresponse
-httpdump
 httpevent
 hugepages
 hugops
@@ -467,6 +465,7 @@ rcode
 rdkafka
 rdparty
 readnone
+recordset
 rediss
 redoctober
 regexes
@@ -541,6 +540,7 @@ spencergilbert
 spinlock
 SPOF
 spog
+sqlx
 srcaddr
 srcport
 SREs
@@ -592,6 +592,7 @@ threatmanager
 Throughputs
 Tiltfile
 timberio
+TIMESTAMPTZ
 TKEY
 tlh
 tmpfs
@@ -672,7 +673,6 @@ wtimeout
 WTS
 xact
 xlarge
-XMODEM
 xxs
 YAMLs
 YBv

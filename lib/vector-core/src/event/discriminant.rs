@@ -1,3 +1,4 @@
+use std::fmt;
 use std::hash::{Hash, Hasher};
 
 use super::{LogEvent, ObjectMap, Value};
@@ -156,6 +157,22 @@ fn hash_map<H: Hasher>(hasher: &mut H, map: &ObjectMap) {
 
 fn hash_null<H: Hasher>(hasher: &mut H) {
     hasher.write_u8(0);
+}
+
+impl fmt::Display for Discriminant {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        for (i, value) in self.values.iter().enumerate() {
+            if i != 0 {
+                write!(fmt, "-")?;
+            }
+            if let Some(value) = value {
+                value.fmt(fmt)?;
+            } else {
+                fmt.write_str("none")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -364,5 +381,22 @@ mod tests {
         assert_eq!(process_event(event_stream_1), 2);
         assert_eq!(process_event(event_stream_2), 2);
         assert_eq!(process_event(event_stream_3), 2);
+    }
+
+    #[test]
+    fn test_display() {
+        let mut event = LogEvent::default();
+        event.insert("hostname", "localhost");
+        event.insert("container_id", 1);
+
+        let discriminant = Discriminant::from_log_event(
+            &event,
+            &["hostname".to_string(), "container_id".to_string()],
+        );
+        assert_eq!(format!("{discriminant}"), "\"localhost\"-1");
+
+        let discriminant =
+            Discriminant::from_log_event(&event, &["hostname".to_string(), "service".to_string()]);
+        assert_eq!(format!("{discriminant}"), "\"localhost\"-none");
     }
 }

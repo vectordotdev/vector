@@ -5,7 +5,7 @@ description: Step by step guide for debugging pipelines
 tags: [ "dev", "debugging", "guides", "guide" ]
 author_github: https://github.com/pront
 domain: dev
-aliases: [ "/docs/guides/developer/debugging.md" ]
+aliases: [ "/docs/guides/developer/debugging/debugging" ]
 weight: 1
 ---
 
@@ -464,6 +464,12 @@ sinks:
 
 </details>
 
+You can run the config with the following command:
+
+```shell
+vector --config path/to/config.yaml
+```
+
 ##### Description
 
 Note that we added a new source:
@@ -541,9 +547,10 @@ sinks:
     compression: gzip
 ```
 
-However, our downstream component can only de-compress `zlib` payloads.
+{{< warning >}}
+However, our downstream component can only de-compress `zlib` payloads. We now observe the following metrics:
+{{< /warning >}}
 
-We now observe the following metrics:
 
 ```json
 {
@@ -610,7 +617,11 @@ Shortly after, observe this new Vector log:
 2025-02-12T19:10:54.562556Z  WARN sink{component_kind="sink" component_id=sink_0 component_type=http}:request{request_id=19}: vector::sinks::util::retries: Retrying after response. reason=too many requests internal_log_rate_limit=true
 ```
 
-The `component_sent_events_total` metrics for `sinks_0` is not increasing anymore. And also, we can now see `429` in the response status:
+{{< warning >}}
+The `component_sent_events_total` metric for `sinks_0` has stopped increasing, and we are observing a 429 response status code.
+{{< /warning >}}
+
+A sample metric demonstrating this:
 
 ```json
 {
@@ -665,8 +676,17 @@ Notice how the `component_sent_events_total` metrics for `sinks_0` is now increa
 
 #### Scenario 3 - Smaller Batching
 
-For this scenario, let's assume our downstream server has a strict limit on the maximum payload size. Also, assume Vector sets the maximum
-batch to 10MB. Note: always refer to the docs for as the source of truth for this value.
+For this scenario, we will introduce a new limitation imposed by the server.
+
+{{< warning >}}
+Our downstream server enforces a strict limit on the maximum payload size. Payloads larger than 8192 bytes will be rejected.
+{{< /warning >}}
+
+Also, assume Vector sets the maximum batch size to 10MB.
+
+{{< info >}}
+Always refer to the documentation as the source of truth for this value.
+{{< /info >}}
 
 ```text
 📥 Received POST request:
@@ -741,7 +761,7 @@ transforms:
   transform_0:
     type: remap
     inputs:
-      - source_0
+      - source_*
     source: |
       . = parse_json!(.message)
       if .key == "a" {
@@ -778,3 +798,192 @@ sinks:
 
 Now that we have a final configuration, we can also write
 [Vector configuration unit tests]({{< ref "/docs/reference/configuration/unit-tests/" >}}).
+
+### Visualizing and querying internal metrics
+
+#### Datadog Metrics
+
+It is surprisingly simple to integrate Vector with the [Datadog Metrics Explorer](https://docs.datadoghq.com/metrics/explorer/).
+
+##### Step 1: Update the Vector config
+
+```yaml
+sinks:
+  sink_2:
+    datadog_metrics:
+      type: datadog_metrics
+      inputs: ["internal_metrics"]
+      api_key: "${DATADOG_API_KEY}"
+```
+
+##### Step 2: Navigate to the Datadog metrics explorer
+
+* https://app.datadoghq.com/metric/explorer
+* Use the UI to search for Vector metrics.
+  * Sample query: `sum:vector.component_sent_event_bytes_total{host:foo}.as_count()`
+
+<img src="/img/guides/dd-metrics-vector-errors-visualization.png"  alt="dd-metrics" width="800"/>
+
+{{< info >}}
+If you are investigating an issue, you can create a [notebook](https://app.datadoghq.com/notebook/list)
+with and add multiple queries for a bird's-eye view of the system.
+{{< /info >}}
+
+#### Prometheus and Grafana
+
+We will use Docker Compose to start a Vector, Prometheus and Grafana instance.
+
+##### Step 1: Update your Vector config
+
+```yaml
+sinks:
+  sink_2:
+    type: prometheus_exporter
+    inputs:
+      - internal_metrics
+    address: 0.0.0.0:9598
+```
+
+<details>
+  <summary> 👉 Click to view the whole config 👈</summary>
+
+```yaml
+# Vector config - version 4
+api:
+  enabled: true
+
+sources:
+  source_0:
+    type: demo_logs
+    format: shuffle
+    lines:
+      - '{ "key": "a", "property": "foo" }'
+      - '{ "key": "b", "property": "bar" }'
+    interval: 10
+
+  source_1:
+    type: demo_logs
+    format: shuffle
+    lines:
+      - '{ "key": "c", "property": "some" }'
+      - '{ "key": "d", "property": "another" }'
+    interval: 10
+
+  internal_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 10
+
+transforms:
+  transform_0:
+    type: remap
+    inputs:
+      - source_*
+    source: |
+      . = parse_json!(.message)
+      if .key == "a" {
+        .group = 0
+      } else {
+        .group = 1
+      }
+
+sinks:
+  sink_0:
+    inputs:
+      - transform_0
+    type: http
+    uri: http://host.docker.internal:8000/logs
+    encoding:
+      codec: json
+      json:
+        pretty: true
+    compression: zlib
+    batch:
+      max_events: 4
+
+  sink_1:
+    type: console
+    inputs:
+      - internal_metrics
+    encoding:
+      codec: json
+      json:
+        pretty: true
+
+  sink_2:
+    type: prometheus_exporter
+    inputs:
+      - internal_metrics
+    address: 0.0.0.0:9598
+```
+
+</details>
+
+##### Step 2: Prometheus configuration
+
+```yaml
+# prometheus config
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "vector"
+    static_configs:
+      - targets: ["host.docker.internal:9598"]
+```
+
+##### Step 3: Docker Compose configuration
+
+Use the following template and replace with the actual paths:
+
+```yaml
+# docker-compose.yaml
+services:
+  vector:
+    image: timberio/vector:0.45.0-debian
+    container_name: vector
+    ports:
+      - "9598:9598"
+    volumes:
+      - <path to Vector config here>:/etc/vector/vector.yaml
+    networks:
+      - vector-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - - <path to Prometheus config here>:/etc/prometheus/prometheus.yml
+    networks:
+      - vector-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - vector-net
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+
+networks:
+  vector-net:
+    driver: bridge
+```
+
+##### Step 4: Setup Grafana
+
+1. Login to Grafana with username `admin` and password `admin`
+2. Navigate to [connections/datasources/](http://localhost:3000/connections/datasources/)
+3. Add the Prometheus datasource with the following URL: `http://host.docker.internal:9090`. If you are having trouble with this step, please [read this guide](https://grafana.com/docs/grafana/latest/getting-started/get-started-grafana-prometheus/).
+4. Create a Grafana dashboard
+    * All Vector internal metrics with have the `vector_` prefix
+    * For example, you can visualize `vector_component_errors_total` and `vector_component_discarded_events_total`.
+    * You can take it further and alert with `increase(vector_component_discarded_events_total[5m])`
+
+Note that this guide is meant as a starting point. I recommend saving your Grafana datasources and
+dashboards and including them as volumes in your `docker-compose.yaml`.

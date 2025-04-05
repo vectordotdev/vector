@@ -86,7 +86,7 @@ impl<T: AsRef<OsStr>> ChainArgs for [T] {
     }
 }
 
-pub fn run_command(cmd: &str) {
+pub fn run_command(cmd: &str) -> String {
     let output = Command::new("sh")
         .arg("-c")
         .arg(cmd)
@@ -100,4 +100,6 @@ pub fn run_command(cmd: &str) {
         );
         process::exit(1);
     }
+
+    String::from_utf8_lossy(&output.stdout).to_string()
 }

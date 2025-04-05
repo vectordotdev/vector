@@ -8,3 +8,4 @@ resources:
   - daemonset.yaml
   - rbac.yaml
   - serviceaccount.yaml
+  - service-headless.yaml

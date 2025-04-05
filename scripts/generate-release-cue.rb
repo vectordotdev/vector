@@ -14,21 +14,55 @@
 
 require "json"
 require "time"
+require "optparse"
+require 'pathname'
 require_relative "util/commit"
 require_relative "util/git_log_commit"
 require_relative "util/printer"
 require_relative "util/release"
 require_relative "util/version"
 
+# Function to find the repository root by looking for .git directory
+def find_repo_root
+  # Get the absolute path of the current script
+  script_path = File.expand_path(__FILE__)
+  dir = Pathname.new(script_path).dirname
+
+  # Walk up the directory tree until we find .git or reach the filesystem root
+  loop do
+    return dir.to_s if File.exist?(File.join(dir, '.git'))
+    parent = dir.parent
+    raise "Could not find repository root (no .git directory found)" if parent == dir # Reached filesystem root
+    dir = parent
+  end
+end
+
 #
 # Constants
 #
 
-ROOT = ".."
+ROOT = find_repo_root
 RELEASE_REFERENCE_DIR = File.join(ROOT, "website", "cue", "reference", "releases")
 CHANGELOG_DIR = File.join(ROOT, "changelog.d")
 TYPES = ["chore", "docs", "feat", "fix", "enhancement", "perf"]
 TYPES_THAT_REQUIRE_SCOPES = ["feat", "enhancement", "fix"]
+
+# Parse command-line options
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: #{File.basename(__FILE__)} [options]"
+
+  opts.on("--new-version VERSION", "Specify the new version (e.g., 1.2.3)") do |v|
+    options[:new_version] = v
+  end
+  opts.on("--[no-]interactive", "Enable/disable interactive prompts (default: true)") do |i|
+    options[:interactive] = i
+  end
+  opts.on_tail("-h", "--help", "Show this help message") do
+    puts opts
+    exit
+  end
+end.parse!
 
 #
 # Functions
@@ -43,66 +77,60 @@ TYPES_THAT_REQUIRE_SCOPES = ["feat", "enhancement", "fix"]
 # This file is created from outstanding commits since the last release.
 # It's meant to be a starting point. The resulting file should be reviewed
 # and edited by a human before being turned into a cue file.
-def create_log_file!(current_commits, new_version)
+def create_log_file!(current_commits, new_version, interactive)
   release_log_path = "#{RELEASE_REFERENCE_DIR}/#{new_version}.log"
 
   # Grab all existing commits
   existing_commits = get_existing_commits!
 
-  # Ensure this release does not include duplicate commits. Notice that we
-  # check the parsed PR numbers. This is necessary to ensure we do not include
-  # cherry-picked commits made available in other releases.
-  #
-  # For example, if we cherry pick a commit from `master` to the `0.8` branch
-  # it will have a different commit sha. Without checking something besides the
-  # sha, this commit would also show up in the next release.
-  new_commits =
-    current_commits.select do |current_commit|
-      !existing_commits.any? do |existing_commit|
-        existing_commit.eql?(current_commit)
-      end
-    end
+  # Filter out duplicate commits
+  new_commits = current_commits.select do |current_commit|
+    !existing_commits.any? { |existing_commit| existing_commit.eql?(current_commit) }
+  end
 
   new_commit_lines = new_commits.collect { |c| c.to_git_log_commit.to_raw }.join("\n")
 
   if new_commits.any?
     if File.exists?(release_log_path)
-      words =
-        <<~EOF
-        I found #{new_commits.length} new commits since you last ran this
-        command. So that I don't erase any other work in that file, please
-        manually add the following commit lines:
+      if interactive
+        words = <<~EOF
+          I found #{new_commits.length} new commits since you last ran this
+          command. So that I don't erase any other work in that file, please
+          manually add the following commit lines:
 
-            #{new_commit_lines.split("\n").collect { |line| "    #{line}" }.join("\n")}
+              #{new_commit_lines.split("\n").collect { |line| "    #{line}" }.join("\n")}
 
-        To:
+          To:
 
-            #{release_log_path}
+              #{release_log_path}
 
-        All done? Ready to proceed?
+          All done? Ready to proceed?
         EOF
 
-      if Util::Printer.get(words, ["y", "n"]) == "n"
-        Util::Printer.error!("Ok, re-run this command when you're ready.")
+        if Util::Printer.get(words, ["y", "n"]) == "n"
+          Util::Printer.error!("Ok, re-run this command when you're ready.")
+        end
       end
     else
       File.open(release_log_path, 'w+') do |file|
         file.write(new_commit_lines)
       end
 
-      words =
-        <<~EOF
-        I've created a release log file here:
+      puts interactive
+      if interactive
+        words = <<~EOF
+          I've created a release log file here:
 
-            #{release_log_path}
+              #{release_log_path}
 
-        Please review the commits and *adjust the commit messages as necessary*.
+          Please review the commits and *adjust the commit messages as necessary*.
 
-        All done? Ready to proceed?
+          All done? Ready to proceed?
         EOF
 
-      if Util::Printer.get(words, ["y", "n"]) == "n"
-        Util::Printer.error!("Ok, re-run this command when you're ready.")
+        if Util::Printer.get(words, ["y", "n"]) == "n"
+          Util::Printer.error!("Ok, re-run this command when you're ready.")
+        end
       end
     end
   end
@@ -391,16 +419,32 @@ end
 #
 # Execute
 #
-
-Dir.chdir "scripts"
+script_dir = File.expand_path(File.dirname(__FILE__))
+Dir.chdir script_dir
 
 Util::Printer.title("Creating release meta file...")
 
 last_tag = `git describe --tags $(git rev-list --tags --max-count=1)`.chomp
 last_version = Util::Version.new(last_tag.gsub(/^v/, ''))
 current_commits = get_commits_since(last_version)
-new_version = get_new_version(last_version, current_commits)
-log_file_path = create_log_file!(current_commits, new_version)
+
+new_version_string = options[:new_version]
+if new_version_string
+  begin
+    new_version = Util::Version.new(new_version_string)
+    if last_version.bump_type(new_version).nil?
+      Util::Printer.error!("The specified version '#{new_version_string}' must be a single patch, minor, or major bump from #{last_version}")
+      exit 1
+    end
+  rescue ArgumentError => e
+    Util::Printer.error!("Invalid version specified: #{e.message}")
+    exit 1
+  end
+else
+  new_version = get_new_version(last_version, current_commits)
+end
+
+log_file_path = create_log_file!(current_commits, new_version, options[":interactive"])
 create_release_file!(new_version)
 File.delete(log_file_path)
 
