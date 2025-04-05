@@ -44,6 +44,7 @@ pub struct LogApiRequest {
     pub finalizers: EventFinalizers,
     pub uncompressed_size: usize,
     pub metadata: RequestMetadata,
+    pub conforms: bool,
 }
 
 impl Finalizable for LogApiRequest {
@@ -141,6 +142,18 @@ impl Service<LogApiRequest> for LogApiService {
 
         let http_request = if let Some(ce) = request.compression.content_encoding() {
             http_request.header(CONTENT_ENCODING, ce)
+        } else {
+            http_request
+        };
+
+        // Apply the following HTTP header if the agent reserved attributes were not removed. This
+        // effectively lets the backend know that the payload is nested within the 'message' field
+        // therefore allowing the UI act on the fields within the payload not the ones applied by
+        // the agent. Without applying this header the 'status' field appended by the agent would
+        // take precdence, ignoring any status or level that the original event had contained, the
+        // result being all logs appear as info regardless of their intended level.
+        let http_request = if request.conforms {
+            http_request.header("DD-PROTOCOL", "agent-json")
         } else {
             http_request
         };
