@@ -7,14 +7,16 @@ use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     event::{Event, LogEvent, TraceEvent},
 };
-use vrl::value::KeyString;
 use vrl::{
     event_path,
-    value::{ObjectMap, Value},
+    value::{KeyString, ObjectMap, Value},
 };
 
 use super::proto::{
-    common::v1::{any_value::Value as PBValue, InstrumentationScope, KeyValue},
+    common::v1::{
+        any_value::Value as PBValue, AnyValue, ArrayValue, InstrumentationScope, KeyValue,
+        KeyValueList,
+    },
     logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
     resource::v1::Resource,
     trace::v1::{
@@ -75,6 +77,32 @@ impl ResourceSpans {
     }
 }
 
+impl From<Value> for AnyValue {
+    fn from(value: Value) -> Self {
+        let v = match value {
+            Value::Null => return AnyValue { value: None },
+            Value::Boolean(b) => PBValue::BoolValue(b),
+            Value::Integer(i) => PBValue::IntValue(i),
+            Value::Float(f) => PBValue::DoubleValue(f.into()),
+            Value::Regex(r) => PBValue::StringValue(r.as_str().to_string()),
+            Value::Timestamp(t) => PBValue::StringValue(t.to_string()),
+            Value::Bytes(bytes) => PBValue::BytesValue(bytes.into()),
+            Value::Object(obj) => PBValue::KvlistValue(obj.into()),
+            Value::Array(arr) => PBValue::ArrayValue(arr.into()),
+        };
+
+        AnyValue { value: Some(v) }
+    }
+}
+
+impl From<Vec<Value>> for ArrayValue {
+    fn from(values: Vec<Value>) -> Self {
+        ArrayValue {
+            values: values.into_iter().map(|v| v.into()).collect(),
+        }
+    }
+}
+
 impl From<PBValue> for Value {
     fn from(av: PBValue) -> Self {
         match av {
@@ -118,6 +146,35 @@ fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
             })
             .collect::<ObjectMap>(),
     )
+}
+
+impl From<KeyValueList> for Vec<KeyValue> {
+    fn from(value: KeyValueList) -> Self {
+        value.values
+    }
+}
+
+impl From<ObjectMap> for KeyValueList {
+    fn from(value: ObjectMap) -> Self {
+        let v = value
+            .into_iter()
+            .map(|(k, v)| KeyValue {
+                key: k.to_string(),
+                value: Some(v.into()),
+            })
+            .collect();
+        KeyValueList { values: v }
+    }
+}
+
+impl TryFrom<Value> for KeyValueList {
+    type Error = &'static str;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Object(map) => Ok(map.into()),
+            _ => Err("Invalid Value type for KeyValueList"),
+        }
+    }
 }
 
 fn to_hex(d: &[u8]) -> String {
