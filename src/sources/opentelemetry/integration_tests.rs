@@ -1,9 +1,9 @@
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use itertools::Itertools;
 use serde_json::json;
 
-use super::{LOGS, TRACES};
+use super::{LOGS, METRICS, TRACES};
 use crate::{
     config::{log_schema, SourceConfig, SourceContext},
     event::EventStatus,
@@ -15,12 +15,17 @@ use crate::{
 };
 use prost::Message;
 
+use super::{tests::new_source, GrpcConfig, HttpConfig, OpentelemetryConfig};
 use vector_lib::opentelemetry::proto::{
-    collector::trace::v1::ExportTraceServiceRequest,
+    collector::{metrics::v1::ExportMetricsServiceRequest, trace::v1::ExportTraceServiceRequest},
+    common::v1::{any_value::Value::StringValue, AnyValue, InstrumentationScope, KeyValue},
+    metrics::v1::{
+        metric::Data, number_data_point::Value, Gauge, Metric, NumberDataPoint, ResourceMetrics,
+        ScopeMetrics,
+    },
+    resource::v1::Resource,
     trace::v1::{ResourceSpans, ScopeSpans, Span},
 };
-
-use super::{tests::new_source, GrpcConfig, HttpConfig, OpentelemetryConfig};
 
 fn otel_health_url() -> String {
     std::env::var("OTEL_HEALTH_URL").unwrap_or_else(|_| "http://0.0.0.0:13133".to_owned())
@@ -177,6 +182,108 @@ async fn receive_trace() {
         // The Opentelemetry Collector is configured to send to both the gRPC and HTTP endpoints
         // so we should expect to collect two events from the single log sent.
         let events = collect_n(trace_output, 2).await;
+        assert_eq!(events.len(), 2);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn receive_metric() {
+    // generate a metrics gauge request
+    let req = ExportMetricsServiceRequest {
+        resource_metrics: vec![ResourceMetrics {
+            resource: Some(Resource {
+                attributes: vec![KeyValue {
+                    key: "service.name".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(StringValue("vector-collector".to_string())),
+                    }),
+                }],
+                dropped_attributes_count: 0,
+            }),
+            schema_url: "".to_string(),
+            scope_metrics: vec![ScopeMetrics {
+                scope: Some(InstrumentationScope {
+                    name: "vector-collector-instrumentation".to_string(),
+                    version: "0.111.0".to_string(),
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                }),
+                schema_url: "".to_string(),
+                metrics: vec![Metric {
+                    name: "some.random.metric".to_string(),
+                    description: "Some random metric we use for test".to_string(),
+                    unit: "1".to_string(),
+                    data: Some(Data::Gauge(Gauge {
+                        data_points: vec![NumberDataPoint {
+                            attributes: vec![
+                                KeyValue {
+                                    key: "host".to_string(),
+                                    value: Some(AnyValue {
+                                        value: Some(StringValue("localhost".to_string())),
+                                    }),
+                                },
+                                KeyValue {
+                                    key: "service".to_string(),
+                                    value: Some(AnyValue {
+                                        value: Some(StringValue("vector-collector".to_string())),
+                                    }),
+                                },
+                            ],
+                            start_time_unix_nano: 0,
+                            time_unix_nano: SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_nanos() as u64,
+                            value: Some(Value::AsDouble(42.0)),
+                            exemplars: vec![],
+                            flags: 0,
+                        }],
+                    })),
+                }],
+            }],
+        }],
+    };
+
+    let body = req.encode_to_vec();
+
+    assert_source_compliance(&SOURCE_TAGS, async {
+        wait_ready(otel_health_url()).await;
+
+        let config = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: source_grpc_address().parse().unwrap(),
+                tls: Default::default(),
+            },
+            http: HttpConfig {
+                address: source_http_address().parse().unwrap(),
+                tls: Default::default(),
+                keepalive: Default::default(),
+                headers: vec![],
+            },
+            acknowledgements: Default::default(),
+            log_namespace: Default::default(),
+        };
+
+        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
+        let server = config
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        wait_for_tcp(source_grpc_address()).await;
+        wait_for_tcp(source_http_address()).await;
+
+        let client = reqwest::Client::new();
+        let _res = client
+            .post(format!("{}/v1/metrics", otel_otlp_url()))
+            .header(reqwest::header::CONTENT_TYPE, "application/x-protobuf")
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to send metrics to Opentelemetry Collector.");
+
+        let events = collect_n(metrics_output, 2).await;
         assert_eq!(events.len(), 2);
     })
     .await;

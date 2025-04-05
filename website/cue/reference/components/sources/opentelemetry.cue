@@ -39,11 +39,7 @@ components: sources: opentelemetry: {
 
 	support: {
 		requirements: []
-		warnings: [
-			"""
-				The `opentelemetry` source only supports log and trace events at this time.
-				""",
-		]
+		warnings: []
 		notices: []
 	}
 
@@ -64,6 +60,12 @@ components: sources: opentelemetry: {
 			name: "traces"
 			description: """
 				Received trace events will go to this output stream. Use `<component_id>.traces` as an input to downstream transforms and sinks.
+				"""
+		},
+		{
+			name: "metrics"
+			description: """
+				Received metric events will go to this output stream. Use `<component_id>.metrics` as an input to downstream transforms and sinks.
 				"""
 		},
 	]
@@ -254,6 +256,18 @@ components: sources: opentelemetry: {
 			title: "Ingest OTLP traces"
 			body: """
 				Trace support is experimental and subject to change as Vector has no strongly-typed structure for traces internally. Instead traces are stored as a key/value map similar to logs. This may change in the future to be a structured format.
+				"""
+		}
+		metrics: {
+			title: "Ingest metrics"
+			body: """
+				Metrics support is experimental and subject to change due to the differences in metrics structure between internal Vector metric DataModel and OpenTelemetry.
+				The current mapping behavior is as follows:
+				Gauge is mapped to a Vector Gauge with `MetricKind::Absolute`;
+				Sum is mapped to a Vector Counter(if `is_monotonic` is true, it uses `MetricKind::Incremental`, otherwise, it uses `MetricKind::Absolute`);
+				Histogram is mapped to a Vector AggregatedHistogram;
+				Exponential Histogram is also mapped to a Vector AggregatedHistogram, bucket boundaries are reconstructed from the exponential scale;
+				Summary is mapped to a Vector Aggregated Summary.
 				"""
 		}
 	}
