@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
 use snafu::Snafu;
+use std::collections::HashSet;
 use tokio::{runtime::Runtime, sync::broadcast};
 use tokio_stream::{Stream, StreamExt};
 
@@ -15,7 +16,7 @@ pub type SignalRx = broadcast::Receiver<SignalTo>;
 #[allow(clippy::large_enum_variant)] // discovered during Rust upgrade to 1.57; just allowing for now since we did previously
 pub enum SignalTo {
     /// Signal to reload given components.
-    ReloadComponents(Vec<ComponentKey>),
+    ReloadComponents(HashSet<ComponentKey>),
     /// Signal to reload config from a string.
     ReloadFromConfigBuilder(ConfigBuilder),
     /// Signal to reload config from the filesystem.
