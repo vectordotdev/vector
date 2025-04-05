@@ -167,16 +167,16 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
             let ping = warp::get().and(warp::path("ping")).map(|| "pong");
             let routes = svc.or(ping).recover(|r: Rejection| async move {
-                if let Some(e_msg) = r.find::<ErrorMessage>() {
+                match r.find::<ErrorMessage>() { Some(e_msg) => {
                     let json = warp::reply::json(e_msg);
                     Ok(warp::reply::with_status(json, e_msg.status_code()))
-                } else {
+                } _ => {
                     //other internal error - will return 500 internal server error
                     emit!(HttpInternalError {
                         message: &format!("Internal error: {:?}", r)
                     });
                     Err(r)
-                }
+                }}
             });
 
             let span = Span::current();

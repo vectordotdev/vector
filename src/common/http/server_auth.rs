@@ -197,7 +197,7 @@ impl HttpServerAuthMatcher {
     pub fn handle_auth(&self, headers: &HeaderMap<HeaderValue>) -> Result<(), ErrorMessage> {
         match self {
             HttpServerAuthMatcher::AuthHeader(expected, err_message) => {
-                if let Some(header) = headers.get(AUTHORIZATION) {
+                match headers.get(AUTHORIZATION) { Some(header) => {
                     if expected == header {
                         Ok(())
                     } else {
@@ -206,12 +206,12 @@ impl HttpServerAuthMatcher {
                             err_message.to_string(),
                         ))
                     }
-                } else {
+                } _ => {
                     Err(ErrorMessage::new(
                         StatusCode::UNAUTHORIZED,
                         "No authorization header".to_owned(),
                     ))
-                }
+                }}
             }
             HttpServerAuthMatcher::Vrl { program } => self.handle_vrl_auth(headers, program),
         }

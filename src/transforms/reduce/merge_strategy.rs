@@ -128,18 +128,18 @@ impl ConcatMerger {
 
 impl ReduceValueMerger for ConcatMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
-        if let Value::Bytes(b) = v {
+        match v { Value::Bytes(b) => {
             if let Some(buf) = self.join_by.as_ref() {
                 self.v.extend(&buf[..]);
             }
             self.v.extend_from_slice(&b);
             Ok(())
-        } else {
+        } _ => {
             Err(format!(
                 "expected string value, found: '{}'",
                 v.to_string_lossy()
             ))
-        }
+        }}
     }
 
     fn insert_into(
@@ -165,11 +165,11 @@ impl ConcatArrayMerger {
 
 impl ReduceValueMerger for ConcatArrayMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
-        if let Value::Array(a) = v {
+        match v { Value::Array(a) => {
             self.v.extend_from_slice(&a);
-        } else {
+        } _ => {
             self.v.push(v);
-        }
+        }}
         Ok(())
     }
 
@@ -223,17 +223,17 @@ impl LongestArrayMerger {
 
 impl ReduceValueMerger for LongestArrayMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
-        if let Value::Array(a) = v {
+        match v { Value::Array(a) => {
             if a.len() > self.v.len() {
                 self.v = a;
             }
             Ok(())
-        } else {
+        } _ => {
             Err(format!(
                 "expected array value, found: '{}'",
                 v.to_string_lossy()
             ))
-        }
+        }}
     }
 
     fn insert_into(
@@ -259,17 +259,17 @@ impl ShortestArrayMerger {
 
 impl ReduceValueMerger for ShortestArrayMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
-        if let Value::Array(a) = v {
+        match v { Value::Array(a) => {
             if a.len() < self.v.len() {
                 self.v = a;
             }
             Ok(())
-        } else {
+        } _ => {
             Err(format!(
                 "expected array value, found: '{}'",
                 v.to_string_lossy()
             ))
-        }
+        }}
     }
 
     fn insert_into(
@@ -348,14 +348,14 @@ impl TimestampWindowMerger {
 
 impl ReduceValueMerger for TimestampWindowMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
-        if let Value::Timestamp(ts) = v {
+        match v { Value::Timestamp(ts) => {
             self.latest = ts
-        } else {
+        } _ => {
             return Err(format!(
                 "expected timestamp value, found: {}",
                 v.to_string_lossy()
             ));
-        }
+        }}
         Ok(())
     }
 
@@ -887,39 +887,39 @@ mod test {
         );
 
         let v = merge(34_i64.into(), 43_i64.into(), &MergeStrategy::FlatUnique).unwrap();
-        if let Value::Array(v) = v.clone() {
+        match v.clone() { Value::Array(v) => {
             let v: Vec<_> = v
                 .into_iter()
                 .map(|i| {
-                    if let Value::Integer(i) = i {
+                    match i { Value::Integer(i) => {
                         i
-                    } else {
+                    } _ => {
                         panic!("Bad value");
-                    }
+                    }}
                 })
                 .collect();
             assert_eq!(v.iter().filter(|i| **i == 34i64).count(), 1);
             assert_eq!(v.iter().filter(|i| **i == 43i64).count(), 1);
-        } else {
+        } _ => {
             panic!("Not array");
-        }
+        }}
         let v = merge(v, 34_i32.into(), &MergeStrategy::FlatUnique).unwrap();
-        if let Value::Array(v) = v {
+        match v { Value::Array(v) => {
             let v: Vec<_> = v
                 .into_iter()
                 .map(|i| {
-                    if let Value::Integer(i) = i {
+                    match i { Value::Integer(i) => {
                         i
-                    } else {
+                    } _ => {
                         panic!("Bad value");
-                    }
+                    }}
                 })
                 .collect();
             assert_eq!(v.iter().filter(|i| **i == 34i64).count(), 1);
             assert_eq!(v.iter().filter(|i| **i == 43i64).count(), 1);
-        } else {
+        } _ => {
             panic!("Not array");
-        }
+        }}
     }
 
     fn merge(initial: Value, additional: Value, strategy: &MergeStrategy) -> Result<Value, String> {
