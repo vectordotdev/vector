@@ -603,6 +603,8 @@ pub fn file_source(
         handle: tokio::runtime::Handle::current(),
         rotate_wait: config.rotate_wait,
         idle_timeout: Some(Duration::from_secs(60)), // Default to 60 seconds idle timeout
+        using_notify_discovery: config.use_notify_for_discovery,
+        checkpoint_interval: Duration::from_secs(30), // Use a longer interval for checkpointing with notify
     };
 
     let event_metadata = EventMetadata {

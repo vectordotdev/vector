@@ -60,6 +60,10 @@ where
     pub rotate_wait: Duration,
     /// Duration after which to switch a file from active to passive watching
     pub idle_timeout: Option<Duration>,
+    /// Whether we're using notify-based file discovery
+    pub using_notify_discovery: bool,
+    /// Duration after which to checkpoint files when using notify-based discovery
+    pub checkpoint_interval: Duration,
 }
 
 /// `FileServer` as Source
@@ -144,10 +148,19 @@ where
 
         let mut stats = TimingStats::default();
 
-        // Spawn the checkpoint writer task
+        // Spawn the checkpoint writer task with appropriate interval
+        let checkpoint_interval = if self.using_notify_discovery {
+            // When using notify-based discovery, we can use a longer checkpoint interval
+            // since we're not relying on frequent polling
+            self.checkpoint_interval
+        } else {
+            // Standard behavior for polling-based discovery
+            self.glob_minimum_cooldown
+        };
+
         let checkpoint_task_handle = self.handle.spawn(checkpoint_writer(
             checkpointer,
-            self.glob_minimum_cooldown,
+            checkpoint_interval,
             shutdown_checkpointer,
             self.emitter.clone(),
         ));
@@ -163,9 +176,18 @@ where
         // or write new checkpoints, on every iteration.
         let mut next_glob_time = time::Instant::now();
         loop {
-            // Glob find files to follow, but not too often.
+            // Determine if we need to perform file discovery
             let now_time = time::Instant::now();
-            if next_glob_time <= now_time {
+            let should_discover = if self.using_notify_discovery {
+                // When using notify-based discovery, we only need to glob occasionally as a fallback
+                // This is much less frequent than with polling-based discovery
+                next_glob_time <= now_time && now_time.duration_since(next_glob_time) > Duration::from_secs(10)
+            } else {
+                // Standard behavior for polling-based discovery
+                next_glob_time <= now_time
+            };
+
+            if should_discover {
                 // Schedule the next glob time.
                 next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
 
@@ -368,16 +390,31 @@ where
             stats.record("sending", start.elapsed());
 
             let start = time::Instant::now();
-            // When no lines have been read we kick the backup_cap up by twice,
-            // limited by the hard-coded cap. Else, we set the backup_cap to its
-            // minimum on the assumption that next time through there will be
-            // more lines to read promptly.
-            backoff_cap = if global_bytes_read == 0 {
-                cmp::min(2_048, backoff_cap.saturating_mul(2))
+            // Determine the appropriate backoff based on file activity and discovery mode
+            let backoff = if self.using_notify_discovery {
+                // When using notify-based discovery, we can use a more adaptive approach
+                let all_files_passive = fp_map.values().all(|w| w.state() == WatcherState::Passive);
+
+                if global_bytes_read > 0 {
+                    // If we read data, use minimal backoff for responsiveness
+                    1
+                } else if all_files_passive {
+                    // If all files are in passive mode, use a longer backoff
+                    // This significantly reduces CPU usage when files are idle
+                    cmp::min(5_000, backoff_cap)
+                } else {
+                    // Otherwise, use standard exponential backoff
+                    cmp::min(2_048, backoff_cap.saturating_mul(2))
+                }
             } else {
-                1
+                // Standard behavior for polling-based discovery
+                backoff_cap = if global_bytes_read == 0 {
+                    cmp::min(2_048, backoff_cap.saturating_mul(2))
+                } else {
+                    1
+                };
+                backoff_cap.saturating_sub(global_bytes_read)
             };
-            let backoff = backoff_cap.saturating_sub(global_bytes_read);
 
             // This works only if run inside tokio context since we are using
             // tokio's Timer. Outside of such context, this will panic on the first
