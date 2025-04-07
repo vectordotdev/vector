@@ -138,7 +138,7 @@ anyhow = "1.0.97"
 cfg-if = { version = "1.0.0", default-features = false }
 chrono = { version = "0.4.40", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.3", default-features = false, features = ["serde"] }
-clap = { version = "4.5.34", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.35", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 flate2 = { version = "1.0.35", default-features = false, features = ["default"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.2", default-features = false }
@@ -164,7 +164,7 @@ serde_json = { version = "1.0.140", default-features = false, features = ["raw_v
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
 tempfile = "3.19.1"
-tokio = { version = "1.44.1", default-features = false, features = ["full"] }
+tokio = { version = "1.44.2", default-features = false, features = ["full"] }
 toml = { version = "0.8.20", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
@@ -206,7 +206,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.88", default-features = false }
 futures.workspace = true
-tokio = { version = "1.44.1", default-features = false, features = ["full"] }
+tokio = { version = "1.44.2", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { version = "0.1.17", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -282,7 +282,7 @@ goauth = { version = "0.14.0", optional = true }
 smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 
 # AMQP
-lapin = { version = "2.5.1", default-features = false, features = ["native-tls"], optional = true }
+lapin = { version = "2.5.3", default-features = false, features = ["native-tls"], optional = true }
 
 # API
 async-graphql = { version = "7.0.16", default-features = false, optional = true, features = ["chrono", "playground"] }
@@ -366,7 +366,7 @@ rand_distr.workspace = true
 rdkafka = { version = "0.37.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.24.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
-roaring = { version = "0.10.10", default-features = false, features = ["std"], optional = true }
+roaring = { version = "0.10.12", default-features = false, features = ["std"], optional = true }
 rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
@@ -435,7 +435,7 @@ reqwest = { version = "0.11", features = ["json"] }
 rstest = { version = "0.25.0" }
 tempfile.workspace = true
 test-generator = "0.3.1"
-tokio = { version = "1.44.1", features = ["test-util"] }
+tokio = { version = "1.44.2", features = ["test-util"] }
 tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { workspace = true, features = ["test"] }
