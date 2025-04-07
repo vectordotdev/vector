@@ -80,7 +80,7 @@ releases: "0.46.0": {
 		#### Fixes
 
 		- The `parse_nginx_log` function can now parse `delaying requests` error messages.
-		""",
+		"""
 
 	changelog: [
 		{
