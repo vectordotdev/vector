@@ -188,23 +188,22 @@ releases: "0.46.0": {
 			type: "enhancement"
 			description: """
 				Add support for static labels in `gcp_stackdriver_logs` sink.
-
-				```text
 				This enhancement enables users to define static labels directly in the
 				gcp_stackdriver_logs sink configuration. Static labels are key-value pairs
 				that are consistently applied to all log entries sent to Google Cloud Logging,
 				improving log organization and filtering capabilities.
-				```
-
+				"""
+			contributors: ["stackempty"]
+		},
+		{
+			type: "enhancement"
+			description: """
 				Add support for dynamic labels in `gcp_stackdriver_logs` sink via `labels_key`.
-
-				```text
 				This enhancement allows Vector to automatically map fields from structured
 				log entries to Google Cloud LogEntry labels. When a structured log contains
 				fields matching the configured `labels_key`, Vector will populate the
 				corresponding labels in the Google Cloud LogEntry, enabling better log
 				organization and filtering in Google Cloud Logging.
-				```
 				"""
 			contributors: ["stackempty"]
 		},
