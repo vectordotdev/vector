@@ -159,7 +159,7 @@ releases: "0.46.0": {
 		{
 			type: "fix"
 			description: """
-				Fix an issue where using the LengthDelimitedEncoder, the last or only message is not correctly framed.
+				Fix an issue where using `length_delimited` encoder in `framing.method`, the last or only message is not correctly framed.
 				"""
 			contributors: ["callum-ryan"]
 		},
