@@ -61,7 +61,7 @@ releases: "0.46.0": {
 
 		#### New Features
 
-		- Support for encoding and decoding lz4 block compression.
+		- Support for encoding and decoding lz4 block compression with the `encode_lz4` and `decode_lz4` functions.
 
 		#### Enhancements
 
