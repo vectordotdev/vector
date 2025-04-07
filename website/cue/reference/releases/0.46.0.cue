@@ -231,14 +231,8 @@ releases: "0.46.0": {
 		{
 			type: "feat"
 			description: """
-				The sample transform now accepts a percentage via a new `percent_rate`. configuration parameter.
-				"""
-			contributors: ["graphcareful"]
-		},
-		{
-			type: "feat"
-			description: """
 				The sample transform now accepts a ratio via a new `ratio` configuration parameter.
+				This allow expressing the rate of forwarded events as a percentage.
 				"""
 			contributors: ["graphcareful"]
 		},
