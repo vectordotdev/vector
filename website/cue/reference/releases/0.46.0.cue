@@ -180,7 +180,7 @@ releases: "0.46.0": {
 		{
 			type: "fix"
 			description: """
-				Fixes bug that `vector top` command was not refreshing values that was introduced in version 0.45.
+				Fixes a `vector top` bug was introduced in version 0.45 which prevented connections from being established.
 				"""
 			contributors: ["JakubOnderka"]
 		},
