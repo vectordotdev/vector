@@ -126,7 +126,7 @@ impl Prepare {
     fn pin_vrl_version(&self) -> Result<()> {
         debug!("pin_vrl_version");
         let cargo_toml_path = &self.repo_root.join("Cargo.toml");
-        let contents = fs::read_to_string(&cargo_toml_path).expect("Failed to read Cargo.toml");
+        let contents = fs::read_to_string(cargo_toml_path).expect("Failed to read Cargo.toml");
 
         // Needs this hybrid approach to preserve ordering.
         let mut lines: Vec<String> = contents.lines().map(String::from).collect();
@@ -148,7 +148,8 @@ impl Prepare {
             }
         }
 
-        fs::write(&cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
+        lines.push(String::new()); // File should end with a newline.
+        fs::write(cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
         run_command("cargo update -p vrl");
         git::commit(&format!("chore(releasing): Pinned VRL version to {vrl_version}"))?;
         Ok(())
@@ -319,6 +320,7 @@ impl Prepare {
 
 
         let new_file_path = releases_dir.join(format!("{new_version}.md"));
+        updated_lines.push(String::new()); // File should end with a newline.
         let updated_content = updated_lines.join("\n");
         fs::write(&new_file_path, updated_content)?;
         git::add_files_in_current_dir()?;
@@ -339,6 +341,7 @@ impl Prepare {
         let gh_status = Command::new("gh")
             .arg("pr")
             .arg("create")
+            .arg("--draft")
             .arg("--base")
             .arg(&release_branch)
             .arg("--head")
@@ -347,6 +350,8 @@ impl Prepare {
             .arg(&pr_title)
             .arg("--body")
             .arg(&pr_body)
+            .arg("--label")
+            .arg("no-changelog")
             .current_dir(&self.repo_root)
             .status()?;
         if !gh_status.success() {
