@@ -3,4 +3,12 @@
 .github/workflows/regression.yml @vectordotdev/vector @vectordotdev/single-machine-performance
 regression/config.yaml @vectordotdev/vector @vectordotdev/single-machine-performance
 docs/ @vectordotdev/ux-team @vectordotdev/documentation
-website/ @vectordotdev/ux-team @vectordotdev/documentation
+website/ @vectordotdev/ux-team
+website/content  @vectordotdev/documentation
+website/cue/reference/remap @vectordotdev/documentation
+
+website/js @vectordotdev/vector-website
+website/layouts @vectordotdev/vector-website
+website/scripts @vectordotdev/vector-website
+website/data @vectordotdev/vector-website
+website/* @vectordotdev/vector-website

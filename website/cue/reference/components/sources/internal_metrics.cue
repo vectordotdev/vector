@@ -570,6 +570,12 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
+		open_files: {
+			description:       "The total number of open files."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		grpc_server_messages_received_total: {
 			description:       "The total number of gRPC messages received."
 			type:              "counter"

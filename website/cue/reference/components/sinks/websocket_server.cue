@@ -83,6 +83,18 @@ components: sinks: websocket_server: {
 		open_connections:             components.sources.internal_metrics.output.metrics.open_connections
 		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total
 		connection_shutdown_total:    components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		websocket_messages_sent_total: {
+			description:       "Number of messages sent from the websocket server."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              components.sources.internal_metrics.output.metrics._component_tags
+		}
+		websocket_bytes_sent_total: {
+			description:       "Bytes sent from the websocket server."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              components.sources.internal_metrics.output.metrics._component_tags
+		}
 	}
 
 	configuration: base.components.sinks.websocket_server.configuration
@@ -117,6 +129,74 @@ components: sinks: websocket_server: {
 				For clients to connect, they need to provide credentials in the Authorization header,
 				because `auth` configuration is defined (by default, no auth is required). In this case,
 				it requires Basic auth with defined username and password.
+				"""
+		}
+		custom_metric_tags: {
+			title: "Additional metrics tags"
+			body: """
+				To provide more details about connected clients, this component supports
+				defining additional custom tags to attach to metrics. Additional tags are only applied
+				to `connection_established_total`, `active_clients`, `component_errors_total`,
+				`connection_shutdown_total`, `websocket_messages_sent_total`, and
+				`websocket_bytes_sent_total`.
+
+				Example configuration:
+				```yaml
+				sinks:
+				  websocket_sink:
+					type: "websocket_server"
+					# ...
+					internal_metrics:
+					  extra_tags:
+						test_extra_tag:
+						  type: fixed
+						  value: test_value
+						user_auth:
+						  type: header
+						  name: Authorization
+						client_ip:
+						  type: ip_address
+						full_url:
+						  type: url
+						last_received_query:
+						  type: query
+						  name: last_received
+					# ...
+				```
+
+				This configuration adds a fixed tag (`test_extra_tag`) to each metric with the value,
+				`test_value`. It also puts the `Authorization` header found in connection requests
+				into the `user_auth` tag, IP address of the client under the `client_ip` tag, full
+				connection URL under the `full_url` tag and the `last_received` query parameter under
+				the `last_received_query` tag.
+				"""
+		}
+		message_buffering: {
+			title: "Message buffering"
+			body: """
+				The `message_buffering` configuration option enables event buffering. It defines the number
+				of events to buffer, allowing clients to replay messages after a disconnection.
+				To provide clients with the message ID, define `message_buffering.message_id_path`.
+				This encodes the outgoing messages ID. The buffer is backed by a ring buffer, so
+				the oldest messages are discarded when the size limit is reached.
+
+				After clients have the ID, they can send it in the `last_received` query parameter on future connections.
+				All buffered messages since that ID are then sent to the client immediately upon connection.
+				If the message can't be found, the entire buffer is replayed.
+
+				Example config:
+				```yaml
+				sinks:
+					websocket_export:
+						type: websocket_server
+						inputs: ["demo_logs_test"]
+						address: "0.0.0.0:1234"
+							message_buffering:
+								max_events: 1000
+								message_id_path: "message_id"
+						encoding:
+							codec: "json"
+				```
 				"""
 		}
 	}

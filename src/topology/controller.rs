@@ -59,7 +59,11 @@ pub enum ReloadOutcome {
 }
 
 impl TopologyController {
-    pub async fn reload(&mut self, mut new_config: config::Config) -> ReloadOutcome {
+    pub async fn reload(
+        &mut self,
+        mut new_config: config::Config,
+        components_to_reload: Option<Vec<&config::ComponentKey>>,
+    ) -> ReloadOutcome {
         new_config
             .healthchecks
             .set_require_healthy(self.require_healthy);
@@ -103,7 +107,7 @@ impl TopologyController {
 
         match self
             .topology
-            .reload_config_and_respawn(new_config, self.extra_context.clone())
+            .reload_config_and_respawn(new_config, self.extra_context.clone(), components_to_reload)
             .await
         {
             Ok(true) => {
