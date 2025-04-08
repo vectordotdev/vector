@@ -55,7 +55,7 @@ Providing this information upfront will facilitate a smoother review process. --
   - Feel free to push as many commits as you want. They will be squashed into one before merging.
   - For example, you can run `git merge origin master` and `git push`.
 - If this PR introduces changes Vector dependencies (modifies `Cargo.lock`), please
-  run `dd-rust-license-tool write` to regenerate the [license inventory](https://github.com/vectordotdev/vrl/blob/main/LICENSE-3rdparty.csv) and commit the changes (if any). More details [here](https://crates.io/crates/dd-rust-license-tool).
+  run `cargo vdev build licenses` to regenerate the [license inventory](https://github.com/vectordotdev/vrl/blob/main/LICENSE-3rdparty.csv) and commit the changes (if any). More details [here](https://crates.io/crates/dd-rust-license-tool).
 
 ## References
 
