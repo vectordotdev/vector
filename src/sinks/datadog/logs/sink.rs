@@ -3,14 +3,19 @@ use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 use itertools::Itertools;
 use snafu::Snafu;
 use vector_lib::{
+    event::ObjectMap,
+    event::Value,
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
-use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
+use vrl::{
+    path::{OwnedSegment, OwnedTargetPath, PathPrefix},
+    value::KeyString,
+};
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
-    common::datadog::{DDTAGS, DD_RESERVED_SEMANTIC_ATTRS},
+    common::datadog::{DDTAGS, DD_RESERVED_SEMANTIC_ATTRS, MESSAGE},
     sinks::{
         prelude::*,
         util::{http::HttpJsonBatchSizer, Compressor},
@@ -135,6 +140,76 @@ pub fn normalize_event(event: &mut Event) {
     if let Some(Value::Timestamp(ts)) = log.remove(ts_path) {
         log.insert(ts_path, Value::Integer(ts.timestamp_millis()));
     }
+}
+
+// Optionally for all other non-reserved fields, nest these under the 'message' key. This is the
+// final step in having the event conform to the standard that the logs intake expects when an
+// event originates from an agent. Normalizing the events to the format prepared by the datadog
+// agent resolves any inconsistencies that would be observed when data flows through vector
+// before being ingested by the logs intake. This is because the logs intake interprets the
+// request with slight differences when this header and format are observed.
+pub fn normalize_as_agent_event(event: &mut Event) {
+    let log = event.as_mut_log();
+
+    // Extract the `message` object from the log if it already exists. Then JSON deserialize its
+    // value field. All non reserved fields placed at the root will be moved there.
+    let mut message = if let Some(outer_msg) = log.remove(event_path!(MESSAGE)) {
+        if let Value::Object(current_message) = outer_msg {
+            current_message // already JSON
+        } else {
+            // possible payload is stringified JSON
+            outer_msg
+                .as_bytes()
+                .and_then(|b| serde_json::from_slice::<ObjectMap>(&b).ok())
+                .unwrap_or_else(|| {
+                    [(KeyString::from(MESSAGE), outer_msg)]
+                        .into_iter()
+                        .collect()
+                })
+        }
+    } else {
+        ObjectMap::default()
+    };
+
+    // Move all non reserved fields into a new object
+    if let Some(object_map) = log.as_map_mut() {
+        let mut collisions = ObjectMap::default();
+
+        let keys_to_move = object_map
+            .keys()
+            .filter(|key| {
+                DD_RESERVED_SEMANTIC_ATTRS
+                    .iter()
+                    .all(|(_, attr)| *attr != key.as_str())
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        for key in keys_to_move {
+            if let Some((entry_k, entry_v)) = object_map.remove_entry(key.as_str()) {
+                if let Some(returned_entry_v) = message.insert(entry_k, entry_v) {
+                    collisions.insert(key, returned_entry_v);
+                }
+            }
+        }
+        if !collisions.is_empty() {
+            if message
+                .insert(KeyString::from("_collisions"), Value::Object(collisions))
+                .is_none()
+            {
+                warn!(
+                message = "Some duplicate field names collided with ones already existing within the 'message' field. They have been stored under a new object at 'message._collisions'",
+                internal_log_rate_limit = true,
+            );
+            } else {
+                error!(
+                message = "Could not create field named _collisions at .message, a field with that name already exists",
+                internal_log_rate_limit = true,
+            );
+            }
+        }
+    }
+    // .. finally nest this object at the root under the reserved key named 'message'
+    log.insert(MESSAGE, message);
 }
 
 // If an expected reserved attribute is not located in the event root, rename it and handle
