@@ -8467,20 +8467,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "regex-filtered"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c11639076bf147be211b90e47790db89f4c22b6c8a9ca6e960833869da67166"
-dependencies = [
- "aho-corasick",
- "indexmap 2.8.0",
- "itertools 0.13.0",
- "nohash",
- "regex",
- "regex-syntax 0.8.5",
-]
-
-[[package]]
 name = "regex-lite"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
