@@ -6,6 +6,19 @@ base: components: transforms: sample: configuration: {
 		required:    false
 		type: condition: {}
 	}
+	group_by: {
+		description: """
+			The value to group events into separate buckets to be sampled independently.
+
+			If left unspecified, or if the event doesn't have `group_by`, then the event is not
+			sampled separately.
+			"""
+		required: false
+		type: string: {
+			examples: ["{{ service }}", "{{ hostname }}-{{ service }}"]
+			syntax: "template"
+		}
+	}
 	key_field: {
 		description: """
 			The name of the field whose value is hashed to determine if the event should be
@@ -28,11 +41,34 @@ base: components: transforms: sample: configuration: {
 			The rate at which events are forwarded, expressed as `1/N`.
 
 			For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
-			dropped.
+			dropped. This differs from `ratio` which allows more precise control over the number of events
+			retained and values greater than 1/2. It is an error to provide a value for both `rate` and `ratio`.
 			"""
-		required: true
+		required: false
 		type: uint: examples: [
 			1500,
 		]
+	}
+	ratio: {
+		description: """
+			The rate at which events are forwarded, expressed as a percentage
+
+			For example, `ratio = .13` means that 13% out of all events on the stream are forwarded and
+			the rest are dropped. This differs from `rate` allowing the configuration of a higher
+			precision value and also the ability to retain values of greater than 50% of all events. It is
+			an error to provide a value for both `rate` and `ratio`.
+			"""
+		required: false
+		type: float: examples: [
+			0.13,
+		]
+	}
+	sample_rate_key: {
+		description: "The event key in which the sample rate is stored. If set to an empty string, the sample rate will not be added to the event."
+		required:    false
+		type: string: {
+			default: "sample_rate"
+			examples: ["sample_rate"]
+		}
 	}
 }

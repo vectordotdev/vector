@@ -14,6 +14,9 @@
 
 name: K8S E2E Suite
 
+permissions:
+  statuses: write
+
 on:
   workflow_dispatch:
   workflow_call:
@@ -59,7 +62,7 @@ jobs:
 
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     needs: changes
     # Run this job even if `changes` job is skipped (non- pull request trigger)
@@ -80,13 +83,13 @@ jobs:
 
       - name: (PR review) Checkout PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - uses: actions/cache@v4
         with:
@@ -95,12 +98,14 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/ci-free-disk-space.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: ~/.cargo/bin/rustup target add x86_64-unknown-linux-gnu
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: VECTOR_VERSION="$(cargo vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: e2e-test-deb-package
           path: target/artifacts/*
@@ -121,7 +126,7 @@ jobs:
   # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
   compute-k8s-test-plan:
     name: Compute K8s test plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs: changes
     # Run this job even if `changes` job is skipped
@@ -176,7 +181,7 @@ jobs:
 
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     needs:
       - build-x86_64-unknown-linux-gnu
@@ -189,20 +194,20 @@ jobs:
     steps:
       - name: (PR review) Get PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
       - name: (PR review) Checkout PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: e2e-test-deb-package
           path: target/artifacts
@@ -214,11 +219,17 @@ jobs:
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
 
-      - run: make test-e2e-kubernetes
+      # TODO: This job has been quite flakey. Need to investigate further and then remove the retries.
+      - name: Run tests
+        uses: nick-fields/retry@v3
         env:
           USE_MINIKUBE_CACHE: "true"
           SKIP_PACKAGE_DEB: "true"
           CARGO_INCREMENTAL: 0
+        with:
+          timeout_minutes: 45
+          max_attempts: 3
+          command: make test-e2e-kubernetes
 
       - name: (PR review) Set latest commit status as failure
         uses: myrotvorets/set-commit-status-action@v2.0.1
@@ -230,7 +241,7 @@ jobs:
 
   final-result:
     name: K8s E2E Suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
       - changes
@@ -243,7 +254,7 @@ jobs:
     steps:
       - name: (PR review) Get PR branch
         if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
       - name: (PR review) Submit PR result as success

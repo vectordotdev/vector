@@ -13,18 +13,18 @@ env:
 jobs:
   release-build-optimized:
     name: "Release Build (optimized)"
-    runs-on: ubuntu-20.04-8core
+    runs-on: ubuntu-24.04-8core
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - uses: actions/checkout@v4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
       - run: cargo build --release
 
   release-build-normal:
     name: "Release Build (normal)"
-    runs-on: ubuntu-20.04-8core
+    runs-on: ubuntu-24.04-8core
     env:
       # We're not actually doing a debug build, we're just turning off the logic
       # in release-flags.sh so that we don't override the Cargo "release" profile
@@ -32,30 +32,30 @@ jobs:
       PROFILE: debug
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - uses: actions/checkout@v4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
       - run: cargo build --release
 
   debug-build:
     name: "Debug Build"
-    runs-on: ubuntu-20.04-8core
+    runs-on: ubuntu-24.04-8core
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - uses: actions/checkout@v4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
       - run: cargo build
 
   debug-rebuild:
     name: "Debug Rebuild"
-    runs-on: ubuntu-20.04-8core
+    runs-on: ubuntu-24.04-8core
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - uses: actions/checkout@v4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
       - run: cargo build
@@ -64,11 +64,11 @@ jobs:
 
   check:
     name: "Cargo Check"
-    runs-on: ubuntu-20.04-8core
+    runs-on: ubuntu-24.04-8core
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - uses: actions/checkout@v4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
       - run: cargo check

@@ -77,7 +77,7 @@ jobs:
       security-events: write
     outputs:
       followup: ${{ steps.spelling.outputs.followup }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: "contains(github.event_name, 'pull_request') || github.event_name == 'push'"
     concurrency:
@@ -87,45 +87,49 @@ jobs:
     steps:
     - name: check-spelling
       id: spelling
-      uses: check-spelling/check-spelling@v0.0.21
+      uses: check-spelling/check-spelling@v0.0.24
       with:
-        suppress_push_for_open_pull_request: 1
+        suppress_push_for_open_pull_request: ${{ github.actor != 'dependabot[bot]' && 1 }}
         checkout: true
         check_file_names: 1
         spell_check_this: check-spelling/spell-check-this@prerelease
         post_comment: 0
-        use_magic_file: 1
         use_sarif: ${{ (!github.event.pull_request || (github.event.pull_request.head.repo.full_name == github.repository)) && 1 }}
         extra_dictionary_limit: 20
         extra_dictionaries:
-          cspell:software-terms/src/software-terms.txt
-          cspell:node/node.txt
-          cspell:win32/src/win32.txt
-          cspell:typescript/typescript.txt
           cspell:aws/aws.txt
-          cspell:npm/npm.txt
-          cspell:html/html.txt
-          cspell:filetypes/filetypes.txt
-          cspell:fullstack/fullstack.txt
-          cspell:django/django.txt
-          cspell:bash/bash-words.txt
-          cspell:lua/lua.txt
-          cspell:rust/rust.txt
-          cspell:ruby/ruby.txt
-          cspell:mnemonics/src/mnemonics.txt
-          cspell:elixir/elixir.txt
-          cspell:css/css.txt
-          cspell:lorem-ipsum/dictionary.txt
-          cspell:docker/src/docker-words.txt
-          cspell:python/src/python/python-lib.txt
-          cspell:python/src/common/extra.txt
-          cspell:python/src/python/python.txt
-          cspell:cpp/src/cpp.txt
           cspell:cpp/src/compiler-clang-attributes.txt
-          cspell:cpp/src/ecosystem.txt
-          cspell:cpp/src/stdlib-cpp.txt
-          cspell:cpp/src/lang-keywords.txt
-          cspell:cpp/src/lang-jargon.txt
-          cspell:cpp/src/compiler-gcc.txt
           cspell:cpp/src/compiler-msvc.txt
+          cspell:cpp/src/ecosystem.txt
+          cspell:cpp/src/lang-jargon.txt
+          cspell:cpp/src/stdlib-cpp.txt
+          cspell:css/dict/css.txt
+          cspell:django/dict/django.txt
+          cspell:docker/src/docker-words.txt
+          cspell:dotnet/dict/dotnet.txt
+          cspell:elixir/dict/elixir.txt
+          cspell:filetypes/filetypes.txt
+          cspell:fullstack/dict/fullstack.txt
+          cspell:golang/dict/go.txt
+          cspell:html-symbol-entities/entities.txt
+          cspell:html/dict/html.txt
+          cspell:java/src/java-terms.txt
+          cspell:java/src/java.txt
+          cspell:k8s/dict/k8s.txt
+          cspell:lorem-ipsum/dictionary.txt
+          cspell:lua/dict/lua.txt
+          cspell:node/dict/node.txt
+          cspell:npm/dict/npm.txt
+          cspell:php/dict/php.txt
+          cspell:public-licenses/src/generated/public-licenses.txt
+          cspell:python/src/common/extra.txt
+          cspell:python/src/python/python-lib.txt
+          cspell:python/src/python/python.txt
+          cspell:r/src/r.txt
+          cspell:ruby/dict/ruby.txt
+          cspell:rust/dict/rust.txt
+          cspell:shell/dict/shell-all-words.txt
+          cspell:software-terms/dict/softwareTerms.txt
+          cspell:swift/src/swift.txt
+          cspell:typescript/dict/typescript.txt
         check_extra_dictionaries: ''

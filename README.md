@@ -71,8 +71,10 @@ Vector**][docs.installation].
 
 * **Configuration**
   * [**Sources**][docs.configuration.sources] - [docker_logs][docs.sources.docker_logs], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [many more...][docs.sources]
-  * [**Transforms**][docs.configuration.transforms] - [dedupe][docs.transforms.dedupe], [filter][docs.transforms.filter], [geoip][docs.transforms.geoip], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [remap][docs.transforms.remap], and [many more...][docs.transforms]
+  * [**Transforms**][docs.configuration.transforms] - [dedupe][docs.transforms.dedupe], [filter][docs.transforms.filter], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [remap][docs.transforms.remap],
+    and [many more...][docs.transforms]
   * [**Sinks**][docs.configuration.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [many more...][docs.sinks]
+  * [**Enrichment Tables**][docs.configuration.enrichment_tables]
   * [**Unit tests**][docs.configuration.tests]
 * [**Remap Language**][docs.reference.vrl]
 * [**API**][docs.reference.api]
@@ -98,13 +100,13 @@ Vector**][docs.installation].
 The following performance tests demonstrate baseline performance between
 common protocols with the exception of the Regex Parsing test.
 
-|                                                                                                               Test |     Vector      | Filebeat |    FluentBit    |  FluentD  | Logstash  |    SplunkUF     | SplunkHF |
-|-------------------------------------------------------------------------------------------------------------------:|:---------------:|:--------:|:---------------:|:---------:|:---------:|:---------------:|:--------:|
-| [TCP to Blackhole](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) |  _**86mib/s**_  |   n/a    |    64.4mib/s    | 27.7mib/s | 40.6mib/s |       n/a       |   n/a    |
-|           [File to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_to_tcp_performance) | _**76.7mib/s**_ | 7.8mib/s |     35mib/s     | 26.1mib/s | 3.1mib/s  |    40.1mib/s    | 39mib/s  |
-|       [Regex Parsing](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/regex_parsing_performance) |    13.2mib/s    |   n/a    | _**20.5mib/s**_ | 2.6mib/s  | 4.6mib/s  |       n/a       | 7.8mib/s |
-|           [TCP to HTTP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_http_performance) | _**26.7mib/s**_ |   n/a    |    19.6mib/s    |  <1mib/s  | 2.7mib/s  |       n/a       |   n/a    |
-|             [TCP to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_tcp_performance) |    69.9mib/s    |  5mib/s  |    67.1mib/s    | 3.9mib/s  |  10mib/s  | _**70.4mib/s**_ | 7.6mib/s |
+| Test                                                                                                                   | Vector          | Filebeat | FluentBit       | FluentD   | Logstash  | SplunkUF        | SplunkHF |
+| ---------------------------------------------------------------------------------------------------------------------- | --------------- | -------- | --------------- | --------- | --------- | --------------- | -------- |
+| [TCP to Blackhole](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) | _**86mib/s**_   | n/a      | 64.4mib/s       | 27.7mib/s | 40.6mib/s | n/a             | n/a      |
+| [File to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_to_tcp_performance)           | _**76.7mib/s**_ | 7.8mib/s | 35mib/s         | 26.1mib/s | 3.1mib/s  | 40.1mib/s       | 39mib/s  |
+| [Regex Parsing](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/regex_parsing_performance)       | 13.2mib/s       | n/a      | _**20.5mib/s**_ | 2.6mib/s  | 4.6mib/s  | n/a             | 7.8mib/s |
+| [TCP to HTTP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_http_performance)           | _**26.7mib/s**_ | n/a      | 19.6mib/s       | <1mib/s   | 2.7mib/s  | n/a             | n/a      |
+| [TCP to TCP](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/tcp_to_tcp_performance)             | 69.9mib/s       | 5mib/s   | 67.1mib/s       | 3.9mib/s  | 10mib/s   | _**70.4mib/s**_ | 7.6mib/s |
 
 To learn more about our performance tests, please see the [Vector test harness][urls.vector_test_harness].
 
@@ -113,14 +115,14 @@ To learn more about our performance tests, please see the [Vector test harness][
 The following correctness tests are not exhaustive, but they demonstrate
 fundamental differences in quality and attention to detail:
 
-|                                                                                                                             Test | Vector | Filebeat | FluentBit | FluentD | Logstash | Splunk UF | Splunk HF |
-|---------------------------------------------------------------------------------------------------------------------------------:|:------:|:--------:|:---------:|:-------:|:--------:|:---------:|:---------:|
-| [Disk Buffer Persistence](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | **✓**  |    ✓     |           |         |    ⚠     |     ✓     |     ✓     |
-|         [File Rotate (create)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_rotate_create_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
-| [File Rotate (copytruncate)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | **✓**  |          |           |         |          |     ✓     |     ✓     |
-|                   [File Truncation](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_truncate_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
-|                         [Process (SIGHUP)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/sighup_correctness) | **✓**  |          |           |         |    ⚠     |     ✓     |     ✓     |
-|                     [JSON (wrapped)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/wrapped_json_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
+| Test                                                                                                                                 | Vector | Filebeat | FluentBit | FluentD | Logstash | Splunk UF | Splunk HF |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------ | -------- | --------- | ------- | -------- | --------- | --------- |
+| [Disk Buffer Persistence](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | **✓**  | ✓        |           |         | ⚠        | ✓         | ✓         |
+| [File Rotate (create)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_rotate_create_correctness)         | **✓**  | ✓        | ✓         | ✓       | ✓        | ✓         | ✓         |
+| [File Rotate (copytruncate)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | **✓**  |          |           |         |          | ✓         | ✓         |
+| [File Truncation](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/file_truncate_correctness)                   | **✓**  | ✓        | ✓         | ✓       | ✓        | ✓         | ✓         |
+| [Process (SIGHUP)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/sighup_correctness)                         | **✓**  |          |           |         | ⚠        | ✓         | ✓         |
+| [JSON (wrapped)](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/wrapped_json_correctness)                     | **✓**  | ✓        | ✓         | ✓       | ✓        | ✓         | ✓         |
 
 To learn more about our correctness tests, please see the [Vector test harness][urls.vector_test_harness].
 
@@ -129,21 +131,21 @@ To learn more about our correctness tests, please see the [Vector test harness][
 Vector is an end-to-end, unified, open data platform.
 
 |                     | **Vector** | Beats | Fluentbit | Fluentd | Logstash | Splunk UF | Splunk HF | Telegraf |
-|--------------------:|:----------:|:-----:|:---------:|:-------:|:--------:|:---------:|:---------:|:--------:|
-|      **End-to-end** |   **✓**    |       |           |         |          |           |           |     ✓    |
-|               Agent |   **✓**    |   ✓   |     ✓     |         |          |     ✓     |           |     ✓    |
-|          Aggregator |   **✓**    |       |           |    ✓    |    ✓     |           |     ✓     |     ✓    |
-|         **Unified** |   **✓**    |       |           |         |          |           |           |     ✓    |
-|                Logs |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |     ✓    |
-|             Metrics |   **✓**    |   ⚠   |     ⚠     |    ⚠    |    ⚠     |     ⚠     |     ⚠     |     ✓    |
-|              Traces |     🚧     |       |           |         |          |           |           |          |
-|            **Open** |   **✓**    |       |     ✓     |    ✓    |          |           |           |     ✓    |
-|         Open-source |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |           |           |     ✓    |
-|      Vendor-neutral |   **✓**    |       |     ✓     |    ✓    |          |           |           |     ✓    |
-|     **Reliability** |   **✓**    |       |           |         |          |           |           |          |
-|         Memory-safe |   **✓**    |       |           |         |          |           |           |     ✓    |
-| Delivery guarantees |   **✓**    |       |           |         |          |     ✓     |     ✓     |          |
-|          Multi-core |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |     ✓    |
+| ------------------- | ---------- | ----- | --------- | ------- | -------- | --------- | --------- | -------- |
+| **End-to-end**      | **✓**      |       |           |         |          |           |           | ✓        |
+| Agent               | **✓**      | ✓     | ✓         |         |          | ✓         |           | ✓        |
+| Aggregator          | **✓**      |       |           | ✓       | ✓        |           | ✓         | ✓        |
+| **Unified**         | **✓**      |       |           |         |          |           |           | ✓        |
+| Logs                | **✓**      | ✓     | ✓         | ✓       | ✓        | ✓         | ✓         | ✓        |
+| Metrics             | **✓**      | ⚠     | ⚠         | ⚠       | ⚠        | ⚠         | ⚠         | ✓        |
+| Traces              | 🚧         |       |           |         |          |           |           |          |
+| **Open**            | **✓**      |       | ✓         | ✓       |          |           |           | ✓        |
+| Open-source         | **✓**      | ✓     | ✓         | ✓       | ✓        |           |           | ✓        |
+| Vendor-neutral      | **✓**      |       | ✓         | ✓       |          |           |           | ✓        |
+| **Reliability**     | **✓**      |       |           |         |          |           |           |          |
+| Memory-safe         | **✓**      |       |           |         |          |           |           | ✓        |
+| Delivery guarantees | **✓**      |       |           |         |          | ✓         | ✓         |          |
+| Multi-core          | **✓**      | ✓     | ✓         | ✓       | ✓        | ✓         | ✓         | ✓        |
 
 
 ⚠ = Not interoperable, metrics are represented as structured logs
@@ -168,6 +170,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.configuration.sources]: https://vector.dev/docs/reference/configuration/sources/
 [docs.configuration.tests]: https://vector.dev/docs/reference/configuration/tests/
 [docs.configuration.transforms]: https://vector.dev/docs/reference/configuration/transforms/
+[docs.configuration.enrichment_tables]: https://vector.dev/docs/reference/configuration/global-options/#enrichment_tables
 [docs.data-model.log]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/
 [docs.data-model.metric]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/
 [docs.deployment.roles]: https://vector.dev/docs/setup/deployment/roles/

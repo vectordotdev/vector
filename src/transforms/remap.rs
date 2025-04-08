@@ -207,6 +207,8 @@ impl RemapConfig {
 
         let mut functions = vrl::stdlib::all();
         functions.append(&mut vector_lib::enrichment::vrl_functions());
+        #[cfg(feature = "sources-dnstap")]
+        functions.append(&mut dnstap_parser::vrl_functions());
         functions.append(&mut vector_vrl_functions::all());
 
         let state = TypeState {
@@ -876,9 +878,9 @@ mod tests {
 
         let conf = RemapConfig {
             source: Some(
-                indoc! {r#"
+                indoc! {r"
                 . = .events
-            "#}
+            "}
                 .to_owned(),
             ),
             file: None,
@@ -1804,7 +1806,7 @@ mod tests {
         // An abort should not change the typedef.
 
         let transform1 = RemapConfig {
-            source: Some(r#"abort"#.to_string()),
+            source: Some(r"abort".to_string()),
             ..Default::default()
         };
 
@@ -1974,8 +1976,8 @@ mod tests {
 
         let conf = RemapConfig {
             source: Some(
-                r#". = [null]
-"#
+                r". = [null]
+"
                 .to_string(),
             ),
             file: None,

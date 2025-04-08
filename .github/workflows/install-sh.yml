@@ -4,14 +4,17 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions:
+  statuses: write
+
 jobs:
   test-install:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
       - name: (PR comment) Set latest commit status as pending
@@ -25,13 +28,13 @@ jobs:
 
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - run: sudo apt-get install --yes bc
       - run: bash distribution/install.sh -- -y

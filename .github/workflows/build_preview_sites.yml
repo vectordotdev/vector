@@ -6,8 +6,15 @@ on:
     types:
       - completed
 
+permissions:
+  actions: read
+  issues: write
+  pull-requests: write
+  statuses: write
+
 jobs:
   deploy_vector_preview_site:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
     uses: ./.github/workflows/create_preview_sites.yml
     with:
       APP_ID: "d1a7j77663uxsc"
@@ -18,6 +25,7 @@ jobs:
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
 
   deploy_rust_doc_preview_site:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
     uses: ./.github/workflows/create_preview_sites.yml
     with:
       APP_ID: "d1hoyoksbulg25"
@@ -28,6 +36,7 @@ jobs:
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
 
   deploy_vrl_playground_preview_site:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
     uses: ./.github/workflows/create_preview_sites.yml
     with:
       APP_ID: "d2lr4eds605rpz"
@@ -36,4 +45,3 @@ jobs:
       REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
       REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
       ENDPOINT: ${{ secrets.BUILDER_ENDPOINT }}
-

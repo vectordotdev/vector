@@ -85,7 +85,7 @@ pub fn load_and_extract(filename: &Path) -> Result<Vec<String>> {
 
 pub fn from_config(config: VectorConfig) -> Vec<String> {
     let mut features = FeatureSet::default();
-    add_option(&mut features, "api", &config.api);
+    add_option(&mut features, "api", config.api.as_ref());
 
     get_features(
         &mut features,
@@ -108,7 +108,7 @@ pub fn from_config(config: VectorConfig) -> Vec<String> {
     features.into_iter().collect()
 }
 
-fn add_option<T>(features: &mut FeatureSet, name: &str, field: &Option<T>) {
+fn add_option<T>(features: &mut FeatureSet, name: &str, field: Option<&T>) {
     if field.is_some() {
         features.insert(name.into());
     }

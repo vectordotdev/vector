@@ -1,7 +1,4 @@
 [licenses]
-unlicensed = "deny"
-default = "deny"
-copyleft = "deny"
 allow = [
   "0BSD",
   "Apache-2.0",
@@ -39,13 +36,28 @@ license-files = [
 
 [advisories]
 ignore = [
-    # Vulnerability in `rsa` crate: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
-    # There is not fix available yet.
-    # https://github.com/vectordotdev/vector/issues/19262
-    "RUSTSEC-2023-0071",
-
-    # Vulnerability in `tonic` crate: https://rustsec.org/advisories/RUSTSEC-2024-0376
-    # There is a fixed version (v0.12.3) but we are blocked from upgrading to `http` v1, which
-    # `tonic` v0.12 depends on. See https://github.com/vectordotdev/vector/issues/19179
-    "RUSTSEC-2024-0376",
+  # Vulnerability in `rsa` crate: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
+  # There is not fix available yet.
+  # https://github.com/vectordotdev/vector/issues/19262
+  "RUSTSEC-2023-0071",
+  # Vulnerability in `tonic` crate: https://rustsec.org/advisories/RUSTSEC-2024-0376
+  # There is a fixed version (v0.12.3) but we are blocked from upgrading to `http` v1, which
+  # `tonic` v0.12 depends on. See https://github.com/vectordotdev/vector/issues/19179
+  "RUSTSEC-2024-0376",
+  # Advisory in rustls crate: https://rustsec.org/advisories/RUSTSEC-2024-0336 If a `close_notify`
+  # alert is received during a handshake, `complete_io` does not terminate.
+  # Vulnerable version only used in dev-dependencies
+  "RUSTSEC-2024-0336",
+  # idna accepts Punycode labels that do not produce any non-ASCII when decoded
+  # Need to update some direct dependencies before we can upgrade idna to fix
+  "RUSTSEC-2024-0421",
+  { id = "RUSTSEC-2021-0139", reason = " ansi_term is unmaintained" },
+  { id = "RUSTSEC-2024-0388", reason = "derivative is unmaintained" },
+  { id = "RUSTSEC-2024-0384", reason = "instant is unmaintained" },
+  { id = "RUSTSEC-2020-0168", reason = "mach is unmaintained" },
+  { id = "RUSTSEC-2024-0370", reason = "proc-macro-error is unmaintained" },
+  { id = "RUSTSEC-2024-0320", reason = "yaml-rust is unmaintained" },
+  { id = "RUSTSEC-2024-0436", reason = "paste is unmaintained" },
+  { id = "RUSTSEC-2025-0012", reason = "backoff is unmaintained" },
+  { id = "RUSTSEC-2025-0014", reason = "humantime is unmaintained" },
 ]

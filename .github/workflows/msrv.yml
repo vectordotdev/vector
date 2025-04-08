@@ -13,10 +13,13 @@ env:
 
 jobs:
   check-msrv:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - uses: actions/checkout@v4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: |
+          # We usually run `scripts/environment/prepare.sh` but in this case we only need the toolchain.
+          rustup show active-toolchain || rustup toolchain install
       - run: cargo install cargo-msrv --version 0.15.1
       - run: cargo msrv verify

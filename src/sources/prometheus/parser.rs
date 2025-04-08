@@ -103,7 +103,7 @@ fn reparse_groups(
                     }
                     let drop_last = buckets
                         .last()
-                        .map_or(false, |bucket| bucket.bucket == f64::INFINITY);
+                        .is_some_and(|bucket| bucket.bucket == f64::INFINITY);
                     if drop_last {
                         buckets.pop();
                     }
@@ -204,11 +204,11 @@ mod test {
     #[test]
     fn adds_timestamp_if_missing() {
         let now = Utc::now();
-        let exp = r##"
+        let exp = r"
             # HELP counter Some counter
             # TYPE count counter
             http_requests_total 1027
-            "##;
+            ";
         let result = events_to_metrics(parse_text(exp)).unwrap();
         assert_eq!(result.len(), 1);
         assert!(result[0].timestamp().unwrap() >= now);
@@ -216,11 +216,11 @@ mod test {
 
     #[test]
     fn test_counter() {
-        let exp = r##"
+        let exp = r"
             # HELP uptime A counter
             # TYPE uptime counter
             uptime 123.0 1612411506789
-            "##;
+            ";
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
@@ -235,10 +235,10 @@ mod test {
 
     #[test]
     fn test_counter_empty() {
-        let exp = r##"
+        let exp = r"
             # HELP hidden A counter
             # TYPE hidden counter
-            "##;
+            ";
 
         assert_event_data_eq!(events_to_metrics(parse_text(exp)), Ok(vec![]));
     }
@@ -348,11 +348,11 @@ mod test {
 
     #[test]
     fn test_gauge() {
-        let exp = r##"
+        let exp = r"
             # HELP latency A gauge
             # TYPE latency gauge
             latency 123.0 1612411506789
-            "##;
+            ";
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
@@ -367,9 +367,9 @@ mod test {
 
     #[test]
     fn test_gauge_minimalistic() {
-        let exp = r##"
+        let exp = r"
             metric_without_timestamp_and_labels 12.47 1612411506789
-            "##;
+            ";
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
@@ -384,9 +384,9 @@ mod test {
 
     #[test]
     fn test_gauge_empty_labels() {
-        let exp = r##"
+        let exp = r"
             no_labels{} 3 1612411506789
-            "##;
+            ";
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
@@ -588,14 +588,14 @@ mod test {
 
     #[test]
     fn test_mixed() {
-        let exp = r##"
+        let exp = r"
             # TYPE uptime counter
             uptime 123.0 1612411506789
             # TYPE temperature gauge
             temperature -1.5 1612411506789
             # TYPE launch_count counter
             launch_count 10.0 1612411506789
-            "##;
+            ";
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
@@ -634,24 +634,24 @@ mod test {
 
     #[test]
     fn test_no_name() {
-        let exp = r##"
+        let exp = r"
             # TYPE uptime counter
             123.0 1612411506789
-            "##;
+            ";
 
         assert!(events_to_metrics(parse_text(exp)).is_err());
     }
 
     #[test]
     fn test_mixed_and_loosely_typed() {
-        let exp = r##"
+        let exp = r"
             # TYPE uptime counter
             uptime 123.0 1612411506789
             last_downtime 4.0 1612411506789
             # TYPE temperature gauge
             temperature -1.5 1612411506789
             temperature_7_days_average 0.1 1612411506789
-            "##;
+            ";
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),

@@ -15,6 +15,7 @@ administration: {
 			tag:              string | *strings.ToLower(arch)
 			extra?:           string
 			filename:         string
+			version?:         string
 
 			if extra == _|_ {
 				filename: "\(tag).\(_file_type)"
@@ -126,6 +127,12 @@ administration: {
 						target: "x86_64-apple-darwin-tar-gz"
 						arch:   "x86_64"
 						extra:  "apple-darwin"
+					},
+					{
+						target:  "arm64-apple-darwin-tar-gz"
+						arch:    "ARM64"
+						extra:   "apple-darwin"
+						version: "0.44.0"
 					},
 				]
 			},

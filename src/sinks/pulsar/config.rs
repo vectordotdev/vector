@@ -5,7 +5,7 @@ use crate::{
         pulsar::sink::{healthcheck, PulsarSink},
     },
 };
-use futures_util::FutureExt;
+use futures_util::{FutureExt, TryFutureExt};
 use pulsar::{
     authentication::oauth2::{OAuth2Authentication, OAuth2Params},
     compression,
@@ -14,7 +14,8 @@ use pulsar::{
     TokioExecutor,
 };
 use pulsar::{error::AuthenticationError, OperationRetryOptions};
-use snafu::ResultExt;
+use std::path::Path;
+use std::time::Duration;
 use vector_lib::codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use vector_lib::config::DataType;
 use vector_lib::lookup::lookup_v2::OptionalTargetPath;
@@ -77,6 +78,14 @@ pub struct PulsarSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub connection_retry_options: Option<CustomConnectionRetryOptions>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub(crate) tls: Option<PulsarTlsOptions>,
 }
 
 /// Event batching behavior.
@@ -171,6 +180,55 @@ pub enum PulsarCompression {
     Snappy,
 }
 
+#[configurable_component]
+#[configurable(
+    description = "Custom connection retry options configuration for the Pulsar client."
+)]
+#[derive(Clone, Debug)]
+pub struct CustomConnectionRetryOptions {
+    /// Minimum delay between connection retries.
+    #[configurable(metadata(docs::type_unit = "milliseconds"))]
+    pub min_backoff_ms: Option<u64>,
+
+    /// Maximum delay between reconnection retries.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 30))]
+    pub max_backoff_secs: Option<u64>,
+
+    /// Maximum number of connection retries.
+    #[configurable(metadata(docs::examples = 12))]
+    pub max_retries: Option<u32>,
+
+    /// Time limit to establish a connection.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 10))]
+    pub connection_timeout_secs: Option<u64>,
+
+    /// Keep-alive interval for each broker connection.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 60))]
+    pub keep_alive_secs: Option<u64>,
+}
+
+#[configurable_component]
+#[configurable(description = "TLS options configuration for the Pulsar client.")]
+#[derive(Clone, Debug)]
+pub struct PulsarTlsOptions {
+    /// File path containing a list of PEM encoded certificates.
+    #[configurable(metadata(docs::examples = "/etc/certs/chain.pem"))]
+    pub ca_file: String,
+
+    /// Enables certificate verification.
+    ///
+    /// Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
+    pub verify_certificate: Option<bool>,
+
+    /// Whether hostname verification is enabled when verify_certificate is false.
+    ///
+    /// Set to true if not specified.
+    pub verify_hostname: Option<bool>,
+}
+
 impl Default for PulsarSinkConfig {
     fn default() -> Self {
         Self {
@@ -185,12 +243,14 @@ impl Default for PulsarSinkConfig {
             encoding: TextSerializerConfig::default().into(),
             auth: None,
             acknowledgements: Default::default(),
+            connection_retry_options: None,
+            tls: None,
         }
     }
 }
 
 impl PulsarSinkConfig {
-    pub(crate) async fn create_pulsar_client(&self) -> Result<Pulsar<TokioExecutor>, PulsarError> {
+    pub(crate) async fn create_pulsar_client(&self) -> crate::Result<Pulsar<TokioExecutor>> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
             builder = match (
@@ -210,22 +270,60 @@ impl PulsarSinkConfig {
                         scope: oauth2.scope.clone(),
                     }),
                 ),
-                _ => return Err(PulsarError::Authentication(AuthenticationError::Custom(
+                _ => return Err(Box::new(PulsarError::Authentication(AuthenticationError::Custom(
                     "Invalid auth config: can only specify name and token or oauth2 configuration"
                         .to_string(),
-                ))),
+                ))))?,
             };
         }
 
         // Apply configuration for reconnection exponential backoff.
-        let retry_opts = ConnectionRetryOptions::default();
-        builder = builder.with_connection_retry_options(retry_opts);
+        let default_retry_options = ConnectionRetryOptions::default();
+        let retry_options =
+            self.connection_retry_options
+                .as_ref()
+                .map_or(default_retry_options.clone(), |opts| {
+                    ConnectionRetryOptions {
+                        min_backoff: opts
+                            .min_backoff_ms
+                            .map_or(default_retry_options.min_backoff, |ms| {
+                                Duration::from_millis(ms)
+                            }),
+                        max_backoff: opts
+                            .max_backoff_secs
+                            .map_or(default_retry_options.max_backoff, |secs| {
+                                Duration::from_secs(secs)
+                            }),
+                        max_retries: opts
+                            .max_retries
+                            .unwrap_or(default_retry_options.max_retries),
+                        connection_timeout: opts
+                            .connection_timeout_secs
+                            .map_or(default_retry_options.connection_timeout, |secs| {
+                                Duration::from_secs(secs)
+                            }),
+                        keep_alive: opts
+                            .keep_alive_secs
+                            .map_or(default_retry_options.keep_alive, |secs| {
+                                Duration::from_secs(secs)
+                            }),
+                    }
+                });
+
+        builder = builder.with_connection_retry_options(retry_options);
 
         // Apply configuration for retrying Pulsar operations.
         let operation_retry_opts = OperationRetryOptions::default();
         builder = builder.with_operation_retry_options(operation_retry_opts);
 
-        builder.build().await
+        if let Some(options) = &self.tls {
+            builder = builder.with_certificate_chain_file(Path::new(&options.ca_file))?;
+            builder =
+                builder.with_allow_insecure_connection(!options.verify_certificate.unwrap_or(true));
+            builder = builder
+                .with_tls_hostname_verification_enabled(options.verify_hostname.unwrap_or(true));
+        }
+        builder.build().map_err(|e| e.into()).await
     }
 
     pub(crate) fn build_producer_options(&self) -> ProducerOptions {
@@ -287,10 +385,9 @@ impl SinkConfig for PulsarSinkConfig {
         let client = self
             .create_pulsar_client()
             .await
-            .context(super::sink::CreatePulsarSinkSnafu)?;
+            .map_err(|e| super::sink::BuildError::CreatePulsarSink { source: e })?;
 
         let sink = PulsarSink::new(client, self.clone())?;
-
         let hc = healthcheck(self.clone()).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), hc))

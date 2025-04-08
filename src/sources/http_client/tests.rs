@@ -5,6 +5,7 @@ use vector_lib::config::LogNamespace;
 use warp::{http::HeaderMap, Filter};
 
 use crate::components::validation::prelude::*;
+use crate::http::QueryParameterValue;
 use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
 use vector_lib::codecs::decoding::{
@@ -80,7 +81,7 @@ async fn bytes_decoding() {
     // validates the Accept header is set correctly for the Bytes codec
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::header::exact("Accept", "text/plain"))
-        .map(|| r#"A plain text event"#);
+        .map(|| r"A plain text event");
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
@@ -180,10 +181,13 @@ async fn request_query_applied() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::from([
-            ("key1".to_string(), vec!["val2".to_string()]),
+            (
+                "key1".to_string(),
+                QueryParameterValue::MultiParams(vec!["val2".to_string()]),
+            ),
             (
                 "key2".to_string(),
-                vec!["val1".to_string(), "val2".to_string()],
+                QueryParameterValue::MultiParams(vec!["val1".to_string(), "val2".to_string()]),
             ),
         ]),
         decoding: DeserializerConfig::Json(Default::default()),

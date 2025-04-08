@@ -14,6 +14,7 @@ components: sources: prometheus_remote_write: {
 
 	features: {
 		auto_generated:   true
+		has_auth:         true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {

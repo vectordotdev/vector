@@ -1,29 +1,70 @@
 name: Call Build Preview
-
 on:
   pull_request:
-    types: [opened, reopened]
-
+    types: [opened, reopened, synchronize]
 jobs:
   approval_check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
-    if: ${{ contains(github.head_ref, 'website') }}
+    # Only run for PRs with 'website' in the branch name
+    if: ${{ contains(github.head_ref, 'website') && contains(github.head_ref, '-') }}
     steps:
       - name: Echo approval
         run: |
           echo "Workflow has been allowed to run for PR ${{ github.event.number }}. Setting artifacts and then continuing workflow runs"
 
-      # Save the PR number and branch name to an artifact for use in subsequent jobs
-      - name: Save PR number and Branch name
-        run: |
-          mkdir -p ./pr
-          echo "${{ github.event.number }}" > ./pr/number
-          echo "${{ github.head_ref }}" >> ./pr/branch
+      # Use GitHub Action to safely validate and store PR information
+      - name: Validate and save PR information
+        uses: actions/github-script@v7.0.1
+        with:
+          script: |
+            const fs = require('fs').promises;
+            const path = require('path');
+            const crypto = require('crypto');
 
-      # Upload the artifact
+            async function createAndValidateArtifact() {
+              try {
+                // Create directory for artifact
+                await fs.mkdir('./pr', { recursive: true });
+
+                // Get PR number and validate
+                const prNumber = context.payload.number;
+                if (typeof prNumber !== 'number' || !Number.isInteger(prNumber) || prNumber <= 0) {
+                  core.setFailed(`Invalid PR number: ${prNumber}`);
+                  return;
+                }
+
+                // Get branch name and validate
+                const branchName = context.payload.pull_request.head.ref;
+                // Validate branch name (only allow alphanumeric, dash, and underscore)
+                const branchNameRegex = /^[a-zA-Z0-9_\-]+$/;
+                if (!branchNameRegex.test(branchName)) {
+                  core.setFailed(`Invalid branch name detected: ${branchName}`);
+                  return;
+                }
+
+                // Write validated information to files
+                await fs.writeFile('./pr/number', prNumber.toString());
+                await fs.writeFile('./pr/branch', branchName);
+
+                // Log success
+                core.info(`Successfully validated and saved PR #${prNumber} with branch ${branchName}`);
+
+                // Create hash signature of the data
+                const numberHash = crypto.createHash('sha256').update(prNumber.toString()).digest('hex');
+                const branchHash = crypto.createHash('sha256').update(branchName).digest('hex');
+                await fs.writeFile('./pr/integrity', `${numberHash}:${branchHash}`);
+              } catch (error) {
+                core.setFailed(`An error occurred: ${error.message}`);
+              }
+            }
+
+            createAndValidateArtifact();
+
+      # Upload the artifact using latest version
       - name: Upload PR information artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pr
           path: pr/
+          retention-days: 1

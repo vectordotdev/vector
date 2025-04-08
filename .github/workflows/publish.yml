@@ -1,5 +1,9 @@
 name: Publish
 
+permissions:
+  contents: write
+  packages: write
+
 on:
   workflow_call:
     inputs:
@@ -28,7 +32,7 @@ env:
 jobs:
   generate-publish-metadata:
     name: Generate Publish-related Metadata
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       vector_version: ${{ steps.generate-publish-metadata.outputs.vector_version }}
@@ -36,7 +40,7 @@ jobs:
       vector_release_channel: ${{ steps.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Generate publish metadata
@@ -54,17 +58,17 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
         run: make package-x86_64-unknown-linux-musl-all
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
           path: target/artifacts/vector*
@@ -80,17 +84,17 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
         run: make package-x86_64-unknown-linux-gnu-all
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts/vector*
@@ -106,11 +110,11 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
@@ -118,7 +122,7 @@ jobs:
           DOCKER_PRIVILEGED: "true"
         run: make package-aarch64-unknown-linux-musl-all
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
           path: target/artifacts/vector*
@@ -134,11 +138,11 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
@@ -146,7 +150,7 @@ jobs:
           DOCKER_PRIVILEGED: "true"
         run: make package-aarch64-unknown-linux-gnu-all
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts/vector*
@@ -162,11 +166,11 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
@@ -174,7 +178,7 @@ jobs:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-gnueabihf-all
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
           path: target/artifacts/vector*
@@ -190,11 +194,11 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
@@ -202,7 +206,7 @@ jobs:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-musleabihf
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts/vector*
@@ -218,11 +222,11 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
@@ -230,7 +234,7 @@ jobs:
           DOCKER_PRIVILEGED: "true"
         run: make package-arm-unknown-linux-gnueabi-all
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-gnueabi
           path: target/artifacts/vector*
@@ -245,11 +249,11 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh
       - name: Build Vector
@@ -257,39 +261,60 @@ jobs:
           DOCKER_PRIVILEGED: "true"
         run: make package-arm-unknown-linux-musleabi
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts/vector*
 
-  build-x86_64-apple-darwin-packages:
-    name: Build Vector for x86_64-apple-darwin (.tar.gz)
-    runs-on: macos-latest-xl
+  build-apple-darwin-packages:
+    name: Build Vector for ${{ matrix.architecture }}-apple-darwin (.tar.gz)
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+    strategy:
+      matrix:
+        include:
+          # Refer to https://docs.github.com/en/actions/using-github-hosted-runners/using-larger-runners/about-larger-runners#about-macos-larger-runners.
+          - architecture: x86_64
+            runner: macos-latest-large
+          - architecture: arm64
+            runner: macos-latest-xlarge
     steps:
+      - name: Verify Runner Architecture
+        run: |
+          ARCH=$(uname -m)
+          echo "Detected architecture: $ARCH"
+          if [ "$ARCH" != "${{ matrix.architecture }}" ]; then
+            echo "Error: Expected ${{ matrix.architecture }} architecture, but got $ARCH!"
+            exit 1
+          fi
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (macOS-specific)
-        run: bash scripts/environment/bootstrap-macos-10.sh
+        run: |
+          bash scripts/environment/bootstrap-macos.sh
+          # We usually run `scripts/environment/prepare.sh` but in this case we only need the toolchain.
+          rustup show active-toolchain || rustup toolchain install
+          rustup show
       - name: Build Vector
         env:
-          TARGET: "x86_64-apple-darwin"
+          TARGET: "${{ matrix.architecture }}-apple-darwin"
           NATIVE_BUILD: true
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           make package
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.architecture }}-apple-darwin
           path: target/artifacts/vector*
+
 
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
@@ -304,7 +329,7 @@ jobs:
       RELEASE_BUILDER: "true"
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Windows-specific)
@@ -333,14 +358,14 @@ jobs:
           export PATH="/c/wix:$PATH"
           ./scripts/package-msi.sh
       - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts/vector*
 
   deb-verify:
     name: Verify DEB Packages
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
@@ -348,17 +373,12 @@ jobs:
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       DD_PKG_VERSION: "latest"
-      # https://github.blog/changelog/2024-03-07-github-actions-all-actions-will-run-on-node20-instead-of-node16-by-default/
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
-      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
     strategy:
       matrix:
         container:
-          - ubuntu:16.04
-          - ubuntu:18.04
           - ubuntu:20.04
           - ubuntu:22.04
-          - ubuntu:23.04
+          - ubuntu:24.04
           - debian:10
           - debian:11
           - debian:12
@@ -379,11 +399,11 @@ jobs:
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
@@ -393,7 +413,7 @@ jobs:
 
   rpm-verify:
     name: Verify RPM Packages
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
@@ -401,14 +421,10 @@ jobs:
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       DD_PKG_VERSION: "latest"
-      # https://github.blog/changelog/2024-03-07-github-actions-all-actions-will-run-on-node20-instead-of-node16-by-default/
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
-      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
     strategy:
       matrix:
         container:
           - "quay.io/centos/centos:stream9"
-          - "amazonlinux:2"
           - "amazonlinux:2023"
           - "fedora:39"
           - "fedora:40"
@@ -434,11 +450,11 @@ jobs:
       - name: Fix Git safe directories issue when in containers (actions/checkout#760)
         run: git config --global --add safe.directory /__w/vector/vector
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
@@ -448,30 +464,38 @@ jobs:
 
   macos-verify:
     name: Verify macOS Package
-    runs-on: macos-12
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            runner: macos-latest-large
+          - target: arm64-apple-darwin
+            runner: macos-latest-xlarge
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@v3
+      - name: Download staged package artifacts (${{ matrix.target }})
+        uses: actions/download-artifact@v4
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}
           path: target/artifacts
       - name: Verify macOS package
         run: |
-          tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz && vector-x86_64-apple-darwin/bin/vector --version
+          tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-${{ matrix.target }}.tar.gz \
+            && vector-${{ matrix.target }}/bin/vector --version
 
   publish-docker:
     name: Publish to Docker
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs:
       - generate-publish-metadata
@@ -490,7 +514,7 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Login to DockerHub
@@ -498,65 +522,76 @@ jobs:
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3.2.0
+        uses: docker/setup-qemu-action@v3.6.0
         with:
           platforms: all
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.7.1
+        uses: docker/setup-buildx-action@v3.10.0
         with:
           version: latest
           install: true
       - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (aarch64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-gnueabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-gnueabi
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-musleabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts
       - name: Build and publish Docker images
         env:
           PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
-        run: |
-          make release-docker
+          REPOS: "timberio/vector,ghcr.io/vectordotdev/vector"
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: make release-docker
 
   publish-s3:
     name: Publish to S3
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - generate-publish-metadata
@@ -564,7 +599,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - build-armv7-unknown-linux-gnueabihf-packages
@@ -578,56 +613,61 @@ jobs:
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (aarch64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
           path: target/artifacts
+      - name: Download staged package artifacts (arm64-apple-darwin)
+        uses: actions/download-artifact@v4
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-arm64-apple-darwin
+          path: target/artifacts
       - name: Download staged package artifacts (x86_64-pc-windows-msvc)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-gnueabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-gnueabi
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-musleabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts
@@ -641,7 +681,7 @@ jobs:
     name: Publish to GitHub
     # We only publish to GitHub for versioned releases, not nightlies.
     if: inputs.channel == 'release'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - generate-publish-metadata
@@ -649,7 +689,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-armv7-unknown-linux-musleabihf-packages
@@ -663,61 +703,66 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (aarch64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
           path: target/artifacts
+      - name: Download staged package artifacts (arm64-apple-darwin)
+        uses: actions/download-artifact@v4
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-arm64-apple-darwin
+          path: target/artifacts
       - name: Download staged package artifacts (x86_64-pc-windows-msvc)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
       - name: Download artifact checksums
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-gnueabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-gnueabi
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-musleabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts
@@ -730,7 +775,7 @@ jobs:
     name: Publish to Homebrew
     # We only publish to Homebrew for versioned releases, not nightlies.
     if: inputs.channel == 'release'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs:
       - generate-publish-metadata
@@ -739,17 +784,17 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Publish update to Homebrew tap
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: make release-homebrew
 
   generate-sha256sum:
     name: Generate SHA256 checksums
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
@@ -757,7 +802,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
+      - build-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-armv7-unknown-linux-musleabihf-packages
@@ -767,63 +812,68 @@ jobs:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
       - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (aarch64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
           path: target/artifacts
       - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
           path: target/artifacts
+      - name: Download staged package artifacts (arm64-apple-darwin)
+        uses: actions/download-artifact@v4
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-arm64-apple-darwin
+          path: target/artifacts
       - name: Download staged package artifacts (x86_64-pc-windows-msvc)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
           path: target/artifacts
       - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-gnueabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-gnueabi
           path: target/artifacts
       - name: Download staged package artifacts (arm-unknown-linux-musleabi)
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts
       - name: Generate SHA256 checksums for artifacts
         run: make sha256sum
       - name: Stage checksum for publish
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
           path: target/artifacts/vector-${{ env.VECTOR_VERSION }}-SHA256SUMS

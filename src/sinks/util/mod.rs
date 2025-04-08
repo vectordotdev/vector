@@ -6,6 +6,7 @@ pub mod batch;
 pub mod buffer;
 pub mod builder;
 pub mod compressor;
+pub mod datagram;
 pub mod encoding;
 pub mod http;
 pub mod metadata;
@@ -23,7 +24,7 @@ pub mod tcp;
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test;
 pub mod udp;
-#[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
+#[cfg(unix)]
 pub mod unix;
 pub mod uri;
 pub mod zstd;

@@ -488,7 +488,7 @@ mod test {
     // https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus
     #[test]
     fn test_not_extended() {
-        let payload = r##"
+        let payload = r"
 localhost
 ServerVersion: Apache/2.4.46 (Unix)
 ServerMPM: event
@@ -513,7 +513,7 @@ ConnsAsyncWriting: 0
 ConnsAsyncKeepAlive: 0
 ConnsAsyncClosing: 0
 Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W__________________.....................................................................................................................................................................................................................................................................................................................................
-            "##;
+            ";
 
         let (now, metrics, errors) = parse_sort(payload);
 
@@ -672,7 +672,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
     // https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus
     #[test]
     fn test_extended() {
-        let payload = r##"
+        let payload = r"
 localhost
 ServerVersion: Apache/2.4.46 (Unix)
 ServerMPM: event
@@ -710,7 +710,7 @@ ConnsAsyncWriting: 0
 ConnsAsyncKeepAlive: 0
 ConnsAsyncClosing: 0
 Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W__________________.....................................................................................................................................................................................................................................................................................................................................
-            "##;
+            ";
 
         let (now, metrics, errors) = parse_sort(payload);
 
@@ -927,10 +927,10 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
     #[test]
     fn test_parse_failure() {
-        let payload = r##"
+        let payload = r"
 ServerUptimeSeconds: not a number
 ConnsTotal: 1
-            "##;
+            ";
 
         let (now, metrics, errors) = parse_sort(payload);
 

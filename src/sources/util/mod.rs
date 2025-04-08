@@ -9,7 +9,7 @@ pub mod grpc;
 #[cfg(any(
     feature = "sources-utils-http-auth",
     feature = "sources-utils-http-encoding",
-    feature = "sources-utils-http-error",
+    feature = "sources-utils-http-headers",
     feature = "sources-utils-http-prelude",
     feature = "sources-utils-http-query"
 ))]
@@ -48,6 +48,8 @@ pub use wrappers::{AfterRead, AfterReadExt};
 
 #[cfg(feature = "sources-http_server")]
 pub use self::body_decoding::Encoding;
+#[cfg(feature = "sources-utils-http-headers")]
+pub use self::http::add_headers;
 #[cfg(feature = "sources-utils-http-query")]
 pub use self::http::add_query_parameters;
 #[cfg(any(
@@ -56,12 +58,8 @@ pub use self::http::add_query_parameters;
     feature = "sources-utils-http-encoding"
 ))]
 pub use self::http::decode;
-#[cfg(feature = "sources-utils-http-error")]
-pub use self::http::ErrorMessage;
 #[cfg(feature = "sources-utils-http-prelude")]
 pub use self::http::HttpSource;
-#[cfg(feature = "sources-utils-http-auth")]
-pub use self::http::HttpSourceAuthConfig;
 #[cfg(any(feature = "sources-aws_sqs", feature = "sources-gcp_pubsub"))]
 pub use self::message_decoding::decode_message;
 

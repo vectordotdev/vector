@@ -13,38 +13,42 @@ path = "tests/bin/generate-avro-fixtures.rs"
 apache-avro = { version = "0.16.0", default-features = false }
 bytes = { version = "1", default-features = false }
 chrono.workspace = true
-csv-core = { version = "0.1.10", default-features = false }
+csv-core = { version = "0.1.12", default-features = false }
 derivative = { version = "2", default-features = false }
 dyn-clone = { version = "1", default-features = false }
+flate2.workspace = true
 influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
-ordered-float = { version = "4.3.0", default-features = false }
+ordered-float = { version = "4.6.0", default-features = false }
 prost.workspace = true
 prost-reflect.workspace = true
-regex = { version = "1.11.0", default-features = false, features = ["std", "perf"] }
+rand.workspace = true
+regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
 serde.workspace = true
+serde_with = { version = "3.12.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_json.workspace = true
 smallvec = { version = "1", default-features = false, features = ["union"] }
-snafu = { version = "0.7.5", default-features = false, features = ["futures"] }
+snafu.workspace = true
 syslog_loose = { version = "0.21", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
+tokio.workspace = true
 tracing = { version = "0.1", default-features = false }
 vrl.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
-vector-config-common = { path = "../vector-config-common", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 
 [dev-dependencies]
 futures.workspace = true
-indoc = { version = "2", default-features = false }
+indoc.workspace = true
 tokio = { version = "1", features = ["test-util"] }
-similar-asserts = "1.6.0"
+similar-asserts = "1.7.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
+rstest = "0.25.0"
+tracing-test = "0.2.5"
 uuid.workspace = true
-rstest = "0.23.0"
 vrl.workspace = true
 
 [features]

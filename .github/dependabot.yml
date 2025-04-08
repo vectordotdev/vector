@@ -3,16 +3,22 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "monthly"
       time: "04:00" # UTC
     labels:
       - "domain: deps"
       - "no-changelog"
-      - "ci-condition: skip-regression"
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
     groups:
+      patches:
+        applies-to: version-updates
+        patterns:
+        - "*"
+        update-types:
+        - "patch"
+
       amq:
         patterns:
         - "amq-*"
@@ -67,23 +73,21 @@ updates:
   - package-ecosystem: "docker"
     directory: "/distribution/docker/"
     schedule:
-      interval: "daily"
+      interval: "monthly"
       time: "04:00" # UTC
     labels:
       - "domain: releasing"
       - "no-changelog"
-      - "ci-condition: skip-regression"
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "monthly"
     labels:
       - "domain: ci"
       - "no-changelog"
-      - "ci-condition: skip-regression"
     commit-message:
       prefix: "chore(ci)"
     groups:
@@ -91,3 +95,19 @@ updates:
         patterns:
         - "actions/download-artifact"
         - "actions/upload-artifact"
+  - package-ecosystem: "npm"
+    directory: "website/"
+    schedule:
+      interval: "monthly"
+      time: "05:00" # UTC
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "no-changelog"
+    commit-message:
+      prefix: "chore(website deps)"
+    open-pull-requests-limit: 50
+    groups:
+      npm_and_yarn:
+        patterns:
+          - "*"

@@ -1,6 +1,6 @@
 use hickory_proto::{
-    error::ProtoResult,
     serialize::binary::{BinDecodable, BinDecoder, BinEncodable, BinEncoder},
+    ProtoError,
 };
 
 pub const EDE_OPTION_CODE: u16 = 15u16;
@@ -52,6 +52,7 @@ impl EDE {
             27 => Some("Unsupported NSEC3 Iterations Value"),
             28 => Some("Unable to conform to policy"),
             29 => Some("Synthesized"),
+            30 => Some("Invalid Query Type"),
             _ => None,
         }
     }
@@ -66,7 +67,7 @@ impl EDE {
 }
 
 impl BinEncodable for EDE {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
+    fn emit(&self, encoder: &mut BinEncoder<'_>) -> Result<(), ProtoError> {
         encoder.emit_u16(self.info_code)?;
         if let Some(extra_text) = &self.extra_text {
             encoder.emit_vec(extra_text.as_bytes())?;
@@ -76,7 +77,7 @@ impl BinEncodable for EDE {
 }
 
 impl<'a> BinDecodable<'a> for EDE {
-    fn read(decoder: &mut BinDecoder<'a>) -> ProtoResult<Self> {
+    fn read(decoder: &mut BinDecoder<'a>) -> Result<Self, ProtoError> {
         let info_code = decoder.read_u16()?.unverified();
         let extra_text = if decoder.is_empty() {
             None
