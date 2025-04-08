@@ -35,7 +35,7 @@ jobs:
 
   checks:
     name: Checks
-    runs-on: ubuntu-24.04-8core
+    runs-on: ubuntu-16-core-latest
     timeout-minutes: 60
     needs: changes
     env:
