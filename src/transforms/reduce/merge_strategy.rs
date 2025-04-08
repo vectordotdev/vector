@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use crate::event::{LogEvent, Value};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
+use dyn_clone::DynClone;
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
 use vrl::path::OwnedTargetPath;
@@ -566,11 +567,13 @@ impl ReduceValueMerger for MinNumberMerger {
     }
 }
 
-pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync {
+pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync + DynClone {
     fn add(&mut self, v: Value) -> Result<(), String>;
     fn insert_into(self: Box<Self>, path: &OwnedTargetPath, v: &mut LogEvent)
         -> Result<(), String>;
 }
+
+dyn_clone::clone_trait_object!(ReduceValueMerger);
 
 impl From<Value> for Box<dyn ReduceValueMerger> {
     fn from(v: Value) -> Self {
