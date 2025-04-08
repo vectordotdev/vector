@@ -356,7 +356,7 @@ impl Prepare {
         if !gh_status.success() {
             return Err(anyhow!("Failed to create PR with gh CLI"));
         }
-        info!("Successfully created PR against {release_branch}");
+        info!("Successfully created PR against {}", self.release_branch);
         Ok(())
     }
 
