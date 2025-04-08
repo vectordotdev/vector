@@ -527,3 +527,4 @@ gifs
 meme
 simdutf
 vhosts
+miniz
