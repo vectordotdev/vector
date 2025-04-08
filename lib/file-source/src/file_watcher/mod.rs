@@ -14,9 +14,9 @@ use vector_common::constants::GZIP_MAGIC;
 use crate::{
     buffer::read_until_with_max_size, metadata_ext::PortableFileExt, FilePosition, ReadFrom,
 };
+mod notify_watcher;
 #[cfg(test)]
 mod tests;
-mod notify_watcher;
 
 use notify_watcher::NotifyWatcher;
 
@@ -260,7 +260,11 @@ impl FileWatcher {
 
                     for (path, kind) in events {
                         if path == self.path {
-                            debug!(message = "Detected relevant file event, activating watcher", ?path, ?kind);
+                            debug!(
+                                message = "Detected relevant file event, activating watcher",
+                                ?path,
+                                ?kind
+                            );
                             self.activate()?;
                             // Note: The FileServer will handle emitting the event when it processes the file
                             break;
@@ -411,8 +415,6 @@ impl FileWatcher {
     pub fn last_seen(&self) -> Instant {
         self.last_seen
     }
-
-
 }
 
 fn is_gzipped(r: &mut io::BufReader<fs::File>) -> io::Result<bool> {

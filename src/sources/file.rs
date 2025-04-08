@@ -13,8 +13,8 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::file_source::{
     calculate_ignore_before,
     paths_provider::glob::{Glob, MatchOptions},
-    BoxedPathsProvider, Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, NotifyPathsProvider, ReadFrom,
-    ReadFromConfig,
+    BoxedPathsProvider, Checkpointer, FileFingerprint, FileServer, FingerprintStrategy,
+    Fingerprinter, Line, NotifyPathsProvider, ReadFrom, ReadFromConfig,
 };
 use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
@@ -564,12 +564,15 @@ pub fn file_source(
             include_patterns = ?config.include,
             exclude_patterns = ?exclude_patterns,
         );
-        BoxedPathsProvider::new(Glob::new(
-            &config.include,
-            &exclude_patterns,
-            MatchOptions::default(),
-            emitter.clone(),
-        ).expect("invalid glob patterns"))
+        BoxedPathsProvider::new(
+            Glob::new(
+                &config.include,
+                &exclude_patterns,
+                MatchOptions::default(),
+                emitter.clone(),
+            )
+            .expect("invalid glob patterns"),
+        )
     };
 
     let encoding_charset = config.encoding.clone().map(|e| e.charset);

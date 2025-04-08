@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -7,8 +7,8 @@ use glob::{MatchOptions, Pattern};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tracing::{debug, error, trace, warn};
 
-use crate::FileSourceInternalEvents;
 use super::PathsProvider;
+use crate::FileSourceInternalEvents;
 
 /// Metadata about a discovered file
 #[derive(Debug, Clone)]
@@ -74,7 +74,9 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
             discovered_files: Arc::new(DashMap::new()),
             watcher: None,
             event_rx: None,
-            last_glob_scan: Instant::now().checked_sub(glob_minimum_cooldown).unwrap_or_else(Instant::now),
+            last_glob_scan: Instant::now()
+                .checked_sub(glob_minimum_cooldown)
+                .unwrap_or_else(Instant::now),
             glob_minimum_cooldown,
             emitter,
         };
@@ -177,7 +179,7 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
                                     EventKind::Create(notify::event::CreateKind::File) => true,
                                     // File was moved
                                     EventKind::Modify(notify::event::ModifyKind::Name(
-                                        notify::event::RenameMode::To
+                                        notify::event::RenameMode::To,
                                     )) => true,
                                     // Other events are not relevant for discovery
                                     _ => false,
@@ -232,7 +234,8 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
         self.last_glob_scan = now;
 
         // Use the traditional glob approach to find files
-        let files = self.include_patterns
+        let files = self
+            .include_patterns
             .iter()
             .flat_map(|include_pattern| {
                 glob::glob_with(include_pattern.as_str(), self.glob_match_options)
@@ -255,11 +258,9 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
 
         // Update our cache with the discovered files
         for path in files {
-            self.discovered_files.entry(path).or_insert_with(|| {
-                FileMetadata {
-                    last_seen: now,
-                }
-            });
+            self.discovered_files
+                .entry(path)
+                .or_insert_with(|| FileMetadata { last_seen: now });
         }
 
         // Update the last_seen timestamp for all files
@@ -274,7 +275,7 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
     }
 
     /// Check if a path matches our include/exclude patterns
-    fn matches_patterns(&self, path: &PathBuf) -> bool {
+    fn matches_patterns(&self, path: &Path) -> bool {
         // Check if the path matches any include pattern
         let path_str = path.to_str().unwrap_or_default();
         let matches_include = self.include_patterns.iter().any(|pattern| {
@@ -284,9 +285,10 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
         });
 
         // Check if the path matches any exclude pattern
-        let matches_exclude = self.exclude_patterns.iter().any(|pattern| {
-            pattern.matches(path_str)
-        });
+        let matches_exclude = self
+            .exclude_patterns
+            .iter()
+            .any(|pattern| pattern.matches(path_str));
 
         matches_include && !matches_exclude
     }
@@ -300,6 +302,9 @@ impl<E: FileSourceInternalEvents> PathsProvider for NotifyPathsProvider<E> {
         self.process_events();
 
         // Return the current set of discovered files
-        self.discovered_files.iter().map(|entry| entry.key().clone()).collect()
+        self.discovered_files
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect()
     }
 }

@@ -19,10 +19,7 @@ pub use self::{
     file_watcher::WatcherState,
     fingerprinter::{FileFingerprint, FingerprintStrategy, Fingerprinter},
     internal_events::FileSourceInternalEvents,
-    paths_provider::{
-        boxed::BoxedPathsProvider,
-        notify::NotifyPathsProvider,
-    },
+    paths_provider::{boxed::BoxedPathsProvider, notify::NotifyPathsProvider},
 };
 use vector_config::configurable_component;
 

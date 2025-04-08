@@ -181,7 +181,8 @@ where
             let should_discover = if self.using_notify_discovery {
                 // When using notify-based discovery, we only need to glob occasionally as a fallback
                 // This is much less frequent than with polling-based discovery
-                next_glob_time <= now_time && now_time.duration_since(next_glob_time) > Duration::from_secs(10)
+                next_glob_time <= now_time
+                    && now_time.duration_since(next_glob_time) > Duration::from_secs(10)
             } else {
                 // Standard behavior for polling-based discovery
                 next_glob_time <= now_time
@@ -334,7 +335,9 @@ where
                 if let Some(idle_timeout) = self.idle_timeout {
                     match watcher.state() {
                         // If the file is active but hasn't been read from in a while, switch to passive mode
-                        WatcherState::Active if watcher.last_read_success().elapsed() > idle_timeout => {
+                        WatcherState::Active
+                            if watcher.last_read_success().elapsed() > idle_timeout =>
+                        {
                             if watcher.reached_eof() {
                                 trace!(
                                     message = "Switching file to passive mode",
@@ -350,14 +353,17 @@ where
                                         error = ?e
                                     );
                                 } else {
-                                    self.emitter.emit_file_switched_to_passive(&watcher.path, watcher.get_file_position());
+                                    self.emitter.emit_file_switched_to_passive(
+                                        &watcher.path,
+                                        watcher.get_file_position(),
+                                    );
                                 }
                             }
-                        },
+                        }
                         // Passive files are handled by the notify watcher and will be activated when needed
                         WatcherState::Passive => {
                             // The file watcher will automatically activate when events are detected
-                        },
+                        }
                         _ => {}
                     }
                 }

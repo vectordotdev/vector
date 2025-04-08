@@ -70,7 +70,11 @@ impl NotifyWatcher {
     }
 
     /// Add a file to be watched in passive mode
-    pub fn watch_file(&mut self, path: PathBuf, file_position: FilePosition) -> Result<(), notify::Error> {
+    pub fn watch_file(
+        &mut self,
+        path: PathBuf,
+        file_position: FilePosition,
+    ) -> Result<(), notify::Error> {
         if self.watcher.is_none() {
             self.initialize(&path)?;
         }
