@@ -3754,6 +3754,7 @@ dependencies = [
  "glob",
  "indexmap 2.8.0",
  "libc",
+ "notify",
  "quickcheck",
  "scan_fmt",
  "serde",
