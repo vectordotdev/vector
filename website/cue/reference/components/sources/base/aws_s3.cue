@@ -708,14 +708,28 @@ base: components: sources: aws_s3: configuration: {
 					unit: "seconds"
 				}
 			}
-			deferred_queue_url: {
-				description: """
-					Used in conjunction with `max_file_age_secs` to forward events to a different queue for later processing.
-					If the event is older than `max_file_age_secs` seconds, it is forwarded to this queue.
-					If this is not set, the event is deleted.
-					"""
-				required: false
-				type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
+			deferred: {
+				description: "Configuration for deferring events to another queue based on their age."
+				required:    false
+				type: object: options: {
+					max_age_secs: {
+						description: """
+																Event must have been emitted within the last max_age_secs seconds to be processed.
+																If the event is older, it is forwarded to the queue_url for later processing.
+																This is useful for preferring to process more recent files.
+																"""
+						required: true
+						type: uint: {
+							examples: [3600]
+							unit: "seconds"
+						}
+					}
+					queue_url: {
+						description: "The URL of the queue to forward events to when they are older than max_age_secs."
+						required:    true
+						type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
+					}
+				}
 			}
 			delete_failed_message: {
 				description: """
@@ -734,20 +748,6 @@ base: components: sources: aws_s3: configuration: {
 					"""
 				required: false
 				type: bool: default: true
-			}
-			max_file_age_secs: {
-				description: """
-					Event must have been emitted within the last `max_file_age_secs` seconds to be processed.
-					If the event is older, it can be forwarded to the `deferred_queue_url` for later processing
-					otherwise it is deleted.
-
-					This is useful for preferring to process more recent files.
-					"""
-				required: false
-				type: uint: {
-					examples: [3600]
-					unit: "seconds"
-				}
 			}
 			max_number_of_messages: {
 				description: """
