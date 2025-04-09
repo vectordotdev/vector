@@ -110,6 +110,12 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
     }
 }
 
+fn append_param<T: ToString>(uri: &mut String, key: &str, value: Option<T>) {
+    if let Some(val) = value {
+        uri.push_str(&format!("{}={}&", key, val.to_string()));
+    }
+}
+
 fn set_uri_query(
     uri: &Uri,
     database: &str,
@@ -139,63 +145,39 @@ fn set_uri_query(
     }
 
     uri.push_str("?input_format_import_nested_json=1&");
-    if let Some(skip_unknown) = skip_unknown {
-        if skip_unknown {
-            uri.push_str("input_format_skip_unknown_fields=1&");
-        } else {
-            uri.push_str("input_format_skip_unknown_fields=0&")
-        }
-    }
-    if date_time_best_effort {
-        uri.push_str("date_time_input_format=best_effort&")
-    }
-    if insert_random_shard {
-        uri.push_str("insert_distributed_one_random_shard=1&")
-    }
-    if let Some(async_insert) = query_settings.async_insert {
-        if async_insert {
-            uri.push_str("async_insert=1&");
-        } else {
-            uri.push_str("async_insert=0&")
-        }
-    }
-    if let Some(wait_for_async_insert) = query_settings.wait_for_async_insert {
-        if wait_for_async_insert {
-            uri.push_str("wait_for_async_insert=1&");
-        } else {
-            uri.push_str("wait_for_async_insert=0&")
-        }
-    }
-    if let Some(wait_for_async_insert_timeout) = query_settings.wait_for_async_insert_timeout {
-        uri.push_str(
-            format!(
-                "wait_for_async_insert_timeout={}&",
-                wait_for_async_insert_timeout,
-            )
-            .as_str(),
-        );
-    }
-    if let Some(async_insert_deduplicate) = query_settings.async_insert_deduplicate {
-        if async_insert_deduplicate {
-            uri.push_str("async_insert_deduplicate=1&");
-        } else {
-            uri.push_str("async_insert_deduplicate=0&")
-        }
-    }
-    if let Some(async_insert_max_data_size) = query_settings.async_insert_max_data_size {
-        uri.push_str(
-            format!("async_insert_max_data_size={}&", async_insert_max_data_size,).as_str(),
-        );
-    }
-    if let Some(async_insert_max_query_number) = query_settings.async_insert_max_query_number {
-        uri.push_str(
-            format!(
-                "async_insert_max_query_number={}&",
-                async_insert_max_query_number,
-            )
-            .as_str(),
-        );
-    }
+    append_param(&mut uri, "input_format_skip_unknown_fields", skip_unknown);
+    append_param(
+        &mut uri,
+        "date_time_best_effort",
+        Some(date_time_best_effort),
+    );
+    append_param(&mut uri, "insert_random_shard", Some(insert_random_shard));
+    append_param(&mut uri, "async_insert", query_settings.async_insert);
+    append_param(
+        &mut uri,
+        "wait_for_async_insert",
+        query_settings.wait_for_async_insert,
+    );
+    append_param(
+        &mut uri,
+        "wait_for_async_insert_timeout",
+        query_settings.wait_for_async_insert_timeout,
+    );
+    append_param(
+        &mut uri,
+        "async_insert_deduplicate",
+        query_settings.async_insert_deduplicate,
+    );
+    append_param(
+        &mut uri,
+        "async_insert_max_data_size",
+        query_settings.async_insert_max_data_size,
+    );
+    append_param(
+        &mut uri,
+        "async_insert_max_query_number",
+        query_settings.async_insert_max_query_number,
+    );
     uri.push_str(query.as_str());
 
     uri.parse::<Uri>()
