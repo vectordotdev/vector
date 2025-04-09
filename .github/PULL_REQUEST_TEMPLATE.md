@@ -45,11 +45,12 @@ Providing this information upfront will facilitate a smoother review process. --
 - Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
 - Do not hesitate to use `@vectordotdev/vector` to reach out to us regarding this PR.
 - The CI checks run only after we manually approve them.
-  - We recommend adding `pre-push` hook, you can find one [here](https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md#Pre-push).
+  - We recommend adding a `pre-push` hook, please see [this template](https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md#Pre-push).
   - Alternatively, we recommend running the following locally before pushing to the remote branch:
     - `cargo fmt --all`
     - `cargo clippy --workspace --all-targets -- -D warnings`
     - `cargo nextest run --workspace` (alternatively, you can run `cargo test --all`)
+    - `./scripts/check_changelog_fragments.sh`
 - After a review is requested, please avoid force pushes to help us review incrementally.
   - Feel free to push as many commits as you want. They will be squashed into one before merging.
   - For example, you can run `git merge origin master` and `git push`.
