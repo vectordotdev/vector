@@ -6,6 +6,13 @@ releases: "0.46.0": {
 
 	whats_next: []
 
+	known_issues: [
+		"""
+			Several AWS integrations such as `aws_kinesis_firehose` sink, `aws_kinesis_streams` sink and `aws_s3` source stopped working.
+			This was reported in [issue 22840](https://github.com/vectordotdev/vector/issues/22840).
+			""",
+	]
+
 	description: """
 		The Vector team is pleased to announce version `0.46.0`!
 
