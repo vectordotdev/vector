@@ -586,6 +586,8 @@ mod tests {
                                                 user: _user,
                                                 password: _password,
                                             } => { /* Not needed for tests at the moment */ }
+                                            #[cfg(feature = "aws-core")]
+                                            _ => {}
                                         }
                                     }
                                     Ok(res)

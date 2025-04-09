@@ -23,7 +23,7 @@ const DEFAULT_PROFILE_NAME: &str = "default";
 /// IMDS Client Configuration for authenticating with AWS.
 #[serde_as]
 #[configurable_component]
-#[derive(Copy, Clone, Debug, Derivative)]
+#[derive(Copy, Clone, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct ImdsAuthentication {
@@ -57,7 +57,7 @@ const fn default_timeout() -> Duration {
 
 /// Configuration of the authentication strategy for interacting with AWS services.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative)]
+#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, untagged)]
 pub enum AwsAuthentication {
