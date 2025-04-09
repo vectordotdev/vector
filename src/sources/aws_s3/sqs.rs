@@ -57,6 +57,27 @@ use vector_lib::lookup::{metadata_path, path, PathPrefix};
 static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
     LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
 
+/// Configuration for deferring events based on their age.
+#[serde_as]
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub(super) struct DeferredConfig {
+    /// The URL of the queue to forward events to when they are older than max_age_secs.
+    #[configurable(metadata(
+        docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+    ))]
+    #[configurable(validation(format = "uri"))]
+    pub(super) queue_url: String,
+
+    /// Event must have been emitted within the last max_age_secs seconds to be processed.
+    /// If the event is older, it is forwarded to the queue_url for later processing.
+    /// This is useful for preferring to process more recent files.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 3600))]
+    pub(super) max_age_secs: u64,
+}
+
 /// SQS configuration options.
 //
 // TODO: It seems awfully likely that we could re-use the existing configuration type for the `aws_sqs` source in some
@@ -152,23 +173,9 @@ pub(super) struct Config {
     #[serde(flatten)]
     pub(super) timeout: Option<AwsTimeout>,
 
-    /// Used in conjunction with `max_file_age_secs` to forward events to a different queue for later processing.
-    /// If the event is older than `max_file_age_secs` seconds, it is forwarded to this queue.
-    /// If this is not set, the event is deleted.
-    #[configurable(metadata(
-        docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
-    ))]
-    #[configurable(validation(format = "uri"))]
-    pub(super) deferred_queue_url: Option<String>,
-
-    /// Event must have been emitted within the last `max_file_age_secs` seconds to be processed.
-    /// If the event is older, it can be forwarded to the `deferred_queue_url` for later processing
-    /// otherwise it is deleted.
-    ///
-    /// This is useful for preferring to process more recent files.
-    #[configurable(metadata(docs::type_unit = "seconds"))]
-    #[configurable(metadata(docs::examples = 3600))]
-    pub(super) max_file_age_secs: Option<u64>,
+    /// Configuration for deferring events to another queue based on their age.
+    #[configurable(derived)]
+    pub(super) deferred: Option<DeferredConfig>,
 }
 
 const fn default_poll_secs() -> u32 {
@@ -278,8 +285,7 @@ pub struct State {
     delete_failed_message: bool,
     decoder: Decoder,
 
-    max_file_age_secs: Option<u64>,
-    deferred_queue_url: Option<String>,
+    deferred: Option<DeferredConfig>,
 }
 
 pub(super) struct Ingestor {
@@ -322,8 +328,7 @@ impl Ingestor {
             delete_failed_message: config.delete_failed_message,
             decoder,
 
-            deferred_queue_url: config.deferred_queue_url,
-            max_file_age_secs: config.max_file_age_secs,
+            deferred: config.deferred,
         });
 
         Ok(Ingestor { state })
@@ -462,12 +467,12 @@ impl IngestorProcess {
                             emit!(SqsMessageProcessingSucceeded {
                                 message_id: &message_id
                             });
-                            if let Some(deferred_queue) = &self.state.deferred_queue_url {
+                            if let Some(deferred) = &self.state.deferred {
                                 trace!(
                                     message = "Forwarding message to deferred queue.",
                                     id = message_id,
                                     receipt_handle = receipt_handle,
-                                    deferred_queue = deferred_queue,
+                                    deferred_queue = deferred.queue_url,
                                 );
 
                                 deferred_entries.push(
@@ -621,13 +626,13 @@ impl IngestorProcess {
             });
         }
 
-        if let Some(max_age_secs) = self.state.max_file_age_secs {
+        if let Some(deferred) = &self.state.deferred {
             let delta = Utc::now() - s3_event.event_time;
-            if delta.num_seconds() > max_age_secs as i64 {
+            if delta.num_seconds() > deferred.max_age_secs as i64 {
                 return Err(ProcessingError::FileTooOld {
                     bucket: s3_event.s3.bucket.name.clone(),
                     key: s3_event.s3.object.key.clone(),
-                    deferred_queue: self.state.deferred_queue_url.clone().unwrap(),
+                    deferred_queue: deferred.queue_url.clone(),
                 });
             }
         }
@@ -845,13 +850,18 @@ impl IngestorProcess {
         &mut self,
         entries: Vec<SendMessageBatchRequestEntry>,
     ) -> Result<SendMessageBatchOutput, SdkError<SendMessageBatchError, HttpResponse>> {
-        self.state
-            .sqs_client
-            .send_message_batch()
-            .queue_url(self.state.deferred_queue_url.clone().unwrap())
-            .set_entries(Some(entries))
-            .send()
-            .await
+        if let Some(deferred) = &self.state.deferred {
+            self.state
+                .sqs_client
+                .send_message_batch()
+                .queue_url(deferred.queue_url.clone())
+                .set_entries(Some(entries))
+                .send()
+                .await
+        } else {
+            // This shouldn't happen as we only call send_messages when we have deferred config
+            panic!("Attempted to send messages without deferred queue configuration")
+        }
     }
 }
 
@@ -1193,4 +1203,59 @@ fn test_s3_sns_testevent() {
     assert_eq!(value.bucket, "bucketname".to_string());
     assert_eq!(value.event.kind, "s3".to_string());
     assert_eq!(value.event.name, "TestEvent".to_string());
+}
+
+#[test]
+fn parse_sqs_config() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    assert!(config.deferred.is_none());
+
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [deferred]
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+            max_age_secs = 3600
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    let Some(deferred) = config.deferred else {
+        panic!("Expected deferred config");
+    };
+    assert_eq!(
+        deferred.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+    );
+    assert_eq!(deferred.max_age_secs, 3600);
+
+    let test: Result<Config, toml::de::Error> = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [deferred]
+            max_age_secs = 3600
+        "#,
+    );
+    assert!(test.is_err());
+
+    let test: Result<Config, toml::de::Error> = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [deferred]
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+        "#,
+    );
+    assert!(test.is_err());
 }
