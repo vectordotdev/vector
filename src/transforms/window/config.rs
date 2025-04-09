@@ -23,24 +23,24 @@ use super::transform::Window;
 pub struct WindowConfig {
     /// A condition used to pass events through the transform without buffering.
     ///
-    /// If the condition resolves to `true` for an event, the event is immediately passed through
-    /// without preserving the original order of events. Use with caution if the sink cannot handle
-    /// out of order events.
-    pub pass_when: Option<AnyCondition>,
+    /// If the condition resolves to `true` for an event, the event is immediately forwarded without
+    /// buffering and without preserving the original order of events. Use with caution if the sink
+    /// cannot handle out of order events.
+    pub forward_when: Option<AnyCondition>,
 
     /// A condition used to flush the events.
     ///
     /// If the condition resolves to `true` for an event, the whole window is immediately flushed,
-    /// including the event itself, and any following events if `events_after` is more than zero.
+    /// including the event itself, and any following events if `num_events_after` is more than zero.
     pub flush_when: AnyCondition,
 
     /// The maximum number of events to keep before the event matched by the `flush_when` condition.
     #[serde(default = "default_events_before")]
-    pub events_before: usize,
+    pub num_events_before: usize,
 
     /// The maximum number of events to keep after the event matched by the `flush_when` condition.
     #[serde(default = "default_events_after")]
-    pub events_after: usize,
+    pub num_events_after: usize,
 }
 
 impl GenerateConfig for WindowConfig {
@@ -63,13 +63,13 @@ impl TransformConfig for WindowConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(
             Window::new(
-                self.pass_when
+                self.forward_when
                     .as_ref()
                     .map(|condition| condition.build(&context.enrichment_tables))
                     .transpose()?,
                 self.flush_when.build(&context.enrichment_tables)?,
-                self.events_before,
-                self.events_after,
+                self.num_events_before,
+                self.num_events_after,
             )
             .unwrap(),
         ))

@@ -12,10 +12,10 @@ use crate::{
 #[derive(Clone)]
 pub struct Window {
     // Configuration parameters
-    pass_when: Option<Condition>,
+    forward_when: Option<Condition>,
     flush_when: Condition,
-    events_before: usize,
-    events_after: usize,
+    num_events_before: usize,
+    num_events_after: usize,
 
     // Internal variables
     buffer: VecDeque<Event>,
@@ -26,18 +26,18 @@ pub struct Window {
 
 impl Window {
     pub fn new(
-        pass_when: Option<Condition>,
+        forward_when: Option<Condition>,
         flush_when: Condition,
-        events_before: usize,
-        events_after: usize,
+        num_events_before: usize,
+        num_events_after: usize,
     ) -> crate::Result<Self> {
-        let buffer = VecDeque::with_capacity(events_before);
+        let buffer = VecDeque::with_capacity(num_events_before);
 
         Ok(Window {
-            pass_when,
+            forward_when,
             flush_when,
-            events_before,
-            events_after,
+            num_events_before,
+            num_events_after,
             events_dropped: register!(WindowEventsDropped),
             buffer,
             events_counter: 0,
@@ -48,7 +48,7 @@ impl Window {
 
 impl FunctionTransform for Window {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-        let (pass, event) = match self.pass_when.as_ref() {
+        let (pass, event) = match self.forward_when.as_ref() {
             Some(condition) => {
                 let (result, event) = condition.check(event);
                 (result, event)
@@ -58,14 +58,14 @@ impl FunctionTransform for Window {
 
         let (flush, event) = self.flush_when.check(event);
 
-        if self.buffer.capacity() < self.events_before {
-            self.buffer.reserve(self.events_before);
+        if self.buffer.capacity() < self.num_events_before {
+            self.buffer.reserve(self.num_events_before);
         }
 
         if pass {
             output.push(event);
         } else if flush {
-            if self.events_before > 0 {
+            if self.num_events_before > 0 {
                 self.buffer.drain(..).for_each(|evt| output.push(evt));
             }
 
@@ -75,18 +75,18 @@ impl FunctionTransform for Window {
         } else if self.is_flushing {
             self.events_counter += 1;
 
-            if self.events_counter > self.events_after {
+            if self.events_counter > self.num_events_after {
                 self.events_counter = 0;
                 self.is_flushing = false;
                 self.events_dropped.emit(Count(1));
             } else {
                 output.push(event);
             }
-        } else if self.buffer.len() >= self.events_before {
+        } else if self.buffer.len() >= self.num_events_before {
             self.buffer.pop_front();
             self.buffer.push_back(event);
             self.events_dropped.emit(Count(1));
-        } else if self.events_before > 0 {
+        } else if self.num_events_before > 0 {
             self.buffer.push_back(event);
         } else {
             self.events_dropped.emit(Count(1));
@@ -135,15 +135,15 @@ mod test {
     async fn test_pass() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
-            let pass_when = get_condition("pass");
-            let transform_config = get_transform_config(flush_when, Some(pass_when), 1, 0);
+            let forward_when = get_condition("forward");
+            let transform_config = get_transform_config(flush_when, Some(forward_when), 1, 0);
 
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
-            send_event(&tx, "pass").await;
-            assert_event("pass", out.recv().await).await;
+            send_event(&tx, "forward").await;
+            assert_event("forward", out.recv().await).await;
 
             drop(tx);
             topology.stop().await;
@@ -240,26 +240,26 @@ mod test {
     async fn test_flush_and_pass() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
-            let pass_when = get_condition("pass");
-            let transform_config = get_transform_config(flush_when, Some(pass_when), 50, 5);
+            let forward_when = get_condition("forward");
+            let transform_config = get_transform_config(flush_when, Some(forward_when), 50, 5);
 
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             send_events(&tx, generate_events(1..=5)).await;
-            send_event(&tx, "pass").await;
+            send_event(&tx, "forward").await;
             send_events(&tx, generate_events(6..=10)).await;
-            send_event(&tx, "pass").await;
+            send_event(&tx, "forward").await;
             send_event(&tx, "flush").await;
-            send_event(&tx, "pass").await;
+            send_event(&tx, "forward").await;
             send_events(&tx, generate_events(11..=15)).await;
-            send_event(&tx, "pass").await;
+            send_event(&tx, "forward").await;
             send_events(&tx, generate_events(16..=20)).await;
 
             let mut expected: [&str; 20] = [
-                "pass", "pass", "A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09",
-                "A10", "flush", "pass", "A11", "A12", "A13", "A14", "A15", "pass",
+                "forward", "forward", "A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08",
+                "A09", "A10", "flush", "forward", "A11", "A12", "A13", "A14", "A15", "forward",
             ];
 
             assert_events(&mut expected, &mut out).await;
@@ -326,8 +326,8 @@ mod test {
     async fn test_zero_pass() {
         assert_transform_compliance(async {
             let flush_when = get_condition("flush");
-            let pass_when = get_condition("pass");
-            let transform_config = get_transform_config(flush_when, Some(pass_when), 0, 0);
+            let forward_when = get_condition("forward");
+            let transform_config = get_transform_config(flush_when, Some(forward_when), 0, 0);
 
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) =
@@ -337,11 +337,11 @@ mod test {
             let more_events = generate_events(51..=70);
 
             send_events(&tx, events).await;
-            send_event(&tx, "pass").await;
+            send_event(&tx, "forward").await;
             send_event(&tx, "flush").await;
             send_events(&tx, more_events).await;
 
-            let mut expected: [&str; 2] = ["pass", "flush"];
+            let mut expected: [&str; 2] = ["forward", "flush"];
             assert_events(&mut expected, &mut out).await;
 
             drop(tx);
@@ -354,15 +354,15 @@ mod test {
 
     const fn get_transform_config(
         flush_when: AnyCondition,
-        pass_when: Option<AnyCondition>,
-        events_before: usize,
-        events_after: usize,
+        forward_when: Option<AnyCondition>,
+        num_events_before: usize,
+        num_events_after: usize,
     ) -> WindowConfig {
         WindowConfig {
             flush_when,
-            pass_when,
-            events_before,
-            events_after,
+            forward_when,
+            num_events_before,
+            num_events_after,
         }
     }
 

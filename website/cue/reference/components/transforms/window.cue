@@ -50,9 +50,9 @@ components: transforms: window: {
 			]
 
 			configuration: {
-				flush_when:    #".level == "error""#
-				events_before: 2
-				events_after:  2
+				flush_when:        #".level == "error""#
+				num_events_before: 2
+				num_events_after:  2
 			}
 
 			output: [
@@ -80,10 +80,10 @@ components: transforms: window: {
 			]
 
 			configuration: {
-				flush_when:    #".level == "error""#
-				pass_when:     #".level == "info""#
-				events_before: 2
-				events_after:  2
+				flush_when:        #".level == "error""#
+				forward_when:      #".level == "info""#
+				num_events_before: 2
+				num_events_after:  2
 			}
 
 			output: [
@@ -117,17 +117,17 @@ components: transforms: window: {
 			title: "Sliding Window"
 			body: """
 				As the stream of events passes through the transform, it is observed though a "window" that spans between
-				`events_before` and `events_after` relative to an event matched by the `flush_when` condition.  When the
+				`num_events_before` and `num_events_after` relative to an event matched by the `flush_when` condition.  When the
 				condition is matched, the whole window is flushed to the output. This is also known as backtrace logging or
 				ring buffer logging.
 
 				{{< svg "img/sliding-window.svg" >}}
 
-				Past events are stored in a memory buffer with the capacity of `events_before`. When the buffer is full,
+				Past events are stored in a memory buffer with the capacity of `num_events_before`. When the buffer is full,
 				the oldest events are dropped to make space for new ones. The buffer is not persistent, so in case of a hard
 				system crash, all the buffered events will be lost.
 
-				Future events are counted from the event matched by the `flush_when` condition until `events_after` number
+				Future events are counted from the event matched by the `flush_when` condition until `num_events_after` number
 				of events is reached.
 
 				If the `flush_when` condition is matched before the buffer fills up, it will be flushed again. If the flush
