@@ -869,6 +869,8 @@ mod tests {
                     tx.send(msg.unwrap()).await.unwrap();
                 }
             }
+
+            let _ = tx.close().await;
         })
     }
 
