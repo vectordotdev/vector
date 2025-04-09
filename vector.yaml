@@ -1,0 +1,29 @@
+sources:
+  in:
+    type: "stdin"
+
+sinks:
+  out:
+    inputs:
+      - "in"
+    type: "console"
+    encoding:
+      codec: "json"
+
+  doris:
+    inputs:
+      - "in"
+    type: "doris"
+    endpoints: ["http://10.16.10.6:8630"]
+    auth:
+      password: "123456"
+      user: "root"
+      strategy: "basic"
+    database: "test"
+    table: "test_table"
+    label_prefix: "vector"
+    bulk_max_size: 1000
+    log_request: true
+    headers:
+      format: "json"
+      strip_outer_array: "true"
