@@ -284,7 +284,7 @@ impl From<serde_json::Error> for RequestBuildError {
     }
 }
 
-pub struct LogRequestBuilder {
+struct LogRequestBuilder {
     pub default_api_key: Arc<str>,
     pub transformer: Transformer,
     pub compression: Compression,
@@ -517,101 +517,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn normalize_event_doesnt_require() {
-        let mut log = LogEvent::default();
-        log.insert(event_path!("foo"), "bar");
-
-        let mut event = Event::Log(log);
-        normalize_event(&mut event);
-
-        let log = event.as_log();
-
-        assert!(!log.contains(event_path!("message")));
-        assert!(!log.contains(event_path!("timestamp")));
-        assert!(!log.contains(event_path!("hostname")));
-    }
-
-    #[test]
-    fn normalize_event_normalizes_legacy_namespace() {
-        let metadata = EventMetadata::default().with_schema_definition(&Arc::new(
-            Definition::new_with_default_metadata(
-                Kind::object(Collection::empty()),
-                [LogNamespace::Legacy],
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
-                &owned_value_path!("ddtags"),
-                Kind::bytes(),
-                Some(meaning::TAGS),
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
-                &owned_value_path!("hostname"),
-                Kind::bytes(),
-                Some(meaning::HOST),
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
-                &owned_value_path!("timestamp"),
-                Kind::timestamp(),
-                Some(meaning::TIMESTAMP),
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("severity"))),
-                &owned_value_path!("severity"),
-                Kind::bytes(),
-                Some(meaning::SEVERITY),
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
-                &owned_value_path!("service"),
-                Kind::bytes(),
-                Some(meaning::SERVICE),
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("source"))),
-                &owned_value_path!("source"),
-                Kind::bytes(),
-                Some(meaning::SOURCE),
-            ),
-        ));
-
-        let mut log = LogEvent::new_with_metadata(metadata);
-        log.insert(event_path!("message"), "the_message");
-        let namespace = log.namespace();
-
-        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent", Utc::now());
-
-        let tags = vec![
-            Value::Bytes("key1:value1".into()),
-            Value::Bytes("key2:value2".into()),
-        ];
-
-        log.insert(event_path!("ddtags"), tags);
-        log.insert(event_path!("hostname"), "the_host");
-        log.insert(event_path!("service"), "the_service");
-        log.insert(event_path!("source"), "the_source");
-        log.insert(event_path!("severity"), "the_severity");
-
-        assert!(log.namespace() == LogNamespace::Legacy);
-
-        let mut event = Event::Log(log);
-        normalize_event(&mut event);
-
-        assert_normalized_log_has_expected_attrs(event.as_log());
-    }
-
-    #[test]
-    fn normalize_event_normalizes_vector_namespace() {
-        let metadata = EventMetadata::default().with_schema_definition(&Arc::new(
-            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+    fn agent_event_metadata(definition: Definition) -> EventMetadata {
+        EventMetadata::default().with_schema_definition(&Arc::new(
+            definition
                 .with_source_metadata(
                     "datadog_agent",
                     Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
@@ -654,9 +562,60 @@ mod tests {
                     Kind::bytes(),
                     Some(meaning::SOURCE),
                 ),
-        ));
+        ))
+    }
 
-        let mut log = LogEvent::new_with_metadata(metadata);
+    #[test]
+    fn normalize_event_doesnt_require() {
+        let mut log = LogEvent::default();
+        log.insert(event_path!("foo"), "bar");
+
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+
+        let log = event.as_log();
+
+        assert!(!log.contains(event_path!("message")));
+        assert!(!log.contains(event_path!("timestamp")));
+        assert!(!log.contains(event_path!("hostname")));
+    }
+
+    #[test]
+    fn normalize_event_normalizes_legacy_namespace() {
+        let definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        );
+        let mut log = LogEvent::new_with_metadata(agent_event_metadata(definition));
+        log.insert(event_path!("message"), "the_message");
+        let namespace = log.namespace();
+
+        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent", Utc::now());
+
+        let tags = vec![
+            Value::Bytes("key1:value1".into()),
+            Value::Bytes("key2:value2".into()),
+        ];
+
+        log.insert(event_path!("ddtags"), tags);
+        log.insert(event_path!("hostname"), "the_host");
+        log.insert(event_path!("service"), "the_service");
+        log.insert(event_path!("source"), "the_source");
+        log.insert(event_path!("severity"), "the_severity");
+
+        assert!(log.namespace() == LogNamespace::Legacy);
+
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+
+        assert_normalized_log_has_expected_attrs(event.as_log());
+    }
+
+    #[test]
+    fn normalize_event_normalizes_vector_namespace() {
+        let definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector]);
+        let mut log = LogEvent::new_with_metadata(agent_event_metadata(definition));
         log.insert(event_path!("message"), "the_message");
 
         // insert an arbitrary metadata field such that the log becomes Vector namespaced
