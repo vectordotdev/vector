@@ -25,7 +25,7 @@ impl HostMetrics {
         self.system.refresh_processes_specifics(
             ProcessesToUpdate::All,
             true,
-            ProcessRefreshKind::new()
+            ProcessRefreshKind::default()
                 .with_memory()
                 .with_cpu()
                 .with_cmd(UpdateKind::OnlyIfNotSet),

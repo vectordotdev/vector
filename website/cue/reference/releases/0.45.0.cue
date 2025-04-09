@@ -22,9 +22,8 @@ releases: "0.45.0": {
 		"""
 
 	known_issues: [
-		"""
-			To prevent a crash at startup, avoid name clashes between enrichment table names and other components like sources, transforms, and sinks in the configuration. To resolve this, you can rename the enrichment table to a unique name that isn't already used by any other component.
-			""",
+		"To prevent a crash at startup, avoid name clashes between enrichment table names and other components like sources, transforms, and sinks in the configuration. To resolve this, you can rename the enrichment table to a unique name that isn't already used by any other component.",
+		"There are connectivity issues that might prevent `vector top` command connect to a running Vector instance.",
 	]
 
 	changelog: [

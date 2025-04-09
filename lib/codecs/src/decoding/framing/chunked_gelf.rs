@@ -1064,7 +1064,7 @@ mod tests {
     async fn decode_malformed_zlib_message() {
         let mut compressed_payload = BytesMut::new();
         compressed_payload.extend(ZLIB_MAGIC);
-        compressed_payload.extend(&[0x9c, 0x12, 0x34, 0x56]);
+        compressed_payload.extend(&[0x9c, 0x12, 0x00, 0xFF]);
         let mut decoder = ChunkedGelfDecoder::default();
 
         let error = decoder
