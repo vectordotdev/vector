@@ -232,7 +232,7 @@ aws-sdk-elasticsearch = { version = "1.3.0", default-features = false, features 
 aws-sdk-firehose = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-kinesis = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-kms = { version = "1.65.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-s3 = { version = "1.4.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-s3 = { version = "1.15.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-secretsmanager = { version = "1.6.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-sns = { version = "1.65.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-sqs = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
