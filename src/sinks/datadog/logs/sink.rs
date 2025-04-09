@@ -488,11 +488,12 @@ mod tests {
     };
     use vrl::{
         core::Value,
-        event_path, metadata_path, owned_value_path,
+        event_path, metadata_path, owned_value_path, value,
         value::{kind::Collection, Kind},
     };
 
-    use super::normalize_event;
+    use super::{normalize_as_agent_event, normalize_event};
+    use crate::common::datadog::DD_RESERVED_SEMANTIC_ATTRS;
 
     fn assert_normalized_log_has_expected_attrs(log: &LogEvent) {
         assert!(log
@@ -642,5 +643,194 @@ mod tests {
         normalize_event(&mut event);
 
         assert_normalized_log_has_expected_attrs(event.as_log());
+    }
+
+    fn prepare_agent_event() -> LogEvent {
+        let definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        );
+        let mut log = LogEvent::new_with_metadata(agent_event_metadata(definition));
+        let namespace = log.namespace();
+        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent", Utc::now());
+
+        let tags = vec![
+            Value::Bytes("key1:value1".into()),
+            Value::Bytes("key2:value2".into()),
+        ];
+
+        // insert mandatory fields
+        log.insert(event_path!("ddtags"), tags);
+        log.insert(event_path!("hostname"), "the_host");
+        log.insert(event_path!("service"), "the_service");
+        log.insert(event_path!("timestamp"), Utc::now());
+        log.insert(event_path!("source"), "the_source");
+        log.insert(event_path!("severity"), "the_severity");
+
+        let sample_message = value!({
+            "field_a": "field_a_value",
+            "field_b": "field_b_value",
+            "field_c": { "field_c_nested" : "field_c_value" },
+        });
+        log.insert(event_path!("message"), sample_message.to_string());
+        log
+    }
+
+    fn assert_only_reserved_fields_at_root(log: &LogEvent) {
+        let objmap = log.as_map().unwrap();
+        let reserved_fields = DD_RESERVED_SEMANTIC_ATTRS
+            .into_iter()
+            .chain([("message", "message")])
+            .collect::<Vec<(&str, &str)>>();
+        for key in objmap.keys() {
+            assert!(reserved_fields.iter().any(|(_, msg)| *msg == key.as_str()));
+        }
+    }
+
+    #[test]
+    fn normalize_conforming_agent_with_collisions() {
+        let mut log = prepare_agent_event();
+
+        // insert random fields at root which will collide with sample data at 'message'
+        log.insert(event_path!("field_a"), "replaced_field_a_value");
+        log.insert(event_path!("field_c"), "replaced_field_c_value");
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+        normalize_as_agent_event(&mut event);
+
+        let log = event.as_log();
+        assert_normalized_log_has_expected_attrs(log);
+        assert_only_reserved_fields_at_root(log);
+        assert_eq!(
+            log.get(event_path!("message")),
+            Some(&value!({
+                "source_type": "datadog_agent",
+                "field_a": "replaced_field_a_value",
+                "field_b": "field_b_value",
+                "field_c": "replaced_field_c_value",
+                "_collisions": {
+                    "field_a": "field_a_value",
+                    "field_c": { "field_c_nested" : "field_c_value" },
+                }
+            }))
+        );
+    }
+
+    #[test]
+    fn normalize_conforming_agent() {
+        let mut log = prepare_agent_event();
+
+        // insert random fields at root
+        log.insert(event_path!("field_1"), "value_1");
+        log.insert(event_path!("field_2"), "value_2");
+        log.insert(event_path!("field_3", "field_3_nested"), "value_3");
+
+        // normalize and validate...
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+        normalize_as_agent_event(&mut event);
+
+        // that all fields placed at the root no longer exist there
+        let log = event.as_log();
+        assert_normalized_log_has_expected_attrs(log);
+        assert_only_reserved_fields_at_root(log);
+
+        // .. and that they were nested properly underneath message
+        assert_eq!(
+            log.get(event_path!("message")),
+            Some(&value!({
+                "source_type": "datadog_agent",
+                "field_a": "field_a_value",
+                "field_b": "field_b_value",
+                "field_c": { "field_c_nested" : "field_c_value" },
+                "field_1": "value_1",
+                "field_2": "value_2",
+                "field_3": {
+                    "field_3_nested": "value_3"
+                }
+            }))
+        );
+    }
+
+    #[test]
+    fn normalize_conforming_agent_test_msg_field() {
+        // Ensure that if the message field is of any type, normalization will work
+        let mut log = prepare_agent_event();
+        log.insert(event_path!("root_item"), "root_item_value");
+
+        // Macro adds the 'message' field with given value to a copy of the log, then normalizes
+        // and performs standard assertions, returning the resultant log if no assertions have triggered.
+        macro_rules! normalize_case {
+            ($log:expr, $val:expr) => {{
+                $log.insert(event_path!("message"), $val);
+                let mut event = Event::Log($log);
+                normalize_event(&mut event);
+                normalize_as_agent_event(&mut event);
+                let log = event.into_log();
+                assert_normalized_log_has_expected_attrs(&log);
+                assert_only_reserved_fields_at_root(&log);
+                log
+            }};
+        }
+        // Message as String
+        {
+            let log = normalize_case!(log.clone(), "message_value");
+            assert_eq!(
+                log.get(event_path!("message")),
+                Some(&value!({
+                    "source_type": "datadog_agent",
+                    "message": "message_value",
+                    "root_item": "root_item_value",
+                }))
+            );
+        }
+        // Message as stringified JSON
+        {
+            let log = normalize_case!(log.clone(), r#"{ "field_d": "field_d_value" }"#);
+            assert_eq!(
+                log.get(event_path!("message")),
+                Some(&value!({
+                    "source_type": "datadog_agent",
+                    "field_d": "field_d_value",
+                    "root_item": "root_item_value",
+                }))
+            );
+        }
+        // Message as JSON
+        {
+            let log = normalize_case!(log.clone(), value!({ "field_d": "field_d_value" }));
+            assert_eq!(
+                log.get(event_path!("message")),
+                Some(&value!({
+                    "source_type": "datadog_agent",
+                    "field_d": "field_d_value",
+                    "root_item": "root_item_value",
+                }))
+            );
+        }
+        // Message as number
+        {
+            let log = normalize_case!(log.clone(), 5);
+            assert_eq!(
+                log.get(event_path!("message")),
+                Some(&value!({
+                    "source_type": "datadog_agent",
+                    "message": 5,
+                    "root_item": "root_item_value",
+                }))
+            );
+        }
+        // Message as stringified array
+        {
+            let log = normalize_case!(log.clone(), "[1,2,3,4,5]");
+            assert_eq!(
+                log.get(event_path!("message")),
+                Some(&value!({
+                    "source_type": "datadog_agent",
+                    "message": "[1,2,3,4,5]",
+                    "root_item": "root_item_value",
+                }))
+            );
+        }
     }
 }
