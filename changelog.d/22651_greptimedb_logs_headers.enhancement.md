@@ -26,4 +26,4 @@ dbname = "public"
 x-source = "vector"
 ```
 
-author: greptimedb
+authors: greptimedb
