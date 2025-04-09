@@ -8,9 +8,9 @@ use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
-    pin_mut,
+    future, pin_mut,
     stream::BoxStream,
-    StreamExt,
+    StreamExt, TryStreamExt,
 };
 use http::StatusCode;
 use tokio::net::TcpStream;
@@ -52,7 +52,6 @@ use super::{
 };
 
 pub struct WebSocketListenerSink {
-    peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
     tls: MaybeTlsSettings,
     transformer: Transformer,
     encoder: Encoder<()>,
@@ -72,8 +71,8 @@ impl WebSocketListenerSink {
             .auth
             .map(|config| config.build(&cx.enrichment_tables))
             .transpose()?;
+
         Ok(Self {
-            peers: Arc::new(Mutex::new(HashMap::new())),
             tls,
             address: config.address,
             transformer,
@@ -130,6 +129,7 @@ impl WebSocketListenerSink {
         message_buffering: Option<MessageBufferingConfig>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
+        client_checkpoints: Arc<Mutex<HashMap<String, Uuid>>>,
         buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
         mut listener: MaybeTlsListener,
     ) {
@@ -141,6 +141,7 @@ impl WebSocketListenerSink {
                     auth.clone(),
                     message_buffering.clone(),
                     Arc::clone(&peers),
+                    Arc::clone(&client_checkpoints),
                     Arc::clone(&buffer),
                     stream,
                     extra_tags_config.clone(),
@@ -151,10 +152,12 @@ impl WebSocketListenerSink {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn handle_connection(
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
+        client_checkpoints: Arc<Mutex<HashMap<String, Uuid>>>,
         buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
         stream: MaybeTlsIncomingStream<TcpStream>,
         extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
@@ -181,9 +184,20 @@ impl WebSocketListenerSink {
             })
             .collect();
         let mut buffer_replay = BufferReplayRequest::NO_REPLAY;
+        let mut client_checkpoint_key = None;
 
         let header_callback = |req: &Request, response: Response| {
-            buffer_replay = message_buffering.extract_message_replay_request(req);
+            client_checkpoint_key = message_buffering.client_key(req, &addr);
+            buffer_replay = message_buffering.extract_message_replay_request(
+                req,
+                client_checkpoint_key.clone().and_then(|key| {
+                    client_checkpoints
+                        .lock()
+                        .expect("mutex poisoned")
+                        .get(&key)
+                        .cloned()
+                }),
+            );
             let Some(auth) = auth else {
                 extra_tags.append(&mut Self::extract_extra_tags(
                     &extra_tags_config,
@@ -227,12 +241,17 @@ impl WebSocketListenerSink {
         let (tx, rx) = unbounded();
 
         {
-            let mut peers = peers.lock().unwrap();
-            buffer_replay.replay_messages(&buffer.lock().unwrap(), |(_, message)| {
-                if let Err(error) = tx.unbounded_send(message.clone()) {
-                    emit!(WsListenerSendError { error });
-                }
-            });
+            let mut peers = peers.lock().expect("mutex poisoned");
+            buffer_replay.replay_messages(
+                &buffer.lock().expect("mutex poisoned"),
+                |(_, message)| {
+                    if let Err(error) = tx.unbounded_send(message.clone()) {
+                        emit!(WsListenerSendError {
+                            error: Box::new(error)
+                        });
+                    }
+                },
+            );
 
             debug!("WebSocket connection established: {}", addr);
 
@@ -243,8 +262,27 @@ impl WebSocketListenerSink {
             });
         }
 
-        let (outgoing, _incoming) = ws_stream.split();
+        let (outgoing, incoming) = ws_stream.split();
 
+        let incoming_data_handler = incoming.try_for_each(|msg| {
+            let ip = addr.ip();
+            debug!(
+                "Received a message from {ip}: {}",
+                msg.to_text().unwrap_or(&format!("Couldn't convert: {msg}"))
+            );
+            if let (Some(client_key), Some(checkpoint)) = (
+                &client_checkpoint_key,
+                message_buffering.handle_ack_request(msg),
+            ) {
+                debug!("Inserting checkpoint for {client_key}({ip}): {checkpoint}");
+                client_checkpoints
+                    .lock()
+                    .expect("mutex poisoned")
+                    .insert(client_key.clone(), checkpoint);
+            }
+
+            future::ok(())
+        });
         let forward_data_to_client = rx
             .map(|message| {
                 emit!(WsListenerMessageSent {
@@ -255,11 +293,19 @@ impl WebSocketListenerSink {
             })
             .forward(outgoing);
 
-        pin_mut!(forward_data_to_client);
-        let _ = forward_data_to_client.await;
+        pin_mut!(forward_data_to_client, incoming_data_handler);
+        if let Err(error) = future::select(forward_data_to_client, incoming_data_handler)
+            .await
+            .factor_first()
+            .0
+        {
+            emit!(WsListenerSendError {
+                error: Box::new(error)
+            })
+        }
 
         {
-            let mut peers = peers.lock().unwrap();
+            let mut peers = peers.lock().expect("mutex poisoned");
             debug!("{} disconnected.", &addr);
             peers.remove(&addr);
             emit!(WsListenerConnectionShutdown {
@@ -284,15 +330,19 @@ impl StreamSink<Event> for WebSocketListenerSink {
 
         let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
 
+        let peers = Arc::new(Mutex::new(HashMap::default()));
         let message_buffer = Arc::new(Mutex::new(VecDeque::with_capacity(
             self.message_buffering.buffer_capacity(),
         )));
+        let client_checkpoints = Arc::new(Mutex::new(HashMap::default()));
+
         tokio::spawn(
             Self::handle_connections(
                 self.auth,
                 self.message_buffering.clone(),
-                Arc::clone(&self.peers),
+                Arc::clone(&peers),
                 self.extra_tags_config,
+                Arc::clone(&client_checkpoints),
                 Arc::clone(&message_buffer),
                 listener,
             )
@@ -324,18 +374,20 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     let message_len = message.len();
 
                     if self.message_buffering.should_buffer() {
-                        let mut buffer = message_buffer.lock().unwrap();
+                        let mut buffer = message_buffer.lock().expect("mutex poisoned");
                         if buffer.len() + 1 >= buffer.capacity() {
                             buffer.pop_front();
                         }
                         buffer.push_back((message_id, message.clone()));
                     }
 
-                    let peers = self.peers.lock().unwrap();
+                    let peers = peers.lock().expect("mutex poisoned");
                     let broadcast_recipients = peers.iter().map(|(_, ws_sink)| ws_sink);
                     for recp in broadcast_recipients {
                         if let Err(error) = recp.unbounded_send(message.clone()) {
-                            emit!(WsListenerSendError { error });
+                            emit!(WsListenerSendError {
+                                error: Box::new(error)
+                            });
                         } else {
                             events_sent.emit(CountByteSize(1, event_byte_size));
                             bytes_sent.emit(ByteSize(message_len));
@@ -361,13 +413,24 @@ mod tests {
     use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
     use tokio::{task::JoinHandle, time};
-    use vector_lib::{metrics::Controller, sink::VectorSink};
+    use vector_lib::{
+        codecs::{
+            decoding::{DeserializerConfig, JsonDeserializerOptions},
+            JsonDeserializerConfig,
+        },
+        lookup::lookup_v2::ConfigValuePath,
+        metrics::Controller,
+        sink::VectorSink,
+    };
 
     use super::*;
 
     use crate::{
         event::{Event, LogEvent},
-        sinks::websocket_server::config::InternalMetricsConfig,
+        sinks::websocket_server::{
+            buffering::{BufferingAckConfig, ClientKeyConfig},
+            config::InternalMetricsConfig,
+        },
         test_util::{
             components::{run_and_assert_sink_compliance, SINK_TAGS},
             next_addr,
@@ -401,7 +464,7 @@ mod tests {
         .await;
 
         let client_handle =
-            attach_websocket_client(localhost_with_port(port), vec![event.clone()]).await;
+            attach_websocket_client(localhost_with_port(port), vec![event.clone()], false).await;
         sender.send(event).await.expect("Failed to send.");
 
         client_handle.await.unwrap();
@@ -432,7 +495,7 @@ mod tests {
 
         // Now connect the client
         let client_handle =
-            attach_websocket_client(localhost_with_port(port), vec![event2.clone()]).await;
+            attach_websocket_client(localhost_with_port(port), vec![event2.clone()], false).await;
 
         // Sending event 2, this one should be received by the client
         sender.send(event2).await.expect("Failed to send.");
@@ -460,9 +523,9 @@ mod tests {
         .await;
 
         let client_handle_1 =
-            attach_websocket_client(localhost_with_port(port), vec![event.clone()]).await;
+            attach_websocket_client(localhost_with_port(port), vec![event.clone()], false).await;
         let client_handle_2 =
-            attach_websocket_client(localhost_with_port(port), vec![event.clone()]).await;
+            attach_websocket_client(localhost_with_port(port), vec![event.clone()], false).await;
         sender.send(event).await.expect("Failed to send.");
 
         client_handle_1.await.unwrap();
@@ -497,7 +560,7 @@ mod tests {
         .await;
 
         let client_handle =
-            attach_websocket_client(localhost_with_port(port), vec![event.clone()]).await;
+            attach_websocket_client(localhost_with_port(port), vec![event.clone()], false).await;
         sender.send(event).await.expect("Failed to send.");
 
         client_handle.await.unwrap();
@@ -547,7 +610,8 @@ mod tests {
             "{}/?last_received=x&some_other_param=ignored",
             localhost_with_port(port)
         );
-        let client_handle = attach_websocket_client(full_url.clone(), vec![event.clone()]).await;
+        let client_handle =
+            attach_websocket_client(full_url.clone(), vec![event.clone()], false).await;
         sender.send(event).await.expect("Failed to send.");
 
         client_handle.await.unwrap();
@@ -604,6 +668,7 @@ mod tests {
                 message_buffering: Some(MessageBufferingConfig {
                     max_events: NonZeroUsize::new(1).unwrap(),
                     message_id_path: None,
+                    client_ack_config: None,
                 }),
                 ..Default::default()
             },
@@ -616,7 +681,7 @@ mod tests {
 
         // Now connect the clients
         let client_handle =
-            attach_websocket_client(localhost_with_port(port), vec![event2.clone()]).await;
+            attach_websocket_client(localhost_with_port(port), vec![event2.clone()], false).await;
         let client_with_buffer_handle = attach_websocket_client_with_query(
             port,
             "last_received=0",
@@ -648,6 +713,7 @@ mod tests {
                 message_buffering: Some(MessageBufferingConfig {
                     max_events: NonZeroUsize::new(1).unwrap(),
                     message_id_path: None,
+                    client_ack_config: None,
                 }),
                 ..Default::default()
             },
@@ -658,6 +724,7 @@ mod tests {
         let client_handle = attach_websocket_client(
             localhost_with_port(port),
             vec![event1.clone(), event2.clone()],
+            false,
         )
         .await;
 
@@ -670,6 +737,55 @@ mod tests {
 
         client_handle.await.unwrap();
         client_with_buffer_handle.await.unwrap();
+        drop(sender);
+        websocket_sink.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_client_late_connect_with_acks() {
+        let event1 = Event::Log(LogEvent::from("foo1"));
+        let event2 = Event::Log(LogEvent::from("foo2"));
+        let event3 = Event::Log(LogEvent::from("foo3"));
+
+        let (mut sender, input_events) = build_test_event_channel();
+        let address = next_addr();
+        let port = address.port();
+
+        let websocket_sink = start_websocket_server_sink(
+            WebSocketListenerSinkConfig {
+                address,
+                message_buffering: Some(MessageBufferingConfig {
+                    max_events: NonZeroUsize::new(1).unwrap(),
+                    message_id_path: Some(ConfigValuePath::from("message_id")),
+                    client_ack_config: Some(BufferingAckConfig {
+                        ack_decoding: DeserializerConfig::Json(JsonDeserializerConfig::new(
+                            JsonDeserializerOptions::default(),
+                        )),
+                        message_id_path: ConfigValuePath::from("message_id"),
+                        client_key: ClientKeyConfig::IpAddress { with_port: false },
+                    }),
+                }),
+                ..Default::default()
+            },
+            input_events,
+        )
+        .await;
+
+        // First connection, to ACK and save last event
+        let first_connection = attach_websocket_client_with_ack(port, vec![event1.clone()]).await;
+        sender.send(event1.clone()).await.expect("Failed to send.");
+        first_connection.await.unwrap();
+
+        // Second event sent while not connected
+        sender.send(event2.clone()).await.expect("Failed to send.");
+
+        // Second connection, should receive missed event
+        let second_connection =
+            attach_websocket_client_with_ack(port, vec![event2.clone(), event3.clone()]).await;
+
+        sender.send(event3.clone()).await.expect("Failed to send.");
+
+        second_connection.await.unwrap();
         drop(sender);
         websocket_sink.await.unwrap();
     }
@@ -706,28 +822,55 @@ mod tests {
         attach_websocket_client(
             format!("{}/?{query}", localhost_with_port(port)),
             expected_events,
+            false,
         )
         .await
+    }
+
+    async fn attach_websocket_client_with_ack(
+        port: u16,
+        expected_events: Vec<Event>,
+    ) -> JoinHandle<()> {
+        attach_websocket_client(localhost_with_port(port), expected_events, true).await
     }
 
     async fn attach_websocket_client<R: IntoClientRequest + Unpin>(
         client_request: R,
         expected_events: Vec<Event>,
+        ack: bool,
     ) -> JoinHandle<()> {
         let (ws_stream, _) = tokio_tungstenite::connect_async(client_request)
             .await
             .expect("Client failed to connect.");
-        let (_, rx) = ws_stream.split();
+        let (mut tx, rx) = ws_stream.split();
         tokio::spawn(async move {
             let events = expected_events.clone();
-            rx.take(events.len())
+
+            let pairs: Vec<(Result<Message, _>, Event)> = rx
+                .take(events.len())
                 .zip(stream::iter(events))
-                .for_each(|(msg, expected)| async {
-                    let msg_text = msg.unwrap().into_text().unwrap();
-                    let expected = serde_json::to_string(expected.into_log().value()).unwrap();
-                    assert_eq!(expected, msg_text);
-                })
+                .collect()
                 .await;
+
+            pairs.iter().for_each(|(msg, expected)| {
+                let mut base_msg = serde_json::from_str::<Value>(
+                    &msg.as_ref().unwrap().clone().into_text().unwrap(),
+                )
+                .unwrap();
+                // Removing message_id from message, since it is not part of the event
+                base_msg.remove("message_id", true);
+                let msg_text = serde_json::to_string(&base_msg).unwrap();
+                let expected = serde_json::to_string(expected.clone().into_log().value()).unwrap();
+                assert_eq!(expected, msg_text);
+            });
+
+            if ack {
+                for (msg, _) in pairs {
+                    tx.send(msg.unwrap()).await.unwrap();
+                }
+            }
+
+            let _ = tx.close().await;
         })
     }
 
