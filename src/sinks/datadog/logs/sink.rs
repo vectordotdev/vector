@@ -41,6 +41,7 @@ pub struct LogSinkBuilder<S> {
     compression: Option<Compression>,
     default_api_key: Arc<str>,
     protocol: String,
+    conforms_as_agent: bool,
 }
 
 impl<S> LogSinkBuilder<S> {
@@ -50,6 +51,7 @@ impl<S> LogSinkBuilder<S> {
         default_api_key: Arc<str>,
         batch_settings: BatcherSettings,
         protocol: String,
+        conforms_as_agent: bool,
     ) -> Self {
         Self {
             transformer,
@@ -58,6 +60,7 @@ impl<S> LogSinkBuilder<S> {
             batch_settings,
             compression: None,
             protocol,
+            conforms_as_agent,
         }
     }
 
@@ -74,6 +77,7 @@ impl<S> LogSinkBuilder<S> {
             batch_settings: self.batch_settings,
             compression: self.compression.unwrap_or_default(),
             protocol: self.protocol,
+            conforms_as_agent: self.conforms_as_agent,
         }
     }
 }
@@ -96,6 +100,11 @@ pub struct LogSink<S> {
     batch_settings: BatcherSettings,
     /// The protocol name
     protocol: String,
+    /// When enabled this sink will normalize events to conform to the datadog agent standard. This
+    /// also sends requests to the logs backend with the DD-PROTOCOL: agent-json header. This bool
+    /// will be overidden as `true` if this header has already been set in the request.headers
+    /// configuration setting.
+    conforms_as_agent: bool,
 }
 
 // The Datadog logs intake does not require the fields that are set in this
@@ -279,6 +288,7 @@ pub struct LogRequestBuilder {
     pub default_api_key: Arc<str>,
     pub transformer: Transformer,
     pub compression: Compression,
+    pub conforms_as_agent: bool,
 }
 
 impl LogRequestBuilder {
@@ -292,6 +302,9 @@ impl LogRequestBuilder {
             .into_iter()
             .map(|mut event| {
                 normalize_event(&mut event);
+                if self.conforms_as_agent {
+                    normalize_as_agent_event(&mut event);
+                }
                 self.transformer.transform(&mut event);
                 let estimated_json_size = event.estimated_json_encoded_size_of();
                 (event, estimated_json_size)
@@ -415,6 +428,7 @@ where
             default_api_key,
             transformer: self.transformer,
             compression: self.compression,
+            conforms_as_agent: self.conforms_as_agent,
         });
 
         let input = input.batched_partitioned(partitioner, || {
