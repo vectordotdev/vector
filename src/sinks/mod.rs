@@ -38,6 +38,8 @@ pub mod clickhouse;
 pub mod console;
 #[cfg(feature = "sinks-databend")]
 pub mod databend;
+#[cfg(feature = "sinks-doris")]
+pub mod doris;
 #[cfg(any(
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
