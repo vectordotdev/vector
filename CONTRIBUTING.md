@@ -150,7 +150,8 @@ make check-scripts
 # The following check is very slow.
 # make check-component-features
 ```
-Please note that make check-all covers all checks, but it is slow and may include checks not
+
+Please note that `make check-all` covers all checks, but it is slow and may runs checks not
 relevant to your PR. This command is defined
 [here](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454).
 
