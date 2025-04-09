@@ -115,6 +115,11 @@ pub struct ClickhouseConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
+    /// ClickHouse [query settings][settings].  These settings will be added to ClickHouse queries
+    /// as [query-level session settings][query-level], which override user settings and session settings.
+    ///
+    /// [settings]: https://clickhouse.com/docs/operations/settings/settings
+    /// [query-level]: https://clickhouse.com/docs/operations/settings/query-level
     #[configurable(derived)]
     #[serde(default)]
     pub query_settings: ClickHouseQuerySettingsConfig,
