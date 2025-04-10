@@ -899,24 +899,28 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-cloudwatch"
-version = "1.3.0"
+version = "1.70.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "043546afc3d129d3d487c2fd121aabe4208300293f541a5c8adffdc919a603b0"
+checksum = "84865623b1276624879f5283029fa13d7e6bfd5d58eb7df4dabd485a2f291b9b"
 dependencies = [
  "aws-credential-types",
- "aws-http",
  "aws-runtime",
  "aws-smithy-async",
- "aws-smithy-http 0.60.12",
- "aws-smithy-json 0.60.7",
+ "aws-smithy-compression",
+ "aws-smithy-http 0.62.0",
+ "aws-smithy-json 0.61.3",
  "aws-smithy-query",
  "aws-smithy-runtime",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "aws-smithy-xml",
  "aws-types",
+ "fastrand 2.3.0",
+ "flate2",
  "http 0.2.9",
- "regex",
+ "http-body 0.4.5",
+ "once_cell",
+ "regex-lite",
  "tracing 0.1.41",
 ]
 
@@ -1264,6 +1268,23 @@ dependencies = [
  "pin-project-lite",
  "sha1",
  "sha2",
+ "tracing 0.1.41",
+]
+
+[[package]]
+name = "aws-smithy-compression"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c41172a5393f54e26d6b1bfbfce5d0abaa5c46870a1641c1c1899b527f8b6388"
+dependencies = [
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "bytes 1.10.1",
+ "flate2",
+ "futures-util",
+ "http 0.2.9",
+ "http-body 0.4.5",
+ "pin-project-lite",
  "tracing 0.1.41",
 ]
 
@@ -2401,7 +2422,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

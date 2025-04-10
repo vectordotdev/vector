@@ -226,7 +226,7 @@ metrics-tracing-context.workspace = true
 # AWS - Official SDK
 aws-config = { version = "~1.0.1", default-features = false, features = ["behavior-version-latest", "credentials-process", "sso", "rt-tokio"], optional = true }
 aws-credential-types = { version = "1.2.1", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sdk-cloudwatch = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-cloudwatch = { version = "1.70.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-cloudwatchlogs = { version = "1.76.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-elasticsearch = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-firehose = { version = "1.3.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
@@ -235,7 +235,7 @@ aws-sdk-kms = { version = "1.65.0", default-features = false, features = ["behav
 aws-sdk-s3 = { version = "1.15.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-secretsmanager = { version = "1.6.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-sns = { version = "1.65.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-sqs = { version = "1.15.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-sqs = { version = "1.64.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-types = { version = "1.3.5", default-features = false, optional = true }
 
 # The sts crate is needed despite not being referred to anywhere in the code because we need to set the
