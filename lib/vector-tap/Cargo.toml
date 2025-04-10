@@ -10,12 +10,12 @@ license = "MPL-2.0"
 api = ["dep:async-graphql"]
 
 [dependencies]
-async-graphql = { version = "7.0.7", default-features = false, features = ["playground"], optional = true}
+async-graphql = { version = "7.0.16", default-features = false, features = ["playground"], optional = true}
 colored = { version = "3.0.0", default-features = false }
 futures.workspace = true
 glob.workspace = true
 serde_yaml = { version = "0.9.34", default-features = false }
-tokio = { version = "1.43.0", default-features = false, features = ["time"] }
+tokio = { version = "1.44.1", default-features = false, features = ["time"] }
 tokio-stream = { version = "0.1.17", default-features = false, features = ["sync"] }
 tokio-tungstenite = { version = "0.20.1", default-features = false }
 tracing = { version = "0.1.34", default-features = false }
@@ -31,4 +31,4 @@ futures-util = "0.3.30"
 chrono = { workspace = true }
 portpicker = { path = "../portpicker" }
 serde_json = { workspace = true }
-tokio = { version = "1.43.0", default-features = false, features = ["test-util"] }
+tokio = { version = "1.44.1", default-features = false, features = ["test-util"] }

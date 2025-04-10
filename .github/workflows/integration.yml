@@ -104,17 +104,19 @@ jobs:
           fi
 
   integration-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs:
       - changes
       - setup
     if: ${{ needs.setup.outputs.can_access_secrets == 'true' }}
     strategy:
       matrix:
+        # TODO: Add "aws" back once https://github.com/vectordotdev/vector/issues/22780 is fixed.
+        # TODO: Add "azure" back one https://github.com/vectordotdev/vector/issues/22777 is fixed.
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/22379 is fixed.
         # If you modify this list, please also update the `int_tests` job in changes.yml.
         service: [
-          "amqp", "appsignal", "aws", "axiom", "azure", "clickhouse", "databend", "datadog-agent",
+          "amqp", "appsignal", "axiom", "clickhouse", "databend", "datadog-agent",
           "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "elasticsearch",
           "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
           "loki", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",

@@ -105,7 +105,7 @@ jobs:
       - name: Set SMP version
         id: experimental-meta
         run: |
-          export SMP_CRATE_VERSION="0.20.2"
+          export SMP_CRATE_VERSION="0.21.0"
           echo "smp crate version: ${SMP_CRATE_VERSION}"
           echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
 
@@ -184,7 +184,7 @@ jobs:
 
   build-baseline:
     name: Build baseline Vector container
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - should-run-gate
@@ -201,10 +201,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.9.0
+        uses: docker/setup-buildx-action@v3.10.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.13.0
+        uses: docker/build-push-action@v6.15.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -223,7 +223,7 @@ jobs:
 
   build-comparison:
     name: Build comparison Vector container
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - should-run-gate
@@ -240,10 +240,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.9.0
+        uses: docker/setup-buildx-action@v3.10.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.13.0
+        uses: docker/build-push-action@v6.15.0
         with:
           context: comparison-vector/
           cache-from: type=gha

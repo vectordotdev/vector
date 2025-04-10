@@ -23,7 +23,7 @@ default-features = false
 features = []
 
 [dependencies.bytes]
-version = "1.10.0"
+version = "1.10.1"
 default-features = false
 features = []
 
@@ -38,7 +38,7 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "2.7.1"
+version = "2.9.0"
 default-features = false
 features = ["serde"]
 
@@ -68,7 +68,7 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.43.0"
+version = "1.44.1"
 default-features = false
 features = ["full"]
 
@@ -76,7 +76,7 @@ features = ["full"]
 criterion = "0.5"
 quickcheck = "1"
 tempfile.workspace = true
-similar-asserts = "1.6.1"
+similar-asserts = "1.7.0"
 
 [[bench]]
 name = "buffer"

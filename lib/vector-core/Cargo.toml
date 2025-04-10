@@ -11,12 +11,12 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(ddsketch_extended)'] }
 [dependencies]
 async-trait = { version = "0.1", default-features = false }
 bitmask-enum = { version = "2.2.5", default-features = false }
-bytes = { version = "1.10.0", default-features = false, features = ["serde"] }
+bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 chrono.workspace = true
 chrono-tz.workspace = true
 crossbeam-utils = { version = "0.8.21", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
-dyn-clone = { version = "1.0.18", default-features = false }
+dyn-clone = { version = "1.0.19", default-features = false }
 enumflags2 = { version = "0.7.11", default-features = false }
 float_eq = { version = "1.0", default-features = false }
 futures.workspace = true
@@ -32,9 +32,9 @@ metrics.workspace = true
 metrics-tracing-context.workspace = true
 metrics-util.workspace = true
 mlua = { version = "0.10.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
-no-proxy = { version  = "0.3.5", default-features = false, features = ["serialize"] }
+no-proxy = { version  = "0.3.6", default-features = false, features = ["serialize"] }
 ordered-float = { version = "4.6.0", default-features = false }
-openssl = { version = "0.10.71", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.72", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.3", default-features = false }
 pin-project.workspace = true
 proptest = { version = "1.6", optional = true }
@@ -48,8 +48,8 @@ serde_json.workspace = true
 serde_with = { version = "3.12.0", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu.workspace = true
-socket2 = { version = "0.5.8", default-features = false }
-tokio = { version = "1.43.0", default-features = false, features = ["net"] }
+socket2 = { version = "0.5.9", default-features = false }
+tokio = { version = "1.44.1", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
@@ -83,7 +83,7 @@ env-test-util = "1.0.1"
 quickcheck = "1"
 quickcheck_macros = "1"
 proptest = "1.6"
-similar-asserts = "1.6.1"
+similar-asserts = "1.7.0"
 tokio-test = "0.4.4"
 toml.workspace = true
 ndarray = "0.16.1"
