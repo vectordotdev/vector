@@ -109,6 +109,7 @@ mod source {
     use bytes::BytesMut;
     use metrics::counter;
     use vector_lib::file_source::FileSourceInternalEvents;
+    use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL};
 
     use super::{FileOpen, InternalEvent};
     use vector_lib::emit;
@@ -498,26 +499,34 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub struct FileLineTooBig<'a> {
+    pub struct FileLineTooBigError<'a> {
         pub bytes: &'a BytesMut,
         pub configured_limit: usize,
         pub encountered_size_so_far: usize,
     }
 
-    impl InternalEvent for FileLineTooBig<'_> {
+    impl InternalEvent for FileLineTooBigError<'_> {
         fn emit(self) {
-            warn!(
+            error!(
                 message = "Found line that exceeds max_line_bytes; discarding.",
                 bytes = ?self.bytes,
                 configured_limit = self.configured_limit,
                 encountered_size_so_far = self.encountered_size_so_far,
                 internal_log_rate_limit = true,
+                error_type = error_type::CONDITION_FAILED,
+                stage = error_stage::RECEIVING,
             );
             counter!(
-                "component_discarded_events_total",
-                "intentional" => "true",
+                "component_errors_total",
+                "error_code" => "reading_line_from_file",
+                "error_type" => error_type::CONDITION_FAILED,
+                "stage" => error_stage::RECEIVING,
             )
             .increment(1);
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "Found line that exceeds max_line_bytes; discarding.",
+            });
         }
     }
 
@@ -610,7 +619,7 @@ mod source {
             configured_limit: usize,
             encountered_size_so_far: usize,
         ) {
-            emit!(FileLineTooBig {
+            emit!(FileLineTooBigError {
                 bytes,
                 configured_limit,
                 encountered_size_so_far
