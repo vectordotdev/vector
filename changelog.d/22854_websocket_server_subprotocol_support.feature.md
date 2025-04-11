@@ -1,3 +1,3 @@
-Added support for `Sec-WebSocket-Protocol` header in `websocket_server` sink, for better support for clients that require this header.
+Added support for the `Sec-WebSocket-Protocol` header in the `websocket_server` sink to better accommodate clients that require it.
 
 authors: esensar Quad9DNS
