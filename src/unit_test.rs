@@ -46,7 +46,7 @@ pub struct Opts {
 
     /// Output path for JUnit reports
     #[arg(id = "junit-report", long, value_delimiter(','))]
-    path_junit_report: Vec<PathBuf>,
+    junit_report_paths: Option<Vec<PathBuf>>,
 }
 
 impl Opts {
@@ -76,7 +76,7 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
         None => return exitcode::CONFIG,
     };
 
-    let create_junit_report = !opts.path_junit_report.is_empty();
+    let create_junit_report = opts.path_junit_report.is_some();
     let mut report = Report::new("Vector Unit Tests");
     let mut test_suite = TestSuite::new("Test Suite");
 
@@ -156,7 +156,7 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
             }
         };
 
-        for path in &opts.path_junit_report {
+        for path in &opts.path_junit_report.unwrap() { // safe to unwrap because `create_junit_report` is true
             match File::create(path) {
                 Ok(mut file) => {
                     if let Err(error) = file.write_all(&report_bytes) {
